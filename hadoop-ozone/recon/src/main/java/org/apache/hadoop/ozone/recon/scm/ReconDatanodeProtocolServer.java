@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -48,11 +47,11 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
   }
 
   @Override
-  public ProtocolMessageMetrics<ProtocolMessageEnum>
+  public ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type>
       getProtocolMessageMetrics() {
     return ProtocolMessageMetrics
         .create("ReconDatanodeProtocol", "Recon Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+            StorageContainerDatanodeProtocolProtos.Type.class);
   }
 
   @Override

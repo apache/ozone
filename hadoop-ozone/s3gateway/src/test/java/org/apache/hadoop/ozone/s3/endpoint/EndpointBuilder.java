@@ -105,6 +105,10 @@ public class EndpointBuilder<T extends EndpointBase> {
     final OzoneConfiguration config = getConfig();
     endpoint.setOzoneConfiguration(config != null ? config : new OzoneConfiguration());
 
+    if (httpHeaders == null) {
+      httpHeaders = mock(HttpHeaders.class);
+    }
+
     endpoint.setContext(requestContext);
     endpoint.setHeaders(httpHeaders);
     endpoint.setRequestIdentifier(identifier);
@@ -148,6 +152,10 @@ public class EndpointBuilder<T extends EndpointBase> {
 
   public static EndpointBuilder<BucketEndpoint> newBucketEndpointBuilder() {
     return new EndpointBuilder<>(BucketEndpoint::new);
+  }
+
+  public static EndpointBuilder<BucketAclHandler> newBucketAclHandlerBuilder() {
+    return new EndpointBuilder<>(BucketAclHandler::new);
   }
 
   public static EndpointBuilder<ObjectEndpoint> newObjectEndpointBuilder() {

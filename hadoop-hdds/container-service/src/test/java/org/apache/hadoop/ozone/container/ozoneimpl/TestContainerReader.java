@@ -821,13 +821,13 @@ public class TestContainerReader {
     keyValueHandler.updateContainerChecksum(container, treeWriter);
     // Create an empty checksum file that exists but has no valid merkle tree
     assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
-    
+
     // Verify no checksum in RocksDB initially
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
       assertNull(dbDataChecksum);
     }
-    
+
     ContainerCache.getInstance(conf).shutdownCache();
 
     // Test container loading - should handle when checksum file is present without the container merkle tree and

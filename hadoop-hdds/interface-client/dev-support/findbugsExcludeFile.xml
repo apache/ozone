@@ -24,7 +24,4 @@
   <Match>
     <Package name="org.apache.hadoop.hdds.protocol.scm.proto"/>
   </Match>
-  <Match>
-    <Package name="org.apache.hadoop.hdds.protocol.proto3"/>
-  </Match>
 </FindBugsFilter>

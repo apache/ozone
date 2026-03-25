@@ -154,7 +154,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     omTableInsightTask = new OmTableInsightTask(
         reconGlobalStatsManager, reconOMMetadataManager);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager, 10);
+        reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     dslContext = getDslContext();
 
     omTableInsightTask.setTables(omTableInsightTask.getTaskTables());

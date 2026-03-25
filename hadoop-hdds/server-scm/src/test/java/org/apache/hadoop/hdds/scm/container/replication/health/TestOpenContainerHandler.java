@@ -33,10 +33,10 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
@@ -124,7 +124,7 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
-    assertEquals(1, request.getReport().getStat(HealthState.OPEN_UNHEALTHY));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.OPEN_UNHEALTHY));
   }
 
   @Test
@@ -152,7 +152,7 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
-    assertEquals(1, request.getReport().getStat(HealthState.OPEN_WITHOUT_PIPELINE));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.OPEN_WITHOUT_PIPELINE));
   }
 
   @Test
@@ -212,7 +212,7 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(request));
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1)).sendCloseContainerEvent(any());
-    assertEquals(1, request.getReport().getStat(HealthState.OPEN_UNHEALTHY));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.OPEN_UNHEALTHY));
   }
 
   @Test
@@ -239,6 +239,6 @@ public class TestOpenContainerHandler {
     assertTrue(openContainerHandler.handle(request));
     assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1)).sendCloseContainerEvent(any());
-    assertEquals(1, request.getReport().getStat(HealthState.OPEN_WITHOUT_PIPELINE));
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.OPEN_WITHOUT_PIPELINE));
   }
 }

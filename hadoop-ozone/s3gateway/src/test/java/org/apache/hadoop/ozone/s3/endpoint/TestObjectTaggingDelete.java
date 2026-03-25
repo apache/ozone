@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.deleteTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
@@ -28,16 +28,13 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -65,29 +62,25 @@ public class TestObjectTaggingDelete {
   @BeforeEach
   public void init() throws OS3Exception, IOException {
     //GIVEN
-    OzoneConfiguration config = new OzoneConfiguration();
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
-        .setConfig(config)
         .setHeaders(headers)
         .build();
 
-    ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
-    rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
-        1, null, null, null, body);
+        .thenReturn("UNSIGNED-PAYLOAD");
+    put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT);
   }
 
   @Test
   public void testDeleteTagging() throws IOException, OS3Exception {
-    Response response = rest.delete(BUCKET_NAME, KEY_WITH_TAG, null,  "");
+    Response response = deleteTagging(rest, BUCKET_NAME, KEY_WITH_TAG);
     assertEquals(HTTP_NO_CONTENT, response.getStatus());
 
     assertTrue(client.getObjectStore().getS3Bucket(BUCKET_NAME)
@@ -95,25 +88,13 @@ public class TestObjectTaggingDelete {
   }
 
   @Test
-  public void testDeleteTaggingNoKeyFound() throws Exception {
-    try {
-      rest.delete(BUCKET_NAME, "nonexistent", null,  "");
-      fail("Expected an OS3Exception to be thrown");
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
-    }
+  public void testDeleteTaggingNoKeyFound() {
+    assertErrorResponse(NO_SUCH_KEY, () -> deleteTagging(rest, BUCKET_NAME, "nonexistent"));
   }
 
   @Test
-  public void testDeleteTaggingNoBucketFound() throws Exception {
-    try {
-      rest.delete("nonexistent", "nonexistent", null,  "");
-      fail("Expected an OS3Exception to be thrown");
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      assertEquals(NO_SUCH_BUCKET.getCode(), ex.getCode());
-    }
+  public void testDeleteTaggingNoBucketFound() {
+    assertErrorResponse(NO_SUCH_BUCKET, () -> deleteTagging(rest, "nonexistent", "any"));
   }
 
   @Test
@@ -134,12 +115,6 @@ public class TestObjectTaggingDelete {
     doThrow(new OMException("DeleteObjectTagging is not currently supported for FSO directory",
         ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).deleteObjectTagging("dir/");
 
-    try {
-      endpoint.delete("fsoBucket", "dir/", null, "");
-      fail("Expected an OS3Exception to be thrown");
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());
-      assertEquals(NOT_IMPLEMENTED.getCode(), ex.getCode());
-    }
+    assertErrorResponse(NOT_IMPLEMENTED, () -> deleteTagging(endpoint, "fsoBucket", "dir/"));
   }
 }

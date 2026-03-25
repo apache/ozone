@@ -135,10 +135,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         ProtobufRpcEngine.class);
     metrics = new ProtocolMessageMetrics("ScmSecurityProtocol",
         "SCM Security protocol metrics",
-        SCMSecurityProtocolProtos.Type.values());
+        SCMSecurityProtocolProtos.Type.class);
     secretKeyMetrics = new ProtocolMessageMetrics("ScmSecretKeyProtocol",
         "SCM SecretKey protocol metrics",
-        SCMSecretKeyProtocolProtos.Type.values());
+        SCMSecretKeyProtocolProtos.Type.class);
     BlockingService secureProtoPbService =
         SCMSecurityProtocolProtos.SCMSecurityProtocolService
             .newReflectiveBlockingService(

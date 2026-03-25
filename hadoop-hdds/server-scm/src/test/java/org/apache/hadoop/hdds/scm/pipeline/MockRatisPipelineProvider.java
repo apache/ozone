@@ -92,11 +92,6 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   @Override
-  public void shutdown() {
-    // Do nothing.
-  }
-
-  @Override
   public Pipeline create(RatisReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()

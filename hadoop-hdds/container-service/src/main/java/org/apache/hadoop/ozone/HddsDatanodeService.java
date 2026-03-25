@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
@@ -66,6 +67,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -79,6 +81,7 @@ import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -91,6 +94,8 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -311,9 +316,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
                   this::reconfigReplicationStreamsLimit);
 
       scmServiceId = HddsUtils.getScmServiceId(conf);
+
       if (scmServiceId != null) {
-        reconfigurationHandler.register(OZONE_SCM_NODES_KEY + "." + scmServiceId,
-            this::reconfigScmNodes);
+        reconfigurationHandler
+            .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId))
+            .register(OZONE_SCM_NODES_KEY + "." + scmServiceId, this::reconfigScmNodes);
       }
 
       reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
@@ -342,9 +349,12 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         LOG.error("HttpServer failed to start.", ex);
       }
 
+      DiskBalancerProtocol diskBalancerProtocol =
+          new DiskBalancerProtocolServer(datanodeStateMachine,
+              this::checkAdminPrivilege);
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
-          reconfigurationHandler);
+          reconfigurationHandler, diskBalancerProtocol);
 
       int clientRpcport = clientProtocolServer.getClientRpcAddress().getPort();
       serviceRuntimeInfo.setClientRpcPort(String.valueOf(clientRpcport));
@@ -396,12 +406,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
-    Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
+    List<StorageVolume> volumeList = volumeSet.getVolumesList();
 
-    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
-      HddsVolume hddsVolume = (HddsVolume) entry.getValue();
-      boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
-          clusterId, conf, LOG, null);
+    for (StorageVolume storageVolume : volumeList) {
+      HddsVolume hddsVolume = (HddsVolume) storageVolume;
+      boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId, clusterId, conf, LOG, null);
       if (!result) {
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }
@@ -455,7 +464,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     File idFile = new File(idFilePath);
     DatanodeDetails details;
     if (idFile.exists()) {
-      details = ContainerUtils.readDatanodeDetailsFrom(idFile);
+      details = ContainerUtils.readDatanodeDetailsFrom(idFile, conf);
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
@@ -571,6 +580,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
           }
         }
       }
+      IOUtils.close(LOG, reconfigurationHandler);
       if (datanodeStateMachine != null) {
         datanodeStateMachine.stopDaemon();
       }
@@ -665,6 +675,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
    */
   private void checkAdminPrivilege(String operation)
       throws IOException {
+    // Skip check if authorization is disabled
+    if (secConf == null || !secConf.isAuthorizationEnabled()) {
+      return;
+    }
+
     final UserGroupInformation ugi = getRemoteUser();
     admins.checkAdminUserPrivilege(ugi);
   }
@@ -739,12 +754,12 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     LOG.info("Reconfiguring SCM nodes for service ID {} with new SCM nodes {} and remove SCM nodes {}",
         scmServiceId, scmNodesIdsToAdd, scmNodesIdsToRemove);
 
-    Collection<Pair<String, InetSocketAddress>> scmToAdd = HddsUtils.getSCMAddressForDatanodes(
+    Collection<Pair<String, InetSocketAddress>> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToAdd);
     if (scmToAdd == null) {
       throw new IllegalStateException("Reconfiguration failed to get SCM address to add due to wrong configuration");
     }
-    Collection<Pair<String, InetSocketAddress>> scmToRemove = HddsUtils.getSCMAddressForDatanodes(
+    Collection<Pair<String, InetSocketAddress>> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToRemove);
     if (scmToRemove == null) {
       throw new IllegalArgumentException(

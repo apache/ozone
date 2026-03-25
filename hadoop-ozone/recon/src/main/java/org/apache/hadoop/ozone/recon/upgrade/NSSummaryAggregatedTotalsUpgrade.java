@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.apache.hadoop.ozone.recon.upgrade.ReconUpgradeAction.UpgradeActionType.FINALIZE;
-
 import com.google.inject.Injector;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
@@ -35,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * Recon startup is not blocked. During rebuild, APIs that depend on
  * the tree may return initializing responses as designed.
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.NSSUMMARY_AGGREGATED_TOTALS, type = FINALIZE)
+@UpgradeActionRecon(feature = ReconLayoutFeature.NSSUMMARY_AGGREGATED_TOTALS)
 public class NSSummaryAggregatedTotalsUpgrade implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(NSSummaryAggregatedTotalsUpgrade.class);
@@ -59,10 +57,5 @@ public class NSSummaryAggregatedTotalsUpgrade implements ReconUpgradeAction {
               "during NSSummaryAggregatedTotalsUpgrade action, will be retried as part of syncDataFromOM " +
               "scheduler task.", result);
     }
-  }
-
-  @Override
-  public UpgradeActionType getType() {
-    return FINALIZE;
   }
 }

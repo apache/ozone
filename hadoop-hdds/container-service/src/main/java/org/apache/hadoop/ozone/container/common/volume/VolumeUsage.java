@@ -117,14 +117,18 @@ public class VolumeUsage {
    * Calculate available space use method B.
    * |----used----|   (avail)   |++++++++reserved++++++++|
    *              |     fsAvail      |-------other-------|
-   *                          -&gt;|~~~~|&lt;-
+   *                          ->|~~~~|<-
    *                      remainingReserved
    * }
    * </pre>
    * B) avail = fsAvail - Max(reserved - other, 0);
    */
   public SpaceUsageSource.Fixed getCurrentUsage() {
-    final SpaceUsageSource.Fixed real = realUsage();
+    return getCurrentUsage(realUsage());
+  }
+
+  // use this variant if real usage values are also needed at the caller
+  public SpaceUsageSource.Fixed getCurrentUsage(SpaceUsageSource.Fixed real) {
     return reservedInBytes == 0
         ? real
         : new SpaceUsageSource.Fixed(
@@ -175,9 +179,8 @@ public class VolumeUsage {
     return reservedInBytes;
   }
 
-  private static long getUsableSpace(
-      long available, long committed, long minFreeSpace) {
-    return available - committed - minFreeSpace;
+  public static long getUsableSpace(long available, long committed, long spared) {
+    return available - committed - spared;
   }
 
   public static long getUsableSpace(StorageReportProto report) {

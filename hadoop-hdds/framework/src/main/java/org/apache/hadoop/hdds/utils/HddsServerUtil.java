@@ -25,9 +25,17 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVA
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getScmServiceId;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL_DEFAULT;
@@ -40,6 +48,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
@@ -52,12 +61,18 @@ import com.google.protobuf.BlockingService;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -68,7 +83,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.validator.routines.InetAddressValidator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -85,6 +103,7 @@ import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
@@ -104,6 +123,7 @@ import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.ratis.util.Preconditions;
@@ -122,6 +142,10 @@ public final class HddsServerUtil {
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
+  // List of ip's not recommended to be added to CSR.
+  private static final Set<String> INVALID_IPS = new HashSet<>(Arrays.asList(
+      "0.0.0.0", "127.0.0.1"));
+
   private HddsServerUtil() {
   }
 
@@ -136,6 +160,82 @@ public final class HddsServerUtil {
       BlockingService service, RPC.Server server) {
     RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
     server.addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
+  }
+
+  /**
+   * Iterates through network interfaces and return all valid ip's not
+   * listed in {@link #INVALID_IPS}.
+   *
+   * @return List<InetAddress>
+   * @throws IOException if no network interface are found or if an error
+   * occurs.
+   */
+  public static List<InetAddress> getValidInetsForCurrentHost()
+      throws IOException {
+    List<InetAddress> hostIps = new ArrayList<>();
+    InetAddressValidator ipValidator = InetAddressValidator.getInstance();
+
+    Enumeration<NetworkInterface> enumNI =
+        NetworkInterface.getNetworkInterfaces();
+    if (enumNI == null) {
+      throw new IOException("Unable to get network interfaces.");
+    }
+
+    while (enumNI.hasMoreElements()) {
+      NetworkInterface ifc = enumNI.nextElement();
+      if (ifc.isUp()) {
+        Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
+        while (enumAdds.hasMoreElements()) {
+          InetAddress addr = enumAdds.nextElement();
+
+          String hostAddress = addr.getHostAddress();
+          if (!INVALID_IPS.contains(hostAddress) && ipValidator.isValid(hostAddress)
+              && !isScopedOrMaskingIPv6Address(addr)) {
+            LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
+            hostIps.add(addr);
+          } else {
+            LOG.info("ip:{} not returned.", hostAddress);
+          }
+        }
+      }
+    }
+
+    return hostIps;
+  }
+
+  /**
+   * Determines if the supplied address is an IPv6 address, with a defined scope-id and/or with a defined prefix length.
+   * <p>
+   * This method became necessary after Commons Validator was upgraded from 1.6 version to 1.10. In 1.10 version the
+   * IPv6 addresses with a scope-id and/or with a prefix specifier became valid IPv6 addresses, but as these features
+   * are changing the string representation to do not represent only the 16 octet that specifies the address, the
+   * string representation can not be used as it is as a SAN extension in X.509 anymore as in RFC-5280 this type of
+   * Subject Alternative Name is exactly 4 octets in case of an IPv4 address, and 16 octets in case of an IPv6 address.
+   * BouncyCastle does not have support to deal with these in an IPAddress typed GeneralName, so we need to keep the
+   * previous behaviour, and skip IPv6 addresses with a prefix length and/or a scope-id.
+   * <p>
+   * According to RFC-4007 and the InetAddress contract the scope-id is at the end of the address' strin
+   * representation, separated by a '%' character from the address.
+   * According to RFC-4632 there is a possibility to specify a prefix length at the end of the address to specify
+   * routing related information. RFC-4007 specifies the prefix length to come after the scope-id.
+   * <p>
+   *
+   * @param addr the InetAddress to check
+   * @return if the InetAddress is an IPv6 address and if so it contains a scope-id and/or a prefix length.
+   * @see <a href="https://datatracker.ietf.org/doc/html/rfc4007">RFC-4007 - Scoped IPv6 Addresses</a>
+   * @see <a href="https://datatracker.ietf.org/doc/html/rfc4632#section-5.1">RFC-4632 - CIDR addressing strategy -
+   *        prefix length</a>
+   * @see <a href="https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.6">RFC-5280 - SAN description</a>
+   * @see <a href="https://issues.apache.org/jira/browse/VALIDATOR-445">VALIDATOR-445 - Commons Validator change</a>
+   * @see <a href="https://github.com/bcgit/bc-java/issues/2024">BouncyCastle issue discussion about scoped IPv6
+   *        addresses</a>
+   */
+  public static boolean isScopedOrMaskingIPv6Address(InetAddress addr) {
+    if (addr instanceof Inet6Address) {
+      String hostAddress = addr.getHostAddress();
+      return hostAddress.contains("/") || hostAddress.contains("%");
+    }
+    return false;
   }
 
   /**
@@ -757,4 +857,110 @@ public final class HddsServerUtil {
     }
   }
 
+  /**
+   * Retrieve the socket addresses of all storage container managers.
+   *
+   * @return A collection of SCM addresses
+   * @throws IllegalArgumentException If the configuration is invalid
+   */
+  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
+      ConfigurationSource conf) {
+
+    // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
+
+    if (getScmServiceId(conf) != null) {
+      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+      Collection<InetSocketAddress> scmAddressList =
+          new HashSet<>(scmNodeInfoList.size());
+      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
+        scmAddressList.add(
+            NetUtils.createSocketAddr(scmNodeInfo.getScmDatanodeAddress()));
+      }
+      return scmAddressList;
+    } else {
+      // fall back to OZONE_SCM_NAMES.
+      Collection<String> names =
+          conf.getTrimmedStringCollection(ScmConfigKeys.OZONE_SCM_NAMES);
+      if (names.isEmpty()) {
+        throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
+            + " need to be a set of valid DNS names or IP addresses."
+            + " Empty address list found.");
+      }
+
+      Collection<InetSocketAddress> addresses = new HashSet<>(names.size());
+      for (String address : names) {
+        Optional<String> hostname = getHostName(address);
+        if (!hostname.isPresent()) {
+          throw new IllegalArgumentException("Invalid hostname for SCM: "
+              + address);
+        }
+        int port = getHostPort(address)
+            .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                OZONE_SCM_DATANODE_PORT_DEFAULT));
+        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(),
+            port);
+        addresses.add(addr);
+      }
+
+      if (addresses.size() > 1) {
+        LOG.warn("When SCM HA is configured, configure {} appended with " +
+                "serviceId and nodeId. {} is deprecated.", OZONE_SCM_ADDRESS_KEY,
+            OZONE_SCM_NAMES);
+      }
+      return addresses;
+    }
+  }
+
+  /**
+   * Returns the SCM address for datanodes based on the service ID and the SCM addresses.
+   * @param conf Configuration
+   * @param scmServiceId SCM service ID
+   * @param scmNodeIds Requested SCM node IDs
+   * @return A collection with addresses of the request SCM node IDs.
+   * Null if there is any wrongly configured SCM address. Note that the returned collection
+   * might not be ordered the same way as the requested SCM node IDs
+   */
+  public static Collection<Pair<String, InetSocketAddress>> getSCMAddressForDatanodes(
+      ConfigurationSource conf, String scmServiceId, Set<String> scmNodeIds) {
+    Collection<Pair<String, InetSocketAddress>> scmNodeAddress = new HashSet<>(scmNodeIds.size());
+    for (String scmNodeId : scmNodeIds) {
+      String addressKey = ConfUtils.addKeySuffixes(
+          OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
+      String scmAddress = conf.get(addressKey);
+      if (scmAddress == null) {
+        LOG.warn("The SCM address configuration {} is not defined, return nothing", addressKey);
+        return null;
+      }
+
+      int scmDatanodePort = SCMNodeInfo.getPort(conf, scmServiceId, scmNodeId,
+          OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
+          OZONE_SCM_DATANODE_PORT_DEFAULT);
+
+      String scmDatanodeAddressStr = SCMNodeInfo.buildAddress(scmAddress, scmDatanodePort);
+      InetSocketAddress scmDatanodeAddress = NetUtils.createSocketAddr(scmDatanodeAddressStr);
+      scmNodeAddress.add(Pair.of(scmNodeId, scmDatanodeAddress));
+    }
+    return scmNodeAddress;
+  }
+
+  /**
+   * Retrieve the socket addresses of recon.
+   *
+   * @return Recon address
+   * @throws IllegalArgumentException If the configuration is invalid
+   */
+  public static InetSocketAddress getReconAddressForDatanodes(
+      ConfigurationSource conf) {
+    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
+    if (StringUtils.isEmpty(name)) {
+      return null;
+    }
+    Optional<String> hostname = getHostName(name);
+    if (!hostname.isPresent()) {
+      throw new IllegalArgumentException("Invalid hostname for Recon: "
+          + name);
+    }
+    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
+    return NetUtils.createSocketAddr(hostname.get(), port);
+  }
 }

@@ -27,7 +27,7 @@ class TestConfigurationSource {
 
   @Test
   void getPropsMatchPrefixAndTrimPrefix() {
-    MutableConfigurationSource c = new InMemoryConfiguration();
+    MutableConfigurationSource c = new InMemoryConfigurationForTesting();
     c.set("somePrefix.key", "value");
 
     assertEquals(ImmutableMap.of("key", "value"),
@@ -36,7 +36,7 @@ class TestConfigurationSource {
 
   @Test
   void getPropsMatchPrefix() {
-    MutableConfigurationSource c = new InMemoryConfiguration();
+    MutableConfigurationSource c = new InMemoryConfigurationForTesting();
     c.set("somePrefix.key", "value");
 
     assertEquals(ImmutableMap.of("somePrefix.key", "value"),
@@ -47,11 +47,10 @@ class TestConfigurationSource {
   void reconfigurableProperties() {
     String prefix = "ozone.test.config";
     ImmutableSet<String> expected = ImmutableSet.of(
-        prefix + ".dynamic",
-        prefix + ".grandpa.dyna"
+        prefix + ".dynamic"
     );
 
-    ConfigurationExample obj = new InMemoryConfiguration().getObject(
+    ConfigurationExample obj = new InMemoryConfigurationForTesting().getObject(
         ConfigurationExample.class);
 
     assertEquals(expected, obj.reconfigurableProperties());
@@ -59,7 +58,7 @@ class TestConfigurationSource {
 
   @Test
   void reconfiguration() {
-    MutableConfigurationSource subject = new InMemoryConfiguration();
+    MutableConfigurationSource subject = new InMemoryConfigurationForTesting();
     ConfigurationExample orig = subject.getObject(ConfigurationExample.class);
     ConfigurationExample obj = subject.getObject(ConfigurationExample.class);
 
@@ -73,7 +72,7 @@ class TestConfigurationSource {
 
   @Test
   void getPropertyWithPrefixIncludedInName() {
-    MutableConfigurationSource conf = new InMemoryConfiguration();
+    MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
     String value = "newValue";
     conf.set("ozone.test.config.with.prefix.included", value);
 
@@ -84,7 +83,7 @@ class TestConfigurationSource {
 
   @Test
   void setPropertyWithPrefixIncludedInName() {
-    MutableConfigurationSource conf = new InMemoryConfiguration();
+    MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
     ConfigurationExample subject = conf.getObject(ConfigurationExample.class);
 
     String value = "newValue";

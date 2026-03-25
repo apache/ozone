@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -118,6 +119,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     CreateKeyRequest.Builder newCreateKeyRequest = null;
     KeyArgs.Builder newKeyArgs = null;
+    UserInfo userInfo = getUserInfo();
     if (!keyArgs.getIsMultipartKey()) {
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
@@ -144,10 +146,17 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  bucket/key/volume or not and also with out any authorization checks.
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
-      UserInfo userInfo = getUserInfo();
-      List<OmKeyLocationInfo> omKeyLocationInfoList =
-          captureLatencyNs(perfMetrics.getCreateKeyAllocateBlockLatencyNs(),
-              () -> allocateBlock(ozoneManager.getScmClient(),
+
+      List<OmKeyLocationInfo> omKeyLocationInfoList;
+      final long effectiveDataSize;
+      // Skip block allocation if dataSize <= 0. We also consider unspecified dataSize as
+      // empty key since the client will not set dataSize if the key is empty (i.e. dataSize <= 0),
+      if (!keyArgs.hasDataSize() || keyArgs.getDataSize() <= 0) {
+        omKeyLocationInfoList = Collections.emptyList();
+        effectiveDataSize = 0;
+      } else {
+        omKeyLocationInfoList = captureLatencyNs(perfMetrics.getCreateKeyAllocateBlockLatencyNs(),
+            () -> allocateBlock(ozoneManager.getScmClient(),
                 ozoneManager.getBlockTokenSecretManager(), repConfig,
                 new ExcludeList(), requestedSize, scmBlockSize,
                 ozoneManager.getPreallocateBlocksMax(),
@@ -156,10 +165,12 @@ public class OMKeyCreateRequest extends OMKeyRequest {
                 ozoneManager.getMetrics(),
                 keyArgs.getSortDatanodes(),
                 userInfo));
+        effectiveDataSize = requestedSize;
+      }
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
-              .setDataSize(requestedSize);
+              .setDataSize(effectiveDataSize);
 
       newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
           .map(info -> info.getProtobuf(false,
@@ -187,7 +198,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
             .setClientID(UniqueId.next());
 
     return getOmRequest().toBuilder()
-        .setCreateKeyRequest(newCreateKeyRequest).setUserInfo(getUserInfo())
+        .setCreateKeyRequest(newCreateKeyRequest).setUserInfo(userInfo)
         .build();
   }
 

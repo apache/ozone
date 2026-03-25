@@ -84,6 +84,15 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean datastreamPipelineMode = true;
 
+  @Config(key = "ozone.client.datastream.sync.size",
+      defaultValue = "0B",
+      type = ConfigType.SIZE,
+      description = "The minimum size of written data before forcing the datanodes " +
+          "in the pipeline to flush the pending data to underlying storage." +
+          " If set to zero or negative, the client will not force the datanodes to flush.",
+      tags = ConfigTag.CLIENT)
+  private int dataStreamSyncSize = 0;
+
   @Config(key = "ozone.client.stream.buffer.increment",
       defaultValue = "0B",
       type = ConfigType.SIZE,
@@ -568,6 +577,10 @@ public class OzoneClientConfig {
 
   public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
     this.datastreamPipelineMode = datastreamPipelineMode;
+  }
+
+  public int getDataStreamSyncSize() {
+    return dataStreamSyncSize;
   }
 
   public void setHBaseEnhancementsAllowed(boolean isHBaseEnhancementsEnabled) {

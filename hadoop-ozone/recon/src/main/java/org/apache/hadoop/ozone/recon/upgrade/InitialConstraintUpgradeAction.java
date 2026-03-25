@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.recon.upgrade.ReconUpgradeAction.UpgradeActionType.FINALIZE;
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
@@ -39,7 +38,7 @@ import org.slf4j.LoggerFactory;
  * Upgrade action for the INITIAL schema version, which manages constraints
  * for the UNHEALTHY_CONTAINERS table.
  */
-@UpgradeActionRecon(feature = INITIAL_VERSION, type = FINALIZE)
+@UpgradeActionRecon(feature = INITIAL_VERSION)
 public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
@@ -89,11 +88,6 @@ public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
 
     LOG.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",
         Arrays.toString(enumStates));
-  }
-
-  @Override
-  public UpgradeActionType getType() {
-    return FINALIZE;
   }
 
   @VisibleForTesting

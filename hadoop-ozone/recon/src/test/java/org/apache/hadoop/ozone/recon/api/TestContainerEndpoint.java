@@ -26,8 +26,10 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -112,7 +114,7 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -122,6 +124,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for container endpoint.
  */
+@Flaky("HDDS-14178")
 public class TestContainerEndpoint {
 
   @TempDir
@@ -509,8 +512,7 @@ public class TestContainerEndpoint {
     // Set up test data for FSO keys
     setUpFSOData();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
@@ -597,8 +599,7 @@ public class TestContainerEndpoint {
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
 
@@ -949,7 +950,7 @@ public class TestContainerEndpoint {
       throws IOException, TimeoutException {
     String missing = UnHealthyContainerStates.MISSING.toString();
     String emptyMissing = UnHealthyContainerStates.EMPTY_MISSING.toString();
-    String negativeSize = UnHealthyContainerStates.NEGATIVE_SIZE.toString(); // For NEGATIVE_SIZE state
+    String negativeSize = UnHealthyContainerStates.NEGATIVE_SIZE.toString();
 
     // Initial empty response verification
     Response response = containerEndpoint
@@ -971,8 +972,6 @@ public class TestContainerEndpoint {
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
-    createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
-    createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
     // Check for unhealthy containers
     response = containerEndpoint.getUnhealthyContainers(missing, 1000, 0, 0);
@@ -998,19 +997,19 @@ public class TestContainerEndpoint {
       assertEquals(missing, r.getContainerState());
     }
 
-    // Check for empty missing containers, should return zero
+    // Compatibility: legacy states should be valid filters and return empty.
     Response filteredEmptyMissingResponse = containerEndpoint
         .getUnhealthyContainers(emptyMissing, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredEmptyMissingResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
 
-    // Check for negative size containers, should return zero
     Response filteredNegativeSizeResponse = containerEndpoint
         .getUnhealthyContainers(negativeSize, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredNegativeSizeResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
+
   }
 
   @Test
@@ -1126,22 +1125,6 @@ public class TestContainerEndpoint {
     return uuid;
   }
 
-  private void createEmptyMissingUnhealthyRecords(int emptyMissing) {
-    int cid = 0;
-    for (int i = 0; i < emptyMissing; i++) {
-      createUnhealthyRecord(++cid, UnHealthyContainerStates.EMPTY_MISSING.toString(),
-          3, 3, 0, null, false);
-    }
-  }
-
-  private void createNegativeSizeUnhealthyRecords(int negativeSize) {
-    int cid = 0;
-    for (int i = 0; i < negativeSize; i++) {
-      createUnhealthyRecord(++cid, UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-          3, 3, 0, null, false); // Added for NEGATIVE_SIZE state
-    }
-  }
-
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
                                       int misRep, int dataChecksum) {
     int cid = 0;
@@ -1174,18 +1157,11 @@ public class TestContainerEndpoint {
   private void createUnhealthyRecord(int id, String state, int expected,
                                      int actual, int delta, String reason, boolean dataChecksumMismatch) {
     long cID = Integer.toUnsignedLong(id);
-    UnhealthyContainers missing = new UnhealthyContainers();
-    missing.setContainerId(cID);
-    missing.setContainerState(state);
-    missing.setInStateSince(12345L);
-    missing.setActualReplicaCount(actual);
-    missing.setExpectedReplicaCount(expected);
-    missing.setReplicaDelta(delta);
-    missing.setReason(reason);
-
-    ArrayList<UnhealthyContainers> missingList = new ArrayList<>();
-    missingList.add(missing);
-    containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
+    ArrayList<ContainerHealthSchemaManager.UnhealthyContainerRecord> records =
+        new ArrayList<>();
+    records.add(new ContainerHealthSchemaManager.UnhealthyContainerRecord(
+        cID, state, 12345L, expected, actual, delta, reason));
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(records);
 
     long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
 
@@ -1598,6 +1574,102 @@ public class TestContainerEndpoint {
     assertThat(missingContainerIdsSCM).contains(2L);
   }
 
+  /**
+   * Helper to create a container in SCM with a specific pipeline.
+   */
+  private void createContainerInSCM(long containerId, Pipeline targetPipeline)
+      throws IOException, TimeoutException {
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setOwner("owner" + containerId)
+        .setNumberOfKeys(0)
+        .setPipelineID(targetPipeline.getId())
+        .build();
+    reconContainerManager.addNewContainer(
+        new ContainerWithPipeline(containerInfo, targetPipeline));
+  }
+
+  /**
+   * Helper to verify pipeline isolation for a container missing in OM.
+   */
+  private void verifyPipelineIsolation(ContainerDiscrepancyInfo info,
+      long containerId, PipelineID expectedPipelineId,
+      List<List<Pipeline>> otherPipelineLists) {
+    List<Pipeline> pipelines = info.getPipelines();
+    assertNotNull(pipelines);
+    assertEquals(1, pipelines.size(),
+        "Container " + containerId + " should have exactly 1 pipeline");
+    assertEquals(expectedPipelineId, pipelines.get(0).getId(),
+        "Container " + containerId + " should have correct pipeline");
+    assertEquals("SCM", info.getExistsAt());
+    assertEquals(0, info.getNumberOfKeys());
+    // Verify list isolation
+    for (List<Pipeline> other : otherPipelineLists) {
+      if (other != null) {
+        assertNotSame(pipelines, other,
+            "Container " + containerId + " should have independent list");
+      }
+    }
+  }
+
+  @Test
+  public void testGetContainerInsightsNonOMContainersPipelineIsolation()
+      throws IOException, TimeoutException {
+    // Verifies fix for pipeline accumulation bug: containers missing in OM
+    // should each have their own isolated pipeline list, not shared.
+    
+    // Create 3 different pipelines
+    Pipeline[] pipelines = {
+        getRandomPipeline(), getRandomPipeline(), getRandomPipeline()
+    };
+    for (Pipeline p : pipelines) {
+      reconPipelineManager.addPipeline(p);
+    }
+    
+    // Create 3 containers in SCM with different pipelines (not in OM)
+    long[] containerIds = {501L, 502L, 503L};
+    for (int i = 0; i < containerIds.length; i++) {
+      createContainerInSCM(containerIds[i], pipelines[i]);
+      assertFalse(reconContainerMetadataManager.doesContainerExists(containerIds[i]),
+          "Container " + containerIds[i] + " should NOT exist in OM");
+    }
+    
+    // Call API
+    Response response = containerEndpoint.getContainerMisMatchInsights(10, 500, "OM");
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    
+    Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
+    List<ContainerDiscrepancyInfo> discrepancies =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+    assertNotNull(discrepancies);
+    
+    // Find containers in response
+    ContainerDiscrepancyInfo[] infos = new ContainerDiscrepancyInfo[3];
+    for (int i = 0; i < containerIds.length; i++) {
+      final long id = containerIds[i];
+      infos[i] = discrepancies.stream()
+          .filter(d -> d.getContainerID() == id)
+          .findFirst()
+          .orElseThrow(() -> new AssertionError(
+              "Container " + id + " not found in mismatch list"));
+    }
+    
+    // Verify pipeline isolation for each container
+    List<Pipeline> pipelineList1 = infos[0].getPipelines();
+    List<Pipeline> pipelineList2 = infos[1].getPipelines();
+    List<Pipeline> pipelineList3 = infos[2].getPipelines();
+    
+    verifyPipelineIsolation(infos[0], containerIds[0], pipelines[0].getId(),
+        Arrays.asList(pipelineList2, pipelineList3));
+    verifyPipelineIsolation(infos[1], containerIds[1], pipelines[1].getId(),
+        Arrays.asList(pipelineList1, pipelineList3));
+    verifyPipelineIsolation(infos[2], containerIds[2], pipelines[2].getId(),
+        Arrays.asList(pipelineList1, pipelineList2));
+  }
+
   @Test
   public void testGetOmContainersDeletedInSCM() throws Exception {
     Map<Long, ContainerMetadata> omContainers =
@@ -1855,7 +1927,7 @@ public class TestContainerEndpoint {
     setUpDuplicateFSOFileKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mappings so that the new keys are loaded.
     reprocessContainerKeyMapper();

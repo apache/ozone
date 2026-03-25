@@ -1328,54 +1328,33 @@
     ]
   },
   "fileSizeCounts": [
-    {
-      "volume": "vol1",
-      "bucket": "bucket1",
-      "fileSize": 1024,
-      "count": 56
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket2",
-      "fileSize": 4096,
-      "count": 25
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket3",
-      "fileSize": 32768,
-      "count": 312
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket4",
-      "fileSize": 131072,
-      "count": 78
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket5",
-      "fileSize": 1024,
-      "count": 123
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket6",
-      "fileSize": 131072,
-      "count": 187
-    },
-    {
-      "volume": "vol2",
-      "bucket": "bucket7",
-      "fileSize": 1024,
-      "count": 54
-    },
-    {
-      "volume": "vol3",
-      "bucket": "bucket8",
-      "fileSize": 131072,
-      "count": 217
-    }
+    { "volume": "voltpb", "bucket": "buck1pb", "fileSize": 137438953472, "count": 2857 },
+    { "volume": "voltpb", "bucket": "buck2pb", "fileSize": 137438953472, "count": 143  },
+
+    { "volume": "vol-reverse", "bucket": "bucket-r7", "fileSize": 549755813888, "count": 2    },
+    { "volume": "vol-reverse", "bucket": "bucket-r6", "fileSize": 274877906944, "count": 5    },
+    { "volume": "vol-reverse", "bucket": "bucket-r5", "fileSize": 8589934592,   "count": 30   },
+    { "volume": "vol-reverse", "bucket": "bucket-r4", "fileSize": 1048576,      "count": 180  },
+    { "volume": "vol-reverse", "bucket": "bucket-r3", "fileSize": 65536,        "count": 450  },
+    { "volume": "vol-reverse", "bucket": "bucket-r2", "fileSize": 4096,         "count": 1200 },
+    { "volume": "vol-reverse", "bucket": "bucket-r1", "fileSize": 1024,         "count": 3800 },
+
+    { "volume": "vol-single", "bucket": "bucket-s1", "fileSize": 67108864, "count": 620 },
+    { "volume": "vol-single", "bucket": "bucket-s2", "fileSize": 67108864, "count": 180 },
+
+    { "volume": "vol-edge", "bucket": "bucket-e1", "fileSize": 1099511627776, "count": 1     },
+    { "volume": "vol-edge", "bucket": "bucket-e2", "fileSize": 1024,          "count": 50000 },
+
+    { "volume": "vol1", "bucket": "bucket1",  "fileSize": 1024,      "count": 56  },
+    { "volume": "vol1", "bucket": "bucket2",  "fileSize": 4096,      "count": 25  },
+    { "volume": "vol1", "bucket": "bucket3",  "fileSize": 32768,     "count": 312 },
+    { "volume": "vol1", "bucket": "bucket4",  "fileSize": 131072,    "count": 78  },
+    { "volume": "vol1", "bucket": "bucket5",  "fileSize": 1024,      "count": 123 },
+    { "volume": "vol1", "bucket": "bucket6",  "fileSize": 131072,    "count": 187 },
+    { "volume": "vol2", "bucket": "bucket7",  "fileSize": 1048576,   "count": 410 },
+    { "volume": "vol2", "bucket": "bucket8",  "fileSize": 16777216,  "count": 94  },
+    { "volume": "vol3", "bucket": "bucket9",  "fileSize": 134217728, "count": 38  },
+    { "volume": "vol3", "bucket": "bucket10", "fileSize": 1024,      "count": 217 }
   ],
   "containerCount": [
     {
@@ -6866,5 +6845,152 @@
     "selectedRowKeys": [
       "b5907812-a5f2-11ea-bb37-0242ac130011"
     ]
+  },
+  "utilization": {
+    "globalStorage": {
+      "totalFileSystemCapacity": 879788032846,
+      "totalReservedSpace": 268435456,
+      "totalOzoneCapacity": 879519597390,
+      "totalOzoneFreeSpace": 539776978944,
+      "totalOzoneUsedSpace": 30679040,
+      "totalOzonePreAllocatedContainerSpace":1022024
+    },
+    "globalNamespace": {
+        "totalUsedSpace": 12349932,
+        "totalKeys": 1576
+    },
+    "usedSpaceBreakdown": {
+        "openKeyBytes": {
+          "totalOpenKeyBytes": 19255266,
+          "openKeyAndFileBytes": 19255266,
+          "multipartOpenKeyBytes": 0
+        },
+        "committedKeyBytes": 1249923
+    },
+    "dataNodeUsage": [
+        {
+            "datanodeUuid": "1bf314dc-3eba-4774-9dbc-6d957cc7670b",
+            "hostName": "ozone-datanode-7.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "8adead67-85a6-4ba9-942f-cd313f1472f9",
+            "hostName": "ozone-datanode-6.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "953b91f4-c03a-45d8-9fbe-142887531cb1",
+            "hostName": "ozone-datanode-5.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "44617070-a300-48af-a0e3-117167b008b6",
+            "hostName": "ozone-datanode-2.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
+            "hostName": "ozone-datanode-1.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "149a1640-e600-4e98-b62d-397804059f0e",
+            "hostName": "ozone-datanode-3.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
+            "hostName": "ozone-datanode-4.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        }
+    ]
+  },
+  "pendingDeletionDN": {
+    "status": "FINISHED",
+    "totalPendingDeletionSize": 12203,
+    "pendingDeletionPerDataNode": [
+      {
+        "hostName": "ozone-datanode-5.ozone_default",
+        "datanodeUuid": "953b91f4-c03a-45d8-9fbe-142887531cb1",
+        "pendingBlockSize": 1200
+      },
+      {
+        "hostName": "ozone-datanode-3.ozone_default",
+        "datanodeUuid": "149a1640-e600-4e98-b62d-397804059f0e",
+        "pendingBlockSize": 803
+      },
+      {
+        "hostName": "ozone-datanode-4.ozone_default",
+        "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
+        "pendingBlockSize": -1
+      },
+      {
+        "hostName": "ozone-datanode-7.ozone_default",
+        "datanodeUuid": "1bf314dc-3eba-4774-9dbc-6d957cc7670b",
+        "pendingBlockSize": 2200
+      },
+      {
+        "hostName": "ozone-datanode-1.ozone_default",
+        "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
+        "pendingBlockSize": -1
+      },
+      {
+        "hostName": "ozone-datanode-2.ozone_default",
+        "datanodeUuid": "44617070-a300-48af-a0e3-117167b008b6",
+        "pendingBlockSize": 300
+      },
+      {
+        "hostName": "ozone-datanode-6.ozone_default",
+        "datanodeUuid": "8adead67-85a6-4ba9-942f-cd313f1472f9",
+        "pendingBlockSize": 2730
+      }
+    ],
+    "totalNodesQueried": 7,
+    "totalNodeQueriesFailed": 2
+  },
+  "pendingDeletionOM": {
+    "totalSize": 240430,
+    "pendingDirectorySize": 120040,
+    "pendingKeySize": 120390
+  },
+  "pendingDeletionSCM": {
+    "totalBlocksize": 24030,
+    "totalReplicatedBlockSize": 120040,
+    "totalBlocksCount": 120390
   }
 }
