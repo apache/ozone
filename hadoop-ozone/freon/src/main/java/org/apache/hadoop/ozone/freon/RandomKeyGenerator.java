@@ -27,6 +27,8 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -334,9 +336,9 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     LOG.info("Number of Validate Threads: {}", numOfValidateThreads);
     LOG.info("cleanObjects : {}", cleanObjects);
 
-    String currentSpanContext = TracingUtil.exportCurrentSpan();
+    Span currentSpan = TracingUtil.getActiveSpan();
     for (int i = 0; i < numOfThreads; i++) {
-      executor.execute(new ObjectCreator(currentSpanContext));
+      executor.execute(new ObjectCreator(currentSpan));
     }
 
     ExecutorService validateExecutor = null;
@@ -703,15 +705,15 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   }
 
   private class ObjectCreator implements Runnable {
-    private final String parentSpanContext;
+    private final Span parentSpan;
 
-    ObjectCreator(String parentSpanContext) {
-      this.parentSpanContext = parentSpanContext;
+    ObjectCreator(Span parentSpan) {
+      this.parentSpan = parentSpan;
     }
 
     @Override
     public void run() {
-      TracingUtil.executeWithImportedContext(parentSpanContext, () -> {
+      try (Scope scope = parentSpan.makeCurrent()) {
         int v;
         while ((v = volumeCounter.getAndIncrement()) < numOfVolumes) {
           if (!createVolume(v)) {
@@ -730,7 +732,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
             return;
           }
         }
-      });
+      }
     }
   }
 

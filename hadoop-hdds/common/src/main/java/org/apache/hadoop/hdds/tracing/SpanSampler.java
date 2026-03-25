@@ -60,6 +60,7 @@ public final class SpanSampler implements Sampler {
     }
 
     // Child span: check parent's sampling status first
+    // after the process of sampling trace / parent span then check if it is sampled or not.
     if (!parentSpan.getSpanContext().isSampled()) {
       // Parent was not sampled, so this child should not be sampled either
       // This prevents orphaned spans

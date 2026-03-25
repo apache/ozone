@@ -33,6 +33,7 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.lang.reflect.Proxy;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -52,7 +53,7 @@ public final class TracingUtil {
   private static final String OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT = "http://localhost:4317";
   private static final String OTEL_TRACES_SAMPLER_ARG = "OTEL_TRACES_SAMPLER_ARG";
   private static final double OTEL_TRACES_SAMPLER_RATIO_DEFAULT = 1.0;
-  private static final String OTEL_SPAN_SAMPLING = "OTEL_SPAN_SAMPLING";
+  private static final String OTEL_SPAN_SAMPLING_ARG = "OTEL_SPAN_SAMPLING_ARG";
   private static final String OTEL_TRACES_SAMPLER_CONFIG_DEFAULT = "";
 
   private static volatile boolean isInit = false;
@@ -90,19 +91,25 @@ public final class TracingUtil {
       String sampleStrRatio = System.getenv(OTEL_TRACES_SAMPLER_ARG);
       if (sampleStrRatio != null && !sampleStrRatio.isEmpty()) {
         samplerRatio = Double.parseDouble(System.getenv(OTEL_TRACES_SAMPLER_ARG));
+        LOG.info("Sampling Trace Config = '{}'", samplerRatio);
       }
     } catch (NumberFormatException ex) {
-      // ignore and use the default value.
+      // log and use the default value.
+      LOG.warn("Invalid value for {}: '{}'. Falling back to default: {}",
+          OTEL_TRACES_SAMPLER_ARG, System.getenv(OTEL_TRACES_SAMPLER_ARG), OTEL_TRACES_SAMPLER_RATIO_DEFAULT, ex);
     }
 
     String spanSamplingConfig = OTEL_TRACES_SAMPLER_CONFIG_DEFAULT;
     try {
-      String spanStrConfig = System.getenv(OTEL_SPAN_SAMPLING);
+      String spanStrConfig = System.getenv(OTEL_SPAN_SAMPLING_ARG);
       if (spanStrConfig != null && !spanStrConfig.isEmpty()) {
         spanSamplingConfig = spanStrConfig;
       }
+      LOG.info("Sampling Span Config = '{}'", spanSamplingConfig);
     } catch (Exception ex) {
-      // ignore and use the default value.
+      // Log and use the default value.
+      LOG.warn("Failed to process {}. Falling back to default configuration: {}",
+          OTEL_SPAN_SAMPLING_ARG, OTEL_TRACES_SAMPLER_CONFIG_DEFAULT, ex);
     }
     // Pass the config to parseSpanSamplingConfig to get spans to be sampled.
     Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);
@@ -203,17 +210,18 @@ public final class TracingUtil {
   }
 
   /** Function to parse span sampling config. The input is in the form <span_name>:<sample_rate>.
-   * The sample rate must be a natural number (1,2,3). Any value other than that will LOG an error.
+   * The sample rate must be a number between 0 and 1. Any value other than that will LOG an error.
    * */
   private static Map<String, LoopSampler> parseSpanSamplingConfig(String configStr) {
     Map<String, LoopSampler> result = new HashMap<>();
     if (configStr == null || configStr.isEmpty()) {
-      return result;
+      return Collections.emptyMap();
     }
 
     for (String entry : configStr.split(",")) {
       String trimmed = entry.trim();
       int colon = trimmed.indexOf(':');
+
       if (colon <= 0 || colon >= trimmed.length() - 1) {
         continue;
       }
@@ -222,16 +230,17 @@ public final class TracingUtil {
       String val = trimmed.substring(colon + 1).trim();
 
       try {
-        // Long.parseLong strictly rejects decimals (throws NumberFormatException)
-        long interval = Long.parseLong(val);
-
-        // LoopSampler constructor strictly rejects <= 0 (throws IllegalArgumentException)
-        result.put(name, new LoopSampler(interval));
-
+        double rate = Double.parseDouble(val);
+        //if the rate  is less than or equal to zero , no sampling config is taken for that key value pair.
+        if (rate > 0) {
+          // cap it at 1.0 when a number greater than 1 is entered
+          double effectiveRate = Math.min(rate, 1.0);
+          result.put(name, new LoopSampler(effectiveRate));
+        } else {
+          LOG.warn("rate for span '{}' is 0 or less, ignoring sample configuration", name);
+        }
       } catch (NumberFormatException e) {
-        LOG.error("Invalid ratio '{}' for span '{}': decimals not allowed", val, name);
-      } catch (IllegalArgumentException e) {
-        LOG.error("Invalid ratio '{}' for span '{}': {}", val, name, e.getMessage());
+        LOG.error("Invalid rate '{}' for span '{}', ignoring sample configuration", val, name);
       }
     }
     return result;
@@ -315,48 +324,6 @@ public final class TracingUtil {
 
   public static Span getActiveSpan() {
     return Span.current();
-  }
-
-  /**
-   * Import a parent span context and make it current without creating a new span.
-   * When next span is created, it will use this context as parent.
-   *
-   * @param encodedParent Encoded parent span context
-   * @return A Scope that should be closed when done, or null if no valid parent
-   */
-  public static Scope importAndActivateContext(String encodedParent) {
-    if (encodedParent == null || encodedParent.isEmpty()) {
-      return null;
-    }
-
-    W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
-    Context extractedContext = propagator.extract(Context.current(), encodedParent, new TextExtractor());
-
-    if (Span.fromContext(extractedContext).getSpanContext().isValid()) {
-      return extractedContext.makeCurrent();
-    }
-
-    return null;
-  }
-
-  /**
-   * Execute the given runnable with the imported parent span context activated.
-   * This propagates the trace context to the current thread without creating
-   * a new span.
-   *
-   * @param encodedParent Encoded parent span context (can be null or empty)
-   * @param runnable The code to execute within the imported context
-   */
-  public static <E extends Exception> void executeWithImportedContext(
-      String encodedParent, CheckedRunnable<E> runnable) throws E {
-    Scope scope = importAndActivateContext(encodedParent);
-    try {
-      runnable.run();
-    } finally {
-      if (scope != null) {
-        scope.close();
-      }
-    }
   }
 
   /**

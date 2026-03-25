@@ -17,32 +17,30 @@
 
 package org.apache.hadoop.hdds.tracing;
 
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Generic span sampler that samples every Nth span.
- * Uses a counter to ensure accurate 1-in-N sampling without dropping
+ * Probability-based span sampler that samples spans independently.
+ * Uses ThreadLocalRandom for probability decisions.
  */
 public final class LoopSampler {
-  private final long sampleInterval;
-  private final AtomicLong counter = new AtomicLong(0);
+  private final double probability;
 
-  /**
-   * @param sampleInterval sample every Nth span (e.g. 1000 = 1 in 1000)
-   */
-  public LoopSampler(long sampleInterval) {
-    if (sampleInterval <= 0) {
-      throw new IllegalArgumentException("sampleInterval must be positive: " + sampleInterval);
+  public LoopSampler(double ratio) {
+    if (ratio < 0) {
+      throw new IllegalArgumentException("Sampling ratio cannot be negative: " + ratio);
     }
-    this.sampleInterval = sampleInterval;
+    // Cap at 1.0 to prevent logic errors
+    this.probability = Math.min(ratio, 1.0);
   }
 
-  /**
-   * Returns true to sample this span, false to drop.
-   * Thread-safe; provides deterministic 1-in-N sampling.
-   */
   public boolean shouldSample() {
-    long count = counter.incrementAndGet();
-    return (count % sampleInterval) == 0;
+    if (probability <= 0) {
+      return false;
+    }
+    if (probability >= 1.0) {
+      return true;
+    }
+    return ThreadLocalRandom.current().nextDouble() < probability;
   }
 }

@@ -19,15 +19,10 @@ package org.apache.hadoop.hdds.tracing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.opentelemetry.api.common.Attributes;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.api.trace.TraceFlags;
-import io.opentelemetry.api.trace.TraceState;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import io.opentelemetry.sdk.trace.samplers.SamplingDecision;
@@ -44,40 +39,12 @@ import org.junit.jupiter.api.Test;
 public class TestSpanSampling {
 
   /**
-   * Validates the logic of the LoopSampler through the following cases:
-   * 1. Invalid intervals (0 or negative) throw an {@link IllegalArgumentException}.
-   * 2. Sampling occurs exactly every Nth attempt for a given interval.
-   * 3. An interval of 1 results in every single attempt being sampled.
-   */
-  @Test
-  public void testLoopSamplerLogic() {
-    // Tests invalid values
-    assertThrows(IllegalArgumentException.class, () -> new LoopSampler(0));
-    assertThrows(IllegalArgumentException.class, () -> new LoopSampler(-1));
-
-    // Tests functionality of a correct value
-    LoopSampler sampler3 = new LoopSampler(3);
-    assertFalse(sampler3.shouldSample(), "1st span should not be sampled");
-    assertFalse(sampler3.shouldSample(), "2nd span should not be sampled");
-    assertTrue(sampler3.shouldSample(), "3rd span should be sampled");
-    assertFalse(sampler3.shouldSample(), "4th span should not be sampled");
-    assertFalse(sampler3.shouldSample(), "5th span should not be sampled");
-    assertTrue(sampler3.shouldSample(), "6th span should be sampled");
-
-    // Tests every span is sampled for a value of 1
-    LoopSampler sampler1 = new LoopSampler(1);
-    for (int i = 1; i <= 10; i++) {
-      assertTrue(sampler1.shouldSample(), "Span " + i + " should be sampled when interval is 1");
-    }
-  }
-
-  /**
    * Tests that valid configuration strings result in a Map
    * containing the correct LoopSampler objects.
    */
   @Test
   public void testParseSpanSamplingConfigValid() throws Exception {
-    String config = "createVolume:1,createBucket:2,createKey:10";
+    String config = "createVolume:0.25,createBucket:0.5,createKey:0.75";
     Method method = TracingUtil.class.getDeclaredMethod("parseSpanSamplingConfig", String.class);
     method.setAccessible(true);
     Map<String, LoopSampler> result = (Map<String, LoopSampler>) method.invoke(null, config);
@@ -90,12 +57,12 @@ public class TestSpanSampling {
   }
 
   /**
-   * Tests that invalid entries (decimals, zeros, text, negative numbers) are caught
+   * Tests that invalid entries (zeros, negative numbers, non-numeric) are caught
    * by the try-catch blocks and excluded from the resulting Map.
    */
   @Test
   public void testParseSpanSamplingConfigInvalid() throws Exception {
-    String config = "createVolume:0.5,createBucket:0,createKey:-4.5,writeKey:-1";
+    String config = "createVolume:0,createBucket:-0.5,createKey:invalid,writeKey:-1";
 
     Method method = TracingUtil.class.getDeclaredMethod("parseSpanSamplingConfig", String.class);
     method.setAccessible(true);
@@ -112,51 +79,28 @@ public class TestSpanSampling {
    */
   @Test
   public void testParseSpanSamplingConfigMixed() throws Exception {
-    String config = "createVolume:1,createBucket:0.5";
+    String config = "createVolume:0.75,createBucket:0,createKey:-5";
 
     Method method = TracingUtil.class.getDeclaredMethod("parseSpanSamplingConfig", String.class);
     method.setAccessible(true);
 
     Map<String, LoopSampler> result = (Map<String, LoopSampler>) method.invoke(null, config);
 
-    // Verify createVolume is kept and createBucket is discarded
+    // Verify only createVolume is kept
     assertEquals(1, result.size());
     assertTrue(result.containsKey("createVolume"));
     assertFalse(result.containsKey("createBucket"));
+    assertFalse(result.containsKey("createKey"));
   }
 
-  /** Tests a SpanSampler dropping appropriate samples according to Config.
-   * (e.g., keeping every 2nd "createKey").
-   */
-  @Test
-  public void testSpanSamplingWithConfiguration() {
-    Map<String, LoopSampler> spanMap = new HashMap<>();
-    spanMap.put("createKey", new LoopSampler(2));
-
-    Sampler rootSampler = Sampler.alwaysOn();
-    SpanSampler customSampler = new SpanSampler(rootSampler, spanMap);
-
-    // Create a parent span to move from rootSampler to customSampler logic.
-    Span parentSpan = Span.wrap(SpanContext.create(
-        "00000000000000000000000000000001",
-        "0000000000000002",
-        TraceFlags.getSampled(),
-        TraceState.getDefault()));
-    Context parentContext = Context.root().with(parentSpan);
-
-    // result1 will drop and result2 will be sampled according to config
-    SamplingResult result1 = customSampler.shouldSample(parentContext, "trace1", "createKey",
-        SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
-    assertEquals(SamplingDecision.DROP, result1.getDecision());
-    SamplingResult result2 = customSampler.shouldSample(parentContext, "trace1", "createKey",
-        SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
-    assertEquals(SamplingDecision.RECORD_AND_SAMPLE, result2.getDecision());
-  }
-
+  /**
+  * Test to show sampling of span only if trace is sampled.
+   * This shows priority given to trace.
+  * */
   @Test
   public void testSpanSamplingWithTraceSampled() {
     Map<String, LoopSampler> spanMap = new HashMap<>();
-    spanMap.put("createKey", new LoopSampler(2));
+    spanMap.put("createKey", new LoopSampler(0.5));
 
     Sampler rootSampler = Sampler.alwaysOn();
     SpanSampler customSampler = new SpanSampler(rootSampler, spanMap);
@@ -168,6 +112,10 @@ public class TestSpanSampling {
     assertEquals(SamplingDecision.RECORD_AND_SAMPLE, result.getDecision());
   }
 
+  /**
+   * Test to show dropping of span only if trace is not sample sampled.
+   * This shows priority given to Trace.
+   * */
   @Test
   public void testSpanSamplingWithTraceNotSampled() {
     Map<String, LoopSampler> spanMap = new HashMap<>();
@@ -179,5 +127,30 @@ public class TestSpanSampling {
     SamplingResult rootResult = customSampler.shouldSample(parentContext, "trace1", "rootSpan",
         SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
     assertEquals(SamplingDecision.DROP, rootResult.getDecision());
+  }
+
+  @Test
+  public void testChildDropsWhenParentIsNotSampled() {
+    Map<String, LoopSampler> spanMap = new HashMap<>();
+    // Even if we set this to 100% (always sample), it should be ignored
+    spanMap.put("createKey", new LoopSampler(1.0));
+
+    SpanSampler customSampler = new SpanSampler(Sampler.alwaysOn(), spanMap);
+
+    // 1. Manually create a NOT SAMPLED parent context
+    io.opentelemetry.api.trace.Span parentSpan = io.opentelemetry.api.trace.Span.wrap(
+        io.opentelemetry.api.trace.SpanContext.create(
+            "ff000000000000000000000000000041",
+            "ff00000000000042",
+            io.opentelemetry.api.trace.TraceFlags.getDefault(), // turns off sampling bit
+            io.opentelemetry.api.trace.TraceState.getDefault()));
+
+    Context parentContext = Context.root().with(parentSpan);
+
+    SamplingResult result = customSampler.shouldSample(parentContext, "trace1", "createKey",
+        SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
+
+    //Assert that span is dropped because parent was not sampled
+    assertEquals(SamplingDecision.DROP, result.getDecision());
   }
 }
