@@ -713,14 +713,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
           " interrupted.");
     }
 
-    // As WRITE keeps happening there is probability, disk has become full during above check.
-    // We can check again if disk is full. If it is full,
-    // in this case keep volume as healthy so that READ can still be served
-    if (!diskChecksPassed && getCurrentUsage().getAvailable() < minimumDiskSpace) {
-      ioTestSlidingWindow.add(true);
-      return VolumeCheckResult.HEALTHY;
-    }
-
     // Move the sliding window of IO test results forward 1 by adding the
     // latest entry and removing the oldest entry from the window.
     // Update the failure counter for the new window.
