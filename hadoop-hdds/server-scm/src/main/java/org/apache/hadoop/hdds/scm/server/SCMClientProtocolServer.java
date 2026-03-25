@@ -1502,7 +1502,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("state", String.valueOf(state));
 
     try {
-      long count = scm.getContainerManager().getContainers(state).size();
+      long count = scm.getContainerManager().getContainerStateCount(state);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_COUNT, auditMap));
       return count;

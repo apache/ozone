@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH;
+import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT;
 
@@ -32,10 +34,8 @@ import org.slf4j.LoggerFactory;
 
 class ReconStorageContainerSyncHelper {
 
-  private static final String IPC_MAXIMUM_DATA_LENGTH = "ipc.maximum.data.length";
-  private static final int IPC_MAXIMUM_DATA_LENGTH_DEFAULT = 128 * 1024 * 1024;
-
-  // Assumption of size of 1 ContainerID proto here is 12 bytes
+  // Serialized size of one ContainerID proto on the wire (varint tag + 8-byte long = ~12 bytes).
+  // Used to derive the maximum batch size that fits within ipc.maximum.data.length.
   private static final long CONTAINER_ID_PROTO_SIZE_BYTES = 12;
 
   private static final Logger LOG = LoggerFactory

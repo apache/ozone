@@ -222,14 +222,36 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT = "10m";
 
   /**
-   * Maximum number of ContainerIDs to fetch from SCM per RPC call
-   * during container sync. Each ContainerID is approximately 12 bytes
-   * on the wire. Reduce this value on memory-constrained Recon nodes.
-   * Default: 500,000 (~16MB heap per batch, 8 calls for a 4M container cluster)
+   * Application-level ceiling on the number of ContainerIDs fetched from SCM
+   * per RPC call during container sync. The effective batch size is
+   * {@code min(this value, ipc.maximum.data.length / 12, totalContainerCount)},
+   * so raising this above the default is only meaningful if
+   * {@code ipc.maximum.data.length} has also been raised from its default.
+   *
+   * <p><b>Recon wire cost</b>: each ContainerID is ~12 bytes on the wire, so
+   * the default 1,000,000 produces ~12 MB per RPC.
+   *
+   * <p><b>Recon JVM heap</b>: each deserialized {@code ContainerID} object
+   * occupies ~32 bytes, so the default batch requires ~32 MB of heap on Recon.
+   * Reduce this value on memory-constrained Recon nodes.
+   *
+   * <p><b>SCM-side pressure</b>: on each RPC call SCM holds its container
+   * state read lock (a fair {@link java.util.concurrent.locks.ReentrantReadWriteLock})
+   * for the full duration of streaming N entries from its in-memory
+   * {@link java.util.TreeMap} and collecting them into a response list.
+   * Because the lock is fair, any concurrent write (container allocation,
+   * state transition) queuing for the write lock will be blocked for the
+   * entire batch duration — and new reads queue behind that waiting writer.
+   * Larger batches therefore increase worst-case container-allocation latency
+   * on SCM during sync. On write-heavy SCM nodes, prefer smaller batches with
+   * more calls over fewer large batches.
+   *
+   * <p>Default: 1,000,000 (~12 MB wire, ~32 MB JVM heap per batch on Recon;
+   * 4 calls for a 4 M-container cluster)
    */
   public static final String OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE =
       "ozone.recon.scm.container.id.batch.size";
-  public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 500_000;
+  public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
 
   /**
    * Private constructor for utility class.
