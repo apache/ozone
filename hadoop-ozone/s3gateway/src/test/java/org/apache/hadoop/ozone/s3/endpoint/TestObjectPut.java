@@ -583,9 +583,6 @@ class TestObjectPut {
     String etag = response.getHeaderString(HttpHeaders.ETAG);
     assertNotNull(etag);
 
-    // Strip quotes from the ETag
-    String rawEtag = etag.replace("\"", "");
-
     // Now try to rewrite with matching ETag
     when(headers.getHeaderString("If-Match")).thenReturn(etag);
 

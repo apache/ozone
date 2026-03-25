@@ -4566,12 +4566,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertNotNull(omMultipartUploadCompleteInfo.getHash());
   }
 
-  private OzoneOutputStream openTestKey(OzoneBucket bucket, String keyName, String keyValue) throws IOException {
-    return bucket.createKey(keyName, keyValue.getBytes(UTF_8).length,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-        singletonMap("key", RandomStringUtils.secure().nextAscii(10)));
-  }
-
   private OzoneKeyDetails createTestKey(OzoneBucket bucket) throws IOException {
     return createTestKey(bucket, getTestName(), UUID.randomUUID().toString());
   }
