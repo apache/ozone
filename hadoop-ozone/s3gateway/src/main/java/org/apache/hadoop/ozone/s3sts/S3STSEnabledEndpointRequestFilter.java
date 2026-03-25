@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 /**
  * Filter that disables all endpoints annotated with {@link S3STSEnabled}.
  * Condition is based on the value of the configuration key
- * ozone.s3g.s3sts.http.enabled.
+ * ozone.s3g.sts.http.enabled.
  */
 @S3STSEnabled
 @Provider

@@ -163,7 +163,9 @@ public class BucketEndpoint extends EndpointBase {
     } catch (OMException ex) {
       auditReadFailure(s3GAction, ex);
       getMetrics().updateGetBucketFailureStats(startNanos);
-      if (isAccessDenied(ex)) {
+      if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, bucketName, ex);
+      } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
         // File not found, continue and send normal response with 0 keyCount
@@ -362,7 +364,9 @@ public class BucketEndpoint extends EndpointBase {
     } catch (OMException exception) {
       auditReadFailure(s3GAction, exception);
       getMetrics().updateListMultipartUploadsFailureStats(startNanos);
-      if (isAccessDenied(exception)) {
+      if (isExpiredToken(exception)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, prefix, exception);
+      } else if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
       throw exception;
