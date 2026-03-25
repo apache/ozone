@@ -18,8 +18,10 @@
 package org.apache.hadoop.hdds.tracing;
 
 import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Context;
+import io.opentelemetry.sdk.trace.data.LinkData;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import io.opentelemetry.sdk.trace.samplers.SamplingResult;
 import java.util.List;
@@ -29,7 +31,7 @@ import java.util.Map;
  * Custom Sampler that applies span-level sampling for configured
  * span names, and delegates to parent-based strategy otherwise.
  * When a span name is in the configured spanMap, uses LoopSampler for
- * deterministic 1-in-N sampling, otherwise follows the parent span's
+ * probabilistic sampling, otherwise follows the parent span's
  * sampling decision.
  */
 public final class SpanSampler implements Sampler {
@@ -44,17 +46,20 @@ public final class SpanSampler implements Sampler {
   }
 
   @Override
-  public SamplingResult shouldSample(Context parentContext, String traceId,
-                                     String spanName, SpanKind spanKind, Attributes attributes,
-                                     List<io.opentelemetry.sdk.trace.data.LinkData> parentLinks) {
+  public SamplingResult shouldSample(
+      Context parentContext,
+      String traceId,
+      String spanName,
+      SpanKind spanKind,
+      Attributes attributes,
+      List<LinkData> parentLinks) {
 
-    // First, check if we have a valid parent span
-    io.opentelemetry.api.trace.Span parentSpan =
-        io.opentelemetry.api.trace.Span.fromContext(parentContext);
+    Span parentSpan = Span.fromContext(parentContext);
 
+    // check if we have a valid parent span
     if (!parentSpan.getSpanContext().isValid()) {
       // Root span: always delegate to trace-level sampler
-      // This ensures OTEL_TRACES_SAMPLER_ARG=0.5 is respected
+      // This ensures OTEL_TRACES_SAMPLER_ARG is respected
       return rootSampler.shouldSample(parentContext, traceId, spanName,
           spanKind, attributes, parentLinks);
     }
@@ -80,6 +85,6 @@ public final class SpanSampler implements Sampler {
 
   @Override
   public String getDescription() {
-    return "SpanSamplingCustomSampler(spanMap=" + spanMap.keySet() + ")";
+    return "SpanSampler(spanMap=" + spanMap.keySet() + ")";
   }
 }

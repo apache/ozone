@@ -17,12 +17,13 @@
 
 package org.apache.hadoop.hdds.tracing;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import io.opentelemetry.sdk.trace.samplers.SamplingDecision;
@@ -49,11 +50,10 @@ public class TestSpanSampling {
     method.setAccessible(true);
     Map<String, LoopSampler> result = (Map<String, LoopSampler>) method.invoke(null, config);
 
-    // Verify all 3 valid entries exist
-    assertEquals(3, result.size());
-    assertTrue(result.containsKey("createVolume"));
-    assertTrue(result.containsKey("createBucket"));
-    assertTrue(result.containsKey("createKey"));
+    assertThat(result)
+        .hasSize(3)
+        .containsKeys("createVolume", "createBucket", "createKey");
+
   }
 
   /**
@@ -63,14 +63,11 @@ public class TestSpanSampling {
   @Test
   public void testParseSpanSamplingConfigInvalid() throws Exception {
     String config = "createVolume:0,createBucket:-0.5,createKey:invalid,writeKey:-1";
-
     Method method = TracingUtil.class.getDeclaredMethod("parseSpanSamplingConfig", String.class);
     method.setAccessible(true);
-
     Map<String, LoopSampler> result = (Map<String, LoopSampler>) method.invoke(null, config);
 
-    // Verify the map is empty because every entry was invalid
-    assertTrue(result.isEmpty(), "The map should be empty as all inputs were invalid");
+    assertThat(result).as("The map should be empty as all inputs were invalid").isEmpty();
   }
 
   /**
@@ -86,17 +83,16 @@ public class TestSpanSampling {
 
     Map<String, LoopSampler> result = (Map<String, LoopSampler>) method.invoke(null, config);
 
-    // Verify only createVolume is kept
-    assertEquals(1, result.size());
-    assertTrue(result.containsKey("createVolume"));
-    assertFalse(result.containsKey("createBucket"));
-    assertFalse(result.containsKey("createKey"));
+    assertThat(result)
+        .hasSize(1)
+        .containsKey("createVolume")
+        .doesNotContainKeys("createBucket", "createKey");
   }
 
   /**
-  * Test to show sampling of span only if trace is sampled.
-   * This shows priority given to trace.
-  * */
+   * Test to show sampling of span only if trace is sampled.
+   * Trace is always sampled and span name is not mentioned in config, Hence it will be sampled.
+   */
   @Test
   public void testSpanSamplingWithTraceSampled() {
     Map<String, LoopSampler> spanMap = new HashMap<>();
@@ -123,34 +119,35 @@ public class TestSpanSampling {
     SpanSampler customSampler = new SpanSampler(rootSampler, spanMap);
     Context parentContext = Context.current();
 
-    // Root span with alwaysOff should not be sampled.
-    SamplingResult rootResult = customSampler.shouldSample(parentContext, "trace1", "rootSpan",
+    SamplingResult result = customSampler.shouldSample(parentContext, "trace1", "rootSpan",
         SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
-    assertEquals(SamplingDecision.DROP, rootResult.getDecision());
+
+    // Root span with alwaysOff should not be sampled.
+    assertEquals(SamplingDecision.DROP, result.getDecision());
   }
 
+  /**
+   * Test to show child span is not sampled when parent span is also not sampled.
+   */
   @Test
   public void testChildDropsWhenParentIsNotSampled() {
     Map<String, LoopSampler> spanMap = new HashMap<>();
-    // Even if we set this to 100% (always sample), it should be ignored
     spanMap.put("createKey", new LoopSampler(1.0));
 
     SpanSampler customSampler = new SpanSampler(Sampler.alwaysOn(), spanMap);
 
-    // 1. Manually create a NOT SAMPLED parent context
     io.opentelemetry.api.trace.Span parentSpan = io.opentelemetry.api.trace.Span.wrap(
         io.opentelemetry.api.trace.SpanContext.create(
             "ff000000000000000000000000000041",
             "ff00000000000042",
-            io.opentelemetry.api.trace.TraceFlags.getDefault(), // turns off sampling bit
-            io.opentelemetry.api.trace.TraceState.getDefault()));
+            TraceFlags.getDefault(),
+            TraceState.getDefault()));
 
     Context parentContext = Context.root().with(parentSpan);
 
     SamplingResult result = customSampler.shouldSample(parentContext, "trace1", "createKey",
         SpanKind.INTERNAL, Attributes.empty(), Collections.emptyList());
 
-    //Assert that span is dropped because parent was not sampled
     assertEquals(SamplingDecision.DROP, result.getDecision());
   }
 }

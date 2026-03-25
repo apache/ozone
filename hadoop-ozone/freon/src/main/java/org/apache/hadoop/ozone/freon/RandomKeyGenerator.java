@@ -714,23 +714,27 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     @Override
     public void run() {
       try (Scope scope = parentSpan.makeCurrent()) {
-        int v;
-        while ((v = volumeCounter.getAndIncrement()) < numOfVolumes) {
-          if (!createVolume(v)) {
-            return;
-          }
+        createObjects();
+      }
+    }
+
+    private void createObjects() {
+      int v;
+      while ((v = volumeCounter.getAndIncrement()) < numOfVolumes) {
+        if (!createVolume(v)) {
+          return;
         }
-        int b;
-        while ((b = bucketCounter.getAndIncrement()) < totalBucketCount) {
-          if (!createBucket(b)) {
-            return;
-          }
+      }
+      int b;
+      while ((b = bucketCounter.getAndIncrement()) < totalBucketCount) {
+        if (!createBucket(b)) {
+          return;
         }
-        long k;
-        while ((k = keyCounter.getAndIncrement()) < totalKeyCount) {
-          if (!createKey(k)) {
-            return;
-          }
+      }
+      long k;
+      while ((k = keyCounter.getAndIncrement()) < totalKeyCount) {
+        if (!createKey(k)) {
+          return;
         }
       }
     }
