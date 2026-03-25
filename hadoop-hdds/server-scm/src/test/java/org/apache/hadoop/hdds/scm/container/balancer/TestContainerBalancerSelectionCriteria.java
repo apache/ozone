@@ -146,7 +146,7 @@ public class TestContainerBalancerSelectionCriteria {
     DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
 
-    // Over-replicated CLOSED container with 3 CLOSED + 1 QUASI_CLOSED replica
+    // Over-replicated CLOSED container with 3 CLOSED + 1 QUASI_CLOSED replica (non-empty)
     Set<ContainerReplica> replicas = new HashSet<>();
     replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
         CLOSED, 1L, OzoneConsts.GB, source, source.getID()));
@@ -189,6 +189,53 @@ public class TestContainerBalancerSelectionCriteria {
   }
 
   @Test
+  public void shouldExcludeEmptyQuasiClosedReplicas() throws Exception {
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+
+    // Over-replicated CLOSED container with 3 CLOSED + 1 QUASI_CLOSED replica (empty)
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        CLOSED, 1L, OzoneConsts.GB, source, source.getID()));
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        CLOSED, 1L, OzoneConsts.GB, dn2, dn2.getID()));
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        CLOSED, 1L, OzoneConsts.GB, dn3, dn3.getID()));
+
+    // Empty QUASI_CLOSED replica
+    ContainerReplica emptyQuasiClosedReplica = ContainerReplica.newBuilder()
+        .setContainerID(containerID)
+        .setContainerState(QUASI_CLOSED)
+        .setSequenceId(0L)
+        .setKeyCount(0)
+        .setBytesUsed(0)
+        .setReplicaIndex(0)
+        .setDatanodeDetails(dn4)
+        .setEmpty(true)
+        .build();
+    replicas.add(emptyQuasiClosedReplica);
+
+    when(containerManager.getContainerReplicas(containerID)).thenReturn(replicas);
+    when(replicationManager.getContainerReplicationHealth(eq(containerInfo), anySet()))
+        .thenReturn(new ContainerHealthResult.OverReplicatedHealthResult(containerInfo, 1, false));
+
+    balancerConfiguration.setIncludeNonStandardContainers(true);
+    ContainerBalancerSelectionCriteria configEnabled = new ContainerBalancerSelectionCriteria(
+        balancerConfiguration, nodeManager, replicationManager,
+        containerManager, findSourceStrategy, new HashMap<>());
+
+    // CLOSED replicas can be moved
+    assertFalse(configEnabled.shouldBeExcluded(containerID, source, 0L));
+    assertFalse(configEnabled.shouldBeExcluded(containerID, dn2, 0L));
+    assertFalse(configEnabled.shouldBeExcluded(containerID, dn3, 0L));
+
+    // Empty QUASI_CLOSED replica should be EXCLUDED
+    assertTrue(configEnabled.shouldBeExcluded(containerID, dn4, 0L),
+        "Empty QUASI_CLOSED replica should be excluded from balancing");
+  }
+
+  @Test
   public void shouldIncludeQuasiClosedContainers() throws Exception {
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
@@ -222,7 +269,7 @@ public class TestContainerBalancerSelectionCriteria {
     // All QUASI_CLOSED replicas can be moved because:
     // - Config is enabled
     // - Container is QUASI_CLOSED
-    // - All replicas are QUASI_CLOSED (consistent state)
+    // - All replicas are non-empty QUASI_CLOSED (consistent state)
     assertFalse(configEnabled.shouldBeExcluded(quasiClosedContainerID, source, 0L));
     assertFalse(configEnabled.shouldBeExcluded(quasiClosedContainerID, dn2, 0L));
     assertFalse(configEnabled.shouldBeExcluded(quasiClosedContainerID, dn3, 0L));
