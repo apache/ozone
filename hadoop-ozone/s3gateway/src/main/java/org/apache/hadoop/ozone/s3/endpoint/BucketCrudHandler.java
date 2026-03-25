@@ -111,6 +111,8 @@ public class BucketCrudHandler extends BucketOperationHandler {
         throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
       } else if (ex.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, bucketName, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {

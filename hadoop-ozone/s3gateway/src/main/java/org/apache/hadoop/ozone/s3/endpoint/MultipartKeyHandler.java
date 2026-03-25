@@ -164,6 +164,8 @@ class MultipartKeyHandler extends ObjectOperationHandler {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadId, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, bucketName + "/" + key + "/" + uploadId, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             bucketName + "/" + key + "/" + uploadId, ex);

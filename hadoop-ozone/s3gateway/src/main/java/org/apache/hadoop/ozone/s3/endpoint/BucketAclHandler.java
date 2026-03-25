@@ -113,6 +113,8 @@ public class BucketAclHandler extends BucketOperationHandler {
       auditReadFailure(context.getAction(), ex);
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, bucketName, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else {
@@ -232,6 +234,8 @@ public class BucketAclHandler extends BucketOperationHandler {
       auditWriteFailure(context.getAction(), exception);
       if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
+      } else if (isExpiredToken(exception)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, bucketName, exception);
       } else if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, exception);
       }

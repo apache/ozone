@@ -883,6 +883,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Returns true if the current RPC handler thread is processing an S3 request
+   * authenticated via STS temporary credentials.
+   */
+  public static boolean isStsS3Request() {
+    return getS3Auth() != null && getStsTokenIdentifier() != null;
+  }
+
+  /**
    * Returns the effective accessId for the current request.  If STS temporary credentials are being used,
    * the access key id will be the original access key id (i.e. the creator of the token).
    */
@@ -4026,9 +4034,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final String realVolumeName = bucket.realVolume();
+    final String realBucketName = bucket.realBucket();
 
-    Map<String, String> auditMap = bucket.audit();
+    if (getAclsEnabled() && isStsS3Request()) {
+      omMetadataReader.checkAcls(
+          ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, null);
+      omMetadataReader.checkAcls(
+          ResourceType.KEY, StoreType.OZONE, ACLType.LIST, realVolumeName, realBucketName, keyName);
+    }
+
+    final Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.KEY, keyName);
     auditMap.put(OzoneConsts.UPLOAD_ID, uploadID);
     auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
@@ -4037,9 +4054,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metrics.incNumListMultipartUploadParts();
     try {
-      OmMultipartUploadListParts omMultipartUploadListParts =
-          keyManager.listParts(bucket.realVolume(), bucket.realBucket(),
-              keyName, uploadID, partNumberMarker, maxParts);
+      final OmMultipartUploadListParts omMultipartUploadListParts = keyManager.listParts(
+          realVolumeName, realBucketName, keyName, uploadID, partNumberMarker, maxParts);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap));
       return omMultipartUploadListParts;
@@ -4057,15 +4073,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final String realVolumeName = bucket.realVolume();
+    final String realBucketName = bucket.realBucket();
 
-    Map<String, String> auditMap = bucket.audit();
+    final Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.PREFIX, prefix);
 
-    metrics.incNumListMultipartUploads();
     try {
-      OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(bucket.realVolume(),
-          bucket.realBucket(), prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
+      if (getAclsEnabled() && isStsS3Request()) {
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, null);
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, realVolumeName, realBucketName, null);
+      }
+
+      metrics.incNumListMultipartUploads();
+      final OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(
+          realVolumeName, realBucketName, prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_MULTIPART_UPLOADS, auditMap));
       return omMultipartUploadList;
 

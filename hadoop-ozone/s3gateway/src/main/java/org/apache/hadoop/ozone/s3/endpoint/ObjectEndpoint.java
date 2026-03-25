@@ -179,6 +179,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             " considered as Unix Paths. Path has Violated FS Semantics " +
             "which caused put operation to fail.");
         throw os3Exception;
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, keyPath, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.QUOTA_EXCEEDED) {
@@ -375,6 +377,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, keyPath, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
@@ -554,6 +558,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
         return Response.status(Status.NOT_FOUND).build();
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, keyPath, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
@@ -640,6 +646,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
         return Response.status(Status.NO_CONTENT).build();
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, keyPath, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.NOT_SUPPORTED_OPERATION) {
@@ -714,6 +722,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     } catch (OMException ex) {
       auditWriteFailure(s3GAction, ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
+      if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, key, ex);
+      }
       if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
       }
@@ -794,6 +805,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             "considered as Unix Paths. A directory already exists with a " +
             "given KeyName caused failure for MPU");
         throw os3Exception;
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, key, ex);
+      } else if (isAccessDenied(ex)) {
+        throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucket, ex);
       }
@@ -959,6 +974,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, bucketName + "/" + key, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName + "/" + key, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_PART) {
@@ -1114,6 +1131,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, destBucket + "/" + destkey, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             destBucket + "/" + destkey, ex);

@@ -24,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -31,6 +34,7 @@ import java.util.Map;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
@@ -126,4 +130,56 @@ public class TestEndpointBase {
     assertFalse(endpointBase.isAccessDenied(new OMException(ResultCodes.BUCKET_NOT_FOUND)));
   }
 
+  @Test
+  public void testExpiredTokenResultCode() {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+    };
+
+    assertTrue(endpointBase.isExpiredToken(new OMException(ResultCodes.TOKEN_EXPIRED)));
+    assertFalse(endpointBase.isExpiredToken(new OMException(ResultCodes.INVALID_TOKEN)));
+  }
+
+  @Test
+  public void testListS3BucketsHandlesRuntimeExceptionWrappingOMException() throws Exception {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+
+      @Override
+      protected OzoneVolume getVolume() {
+        final OzoneVolume volume = mock(OzoneVolume.class);
+        when(volume.listBuckets(anyString())).thenThrow(
+            new RuntimeException(new OMException("Permission Denied", ResultCodes.PERMISSION_DENIED)));
+        return volume;
+      }
+    };
+
+    final OS3Exception e = assertThrows(
+        OS3Exception.class, () -> endpointBase.listS3Buckets(
+            "prefix", volume -> { }), "listS3Buckets should fail.");
+
+    // Ensure we get the correct code
+    assertEquals("AccessDenied", e.getCode());
+  }
+
+  @Test
+  public void testListS3BucketsHandlesRuntimeExceptionWrappingOMExceptionVolumeNotFound() throws Exception {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+
+      @Override
+      protected OzoneVolume getVolume() {
+        final OzoneVolume volume = mock(OzoneVolume.class);
+        when(volume.listBuckets(anyString())).thenThrow(
+            new RuntimeException(new OMException("Volume Not Found", ResultCodes.VOLUME_NOT_FOUND)));
+        return volume;
+      }
+    };
+
+    // Ensure we get an empty iterator
+    assertFalse(endpointBase.listS3Buckets("prefix", volume -> { }).hasNext());
+  }
 }
