@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -160,7 +161,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.dnConf = conf.getObject(DatanodeConfiguration.class);
       this.ioTestCount = dnConf.getVolumeIOTestCount();
       this.ioTestSlidingWindow = new SlidingWindow(dnConf.getVolumeIOFailureTolerance(),
-          dnConf.getDiskCheckSlidingWindowTimeout());
+          dnConf.getDiskCheckSlidingWindowTimeout(), b.getClock());
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
@@ -405,6 +406,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     private boolean failedVolume = false;
     private String datanodeUuid;
     private String clusterID;
+    private Clock clock = new SlidingWindow.MonotonicClock();
 
     public Builder(String volumeRootStr, String storageDirStr) {
       this.volumeRootStr = volumeRootStr;
@@ -451,6 +453,11 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       return this.getThis();
     }
 
+    public T clock(Clock c) {
+      this.clock = c;
+      return this.getThis();
+    }
+
     public abstract StorageVolume build() throws IOException;
 
     public String getVolumeRootStr() {
@@ -467,6 +474,10 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
     public String getStorageDirStr() {
       return this.storageDirStr;
+    }
+
+    public Clock getClock() {
+      return this.clock;
     }
   }
 
