@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -57,6 +58,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 /**
  * Test for DeletedBlocksTxnSubcommand Cli.
@@ -67,6 +69,7 @@ public class TestDeletedBlocksTxnShell {
       .getLogger(TestDeletedBlocksTxnShell.class);
 
   private final PrintStream originalOut = System.out;
+  private final InputStream originalIn = System.in;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
@@ -112,6 +115,7 @@ public class TestDeletedBlocksTxnShell {
       cluster.shutdown();
     }
     System.setOut(originalOut);
+    System.setIn(originalIn);
   }
 
   //<containerID,  List<blockID>>
@@ -196,5 +200,121 @@ public class TestDeletedBlocksTxnShell {
     assertTrue(output.contains("Total number of blocks: 150"));
     assertTrue(output.contains("Total size of blocks: 15000"));
     assertTrue(output.contains("Total replicated size of blocks: 45000"));
+  }
+
+  @Test
+  public void testDetailModeSubcommand() throws Exception {
+    DeletedBlockLog deletedBlockLog = getSCMLeader()
+        .getScmBlockManager().getDeletedBlockLog();
+    deletedBlockLog.addTransactions(generateData(30));
+    flush();
+    GetDeletedBlockSummarySubcommand cmd = new GetDeletedBlockSummarySubcommand();
+    new CommandLine(cmd).parseArgs("--detail");
+    outContent.reset();
+    try (ContainerOperationClient scmClient = new ContainerOperationClient(conf)) {
+      cmd.execute(scmClient);
+    }
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertTrue(output.contains("Checkpoint Comparison"));
+    assertTrue(output.contains("Total transactions"));
+    assertTrue(output.contains("Total blocks"));
+    assertTrue(output.contains("30"));
+    assertTrue(output.contains("150"));
+  }
+
+  @Test
+  public void testRepairModeSubcommandConsistentStateSkipsRepair() throws Exception {
+    DeletedBlockLog deletedBlockLog = getSCMLeader()
+        .getScmBlockManager().getDeletedBlockLog();
+    deletedBlockLog.addTransactions(generateData(20));
+    flush();
+    GetDeletedBlockSummarySubcommand cmd = new GetDeletedBlockSummarySubcommand();
+    new CommandLine(cmd).parseArgs("--repair");
+    outContent.reset();
+    try (ContainerOperationClient scmClient = new ContainerOperationClient(conf)) {
+      cmd.execute(scmClient);
+    }
+
+    // Checkpoint is internally consistent: actual == persisted, so repair is not prompted.
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertTrue(output.contains("nothing to repair"));
+  }
+
+  @Test
+  public void testGetTransactionSummaryFromCheckpoint() throws Exception {
+    int txCount = 20;
+    DeletedBlockLog deletedBlockLog = getSCMLeader()
+        .getScmBlockManager().getDeletedBlockLog();
+    deletedBlockLog.addTransactions(generateData(txCount));
+    flush();
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(false);
+
+    DeletedBlocksTransactionSummary actual = result.getCheckpointActual();
+    assertEquals(txCount, actual.getTotalTransactionCount());
+    assertEquals((long) txCount * BLOCKS_PER_TX, actual.getTotalBlockCount());
+    assertEquals((long) txCount * BLOCKS_PER_TX * BLOCK_SIZE, actual.getTotalBlockSize());
+    assertEquals((long) txCount * BLOCKS_PER_TX * BLOCK_REPLICATED_SIZE,
+        actual.getTotalBlockReplicatedSize());
+  }
+
+  @Test
+  public void testGetTransactionSummaryFromCheckpointMatchesPersisted() throws Exception {
+    int txCount = 15;
+    DeletedBlockLog deletedBlockLog = getSCMLeader()
+        .getScmBlockManager().getDeletedBlockLog();
+    deletedBlockLog.addTransactions(generateData(txCount));
+    flush();
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(false);
+    DeletedBlocksTransactionSummary actual = result.getCheckpointActual();
+    DeletedBlocksTransactionSummary persisted = result.getCheckpointPersisted();
+
+    // After a clean add+flush, the checkpoint's persisted summary must match its actual counts.
+    assertEquals(actual.getTotalTransactionCount(), persisted.getTotalTransactionCount());
+    assertEquals(actual.getTotalBlockCount(), persisted.getTotalBlockCount());
+    assertEquals(actual.getTotalBlockSize(), persisted.getTotalBlockSize());
+    assertEquals(actual.getTotalBlockReplicatedSize(), persisted.getTotalBlockReplicatedSize());
+  }
+
+  @Test
+  public void testRepairFromCheckpointConsistentStateLeavesCountersUnchanged() throws Exception {
+    int txCount = 10;
+    DeletedBlockLog deletedBlockLog = getSCMLeader()
+        .getScmBlockManager().getDeletedBlockLog();
+    deletedBlockLog.addTransactions(generateData(txCount));
+    flush();
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(true);
+
+    // When cpActual == cpPersisted, the diff is 0 and the live in-memory counters are not changed.
+    assertEquals(result.getLiveInMemBefore().getTotalTransactionCount(),
+        result.getLiveInMemAfter().getTotalTransactionCount());
+    assertEquals(result.getLiveInMemBefore().getTotalBlockCount(),
+        result.getLiveInMemAfter().getTotalBlockCount());
+    assertEquals(result.getLiveInMemBefore().getTotalBlockSize(),
+        result.getLiveInMemAfter().getTotalBlockSize());
+    assertEquals(result.getLiveInMemBefore().getTotalBlockReplicatedSize(),
+        result.getLiveInMemAfter().getTotalBlockReplicatedSize());
+  }
+
+  @Test
+  public void testLiveInMemBeforeMatchesCurrentSummary() throws Exception {
+    int txCount = 25;
+    DeletedBlockLog deletedBlockLog = getSCMLeader()
+        .getScmBlockManager().getDeletedBlockLog();
+    deletedBlockLog.addTransactions(generateData(txCount));
+    flush();
+    DeletedBlocksTransactionSummary inMem = deletedBlockLog.getTransactionSummary();
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(false);
+
+    assertEquals(inMem.getTotalTransactionCount(),
+        result.getLiveInMemBefore().getTotalTransactionCount());
+    assertEquals(inMem.getTotalBlockCount(),
+        result.getLiveInMemBefore().getTotalBlockCount());
+    assertEquals(inMem.getTotalBlockSize(),
+        result.getLiveInMemBefore().getTotalBlockSize());
   }
 }

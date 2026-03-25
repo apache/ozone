@@ -128,4 +128,56 @@ public interface DeletedBlockLog extends Closeable {
 
   @Nullable
   DeletedBlocksTransactionSummary getTransactionSummary();
+
+  /**
+   * Takes a RocksDB checkpoint, scans the deletedBlocks table in the
+   * checkpoint, and compares the actual row counts with the persisted summary
+   * stored in the same checkpoint.
+   *
+   * <p>When {@code repair} is {@code true}, the diff (actual - persisted) is
+   * applied to the live in-memory counters and the live persisted summary.
+   *
+   * @return a {@link CheckpointSummaryResult} carrying both sides of the
+   *         comparison and the live in-memory state before/after repair.
+   */
+  CheckpointSummaryResult getTransactionSummaryFromCheckpoint(boolean repair)
+      throws IOException;
+
+  /**
+   * Result of a checkpoint-based summary comparison, holding both sides of
+   * the comparison so the CLI can display them side-by-side.
+   */
+  final class CheckpointSummaryResult {
+    private final DeletedBlocksTransactionSummary checkpointActual;
+    private final DeletedBlocksTransactionSummary checkpointPersisted;
+    private final DeletedBlocksTransactionSummary liveInMemBefore;
+    private final DeletedBlocksTransactionSummary liveInMemAfter;
+
+    public CheckpointSummaryResult(
+        DeletedBlocksTransactionSummary checkpointActual,
+        DeletedBlocksTransactionSummary checkpointPersisted,
+        DeletedBlocksTransactionSummary liveInMemBefore,
+        DeletedBlocksTransactionSummary liveInMemAfter) {
+      this.checkpointActual = checkpointActual;
+      this.checkpointPersisted = checkpointPersisted;
+      this.liveInMemBefore = liveInMemBefore;
+      this.liveInMemAfter = liveInMemAfter;
+    }
+
+    public DeletedBlocksTransactionSummary getCheckpointActual() {
+      return checkpointActual;
+    }
+
+    public DeletedBlocksTransactionSummary getCheckpointPersisted() {
+      return checkpointPersisted;
+    }
+
+    public DeletedBlocksTransactionSummary getLiveInMemBefore() {
+      return liveInMemBefore;
+    }
+
+    public DeletedBlocksTransactionSummary getLiveInMemAfter() {
+      return liveInMemAfter;
+    }
+  }
 }

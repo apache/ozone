@@ -185,6 +185,11 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public boolean hasPendingOperations() {
+    return txFlushPending.get() > 0;
+  }
+
+  @Override
   public String toString() {
     return latestTrxInfo.toString();
   }

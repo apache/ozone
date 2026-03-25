@@ -46,5 +46,16 @@ public interface SCMHADBTransactionBuffer
 
   boolean shouldFlush(long snapshotWaitTime);
 
+  /**
+   * Returns {@code true} when the buffer holds uncommitted RocksDB operations
+   * (puts or deletes) that have been counted in the in-memory summary but have
+   * not yet been flushed to RocksDB via a Raft batch.
+   *
+   * <p>Used by {@code DeletedBlockLogImpl} to distinguish a legitimate
+   * "in-memory &gt; DB-active" gap (pending Raft additions) from a genuine
+   * in-memory over-count bug.
+   */
+  boolean hasPendingOperations();
+
   void init() throws RocksDatabaseException, CodecException;
 }

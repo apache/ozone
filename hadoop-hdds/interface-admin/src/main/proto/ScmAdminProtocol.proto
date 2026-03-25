@@ -88,6 +88,8 @@ message ScmContainerLocationRequest {
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
   optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
   optional SCMListContainerIDsRequestProto scmListContainerIDsRequest = 51;
+  optional GetDeletedBlocksTxnSummaryFromCheckpointRequestProto getDeletedBlocksTxnSummaryFromCheckpointRequest = 52;
+  optional RepairDeletedBlocksTxnSummaryFromCheckpointRequestProto repairDeletedBlocksTxnSummaryFromCheckpointRequest = 53;
 }
 
 message ScmContainerLocationResponse {
@@ -147,6 +149,8 @@ message ScmContainerLocationResponse {
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
   optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
   optional SCMListContainerIDsResponseProto scmListContainerIDsResponse = 51;
+  optional RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto getDeletedBlocksTxnSummaryFromCheckpointResponse = 52;
+  optional RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto repairDeletedBlocksTxnSummaryFromCheckpointResponse = 53;
 
   enum Status {
     OK = 1;
@@ -205,6 +209,8 @@ enum Type {
   ReconcileContainer = 45;
   GetDeletedBlocksTransactionSummary = 46;
   ListContainerIDs = 47;
+  GetDeletedBlocksTransactionSummaryFromCheckpoint = 48;
+  RepairDeletedBlocksTransactionSummaryFromCheckpoint = 49;
 }
 
 /**
@@ -717,4 +723,17 @@ message ReconcileContainerResponseProto {
  */
 service StorageContainerLocationProtocolService {
   rpc submitRequest (ScmContainerLocationRequest) returns (ScmContainerLocationResponse);
+}
+
+message GetDeletedBlocksTxnSummaryFromCheckpointRequestProto {
+}
+
+message RepairDeletedBlocksTxnSummaryFromCheckpointRequestProto {
+}
+
+message RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto {
+  optional DeletedBlocksTransactionSummary checkpointActual = 1;
+  optional DeletedBlocksTransactionSummary checkpointPersisted = 2;
+  optional DeletedBlocksTransactionSummary liveInMemBefore = 3;
+  optional DeletedBlocksTransactionSummary liveInMemAfter = 4;
 }

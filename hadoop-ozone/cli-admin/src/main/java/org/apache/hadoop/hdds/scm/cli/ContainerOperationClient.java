@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -568,6 +569,18 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException {
     return storageContainerLocationClient.getDeletedBlockSummary();
+  }
+
+  @Override
+  public RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      getDeletedBlockSummaryFromCheckpoint() throws IOException {
+    return storageContainerLocationClient.getDeletedBlockSummaryFromCheckpoint();
+  }
+
+  @Override
+  public RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      repairDeletedBlockSummaryFromCheckpoint() throws IOException {
+    return storageContainerLocationClient.repairDeletedBlockSummaryFromCheckpoint();
   }
 
   @Override

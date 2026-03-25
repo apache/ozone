@@ -127,6 +127,11 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public boolean hasPendingOperations() {
+    return false;
+  }
+
+  @Override
   public void close() throws RocksDatabaseException {
     flush();
   }

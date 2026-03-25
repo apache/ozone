@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -419,6 +420,14 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException;
+
+  /** Take a checkpoint and compare actual vs persisted summary (no repair). */
+  RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      getDeletedBlockSummaryFromCheckpoint() throws IOException;
+
+  /** Take a checkpoint, compute diff, apply to live state. */
+  RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      repairDeletedBlockSummaryFromCheckpoint() throws IOException;
 
   /**
    * Get usage information of datanode by address or uuid.
