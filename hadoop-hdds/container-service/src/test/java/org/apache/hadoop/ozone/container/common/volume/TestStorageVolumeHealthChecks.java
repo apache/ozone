@@ -317,12 +317,14 @@ public class TestStorageVolumeHealthChecks {
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
     // Sliding window protocol transitioned from count-based to a time-based system
-    // Update the default failure duration of the window from 60 minutes to a shorter duration for the test
-    long eventRate = 1L;
+    // Update the event rate so that all the tested events are processed within the same sliding window period
+    long slidingWindowTimeoutMillis = volume.getConf().getObject(DatanodeConfiguration.class)
+        .getDiskCheckSlidingWindowTimeout().toMillis();
+    long eventRateMillis = slidingWindowTimeoutMillis / ioTestCount;
 
     for (int i = 0; i < checkResults.length; i++) {
       // Sleep to allow entries in the sliding window to eventually timeout
-      TEST_CLOCK.fastForward(eventRate);
+      TEST_CLOCK.fastForward(eventRateMillis);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override

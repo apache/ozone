@@ -26,7 +26,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.STORAGE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -715,11 +715,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
     // Do not set window timeout <= periodic disk check interval period, or failures can be missed across sparse checks
     // e.g., every 120m interval with a 60m window rarely accumulates enough failed events
-    if (diskCheckSlidingWindowTimeout.get(ChronoUnit.MINUTES) <= periodicDiskCheckIntervalMinutes) {
+    if (diskCheckSlidingWindowTimeout.compareTo(Duration.ofMinutes(periodicDiskCheckIntervalMinutes)) < 0) {
       LOG.warn("{} must be greater than or equal to {} minutes and was set to {} minutes. Defaulting to {}",
           DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY, periodicDiskCheckIntervalMinutes,
-          diskCheckSlidingWindowTimeout.get(ChronoUnit.MINUTES),
-          DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT);
+          diskCheckSlidingWindowTimeout.toMinutes(),
+          DurationFormatUtils.formatDurationHMS(DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT.toMillis()));
       diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
     }
 
