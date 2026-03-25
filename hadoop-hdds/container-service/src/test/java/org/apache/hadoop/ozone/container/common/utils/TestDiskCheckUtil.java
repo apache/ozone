@@ -20,11 +20,23 @@ package org.apache.hadoop.ozone.container.common.utils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
 
 import java.io.File;
+import java.nio.file.FileSystemException;
+import java.nio.file.Files;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.mockito.MockedStatic;
 
 /**
  * Tests {@link DiskCheckUtil} does not incorrectly identify an unhealthy
@@ -32,6 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Tests that it identifies an improperly configured directory mount point.
  *
  */
+@Execution(ExecutionMode.SAME_THREAD)
 public class TestDiskCheckUtil {
 
   @TempDir
@@ -79,5 +92,39 @@ public class TestDiskCheckUtil {
     File[] children = testDir.listFiles();
     assertNotNull(children);
     assertEquals(0, children.length);
+  }
+
+  @Test
+  public void testWriteFailureDueToTooManyOpenFiles() {
+    try (MockedStatic<FileUtils> mockService = mockStatic(FileUtils.class)) {
+
+      mockService.when(() -> FileUtils.newOutputStreamForceAtClose(any(File.class), any(OpenOption[].class)))
+          .thenThrow(new ExceptionInInitializerError("java.io.IOException: Too many open files"));
+
+      String path = "/Volumes/DiskFullTest/disk-check-c967569c";
+      assertThrows(ExceptionInInitializerError.class,
+          () -> FileUtils.newOutputStreamForceAtClose(new File(path), new OpenOption[2]));
+
+      // Test that checkReadWrite returns true for the too many open file case
+      boolean result = DiskCheckUtil.checkReadWrite(testDir, testDir, 1024);
+      assertTrue(result, "checkReadWrite should return true when too many open files");
+    }
+  }
+
+  @Test
+  public void testReadFailureDueToTooManyOpenFiles() {
+    try (MockedStatic<Files> mockService = mockStatic(Files.class)) {
+
+      String path = "/Volumes/DiskFullTest/disk-check-c967569c";
+      mockService.when(() -> Files.newInputStream(any(Path.class), any(OpenOption[].class)))
+          .thenThrow(new FileSystemException(path + ": Too many open files"));
+
+      assertThrows(FileSystemException.class,
+          () -> Files.newInputStream(Paths.get(path), new OpenOption[2]));
+
+      // Test that checkReadWrite returns true for the too many open file case
+      boolean result = DiskCheckUtil.checkReadWrite(testDir, testDir, 1024);
+      assertTrue(result, "checkReadWrite should return true when too many open files");
+    }
   }
 }
