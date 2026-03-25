@@ -156,7 +156,7 @@ public class SlidingWindow {
   /**
    * A custom monotonic clock implementation.
    * Implementation of Clock that uses System.nanoTime() for real usage.
-   * See {@see org.apache.ozone.test.TestClock}
+   * @see org.apache.ozone.test.TestClock
    */
   public static final class MonotonicClock extends Clock {
     @Override
