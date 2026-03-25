@@ -1255,7 +1255,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (!StringUtils.isBlank(snapshotName)) {
       requestBuilder.setSnapshotName(snapshotName);
     }
-      
+
     final OMRequest omRequest = createOMRequest(Type.CreateSnapshot)
         .setCreateSnapshotRequest(requestBuilder)
         .build();

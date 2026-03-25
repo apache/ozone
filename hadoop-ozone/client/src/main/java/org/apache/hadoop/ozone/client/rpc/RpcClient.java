@@ -1408,6 +1408,9 @@ public class RpcClient implements ClientProtocol {
     if (omVersion.compareTo(OzoneManagerVersion.ATOMIC_REWRITE_KEY) < 0) {
       throw new IOException("OzoneManager does not support atomic key rewrite.");
     }
+    Preconditions.checkArgument(existingKeyGeneration > 0,
+        "existingKeyGeneration must be positive, but was %s",
+        existingKeyGeneration);
 
     createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
 
