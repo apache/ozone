@@ -112,8 +112,6 @@ for s in dn1 dn2 dn3 dn4 dn5; do
   rolling_restart_service "$s" "$OZONE_UPGRADE_TO"
 done
 
-# OMs with upgrade arg
-export OM_HA_ARGS='--upgrade'
 for s in om1 om2 om3; do
   OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-${s}"
   rolling_restart_service "$s" "$OZONE_UPGRADE_TO"
