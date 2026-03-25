@@ -869,8 +869,6 @@ public final class IamSessionPolicyResolver {
         EnumSet.noneOf(ACLType.class)),
     GET_BUCKET_ACL("s3:GetBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, READ_ACL),
         EnumSet.noneOf(ACLType.class)),
-    GET_BUCKET_LOCATION("s3:GetBucketLocation", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
-        EnumSet.noneOf(ACLType.class)),
     // Used for HeadBucket, ListObjects and ListObjectsV2 apis
     LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST), EnumSet.of(LIST)),
     // Used for ListMultipartUploads API
