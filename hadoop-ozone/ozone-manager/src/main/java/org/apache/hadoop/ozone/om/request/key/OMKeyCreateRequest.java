@@ -96,7 +96,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
     if (keyArgs.hasExpectedDataGeneration()) {
-      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+      if (keyArgs.getExpectedDataGeneration()
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+        ozoneManager.checkFeatureEnabled(
+            OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
+      } else {
+        ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+      }
     }
 
     OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());

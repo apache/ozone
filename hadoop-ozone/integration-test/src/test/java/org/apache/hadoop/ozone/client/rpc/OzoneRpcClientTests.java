@@ -1439,50 +1439,22 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @ParameterizedTest
   @EnumSource
-  void rewriteFailsWhenKeyExists(BucketLayout layout) throws IOException {
+  void rewriteRejectsNonPositiveGeneration(BucketLayout layout)
+      throws IOException {
     checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails key1Details = createTestKey(bucket, "key1", "value".getBytes(UTF_8));
-    OzoneOutputStream key2Out = openTestKey(bucket, "key2", "value");
-    OzoneOutputStream key3Out = openTestKey(bucket, "key3", "value");
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> {
+        bucket.rewriteKey("key2",
+            1024,
+            EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+            singletonMap("key", "value"));
+        });
 
-    // Test 1: Rewrite with -1 fails when key is already committed
-    OMException e = assertThrows(OMException.class, () -> {
-      bucket.rewriteKey(
-          key1Details.getName(),
-          key1Details.getDataSize(),
-          EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-          key1Details.getMetadata());
-    });
-
-    assertEquals(KEY_ALREADY_EXISTS, e.getResult());
-    assertThat(e).hasMessageContaining("Key already exists");
-
-    // Test 2: Rewrite with -1 succeeds when key is open but not yet committed
-    assertDoesNotThrow(() -> {
-      bucket.rewriteKey("key2",
-          1024,
-          EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-          singletonMap("key", "value"));
-    });
-    key2Out.close();
-
-    // Test 3: After rewrite completes, attempting to rewrite again with -1 fails
-    key3Out.write("value".getBytes(UTF_8));
-    key3Out.close();
-
-    e = assertThrows(OMException.class, () -> {
-      bucket.rewriteKey("key2",
-          1024,
-          EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-          singletonMap("key", "value"));
-    });
-
-    assertEquals(KEY_ALREADY_EXISTS, e.getResult());
-    assertThat(e).hasMessageContaining("Key already exists");
+    assertThat(e).hasMessageContaining("existingKeyGeneration must be positive");
+    assertKeyContent(bucket, key1Details.getName(), "value".getBytes(UTF_8));
   }
 
   @ParameterizedTest
@@ -4500,12 +4472,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertNotNull(omMultipartUploadCompleteInfo.getHash());
   }
 
-  private OzoneOutputStream openTestKey(OzoneBucket bucket, String keyName, String keyValue) throws IOException {
-    return bucket.createKey(keyName, keyValue.getBytes(UTF_8).length,
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-        singletonMap("key", RandomStringUtils.secure().nextAscii(10)));
-  }
-
   private OzoneKeyDetails createTestKey(OzoneBucket bucket) throws IOException {
     return createTestKey(bucket, getTestName(), UUID.randomUUID().toString());
   }
@@ -4528,6 +4494,32 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertNotNull(key);
     assertEquals(keyName, key.getName());
     return key;
+  }
+
+  private OzoneKeyDetails createTestKeyWithETag(OzoneBucket bucket)
+      throws IOException {
+    String keyName = getTestName();
+    byte[] bytes = UUID.randomUUID().toString().getBytes(UTF_8);
+    RatisReplicationConfig replication =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+    Map<String, String> metadata = metadataWithETag(
+        singletonMap("key", RandomStringUtils.secure().nextAscii(10)), bytes);
+    try (OzoneOutputStream out = bucket.createKey(keyName, bytes.length,
+        replication, metadata)) {
+      out.write(bytes);
+    }
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    assertNotNull(key);
+    assertEquals(keyName, key.getName());
+    assertEquals(DigestUtils.md5Hex(bytes), key.getMetadata().get(ETAG));
+    return key;
+  }
+
+  private static Map<String, String> metadataWithETag(
+      Map<String, String> metadata, byte[] data) {
+    Map<String, String> metadataWithETag = new HashMap<>(metadata);
+    metadataWithETag.put(ETAG, DigestUtils.md5Hex(data));
+    return metadataWithETag;
   }
 
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName) {
