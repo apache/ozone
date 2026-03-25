@@ -456,6 +456,25 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testPutObjectIfMatchMissingKeyFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream("bar2".getBytes(
+        StandardCharsets.UTF_8));
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setHeader("If-Match", "some-etag");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(bucketName, keyName, is, metadata));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(404, ase.getStatusCode());
+    assertEquals("NoSuchKey", ase.getErrorCode());
+  }
+
+  @Test
   public void testPutObjectWithMD5Header() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
