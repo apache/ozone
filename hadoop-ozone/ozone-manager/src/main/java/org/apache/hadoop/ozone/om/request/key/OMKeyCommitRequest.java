@@ -634,9 +634,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         if (existing == null) {
           throw new OMException("Atomic rewrite is not allowed for a new key", KEY_NOT_FOUND);
         }
-        if (!toCommit.getExpectedDataGeneration().equals(existing.getUpdateID())) {
+        if (expectedGen != existing.getUpdateID()) {
           throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
-              ") does not match the expected generation to rewrite (" + toCommit.getExpectedDataGeneration() + ")",
+              ") does not match the expected generation to rewrite (" + expectedGen + ")",
               KEY_NOT_FOUND);
         }
       }
