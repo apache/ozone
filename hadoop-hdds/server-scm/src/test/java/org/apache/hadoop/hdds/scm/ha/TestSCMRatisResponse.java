@@ -23,8 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -33,6 +35,9 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.RaftException;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -62,7 +67,7 @@ public class TestSCMRatisResponse {
         .build();
     SCMRatisResponse response = SCMRatisResponse.decode(reply);
     assertTrue(response.isSuccess());
-    assertEquals(Message.EMPTY, SCMRatisResponse.encode(response.getResult()));
+    assertEquals(Message.EMPTY, SCMRatisResponse.encode(response.getResult(), Object.class));
   }
 
   @Test
@@ -89,6 +94,48 @@ public class TestSCMRatisResponse {
     Message message = Message.valueOf("test");
     // Should fail with exception.
     assertThrows(InvalidProtocolBufferException.class,
-        () -> SCMRatisResponse.encode(message));
+        () -> SCMRatisResponse.encode(message, message.getClass()));
+  }
+
+  @Test
+  public void testResponseDecodeMissingTypeShouldFail() throws Exception {
+    // Build response proto missing type
+    SCMRatisProtocol.SCMRatisResponseProto proto =
+        SCMRatisProtocol.SCMRatisResponseProto.newBuilder()
+            // no type
+            .setValue(ByteString.copyFromUtf8("v"))
+            .build();
+
+    RaftClientReply reply = mock(RaftClientReply.class);
+    when(reply.isSuccess()).thenReturn(true);
+    when(reply.getMessage()).thenReturn(Message.valueOf(
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer())));
+
+    InvalidProtocolBufferException ex = assertThrows(
+        InvalidProtocolBufferException.class,
+        () -> SCMRatisResponse.decode(reply));
+
+    assertTrue(ex.getMessage().contains("Missing response type"));
+  }
+
+  @Test
+  public void testResponseDecodeMissingValueShouldFail() throws Exception {
+    // Build response proto missing value
+    SCMRatisProtocol.SCMRatisResponseProto proto =
+        SCMRatisProtocol.SCMRatisResponseProto.newBuilder()
+            .setType("java.lang.String")
+            // no value
+            .build();
+
+    RaftClientReply reply = mock(RaftClientReply.class);
+    when(reply.isSuccess()).thenReturn(true);
+    when(reply.getMessage()).thenReturn(Message.valueOf(
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer())));
+
+    InvalidProtocolBufferException ex = assertThrows(
+        InvalidProtocolBufferException.class,
+        () -> SCMRatisResponse.decode(reply));
+
+    assertTrue(ex.getMessage().contains("Missing response value"));
   }
 }
