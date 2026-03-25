@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DEL
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -875,23 +876,23 @@ public final class IamSessionPolicyResolver {
     // Used for ListMultipartUploads API
     LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads", ActionKind.BUCKET, EnumSet.of(READ),
         EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),
-    PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(WRITE_ACL),
+    PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, READ_ACL, WRITE_ACL),
         EnumSet.noneOf(ACLType.class)),
 
     // Object-scope
     ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
-        EnumSet.of(DELETE)),
+        EnumSet.of(WRITE)),
     // Used for DeleteObject (when versionId parameter is not supplied),
     // DeleteObjects (when versionId parameter is not supplied) APIs
     DELETE_OBJECT("s3:DeleteObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(DELETE)),
     DELETE_OBJECT_TAGGING("s3:DeleteObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
-        EnumSet.of(DELETE)),
+        EnumSet.of(WRITE)),
     // Used for HeadObject, CopyObject (for source bucket), GetObject (without versionId parameter) APIs
     GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
     GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
     // Used for ListParts API
     LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
-        EnumSet.of(READ)),
+        EnumSet.of(LIST)),
     // Used for CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
     // CopyObject (for destination bucket), PutObject APIs
     PUT_OBJECT("s3:PutObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
