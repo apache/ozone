@@ -4495,32 +4495,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     return key;
   }
 
-  private OzoneKeyDetails createTestKeyWithETag(OzoneBucket bucket)
-      throws IOException {
-    String keyName = getTestName();
-    byte[] bytes = UUID.randomUUID().toString().getBytes(UTF_8);
-    RatisReplicationConfig replication =
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
-    Map<String, String> metadata = metadataWithETag(
-        singletonMap("key", RandomStringUtils.secure().nextAscii(10)), bytes);
-    try (OzoneOutputStream out = bucket.createKey(keyName, bytes.length,
-        replication, metadata)) {
-      out.write(bytes);
-    }
-    OzoneKeyDetails key = bucket.getKey(keyName);
-    assertNotNull(key);
-    assertEquals(keyName, key.getName());
-    assertEquals(DigestUtils.md5Hex(bytes), key.getMetadata().get(ETAG));
-    return key;
-  }
-
-  private static Map<String, String> metadataWithETag(
-      Map<String, String> metadata, byte[] data) {
-    Map<String, String> metadataWithETag = new HashMap<>(metadata);
-    metadataWithETag.put(ETAG, DigestUtils.md5Hex(data));
-    return metadataWithETag;
-  }
-
   private void assertKeyRenamedEx(OzoneBucket bucket, String keyName) {
     OMException oe = assertThrows(OMException.class, () -> bucket.getKey(keyName));
     assertEquals(KEY_NOT_FOUND, oe.getResult());
