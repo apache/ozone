@@ -33,6 +33,7 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.lang.reflect.Proxy;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -52,6 +53,8 @@ public final class TracingUtil {
   private static final String OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT = "http://localhost:4317";
   private static final String OTEL_TRACES_SAMPLER_ARG = "OTEL_TRACES_SAMPLER_ARG";
   private static final double OTEL_TRACES_SAMPLER_RATIO_DEFAULT = 1.0;
+  private static final String OTEL_SPAN_SAMPLING_ARG = "OTEL_SPAN_SAMPLING_ARG";
+  private static final String OTEL_TRACES_SAMPLER_CONFIG_DEFAULT = "";
 
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
@@ -88,10 +91,28 @@ public final class TracingUtil {
       String sampleStrRatio = System.getenv(OTEL_TRACES_SAMPLER_ARG);
       if (sampleStrRatio != null && !sampleStrRatio.isEmpty()) {
         samplerRatio = Double.parseDouble(System.getenv(OTEL_TRACES_SAMPLER_ARG));
+        LOG.info("Sampling Trace Config = '{}'", samplerRatio);
       }
     } catch (NumberFormatException ex) {
-      // ignore and use the default value.
+      // log and use the default value.
+      LOG.warn("Invalid value for {}: '{}'. Falling back to default: {}",
+          OTEL_TRACES_SAMPLER_ARG, System.getenv(OTEL_TRACES_SAMPLER_ARG), OTEL_TRACES_SAMPLER_RATIO_DEFAULT, ex);
     }
+
+    String spanSamplingConfig = OTEL_TRACES_SAMPLER_CONFIG_DEFAULT;
+    try {
+      String spanStrConfig = System.getenv(OTEL_SPAN_SAMPLING_ARG);
+      if (spanStrConfig != null && !spanStrConfig.isEmpty()) {
+        spanSamplingConfig = spanStrConfig;
+      }
+      LOG.info("Sampling Span Config = '{}'", spanSamplingConfig);
+    } catch (Exception ex) {
+      // Log and use the default value.
+      LOG.warn("Failed to process {}. Falling back to default configuration: {}",
+          OTEL_SPAN_SAMPLING_ARG, OTEL_TRACES_SAMPLER_CONFIG_DEFAULT, ex);
+    }
+    // Pass the config to parseSpanSamplingConfig to get spans to be sampled.
+    Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);
 
     Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), serviceName));
     OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
@@ -99,10 +120,21 @@ public final class TracingUtil {
         .build();
 
     SimpleSpanProcessor spanProcessor = SimpleSpanProcessor.builder(spanExporter).build();
+
+    // Choose sampler based on span sampling config. If it is empty use trace based sampling only.
+    // else use custom SpanSampler.
+    Sampler sampler;
+    if (spanMap.isEmpty()) {
+      sampler = Sampler.traceIdRatioBased(samplerRatio);
+    } else {
+      Sampler rootSampler = Sampler.traceIdRatioBased(samplerRatio);
+      sampler = new SpanSampler(rootSampler, spanMap);
+    }
+
     SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
         .addSpanProcessor(spanProcessor)
         .setResource(resource)
-        .setSampler(Sampler.traceIdRatioBased(samplerRatio))
+        .setSampler(sampler)
         .build();
     OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
         .setTracerProvider(tracerProvider)
@@ -133,7 +165,6 @@ public final class TracingUtil {
    *
    * @param name          name of the newly created scope
    * @param encodedParent Encoded parent span (could be null or empty)
-   *
    * @return Tracing scope.
    */
   public static Span importAndCreateSpan(String name, String encodedParent) {
@@ -178,6 +209,44 @@ public final class TracingUtil {
   }
 
   /**
+   * Function to parse span sampling config. The input is in the form <span_name>:<sample_rate>.
+   * The sample rate must be a number between 0 and 1. Any value other than that will LOG an error.
+   */
+  static Map<String, LoopSampler> parseSpanSamplingConfig(String configStr) {
+    Map<String, LoopSampler> result = new HashMap<>();
+    if (configStr == null || configStr.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    for (String entry : configStr.split(",")) {
+      String trimmed = entry.trim();
+      int colon = trimmed.indexOf(':');
+
+      if (colon <= 0 || colon >= trimmed.length() - 1) {
+        continue;
+      }
+
+      String name = trimmed.substring(0, colon).trim();
+      String val = trimmed.substring(colon + 1).trim();
+
+      try {
+        double rate = Double.parseDouble(val);
+        //if the rate  is less than or equal to zero , no sampling config is taken for that key value pair.
+        if (rate > 0) {
+          // cap it at 1.0 when a number greater than 1 is entered
+          double effectiveRate = Math.min(rate, 1.0);
+          result.put(name, new LoopSampler(effectiveRate));
+        } else {
+          LOG.warn("rate for span '{}' is 0 or less, ignoring sample configuration", name);
+        }
+      } catch (NumberFormatException e) {
+        LOG.error("Invalid rate '{}' for span '{}', ignoring sample configuration", val, name);
+      }
+    }
+    return result;
+  }
+
+  /**
    * Execute {@code runnable} inside an activated new span.
    * If a parent span exists in the current context, this becomes a child span.
    */
@@ -198,6 +267,7 @@ public final class TracingUtil {
 
   /**
    * Execute {@code supplier} in the given {@code span}.
+   *
    * @return the value returned by {@code supplier}
    */
   private static <R, E extends Exception> R executeInSpan(Span span,
