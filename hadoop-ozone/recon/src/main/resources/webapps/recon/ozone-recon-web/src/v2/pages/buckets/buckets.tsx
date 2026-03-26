@@ -274,7 +274,6 @@ const Buckets: React.FC<{}> = () => {
                 onTagClose={() => { }}
                 fixedColumn={['name', 'volumeName']}
                 columnLength={COLUMNS.length}
-                showSearch={true}
                 showSelectAll={true} />
               <SingleSelect
                 options={LIMIT_OPTIONS}
