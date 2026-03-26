@@ -165,7 +165,6 @@ public final class TracingUtil {
    *
    * @param name          name of the newly created scope
    * @param encodedParent Encoded parent span (could be null or empty)
-   *
    * @return Tracing scope.
    */
   public static Span importAndCreateSpan(String name, String encodedParent) {
@@ -209,10 +208,11 @@ public final class TracingUtil {
         ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
   }
 
-  /** Function to parse span sampling config. The input is in the form <span_name>:<sample_rate>.
+  /**
+   * Function to parse span sampling config. The input is in the form <span_name>:<sample_rate>.
    * The sample rate must be a number between 0 and 1. Any value other than that will LOG an error.
-   * */
-  private static Map<String, LoopSampler> parseSpanSamplingConfig(String configStr) {
+   */
+  static Map<String, LoopSampler> parseSpanSamplingConfig(String configStr) {
     Map<String, LoopSampler> result = new HashMap<>();
     if (configStr == null || configStr.isEmpty()) {
       return Collections.emptyMap();
@@ -267,6 +267,7 @@ public final class TracingUtil {
 
   /**
    * Execute {@code supplier} in the given {@code span}.
+   *
    * @return the value returned by {@code supplier}
    */
   private static <R, E extends Exception> R executeInSpan(Span span,

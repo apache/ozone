@@ -28,7 +28,6 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import io.opentelemetry.sdk.trace.samplers.SamplingDecision;
 import io.opentelemetry.sdk.trace.samplers.SamplingResult;
-import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,9 +45,7 @@ public class TestSpanSampling {
   @Test
   public void testParseSpanSamplingConfigValid() throws Exception {
     String config = "createVolume:0.25,createBucket:0.5,createKey:0.75";
-    Method method = TracingUtil.class.getDeclaredMethod("parseSpanSamplingConfig", String.class);
-    method.setAccessible(true);
-    Map<String, LoopSampler> result = (Map<String, LoopSampler>) method.invoke(null, config);
+    Map<String, LoopSampler> result = TracingUtil.parseSpanSamplingConfig(config);
 
     assertThat(result)
         .hasSize(3)
@@ -63,9 +60,7 @@ public class TestSpanSampling {
   @Test
   public void testParseSpanSamplingConfigInvalid() throws Exception {
     String config = "createVolume:0,createBucket:-0.5,createKey:invalid,writeKey:-1";
-    Method method = TracingUtil.class.getDeclaredMethod("parseSpanSamplingConfig", String.class);
-    method.setAccessible(true);
-    Map<String, LoopSampler> result = (Map<String, LoopSampler>) method.invoke(null, config);
+    Map<String, LoopSampler> result = TracingUtil.parseSpanSamplingConfig(config);
 
     assertThat(result).as("The map should be empty as all inputs were invalid").isEmpty();
   }
@@ -77,11 +72,7 @@ public class TestSpanSampling {
   @Test
   public void testParseSpanSamplingConfigMixed() throws Exception {
     String config = "createVolume:0.75,createBucket:0,createKey:-5";
-
-    Method method = TracingUtil.class.getDeclaredMethod("parseSpanSamplingConfig", String.class);
-    method.setAccessible(true);
-
-    Map<String, LoopSampler> result = (Map<String, LoopSampler>) method.invoke(null, config);
+    Map<String, LoopSampler> result = TracingUtil.parseSpanSamplingConfig(config);
 
     assertThat(result)
         .hasSize(1)
