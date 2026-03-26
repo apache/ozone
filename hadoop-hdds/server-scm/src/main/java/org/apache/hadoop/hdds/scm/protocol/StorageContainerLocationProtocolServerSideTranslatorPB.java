@@ -123,8 +123,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse.Status;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SetAckMissingContainerRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SetAckMissingContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
@@ -137,6 +135,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -754,12 +754,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
             .build();
-      case SetAckMissingContainer:
+      case SuppressContainer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
-            .setSetAckMissingContainerResponse(
-                setAckMissingContainer(request.getSetAckMissingContainerRequest()))
+            .setSuppressContainerResponse(suppressContainer(request.getSuppressContainerRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -890,6 +889,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     } else if (request.hasFactor()) {
       factor = request.getFactor();
     }
+    // Filter by suppressed: true (suppressed only), false (unsuppressed only) or null (display all).
+    Boolean suppressed = request.hasSuppressed() ? request.getSuppressed() : null;
+    
     ContainerListResult containerListAndTotalCount;
     if (factor != null) {
       // Call from a legacy client
@@ -897,7 +899,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           impl.listContainer(startContainerID, count, state, factor);
     } else {
       containerListAndTotalCount =
-          impl.listContainer(startContainerID, count, state, replicationType, repConfig);
+          impl.listContainer(startContainerID, count, state, replicationType, repConfig, suppressed);
     }
     SCMListContainerResponseProto.Builder builder =
         SCMListContainerResponseProto.newBuilder();
@@ -1410,9 +1412,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
 
-  public SetAckMissingContainerResponseProto setAckMissingContainer(
-      SetAckMissingContainerRequestProto request) throws IOException {
-    impl.setAckMissingContainer(request.getContainerID(), request.getAcknowledge());
-    return SetAckMissingContainerResponseProto.getDefaultInstance();
+  public SuppressContainerResponseProto suppressContainer(SuppressContainerRequestProto request) throws IOException {
+    impl.suppressContainer(request.getContainerID(), request.getSuppress());
+    return SuppressContainerResponseProto.getDefaultInstance();
   }
 }

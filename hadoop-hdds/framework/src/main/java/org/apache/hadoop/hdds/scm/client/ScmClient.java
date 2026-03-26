@@ -146,6 +146,25 @@ public interface ScmClient extends Closeable {
       throws IOException;
 
   /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container of this state will be returned.
+   * @param replicationConfig container replication Config.
+   * @param suppressed container to be suppressed/unsuppressed from report
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
+  ContainerListResult listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed)
+      throws IOException;
+
+  /**
    * Read meta data from an existing container.
    * @param containerID - ID of the container.
    * @param pipeline - Pipeline where the container is located.
@@ -466,11 +485,13 @@ public interface ScmClient extends Closeable {
   void reconcileContainer(long containerID) throws IOException;
 
   /**
-   * Set or unset the ACK_MISSING state for a container.
+   * Suppress or unsuppress a container from reports.
+   * Suppressed containers are excluded from replication manager reports
+   * regardless of their health state.
    *
    * @param containerId The ID of the container.
-   * @param acknowledge true to set ACK_MISSING, false to unset to MISSING.
+   * @param suppress true to suppress the container, false to unsuppress it.
    * @throws IOException
    */
-  void setAckMissingContainer(long containerId, boolean acknowledge) throws IOException;
+  void suppressContainer(long containerId, boolean suppress) throws IOException;
 }

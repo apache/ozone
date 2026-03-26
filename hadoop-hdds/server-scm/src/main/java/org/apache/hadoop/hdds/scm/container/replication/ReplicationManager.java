@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -855,11 +854,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReplicationQueue repQueue, ReplicationManagerReport report,
       boolean readOnly) throws ContainerNotFoundException {
     synchronized (containerInfo) {
-      // Skip containers that are acknowledged as missing
-      // These containers are persisted with ACK_MISSING state and should not be
-      // processed by ReplicationManager until unacknowledged
-      if (containerInfo.getHealthState() == ContainerHealthState.ACK_MISSING) {
-        LOG.debug("Skipping ACK_MISSING container: {}", containerInfo.getContainerID());
+      // Filter out suppressed containers early
+      if (containerInfo.isSuppressed()) {
+        LOG.debug("Skipping suppressed container: {}", containerInfo.getContainerID());
         return false;
       }
       
@@ -1577,4 +1574,3 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     }
   }
 }
-

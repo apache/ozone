@@ -107,13 +107,6 @@ public enum ContainerHealthState {
       "Containers in OPEN state without any healthy Pipeline",
       "OpenContainersWithoutPipeline"),
 
-  /**
-   * Acknowledge missing containers which are not problematic.
-   */
-  ACK_MISSING((short) 10,
-      "Acknowledge missing containers which are not problematic",
-      "AcknowledgeMissingContainers"),
-
   // ========== Actual Combinations Found in Code (100+) ==========
 
   /**

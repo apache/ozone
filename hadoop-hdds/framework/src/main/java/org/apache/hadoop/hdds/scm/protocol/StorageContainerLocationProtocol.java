@@ -229,6 +229,30 @@ public interface StorageContainerLocationProtocol extends Closeable {
       ReplicationConfig replicationConfig) throws IOException;
 
   /**
+   * Ask SCM for a list of containers with a range of container ID, state
+   * and replication config, and the limit of count.
+   * The containers are returned from startID (exclusive), and
+   * filtered by state and replication config. The returned list is limited to
+   * count entries.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   * @param state Container with this state will be returned.
+   * @param replicationConfig Replication config for the containers
+   * @param suppressed container to be suppressed/unsuppressed from report
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
+  ContainerListResult listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed) throws IOException;
+
+  /**
    * Deletes a container in SCM.
    *
    * @param containerID
@@ -523,11 +547,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
   void reconcileContainer(long containerID) throws IOException;
 
   /**
-   * Set or unset the ACK_MISSING state for a container.
+   * Suppress or unsuppress the container.
    *
    * @param containerId The ID of the container.
-   * @param acknowledge true to set ACK_MISSING, false to unset to MISSING.
+   * @param suppress true to suppress, false to unsuppress.
    * @throws IOException
    */
-  void setAckMissingContainer(long containerId, boolean acknowledge) throws IOException;
+  void suppressContainer(long containerId, boolean suppress) throws IOException;
 }

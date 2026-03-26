@@ -115,7 +115,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SetAckMissingContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
@@ -125,6 +124,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -443,6 +443,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
       throws IOException {
+    return listContainer(startContainerID, count, state, replicationType, replicationConfig, null);
+  }
+
+  @Override
+  public ContainerListResult listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed)
+      throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
     Preconditions.checkState(count > 0,
@@ -452,6 +462,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     builder.setStartContainerID(startContainerID);
     builder.setCount(count);
     builder.setTraceID(TracingUtil.exportCurrentSpan());
+    if (suppressed != null) {
+      builder.setSuppressed(suppressed);
+    }
     if (state != null) {
       builder.setState(state);
     }
@@ -1291,13 +1304,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void setAckMissingContainer(long containerID, boolean acknowledge) 
+  public void suppressContainer(long containerID, boolean suppress)
       throws IOException {
-    SetAckMissingContainerRequestProto request = SetAckMissingContainerRequestProto.newBuilder()
+    SuppressContainerRequestProto request = SuppressContainerRequestProto.newBuilder()
         .setContainerID(containerID)
-        .setAcknowledge(acknowledge)
+        .setSuppress(suppress)
         .build();
-    submitRequest(Type.SetAckMissingContainer, builder -> builder.setSetAckMissingContainerRequest(request));
+    submitRequest(Type.SuppressContainer, builder -> builder.setSuppressContainerRequest(request));
   }
 
   /**

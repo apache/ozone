@@ -390,6 +390,22 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public ContainerListResult listContainer(long startContainerID,
+       int count, HddsProtos.LifeCycleState state,
+       HddsProtos.ReplicationType repType,
+       ReplicationConfig replicationConfig,
+       Boolean suppressed) throws IOException {
+    if (count > maxCountOfContainerList) {
+      LOG.warn("Attempting to list {} containers. However, this exceeds" +
+          " the cluster's current limit of {}. The results will be capped at the" +
+          " maximum allowed count.", count, maxCountOfContainerList);
+      count = maxCountOfContainerList;
+    }
+    return storageContainerLocationClient.listContainer(
+        startContainerID, count, state, repType, replicationConfig, suppressed);
+  }
+
+  @Override
   public ContainerDataProto readContainer(long containerID,
       Pipeline pipeline) throws IOException {
     XceiverClientManager clientManager = getXceiverClientManager();
@@ -616,7 +632,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public void setAckMissingContainer(long containerId, boolean acknowledge) throws IOException {
-    storageContainerLocationClient.setAckMissingContainer(containerId, acknowledge);
+  public void suppressContainer(long containerId, boolean suppress) throws IOException {
+    storageContainerLocationClient.suppressContainer(containerId, suppress);
   }
 }

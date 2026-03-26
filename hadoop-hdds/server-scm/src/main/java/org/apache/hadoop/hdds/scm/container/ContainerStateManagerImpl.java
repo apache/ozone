@@ -568,20 +568,10 @@ public final class ContainerStateManagerImpl
       if (currentInfo == null) {
         throw new ContainerNotFoundException(containerID);
       }
-      
-      // Only persist ACK_MISSING health state changes
-      // Other health states are dynamic and computed by ReplicationManager
-      ContainerHealthState newHealthState = updatedInfo.getHealthState();
-      if (newHealthState == ContainerHealthState.ACK_MISSING) {
-        currentInfo.setHealthState(ContainerHealthState.ACK_MISSING);
-        LOG.debug("Persisting ACK_MISSING state for container: {}", containerID);
-      } else if (currentInfo.getHealthState() == ContainerHealthState.ACK_MISSING) {
-        currentInfo.setHealthState(null);
-        LOG.debug("Clearing ACK_MISSING state for container: {}, new state: {}",
-            containerID, newHealthState);
-      }
+      // Update suppressed flag
+      currentInfo.setSuppressed(updatedInfo.isSuppressed());
       transactionBuffer.addToBuffer(containerStore, containerID, currentInfo);
-      LOG.debug("Updated container info for container: {}, healthState={}", containerID, currentInfo.getHealthState());
+      LOG.debug("Updated container info for container: {}, suppressed={}", containerID, currentInfo.isSuppressed());
     }
   }
 

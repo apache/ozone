@@ -71,7 +71,6 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -452,7 +451,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerListResult listContainer(long startContainerID,
       int count) throws IOException {
-    return listContainer(startContainerID, count, null, null, null);
+    return listContainer(startContainerID, count, null, null, null, null);
   }
 
   /**
@@ -469,7 +468,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
-    return listContainer(startContainerID, count, state, null, null);
+    return listContainer(startContainerID, count, state, null, null, null);
   }
 
   /**
@@ -488,20 +487,27 @@ public class SCMClientProtocolServer implements
   public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException {
-    return listContainerInternal(startContainerID, count, state, factor, null, null);
+    return listContainerInternal(startContainerID, count, state, factor, null, null, null);
   }
 
   private ContainerListResult listContainerInternal(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig) throws IOException {
+      ReplicationConfig repConfig,
+      Boolean suppressed) throws IOException {
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, replicationType, repConfig);
 
     try {
       Stream<ContainerInfo> containerStream =
           buildContainerStream(factor, replicationType, repConfig, getBaseContainerStream(state));
+      
+      // Filter by suppressed flag only if explicitly specified
+      if (suppressed != null) {
+        containerStream = containerStream.filter(info -> info.isSuppressed() == suppressed);
+      }
+      
       List<ContainerInfo> containerInfos =
           containerStream.filter(info -> info.containerID().getId() >= startContainerID)
               .sorted().collect(Collectors.toList());
@@ -589,7 +595,28 @@ public class SCMClientProtocolServer implements
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig repConfig) throws IOException {
-    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig);
+    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig, null);
+  }
+
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container with this state will be returned.
+   * @param repConfig Replication Config for the container.
+   * @param suppressed container to be suppressed/unsuppressed from report
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
+  @Override
+  public ContainerListResult listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig repConfig,
+      Boolean suppressed) throws IOException {
+    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig, suppressed);
   }
 
   @Override
@@ -1698,37 +1725,19 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void setAckMissingContainer(long longContainerID, boolean acknowledge) throws IOException {
+  public void suppressContainer(long longContainerID, boolean suppress) throws IOException {
     ContainerID containerID = ContainerID.valueOf(longContainerID);
     final Map<String, String> auditMap = new HashMap<>();
     auditMap.put("containerID", containerID.toString());
-    auditMap.put("acknowledge", String.valueOf(acknowledge));
-
+    auditMap.put("suppress", String.valueOf(suppress));
+    SCMAction action = suppress ? SCMAction.SUPPRESS_CONTAINER : SCMAction.UNSUPPRESS_CONTAINER;
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
       ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
-      
-      if (acknowledge) {
-        // Validation for setting ACK_MISSING
-        Set<ContainerReplica> replicas = scm.getContainerManager().getContainerReplicas(containerID);
-        if (replicas != null && !replicas.isEmpty()) {
-          throw new IOException("Container " + longContainerID + " has " + replicas.size() +
-              " replicas and cannot be acknowledged as missing");
-        }
-        if (containerInfo.getNumberOfKeys() == 0) {
-          throw new IOException("Container " + longContainerID + " is empty (0 keys) and cannot be acknowledged.");
-        }
-        // Set to ACK_MISSING
-        containerInfo.setHealthState(ContainerHealthState.ACK_MISSING);
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.ACKNOWLEDGE_MISSING_CONTAINER, auditMap));
-      } else {
-        containerInfo.setHealthState(null);
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.UNACKNOWLEDGE_MISSING_CONTAINER, auditMap));
-      }
+      containerInfo.setSuppressed(suppress);
       scm.getContainerManager().updateContainerInfo(containerID, containerInfo.getProtobuf());
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(action, auditMap));
     } catch (IOException ex) {
-      SCMAction action = acknowledge ?
-          SCMAction.ACKNOWLEDGE_MISSING_CONTAINER : SCMAction.UNACKNOWLEDGE_MISSING_CONTAINER;
       AUDIT.logWriteFailure(buildAuditMessageForFailure(action, auditMap, ex));
       throw ex;
     }
