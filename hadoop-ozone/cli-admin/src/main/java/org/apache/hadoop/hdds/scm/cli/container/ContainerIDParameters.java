@@ -41,7 +41,7 @@ public class ContainerIDParameters extends ItemsFromStdin {
   }
 
   public List<Long> getValidatedIDs(boolean required) {
-    if (required && size() == 0) {
+    if (required && size() == 0 && !isReadFromStdin()) {
       throw new CommandLine.MissingParameterException(spec.commandLine(),
           spec.commandLine().getCommandSpec().args(),
           "Missing required parameter: '<container ID>'");

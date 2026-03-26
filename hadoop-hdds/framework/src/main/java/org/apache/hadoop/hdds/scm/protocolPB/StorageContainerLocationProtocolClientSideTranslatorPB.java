@@ -224,7 +224,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   private ScmContainerLocationResponse submitRpcRequest(
       ScmContainerLocationRequest wrapper) throws ServiceException {
     // If targetScmNode has a specific node ID, route follower-readable requests to that node
-    if (targetScmNode != null && targetScmNode.hasNodeId() &&
+    if (targetScmNode != null && targetScmNode.hasNodeId() && 
         FOLLOWER_READABLE_COMMAND_TYPES.contains(wrapper.getCmdType())) {
       try {
         StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(targetScmNode.getNodeId());

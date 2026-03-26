@@ -37,7 +37,7 @@ import picocli.CommandLine.Command;
         CloseSubcommand.class,
         ReportSubcommand.class,
         UpgradeSubcommand.class,
-        ReconcileSubcommand.class,
+        ReconcileSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class ContainerCommands implements AdminSubcommand {

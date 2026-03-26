@@ -52,12 +52,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import picocli.CommandLine;
 
 /**
- * Tests the complete workflow of suppressing empty containers:
- * 1. Assert RM report shows EMPTY/MISSING containers
- * 2. Suppress a MISSING container
- * 3. List only suppressed containers
- * 4. Unsuppress the container
- * 5. List non-suppressed containers
+ * Tests the suppress/unsuppress options in container report.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestContainerReportSuppressOptions {
