@@ -372,6 +372,37 @@ public class TestContainerStateManager {
   }
 
   @Test
+  public void testGetContainerIDs() throws IOException {
+    ContainerInfo openContainerInfo = new ContainerInfo.Builder()
+        .setContainerID(1)
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setSequenceId(100L)
+        .setOwner("scm")
+        .setPipelineID(PipelineID.randomId())
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE))
+        .build();
+
+    ContainerInfo closedContainerInfo = new ContainerInfo.Builder()
+        .setContainerID(2)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setSequenceId(200L)
+        .setOwner("scm")
+        .setPipelineID(PipelineID.randomId())
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE))
+        .build();
+
+    containerStateManager.addContainer(openContainerInfo.getProtobuf());
+    containerStateManager.addContainer(closedContainerInfo.getProtobuf());
+
+    assertEquals(1, containerStateManager.getContainerIDs(
+        HddsProtos.LifeCycleState.CLOSED, ContainerID.MIN, 10).size());
+  }
+
+  @Test
   public void testSequenceIdOnStateUpdate() throws Exception {
     ContainerID containerID = ContainerID.valueOf(3L);
     long sequenceId = 100L;

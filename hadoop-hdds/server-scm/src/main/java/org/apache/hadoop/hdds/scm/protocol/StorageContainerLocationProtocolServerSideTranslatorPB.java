@@ -117,6 +117,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -754,6 +756,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
             .build();
+      case ListContainerIDs:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setScmListContainerIDsResponse(listContainerIDs(request.getScmListContainerIDsRequest()))
+            .build();
       case SuppressContainer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -891,7 +899,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     }
     // Filter by suppressed: true (suppressed only), false (unsuppressed only) or null (display all).
     Boolean suppressed = request.hasSuppressed() ? request.getSuppressed() : null;
-    
+
     ContainerListResult containerListAndTotalCount;
     if (factor != null) {
       // Call from a legacy client
@@ -1410,6 +1418,32 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public ReconcileContainerResponseProto reconcileContainer(ReconcileContainerRequestProto request) throws IOException {
     impl.reconcileContainer(request.getContainerID());
     return ReconcileContainerResponseProto.getDefaultInstance();
+  }
+
+  public SCMListContainerIDsResponseProto listContainerIDs(
+      SCMListContainerIDsRequestProto request) throws IOException {
+    ContainerID startContainerID = ContainerID.valueOf(0);
+
+    if (request.hasStartContainerID()) {
+      startContainerID = ContainerID.valueOf(request.getStartContainerID().getId());
+    }
+
+    HddsProtos.LifeCycleState state = null;
+    if (request.hasState()) {
+      state = request.getState();
+    }
+
+    SCMListContainerIDsResponseProto.Builder builder =
+        SCMListContainerIDsResponseProto.newBuilder();
+
+    List<ContainerID> containerIDs = impl.getListOfContainerIDs(
+        startContainerID, request.getCount(), state);
+
+    containerIDs.stream()
+        .map(ContainerID::getProtobuf)
+        .forEach(builder::addContainerIDs);
+
+    return builder.build();
   }
 
   public SuppressContainerResponseProto suppressContainer(SuppressContainerRequestProto request) throws IOException {

@@ -15,34 +15,32 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha;
+package org.apache.hadoop.hdds.tracing;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Reflection util for SCM HA.
+ * Probability-based span sampler that samples spans independently.
+ * Uses ThreadLocalRandom for probability decisions.
  */
-public final class ReflectionUtil {
+public final class LoopSampler {
+  private final double probability;
 
-  private static Map<String, Class<?>> classCache = new HashMap<>();
-
-  private ReflectionUtil() {
+  public LoopSampler(double ratio) {
+    if (ratio < 0) {
+      throw new IllegalArgumentException("Sampling ratio cannot be negative: " + ratio);
+    }
+    // Cap at 1.0 to prevent logic errors
+    this.probability = Math.min(ratio, 1.0);
   }
 
-  /**
-   * Returns the {@code Class} object associated with the given string name.
-   *
-   * @param className the fully qualified name of the desired class.
-   * @return the {@code Class} object for the class with the
-   *         specified name.
-   * @throws ClassNotFoundException if the class cannot be located
-   */
-  public static Class<?> getClass(String className)
-      throws ClassNotFoundException {
-    if (!classCache.containsKey(className)) {
-      classCache.put(className, Class.forName(className));
+  public boolean shouldSample() {
+    if (probability <= 0) {
+      return false;
     }
-    return classCache.get(className);
+    if (probability >= 1.0) {
+      return true;
+    }
+    return ThreadLocalRandom.current().nextDouble() < probability;
   }
 }

@@ -57,7 +57,6 @@
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-configuration2.version>2.13.0</commons-configuration2.version>
     <commons-csv.version>1.14.1</commons-csv.version>
-    <commons-daemon.version>1.4.0</commons-daemon.version>
     <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-io.version>2.21.0</commons-io.version>
     <commons-lang3.version>3.20.0</commons-lang3.version>
@@ -538,11 +537,6 @@
         <version>${commons-codec.version}</version>
       </dependency>
       <dependency>
-        <groupId>commons-daemon</groupId>
-        <artifactId>commons-daemon</artifactId>
-        <version>${commons-daemon.version}</version>
-      </dependency>
-      <dependency>
         <groupId>commons-fileupload</groupId>
         <artifactId>commons-fileupload</artifactId>
         <version>${commons-fileupload.version}</version>
@@ -749,6 +743,36 @@
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-framework</artifactId>
         <version>${curator.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>javax.mail</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>jline</groupId>
+            <artifactId>jline</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-math</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.yetus</groupId>
+            <artifactId>audience-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.derby</groupId>
@@ -882,9 +906,37 @@
         <type>test-jar</type>
         <exclusions>
           <exclusion>
+            <groupId>com.github.pjfanning</groupId>
+            <artifactId>jersey-json</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.sun.jersey</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
             <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-math3</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.zookeeper</groupId>
+            <artifactId>zookeeper</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.xerial.snappy</groupId>
+            <artifactId>snappy-java</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -913,6 +965,10 @@
             <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
+            <groupId>commons-daemon</groupId>
+            <artifactId>commons-daemon</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>*</artifactId>
           </exclusion>
@@ -935,6 +991,24 @@
         <artifactId>hadoop-hdfs</artifactId>
         <version>${hadoop.version}</version>
         <type>test-jar</type>
+        <exclusions>
+          <exclusion>
+            <groupId>com.sun.jersey</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>commons-daemon</groupId>
+            <artifactId>commons-daemon</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.fusesource.leveldbjni</groupId>
+            <artifactId>leveldbjni-all</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -956,16 +1030,62 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-mapreduce-client-core</artifactId>
         <version>${hadoop.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-servlet</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
         <version>${hadoop.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-servlet</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-minikdc</artifactId>
         <version>${hadoop.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -1674,6 +1794,17 @@
           <groupId>dev.aspectj</groupId>
           <artifactId>aspectj-maven-plugin</artifactId>
           <version>${aspectj-plugin.version}</version>
+          <configuration>
+            <complianceLevel>${maven.compiler.release}</complianceLevel>
+            <argumentFileDirectory>${project.build.directory}/aspectj-build</argumentFileDirectory>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>org.aspectj</groupId>
+              <artifactId>aspectjtools</artifactId>
+              <version>${aspectj.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -1952,10 +2083,6 @@
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
                     </excludedSourceRoots>
-                    <exclusions>
-                      <exclusion>org.apache.hadoop.fs.contract.*</exclusion>
-                      <exclusion>org.apache.hadoop.tools.contract.*</exclusion>
-                    </exclusions>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
@@ -2559,6 +2686,23 @@
       <properties>
         <aspectj.version>${aspectj.java21.version}</aspectj.version>
       </properties>
+    </profile>
+    <profile>
+      <id>java11+</id>
+      <activation>
+        <jdk>[11,]</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>dev.aspectj</groupId>
+            <artifactId>aspectj-maven-plugin</artifactId>
+            <configuration>
+              <release>${maven.compiler.release}</release>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
     <profile>
       <id>go-offline</id>
