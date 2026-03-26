@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
@@ -93,6 +94,7 @@ public class SCMUpgradeFinalizer extends
   @Override
   public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context) throws IOException {
     waitForDatanodesToFinalize(context);
+    getVersionManager().setUpgradeState(UpgradeFinalization.Status.FINALIZATION_DONE);
   }
 
   /**
