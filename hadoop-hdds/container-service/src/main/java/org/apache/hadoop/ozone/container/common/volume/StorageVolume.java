@@ -605,6 +605,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   public void failVolume() {
+    LOG.warn("Volume {} failed", this);
     setState(VolumeState.FAILED);
     if (volumeUsage != null) {
       volumeUsage.shutdown();
@@ -685,6 +686,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
         throw new InterruptedException("Directory check of volume " + this +
             " interrupted.");
       }
+      LOG.error("Directory check of volume {} failed", this);
       return VolumeCheckResult.FAILED;
     }
 

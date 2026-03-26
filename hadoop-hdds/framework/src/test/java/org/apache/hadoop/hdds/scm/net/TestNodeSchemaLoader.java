@@ -61,7 +61,7 @@ public class TestNodeSchemaLoader {
         arguments("no-topology.xml", "no or multiple <topology> element"),
         arguments("multiple-topology.xml", "no or multiple <topology> element"),
         arguments("invalid-version.xml", "Bad layoutversion value"),
-        arguments("external-entity.xml", "accessExternalDTD")
+        arguments("external-entity.xml", "disallow-doctype-decl")
     );
   }
 

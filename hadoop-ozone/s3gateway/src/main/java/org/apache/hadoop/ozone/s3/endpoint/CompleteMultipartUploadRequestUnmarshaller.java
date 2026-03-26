@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
+import javax.inject.Singleton;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -33,6 +34,7 @@ import javax.ws.rs.ext.Provider;
  * Custom unmarshaller to read CompleteMultipartUploadRequest wo namespace.
  */
 @Provider
+@Singleton
 public class CompleteMultipartUploadRequestUnmarshaller
     extends MessageUnmarshaller<CompleteMultipartUploadRequest> {
 

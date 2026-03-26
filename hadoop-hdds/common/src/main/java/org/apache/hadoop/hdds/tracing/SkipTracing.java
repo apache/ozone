@@ -15,25 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.container.replication;
+package org.apache.hadoop.hdds.tracing;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * A class which extents ReplicationQueue and does nothing. This is used when
- * checking containers in a read-only mode, where we don't want to queue them
- * for replication.
+ * Annotation to mark methods that should be excluded from tracing.
  */
-public class NullReplicationQueue extends ReplicationQueue {
-
-  @Override
-  public void enqueue(ContainerHealthResult.UnderReplicatedHealthResult
-                          underReplicatedHealthResult) {
-    // Do nothing
-  }
-
-  @Override
-  public void enqueue(ContainerHealthResult.OverReplicatedHealthResult
-                          overReplicatedHealthResult) {
-    // Do nothing
-  }
-
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface SkipTracing {
 }
