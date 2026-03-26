@@ -47,6 +47,14 @@ public class ReportSubcommand extends ScmSubcommand {
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
   private SuppressOptions suppressOptions;
 
+  @CommandLine.Mixin
+  private ContainerIDParameters containerList;
+
+  @CommandLine.Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
+
   static class SuppressOptions {
     @CommandLine.Option(names = {"--suppress"},
         description = "Suppress container(s) from future reports")
@@ -64,14 +72,6 @@ public class ReportSubcommand extends ScmSubcommand {
       return unsuppress;
     }
   }
-
-  @CommandLine.Mixin
-  private ContainerIDParameters containerList;
-
-  @CommandLine.Option(names = { "--json" },
-      defaultValue = "false",
-      description = "Format output as JSON")
-  private boolean json;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {

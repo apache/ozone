@@ -63,7 +63,6 @@ import picocli.CommandLine;
 public class TestContainerReportSuppressOptions {
 
   private ScmClient scmClient;
-  private ReportSubcommand reportCmd;
   private List<ContainerInfo> containers;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
@@ -109,7 +108,7 @@ public class TestContainerReportSuppressOptions {
   @Test
   @Order(1)
   public void testReportShowsEmptyAndMissingContainers() throws IOException {
-    reportCmd = new ReportSubcommand();
+    ReportSubcommand reportCmd = new ReportSubcommand();
     CommandLine c = new CommandLine(reportCmd);
     c.parseArgs();
     reportCmd.execute(scmClient);
@@ -126,7 +125,7 @@ public class TestContainerReportSuppressOptions {
   @Order(2)
   public void testSuppressMissingContainer() throws IOException {
     outContent.reset();
-    reportCmd = new ReportSubcommand();
+    ReportSubcommand reportCmd = new ReportSubcommand();
     CommandLine c = new CommandLine(reportCmd);
     c.parseArgs("--suppress", "2");
     reportCmd.execute(scmClient);
@@ -176,7 +175,7 @@ public class TestContainerReportSuppressOptions {
     containers.get(1).setSuppressed(true);
 
     outContent.reset();
-    reportCmd = new ReportSubcommand();
+    ReportSubcommand reportCmd = new ReportSubcommand();
     CommandLine c = new CommandLine(reportCmd);
     c.parseArgs("--unsuppress", "2");
     reportCmd.execute(scmClient);
