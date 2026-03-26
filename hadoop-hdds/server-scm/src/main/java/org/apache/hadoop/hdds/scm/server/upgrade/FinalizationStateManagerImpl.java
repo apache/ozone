@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
@@ -30,7 +28,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +44,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   private final HDDSLayoutVersionManager versionManager;
   // Ensures that we are not in the process of updating checkpoint state as
   // we read it to determine the current checkpoint.
-  private final ReadWriteLock checkpointLock;
   private SCMUpgradeFinalizationContext upgradeContext;
   private final SCMUpgradeFinalizer upgradeFinalizer;
 
@@ -56,7 +52,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     this.transactionBuffer = builder.transactionBuffer;
     this.upgradeFinalizer = builder.upgradeFinalizer;
     this.versionManager = this.upgradeFinalizer.getVersionManager();
-    this.checkpointLock = new ReentrantReadWriteLock();
   }
 
   @Override
@@ -65,7 +60,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   @Override
-  public void finalizeLayoutFeatures(Integer toVersion) throws IOException {
+  public synchronized void finalizeLayoutFeatures(Integer toVersion) throws IOException {
     for (LayoutFeature feature : versionManager.unfinalizedFeatures()) {
       finalizeLayoutFeatureLocal((HDDSLayoutFeature) feature);
     }
@@ -77,28 +72,16 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
    */
   private void finalizeLayoutFeatureLocal(HDDSLayoutFeature layoutFeature)
       throws IOException {
-    checkpointLock.writeLock().lock();
-    try {
-      // The VERSION file is the source of truth for the current layout
-      // version. This is updated in the replicated finalization steps.
-      // Layout version will be written to the DB as well so followers can
-      // finalize from a snapshot.
-      if (versionManager.getMetadataLayoutVersion() >= layoutFeature.layoutVersion()) {
-        LOG.warn("Attempting to finalize layout feature for layout version {}, but " +
-            "current metadata layout version is {}. Skipping finalization for this layout version.",
-            layoutFeature.layoutVersion(), versionManager.getMetadataLayoutVersion());
-      } else {
-        upgradeFinalizer.replicatedFinalizationSteps(layoutFeature, upgradeContext);
-      }
-    } finally {
-      checkpointLock.writeLock().unlock();
-    }
-
-    if (!versionManager.needsFinalization() && !upgradeContext.getSCMContext().isLeader()) {
-      // Only the followers complete finalize here, the leader must wait until the DNs
-      // have finalized before making finalization done, otherwise a polling client could
-      // be told it is complete too early.
-      versionManager.setUpgradeState(UpgradeFinalization.Status.FINALIZATION_DONE);
+    // The VERSION file is the source of truth for the current layout
+    // version. This is updated in the replicated finalization steps.
+    // Layout version will be written to the DB as well so followers can
+    // finalize from a snapshot.
+    if (versionManager.getMetadataLayoutVersion() >= layoutFeature.layoutVersion()) {
+      LOG.warn("Attempting to finalize layout feature for layout version {}, but " +
+          "current metadata layout version is {}. Skipping finalization for this layout version.",
+          layoutFeature.layoutVersion(), versionManager.getMetadataLayoutVersion());
+    } else {
+      upgradeFinalizer.replicatedFinalizationSteps(layoutFeature, upgradeContext);
     }
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutFeature.layoutVersion()));
@@ -108,9 +91,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
    * Called on snapshot installation.
    */
   @Override
-  public void reinitialize(Table<String, String> newFinalizationStore)
+  public synchronized void reinitialize(Table<String, String> newFinalizationStore)
       throws IOException {
-    checkpointLock.writeLock().lock();
     try {
       this.finalizationStore = newFinalizationStore;
 
@@ -133,8 +115,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     } catch (Exception ex) {
       LOG.error("Failed to reinitialize finalization state", ex);
       throw new IOException(ex);
-    } finally {
-      checkpointLock.writeLock().unlock();
     }
   }
 

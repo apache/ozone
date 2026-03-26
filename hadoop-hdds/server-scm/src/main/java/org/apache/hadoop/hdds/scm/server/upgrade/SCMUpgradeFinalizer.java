@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
-
 import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -95,7 +93,6 @@ public class SCMUpgradeFinalizer extends
   @Override
   public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context) throws IOException {
     waitForDatanodesToFinalize(context);
-    getVersionManager().setUpgradeState(FINALIZATION_DONE);
   }
 
   /**

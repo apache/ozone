@@ -47,8 +47,4 @@ public interface FinalizationManager {
 
   void reinitialize(Table<String, String> finalizationStore) throws IOException;
 
-  static boolean shouldTellDatanodesToFinalize(HDDSLayoutVersionManager versionManager) {
-    return !versionManager.needsFinalization();
-  }
-
 }

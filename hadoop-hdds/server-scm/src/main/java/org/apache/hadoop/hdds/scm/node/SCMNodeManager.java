@@ -83,7 +83,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc_.Server;
@@ -758,38 +757,37 @@ public class SCMNodeManager implements NodeManager {
               "DataNode SoftwareLayoutVersion = {}, SCM " +
               "SoftwareLayoutVersion = {}",
           datanodeDetails.getHostName(), dnSlv, scmSlv);
+      return;
     }
 
-    if (FinalizationManager.shouldTellDatanodesToFinalize(scmLayoutVersionManager)) {
-      // Because the finalizationManager / versionManager says finalization is not needed
-      // it means any DN that is reporting a metadata layout version less than the SCM's metadata layout version
-      // can be finalized.
-      int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
+    if (!scmContext.isLeader() || scmLayoutVersionManager.needsFinalization()) {
+      return;
+    }
 
-      if (dnMlv < scmMlv) {
-        LOG.warn("Data node {} has a MetadataLayoutVersion = {}, SCM MetadataLayoutVersion = {}. Sending finalize",
-            datanodeDetails.getHostName(), dnMlv, scmMlv);
+    int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
+    if (dnMlv == scmMlv) {
+      // datanode is already finalized, so there is nothing to do
+      return;
+    }
 
-        FinalizeNewLayoutVersionCommand finalizeCmd =
-            new FinalizeNewLayoutVersionCommand(true,
-                LayoutVersionProto.newBuilder()
-                    .setSoftwareLayoutVersion(dnSlv)
-                    .setMetadataLayoutVersion(dnSlv).build());
-        if (scmContext.isLeader()) {
-          try {
-            finalizeCmd.setTerm(scmContext.getTermOfLeader());
+    // Because the finalizationManager / versionManager says finalization is not needed it means any DN reporting a
+    // metadata layout version less than the SCM's metadata layout version can be finalized.
+    LOG.warn("Data node {} has a MetadataLayoutVersion = {}, SCM MetadataLayoutVersion = {}. Sending finalize",
+        datanodeDetails.getHostName(), dnMlv, scmMlv);
 
-            // Send Finalize command to the data node. Its OK to
-            // send Finalize command multiple times.
-            scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-                new CommandForDatanode<>(datanodeDetails,
-                    finalizeCmd));
-          } catch (NotLeaderException ex) {
-            LOG.warn("Skip sending finalize upgrade command since current SCM" +
-                " is not leader.", ex);
-          }
-        }
-      }
+    FinalizeNewLayoutVersionCommand finalizeCmd =
+        new FinalizeNewLayoutVersionCommand(true,
+            LayoutVersionProto.newBuilder()
+                .setSoftwareLayoutVersion(dnSlv)
+                .setMetadataLayoutVersion(dnSlv).build());
+    try {
+      finalizeCmd.setTerm(scmContext.getTermOfLeader());
+      // Send Finalize command to the data node. Its OK to send Finalize command multiple times.
+      scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+          new CommandForDatanode<>(datanodeDetails,
+              finalizeCmd));
+    } catch (NotLeaderException ex) {
+      LOG.warn("Skip sending finalize upgrade command since current SCM is not leader.", ex);
     }
   }
 
