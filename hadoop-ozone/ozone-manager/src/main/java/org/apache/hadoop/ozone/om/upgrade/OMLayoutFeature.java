@@ -17,11 +17,21 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
+
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
- * List of OM Layout features / versions.
+ * List of OM Layout Features. All version management has been migrated to {@link OzoneManagerVersion} and no new
+ * additions should be made to this class. Existing versions are kept here for backwards compatibility when upgrading
+ * to this version from older versions.
  */
 public enum OMLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
@@ -46,7 +56,13 @@ public enum OMLayoutFeature implements LayoutFeature {
   DELEGATION_TOKEN_SYMMETRIC_SIGN(8, "Delegation token signed by symmetric key"),
   SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot");
 
+  // ALL NEW VERSIONS SHOULD NOW BE ADDED TO OzoneManagerVersion
+
   ///////////////////////////////  /////////////////////////////
+
+  private static final SortedMap<Integer, OMLayoutFeature> BY_VALUE =
+      Arrays.stream(values())
+          .collect(toMap(OMLayoutFeature::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
 
   private final int layoutVersion;
   private final String description;
@@ -60,6 +76,15 @@ public enum OMLayoutFeature implements LayoutFeature {
   @Override
   public int layoutVersion() {
     return layoutVersion;
+  }
+
+  /**
+   * @param version The serialized version to convert.
+   * @return The version corresponding to this serialized value, or {@code null} if no matching version is
+   *    found.
+   */
+  public static OMLayoutFeature deserialize(int version) {
+    return BY_VALUE.get(version);
   }
 
   @Override
@@ -81,6 +106,21 @@ public enum OMLayoutFeature implements LayoutFeature {
     // Required by SpotBugs since this setter exists in an enum.
     if (this.action == null) {
       this.action = upgradeAction;
+    }
+  }
+
+  /**
+   * @return The next version immediately following this one. If there is no next version found in this enum,
+   *    the next version is {@link OzoneManagerVersion#ZDU}, since all OM versioning has been migrated to
+   *    {@link OzoneManagerVersion} as part of the ZDU feature.
+   */
+  @Override
+  public ComponentVersion nextVersion() {
+    OMLayoutFeature nextFeature = BY_VALUE.get(layoutVersion + 1);
+    if (nextFeature == null) {
+      return OzoneManagerVersion.ZDU;
+    } else {
+      return nextFeature;
     }
   }
 

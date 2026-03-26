@@ -21,7 +21,8 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
-import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
 
 /**
@@ -44,11 +45,11 @@ public enum ClientVersion implements ComponentVersion {
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
 
-  public static final ClientVersion CURRENT = latest();
-
-  private static final Map<Integer, ClientVersion> BY_VALUE =
+  private static final SortedMap<Integer, ClientVersion> BY_VALUE =
       Arrays.stream(values())
-          .collect(toMap(ClientVersion::serialize, identity()));
+          .collect(toMap(ClientVersion::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
+
+  public static final ClientVersion CURRENT = BY_VALUE.get(BY_VALUE.lastKey());
 
   private final int version;
   private final String description;
@@ -64,6 +65,15 @@ public enum ClientVersion implements ComponentVersion {
   }
 
   @Override
+  public ClientVersion nextVersion() {
+    int nextOrdinal = ordinal() + 1;
+    if (nextOrdinal >= values().length - 1) {
+      return null;
+    }
+    return values()[nextOrdinal];
+  }
+
+  @Override
   public int serialize() {
     return version;
   }
@@ -73,21 +83,7 @@ public enum ClientVersion implements ComponentVersion {
   }
 
   @Override
-  public boolean isSupportedBy(int serializedVersion) {
-    // In order for the other serialized version to support this version's features,
-    // the other version must be equal or larger to this version.
-    return deserialize(serializedVersion).compareTo(this) >= 0;
-  }
-
-  @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
-  }
-
-  private static ClientVersion latest() {
-    ClientVersion[] versions = ClientVersion.values();
-    // The last entry in the array will be `FUTURE_VERSION`. We want the entry prior to this which defines the latest
-    // version in the software.
-    return versions[versions.length - 2];
   }
 }

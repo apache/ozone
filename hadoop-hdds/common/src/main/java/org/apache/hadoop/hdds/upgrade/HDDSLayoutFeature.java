@@ -17,11 +17,21 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
+
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
- * List of HDDS Features.
+ * List of HDDS Layout Features. All version management has been migrated to {@link HDDSVersion} and no new additions
+ * should be made to this class. Existing versions are kept here for backwards compatibility when upgrading to this
+ * version from older versions.
  */
 public enum HDDSLayoutFeature implements LayoutFeature {
   //////////////////////////////  //////////////////////////////
@@ -44,7 +54,13 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   WITNESSED_CONTAINER_DB_PROTO_VALUE(9, "ContainerID table schema to use value type as proto"),
   STORAGE_SPACE_DISTRIBUTION(10, "Enhanced block deletion function for storage space distribution feature.");
 
+  // ALL NEW VERSIONS SHOULD NOW BE ADDED TO HDDSVersion
+
   //////////////////////////////  //////////////////////////////
+
+  private static final SortedMap<Integer, HDDSLayoutFeature> BY_VALUE =
+      Arrays.stream(values())
+          .collect(toMap(HDDSLayoutFeature::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
 
   private final int layoutVersion;
   private final String description;
@@ -88,6 +104,30 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   @Override
   public String description() {
     return description;
+  }
+
+  /**
+   * @return The next version immediately following this one. If there is no next version found in this enum,
+   *    the next version is {@link HDDSVersion#ZDU}, since all HDDS versioning has been migrated to
+   *    {@link HDDSVersion} as part of the ZDU feature.
+   */
+  @Override
+  public ComponentVersion nextVersion() {
+    HDDSLayoutFeature nextFeature = BY_VALUE.get(layoutVersion + 1);
+    if (nextFeature == null) {
+      return HDDSVersion.ZDU;
+    } else {
+      return nextFeature;
+    }
+  }
+
+  /**
+   * @param version The serialized version to convert.
+   * @return The version corresponding to this serialized value, or {@code null} if no matching version is
+   *    found.
+   */
+  public static HDDSLayoutFeature deserialize(int version) {
+    return BY_VALUE.get(version);
   }
 
   @Override
