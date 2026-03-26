@@ -569,6 +569,29 @@ public abstract class ContainerData {
    */
   public abstract long getBlockCommitSequenceId();
 
+  /**
+   * Update write statistics for chunk operations.
+   * <p>
+   * This method handles two distinct cases:
+   * 1. New writes (overwrite=false):
+   *    - Updates I/O metrics: writeBytes, writeCount
+   *    - Updates disk metrics: blockBytes
+   *    - Updates space metrics: usedSpace, committedBytes (via incrWriteBytes)
+   * 2. Overwrites (overwrite=true):
+   *    - Updates I/O metrics only: writeBytes, writeCount
+   *    - Does NOT update space metrics (file may not grow)
+   *    - blockBytes is handled separately for file growth
+   * <p>
+   * Example for overwrite with growth (file 4 bytes, overwrite 6 bytes at offset 2):
+   * - bytesWritten=6, overwrite=true
+   * - writeBytes += 6 (I/O operation size)
+   * - writeCount += 1 (one operation)
+   * - usedSpace/committedBytes NOT updated here (delta handled separately)
+   * - blockBytes NOT updated here (delta=4 handled by incrementBlockBytes)
+   * 
+   * @param bytesWritten Number of bytes in the I/O operation
+   * @param overwrite Whether this is an overwrite operation
+   */
   public void updateWriteStats(long bytesWritten, boolean overwrite) {
     getStatistics().updateWrite(bytesWritten, overwrite);
     if (!overwrite) {
