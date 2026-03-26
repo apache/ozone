@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -490,6 +491,48 @@ public class TestHddsDispatcher {
       assertThat(logCapturer.getOutput())
           .contains("ContainerID " + writeChunkRequest.getContainerID()
               + " creation failed , Result: DISK_OUT_OF_SPACE");
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testCreateContainerWhenAlreadyExistsDoesNotMarkUnhealthy() throws IOException {
+    String testDirPath = testDir.getPath();
+    try {
+      UUID scmId = UUID.randomUUID();
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+      DatanodeDetails dd = randomDatanodeDetails();
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
+
+      // Create container via WriteChunk
+      ContainerCommandRequestProto writeChunkRequest =
+          getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+      ContainerCommandResponseProto initialResponse =
+          hddsDispatcher.dispatch(writeChunkRequest, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, initialResponse.getResult());
+
+      // Send direct CreateContainer for existing container
+      ContainerCommandRequestProto createRequest =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.CreateContainer)
+              .setContainerID(1L)
+              .setCreateContainer(ContainerProtos.CreateContainerRequestProto.newBuilder()
+                  .setContainerType(ContainerProtos.ContainerType.KeyValueContainer)
+                  .build())
+              .setDatanodeUuid(dd.getUuidString())
+              .build();
+
+      ContainerCommandResponseProto response =
+          hddsDispatcher.dispatch(createRequest, null);
+      assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, response.getResult());
+
+      Container container = hddsDispatcher.getContainer(1L);
+      assertNotNull(container);
+      assertTrue(container.getContainerData().isOpen());
+      assertFalse(container.getContainerData().isUnhealthy());
     } finally {
       ContainerMetrics.remove();
     }

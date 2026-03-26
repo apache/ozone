@@ -305,7 +305,6 @@ Apache License 2.0
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
-   commons-daemon:commons-daemon
    commons-digester:commons-digester
    commons-httpclient:commons-httpclient
    commons-io:commons-io

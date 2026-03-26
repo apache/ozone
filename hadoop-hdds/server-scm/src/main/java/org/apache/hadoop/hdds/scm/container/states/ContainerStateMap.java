@@ -260,6 +260,20 @@ public class ContainerStateMap {
     currentInfo.setState(newState);
   }
 
+  /**
+   *
+   * @param state the state of the containers
+   * @param start the start id
+   * @param count the maximum size of the returned list
+   * @return a list of sorted {@link ContainerID}s
+   */
+  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
+    Preconditions.assertTrue(count >= 0, "count < 0");
+    return lifeCycleStateMap.tailMap(state, start).keySet().stream()
+        .limit(count)
+        .collect(Collectors.toList());
+  }
+
   public List<ContainerInfo> getContainerInfos(ContainerID start, int count) {
     return containerMap.getInfos(start, count);
   }

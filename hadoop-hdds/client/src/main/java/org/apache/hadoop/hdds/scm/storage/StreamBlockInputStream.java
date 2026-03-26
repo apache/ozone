@@ -131,8 +131,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dataAvailableToRead(1, true)) {
       return EOF;
     }
-    position++;
-    return buffer.get();
+    int value = buffer.get();
+    advancePosition(1);
+    return value;
   }
 
   @Override
@@ -158,7 +159,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       tmpBuf.limit(tmpBuf.position() + toCopy);
       targetBuf.put(tmpBuf);
       buffer.position(tmpBuf.position());
-      position += toCopy;
+      advancePosition(toCopy);
       read += toCopy;
     }
     return read > 0 ? read : EOF;
@@ -175,6 +176,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
     buffer = streamingReader.read(length, preRead);
     return bufferHasRemaining();
+  }
+
+  private synchronized void advancePosition(long delta) {
+    position += delta;
+    if (position >= blockLength && streamingReader != null) {
+      closeStream();
+    }
   }
 
   private synchronized boolean bufferHasRemaining() {
