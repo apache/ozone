@@ -15,15 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
+package org.apache.hadoop.hdds.scm.container.replication;
 
 /**
- * Custom unmarshaller to read Tagging request body.
+ * A class which extends ReplicationQueue and does nothing. This is used when
+ * checking containers in a read-only mode, where we don't want to queue them
+ * for replication.
  */
-public class PutTaggingUnmarshaller extends MessageUnmarshaller<S3Tagging> {
+public class MonitoringReplicationQueue extends ReplicationQueue {
 
-  public PutTaggingUnmarshaller() {
-    super(S3Tagging.class);
+  @Override
+  public void enqueue(ContainerHealthResult.UnderReplicatedHealthResult
+                          underReplicatedHealthResult) {
+    // Do nothing
+  }
+
+  @Override
+  public void enqueue(ContainerHealthResult.OverReplicatedHealthResult
+                          overReplicatedHealthResult) {
+    // Do nothing
   }
 
 }

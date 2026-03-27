@@ -21,7 +21,9 @@ if [[ ${SECURITY_ENABLED} == "true" ]]; then
 fi
 export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_compose_file}
 
-: ${HADOOP_IMAGE:="${docker.hadoop.image}"}
+DEFAULT_HADOOP_IMAGE="${docker.hadoop.image}"
+
+: ${HADOOP_IMAGE:="${DEFAULT_HADOOP_IMAGE}"}
 : ${HADOOP_TEST_IMAGES:=""}
 
 if [[ -z "${HADOOP_TEST_IMAGES}" ]]; then
