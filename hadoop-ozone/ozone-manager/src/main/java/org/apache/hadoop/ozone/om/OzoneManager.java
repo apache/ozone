@@ -1111,8 +1111,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public void checkLifecycleEnabled() throws OMException {
     if (!isLifecycleEnabled()) {
-      throw new OMException("OM Lifecycle feature is not enabled. Please "
-          + "set ozone.om.lifecycle.service.enabled to true and restart all OMs.",
+      throw new OMException("OM Lifecycle feature is not enabled. Please set "
+          + OZONE_KEY_LIFECYCLE_SERVICE_ENABLED + " to true and restart all OMs.",
           FEATURE_NOT_ENABLED);
     }
   }
