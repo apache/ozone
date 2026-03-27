@@ -127,6 +127,16 @@ public class ContainerScannerConfiguration {
   private long onDemandBandwidthPerVolume
       = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
 
+  @Config(key = "hdds.container.scrub.max.retries",
+      defaultValue = "3",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The maximum number of times to retry scanning a container"
+          + " if its data checksum changes during the scan (for example, due"
+          + " to concurrent reconciliation)."
+  )
+  private int dataScanMaxRetries = 3;
+
   @Config(key = "hdds.container.scrub.min.gap",
       defaultValue = "15m",
       type = ConfigType.TIME,
@@ -171,6 +181,12 @@ public class ContainerScannerConfiguration {
               " must be >= 0 and was set to {}. Defaulting to {}",
           onDemandBandwidthPerVolume, ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT);
       onDemandBandwidthPerVolume = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
+    }
+
+    if (dataScanMaxRetries < 0) {
+      LOG.warn("hdds.container.scrub.data.scan.max.retries must be >= 0 and was set to {}. Defaulting to 3",
+          dataScanMaxRetries);
+      dataScanMaxRetries = 3;
     }
   }
 
@@ -220,5 +236,13 @@ public class ContainerScannerConfiguration {
 
   public void setContainerScanMinGap(long scanGap) {
     containerScanMinGap = scanGap;
+  }
+
+  public int getDataScanMaxRetries() {
+    return dataScanMaxRetries;
+  }
+
+  public void setDataScanMaxRetries(int dataScanMaxRetries) {
+    this.dataScanMaxRetries = dataScanMaxRetries;
   }
 }
