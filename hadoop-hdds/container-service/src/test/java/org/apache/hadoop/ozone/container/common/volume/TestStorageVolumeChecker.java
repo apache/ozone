@@ -396,7 +396,7 @@ public class TestStorageVolumeChecker {
     HddsVolume volume = mock(HddsVolume.class);
     CountDownLatch blockLatch = new CountDownLatch(1);
     when(volume.check(any())).thenAnswer(inv -> {
-      blockLatch.await(10, TimeUnit.SECONDS);
+      blockLatch.await();
       return VolumeCheckResult.HEALTHY;
     });
     // First timeout returns false (within tolerance), second returns true.
@@ -447,7 +447,7 @@ public class TestStorageVolumeChecker {
     HddsVolume volume = mock(HddsVolume.class);
     CountDownLatch blockLatch = new CountDownLatch(1);
     when(volume.check(any())).thenAnswer(inv -> {
-      blockLatch.await(10, TimeUnit.SECONDS);
+      blockLatch.await();
       return VolumeCheckResult.HEALTHY;
     });
     // Simulate: first timeout is within tolerance.
