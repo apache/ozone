@@ -113,6 +113,15 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   private Queue<Boolean> ioTestSlidingWindow;
   private int healthCheckFileSize;
 
+  /*
+  Counter for consecutive latch or per-check timeouts. Incremented by
+  recordTimeoutAsIOFailure() which must NOT be synchronized (check() may be
+  holding the lock — that is exactly why the timeout fired). AtomicInteger
+  provides the necessary thread safety without locking. Reset to 0 by
+  resetTimeoutCount() whenever a check completes successfully.
+   */
+  private final AtomicInteger consecutiveTimeoutCount;
+
   /**
    * Type for StorageVolume.
    */
@@ -164,6 +173,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.ioTestSlidingWindow = new LinkedList<>();
       this.currentIOFailureCount = new AtomicInteger(0);
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
+      this.consecutiveTimeoutCount = new AtomicInteger(0);
     } else {
       storageDir = new File(b.volumeRootStr);
       volumeUsage = null;
@@ -174,6 +184,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.ioFailureTolerance = 0;
       this.conf = null;
       this.dnConf = null;
+      this.consecutiveTimeoutCount = new AtomicInteger(0);
     }
     this.storageDirStr = storageDir.getAbsolutePath();
   }
@@ -734,33 +745,60 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
    * this volume's async check completed, or because the per-check timeout
    * inside {@link ThrottledAsyncChecker} fired.
    *
-   * <p>Records a synthetic IO-test failure in the existing sliding window,
-   * making latch timeouts subject to the same {@code ioFailureTolerance}
-   * threshold as genuine read/write failures.  No separate configuration key
-   * is required: the existing
-   * {@code hdds.datanode.disk.check.io.failures.tolerated} governs both.
+   * <p><b>Must not be {@code synchronized}.</b> When a timeout fires,
+   * {@link #check} may still be executing and holding the object lock — that
+   * is precisely why the timeout occurred. Acquiring the same lock here would
+   * deadlock or stall {@link StorageVolumeChecker#checkAllVolumes} until the
+   * hung check finally returns.
    *
-   * <p>Recovery is automatic: each successful {@link #check} call records a
-   * {@code true} entry in the window, gradually evicting the synthetic
-   * failure once {@code ioTestCount} healthy results have accumulated.
+   * <p>Instead, a dedicated {@link AtomicInteger} ({@code
+   * consecutiveTimeoutCount}) tracks consecutive timeouts without any locking.
+   * The threshold reuses the existing {@code ioFailureTolerance} so no
+   * additional configuration key is required.
    *
-   * @return {@code true} if {@code currentIOFailureCount > ioFailureTolerance},
+   * <p>Recovery: call {@link #resetTimeoutCount()} when a check completes
+   * successfully to break the timeout streak.
+   *
+   * @return {@code true} if {@code consecutiveTimeoutCount > ioFailureTolerance},
    *         meaning the volume should now be marked FAILED; {@code false} if
-   *         the failure is still within tolerance this round.
+   *         the timeout is still within tolerance this round.
    */
-  public synchronized boolean recordTimeoutAsIOFailure() {
-    if (advanceIOWindow(false)) {
-      LOG.error("Volume {} check timed out: IO-failure count ({}) exceeds"
-              + " tolerance ({}). Marking FAILED.",
-          this, currentIOFailureCount, ioFailureTolerance);
+  public boolean recordTimeoutAsIOFailure() {
+    int count = consecutiveTimeoutCount.incrementAndGet();
+    if (count > ioFailureTolerance) {
+      LOG.error("Volume {} check timed out {} consecutive time(s),"
+              + " exceeding tolerance of {}. Marking FAILED.",
+          this, count, ioFailureTolerance);
       return true;
     }
-    LOG.warn("Volume {} check timed out. IO-failure count: {} / tolerance: {}."
-            + " Volume will not be failed until tolerance is exceeded."
+    LOG.warn("Volume {} check timed out ({}/{} consecutive timeouts tolerated)."
             + " Common transient causes: kernel I/O scheduler saturation"
-            + " or JVM GC pressure.",
-        this, currentIOFailureCount, ioFailureTolerance);
+            + " or JVM GC pressure. Volume will be failed if the next check"
+            + " also times out.",
+        this, count, ioFailureTolerance);
     return false;
+  }
+
+  /**
+   * Resets the consecutive-timeout counter to 0.
+   *
+   * <p>Called by {@link StorageVolumeChecker} when this volume's check
+   * completes successfully, indicating that the transient stall has resolved
+   * and any accumulated timeout count should not carry over to the next cycle.
+   *
+   * <p>No synchronization needed — operates on an {@link AtomicInteger}.
+   */
+  public void resetTimeoutCount() {
+    int prev = consecutiveTimeoutCount.getAndSet(0);
+    if (prev > 0 && LOG.isDebugEnabled()) {
+      LOG.debug("Volume {} completed a healthy check. Consecutive timeout"
+          + " count reset from {} to 0.", this, prev);
+    }
+  }
+
+  @VisibleForTesting
+  public int getConsecutiveTimeoutCount() {
+    return consecutiveTimeoutCount.get();
   }
 
   /**

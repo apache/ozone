@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.isNull;
@@ -28,8 +29,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.File;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -39,8 +43,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -299,6 +308,165 @@ public class TestStorageVolumeChecker {
     assertEquals(1, metrics3.getNumScansSkipped());
 
     checker.shutdownAndWait(0, TimeUnit.SECONDS);
+  }
+
+  /**
+   * Explicitly captures the {@link Throwable} type that
+   * {@link Futures#withTimeout} delivers to {@code onFailure()} when the
+   * deadline fires.
+   *
+   * <p>{@link ThrottledAsyncChecker} uses {@code Futures.withTimeout()}
+   * internally; this test replicates that exact call to confirm that Guava
+   * 28+ (including the 33.5.0-jre version used by Ozone) delivers a
+   * {@link TimeoutException} — NOT a {@link java.util.concurrent.CancellationException}.
+   * {@code CancellationException} in new Guava means external cancellation
+   * (e.g. executor shutdown), not a disk-check timeout, so
+   * {@link StorageVolumeChecker} {@code ResultHandler.onFailure()} only
+   * treats {@link TimeoutException} as a timeout.
+   */
+  @Test
+  public void testFuturesWithTimeoutExceptionType() throws Exception {
+    ScheduledExecutorService scheduler =
+        Executors.newSingleThreadScheduledExecutor();
+    AtomicReference<Throwable> captured = new AtomicReference<>();
+    CountDownLatch done = new CountDownLatch(1);
+
+    try {
+      // A future that never completes on its own — same situation as a
+      // check() thread blocked inside fsync().
+      SettableFuture<VolumeCheckResult> neverCompletes = SettableFuture.create();
+
+      // Wrap with a real Futures.withTimeout(), identical to what
+      // ThrottledAsyncChecker does.
+      ListenableFuture<VolumeCheckResult> timedFuture =
+          Futures.withTimeout(neverCompletes, 100, TimeUnit.MILLISECONDS,
+              scheduler);
+
+      Futures.addCallback(timedFuture, new FutureCallback<VolumeCheckResult>() {
+        @Override
+        public void onSuccess(VolumeCheckResult result) {
+          done.countDown();
+        }
+
+        @Override
+        public void onFailure(Throwable t) {
+          captured.set(t);
+          done.countDown();
+        }
+      }, MoreExecutors.directExecutor());
+
+      assertTrue(done.await(2, TimeUnit.SECONDS),
+          "Timeout should have fired within 2 seconds");
+
+      Throwable thrown = captured.get();
+      LOG.info("Futures.withTimeout() delivered to onFailure(): {}",
+          thrown.getClass().getName());
+
+      // Guava 28+ delivers TimeoutException for a timeout.
+      // CancellationException would mean external cancellation, not a timeout.
+      assertTrue(thrown instanceof TimeoutException,
+          "Expected TimeoutException from Futures.withTimeout() but got: "
+              + thrown.getClass().getName());
+    } finally {
+      scheduler.shutdownNow();
+    }
+  }
+
+  /**
+   * Verifies that when the per-check timeout inside {@link ThrottledAsyncChecker}
+   * fires on {@link StorageVolumeChecker#checkVolume}, the first timeout is
+   * tolerated (callback not invoked, volume not failed) and the second
+   * consecutive timeout causes the volume to be failed.
+   *
+   * <p>This test uses the real {@link ThrottledAsyncChecker} (not
+   * {@link DummyChecker}) so that the actual {@code TimeoutException}
+   * path in {@code ResultHandler.onFailure()} fires.
+   */
+  @Test
+  public void testCheckVolumeTimeoutTolerance() throws Exception {
+    setup();
+    // Use a very short check timeout so the test completes quickly.
+    OzoneConfiguration timeoutConf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = timeoutConf.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeout(Duration.ofMillis(200));
+    dnConf.setDiskCheckMinGap(Duration.ZERO);
+    timeoutConf.setFromObject(dnConf);
+
+    // A latch-controlled mock volume: check() blocks until released.
+    HddsVolume volume = mock(HddsVolume.class);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    when(volume.check(any())).thenAnswer(inv -> {
+      blockLatch.await(10, TimeUnit.SECONDS);
+      return VolumeCheckResult.HEALTHY;
+    });
+    // First timeout returns false (within tolerance), second returns true.
+    when(volume.recordTimeoutAsIOFailure()).thenReturn(false).thenReturn(true);
+
+    AtomicLong callbackCount = new AtomicLong(0);
+    StorageVolumeChecker checker =
+        new StorageVolumeChecker(timeoutConf, new FakeTimer(), "test-");
+
+    // First checkVolume — should time out and be tolerated (callback NOT fired).
+    checker.checkVolume(volume, (healthy, failed) -> callbackCount.incrementAndGet());
+
+    // Wait long enough for the timeout to fire.
+    Thread.sleep(600);
+    assertEquals(0, callbackCount.get(),
+        "Callback must NOT fire for a tolerated timeout");
+    verify(volume, times(1)).recordTimeoutAsIOFailure();
+
+    // Second checkVolume — should time out and exceed tolerance (callback fired).
+    checker.checkVolume(volume, (healthy, failed) -> callbackCount.incrementAndGet());
+    Thread.sleep(600);
+
+    assertEquals(1, callbackCount.get(),
+        "Callback must fire when tolerance is exceeded");
+
+    blockLatch.countDown();
+    checker.shutdownAndWait(5, TimeUnit.SECONDS);
+  }
+
+  /**
+   * Verifies that when the {@code checkAllVolumes()} latch times out and
+   * pending volumes have not yet reported a result, their consecutive-timeout
+   * counter is incremented and the first timeout is tolerated.
+   *
+   * <p>This test confirms that {@code recordTimeoutAsIOFailure()} is called on
+   * pending volumes, and that the volume is NOT in the returned failed set on
+   * the first timeout.
+   */
+  @Test
+  public void testCheckAllVolumesLatchTimeoutTolerance() throws Exception {
+    setup();
+    OzoneConfiguration timeoutConf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = timeoutConf.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeout(Duration.ofMillis(200));
+    dnConf.setDiskCheckMinGap(Duration.ZERO);
+    timeoutConf.setFromObject(dnConf);
+
+    HddsVolume volume = mock(HddsVolume.class);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    when(volume.check(any())).thenAnswer(inv -> {
+      blockLatch.await(10, TimeUnit.SECONDS);
+      return VolumeCheckResult.HEALTHY;
+    });
+    // Simulate: first timeout is within tolerance.
+    when(volume.recordTimeoutAsIOFailure()).thenReturn(false);
+    when(volume.getVolumeInfoStats()).thenReturn(
+        new VolumeInfoMetrics("test-vol", volume));
+
+    StorageVolumeChecker checker =
+        new StorageVolumeChecker(timeoutConf, new FakeTimer(), "test-");
+
+    Set<? extends StorageVolume> failed =
+        checker.checkAllVolumes(Arrays.asList(volume));
+
+    assertFalse(failed.contains(volume),
+        "Volume must NOT be in failed set on first tolerated timeout");
+    verify(volume, times(1)).recordTimeoutAsIOFailure();
+
+    blockLatch.countDown();
+    checker.shutdownAndWait(5, TimeUnit.SECONDS);
   }
 
   /**

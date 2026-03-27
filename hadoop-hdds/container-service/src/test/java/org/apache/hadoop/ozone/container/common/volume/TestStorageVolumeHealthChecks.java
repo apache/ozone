@@ -344,10 +344,10 @@ public class TestStorageVolumeHealthChecks {
   }
 
   /**
-   * With the default settings (ioTestCount=3, ioFailureTolerance=1), the
-   * first simulated check timeout must be tolerated: it records one synthetic
-   * IO failure in the sliding window (count=1, which is NOT &gt; tolerance=1),
-   * so {@code recordTimeoutAsIOFailure()} returns false.
+   * With the default settings (ioFailureTolerance=1), the first simulated
+   * check timeout must be tolerated: {@code consecutiveTimeoutCount} becomes 1
+   * which is NOT {@code > 1}, so {@code recordTimeoutAsIOFailure()} returns
+   * {@code false}.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
@@ -357,16 +357,16 @@ public class TestStorageVolumeHealthChecks {
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
 
-    // First simulated check timeout: tolerance not exceeded.
+    assertEquals(0, volume.getConsecutiveTimeoutCount());
     assertFalse(volume.recordTimeoutAsIOFailure(),
-        "First timeout should be tolerated (IO failure count 1 is not > tolerance 1)");
+        "First timeout should be tolerated (count 1 is not > tolerance 1)");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
   }
 
   /**
-   * With the default settings (ioTestCount=3, ioFailureTolerance=1), the
-   * second consecutive check timeout must cause
-   * {@code recordTimeoutAsIOFailure()} to return true: count=2 which IS
-   * &gt; tolerance=1.
+   * With the default settings (ioFailureTolerance=1), the second consecutive
+   * timeout must cause {@code recordTimeoutAsIOFailure()} to return
+   * {@code true}: count becomes 2 which IS {@code > 1}.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
@@ -376,30 +376,26 @@ public class TestStorageVolumeHealthChecks {
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
 
-    assertFalse(volume.recordTimeoutAsIOFailure(),
-        "First timeout should be tolerated");
+    assertFalse(volume.recordTimeoutAsIOFailure(), "First timeout should be tolerated");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
+
     assertTrue(volume.recordTimeoutAsIOFailure(),
         "Second consecutive timeout should exceed tolerance and return true");
+    assertEquals(2, volume.getConsecutiveTimeoutCount());
   }
 
   /**
-   * After a simulated timeout, {@code ioTestCount} healthy check() calls
-   * gradually evict the synthetic failure from the sliding window. Once
-   * evicted, the IO failure count drops back to 0 and a new single timeout
-   * is tolerated again — no separate reset API is required.
+   * {@code resetTimeoutCount()} resets the consecutive-timeout counter to 0,
+   * so a subsequent single timeout is tolerated again — the streak does not
+   * carry over past a successful check cycle.
    *
-   * <p>With the defaults (ioTestCount=3, ioFailureTolerance=1):
-   * <ol>
-   *   <li>1 timeout: window=[F], failures=1</li>
-   *   <li>3 healthy checks push T, T, T — the 4th entry evicts F:
-   *       window=[T,T,T], failures=0</li>
-   *   <li>New timeout: window=[T,T,F] (evicts oldest T), failures=1
-   *       → 1 is not &gt; 1 → tolerated again</li>
-   * </ol>
+   * <p>{@code resetTimeoutCount()} is called by {@link StorageVolumeChecker}
+   * whenever a volume completes a healthy check (either via
+   * {@code checkAllVolumes()} or via {@code checkVolume()}).
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
-  public void testHealthyChecksEvictTimeoutFromSlidingWindow(
+  public void testResetTimeoutCountResetsConsecutiveCounter(
       StorageVolume.Builder<?> builder) throws Exception {
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
@@ -408,24 +404,18 @@ public class TestStorageVolumeHealthChecks {
     // Simulate one tolerated timeout.
     assertFalse(volume.recordTimeoutAsIOFailure(),
         "First timeout should be tolerated");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
 
-    // Three healthy checks push TRUE entries into the sliding window,
-    // eventually evicting the synthetic FALSE.
-    DiskCheckUtil.DiskChecks alwaysPass = new DiskCheckUtil.DiskChecks() {
-      @Override
-      public boolean checkReadWrite(File storageDir, File testFileDir,
-          int numBytesToWrite) {
-        return true;
-      }
-    };
-    DiskCheckUtil.setTestImpl(alwaysPass);
-    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+    // StorageVolumeChecker calls resetTimeoutCount() when the volume's check
+    // eventually completes successfully. Simulate that here.
+    volume.resetTimeoutCount();
+    assertEquals(0, volume.getConsecutiveTimeoutCount(),
+        "Counter must be reset to 0 after a successful check");
 
-    // After recovery a new single timeout is tolerated again.
+    // A new single timeout after reset is tolerated again.
     assertFalse(volume.recordTimeoutAsIOFailure(),
-        "Timeout after recovery should be tolerated again");
+        "Timeout after reset should be tolerated again");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
   }
 
   /**
