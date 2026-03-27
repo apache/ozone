@@ -17,8 +17,9 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.isValidKeyPath;
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.normalizePrefix;
+import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateAndNormalizePrefix;
+import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validatePrefixLength;
+import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateTrashPrefix;
 
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
@@ -142,14 +143,17 @@ public final class OmLCRule {
 
   /**
    * Validates the lifecycle rule.
-   * - ID length should not exceed the allowed limit
-   * - At least one action must be specified
-   * - Filter and Prefix cannot be used together
-   * - Filter and prefix cannot both be null
+   * - ID length should not exceed the allowed limit.
+   * - At least one action must be specified, and the expiration type Action can have at most one.
+   * - Filter and Prefix cannot be used together.
+   * - Filter and prefix cannot both be null.
    * - Prefix can be "", in which case the rule applies to all objects in the bucket.
-   * - Actions must be valid
-   * - Filter must be valid
-   * - There must be at most one Expiration action per rule
+   * - Prefix length must be a length between 0 and 1024.
+   * - For FSO bucket, the prefix must be normalized and valid path.
+   * - Prefix cannot be the Trash directory or any of its subdirectories.
+   * - Actions must be valid.
+   * - Filter must be valid.
+   * - There must be at most one Expiration action per rule.
    *
    * @param bucketLayout The bucket layout for validation
    * @param creationTime The creation time of the lifecycle configuration in milliseconds since epoch
@@ -189,17 +193,13 @@ public final class OmLCRule {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
+    if (prefix != null) {
+      validatePrefixLength(prefix);
+      validateTrashPrefix(prefix);
+    }
+
     if (prefix != null && bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      String normalizedPrefix = normalizePrefix(prefix);
-      if (!normalizedPrefix.equals(prefix)) {
-        throw new OMException("Prefix format is not supported. Please use " + normalizedPrefix +
-            " instead of " + prefix + ".", OMException.ResultCodes.INVALID_REQUEST);
-      }
-      try {
-        isValidKeyPath(normalizedPrefix);
-      } catch (OMException e) {
-        throw new OMException("Prefix is not a valid key path: " + prefix, OMException.ResultCodes.INVALID_REQUEST);
-      }
+      validateAndNormalizePrefix(prefix);
     }
 
     if (filter != null) {

@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -1405,24 +1406,14 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
       // create new policy to test rule with prefix ".Trash/" is ignored during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
-      date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, bucketLayout, TRASH_PREFIX + OM_KEY_PREFIX,
-          null, date.toString(), true);
-
-      GenericTestUtils.waitFor(
-          () -> log.getOutput().contains("Skip rule") &&
-              log.getOutput().contains("as its prefix starts with " + TRASH_PREFIX + OM_KEY_PREFIX),
-          WAIT_CHECK_INTERVAL, 5000);
-      deleteLifecyclePolicy(volumeName, bucketName);
+      final String expiredDate = now.plusSeconds(EXPIRE_SECONDS).toString();
+      assertThrowsExactly(OMException.class, () -> createLifecyclePolicy(
+          volumeName, bucketName, bucketLayout, TRASH_PREFIX + OM_KEY_PREFIX, null, expiredDate, true));
 
       // create new policy to test rule with prefix ".Trash" is ignored during lifecycle evaluation
-      now = ZonedDateTime.now(ZoneOffset.UTC);
-      date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, bucketLayout, TRASH_PREFIX, null, date.toString(), true);
-
-      GenericTestUtils.waitFor(
-          () -> log.getOutput().contains("Skip evaluate trash directory " + TRASH_PREFIX), WAIT_CHECK_INTERVAL, 5000);
-      deleteLifecyclePolicy(volumeName, bucketName);
+      assertThrowsExactly(OMException.class, () -> createLifecyclePolicy(
+          volumeName, bucketName, bucketLayout, TRASH_PREFIX,
+          null, expiredDate, true));
 
       // create new policy to test rule with prefix ".Tras" is ignored during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -1430,8 +1421,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, ".Tras", null, date.toString(), true);
 
       GenericTestUtils.waitFor(
-          () -> log.getOutput().contains("Skip evaluate trash directory " + TRASH_PREFIX), WAIT_CHECK_INTERVAL, 5000);
+          () -> log.getOutput().contains("No expired keys/dirs found/remained for bucket"), WAIT_CHECK_INTERVAL, 5000);
       deleteLifecyclePolicy(volumeName, bucketName);
+      log.clearOutput();
 
       // create new policy to test trash directory is skipped during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -1854,21 +1846,29 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   private void createLifecyclePolicy(String volume, String bucket, BucketLayout layout, String prefix,
       OmLCFilter filter, String date, boolean enabled) throws IOException {
-    OmLifecycleConfiguration lcc = new OmLifecycleConfiguration.Builder()
-        .setVolume(volume)
-        .setBucket(bucket)
-        .setBucketLayout(layout)
-        .setBucketObjectID(bucketObjectID)
-        .setRules(Collections.singletonList(new OmLCRule.Builder()
-            .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
-            .setEnabled(enabled)
-            .setPrefix(prefix)
-            .setFilter(filter)
-            .setAction(new OmLCExpiration.Builder()
-                .setDate(date)
-                .build())
-            .build()))
-        .build();
+    OmLifecycleConfiguration lcc;
+    try {
+      lcc = new OmLifecycleConfiguration.Builder()
+          .setVolume(volume)
+          .setBucket(bucket)
+          .setBucketLayout(layout)
+          .setBucketObjectID(bucketObjectID)
+          .setRules(Collections.singletonList(new OmLCRule.Builder()
+              .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
+              .setEnabled(enabled)
+              .setPrefix(prefix)
+              .setFilter(filter)
+              .setAction(new OmLCExpiration.Builder()
+                  .setDate(date)
+                  .build())
+              .build()))
+          .build();
+    } catch (IllegalArgumentException e) {
+      if (e.getCause() instanceof OMException) {
+        throw (OMException) e.getCause();
+      }
+      throw e;
+    }
     String key = "/" + volume + "/" + bucket;
     LifecycleConfiguration lcProto = lcc.getProtobuf();
     OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);
@@ -1880,13 +1880,21 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   private void createLifecyclePolicy(String volume, String bucket, BucketLayout layout, List<OmLCRule> ruleList)
       throws IOException {
-    OmLifecycleConfiguration lcc = new OmLifecycleConfiguration.Builder()
-        .setVolume(volume)
-        .setBucket(bucket)
-        .setBucketObjectID(bucketObjectID)
-        .setBucketLayout(layout)
-        .setRules(ruleList)
-        .build();
+    OmLifecycleConfiguration lcc;
+    try {
+      lcc = new OmLifecycleConfiguration.Builder()
+          .setVolume(volume)
+          .setBucket(bucket)
+          .setBucketObjectID(bucketObjectID)
+          .setBucketLayout(layout)
+          .setRules(ruleList)
+          .build();
+    } catch (IllegalArgumentException e) {
+      if (e.getCause() instanceof OMException) {
+        throw (OMException) e.getCause();
+      }
+      throw e;
+    }
     String key = "/" + volume + "/" + bucket;
     LifecycleConfiguration lcProto = lcc.getProtobuf();
     OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);

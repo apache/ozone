@@ -110,6 +110,11 @@ public final class OmLifecycleConfiguration extends WithObjectID
    * @throws OMException if the validation fails
    */
   public void valid() throws OMException {
+    validateFields(volume, bucket, rules, bucketLayout, creationTime);
+  }
+
+  private static void validateFields(String volume, String bucket, List<OmLCRule> rules,
+      BucketLayout bucketLayout, long creationTime) throws OMException {
     if (StringUtils.isBlank(volume)) {
       throw new OMException("Invalid lifecycle configuration: Volume cannot be blank.",
           OMException.ResultCodes.INVALID_REQUEST);
@@ -130,7 +135,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
           + LC_MAX_RULES + " rules", OMException.ResultCodes.INVALID_REQUEST);
     }
 
-    if (!hasNoDuplicateID()) {
+    if (!hasNoDuplicateID(rules)) {
       throw new OMException("Invalid lifecycle configuration: Duplicate rule IDs found.",
           OMException.ResultCodes.INVALID_REQUEST);
     }
@@ -140,7 +145,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     }
   }
 
-  private boolean hasNoDuplicateID() {
+  private static boolean hasNoDuplicateID(List<OmLCRule> rules) {
     return rules.size() == rules.stream()
         .map(OmLCRule::getId)
         .collect(Collectors.toSet())
@@ -312,14 +317,18 @@ public final class OmLifecycleConfiguration extends WithObjectID
     }
 
     @Override
-    public OmLifecycleConfiguration buildObject() {
-      return new OmLifecycleConfiguration(this);
+    protected void validate() {
+      super.validate();
+      try {
+        validateFields(volume, bucket, rules, bucketLayout, creationTime);
+      } catch (OMException e) {
+        throw new IllegalArgumentException(e.getMessage(), e);
+      }
     }
 
-    public OmLifecycleConfiguration buildAndValid() throws OMException {
-      OmLifecycleConfiguration omLifecycleConfiguration = buildObject();
-      omLifecycleConfiguration.valid();
-      return omLifecycleConfiguration;
+    @Override
+    protected OmLifecycleConfiguration buildObject() {
+      return new OmLifecycleConfiguration(this);
     }
   }
 }

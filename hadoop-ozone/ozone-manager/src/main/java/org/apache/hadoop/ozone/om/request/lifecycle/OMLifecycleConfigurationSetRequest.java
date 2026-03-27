@@ -148,9 +148,16 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
       OmLifecycleConfiguration.Builder lcBuilder =
           OmLifecycleConfiguration.getBuilderFromProtobuf(lifecycleConfiguration);
       lcBuilder.setUpdateID(transactionLogIndex);
-      OmLifecycleConfiguration omLifecycleConfiguration =
-          lcBuilder.setBucketObjectID(bucketInfo.getObjectID()).build();
-      omLifecycleConfiguration.valid();
+      OmLifecycleConfiguration omLifecycleConfiguration;
+      try {
+        omLifecycleConfiguration =
+            lcBuilder.setBucketObjectID(bucketInfo.getObjectID()).build();
+      } catch (IllegalArgumentException e) {
+        if (e.getCause() instanceof OMException) {
+          throw (OMException) e.getCause();
+        }
+        throw e;
+      }
       auditMap = omLifecycleConfiguration.toAuditMap();
 
       metadataManager.getLifecycleConfigurationTable().addCacheEntry(
