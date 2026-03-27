@@ -82,6 +82,12 @@ public class SnapshotDiffHandler extends Handler {
       defaultValue = "false")
   private boolean cancel;
 
+  @CommandLine.Option(names = {"-r", "--get-report"},
+      description = "Get the snapshot diff report is available; " +
+          "does not submit a diff job if there is no job in progress.",
+      defaultValue = "false")
+  private boolean getReport;
+
   @CommandLine.Option(names = {"--dnld", "--disable-native-libs-diff"},
       description = "perform diff of snapshot without using" +
           " native libs (optional)",
@@ -109,15 +115,25 @@ public class SnapshotDiffHandler extends Handler {
 
     if (cancel) {
       cancelSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
-    } else {
+    } else if (getReport) {
       getSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+    } else {
+      submitSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+    }
+  }
+
+  private void submitSnapshotDiff(ObjectStore store, String volumeName,
+                               String bucketName) throws IOException {
+    try (PrintWriter writer = out()) {
+      writer.println(store.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+          forceFullDiff, diffDisableNativeLibs));
     }
   }
 
   private void getSnapshotDiff(ObjectStore store, String volumeName,
                                String bucketName) throws IOException {
     SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff, diffDisableNativeLibs);
+        token, pageSize);
     try (PrintWriter writer = out()) {
       if (json) {
         writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
