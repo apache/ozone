@@ -619,9 +619,13 @@ public class TestDiskBalancerSubCommands {
       assertTrue(output.contains("\"idealUsage\""));
       assertTrue(output.contains("\"volumes\""));
       assertTrue(output.contains("\"storageId\""));
+      assertTrue(output.contains("\"storagePath\""));
+      assertTrue(output.contains("\"totalCapacity\""));
+      assertTrue(output.contains("\"usedSpace\""));
+      assertTrue(output.contains("\"effectiveUsedSpace\""));
       assertTrue(output.contains("\"utilization\""));
       assertTrue(output.contains("\"volumeDensity\""));
-      assertTrue(output.contains("\"pre-Allocated container bytes\""));
+      assertTrue(output.contains("\"containerPreAllocatedSpace\""));
     }
   }
 
@@ -763,6 +767,14 @@ public class TestDiskBalancerSubCommands {
 
     long committed1 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
     long committed2 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
+    long capacity1 = 500L * 1024 * 1024 * 1024 + random.nextInt(1024 * 1024);
+    long capacity2 = 600L * 1024 * 1024 * 1024 + random.nextInt(1024 * 1024);
+    double util1 = idealUsage + random.nextDouble() * 0.1;
+    double util2 = idealUsage - random.nextDouble() * 0.1;
+    long used1 = (long) (capacity1 * util1);
+    long used2 = (long) (capacity2 * util2);
+    long effective1 = used1 + committed1;
+    long effective2 = used2 + committed2;
     String path1 = "/data/hdds-" + hostname + "-1";
     String path2 = "/data/hdds-" + hostname + "-2";
     VolumeReportProto vol1 = VolumeReportProto.newBuilder()
@@ -770,12 +782,18 @@ public class TestDiskBalancerSubCommands {
         .setStoragePath(path1)
         .setUtilization(idealUsage + random.nextDouble() * 0.1)
         .setCommittedBytes(committed1)
+        .setTotalCapacity(capacity1)
+        .setUsedSpace(used1)
+        .setEffectiveUsedSpace(effective1)
         .build();
     VolumeReportProto vol2 = VolumeReportProto.newBuilder()
         .setStorageId("DISK-" + hostname + "-vol2")
         .setStoragePath(path2)
-        .setUtilization(idealUsage - random.nextDouble() * 0.1)
+        .setUtilization(util2)
         .setCommittedBytes(committed2)
+        .setTotalCapacity(capacity2)
+        .setUsedSpace(used2)
+        .setEffectiveUsedSpace(effective2)
         .build();
 
     return DatanodeDiskBalancerInfoProto.newBuilder()

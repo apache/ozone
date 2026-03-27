@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
+import org.apache.hadoop.util.StringUtils;
 import picocli.CommandLine.Command;
 
 /**
@@ -109,31 +110,37 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         double threshold = p.getDiskBalancerConf().getThreshold();
         double lt = idealUsage - threshold / 100.0;
         double ut = idealUsage + threshold / 100.0;
-        header.append("IdealUsage: ").append(idealUsage);
+        header.append("IdealUsage: ").append(String.format("%.8f", idealUsage));
         header.append(" | Threshold: ").append(threshold).append('%');
-        header.append(" | ThresholdRange: (").append(lt);
-        header.append(", ").append(ut).append(')').append('\n').append('\n');
+        header.append(" | ThresholdRange: (").append(String.format("%.8f", lt));
+        header.append(", ").append(String.format("%.8f", ut)).append(')').append('\n').append('\n');
         header.append("Volume Details -:").append('\n');
       }
       formatBuilder.append("%s%n");
       contentList.add(header.toString());
 
       if (p.getVolumeInfoCount() > 0 && p.hasIdealUsage()) {
-        formatBuilder.append("%-45s %-50s %-25s %-25s %-25s%n");
+        formatBuilder.append("%-45s %-40s %15s %15s %30s %20s %15s %15s%n");
         contentList.add("StorageID");
         contentList.add("StoragePath");
-        contentList.add("VolumeDensity");
+        contentList.add("TotalCapacity");
+        contentList.add("UsedSpace");
+        contentList.add("Container Pre-AllocatedSpace");
+        contentList.add("EffectiveUsedSpace");
         contentList.add("Utilization");
-        contentList.add("Pre-Allocated Container Bytes");
+        contentList.add("VolumeDensity");
 
         double ideal = p.getIdealUsage();
         for (VolumeReportProto v : p.getVolumeInfoList()) {
-          formatBuilder.append("%-45s %-50s %-25s %-25s %-25s%n");
+          formatBuilder.append("%-45s %-40s %15s %15s %30s %20s %15s %15s%n");
           contentList.add(v.getStorageId() != null ? v.getStorageId() : "-");
           contentList.add(v.hasStoragePath() ? v.getStoragePath() : "-");
-          contentList.add(String.format("%.20f", Math.abs(v.getUtilization() - ideal)));
-          contentList.add(String.format("%.20f", v.getUtilization()));
-          contentList.add(String.valueOf(v.getCommittedBytes()));
+          contentList.add(v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
+          contentList.add(v.hasUsedSpace() ? StringUtils.byteDesc(v.getUsedSpace()) : "-");
+          contentList.add(StringUtils.byteDesc(v.getCommittedBytes()));
+          contentList.add(v.hasEffectiveUsedSpace() ? StringUtils.byteDesc(v.getEffectiveUsedSpace()) : "-");
+          contentList.add(String.format("%.8f", v.getUtilization()));
+          contentList.add(String.format("%.8f", Math.abs(v.getUtilization() - ideal)));
         }
         formatBuilder.append("%n");
       }
@@ -152,7 +159,12 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         " IdealUsage +/- Threshold are considered balanced.%n");
     formatBuilder.append("  - VolumeDensity: Deviation of a particular volume's utilization from IdealUsage.%n");
     formatBuilder.append("  - Utilization: Ratio of actual used space to capacity (0-1) for a particular volume.%n");
-    formatBuilder.append("  - Pre-Allocated Container Bytes: Space reserved for containers not yet written to disk.%n");
+    formatBuilder.append("  - TotalCapacity: Total volume capacity.%n");
+    formatBuilder.append("  - UsedSpace: Ozone used space.%n");
+    formatBuilder.append("  - Container Pre-AllocatedSpace: Space reserved for containers not yet written to disk.%n");
+    formatBuilder.append("  - EffectiveUsedSpace: This is the actual used space of volume which is visible" +
+        " to the diskBalancer : (ozoneCapacity minus ozoneAvailable) + containerPreAllocatedSpace + " +
+        "move delta for source volume.%n");
 
     return String.format(formatBuilder.toString(), contentList.toArray(new String[0]));
   }
@@ -181,9 +193,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       double threshold = report.getDiskBalancerConf().getThreshold();
       double lt = idealUsage - threshold / 100.0;
       double ut = idealUsage + threshold / 100.0;
-      result.put("idealUsage", report.getIdealUsage());
+      result.put("idealUsage", String.format("%.8f", idealUsage));
       result.put("threshold %", report.getDiskBalancerConf().getThreshold());
-      result.put("thresholdRange", String.format("(%.20f, %.20f)", lt, ut));
+      result.put("thresholdRange", String.format("(%.08f, %.08f)", lt, ut));
     }
 
     if (report.getVolumeInfoCount() > 0) {
@@ -193,9 +205,13 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         Map<String, Object> vm = new LinkedHashMap<>();
         vm.put("storageId", v.getStorageId());
         vm.put("storagePath", v.hasStoragePath() ? v.getStoragePath() : "-");
-        vm.put("volumeDensity", Math.abs(v.getUtilization() - ideal));
+        vm.put("totalCapacity", v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
+        vm.put("usedSpace", v.hasUsedSpace() ? StringUtils.byteDesc(v.getUsedSpace()) : "-");
+        vm.put("containerPreAllocatedSpace", StringUtils.byteDesc(v.getCommittedBytes()));
+        vm.put("effectiveUsedSpace", v.hasEffectiveUsedSpace() ?
+            StringUtils.byteDesc(v.getEffectiveUsedSpace()) : "-");
         vm.put("utilization", v.getUtilization());
-        vm.put("pre-Allocated container bytes", v.getCommittedBytes());
+        vm.put("volumeDensity", Math.abs(v.getUtilization() - ideal));
         vols.add(vm);
       }
 

@@ -715,9 +715,12 @@ public class DiskBalancerService extends BackgroundService {
       String path = volume.getStorageDir() != null ? volume.getStorageDir().getPath() : "";
       result.add(VolumeReportProto.newBuilder()
           .setStorageId(volume.getStorageID())
-          .setUtilization(v.getUtilization())
-          .setCommittedBytes(volume.getCommittedBytes())
           .setStoragePath(path)
+          .setTotalCapacity(v.getUsage().getCapacity())
+          .setUsedSpace(v.getUsage().getUsedSpace())
+          .setCommittedBytes(volume.getCommittedBytes())
+          .setEffectiveUsedSpace(v.getEffectiveUsed())
+          .setUtilization(v.getUtilization())
           .build());
     }
     return result;
