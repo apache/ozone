@@ -55,6 +55,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -108,6 +109,7 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
+import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -449,6 +451,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       isFile(keyPath, keyDetails);
 
+      Response conditionalResponse = createConditionalReadResponse(
+          keyPath, keyDetails);
+      if (conditionalResponse != null) {
+        long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(
+            startNanos);
+        perf.appendMetaLatencyNanos(metadataLatencyNs);
+        long opLatencyNs = getMetrics().updateGetKeySuccessStats(startNanos);
+        perf.appendOpLatencyNanos(opLatencyNs);
+        return conditionalResponse;
+      }
+
       long length = keyDetails.getDataSize();
 
       LOG.debug("Data length of the key {} is {}", keyPath, length);
@@ -509,15 +522,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
 
       responseBuilder.header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
-
-      String eTag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
-      if (eTag != null) {
-        responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
-        String partsCount = extractPartsCount(eTag);
-        if (partsCount != null) {
-          responseBuilder.header(MP_PARTS_COUNT, partsCount);
-        }
-      }
+      addEntityTagHeader(responseBuilder, keyDetails);
 
       MultivaluedMap<String, String> queryParams =
           getContext().getUriInfo().getQueryParameters();
@@ -569,6 +574,20 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
+  static void addEntityTagHeader(ResponseBuilder responseBuilder, OzoneKey key) {
+    String eTag = key.getMetadata().get(OzoneConsts.ETAG);
+    if (eTag != null) {
+      // Should not return ETag header if the ETag is not set
+      // doing so will result in "null" string being returned instead
+      // which breaks some AWS SDK implementation
+      responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
+      String partsCount = extractPartsCount(eTag);
+      if (partsCount != null) {
+        responseBuilder.header(MP_PARTS_COUNT, partsCount);
+      }
+    }
+  }
+
   /**
    * Rest endpoint to check existence of an object in a bucket.
    * <p>
@@ -591,6 +610,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
+      Response conditionalResponse = createConditionalReadResponse(
+          keyPath, key);
+      if (conditionalResponse != null) {
+        getMetrics().updateHeadKeySuccessStats(startNanos);
+        auditReadSuccess(s3GAction);
+        return conditionalResponse;
+      }
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       auditReadFailure(s3GAction, ex);
@@ -618,18 +644,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .header(HttpHeaders.CONTENT_LENGTH, key.getDataSize())
         .header(HttpHeaders.CONTENT_TYPE, "binary/octet-stream")
         .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
-
-    String eTag = key.getMetadata().get(OzoneConsts.ETAG);
-    if (eTag != null) {
-      // Should not return ETag header if the ETag is not set
-      // doing so will result in "null" string being returned instead
-      // which breaks some AWS SDK implementation
-      response.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
-      String partsCount = extractPartsCount(eTag);
-      if (partsCount != null) {
-        response.header(MP_PARTS_COUNT, partsCount);
-      }
-    }
+    addEntityTagHeader(response, key);
 
     addLastModifiedDate(response, key);
     addCustomMetadataHeaders(response, key);
@@ -1206,6 +1221,98 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       return null;
     }
     return stripQuotes(headerValue.trim());
+  }
+
+  private Response createConditionalReadResponse(String keyPath, OzoneKey key)
+      throws OS3Exception {
+    String currentETag = key.getMetadata().get(OzoneConsts.ETAG);
+    String ifMatch = getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER);
+    if (ifMatch != null && !eTagMatches(ifMatch, currentETag)) {
+      throw newError(PRECOND_FAILED, keyPath);
+    }
+
+    String ifUnmodifiedSince = getHeaders().getHeaderString(
+        S3Consts.IF_UNMODIFIED_SINCE_HEADER);
+    if (ifMatch == null && ifUnmodifiedSince != null
+        && !matchesIfUnmodifiedSince(key, ifUnmodifiedSince)) {
+      throw newError(PRECOND_FAILED, keyPath);
+    }
+
+    String ifNoneMatch = getHeaders().getHeaderString(
+        S3Consts.IF_NONE_MATCH_HEADER);
+    if (ifNoneMatch != null) {
+      if (eTagMatches(ifNoneMatch, currentETag)) {
+        return buildNotModifiedResponse(key);
+      }
+      return null;
+    }
+
+    String ifModifiedSince = getHeaders().getHeaderString(
+        S3Consts.IF_MODIFIED_SINCE_HEADER);
+    if (ifModifiedSince != null
+        && !matchesIfModifiedSince(key, ifModifiedSince)) {
+      return buildNotModifiedResponse(key);
+    }
+
+    return null;
+  }
+
+  private static Response buildNotModifiedResponse(OzoneKey key) {
+    ResponseBuilder responseBuilder = Response.status(Status.NOT_MODIFIED);
+    addEntityTagHeader(responseBuilder, key);
+    addLastModifiedDate(responseBuilder, key);
+    return responseBuilder.build();
+  }
+
+  static boolean eTagMatches(String headerValue, String currentETag) {
+    if (headerValue == null) {
+      return false;
+    }
+    for (String candidate : headerValue.split(",")) {
+      String trimmedCandidate = candidate.trim();
+      if ("*".equals(trimmedCandidate)) {
+        return true;
+      }
+      if (currentETag != null
+          && currentETag.equals(parseETag(trimmedCandidate))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean matchesIfModifiedSince(OzoneKey key,
+      String headerValue) {
+    Instant since = parseConditionalInstant(headerValue);
+    if (since == null) {
+      return true;
+    }
+    Instant lastModified = key.getModificationTime().truncatedTo(
+        ChronoUnit.SECONDS);
+    return lastModified.isAfter(since);
+  }
+
+  private static boolean matchesIfUnmodifiedSince(OzoneKey key,
+      String headerValue) {
+    Instant since = parseConditionalInstant(headerValue);
+    if (since == null) {
+      return true;
+    }
+    Instant lastModified = key.getModificationTime().truncatedTo(
+        ChronoUnit.SECONDS);
+    return !lastModified.isAfter(since);
+  }
+
+  private static Instant parseConditionalInstant(String headerValue) {
+    if (headerValue == null) {
+      return null;
+    }
+    try {
+      return Instant.ofEpochMilli(OzoneUtils.formatDate(headerValue))
+          .truncatedTo(ChronoUnit.SECONDS);
+    } catch (IllegalArgumentException | java.text.ParseException ex) {
+      return null;
+    }
   }
 
   /** Request context shared among {@code ObjectOperationHandler}s. */

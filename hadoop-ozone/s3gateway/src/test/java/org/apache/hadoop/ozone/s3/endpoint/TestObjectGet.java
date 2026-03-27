@@ -22,28 +22,38 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorR
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MODIFIED_SINCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneClientTestUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -110,6 +120,79 @@ public class TestObjectGet {
         .parse(response.getHeaderString("Last-Modified"));
 
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @Test
+  public void testGetIfMatch() throws IOException, OS3Exception {
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn(eTag);
+
+    response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testGetIfMatchFailure() throws IOException {
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn("\"wrong-etag\"");
+
+    assertErrorResponse(PRECOND_FAILED, () -> get(rest, BUCKET_NAME, KEY_NAME));
+  }
+
+  @Test
+  public void testGetIfNoneMatchReturnsNotModified() throws IOException, OS3Exception {
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_NONE_MATCH_HEADER)).thenReturn(eTag);
+
+    response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(),
+        response.getStatus());
+  }
+
+  @Test
+  public void testGetIfModifiedSinceReturnsNotModified()
+      throws IOException, OS3Exception {
+    when(headers.getHeaderString(IF_MODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey(KEY_NAME)
+            .getModificationTime().plusSeconds(60)));
+
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(),
+        response.getStatus());
+  }
+
+  @Test
+  public void testGetIgnoresIfUnmodifiedSinceAfterMatchingIfMatch()
+      throws IOException, OS3Exception {
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn(eTag);
+    when(headers.getHeaderString(IF_UNMODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey(KEY_NAME)
+            .getModificationTime().minusSeconds(60)));
+
+    response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testGetIgnoresIfModifiedSinceWhenIfNoneMatchPresent()
+      throws IOException, OS3Exception {
+    when(headers.getHeaderString(IF_NONE_MATCH_HEADER))
+        .thenReturn("\"different-etag\"");
+    when(headers.getHeaderString(IF_MODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey(KEY_NAME)
+            .getModificationTime().plusSeconds(60)));
+
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
   }
 
   @Test
@@ -240,5 +323,10 @@ public class TestObjectGet {
     bucket.createDirectory(keyPath);
 
     assertErrorResponse(NO_SUCH_KEY, () -> get(rest, BUCKET_NAME, keyPath));
+  }
+
+  private static String formatHttpDate(Instant instant) {
+    return RFC1123Util.FORMAT.format(
+        instant.atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE)));
   }
 }
