@@ -63,6 +63,27 @@ export type ContainerKeysResponse = {
   keys: KeyResponse[];
 }
 
+export type ContainersPaginationResponse = {
+  containers: Container[];
+  firstKey: number;
+  lastKey: number;
+  missingCount: number;
+  underReplicatedCount: number;
+  overReplicatedCount: number;
+  misReplicatedCount: number;
+  replicaMismatchCount: number;
+}
+
+export type TabPaginationState = {
+  data: Container[];
+  loading: boolean;
+  firstKey: number;
+  lastKey: number;
+  currentMinContainerId: number;
+  pageHistory: number[];
+  hasNextPage: boolean;
+}
+
 export type ContainerTableProps = {
   loading: boolean;
   data: Container[];
@@ -71,6 +92,12 @@ export type ContainerTableProps = {
   selectedColumns: Option[];
   expandedRow: ExpandedRow;
   expandedRowSetter: (arg0: ExpandedRow) => void;
+  onNextPage: () => void;
+  onPrevPage: () => void;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  pageSize: number;
+  onPageSizeChange: (newSize: number) => void;
 }
 
 
@@ -89,9 +116,9 @@ export type ContainerState = {
   lastUpdated: number;
   totalContainers: number;
   columnOptions: Option[];
-  missingContainerData: Container[];
-  underReplicatedContainerData: Container[];
-  overReplicatedContainerData: Container[];
-  misReplicatedContainerData: Container[];
-  mismatchedReplicaContainerData: Container[];
+  missingCount: number;
+  underReplicatedCount: number;
+  overReplicatedCount: number;
+  misReplicatedCount: number;
+  replicaMismatchCount: number;
 }

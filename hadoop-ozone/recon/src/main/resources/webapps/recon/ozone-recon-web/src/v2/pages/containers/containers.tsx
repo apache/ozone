@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import moment from "moment";
 import { Card, Row, Tabs } from "antd";
 import { ValueType } from "react-select/src/types";
@@ -27,18 +27,30 @@ import ContainerTable, { COLUMNS } from "@/v2/components/tables/containersTable"
 import AutoReloadPanel from "@/components/autoReloadPanel/autoReloadPanel";
 import { showDataFetchError } from "@/utils/common";
 import { useDebounce } from "@/v2/hooks/useDebounce";
-import { useApiData } from "@/v2/hooks/useAPIData.hook";
+import { fetchData, useApiData } from "@/v2/hooks/useAPIData.hook";
 import { useAutoReload } from "@/v2/hooks/useAutoReload.hook";
 import * as CONSTANTS from '@/v2/constants/overview.constants';
 
 import {
-  Container,
+  ContainersPaginationResponse,
   ContainerState,
-  ExpandedRow
+  ExpandedRow,
+  TabPaginationState,
 } from "@/v2/types/container.types";
 import { ClusterStateResponse } from "@/v2/types/overview.types";
 
 import './containers.less';
+
+const DEFAULT_PAGE_SIZE = 10;
+export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
+const TAB_STATE_MAP: Record<string, string> = {
+  '1': 'MISSING',
+  '2': 'UNDER_REPLICATED',
+  '3': 'OVER_REPLICATED',
+  '4': 'MIS_REPLICATED',
+  '5': 'REPLICA_MISMATCH',
+};
 
 const SearchableColumnOpts = [{
   label: 'Container ID',
@@ -46,15 +58,21 @@ const SearchableColumnOpts = [{
 }, {
   label: 'Pipeline ID',
   value: 'pipelineID'
-}]
+}];
 
 const defaultColumns = COLUMNS.map(column => ({
   label: column.title as string,
   value: column.key as string
 }));
 
-const DEFAULT_CONTAINERS_RESPONSE = {
-  containers: []
+const DEFAULT_TAB_STATE: TabPaginationState = {
+  data: [],
+  loading: false,
+  firstKey: 0,
+  lastKey: 0,
+  currentMinContainerId: 0,
+  pageHistory: [],
+  hasNextPage: false,
 };
 
 const Containers: React.FC<{}> = () => {
@@ -62,11 +80,19 @@ const Containers: React.FC<{}> = () => {
     lastUpdated: 0,
     totalContainers: 0,
     columnOptions: defaultColumns,
-    missingContainerData: [],
-    underReplicatedContainerData: [],
-    overReplicatedContainerData: [],
-    misReplicatedContainerData: [],
-    mismatchedReplicaContainerData: []
+    missingCount: 0,
+    underReplicatedCount: 0,
+    overReplicatedCount: 0,
+    misReplicatedCount: 0,
+    replicaMismatchCount: 0,
+  });
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const [tabStates, setTabStates] = useState<Record<string, TabPaginationState>>({
+    '1': { ...DEFAULT_TAB_STATE },
+    '2': { ...DEFAULT_TAB_STATE },
+    '3': { ...DEFAULT_TAB_STATE },
+    '4': { ...DEFAULT_TAB_STATE },
+    '5': { ...DEFAULT_TAB_STATE },
   });
   const [expandedRow, setExpandedRow] = useState<ExpandedRow>({});
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
@@ -75,17 +101,6 @@ const Containers: React.FC<{}> = () => {
   const [searchColumn, setSearchColumn] = useState<'containerID' | 'pipelineID'>('containerID');
 
   const debouncedSearch = useDebounce(searchTerm, 300);
-
-  // Use the modern hooks pattern
-  const containersData = useApiData<{ containers: Container[] }>(
-    '/api/v1/containers/unhealthy',
-    DEFAULT_CONTAINERS_RESPONSE,
-    {
-      retryAttempts: 2,
-      initialFetch: false,
-      onError: (error) => showDataFetchError(error)
-    }
-  );
 
   const clusterState = useApiData<ClusterStateResponse>(
     '/api/v1/clusterState',
@@ -97,59 +112,156 @@ const Containers: React.FC<{}> = () => {
     }
   );
 
-  // Process containers data when it changes
-  React.useEffect(() => {
-    if (containersData.data && containersData.data.containers && clusterState.data) {
-      const containers: Container[] = containersData.data.containers;
-
-      const missingContainerData: Container[] = containers?.filter(
-        container => container.containerState === 'MISSING'
-      ) ?? [];
-      const underReplicatedContainerData: Container[] = containers?.filter(
-        container => container.containerState === 'UNDER_REPLICATED'
-      ) ?? [];
-      const overReplicatedContainerData: Container[] = containers?.filter(
-        container => container.containerState === 'OVER_REPLICATED'
-      ) ?? [];
-      const misReplicatedContainerData: Container[] = containers?.filter(
-        container => container.containerState === 'MIS_REPLICATED'
-      ) ?? [];
-      const mismatchedReplicaContainerData: Container[] = containers?.filter(
-        container => container.containerState === 'MISMATCHED_REPLICA'
-      ) ?? [];
-
-      const totalContainers = clusterState.data.containers;
-
-      setState({
-        ...state,
-        totalContainers,
-        missingContainerData,
-        underReplicatedContainerData,
-        overReplicatedContainerData,
-        misReplicatedContainerData,
-        mismatchedReplicaContainerData,
-        lastUpdated: Number(moment())
-      });
+  useEffect(() => {
+    if (clusterState.data) {
+      setState(prev => ({
+        ...prev,
+        totalContainers: clusterState.data.containers,
+      }));
     }
-  }, [containersData.data, clusterState.data]);
+  }, [clusterState.data]);
+
+  // Fetch a single page for a tab using cursor-based pagination.
+  // minContainerId=0 means "start from the beginning".
+  // currentPageSize is passed explicitly so callers (e.g. size-change handler) can
+  // provide the new value before React state has updated.
+  const fetchTabData = async (
+    tabKey: string,
+    minContainerId: number,
+    currentPageSize: number
+  ) => {
+    const containerStateName = TAB_STATE_MAP[tabKey];
+    // Fetch one extra item so we can detect a next page without a separate count request.
+    const fetchSize = currentPageSize + 1;
+
+    setTabStates(prev => ({
+      ...prev,
+      [tabKey]: { ...prev[tabKey], loading: true },
+    }));
+
+    try {
+      const response = await fetchData<ContainersPaginationResponse>(
+        `/api/v1/containers/unhealthy/${containerStateName}`,
+        'GET',
+        { limit: fetchSize, minContainerId }
+      );
+
+      const allContainers = response.containers ?? [];
+      // If we received more than currentPageSize items, a next page exists.
+      const hasNextPage = allContainers.length > currentPageSize;
+      // Always display at most currentPageSize rows.
+      const containers = allContainers.slice(0, currentPageSize);
+      // Derive cursor keys from the visible slice, not the full response,
+      // so the next-page request starts exactly after the last displayed row.
+      const lastKey = containers.length > 0
+        ? Math.max(...containers.map(c => c.containerID))
+        : 0;
+      const firstKey = containers.length > 0
+        ? Math.min(...containers.map(c => c.containerID))
+        : 0;
+
+      setTabStates(prev => ({
+        ...prev,
+        [tabKey]: {
+          ...prev[tabKey],
+          data: containers,
+          loading: false,
+          firstKey,
+          lastKey,
+          currentMinContainerId: minContainerId,
+          hasNextPage,
+        },
+      }));
+
+      // Summary counts are returned by every tab endpoint.
+      setState(prev => ({
+        ...prev,
+        missingCount: response.missingCount ?? 0,
+        underReplicatedCount: response.underReplicatedCount ?? 0,
+        overReplicatedCount: response.overReplicatedCount ?? 0,
+        misReplicatedCount: response.misReplicatedCount ?? 0,
+        replicaMismatchCount: response.replicaMismatchCount ?? 0,
+        lastUpdated: Number(moment()),
+      }));
+    } catch (error) {
+      setTabStates(prev => ({
+        ...prev,
+        [tabKey]: { ...prev[tabKey], loading: false },
+      }));
+      showDataFetchError(error);
+    }
+  };
+
+  // Initial fetch on mount.
+  useEffect(() => {
+    fetchTabData('1', 0, DEFAULT_PAGE_SIZE);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
   }
 
-  function handleTagClose(label: string) {
-    setSelectedColumns(
-      selectedColumns.filter((column) => column.label !== label)
-    );
-  }
-
   function handleTabChange(key: string) {
     setSelectedTab(key);
+    // Lazy-load: fetch first page only if the tab has never been loaded.
+    if (tabStates[key].data.length === 0 && !tabStates[key].loading) {
+      fetchTabData(key, 0, pageSize);
+    }
   }
 
-  // Create refresh function for auto-reload
+  function handleNextPage(tabKey: string) {
+    const tab = tabStates[tabKey];
+    if (tab.loading || !tab.hasNextPage) return;
+
+    // Push the current minContainerId so we can navigate back.
+    setTabStates(prev => ({
+      ...prev,
+      [tabKey]: {
+        ...prev[tabKey],
+        pageHistory: [...prev[tabKey].pageHistory, tab.currentMinContainerId],
+      },
+    }));
+    fetchTabData(tabKey, tab.lastKey, pageSize);
+  }
+
+  function handlePrevPage(tabKey: string) {
+    const tab = tabStates[tabKey];
+    if (tab.loading || tab.pageHistory.length === 0) return;
+
+    const history = [...tab.pageHistory];
+    const prevMinContainerId = history.pop() ?? 0;
+
+    setTabStates(prev => ({
+      ...prev,
+      [tabKey]: { ...prev[tabKey], pageHistory: history },
+    }));
+    fetchTabData(tabKey, prevMinContainerId, pageSize);
+  }
+
+  // Changing page size resets all tabs and re-fetches the active tab from page 1.
+  function handlePageSizeChange(newSize: number) {
+    setPageSize(newSize);
+    const reset = {
+      '1': { ...DEFAULT_TAB_STATE },
+      '2': { ...DEFAULT_TAB_STATE },
+      '3': { ...DEFAULT_TAB_STATE },
+      '4': { ...DEFAULT_TAB_STATE },
+      '5': { ...DEFAULT_TAB_STATE },
+    };
+    setTabStates(reset);
+    fetchTabData(selectedTab, 0, newSize);
+  }
+
+  // Full refresh: reset all tab states and re-fetch the active tab from page 1.
   const loadContainersData = () => {
-    containersData.refetch();
+    setTabStates({
+      '1': { ...DEFAULT_TAB_STATE },
+      '2': { ...DEFAULT_TAB_STATE },
+      '3': { ...DEFAULT_TAB_STATE },
+      '4': { ...DEFAULT_TAB_STATE },
+      '5': { ...DEFAULT_TAB_STATE },
+    });
+    fetchTabData(selectedTab, 0, pageSize);
     clusterState.refetch();
   };
 
@@ -159,21 +271,14 @@ const Containers: React.FC<{}> = () => {
     lastUpdated,
     totalContainers,
     columnOptions,
-    missingContainerData,
-    underReplicatedContainerData,
-    overReplicatedContainerData,
-    misReplicatedContainerData,
-    mismatchedReplicaContainerData
+    missingCount,
+    underReplicatedCount,
+    overReplicatedCount,
+    misReplicatedCount,
+    replicaMismatchCount,
   } = state;
 
-  // Mapping the data to the Tab keys for enabling/disabling search
-  const dataToTabKeyMap: Record<string, Container[]> = {
-    1: missingContainerData,
-    2: underReplicatedContainerData,
-    3: overReplicatedContainerData,
-    4: misReplicatedContainerData,
-    5: mismatchedReplicaContainerData
-  }
+  const currentTabState = tabStates[selectedTab];
 
   const highlightData = (
     <div style={{
@@ -187,50 +292,33 @@ const Containers: React.FC<{}> = () => {
       </div>
       <div className='highlight-content'>
         Missing <br/>
-        <span className='highlight-content-value'>{missingContainerData?.length ?? 'N/A'}</span>
+        <span className='highlight-content-value'>{missingCount ?? 'N/A'}</span>
       </div>
       <div className='highlight-content'>
         Under-Replicated <br/>
-        <span className='highlight-content-value'>{underReplicatedContainerData?.length ?? 'N/A'}</span>
+        <span className='highlight-content-value'>{underReplicatedCount ?? 'N/A'}</span>
       </div>
       <div className='highlight-content'>
         Over-Replicated <br/>
-        <span className='highlight-content-value'>{overReplicatedContainerData?.length ?? 'N/A'}</span>
+        <span className='highlight-content-value'>{overReplicatedCount ?? 'N/A'}</span>
       </div>
       <div className='highlight-content'>
         Mis-Replicated <br/>
-        <span className='highlight-content-value'>{misReplicatedContainerData?.length ?? 'N/A'}</span>
+        <span className='highlight-content-value'>{misReplicatedCount ?? 'N/A'}</span>
       </div>
       <div className='highlight-content'>
         Mismatched Replicas <br/>
-        <span className='highlight-content-value'>{mismatchedReplicaContainerData?.length ?? 'N/A'}</span>
+        <span className='highlight-content-value'>{replicaMismatchCount ?? 'N/A'}</span>
       </div>
     </div>
-  )
-
-  const getCurrentTabData = () => {
-    switch (selectedTab) {
-      case '1':
-        return missingContainerData;
-      case '2':
-        return underReplicatedContainerData;
-      case '3':
-        return overReplicatedContainerData;
-      case '4':
-        return misReplicatedContainerData;
-      case '5':
-        return mismatchedReplicaContainerData;
-      default:
-        return missingContainerData;
-    }
-  };
+  );
 
   return (
     <>
       <div className='page-header-v2'>
         Containers
         <AutoReloadPanel
-          isLoading={containersData.loading}
+          isLoading={currentTabState.loading}
           lastRefreshed={lastUpdated}
           togglePolling={autoReload.handleAutoReloadToggle}
           onReload={loadContainersData}
@@ -240,7 +328,7 @@ const Containers: React.FC<{}> = () => {
         <div style={{ marginBottom: '12px' }}>
           <Card
             title='Highlights'
-            loading={containersData.loading}>
+            loading={currentTabState.loading && missingCount === 0}>
               <Row
                 align='middle'>
                   {highlightData}
@@ -261,7 +349,7 @@ const Containers: React.FC<{}> = () => {
                 columnLength={columnOptions.length} />
             </div>
             <Search
-              disabled={dataToTabKeyMap[selectedTab]?.length < 1}
+              disabled={currentTabState.data.length === 0}
               searchOptions={SearchableColumnOpts}
               searchInput={searchTerm}
               searchColumn={searchColumn}
@@ -274,72 +362,28 @@ const Containers: React.FC<{}> = () => {
               }} />
           </div>
           <Tabs defaultActiveKey='1'
-            onChange={(activeKey: string) => setSelectedTab(activeKey)}>
-            <Tabs.TabPane
-              key='1'
-              tab='Missing'>
-              <ContainerTable
-                data={missingContainerData}
-                loading={containersData.loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane
-              key='2'
-              tab='Under-Replicated'>
-              <ContainerTable
-                data={underReplicatedContainerData}
-                loading={containersData.loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane
-              key='3'
-              tab='Over-Replicated'>
-              <ContainerTable
-                data={overReplicatedContainerData}
-                loading={containersData.loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane
-              key='4'
-              tab='Mis-Replicated'>
-              <ContainerTable
-                data={misReplicatedContainerData}
-                loading={containersData.loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane
-              key='5'
-              tab='Mismatched Replicas'>
-              <ContainerTable
-                data={mismatchedReplicaContainerData}
-                loading={containersData.loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
+            onChange={(activeKey: string) => handleTabChange(activeKey)}>
+            {(['1','2','3','4','5'] as const).map((key) => (
+              <Tabs.TabPane
+                key={key}
+                tab={['Missing','Under-Replicated','Over-Replicated','Mis-Replicated','Mismatched Replicas'][Number(key)-1]}>
+                <ContainerTable
+                  data={tabStates[key].data}
+                  loading={tabStates[key].loading}
+                  searchColumn={searchColumn}
+                  searchTerm={debouncedSearch}
+                  selectedColumns={selectedColumns}
+                  expandedRow={expandedRow}
+                  expandedRowSetter={setExpandedRow}
+                  onNextPage={() => handleNextPage(key)}
+                  onPrevPage={() => handlePrevPage(key)}
+                  hasNextPage={tabStates[key].hasNextPage}
+                  hasPrevPage={tabStates[key].pageHistory.length > 0}
+                  pageSize={pageSize}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              </Tabs.TabPane>
+            ))}
           </Tabs>
         </div>
       </div>
