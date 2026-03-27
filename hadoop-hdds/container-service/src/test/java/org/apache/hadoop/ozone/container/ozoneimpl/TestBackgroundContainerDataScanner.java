@@ -183,6 +183,25 @@ public class TestBackgroundContainerDataScanner extends
             eq(deletedContainer.getContainerData().getContainerID()), any());
   }
 
+  /**
+   * If the data checksum of a container changes from its initial value when the scan started, it means that
+   * reconciliation updated the container while the scan was running.
+   * The container scanner should redo the scan instead of persisting the potentially stale merkle tree it built.
+   */
+  @Test
+  public void testContainerRescannedWhenChecksumChanges() throws Exception {
+    Container<?> rescanned = mockKeyValueContainer();
+    when(rescanned.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(rescanned.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getHealthyDataScanResult());
+    when(rescanned.getContainerData().getDataChecksum()).thenReturn(1L, 2L);
+
+    setContainers(rescanned, healthy);
+
+    scanner.runIteration();
+    verify(rescanned, times(2)).scanData(any(), any());
+  }
+
   @Test
   @Override
   public void testUnhealthyContainerRescanned() throws Exception {

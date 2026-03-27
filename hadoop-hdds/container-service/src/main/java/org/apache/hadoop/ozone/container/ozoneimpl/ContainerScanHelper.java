@@ -65,7 +65,22 @@ public final class ContainerScanHelper {
     ContainerData containerData = container.getContainerData();
     long containerId = containerData.getContainerID();
     logScanStart(containerData, "data");
-    DataScanResult result = container.scanData(throttler, canceler);
+
+    DataScanResult result;
+    while (true) {
+      long initialChecksum = containerData.getDataChecksum();
+
+      result = container.scanData(throttler, canceler);
+
+      if (!result.isDeleted()) {
+        long finalChecksum = containerData.getDataChecksum();
+        if (initialChecksum != finalChecksum) {
+          log.info("Container [{}] data checksum changed during the scan. Rescanning.", containerId);
+          continue;
+        }
+      }
+      break;
+    }
 
     if (result.isDeleted()) {
       log.debug("Container [{}] has been deleted during the data scan.", containerId);

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -276,6 +277,23 @@ public class TestOnDemandContainerScanner extends
     onDemandScanner.shutdown();
     // Interrupting the healthy container's scan should not mark it unhealthy.
     verifyContainerMarkedUnhealthy(healthy, never());
+  }
+
+  /**
+   * If the data checksum of a container changes from its initial value when the scan started, it means that
+   * reconciliation updated the container while the scan was running.
+   * The container scanner should redo the scan instead of persisting the potentially stale merkle tree it built.
+   */
+  @Test
+  public void testContainerRescannedWhenChecksumChanges() throws Exception {
+    Container<?> rescanned = mockKeyValueContainer();
+    when(rescanned.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(rescanned.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getHealthyDataScanResult());
+    when(rescanned.getContainerData().getDataChecksum()).thenReturn(1L, 2L);
+
+    scanContainer(rescanned);
+    verify(rescanned, times(2)).scanData(any(), any());
   }
 
   @Test
