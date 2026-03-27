@@ -183,6 +183,13 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void forceExitSafeMode() {
     LOG.info("SCM force-exiting safe mode.");
     status.set(SafeModeStatus.OUT_OF_SAFE_MODE);
+    exitRules.values().forEach(rule -> {
+      try {
+        rule.cleanup();
+      } catch (Exception e) {
+        LOG.warn("Safe mode exit rule cleanup failed for {}", rule.getRuleName(), e);
+      }
+    });
     emitSafeModeStatus();
   }
 

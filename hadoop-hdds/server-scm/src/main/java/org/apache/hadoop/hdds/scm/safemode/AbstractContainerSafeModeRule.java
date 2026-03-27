@@ -17,14 +17,20 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -54,12 +60,19 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   private final Map<ContainerID, ContainerID> closedContainers = new ConcurrentHashMap<>();
   private final Map<ContainerID, ContainerID> processedContainers = new ConcurrentHashMap<>();
 
+  private final long refreshInterval;
+  private volatile ScheduledExecutorService refreshExecutor;
   public AbstractContainerSafeModeRule(ConfigurationSource conf, SCMSafeModeManager safeModeManager,
       ContainerManager containerManager, EventQueue eventQueue) {
     super(safeModeManager, eventQueue);
     this.containerManager = containerManager;
     this.safeModeCutoff = getSafeModeCutoff(conf);
+    this.refreshInterval = conf.getTimeDuration(
+        HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
     initializeRule();
+    startRefreshExecutor();
   }
 
   public ContainerManager getContainerManager() {
@@ -179,11 +192,53 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
     return total == 0 ? 1 : ((double) getNumberOfContainersWithMinReplica() / total);
   }
 
+
+
+  private void startRefreshExecutor() {
+    if (refreshInterval <= 0) {
+      SCMSafeModeManager.getLogger().info(
+          "Container safe mode rule incremental sync is disabled ({}=0).",
+          HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL);
+      return;
+    }
+    refreshExecutor = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat(
+                "ContainerSafeModeRule-" + getContainerType() + "-refresh-%d")
+            .build());
+    refreshExecutor.scheduleAtFixedRate(
+        this::runRefresh,
+        refreshInterval,
+        refreshInterval,
+        TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Background task: reconcile open/closed container tracking with
+   * {@link ContainerManager} while SCM is in safe mode.
+   */
+  private void runRefresh() {
+    synchronized (this) {
+      if (!scmInSafeMode()) {
+        return;
+      }
+      refreshExpectedContainers();
+    }
+  }
+
   @Override
   public synchronized void refresh(boolean forceRefresh) {
     if (forceRefresh) {
       initializeRule();
     }
+  }
+
+  /**
+   * Aligns tracked open/closed sets with current {@link ContainerManager} state.
+   * Runs on the incremental sync thread when configured.
+   */
+  private void refreshExpectedContainers() {
     if (!validate()) {
       // iterate through open containers and check if any of them have moved to closed state
       for(ContainerID containerID : openContainers.keySet()) {
@@ -218,11 +273,41 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   @Override
   protected void cleanup() {
-    if (containers != null) containers.clear();
-    if (openContainers != null) openContainers.clear();
-    if (closedContainers != null) closedContainers.clear();
-    if (totalContainers != null) totalContainers.set(0);
-    if (processedContainers != null) processedContainers.clear();
+    stopIncrementalSyncExecutor();
+    synchronized (this) {
+      if (containers != null) {
+        containers.clear();
+      }
+      if (openContainers != null) {
+        openContainers.clear();
+      }
+      if (closedContainers != null) {
+        closedContainers.clear();
+      }
+      if (totalContainers != null) {
+        totalContainers.set(0);
+      }
+      if (processedContainers != null) {
+        processedContainers.clear();
+      }
+    }
+  }
+
+  private void stopIncrementalSyncExecutor() {
+    if (refreshExecutor != null) {
+      refreshExecutor.shutdownNow();
+      try {
+        refreshExecutor.awaitTermination(5, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      refreshExecutor = null;
+    }
+  }
+
+  @VisibleForTesting
+  void runIncrementalContainerSyncForTesting() {
+    runRefresh();
   }
 
   /**

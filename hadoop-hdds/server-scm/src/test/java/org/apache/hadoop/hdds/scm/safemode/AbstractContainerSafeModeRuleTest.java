@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -51,16 +54,21 @@ import org.junit.jupiter.params.provider.EnumSource;
 public abstract class AbstractContainerSafeModeRuleTest {
   private List<ContainerInfo> containers;
   private AbstractContainerSafeModeRule rule;
+  private SCMSafeModeManager safeModeManager;
 
   @BeforeEach
   public void setup() throws ContainerNotFoundException {
     final ContainerManager containerManager = mock(ContainerManager.class);
     final ConfigurationSource conf = mock(ConfigurationSource.class);
     final EventQueue eventQueue = mock(EventQueue.class);
-    final SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
+    safeModeManager = mock(SCMSafeModeManager.class);
     final SafeModeMetrics metrics = mock(SafeModeMetrics.class);
 
     when(safeModeManager.getSafeModeMetrics()).thenReturn(metrics);
+    when(conf.getTimeDuration(
+            HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS)).thenReturn(0L);
     containers = new ArrayList<>();
     when(containerManager.getContainers(getReplicationType())).thenReturn(containers);
     when(containerManager.getContainer(any(ContainerID.class))).thenAnswer(invocation -> {
@@ -168,6 +176,34 @@ public abstract class AbstractContainerSafeModeRuleTest {
     rule.process(report);
 
     assertEquals(1.0, rule.getCurrentContainerThreshold(), "Duplicated containers should be counted only once");
+  }
+
+  /**
+   * When {@code validate()} is false, background refresh reconciles tracked open
+   * containers with {@link ContainerManager}: an OPEN container that becomes CLOSED is
+   * moved into closed tracking.
+   */
+  @Test
+  public void testIncrementalRefreshPromotesOpenContainerToClosedInTracking() {
+    when(safeModeManager.getInSafeMode()).thenReturn(true);
+
+    ContainerInfo closedMissingReplicas = mockContainer(LifeCycleState.CLOSED, 1L);
+    ContainerInfo openThenClosed = mockContainer(LifeCycleState.OPEN, 2L);
+    containers.add(closedMissingReplicas);
+    containers.add(openThenClosed);
+    rule.refresh(true);
+
+    ContainerID id2 = ContainerID.valueOf(2L);
+    assertTrue(rule.getOpenContainers().containsKey(id2),
+        "OPEN container should be tracked in openContainers after initializeRule");
+
+    when(openThenClosed.getState()).thenReturn(LifeCycleState.CLOSED);
+
+    rule.runIncrementalContainerSyncForTesting();
+
+    assertFalse(rule.getOpenContainers().containsKey(id2));
+    assertTrue(rule.getClosedContainers().containsKey(id2));
+    assertTrue(rule.getContainers().containsKey(id2));
   }
 
   @Test
