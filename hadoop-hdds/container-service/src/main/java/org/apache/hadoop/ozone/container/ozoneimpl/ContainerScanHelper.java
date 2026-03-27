@@ -41,8 +41,8 @@ public final class ContainerScanHelper {
   private final int maxRetries;
 
   public static ContainerScanHelper withoutScanGap(Logger log, ContainerController controller,
-      AbstractContainerScannerMetrics metrics) {
-    return new ContainerScanHelper(log, controller, metrics, 0, 0);
+      AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
+    return new ContainerScanHelper(log, controller, metrics, 0, conf.getDataScanMaxRetries());
   }
 
   public static ContainerScanHelper withScanGap(Logger log, ContainerController controller,

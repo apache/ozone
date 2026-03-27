@@ -215,8 +215,8 @@ public class TestBackgroundContainerDataScanner extends
 
     scanner.runIteration();
     
-    // max retries is 3 by default, so it should be scanned 4 times (1 initial + 3 retries)
-    verify(rescanned, times(4)).scanData(any(), any());
+    // max retries is 2 by default, so it should be scanned 3 times (1 initial + 2 retries)
+    verify(rescanned, times(3)).scanData(any(), any());
     
     // Check that timestamp is not updated when aborted
     verify(controller, never())
