@@ -18,6 +18,7 @@
 package org.apache.hadoop.tools.contract;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.createSubdirs;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.verifyFileContents;
@@ -26,6 +27,7 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.logIOStatistic
 import static org.apache.hadoop.tools.DistCpConstants.CONF_LABEL_DISTCP_JOB_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,7 +46,6 @@ import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.tools.CopyListingFileStatus;
 import org.apache.hadoop.tools.DistCp;
 import org.apache.hadoop.tools.DistCpConstants;
@@ -53,10 +54,12 @@ import org.apache.hadoop.tools.SimpleCopyListing;
 import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.util.functional.RemoteIterators;
+import org.apache.ozone.test.GenericTestUtils;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,6 +140,9 @@ public abstract class AbstractContractDistCpTest
 
   private Path inputDirUnderOutputDir;
 
+  @TempDir
+  private File testDir;
+
   /**
    * The timeout value is extended over the default so that large updates
    * are allowed to take time, especially to remote stores.
@@ -168,8 +174,7 @@ public abstract class AbstractContractDistCpTest
     String className = getClass().getSimpleName();
     String testSubDir = className + "/" + getMethodName();
     localDir =
-        localFS.makeQualified(new Path(new Path(
-        GenericTestUtils.getTestDir().toURI()), testSubDir + "/local"));
+        localFS.makeQualified(new Path(new Path(testDir.toURI()), testSubDir + "/local"));
     localFS.delete(localDir, true);
     mkdirs(localFS, localDir);
     Path testSubPath = path(testSubDir);
@@ -703,8 +708,7 @@ public abstract class AbstractContractDistCpTest
     Path dest = new Path(localDir, "dest");
     dest = localFS.makeQualified(dest);
 
-    GenericTestUtils
-        .createFiles(remoteFS, source, getDepth(), getWidth(), getWidth());
+    createSubdirs(remoteFS, source, getDepth(), getWidth(), getWidth(), 0);
 
     GenericTestUtils.LogCapturer log =
         GenericTestUtils.LogCapturer.captureLogs(SimpleCopyListing.LOG);
