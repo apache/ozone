@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -1433,6 +1434,26 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneKeyDetails actualKeyDetails = assertKeyContent(bucket, keyDetails.getName(), overwriteContent);
     assertEquals(overwriteDetails.getGeneration(), actualKeyDetails.getGeneration());
     assertUnchanged(keyInfo, ozoneManager.lookupKey(keyArgs));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void rewriteRejectsNonPositiveGeneration(BucketLayout layout)
+      throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails key1Details = createTestKey(bucket, "key1", "value".getBytes(UTF_8));
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> {
+        bucket.rewriteKey("key2",
+            1024,
+            EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+            singletonMap("key", "value"));
+        });
+
+    assertThat(e).hasMessageContaining("existingKeyGeneration must be positive");
+    assertKeyContent(bucket, key1Details.getName(), "value".getBytes(UTF_8));
   }
 
   @ParameterizedTest

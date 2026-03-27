@@ -677,7 +677,7 @@ public class RpcClient implements ClientProtocol {
       builder.setDefaultReplicationConfig(defaultReplicationConfig);
     }
 
-    String replicationType = defaultReplicationConfig == null 
+    String replicationType = defaultReplicationConfig == null
         ? "server-side default replication type"
         : defaultReplicationConfig.getType().toString();
 
@@ -1317,7 +1317,7 @@ public class RpcClient implements ClientProtocol {
     List<OmBucketInfo> buckets = ozoneManagerClient.listBuckets(
         volumeName, prevBucket, bucketPrefix, maxListResult, hasSnapshot);
 
-    return buckets.stream().map(bucket -> 
+    return buckets.stream().map(bucket ->
             OzoneBucket.newBuilder(conf, this)
                 .setVolumeName(bucket.getVolumeName())
                 .setName(bucket.getBucketName())
@@ -1408,6 +1408,9 @@ public class RpcClient implements ClientProtocol {
     if (omVersion.compareTo(OzoneManagerVersion.ATOMIC_REWRITE_KEY) < 0) {
       throw new IOException("OzoneManager does not support atomic key rewrite.");
     }
+    Preconditions.checkArgument(existingKeyGeneration > 0,
+        "existingKeyGeneration must be positive, but was %s",
+        existingKeyGeneration);
 
     createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
 

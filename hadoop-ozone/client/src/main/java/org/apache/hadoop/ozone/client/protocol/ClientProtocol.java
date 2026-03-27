@@ -368,7 +368,7 @@ public interface ClientProtocol {
    * @param bucketName Name of the Bucket
    * @param keyName Existing key to rewrite. This must exist in the bucket.
    * @param size The size of the new key
-   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   * @param existingKeyGeneration The positive generation of the existing key which is checked for changes at key create
    *                              and commit time.
    * @param replicationConfig The replication configuration for the key to be rewritten.
    * @param metadata custom key value metadata
