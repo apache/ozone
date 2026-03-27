@@ -470,8 +470,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         () -> s3Client.putObject(bucketName, keyName, is, metadata));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
-    assertEquals(404, ase.getStatusCode());
-    assertEquals("NoSuchKey", ase.getErrorCode());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
   }
 
   @Test

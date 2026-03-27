@@ -1525,19 +1525,24 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   void testRewriteKeyIfMatchSuccess(BucketLayout layout) throws IOException {
     checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
-    OzoneKeyDetails keyDetails = createTestKey(bucket);
-    String etag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
+    OzoneKeyDetails keyDetails = createTestKeyWithETag(bucket);
+    String etag = keyDetails.getMetadata().get(ETAG);
     assertNotNull(etag, "Key should have an ETag");
 
     byte[] newContent = "rewritten-content".getBytes(UTF_8);
+    Map<String, String> rewrittenMetadata = new HashMap<>(keyDetails.getMetadata());
+    String rewrittenETag = UUID.randomUUID().toString();
+    rewrittenMetadata.put(ETAG, rewrittenETag);
     try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
         keyDetails.getName(), newContent.length, etag,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
-        keyDetails.getMetadata(), Collections.emptyMap())) {
+        rewrittenMetadata, Collections.emptyMap())) {
       out.write(newContent);
     }
 
     assertKeyContent(bucket, keyDetails.getName(), newContent);
+    assertEquals(rewrittenETag, bucket.getKey(keyDetails.getName())
+        .getMetadata().get(ETAG));
   }
 
   @ParameterizedTest
@@ -1545,7 +1550,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   void testRewriteKeyIfMatchFailsWithWrongETag(BucketLayout layout) throws IOException {
     checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);
-    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    OzoneKeyDetails keyDetails = createTestKeyWithETag(bucket);
     byte[] newContent = "rewritten-content".getBytes(UTF_8);
 
     OMException e = assertThrows(OMException.class, () -> {
@@ -1557,6 +1562,26 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       }
     });
     assertEquals(OMException.ResultCodes.ETAG_MISMATCH, e.getResult());
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testRewriteKeyIfMatchFailsWhenETagNotAvailable(BucketLayout layout)
+      throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    byte[] newContent = "rewritten-content".getBytes(UTF_8);
+
+    OMException e = assertThrows(OMException.class, () -> {
+      try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
+          keyDetails.getName(), newContent.length, "some-etag",
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          keyDetails.getMetadata(), Collections.emptyMap())) {
+        out.write(newContent);
+      }
+    });
+    assertEquals(OMException.ResultCodes.ETAG_NOT_AVAILABLE, e.getResult());
   }
 
   @ParameterizedTest
@@ -4579,8 +4604,28 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   private OzoneKeyDetails createTestKey(
       OzoneBucket bucket, String keyName, byte[] bytes
   ) throws IOException {
+    return createTestKey(bucket, keyName, bytes, createTestKeyMetadata());
+  }
+
+  private OzoneKeyDetails createTestKeyWithETag(OzoneBucket bucket)
+      throws IOException {
+    Map<String, String> metadata = createTestKeyMetadata();
+    metadata.put(ETAG, UUID.randomUUID().toString());
+    return createTestKey(bucket, getTestName(),
+        UUID.randomUUID().toString().getBytes(UTF_8), metadata);
+  }
+
+  private static Map<String, String> createTestKeyMetadata() {
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put("key", RandomStringUtils.secure().nextAscii(10));
+    return metadata;
+  }
+
+  private OzoneKeyDetails createTestKey(
+      OzoneBucket bucket, String keyName, byte[] bytes,
+      Map<String, String> metadata
+  ) throws IOException {
     RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
-    Map<String, String> metadata = singletonMap("key", RandomStringUtils.secure().nextAscii(10));
     try (OzoneOutputStream out = bucket.createKey(keyName, bytes.length, replication, metadata)) {
       out.write(bytes);
     }

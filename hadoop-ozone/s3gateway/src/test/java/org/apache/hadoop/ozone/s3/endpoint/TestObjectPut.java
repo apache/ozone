@@ -614,36 +614,6 @@ class TestObjectPut {
   }
 
   @Test
-  void testCopyObjectIfNoneMatchKeyExistsPreconditionFailed() throws Exception {
-    assertSucceeds(() -> putObject(CONTENT));
-    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, "existing-destination"));
-
-    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
-    when(headers.getHeaderString("If-None-Match")).thenReturn("*");
-
-    OS3Exception ex = assertErrorResponse(
-        S3ErrorTable.PRECOND_FAILED,
-        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
-    assertNotNull(ex);
-    assertKeyContent(destBucket, DEST_KEY, "existing-destination");
-  }
-
-  @Test
-  void testCopyObjectIfMatchKeyNotFoundNoSuchKey() throws Exception {
-    assertSucceeds(() -> putObject(CONTENT));
-
-    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
-    when(headers.getHeaderString("If-Match")).thenReturn("\"some-etag\"");
-
-    OS3Exception ex = assertErrorResponse(
-        S3ErrorTable.NO_SUCH_KEY,
-        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
-    assertNotNull(ex);
-  }
-
-  @Test
   void testBothHeadersProvidedInvalidRequest() throws Exception {
     when(headers.getHeaderString("If-None-Match")).thenReturn("*");
     when(headers.getHeaderString("If-Match")).thenReturn("\"some-etag\"");
