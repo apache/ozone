@@ -156,6 +156,7 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
+  SubmitSnapshotDiff = 143;
 }
 
 enum SafeMode {
@@ -306,6 +307,8 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
+
+  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest       = 144;
 }
 
 message OMResponse {
@@ -439,6 +442,8 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
+
+  optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
 }
 
 enum Status {
@@ -2031,6 +2036,15 @@ message SnapshotDiffRequest {
   optional bool disableNativeDiff = 8;
 }
 
+message SubmitSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+  optional bool forceFullDiff = 7;
+  optional bool disableNativeDiff = 8;
+}
+
 message CancelSnapshotDiffRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
@@ -2166,6 +2180,7 @@ message SnapshotDiffResponse {
     REJECTED = 4;
     FAILED = 5;
     CANCELLED = 6;
+    NOT_FOUND = 7;
   }
 
   enum SubStatus {
@@ -2181,6 +2196,10 @@ message SnapshotDiffResponse {
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
   optional SubStatus subStatus = 5;
+}
+
+message SubmitSnapshotDiffResponse {
+  optional string response = 1;
 }
 
 message CancelSnapshotDiffResponse {
