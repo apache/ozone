@@ -68,7 +68,6 @@ public class TestOzoneFileSystemWithStreamingDisabledDatanode {
     // Client side: enable datastream so the write path will attempt streaming.
     conf.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
 
-    // Force datastream path deterministically.
     conf.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, "1B");
 
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
