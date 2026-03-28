@@ -205,8 +205,8 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
   public static OMRequest disallowSetLifecycleConfigurationBeforeFinalization(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.LIFECYCLE_SUPPORT)) {
-      throw new OMException("Cluster does not have the Lifecycle Support"
+        .isAllowed(OMLayoutFeature.S3_LIFECYCLE_SUPPORT)) {
+      throw new OMException("Cluster does not have the S3 Lifecycle Support"
           + " feature finalized yet. Rejecting the request to set lifecycle"
           + " configuration. Please finalize the cluster upgrade and then try again.",
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
