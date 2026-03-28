@@ -162,7 +162,7 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
     String bucketName = UUID.randomUUID().toString();
 
     LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
-    when(versionManager.isAllowed(OMLayoutFeature.LIFECYCLE_SUPPORT)).thenReturn(false);
+    when(versionManager.isAllowed(OMLayoutFeature.S3_LIFECYCLE_SUPPORT)).thenReturn(false);
 
     ValidationContext ctx = of(versionManager, omMetadataManager);
     OMRequest request = createDeleteLifecycleConfigurationRequest(volumeName, bucketName);
@@ -181,7 +181,7 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
     String bucketName = UUID.randomUUID().toString();
 
     LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
-    when(versionManager.isAllowed(OMLayoutFeature.LIFECYCLE_SUPPORT)).thenReturn(true);
+    when(versionManager.isAllowed(OMLayoutFeature.S3_LIFECYCLE_SUPPORT)).thenReturn(true);
 
     ValidationContext ctx = of(versionManager, omMetadataManager);
     OMRequest request = createDeleteLifecycleConfigurationRequest(volumeName, bucketName);
