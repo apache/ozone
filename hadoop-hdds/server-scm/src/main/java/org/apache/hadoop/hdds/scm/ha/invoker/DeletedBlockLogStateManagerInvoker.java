@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.block;
+package org.apache.hadoop.hdds.scm.ha.invoker;
 
 import com.google.protobuf.ByteString;
 import java.lang.reflect.Method;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvoker;
 import org.apache.hadoop.hdds.utils.db.Table;
 
