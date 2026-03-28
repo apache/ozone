@@ -1,3 +1,4 @@
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,7 +19,8 @@
 
 import React, { useState, useCallback } from "react";
 import moment from "moment";
-import { Card, Row, Tabs } from "antd";
+import { Button, Card, Row, Tabs, Tooltip, message, Select } from "antd";
+import { DownloadOutlined } from "@ant-design/icons";
 import { ValueType } from "react-select/src/types";
 
 import Search from "@/v2/components/search/search";
@@ -73,6 +75,7 @@ const Containers: React.FC<{}> = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedTab, setSelectedTab] = useState<string>('1');
   const [searchColumn, setSearchColumn] = useState<'containerID' | 'pipelineID'>('containerID');
+  const [exportLimit, setExportLimit] = useState<number>(10000);
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
@@ -175,6 +178,31 @@ const Containers: React.FC<{}> = () => {
     5: mismatchedReplicaContainerData
   }
 
+  // Mapping tab keys to the backend state parameter for CSV export
+  const tabToExportState: Record<string, string> = {
+    '1': 'MISSING',
+    '2': 'UNDER_REPLICATED',
+    '3': 'OVER_REPLICATED',
+    '4': 'MIS_REPLICATED',
+    '5': 'REPLICA_MISMATCH'
+  };
+
+  // Human-readable labels for the export tooltip
+  const tabToLabel: Record<string, string> = {
+    '1': 'Missing',
+    '2': 'Under-Replicated',
+    '3': 'Over-Replicated',
+    '4': 'Mis-Replicated',
+    '5': 'Mismatched Replicas'
+  };
+
+  const handleExportCsv = useCallback(() => {
+    const state = tabToExportState[selectedTab];
+    const exportUrl = `/api/v1/containers/unhealthy/export?state=${state}&limit=${exportLimit}`;
+    window.open(exportUrl, '_blank');
+    message.success(`Exporting ${tabToLabel[selectedTab]} containers as CSV (Limit: ${exportLimit})`);
+  }, [selectedTab, exportLimit]);
+
   const highlightData = (
     <div style={{
         display: 'flex',
@@ -260,18 +288,40 @@ const Containers: React.FC<{}> = () => {
                 onTagClose={() => { }}
                 columnLength={columnOptions.length} />
             </div>
-            <Search
-              disabled={dataToTabKeyMap[selectedTab]?.length < 1}
-              searchOptions={SearchableColumnOpts}
-              searchInput={searchTerm}
-              searchColumn={searchColumn}
-              onSearchChange={
-                (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
-              }
-              onChange={(value) => {
-                setSearchTerm('');
-                setSearchColumn(value as 'containerID' | 'pipelineID');
-              }} />
+            <div className='table-actions-section'>
+              <Search
+                disabled={dataToTabKeyMap[selectedTab]?.length < 1}
+                searchOptions={SearchableColumnOpts}
+                searchInput={searchTerm}
+                searchColumn={searchColumn}
+                onSearchChange={
+                  (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
+                }
+                onChange={(value) => {
+                  setSearchTerm('');
+                  setSearchColumn(value as 'containerID' | 'pipelineID');
+                }} />
+              <Select
+                value={exportLimit}
+                onChange={(value: number) => setExportLimit(value)}
+                style={{ width: 130 }}
+                options={[
+                  { value: 10000, label: '10K Records' },
+                  { value: 100000, label: '100K Records' },
+                  { value: 1000000, label: '1M Records' },
+                  { value: 5000000, label: '5M Records' }
+                ]}
+              />
+              <Tooltip title={`Export ${tabToLabel[selectedTab]} containers as CSV`}>
+                <Button
+                  type='primary'
+                  icon={<DownloadOutlined />}
+                  onClick={handleExportCsv}
+                  className='export-csv-btn'>
+                  Export CSV
+                </Button>
+              </Tooltip>
+            </div>
           </div>
           <Tabs defaultActiveKey='1'
             onChange={(activeKey: string) => setSelectedTab(activeKey)}>

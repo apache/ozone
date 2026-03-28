@@ -61,6 +61,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
@@ -84,8 +86,14 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.util.SeekableIterator;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.recon.schema.generated.tables.records.UnhealthyContainersRecord;
+import org.jooq.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import javax.ws.rs.core.StreamingOutput;
 
 
 /**
@@ -107,6 +115,7 @@ public class ContainerEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
   private BucketLayout layout = BucketLayout.DEFAULT;
+  private final int maxCsvExportRecords;
 
   /**
    * Enumeration representing different data filters.
@@ -145,7 +154,8 @@ public class ContainerEndpoint {
                            ContainerHealthSchemaManager containerHealthSchemaManager,
                            ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                            ReconContainerMetadataManager reconContainerMetadataManager,
-                           ReconOMMetadataManager omMetadataManager) {
+                           ReconOMMetadataManager omMetadataManager,
+                           OzoneConfiguration ozoneConfiguration) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
@@ -154,6 +164,9 @@ public class ContainerEndpoint {
     this.reconSCM = reconSCM;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.omMetadataManager = omMetadataManager;
+    this.maxCsvExportRecords = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_CSV_EXPORT_MAX_RECORDS_KEY,
+        ReconServerConfigKeys.OZONE_RECON_CSV_EXPORT_MAX_RECORDS_DEFAULT);
   }
 
   /**
@@ -448,6 +461,68 @@ public class ContainerEndpoint {
       response.setSummaryCount(s.getContainerState(), s.getCount());
     }
     return Response.ok(response).build();
+  }
+
+  /**
+   * Export all unhealthy containers into a CSV file by streaming the results directly
+   * from the database without holding them in the JVM heap.
+   *
+   * @param state The container state to filter by, or null for all.
+   * @param limit The maximum number of records to return, 0 for unlimited.
+   * @return {@link Response} containing the CSV StreamingOutput.
+   */
+  @GET
+  @Path("/unhealthy/export")
+  @Produces("text/csv")
+  public Response exportUnhealthyContainers(
+      @QueryParam("state") String state,
+      @DefaultValue("0") @QueryParam(RECON_QUERY_LIMIT) int limit) {
+
+    ContainerSchemaDefinition.UnHealthyContainerStates internalState = null;
+    if (StringUtils.isNotEmpty(state)) {
+      try {
+        internalState = ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
+      } catch (IllegalArgumentException e) {
+        throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+      }
+    }
+
+    // Must be effectively final for use in the lambda
+    final ContainerSchemaDefinition.UnHealthyContainerStates filterState = internalState;
+    final int finalLimit = (limit <= 0 || limit > maxCsvExportRecords)
+        ? maxCsvExportRecords : limit;
+
+    StreamingOutput stream = outputStream -> {
+      try (Cursor<UnhealthyContainersRecord> cursor =
+               containerHealthSchemaManager.getUnhealthyContainersCursor(filterState, finalLimit)) {
+        
+        PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+        
+        // Write CSV header
+        writer.println("container_id,container_state,in_state_since," +
+            "expected_replica_count,actual_replica_count,replica_delta");
+        
+        while (cursor.hasNext()) {
+          UnhealthyContainersRecord rec = cursor.fetchNext();
+          writer.printf("%d,%s,%d,%d,%d,%d%n",
+              rec.getContainerId(), rec.getContainerState(),
+              rec.getInStateSince(), rec.getExpectedReplicaCount(),
+              rec.getActualReplicaCount(), rec.getReplicaDelta());
+        }
+        writer.flush();
+      } catch (Exception e) {
+        LOG.error("Error streaming unhealthy containers CSV", e);
+        throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    };
+
+    String filename = String.format("unhealthy_containers_%s_%d.csv",
+        state != null ? state.toLowerCase() : "all",
+        System.currentTimeMillis());
+
+    return Response.ok(stream)
+        .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+        .build();
   }
 
   private UnhealthyContainerMetadata toUnhealthyMetadata(
