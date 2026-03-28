@@ -36,23 +36,32 @@ import org.slf4j.LoggerFactory;
  * InvocationHandler which checks for {@link Replicate} annotation and
  * dispatches the request to Ratis Server.
  */
-public class SCMHAInvocationHandler implements InvocationHandler {
+public class SCMHAInvocationHandler<T> implements InvocationHandler {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(SCMHAInvocationHandler.class);
 
   private final RequestType requestType;
-  private final Object localHandler;
+  private final T localHandler;
   private final SCMRatisServer ratisHandler;
+  private final SCMHAInvoker<T> localInvoker;
 
   /**
    * TODO.
    */
   public SCMHAInvocationHandler(final RequestType requestType,
-                                final Object localHandler,
+                                final T localHandler,
                                 final SCMRatisServer ratisHandler) {
+    this(requestType, localHandler, null, ratisHandler);
+  }
+
+  public SCMHAInvocationHandler(final RequestType requestType,
+      final T localHandler,
+      final SCMHAInvoker<T> localInvoker,
+      final SCMRatisServer ratisHandler) {
     this.requestType = requestType;
     this.localHandler = localHandler;
+    this.localInvoker = localInvoker;
     this.ratisHandler = ratisHandler;
     if (ratisHandler != null) {
       ratisHandler.registerStateMachineHandler(requestType, localHandler);
@@ -87,6 +96,9 @@ public class SCMHAInvocationHandler implements InvocationHandler {
           method, localHandler, args);
     }
     try {
+      if (localInvoker != null) {
+        return localInvoker.invoke(localHandler, method, args);
+      }
       return method.invoke(localHandler, args);
     } catch (Exception e) {
       throw translateException(e);
