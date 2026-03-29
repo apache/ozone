@@ -88,7 +88,6 @@
     <guice.version>6.0.0</guice.version>
     <hadoop.version>3.4.3</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
-    <hamcrest.version>2.2</hamcrest.version>
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <hdds.version>${ozone.version}</hdds.version>
     <hk2.version>2.6.1</hk2.version>
@@ -1559,11 +1558,6 @@
             <artifactId>jaxb-api</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.hamcrest</groupId>
-        <artifactId>hamcrest</artifactId>
-        <version>${hamcrest.version}</version>
       </dependency>
       <dependency>
         <groupId>org.jacoco</groupId>
