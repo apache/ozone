@@ -43,6 +43,7 @@
   <rule ref="category/java/performance.xml/InefficientStringBuffering"/>
   <rule ref="category/java/performance.xml/StringInstantiation"/>
   <rule ref="category/java/performance.xml/UseStringBufferLength"/>
+  <rule ref="category/java/performance.xml/UselessStringValueOf"/>
 
   <rule ref="category/java/codestyle.xml/FieldDeclarationsShouldBeAtStartOfClass">
     <properties>
