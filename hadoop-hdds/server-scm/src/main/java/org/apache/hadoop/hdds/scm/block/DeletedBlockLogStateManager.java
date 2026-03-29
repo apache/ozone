@@ -21,6 +21,7 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ha.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
@@ -69,6 +70,6 @@ public interface DeletedBlockLogStateManager {
       Table<String, ByteString> statefulConfigTable);
 
   static void main(String[] args) {
-    new ScmInvokerCodeGenerator(System.out).generateInvokeLocal(DeletedBlockLogStateManager.class);
+    new ScmInvokerCodeGenerator(DeletedBlockLogStateManager.class, RequestType.BLOCK).generateClass();
   }
 }
