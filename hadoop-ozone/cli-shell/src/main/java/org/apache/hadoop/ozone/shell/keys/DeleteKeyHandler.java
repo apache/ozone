@@ -117,7 +117,7 @@ public class DeleteKeyHandler extends KeyHandler {
 
       String trashDirectory = (keyName.contains("/")
           ? new Path(userTrashCurrent, keyName.substring(0,
-          keyName.lastIndexOf("/")))
+          keyName.lastIndexOf('/')))
           : userTrashCurrent).toUri().getPath();
 
       String toKeyName = new Path(userTrashCurrent, keyName).toUri().getPath();

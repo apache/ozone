@@ -45,6 +45,7 @@
   <rule ref="category/java/performance.xml/UseStringBufferLength"/>
   <rule ref="category/java/performance.xml/StringToString"/>
   <rule ref="category/java/performance.xml/UseArraysAsList"/>
+  <rule ref="category/java/performance.xml/UseIndexOfChar"/>
 
   <rule ref="category/java/codestyle.xml/FieldDeclarationsShouldBeAtStartOfClass">
     <properties>
