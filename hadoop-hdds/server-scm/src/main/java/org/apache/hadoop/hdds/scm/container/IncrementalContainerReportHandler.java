@@ -89,6 +89,15 @@ public class IncrementalContainerReportHandler
         ContainerID id = ContainerID.valueOf(replicaProto.getContainerID());
         final ContainerInfo container;
         try {
+          // Check if container is already known to this DN before adding
+          boolean alreadyOnDn = false;
+          try {
+            alreadyOnDn = getNodeManager().getContainers(dd).contains(id);
+          } catch (NodeNotFoundException e) {
+            // DN not found, treat as not already on DN
+            getLogger().debug("Datanode not found when checking containers: {}", dd);
+          }
+          
           try {
             container = getContainerManager().getContainer(id);
             // Ensure we reuse the same ContainerID instance in containerInfo
@@ -103,6 +112,13 @@ public class IncrementalContainerReportHandler
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
             processContainerReplica(dd, container, replicaProto, publisher, detailsForLogging);
+            
+            // Remove from pending tracker when container is added to DN
+            if (!alreadyOnDn && getContainerManager() instanceof ContainerManagerImpl) {
+              ((ContainerManagerImpl) getContainerManager())
+                  .getPendingContainerTracker()
+                  .removePendingAllocation(dd, id);
+            }
           }
           success = true;
         } catch (ContainerNotFoundException e) {

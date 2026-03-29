@@ -649,6 +649,11 @@ public class PipelineManagerImpl implements PipelineManager {
     return true;
   }
 
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    return nodeManager.getDatanodeInfo(datanodeDetails);
+  }
+
   /**
    * Schedules a fixed interval job to create pipelines.
    */

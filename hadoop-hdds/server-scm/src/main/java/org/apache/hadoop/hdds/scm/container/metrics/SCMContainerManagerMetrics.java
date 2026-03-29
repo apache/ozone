@@ -48,6 +48,10 @@ public final class SCMContainerManagerMetrics {
   private @Metric MutableCounterLong numICRReportsProcessedSuccessful;
   private @Metric MutableCounterLong numICRReportsProcessedFailed;
 
+  // Pending container allocation metrics
+  private @Metric MutableCounterLong numPendingContainersAdded;
+  private @Metric MutableCounterLong numPendingContainersRemoved;
+
   private SCMContainerManagerMetrics() {
   }
 
@@ -139,6 +143,24 @@ public final class SCMContainerManagerMetrics {
 
   public long getNumListContainersOps() {
     return numListContainerOps.value();
+  }
+
+  // Pending container allocation metrics
+
+  public void incNumPendingContainersAdded() {
+    this.numPendingContainersAdded.incr();
+  }
+
+  public long getNumPendingContainersAdded() {
+    return numPendingContainersAdded.value();
+  }
+
+  public void incNumPendingContainersRemoved() {
+    this.numPendingContainersRemoved.incr();
+  }
+
+  public long getNumPendingContainersRemoved() {
+    return numPendingContainersRemoved.value();
   }
 
 }

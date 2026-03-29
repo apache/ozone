@@ -34,20 +34,26 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +87,8 @@ public class ContainerManagerImpl implements ContainerManager {
 
   private final long maxContainerSize;
 
+  private final PendingContainerTracker pendingContainerTracker;
+
   /**
    *
    */
@@ -109,7 +117,16 @@ public class ContainerManagerImpl implements ContainerManager {
     maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
+    // Get pending container roll interval from configuration
+    ScmConfig scmConfig = ((OzoneConfiguration)conf).getObject(ScmConfig.class);
+    long rollIntervalMs = scmConfig.getPendingContainerAllocationRollInterval().toMillis();
+
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+    this.pendingContainerTracker = new PendingContainerTracker(
+        maxContainerSize, rollIntervalMs, scmContainerManagerMetrics);
+
+    LOG.info("Container allocation pending tracker initialized with maxContainerSize={}B, rollInterval={}ms",
+        maxContainerSize, rollIntervalMs);
   }
 
   @Override
@@ -242,12 +259,75 @@ public class ContainerManagerImpl implements ContainerManager {
     return containerInfo;
   }
 
+  /**
+   * Check if a pipeline has sufficient space after considering pending allocations.
+   * Tracks containers scheduled but not yet written to DataNodes, preventing over-allocation.
+   * 
+   * @param pipeline The pipeline to check
+   * @return true if sufficient space is available, false otherwise
+   */
+  private boolean hasSpaceAfterPendingAllocations(Pipeline pipeline) {
+    try {
+      for (DatanodeDetails node : pipeline.getNodes()) {
+        // Get DN's storage statistics
+        DatanodeInfo datanodeInfo = pipelineManager.getDatanodeInfo(node);
+        if (datanodeInfo == null) {
+          LOG.warn("DatanodeInfo not found for node {}", node.getUuidString());
+          continue;
+        }
+
+        List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
+        if (storageReports == null || storageReports.isEmpty()) {
+          LOG.warn("No storage reports for node {}", node.getUuidString());
+          continue;
+        }
+
+        // Calculate total capacity and effective allocatable space
+        // For each disk, calculate how many containers can actually fit,
+        // since containers are written to individual disks, not spread across them.
+        // Example: disk1=9GB, disk2=14GB with 5GB containers
+        // (1*5GB) + (2*5GB) = 15GB → actually 3 containers
+        long totalCapacity = 0L;
+        long effectiveAllocatableSpace = 0L;
+        for (StorageReportProto report : storageReports) {
+          totalCapacity += report.getCapacity();
+          long usableSpace = VolumeUsage.getUsableSpace(report);
+          // Calculate how many containers can fit on this disk
+          long containersOnThisDisk = usableSpace / maxContainerSize;
+          // Add effective space (containers that fit * container size)
+          effectiveAllocatableSpace += containersOnThisDisk * maxContainerSize;
+        }
+
+        // Get pending allocations from tracker
+        long pendingAllocations = pendingContainerTracker.getPendingAllocationSize(node);
+        
+        // Calculate effective remaining space after pending allocations
+        long effectiveRemaining = effectiveAllocatableSpace - pendingAllocations;
+        
+        // Check if there's enough space for a new container
+        if (effectiveRemaining < maxContainerSize) {
+          LOG.info("Node {} insufficient space: capacity={}, effective allocatable={}, " +
+                  "pending allocations={}, effective remaining={}, required={}",
+              node.getUuidString(), totalCapacity, effectiveAllocatableSpace,
+              pendingAllocations, effectiveRemaining, maxContainerSize);
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (Exception e) {
+      LOG.warn("Error checking space for pipeline {}", pipeline.getId(), e);
+      return true;
+    }
+  }
+
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
       throws IOException {
-    if (!pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
-      LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-          pipeline, maxContainerSize);
+    // Check if pipeline has sufficient space after considering recent allocations
+    if (!hasSpaceAfterPendingAllocations(pipeline)) {
+      LOG.warn("Pipeline {} does not have sufficient space after considering recent allocations",
+          pipeline.getId());
       return null;
     }
 
@@ -278,6 +358,11 @@ public class ContainerManagerImpl implements ContainerManager {
 
     containerStateManager.addContainer(containerInfoBuilder.build());
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
+    // Record pending allocation - tracks containers scheduled but not yet written
+    pendingContainerTracker.recordPendingAllocation(pipeline, containerID);
+    LOG.debug("Allocated container {} on pipeline {}. Recorded as pending on {} DataNodes",
+        containerID, pipeline.getId(), pipeline.getNodes().size());
+
     return containerStateManager.getContainer(containerID);
   }
 
@@ -467,5 +552,15 @@ public class ContainerManagerImpl implements ContainerManager {
   @VisibleForTesting
   public SCMHAManager getSCMHAManager() {
     return haManager;
+  }
+
+  /**
+   * Get the pending container tracker for tracking scheduled containers.
+   * Used for removing pending containers when they are confirmed via reports.
+   *
+   * @return PendingContainerTracker instance
+   */
+  public PendingContainerTracker getPendingContainerTracker() {
+    return pendingContainerTracker;
   }
 }

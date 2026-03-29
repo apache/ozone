@@ -380,6 +380,17 @@
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
+    <name>hdds.scm.container.pending-allocation.roll-interval</name>
+    <value>10m</value>
+    <tag>OZONE, CONTAINER, MANAGEMENT</tag>
+    <description>Time interval for rolling the pending container allocation window.
+      Pending container allocations are tracked in a two-window tumbling bucket
+      pattern. Each window has this duration.
+      After 2x this interval, allocations that haven't been confirmed via
+      container reports will automatically age out. Default is 10 minutes.
+    </description>
+  </property>
+  <property>
     <name>hdds.pipeline.report.interval</name>
     <value>60000ms</value>
     <tag>OZONE, PIPELINE, MANAGEMENT</tag>
