@@ -270,6 +270,8 @@ public class ContainerManagerImpl implements ContainerManager {
 
     containerStateManager.addContainer(containerInfoBuilder.build());
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
+    // Record pending allocation - tracks containers scheduled but not yet written
+    pipelineManager.recordPendingAllocation(pipeline, containerID);
     return containerStateManager.getContainer(containerID);
   }
 

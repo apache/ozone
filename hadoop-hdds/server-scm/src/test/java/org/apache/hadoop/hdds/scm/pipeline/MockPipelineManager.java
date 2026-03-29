@@ -355,4 +355,9 @@ public class MockPipelineManager implements PipelineManager {
   public SCMPipelineMetrics getMetrics() {
     return null;
   }
+
+  @Override
+  public org.apache.hadoop.hdds.scm.node.DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    return null;
+  }
 }

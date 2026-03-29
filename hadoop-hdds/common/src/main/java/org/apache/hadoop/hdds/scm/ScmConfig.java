@@ -138,8 +138,29 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private int transactionToDNsCommitMapLimit = 5000000;
 
+  @Config(key = "hdds.scm.container.pending-allocation.roll-interval",
+      defaultValue = "10m",
+      type = ConfigType.TIME,
+      tags = { ConfigTag.SCM, ConfigTag.CONTAINER },
+      description =
+          "Time interval for rolling the pending container allocation window. " +
+              "Pending container allocations are tracked in a two-window tumbling bucket " +
+              "pattern. Each window has this duration. " +
+              "After 2x this interval, allocations that haven't been confirmed via " +
+              "container reports will automatically age out. Default is 10 minutes."
+  )
+  private Duration pendingContainerAllocationRollInterval = Duration.ofMinutes(10);
+
   public int getTransactionToDNsCommitMapLimit() {
     return transactionToDNsCommitMapLimit;
+  }
+
+  public Duration getPendingContainerAllocationRollInterval() {
+    return pendingContainerAllocationRollInterval;
+  }
+
+  public void setPendingContainerAllocationRollInterval(Duration duration) {
+    this.pendingContainerAllocationRollInterval = duration;
   }
 
   public Duration getBlockDeletionInterval() {
