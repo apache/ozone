@@ -118,7 +118,10 @@ public class ContainerManagerImpl implements ContainerManager {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     // Get pending container roll interval from configuration
-    ScmConfig scmConfig = ((OzoneConfiguration)conf).getObject(ScmConfig.class);
+    OzoneConfiguration ozoneConf = (conf instanceof OzoneConfiguration)
+        ? (OzoneConfiguration) conf
+        : new OzoneConfiguration(conf);
+    ScmConfig scmConfig = ozoneConf.getObject(ScmConfig.class);
     long rollIntervalMs = scmConfig.getPendingContainerAllocationRollInterval().toMillis();
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
