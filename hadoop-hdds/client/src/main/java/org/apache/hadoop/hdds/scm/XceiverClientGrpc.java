@@ -776,7 +776,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   /**
    * Group the channel and stub so that they are published together.
    */
-  private class ChannelInfo {
+  private static class ChannelInfo {
     private ManagedChannel channel;
     private XceiverClientProtocolServiceStub stub;
 
