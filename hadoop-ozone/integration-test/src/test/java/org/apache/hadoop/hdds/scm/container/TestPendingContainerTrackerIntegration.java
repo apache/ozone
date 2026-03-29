@@ -55,8 +55,6 @@ public class TestPendingContainerTrackerIntegration {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestPendingContainerTrackerIntegration.class);
-
-  private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;
   private OzoneClient client;
@@ -67,7 +65,7 @@ public class TestPendingContainerTrackerIntegration {
 
   @BeforeEach
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     conf.set(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, "60s");
     
@@ -151,7 +149,7 @@ public class TestPendingContainerTrackerIntegration {
       }
     }
 
-    assertThat(nodesWithPending.size() > 0);
+    assertThat(!nodesWithPending.isEmpty());
 
     // Verify metrics increased
     long afterAdded = metrics.getNumPendingContainersAdded();

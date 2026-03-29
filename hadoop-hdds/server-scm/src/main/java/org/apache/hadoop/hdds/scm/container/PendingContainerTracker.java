@@ -74,6 +74,21 @@ public class PendingContainerTracker {
    * Containers automatically age out after 2 × rollIntervalMs.
    */
   private final long rollIntervalMs;
+
+  /**
+   * Map of DataNode UUID to TwoWindowBucket.
+   */
+  private final ConcurrentHashMap<UUID, TwoWindowBucket> datanodeBuckets;
+
+  /**
+   * Maximum container size in bytes.
+   */
+  private final long maxContainerSize;
+
+  /**
+   * Metrics for tracking pending containers.
+   */
+  private final SCMContainerManagerMetrics metrics;
   
   /**
    * Two-window bucket for a single DataNode.
@@ -145,21 +160,6 @@ public class PendingContainerTracker {
       return getAllPending().size();
     }
   }
-  
-  /**
-   * Map of DataNode UUID to TwoWindowBucket.
-   */
-  private final ConcurrentHashMap<UUID, TwoWindowBucket> datanodeBuckets;
-  
-  /**
-   * Maximum container size in bytes.
-   */
-  private final long maxContainerSize;
-  
-  /**
-   * Metrics for tracking pending containers.
-   */
-  private final SCMContainerManagerMetrics metrics;
   
   public PendingContainerTracker(long maxContainerSize) {
     this(maxContainerSize, 10 * 60 * 1000, null); // Default 10 minutes
