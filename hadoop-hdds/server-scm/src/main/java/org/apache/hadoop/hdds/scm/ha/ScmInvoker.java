@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.lang.reflect.Method;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+
 /**
- * Invokes methods on a handler without using reflection.
+ * Invokes methods without using reflection.
  */
 public interface ScmInvoker<T> {
   RequestType getType();
