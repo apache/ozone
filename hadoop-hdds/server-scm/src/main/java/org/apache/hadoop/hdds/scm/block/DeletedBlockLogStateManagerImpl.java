@@ -278,8 +278,7 @@ public class DeletedBlockLogStateManagerImpl
       final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
           deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);
 
-      return scmRatisServer.getProxyHandler(RequestType.BLOCK,
-          DeletedBlockLogStateManager.class, impl, new DeletedBlockLogStateManagerInvoker());
+      return scmRatisServer.getProxyHandler(new DeletedBlockLogStateManagerInvoker(impl));
     }
   }
 }

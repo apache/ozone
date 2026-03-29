@@ -18,10 +18,16 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.lang.reflect.Method;
-
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 /**
  * Invokes methods on a handler without using reflection.
  */
-public interface SCMHAInvoker<T> {
-  Object invoke(T handler, Method method, Object[] args) throws Exception;
+public interface ScmInvoker<T> {
+  RequestType getType();
+
+  Class<T> getApi();
+
+  T getImpl();
+
+  Object invokeLocal(String methodName, Object[] args) throws Exception;
 }
