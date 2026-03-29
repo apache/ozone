@@ -163,7 +163,9 @@ public class XceiverClientManager extends XceiverClientCreator {
 
   private String getPipelineCacheKey(Pipeline pipeline,
                                      boolean topologyAware) {
-    String key = pipeline.getId().getId().toString() + pipeline.getType();
+    StringBuilder key = new StringBuilder()
+        .append(pipeline.getId().getId().toString())
+        .append(pipeline.getType());
     boolean isEC = pipeline.getType() == HddsProtos.ReplicationType.EC;
     if (topologyAware || isEC) {
       try {
@@ -183,7 +185,8 @@ public class XceiverClientManager extends XceiverClientCreator {
         // Standalone port is chosen since all datanodes should have a
         // standalone port regardless of version and this port should not
         // have any collisions.
-        key += closestNode.getHostName() + closestNode.getStandalonePort();
+        key.append(closestNode.getHostName())
+            .append(closestNode.getStandalonePort());
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
             e.getMessage());
@@ -194,13 +197,13 @@ public class XceiverClientManager extends XceiverClientCreator {
       // Append user short name to key to prevent a different user
       // from using same instance of xceiverClient.
       try {
-        key += UserGroupInformation.getCurrentUser().getShortUserName();
+        key.append(UserGroupInformation.getCurrentUser().getShortUserName());
       } catch (IOException e) {
         LOG.error("Failed to get current user to create pipeline cache key:" +
             e.getMessage());
       }
     }
-    return key;
+    return key.toString();
   }
 
   /**

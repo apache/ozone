@@ -99,6 +99,7 @@ public abstract class BucketHandler {
    * @param nextLevel
    * @return subpath
    */
+  @SuppressWarnings("PMD.UseStringBufferForStringAppends")
   public static String buildSubpath(String path, String nextLevel) {
     String subpath = path;
     if (!subpath.startsWith(OM_KEY_PREFIX)) {

@@ -42,6 +42,7 @@
   <rule ref="category/java/performance.xml/InefficientEmptyStringCheck"/>
   <rule ref="category/java/performance.xml/InefficientStringBuffering"/>
   <rule ref="category/java/performance.xml/StringInstantiation"/>
+  <rule ref="category/java/performance.xml/UseStringBufferForStringAppends"/>
   <rule ref="category/java/performance.xml/UseStringBufferLength"/>
   <rule ref="category/java/performance.xml/UselessStringValueOf"/>
 

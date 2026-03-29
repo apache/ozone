@@ -84,6 +84,7 @@ public class DiskUsageSubCommand implements Callable {
   private static final int PATH_INDENT = 27;
 
   @Override
+  @SuppressWarnings(value = "PMD.UseStringBufferForStringAppends")
   public Void call() throws Exception {
     if (path == null || path.isEmpty()) {
       printEmptyPathRequest();
