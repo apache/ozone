@@ -102,7 +102,7 @@ public class ScmInvokerCodeGenerator {
     println("@Override");
     printf("public RequestType getType()");
     try (UncheckedAutoCloseable ignore = printScope()) {
-      println("return %s;", requestTypeName);
+      println("return RequestType.%s;", requestTypeName);
     }
 
     out.println();
@@ -187,7 +187,7 @@ public class ScmInvokerCodeGenerator {
 
   public void generateClass() {
     println("/** Code generated for %s.  Do not modify. */", apiName);
-    printf("public %s implements ScmInvoker<%s>", invokerClassName, apiName);
+    printf("public class %s implements ScmInvoker<%s>", invokerClassName, apiName);
     try (UncheckedAutoCloseable ignored = printScope()) {
       println("private final %s impl;", apiName);
       printHeaderMethods();
