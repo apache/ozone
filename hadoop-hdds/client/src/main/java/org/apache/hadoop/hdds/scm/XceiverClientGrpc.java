@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -165,40 +166,23 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throw new IOException("Client is closed.");
     }
 
-    if (isConnected(dn)) {
-      return;
-    }
+    dnChannelInfoMap.compute(dn.getID(), (dnId, channelInfo) -> {
+      // channel is absent or stale
+      if (channelInfo == null || channelInfo.isChannelInactive()) {
+        LOG.debug("Connecting to server: {}; nodes in pipeline: {}", dn, pipeline.getNodes());
+        try {
+          return generateNewChannel(dn);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }
 
-    LOG.debug("Connecting to server: {}; nodes in pipeline: {}", dn, pipeline.getNodes());
-
-    removeStaleChannel(dn);
-    generateNewChannel(dn);
+      // channel is present and active
+      return channelInfo;
+    });
   }
 
-  /**
-   * Checks if the client has a live connection channel to the specified Datanode.
-   *
-   * @return True if the connection is alive, false otherwise.
-   */
-  @VisibleForTesting
-  public boolean isConnected(DatanodeDetails details) {
-    if (details == null || !dnChannelInfoMap.containsKey(details.getID())) {
-      return false;
-    }
-
-    ManagedChannel channel = dnChannelInfoMap.get(details.getID()).getChannel();
-    return channel != null
-        && !channel.isTerminated()
-        && !channel.isShutdown();
-  }
-
-  private void removeStaleChannel(DatanodeDetails dn) {
-    if (!isConnected(dn)) {
-      dnChannelInfoMap.remove(dn.getID());
-    }
-  }
-
-  private void generateNewChannel(DatanodeDetails dn) throws IOException {
+  private ChannelInfo generateNewChannel(DatanodeDetails dn) throws IOException {
     // read port from the data node, on failure use default configured port
     int port = dn.getStandalonePort().getValue();
     if (port == 0) {
@@ -207,8 +191,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     ManagedChannel channel = createChannel(dn, port).build();
     XceiverClientProtocolServiceStub stub = XceiverClientProtocolServiceGrpc.newStub(channel);
-    ChannelInfo channelInfo = new ChannelInfo(channel, stub);
-    dnChannelInfoMap.put(dn.getID(), channelInfo);
+    return new ChannelInfo(channel, stub);
   }
 
   protected NettyChannelBuilder createChannel(DatanodeDetails dn, int port)
@@ -243,6 +226,21 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return config.getBoolean(
             HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
             HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+  }
+
+  /**
+   * Checks if the client has a live connection channel to the specified
+   * Datanode.
+   *
+   * @return True if the connection is alive, false otherwise.
+   */
+  @VisibleForTesting
+  public boolean isConnected(DatanodeDetails details) {
+    if (details == null || !dnChannelInfoMap.containsKey(details.getID())) {
+      return false;
+    }
+
+    return !dnChannelInfoMap.get(details.getID()).isChannelInactive();
   }
 
   /**
@@ -778,8 +776,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * Group the channel and stub so that they are published together.
    */
   private static class ChannelInfo {
-    private ManagedChannel channel;
-    private XceiverClientProtocolServiceStub stub;
+    private final ManagedChannel channel;
+    private final XceiverClientProtocolServiceStub stub;
 
     ChannelInfo(ManagedChannel channel, XceiverClientProtocolServiceStub stub) {
       this.channel = channel;
@@ -792,6 +790,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     public XceiverClientProtocolServiceStub getStub() {
       return stub;
+    }
+
+    public boolean isChannelInactive() {
+      return channel == null
+          || channel.isTerminated()
+          || channel.isShutdown();
     }
   }
 }
