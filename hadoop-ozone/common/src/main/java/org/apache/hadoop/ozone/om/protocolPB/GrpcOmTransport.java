@@ -231,9 +231,10 @@ public class GrpcOmTransport implements OmTransport {
         IOException remote = null;
         try {
           String cause = status.getDescription();
-          cause = cause.substring(cause.indexOf(':') + 2);
-          remote = new RemoteException(cause.substring(0, cause.indexOf(':')),
-              cause.substring(cause.indexOf(':') + 1));
+          int colonIndex = cause.indexOf(':');
+          cause = cause.substring(colonIndex + 2);
+          remote = new RemoteException(cause.substring(0, colonIndex),
+              cause.substring(colonIndex + 1));
           grpcException.initCause(remote);
         } catch (Exception e) {
           LOG.error("cannot get cause for remote exception");

@@ -168,7 +168,7 @@ public class ProfileServlet extends HttpServlet {
       if (name != null) {
         int idx = name.indexOf('@');
         if (idx != -1) {
-          pidStr = name.substring(0, name.indexOf('@'));
+          pidStr = name.substring(0, idx);
         }
       }
     }

@@ -144,8 +144,9 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   }
 
   private String checkHostWithoutPort(String host) {
-    if (host.contains(":")) {
-      return host.substring(0, host.lastIndexOf(':'));
+    int portIndex = host.lastIndexOf(':');
+    if (portIndex >= 0) {
+      return host.substring(0, portIndex);
     } else {
       return host;
     }
