@@ -28,12 +28,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.invoker.DeletedBlockLogStateManagerInvoker;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -240,8 +240,7 @@ public class DeletedBlockLogStateManagerImpl
       final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
           deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);
 
-      return scmRatisServer.getProxyHandler(RequestType.BLOCK,
-          DeletedBlockLogStateManager.class, impl);
+      return scmRatisServer.getProxyHandler(new DeletedBlockLogStateManagerInvoker(impl));
     }
   }
 }
