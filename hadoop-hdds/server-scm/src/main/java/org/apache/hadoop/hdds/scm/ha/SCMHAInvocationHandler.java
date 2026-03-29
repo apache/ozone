@@ -44,15 +44,15 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   private final RequestType requestType;
   private final Object localHandler;
   private final SCMRatisServer ratisHandler;
+  private final ScmInvoker<?> invoker;
 
-  /**
-   * TODO.
-   */
   public SCMHAInvocationHandler(final RequestType requestType,
-                                final Object localHandler,
-                                final SCMRatisServer ratisHandler) {
+      final Object localHandler,
+      final ScmInvoker<?> invoker,
+      final SCMRatisServer ratisHandler) {
     this.requestType = requestType;
     this.localHandler = localHandler;
+    this.invoker = invoker;
     this.ratisHandler = ratisHandler;
     if (ratisHandler != null) {
       ratisHandler.registerStateMachineHandler(requestType, localHandler);
@@ -87,6 +87,9 @@ public class SCMHAInvocationHandler implements InvocationHandler {
           method, localHandler, args);
     }
     try {
+      if (invoker != null) {
+        return invoker.invokeLocal(method.getName(), args);
+      }
       return method.invoke(localHandler, args);
     } catch (Exception e) {
       throw translateException(e);
