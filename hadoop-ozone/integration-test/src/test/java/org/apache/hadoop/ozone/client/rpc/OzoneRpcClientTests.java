@@ -4385,9 +4385,9 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // Combine all parts data, and check is it matching with get key data.
     String part1 = new String(data, UTF_8);
     String part2 = new String(data, UTF_8);
-    sb.append(part1);
-    sb.append(part2);
-    sb.append(part3);
+    sb.append(part1)
+        .append(part2)
+        .append(part3);
     assertEquals(sb.toString(), new String(fileContent, UTF_8));
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()

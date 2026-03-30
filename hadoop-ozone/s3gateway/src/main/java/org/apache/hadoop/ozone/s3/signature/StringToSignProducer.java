@@ -116,8 +116,8 @@ public final class StringToSignProducer {
       LOG.error("DateTime Header not found.");
       throw S3_AUTHINFO_CREATION_ERROR;
     }
-    strToSign.append(signatureInfo.getDateTime()).append(NEWLINE);
-    strToSign.append(credentialScope).append(NEWLINE);
+    strToSign.append(signatureInfo.getDateTime()).append(NEWLINE)
+        .append(credentialScope).append(NEWLINE);
 
     String canonicalRequest = buildCanonicalRequest(
         scheme,
@@ -175,12 +175,12 @@ public final class StringToSignProducer {
     StringBuilder canonicalHeaders = new StringBuilder();
 
     for (String header : StringUtils.split(signedHeaders, ';')) {
-      canonicalHeaders.append(header.toLowerCase());
-      canonicalHeaders.append(':');
+      canonicalHeaders.append(header.toLowerCase())
+          .append(':');
       if (headers.containsKey(header)) {
         String headerValue = headers.get(header);
-        canonicalHeaders.append(headerValue);
-        canonicalHeaders.append(NEWLINE);
+        canonicalHeaders.append(headerValue)
+            .append(NEWLINE);
 
         // Set for testing purpose only to skip date and host validation.
         try {
@@ -306,10 +306,9 @@ public final class StringToSignProducer {
         if (result.length() > 0) {
           result.append('&');
         }
-        result.append(urlEncode(p));
-        result.append('=');
-
-        result.append(urlEncode(queryMap.get(p)));
+        result.append(urlEncode(p))
+            .append('=')
+            .append(urlEncode(queryMap.get(p)));
       }
     }
     return result.toString();
