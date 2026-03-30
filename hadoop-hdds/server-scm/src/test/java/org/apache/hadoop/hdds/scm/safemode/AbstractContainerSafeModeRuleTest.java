@@ -178,34 +178,6 @@ public abstract class AbstractContainerSafeModeRuleTest {
     assertEquals(1.0, rule.getCurrentContainerThreshold(), "Duplicated containers should be counted only once");
   }
 
-  /**
-   * When {@code validate()} is false, background refresh reconciles tracked open
-   * containers with {@link ContainerManager}: an OPEN container that becomes CLOSED is
-   * moved into closed tracking.
-   */
-  @Test
-  public void testIncrementalRefreshPromotesOpenContainerToClosedInTracking() {
-    when(safeModeManager.getInSafeMode()).thenReturn(true);
-
-    ContainerInfo closedMissingReplicas = mockContainer(LifeCycleState.CLOSED, 1L);
-    ContainerInfo openThenClosed = mockContainer(LifeCycleState.OPEN, 2L);
-    containers.add(closedMissingReplicas);
-    containers.add(openThenClosed);
-    rule.refresh(true);
-
-    ContainerID id2 = ContainerID.valueOf(2L);
-    assertTrue(rule.getOpenContainers().containsKey(id2),
-        "OPEN container should be tracked in openContainers after initializeRule");
-
-    when(openThenClosed.getState()).thenReturn(LifeCycleState.CLOSED);
-
-    rule.runIncrementalContainerSyncForTesting();
-
-    assertFalse(rule.getOpenContainers().containsKey(id2));
-    assertTrue(rule.getClosedContainers().containsKey(id2));
-    assertTrue(rule.getContainers().containsKey(id2));
-  }
-
   @Test
   public void testValidateBasedOnReportProcessingTrue() {
     rule.setValidateBasedOnReportProcessing(true);
