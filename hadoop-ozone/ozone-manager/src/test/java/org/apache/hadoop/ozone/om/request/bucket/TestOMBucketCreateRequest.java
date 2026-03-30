@@ -68,13 +68,22 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
   }
 
   @Test
-  public void preExecuteRejectsInvalidBucketName() {
-    // Verify invalid bucket name throws exception
+  public void preExecuteRejectsShortBucketNameWhenStrictS3Enabled() {
+    when(ozoneManager.isStrictS3()).thenReturn(true);
+
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("volume1", "b1"));
     assertEquals(
         "bucket name 'b1' is too short, valid length is 3-63 characters",
         omException.getMessage());
+  }
+
+  @Test
+  public void preExecuteAllowsShortBucketNameWhenStrictS3Disabled()
+      throws Exception {
+    when(ozoneManager.isStrictS3()).thenReturn(false);
+
+    doPreExecute("volume1", "b1");
   }
 
   @Test
