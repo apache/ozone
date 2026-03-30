@@ -133,7 +133,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         double ideal = p.getIdealUsage();
         for (VolumeReportProto v : p.getVolumeInfoList()) {
           formatBuilder.append("%-45s %-40s %15s %15s %30s %20s %15s %15s%n");
-          contentList.add(v.getStorageId() != null ? v.getStorageId() : "-");
+          contentList.add(v.hasStorageId() ? v.getStorageId() : "-");
           contentList.add(v.hasStoragePath() ? v.getStoragePath() : "-");
           contentList.add(v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
           contentList.add(v.hasUsedSpace() ? StringUtils.byteDesc(v.getUsedSpace()) : "-");
