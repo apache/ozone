@@ -114,7 +114,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         header.append(" | Threshold: ").append(threshold).append('%');
         header.append(" | ThresholdRange: (").append(String.format("%.8f", lt));
         header.append(", ").append(String.format("%.8f", ut)).append(')').append('\n').append('\n');
-        header.append("Volume Details -:").append('\n');
+        header.append("Volume Details:").append('\n');
       }
       formatBuilder.append("%s%n");
       contentList.add(header.toString());
