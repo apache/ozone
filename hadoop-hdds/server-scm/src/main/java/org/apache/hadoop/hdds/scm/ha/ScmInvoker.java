@@ -30,4 +30,6 @@ public interface ScmInvoker<T> {
   T getImpl();
 
   Object invokeLocal(String methodName, Object[] args) throws Exception;
+
+  Object invokeRatisServer(String methodName, Class<?>[] paramTypes, Object[] args) throws Exception;
 }

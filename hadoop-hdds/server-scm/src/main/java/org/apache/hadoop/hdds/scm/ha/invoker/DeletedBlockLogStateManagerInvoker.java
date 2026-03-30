@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.ScmInvoker;
 import org.apache.hadoop.hdds.utils.db.Table;
 
@@ -29,9 +32,11 @@ import org.apache.hadoop.hdds.utils.db.Table;
  */
 public class DeletedBlockLogStateManagerInvoker implements ScmInvoker<DeletedBlockLogStateManager> {
   private final DeletedBlockLogStateManager impl;
+  private final SCMRatisServer ratisHandler;
 
-  public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl) {
+  public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl, SCMRatisServer ratisHandler) {
     this.impl = impl;
+    this.ratisHandler = ratisHandler;
   }
 
   @Override
@@ -86,6 +91,19 @@ public class DeletedBlockLogStateManagerInvoker implements ScmInvoker<DeletedBlo
     default:
       throw new IllegalArgumentException("Method not found: " + methodName);
     }
+  }
+
+  @Override
+  public Object invokeRatisServer(String methodName, Class<?>[] paramTypes,
+      Object[] args) throws Exception {
+    final SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(
+        getType(), methodName, paramTypes, args);
+    final SCMRatisResponse response = ratisHandler.submitRequest(
+        scmRatisRequest);
+    if (response.isSuccess()) {
+      return response.getResult();
+    }
+    throw response.getException();
   }
 
 }
