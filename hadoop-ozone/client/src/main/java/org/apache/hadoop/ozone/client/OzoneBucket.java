@@ -1434,10 +1434,8 @@ public class OzoneBucket extends WithMetadata {
       }
 
       // 2. Get immediate children by listStatusLight method
-      // When delimiterKeyPrefix is "" (root listing), pass getKeyPrefix() as listPrefix
-      // for STS auth so OM checks LIST on that prefix instead of "*".
-      final String listPrefix = (delimiterKeyPrefix.isEmpty() && !getKeyPrefix().isEmpty())
-          ? getKeyPrefix() : null;
+      // For STS auth, pass the original request prefix (if any) as listPrefix so OM
+      // checks LIST on that prefix instead of the internal traversal path.
       final List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
           ListStatusLightOptions.builder()
               .setVolumeName(volumeName)
@@ -1447,7 +1445,7 @@ public class OzoneBucket extends WithMetadata {
               .setStartKey(startKey)
               .setNumEntries(listCacheSize)
               .setAllowPartialPrefixes(false)
-              .setListPrefix(listPrefix)
+              .setListPrefix(getKeyPrefix())
               .build());
 
       if (addedKeyPrefix && !statuses.isEmpty()) {
@@ -1687,10 +1685,8 @@ public class OzoneBucket extends WithMetadata {
       }
 
       // 2. Get immediate children by listStatus method.
-      // When delimiterKeyPrefix is "" (root listing), pass getKeyPrefix() as listPrefix
-      // for STS auth so OM checks LIST on that prefix instead of "*".
-      String listPrefix = (getDelimiterKeyPrefix().isEmpty() && !getKeyPrefix().isEmpty())
-          ? getKeyPrefix() : null;
+      // For STS auth, pass the original request prefix (if any) as listPrefix so OM
+      // checks LIST on that prefix instead of the internal traversal path.
       List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
           ListStatusLightOptions.builder()
               .setVolumeName(volumeName)
@@ -1700,7 +1696,7 @@ public class OzoneBucket extends WithMetadata {
               .setStartKey(startKey)
               .setNumEntries(listCacheSize)
               .setAllowPartialPrefixes(false)
-              .setListPrefix(listPrefix)
+              .setListPrefix(getKeyPrefix())
               .build());
 
       if (!statuses.isEmpty()) {
@@ -1859,8 +1855,17 @@ public class OzoneBucket extends WithMetadata {
       startKey = startKey == null ? "" : startKey;
 
       // 1. Get immediate children of keyPrefix, starting with startKey
-      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(volumeName,
-          name, keyPrefix, false, startKey, listCacheSize, true);
+      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
+          ListStatusLightOptions.builder()
+              .setVolumeName(volumeName)
+              .setBucketName(name)
+              .setKeyName(keyPrefix)
+              .setRecursive(false)
+              .setStartKey(startKey)
+              .setNumEntries(listCacheSize)
+              .setAllowPartialPrefixes(true)
+              .setListPrefix(getKeyPrefix())
+              .build());
 
       // 2. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank
