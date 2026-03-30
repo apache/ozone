@@ -712,16 +712,17 @@ public class DiskBalancerService extends BackgroundService {
     List<VolumeReportProto> result = new ArrayList<>();
     for (VolumeFixedUsage v : volumeSet) {
       HddsVolume volume = v.getVolume();
-      String path = volume.getStorageDir() != null ? volume.getStorageDir().getPath() : "";
-      result.add(VolumeReportProto.newBuilder()
+      VolumeReportProto.Builder builder = VolumeReportProto.newBuilder()
           .setStorageId(volume.getStorageID())
-          .setStoragePath(path)
           .setTotalCapacity(v.getUsage().getCapacity())
           .setUsedSpace(v.getUsage().getUsedSpace())
           .setCommittedBytes(volume.getCommittedBytes())
           .setEffectiveUsedSpace(v.getEffectiveUsed())
-          .setUtilization(v.getUtilization())
-          .build());
+          .setUtilization(v.getUtilization());
+      if (volume.getStorageDir() != null) {
+        builder.setStoragePath(volume.getStorageDir().getPath());
+      }
+      result.add(builder.build());
     }
     return result;
   }
