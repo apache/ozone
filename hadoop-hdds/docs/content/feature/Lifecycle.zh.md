@@ -300,15 +300,15 @@ Prefix 的语义差异：
 
 以下是所有相关的配置项：
 
-| 配置项 | 说明                                         |
-|--------|--------------------------------------------|
-| `ozone.lifecycle.service.enabled` | 是否启用生命周期管理服务。                              |
-| `ozone.lifecycle.service.interval` | 生命周期管理服务的扫描间隔。                             |
-| `ozone.lifecycle.service.timeout` | 生命周期评估任务的超时阈值。该配置不会中断正在执行的任务，仅当单个 Bucket 的评估任务实际执行时间超过该值时，在任务结束后打印 WARN 级别日志以便运维排查。 |
-| `ozone.lifecycle.service.workers` | 生命周期管理服务的工作线程数，必须大于 0。每个 Bucket 由一个线程负责检查和处理，最多同时处理的 Bucket 数等于该值，其余 Bucket 将排队等待。设置过高会增加 OM 上并发 RocksDB 读写和 Ratis 请求的压力，可能影响集群性能。 |
-| `ozone.lifecycle.service.delete.batch-size` | 单次批量删除请求中包含的最大对象数。每批 Key 会封装为一次 Ratis 删除请求提交到 OM，过大的批次会增大单次 Ratis 日志条目的大小并占用更多内存，不建议超过 1000。 |
-| `ozone.lifecycle.service.move.to.trash.enabled` | 启用时将过期对象移入回收站，禁用时直接删除。OBS Bucket 不适用。      |
-| `ozone.lifecycle.service.delete.cached.directory.max-count` | FSO Bucket 递归评估时内存中缓存的最大目录数，超出此限制时本次评估将中止。 |
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `ozone.lifecycle.service.enabled` | `false` | 是否启用生命周期管理服务。 |
+| `ozone.lifecycle.service.interval` | `24h` | 生命周期管理服务的扫描间隔。 |
+| `ozone.lifecycle.service.timeout` | `2h` | 生命周期评估任务的超时阈值。该配置不会中断正在执行的任务，仅当单个 Bucket 的评估任务实际执行时间超过该值时，在任务结束后打印 WARN 级别日志以便运维排查。 |
+| `ozone.lifecycle.service.workers` | `5` | 生命周期管理服务的工作线程数，必须大于 0。每个 Bucket 由一个线程负责检查和处理，最多同时处理的 Bucket 数等于该值，其余 Bucket 将排队等待。设置过高会增加 OM 上并发 RocksDB 读写和 Ratis 请求的压力，可能影响集群性能。 |
+| `ozone.lifecycle.service.delete.batch-size` | `1000` | 单次批量删除请求中包含的最大对象数。每批 Key 会封装为一次 Ratis 删除请求提交到 OM，过大的批次会增大单次 Ratis 日志条目的大小并占用更多内存，不建议超过 1000。 |
+| `ozone.lifecycle.service.move.to.trash.enabled` | `true` | 启用时将过期对象移入回收站，禁用时直接删除。OBS Bucket 不适用。 |
+| `ozone.lifecycle.service.delete.cached.directory.max-count` | `1000000` | FSO Bucket 递归评估时内存中缓存的最大目录数，超出此限制时本次评估将中止。 |
 
 ## 管理操作
 
@@ -347,7 +347,6 @@ ozone admin om lifecycle resume [-id=<omServiceId>] [-host=<omHost>]
 - 在 OM HA 模式下，只有 Leader OM 会执行生命周期评估任务。
 - 对于 FSO Bucket，目录只有在其所有子文件和子目录都已过期的情况下才会被标记为过期并删除。
 - 对于 FSO Bucket 使用 Prefix 时，如果 Prefix 不以 `/` 结尾，则会同时匹配名称相同的目录及以该前缀开头的同级目录（如 `dir` 同时匹配 `dir` 和 `dir1`）。
-- 当 OM RocksDB 中存在无效的生命周期配置时，服务会跳过该配置并记录错误日志，不会影响其他 Bucket 的处理。
 
 ### OM Leader 切换对生命周期服务的影响
 
@@ -355,7 +354,6 @@ ozone admin om lifecycle resume [-id=<omServiceId>] [-host=<omHost>]
 
 1. 旧 Leader 上正在运行的生命周期评估任务会被中断。
 2. 新 Leader 当选后，会重新从头启动生命周期服务，已经评估过的 Bucket 不会被跳过，任务将从第一个 Bucket 重新开始。
-3. 如果 `ozone.lifecycle.service.run.interval` 配置为较大值（例如默认的 `24h`），Transfer Leader 后新一轮任务可能要到第二天才会被调度执行。
 
 因此，在频繁进行 Leader 切换的场景下，建议关注生命周期服务的实际执行情况，确保过期对象能被及时清理。
 

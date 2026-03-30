@@ -301,15 +301,15 @@ The lifecycle service is disabled by default and must be explicitly enabled in `
 
 The following table lists all related configuration properties:
 
-| Property | Description |
-|----------|-------------|
-| `ozone.lifecycle.service.enabled` | Whether to enable the lifecycle management service. |
-| `ozone.lifecycle.service.interval` | The scan interval of the lifecycle management service. |
-| `ozone.lifecycle.service.timeout` | The timeout threshold for lifecycle evaluation tasks. This setting does not interrupt a running task. It only prints a WARN-level log after a task completes if the actual execution time of a single bucket's evaluation exceeds this value. |
-| `ozone.lifecycle.service.workers` | The number of worker threads for the lifecycle management service. Must be greater than 0. Each bucket is handled by one thread. The maximum number of buckets processed concurrently equals this value; remaining buckets are queued. Setting this too high increases concurrent RocksDB reads/writes and Ratis request pressure on the OM, potentially affecting cluster performance. |
-| `ozone.lifecycle.service.delete.batch-size` | The maximum number of objects included in a single batch delete request. Each batch of keys is packaged into a single Ratis delete request submitted to the OM. Excessively large batches increase the size of individual Ratis log entries and consume more memory. It is not recommended to exceed 1000. |
-| `ozone.lifecycle.service.move.to.trash.enabled` | When enabled, expired objects are moved to trash; when disabled, they are deleted directly. Not applicable to OBS buckets. |
-| `ozone.lifecycle.service.delete.cached.directory.max-count` | The maximum number of directories cached in memory during recursive evaluation of FSO buckets. The current evaluation will be aborted if this limit is exceeded. |
+| Property | Default | Description |
+|----------|---------|-------------|
+| `ozone.lifecycle.service.enabled` | `false` | Whether to enable the lifecycle management service. |
+| `ozone.lifecycle.service.interval` | `24h` | The scan interval of the lifecycle management service. |
+| `ozone.lifecycle.service.timeout` | `2h` | The timeout threshold for lifecycle evaluation tasks. This setting does not interrupt a running task. It only prints a WARN-level log after a task completes if the actual execution time of a single bucket's evaluation exceeds this value. |
+| `ozone.lifecycle.service.workers` | `5` | The number of worker threads for the lifecycle management service. Must be greater than 0. Each bucket is handled by one thread. The maximum number of buckets processed concurrently equals this value; remaining buckets are queued. Setting this too high increases concurrent RocksDB reads/writes and Ratis request pressure on the OM, potentially affecting cluster performance. |
+| `ozone.lifecycle.service.delete.batch-size` | `1000` | The maximum number of objects included in a single batch delete request. Each batch of keys is packaged into a single Ratis delete request submitted to the OM. Excessively large batches increase the size of individual Ratis log entries and consume more memory. It is not recommended to exceed 1000. |
+| `ozone.lifecycle.service.move.to.trash.enabled` | `true` | When enabled, expired objects are moved to trash; when disabled, they are deleted directly. Not applicable to OBS buckets. |
+| `ozone.lifecycle.service.delete.cached.directory.max-count` | `1000000` | The maximum number of directories cached in memory during recursive evaluation of FSO buckets. The current evaluation will be aborted if this limit is exceeded. |
 
 ## Administrative Operations
 
@@ -348,7 +348,6 @@ ozone admin om lifecycle resume [-id=<omServiceId>] [-host=<omHost>]
 - In OM HA mode, only the leader OM executes lifecycle evaluation tasks.
 - For FSO buckets, a directory is only marked as expired and deleted if all its child files and subdirectories have expired.
 - For FSO buckets using Prefix, if the Prefix does not end with `/`, it will match both the directory with the exact name and sibling directories starting with the same prefix (e.g., `dir` matches both `dir` and `dir1`).
-- If an invalid lifecycle configuration exists in the OM RocksDB, the service will skip that configuration and log an error without affecting the processing of other buckets.
 
 ### Impact of OM Leader Transfer on the Lifecycle Service
 
@@ -356,7 +355,6 @@ In an OM HA deployment, the lifecycle service only runs on the leader OM. When a
 
 1. The lifecycle evaluation tasks running on the old leader will be interrupted.
 2. After the new leader is elected, the lifecycle service restarts from the beginning. Previously evaluated buckets are not skipped, and the task starts over from the first bucket.
-3. If `ozone.lifecycle.service.run.interval` is set to a large value (e.g., the default `24h`), the next round of tasks may not be scheduled until the following day after a leader transfer.
 
 Therefore, in scenarios with frequent leader transfers, it is recommended to monitor the actual execution of the lifecycle service to ensure expired objects are cleaned up in a timely manner.
 
