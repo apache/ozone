@@ -72,6 +72,8 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadat
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeUnhealthyContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeUnhealthySummary;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
@@ -810,6 +812,146 @@ public class ContainerEndpoint {
       response.put("lastKey", null);
     }
     response.put("containerDiscrepancyInfo", containerDiscrepancyInfoList);
+    return Response.ok(response).build();
+  }
+
+  /**
+   * Return a summary of unhealthy containers grouped by DataNode.
+   * For each DataNode, the response includes a breakdown of unhealthy
+   * container counts by state (MISSING, UNDER_REPLICATED, etc.).
+   *
+   * @param state Optional filter: only count containers in this state.
+   * @param limit Max number of unhealthy containers to scan for aggregation.
+   * @return {@link Response} containing a list of {@link DatanodeUnhealthySummary}.
+   */
+  @GET
+  @Path("/unhealthy/byDatanode")
+  public Response getUnhealthyContainersByDatanode(
+      @QueryParam("state") String state,
+      @DefaultValue("0") @QueryParam(RECON_QUERY_LIMIT) int limit) {
+
+    ContainerSchemaDefinition.UnHealthyContainerStates containerState = null;
+    if (StringUtils.isNotEmpty(state)) {
+      try {
+        containerState = ContainerSchemaDefinition
+            .UnHealthyContainerStates.valueOf(state);
+      } catch (IllegalArgumentException e) {
+        throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+      }
+    }
+
+    final int effectiveLimit = (limit <= 0 || limit > maxCsvExportRecords)
+        ? maxCsvExportRecords : limit;
+
+    // Fetch unhealthy containers from the DB
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> records =
+        containerHealthSchemaManager.getUnhealthyContainers(
+            containerState, 0L, 0L, effectiveLimit);
+
+    // Build DataNode -> Summary map
+    Map<String, DatanodeUnhealthySummary> dnSummaryMap = new HashMap<>();
+
+    for (ContainerHealthSchemaManager.UnhealthyContainerRecord record : records) {
+      long containerID = record.getContainerId();
+      String containerStateStr = record.getContainerState();
+      try {
+        ContainerInfo containerInfo =
+            containerManager.getContainer(ContainerID.valueOf(containerID));
+        List<ContainerHistory> datanodes =
+            containerManager.getLatestContainerHistory(containerID,
+                containerInfo.getReplicationConfig().getRequiredNodes());
+
+        for (ContainerHistory dn : datanodes) {
+          String uuid = dn.getDatanodeUuid();
+          DatanodeUnhealthySummary summary = dnSummaryMap.computeIfAbsent(
+              uuid, k -> new DatanodeUnhealthySummary(uuid,
+                  dn.getDatanodeHost()));
+          summary.incrementStateCount(containerStateStr);
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to get container info/history for container {}",
+            containerID, e);
+      }
+    }
+
+    // Sort by total unhealthy count descending
+    List<DatanodeUnhealthySummary> summaries = dnSummaryMap.values().stream()
+        .sorted(Comparator.comparingInt(
+            DatanodeUnhealthySummary::getTotalUnhealthyContainers).reversed())
+        .collect(Collectors.toList());
+
+    Map<String, Object> response = new HashMap<>();
+    response.put("datanodes", summaries);
+    return Response.ok(response).build();
+  }
+
+  /**
+   * Return unhealthy containers for a specific DataNode.
+   * The response includes the full container metadata for each unhealthy
+   * container whose replica history includes the given DataNode.
+   *
+   * @param datanodeUuid The UUID of the DataNode to query.
+   * @param state Optional filter by unhealthy state.
+   * @param limit Max number of containers to scan.
+   * @return {@link Response} containing {@link DatanodeUnhealthyContainersResponse}.
+   */
+  @GET
+  @Path("/unhealthy/byDatanode/{uuid}")
+  public Response getUnhealthyContainersForDatanode(
+      @PathParam("uuid") String datanodeUuid,
+      @QueryParam("state") String state,
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+      int limit) {
+
+    ContainerSchemaDefinition.UnHealthyContainerStates containerState = null;
+    if (StringUtils.isNotEmpty(state)) {
+      try {
+        containerState = ContainerSchemaDefinition
+            .UnHealthyContainerStates.valueOf(state);
+      } catch (IllegalArgumentException e) {
+        throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+      }
+    }
+
+    final int effectiveLimit = (limit <= 0 || limit > maxCsvExportRecords)
+        ? maxCsvExportRecords : limit;
+
+    // Fetch all unhealthy containers
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> records =
+        containerHealthSchemaManager.getUnhealthyContainers(
+            containerState, 0L, 0L, effectiveLimit);
+
+    // Filter to containers that have this DataNode in their replica history
+    List<UnhealthyContainerMetadata> matchingContainers = new ArrayList<>();
+    String datanodeHost = "N/A";
+
+    for (ContainerHealthSchemaManager.UnhealthyContainerRecord record : records) {
+      try {
+        UnhealthyContainerMetadata meta = toUnhealthyMetadata(record);
+        boolean hasDatanode = meta.getReplicas() != null
+            && meta.getReplicas().stream()
+            .anyMatch(r -> datanodeUuid.equals(r.getDatanodeUuid()));
+
+        if (hasDatanode) {
+          matchingContainers.add(meta);
+          // Get the hostname from the first match
+          if ("N/A".equals(datanodeHost)) {
+            datanodeHost = meta.getReplicas().stream()
+                .filter(r -> datanodeUuid.equals(r.getDatanodeUuid()))
+                .map(ContainerHistory::getDatanodeHost)
+                .findFirst().orElse("N/A");
+          }
+        }
+      } catch (UncheckedIOException e) {
+        LOG.warn("Failed to get metadata for container {}",
+            record.getContainerId(), e);
+      }
+    }
+
+    DatanodeUnhealthyContainersResponse response =
+        new DatanodeUnhealthyContainersResponse(
+            datanodeUuid, datanodeHost,
+            matchingContainers.size(), matchingContainers);
     return Response.ok(response).build();
   }
 }

@@ -24,11 +24,16 @@ import React, {
 import moment from 'moment';
 import {
   Button,
-  Modal
+  Card,
+  Modal,
+  Table,
+  Tag,
+  Tooltip
 } from 'antd';
 import {
   DeleteOutlined,
   WarningFilled,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { ValueType } from 'react-select';
 
@@ -45,7 +50,9 @@ import {
   DatanodeDecomissionInfo,
   DatanodeResponse,
   DatanodesResponse,
-  DatanodesState
+  DatanodesState,
+  DatanodeUnhealthySummary,
+  DatanodeUnhealthyByDatanodeResponse
 } from '@/v2/types/datanode.types';
 
 import './datanodes.less'
@@ -76,6 +83,22 @@ const SearchableColumnOpts = [{
 
 let decommissionUuids: string | string[] = [];
 const COLUMN_UPDATE_DECOMMISSIONING = 'DECOMMISSIONING';
+
+const STATE_COLORS: Record<string, string> = {
+  'MISSING': '#ff4d4f',
+  'UNDER_REPLICATED': '#fa8c16',
+  'OVER_REPLICATED': '#1890ff',
+  'MIS_REPLICATED': '#722ed1',
+  'REPLICA_MISMATCH': '#eb2f96'
+};
+
+const STATE_LABELS: Record<string, string> = {
+  'MISSING': 'Missing',
+  'UNDER_REPLICATED': 'Under-Replicated',
+  'OVER_REPLICATED': 'Over-Replicated',
+  'MIS_REPLICATED': 'Mis-Replicated',
+  'REPLICA_MISMATCH': 'Mismatched'
+};
 
 const Datanodes: React.FC<{}> = () => {
 
@@ -117,6 +140,16 @@ const Datanodes: React.FC<{}> = () => {
       }
     }
   );
+
+  // Unhealthy containers by DataNode API
+  const unhealthyByDnAPI = useApiData<DatanodeUnhealthyByDatanodeResponse>(
+    '/api/v1/containers/unhealthy/byDatanode',
+    { datanodes: [] },
+    {
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
   
   const loading = decommissionAPI.loading || datanodesAPI.loading || removeDatanodesAPI.loading;
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
@@ -143,6 +176,7 @@ const Datanodes: React.FC<{}> = () => {
     // Trigger both API hooks to refetch data
     decommissionAPI.refetch();
     datanodesAPI.refetch();
+    unhealthyByDnAPI.refetch();
   };
 
   // Process data when both APIs have loaded
@@ -216,6 +250,58 @@ const Datanodes: React.FC<{}> = () => {
 
   const { dataSource, lastUpdated, columnOptions } = state;
 
+  // Columns for the unhealthy containers by DataNode table
+  const unhealthyDnColumns = [
+    {
+      title: 'DataNode Host',
+      dataIndex: 'datanodeHost',
+      key: 'datanodeHost',
+      sorter: (a: DatanodeUnhealthySummary, b: DatanodeUnhealthySummary) =>
+        a.datanodeHost.localeCompare(b.datanodeHost),
+    },
+    {
+      title: 'Total Unhealthy',
+      dataIndex: 'totalUnhealthyContainers',
+      key: 'totalUnhealthyContainers',
+      defaultSortOrder: 'descend' as const,
+      sorter: (a: DatanodeUnhealthySummary, b: DatanodeUnhealthySummary) =>
+        a.totalUnhealthyContainers - b.totalUnhealthyContainers,
+      render: (count: number) => (
+        <span style={{ fontWeight: 600, color: count > 0 ? '#ff4d4f' : '#52c41a' }}>
+          {count}
+        </span>
+      ),
+    },
+    ...Object.keys(STATE_LABELS).map(stateKey => ({
+      title: STATE_LABELS[stateKey],
+      key: stateKey,
+      sorter: (a: DatanodeUnhealthySummary, b: DatanodeUnhealthySummary) =>
+        (a.stateCounts[stateKey] ?? 0) - (b.stateCounts[stateKey] ?? 0),
+      render: (_: any, record: DatanodeUnhealthySummary) => {
+        const count = record.stateCounts[stateKey] ?? 0;
+        return count > 0
+          ? <Tag color={STATE_COLORS[stateKey]}>{count}</Tag>
+          : <span style={{ color: '#bfbfbf' }}>0</span>;
+      },
+    })),
+    {
+      title: 'UUID',
+      dataIndex: 'datanodeUuid',
+      key: 'datanodeUuid',
+      ellipsis: true,
+      width: 180,
+      render: (uuid: string) => (
+        <Tooltip title={uuid}>
+          <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+            {uuid.substring(0, 8)}…
+          </span>
+        </Tooltip>
+      ),
+    },
+  ];
+
+  const unhealthyDnData = unhealthyByDnAPI.data?.datanodes ?? [];
+
   return (
     <>
       <div className='page-header-v2'>
@@ -277,6 +363,44 @@ const Datanodes: React.FC<{}> = () => {
             handleSelectionChange={handleSelectionChange}
             decommissionUuids={decommissionUuids}/>
         </div>
+
+        {/* Unhealthy Containers by DataNode Section */}
+        <div style={{ padding: '24px 0 0 0' }}>
+          <Card
+            title={
+              <span>
+                <ExclamationCircleOutlined style={{ color: '#fa8c16', marginRight: 8 }} />
+                Unhealthy Containers by DataNode
+              </span>
+            }
+            loading={unhealthyByDnAPI.loading}
+            extra={
+              <span style={{ color: '#8c8c8c', fontSize: '13px' }}>
+                {unhealthyDnData.length} DataNode(s) with unhealthy containers
+              </span>
+            }
+          >
+            {unhealthyDnData.length === 0 && !unhealthyByDnAPI.loading ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: '#8c8c8c' }}>
+                No unhealthy containers found across DataNodes.
+              </div>
+            ) : (
+              <Table
+                dataSource={unhealthyDnData}
+                columns={unhealthyDnColumns}
+                rowKey='datanodeUuid'
+                size='middle'
+                pagination={{
+                  pageSize: 20,
+                  showSizeChanger: true,
+                  showTotal: (total, range) =>
+                    `${range[0]}-${range[1]} of ${total} DataNodes`
+                }}
+              />
+            )}
+          </Card>
+        </div>
+
       </div>
       <Modal
           title=''
