@@ -276,13 +276,13 @@ public class ContainerManagerImpl implements ContainerManager {
         DatanodeInfo datanodeInfo = pipelineManager.getDatanodeInfo(node);
         if (datanodeInfo == null) {
           LOG.warn("DatanodeInfo not found for node {}", node.getUuidString());
-          continue;
+          return false;
         }
 
         List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
         if (storageReports == null || storageReports.isEmpty()) {
           LOG.warn("No storage reports for node {}", node.getUuidString());
-          continue;
+          return false;
         }
 
         // Calculate total capacity and effective allocatable space
