@@ -37,7 +37,7 @@ import picocli.CommandLine.Command;
  */
 @Command(
     name = "report",
-    description = "Get DiskBalancer volume density report and per volume info from dns.",
+    description = "Get DiskBalancer volume density report and per volume info from datanodes",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand {
