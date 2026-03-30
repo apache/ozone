@@ -112,7 +112,7 @@ public class TestScmHAFinalization {
   }
 
   @Test
-  public void testFinalizationWithLeaderChange() throws Exception {
+  public void testFinalization() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     init(conf, new DefaultUpgradeFinalizationExecutor<>(), 0);
     finalizationFuture.get();
