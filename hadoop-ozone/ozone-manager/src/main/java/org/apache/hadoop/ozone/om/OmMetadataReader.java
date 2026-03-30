@@ -32,6 +32,7 @@ import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.Server;
@@ -237,13 +238,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         if (isStsS3Request()) {
           // We need to be able to tell the difference between being able to download a file and merely seeing the file
           // name in a list.  Use READ for download ability and LIST (here) for listing.
-          // When keyName is empty (root listing), use listPrefix for auth if set (e.g. from S3 shallow list with
-          // prefix). Otherwise fall back to "*" which requires full bucket LIST permission.
+          // When listPrefix is set (original S3 ListObjects prefix), authorize LIST on that prefix for the whole
+          // listing, including FSO traversal where keyName is an internal directory (e.g. userA) under prefix user.
+          final String listPrefix = args.getListPrefix();
+          final String keyName = args.getKeyName();
           final String aclKey;
-          if (args.getKeyName() != null && !args.getKeyName().isEmpty()) {
-            aclKey = args.getKeyName();
-          } else if (args.getListPrefix() != null && !args.getListPrefix().isEmpty()) {
-            aclKey = args.getListPrefix();
+          if (StringUtils.isNotBlank(listPrefix)) {
+            if (StringUtils.isBlank(keyName)) {
+              aclKey = listPrefix;
+            } else if (isStsListPathUnderRequestPrefix(keyName, listPrefix)) {
+              aclKey = listPrefix;
+            } else {
+              throw new OMException(
+                  "STS listStatus: key path does not match authorized list prefix", ResultCodes.PERMISSION_DENIED);
+            }
+          } else if (keyName != null && !keyName.isEmpty()) {
+            aclKey = keyName;
           } else {
             aclKey = "*";
           }
@@ -363,17 +373,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
-            checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-            bucket.realVolume(), bucket.realBucket(), keyPrefix)
-        );
-
         if (isStsS3Request()) {
+          // Check with key null to ensure there is LIST permission on the bucket
+          captureLatencyNs(
+              perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
+                  ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(),
+                  null));
           // With STS we must check acl on the prefix to be compliant with AWS
           final String aclKey = (keyPrefix == null || keyPrefix.isEmpty()) ? "*" : keyPrefix;
           captureLatencyNs(
               perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
                   ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey));
+        } else {
+          captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
+              checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+                  bucket.realVolume(), bucket.realBucket(), keyPrefix)
+          );
         }
       }
       metrics.incNumKeyLists();
@@ -728,6 +743,25 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
   private boolean isStsS3Request() {
     return getS3Auth() != null && OzoneManager.getStsTokenIdentifier() != null;
+  }
+
+  /**
+   * For STS, {@code listPrefix} is the original S3 ListObjects prefix. Internal FSO listing may call
+   * {@code listStatus} with {@code keyName} set to a subdirectory (e.g. userA) while the session policy
+   * still authorizes only the request prefix (e.g. user). This returns true when {@code keyName} is the
+   * prefix itself, a key path under that prefix, or an ancestor directory on the way to a deeper prefix.
+   */
+  private static boolean isStsListPathUnderRequestPrefix(String keyName, String listPrefix) {
+    if (StringUtils.isBlank(listPrefix) || StringUtils.isBlank(keyName)) {
+      return false;
+    }
+    if (keyName.equals(listPrefix)) {
+      return true;
+    }
+    if (keyName.startsWith(listPrefix)) {
+      return true;
+    }
+    return listPrefix.startsWith(keyName + "/");
   }
 
   private ResourceType getResourceType(OmKeyArgs args) {

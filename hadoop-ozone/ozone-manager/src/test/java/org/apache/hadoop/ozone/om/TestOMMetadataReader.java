@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -47,6 +48,7 @@ import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -233,7 +235,53 @@ public class TestOMMetadataReader {
   }
 
   @Test
-  public void testListStatusKeyNameTakesPrecedenceOverListPrefix() throws Exception {
+  public void testListStatusUsesListPrefixForAclWhenKeyNameIsDescendantOfListPrefix() throws Exception {
+    setupStsS3Request();
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final KeyManager keyManager = createListStatusKeyManagerReturningEmpty();
+
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, keyManager);
+    final OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName("userA")
+        .setListPrefix("user")
+        .build();
+
+    final List<OzoneFileStatus> statuses = omMetadataReader.listStatus(args, false, "", MAX_KEYS, false);
+    assertTrue(statuses.isEmpty());
+
+    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
+    assertContainsVolumeReadCheck(checks);
+    assertContainsKeyListCheckWithName(checks, "user");
+  }
+
+  @Test
+  public void testListStatusUsesListPrefixForAclWhenKeyNameIsAncestorOfListPrefix() throws Exception {
+    setupStsS3Request();
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final KeyManager keyManager = createListStatusKeyManagerReturningEmpty();
+
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, keyManager);
+    final OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName("user")
+        .setListPrefix("user/foo")
+        .build();
+
+    final List<OzoneFileStatus> statuses = omMetadataReader.listStatus(args, false, "", MAX_KEYS, false);
+    assertTrue(statuses.isEmpty());
+
+    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
+    assertContainsVolumeReadCheck(checks);
+    assertContainsKeyListCheckWithName(checks, "user/foo");
+  }
+
+  @Test
+  public void testListStatusThrowsWhenStsKeyNameNotUnderListPrefix() throws Exception {
     setupStsS3Request();
 
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
@@ -247,12 +295,9 @@ public class TestOMMetadataReader {
         .setListPrefix("other/")
         .build();
 
-    final List<OzoneFileStatus> statuses = omMetadataReader.listStatus(args, false, "", MAX_KEYS, false);
-    assertTrue(statuses.isEmpty());
-
-    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
-    assertContainsVolumeReadCheck(checks);
-    assertContainsKeyListCheckWithName(checks, KEY_PREFIX);
+    final OMException ex = assertThrows(
+        OMException.class, () -> omMetadataReader.listStatus(args, false, "", MAX_KEYS, false));
+    assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
   }
 
   @Test
