@@ -239,6 +239,9 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
    * Runs on the incremental sync thread when configured.
    */
   private void refreshExpectedContainers() {
+    if (getSafeModeManager().isScmRatisApplyCaughtUpToCommit()) {
+      return;
+    }
     if (!validate()) {
       // iterate through open containers and check if any of them have moved to closed state
       for(ContainerID containerID : openContainers.keySet()) {

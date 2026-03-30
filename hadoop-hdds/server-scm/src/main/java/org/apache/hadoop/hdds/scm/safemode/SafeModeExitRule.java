@@ -68,6 +68,10 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
     return ruleName;
   }
 
+  protected final SCMSafeModeManager getSafeModeManager() {
+    return safeModeManager;
+  }
+
   /**
    * Return's the event type this safeMode exit rule handles.
    * @return TypedEvent
