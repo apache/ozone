@@ -58,10 +58,8 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
@@ -677,30 +675,6 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         scmDeadlineEpochMs);
   }
 
-  /**
-   * Record a pending container replication in the PendingContainerTracker.
-   * This prevents target DNs from being selected for more work when they
-   * already have pending replications that will consume space.
-   * 
-   * @param containerID The container being replicated
-   * @param target The target DataNode that will receive the replica
-   */
-  private void recordPendingReplication(ContainerID containerID, DatanodeDetails target) {
-    if (containerManager instanceof ContainerManagerImpl) {
-      try {
-        PendingContainerTracker tracker =
-            ((ContainerManagerImpl) containerManager).getPendingContainerTracker();
-        tracker.recordPendingAllocationForDatanode(target, containerID);
-        
-        LOG.debug("Recorded pending replication of container {} to DataNode {}",
-            containerID, target.getUuidString());
-      } catch (Exception e) {
-        LOG.warn("Failed to record pending replication of container {} to DataNode {}",
-            containerID, target.getUuidString(), e);
-      }
-    }
-  }
-
   private void adjustPendingOpsAndMetrics(ContainerInfo containerInfo,
       SCMCommand<?> cmd, DatanodeDetails targetDatanode,
       long scmDeadlineEpochMs) {
@@ -720,26 +694,20 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       final ByteString targetIndexes = rcc.getMissingContainerIndexes();
       long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
       for (int i = 0; i < targetIndexes.size(); i++) {
-        DatanodeDetails target = targets.get(i);
-        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), target,
+        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targets.get(i),
             targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
-        
-        // Track EC reconstruction in PendingContainerTracker
-        recordPendingReplication(containerInfo.containerID(), target);
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
       long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
 
-      DatanodeDetails replicationTarget;
       if (rcc.getTargetDatanode() == null) {
         /*
         This means the target will pull a replica from a source, so the
         op's target Datanode should be the Datanode this command is being
         sent to.
          */
-        replicationTarget = targetDatanode;
         containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targetDatanode,
             rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       } else {
@@ -747,13 +715,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         This means the source will push replica to the target, so the op's
         target Datanode should be the Datanode the replica will be pushed to.
          */
-        replicationTarget = rcc.getTargetDatanode();
         containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
             rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       }
-
-      // Track replication in PendingContainerTracker to prevent space exhaustion
-      recordPendingReplication(containerInfo.containerID(), replicationTarget);
 
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcReplicationCmdsSentTotal();
