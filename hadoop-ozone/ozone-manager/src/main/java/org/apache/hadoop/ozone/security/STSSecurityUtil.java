@@ -101,6 +101,8 @@ public final class STSSecurityUtil {
       secretKey = getValidatedSecretKey(secretKeyId, secretKeyClient);
       tokenId.setEncryptionKey(secretKey.getSecretKey().getEncoded());
       tokenId.readFromByteArray(tokenBytes);
+    } catch (OMException e) {
+      throw e;
     } catch (IOException e) {
       throw new SecretManager.InvalidToken("Invalid STS token - could not readFromByteArray: " + e.getMessage());
     }
@@ -122,7 +124,7 @@ public final class STSSecurityUtil {
   }
 
   private static ManagedSecretKey getValidatedSecretKey(UUID secretKeyId, SecretKeyClient secretKeyClient)
-      throws SecretManager.InvalidToken {
+      throws SecretManager.InvalidToken, OMException {
     if (secretKeyId == null) {
       throw new SecretManager.InvalidToken("STS token missing secret key ID");
     }
@@ -139,7 +141,9 @@ public final class STSSecurityUtil {
     }
 
     if (secretKey.isExpired()) {
-      throw new SecretManager.InvalidToken("Token cannot be verified due to expired secret key " + secretKeyId);
+      throw new OMException(
+          "Token cannot be verified due to expired secret key: " + secretKeyId + " Token expired at " +
+              secretKey.getExpiryTime(), TOKEN_EXPIRED);
     }
 
     return secretKey;

@@ -238,6 +238,8 @@ public class TestSTSSecurityUtil {
     // Create a mock secret key that is expired
     final ManagedSecretKey expiredSecretKey = mock(ManagedSecretKey.class);
     when(expiredSecretKey.isExpired()).thenReturn(true);
+    final Instant now = Instant.now();
+    when(expiredSecretKey.getExpiryTime()).thenReturn(now);
 
     final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
     when(mockKeyClient.getSecretKey(any())).thenReturn(expiredSecretKey);
@@ -246,9 +248,8 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() ->
         STSSecurityUtil.constructValidateAndDecryptSTSToken(validTokenString, mockKeyClient, clock))
         .isInstanceOf(OMException.class)
-        .hasMessage(
-            "Invalid STS token format: Invalid STS token - could not readFromByteArray: Token cannot be " +
-            "verified due to expired secret key " + secretKeyId);
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(TOKEN_EXPIRED))
+        .hasMessage("Token cannot be verified due to expired secret key: " + secretKeyId + " Token expired at " + now);
   }
 
   @Test
