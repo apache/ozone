@@ -437,7 +437,7 @@ Apache License 2.0
    org.jooq:jooq-codegen
    org.jooq:jooq-meta
    org.jspecify:jspecify
-   io.github.smengcl:rocksdbjni
+   org.rocksdb:rocksdbjni
    org.springframework:spring-beans
    org.springframework:spring-core
    org.springframework:spring-jdbc
