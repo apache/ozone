@@ -780,7 +780,7 @@ public class TestDiskBalancerSubCommands {
     VolumeReportProto vol1 = VolumeReportProto.newBuilder()
         .setStorageId("DISK-" + hostname + "-vol1")
         .setStoragePath(path1)
-        .setUtilization(idealUsage + random.nextDouble() * 0.1)
+        .setUtilization(util1)
         .setCommittedBytes(committed1)
         .setTotalCapacity(capacity1)
         .setUsedSpace(used1)
