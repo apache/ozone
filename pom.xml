@@ -204,9 +204,9 @@
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>3.0.0</restrict-imports.enforcer.version>
-    <rocksdbjni.groupId>org.rocksdb</rocksdbjni.groupId>
-    <rocksdb.version>10.10.1</rocksdb.version>
     <rocksdb.source.version>10.10.1</rocksdb.source.version>
+    <rocksdb.version>10.10.1</rocksdb.version>
+    <rocksdbjni.groupId>org.rocksdb</rocksdbjni.groupId>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
