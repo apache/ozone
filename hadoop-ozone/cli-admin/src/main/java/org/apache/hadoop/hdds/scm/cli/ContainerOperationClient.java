@@ -583,6 +583,11 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus(String upgradeClientID, boolean readonly) throws IOException {
+    return storageContainerLocationClient.queryUpgradeStatus(upgradeClientID, readonly);
+  }
+
+  @Override
   public DecommissionScmResponseProto decommissionScm(
       String scmId)
       throws IOException {

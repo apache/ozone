@@ -426,6 +426,13 @@ message UpgradeFinalizationStatus {
     repeated string messages = 2;
 }
 
+message UpgradeStatus {
+  required bool scmFinalized = 1;
+  required int32 numDatanodesFinalized = 2;
+  required int32 numDatanodesTotal = 3;
+  required bool shouldFinalize = 4;
+}
+
 /**
  * Information for Certificate Revocation List.
  */
