@@ -76,9 +76,9 @@ public final class HddsClientUtils {
       throw new IllegalArgumentException(resType + " name is null");
     }
 
-    boolean enforceLength = !resType.equals("bucket") || isStrictS3;
+    boolean applyS3LengthConstraint = !resType.equals("bucket") || isStrictS3;
 
-    if (enforceLength) {
+    if (applyS3LengthConstraint) {
       if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH) {
         throw new IllegalArgumentException(resType +
             " name '" + resName + "' is too short, " +
