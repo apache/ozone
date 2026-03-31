@@ -249,6 +249,22 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this(AclListBuilder.empty());
     }
 
+    @SuppressWarnings("checkstyle:parameternumber")
+    public Builder(String volumeName, String bucketName, String keyName,
+        long dataSize, ReplicationConfig replicationConfig,
+        Map<String, String> metadata, Map<String, String> tags,
+        boolean latestVersionLocation) {
+      this();
+      setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setDataSize(dataSize)
+          .setReplicationConfig(replicationConfig)
+          .addAllMetadataGdpr(metadata)
+          .addAllTags(tags)
+          .setLatestVersionLocation(latestVersionLocation);
+    }
+
     private Builder(AclListBuilder acls) {
       this.acls = acls;
       this.tags = MapBuilder.empty();
