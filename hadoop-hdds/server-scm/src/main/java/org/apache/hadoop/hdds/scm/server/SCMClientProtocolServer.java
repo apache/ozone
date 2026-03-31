@@ -1149,6 +1149,32 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus(String upgradeClientID, boolean readonly) throws IOException {
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("upgradeClientID", upgradeClientID);
+    auditMap.put("readonly", String.valueOf(readonly));
+
+    try {
+      if (!readonly) {
+        getScm().checkAdminAccess(getRemoteUser(), true);
+      }
+
+      // Returning a placeholder for now.
+      HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
+          .setScmFinalized(true)
+          .setNumDatanodesFinalized(10)
+          .setNumDatanodesTotal(10)
+          .setShouldFinalize(true)
+          .build();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, auditMap));
+      return result;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.QUERY_UPGRADE_STATUS, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
   public StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
