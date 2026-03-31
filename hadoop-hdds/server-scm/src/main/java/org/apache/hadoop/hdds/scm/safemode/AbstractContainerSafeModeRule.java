@@ -141,8 +141,8 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   }
 
   /**
-   * Aligns tracked open/closed sets with current {@link ContainerManager} state.
-   * Runs on the incremental sync thread when configured.
+   * Refreshes the expected container list when the rule is
+   * not yet validated and when there are pending transactions to be applied.
    */
   private void refreshExpectedContainers() {
     if (getSafeModeManager().isScmRatisApplyCaughtUpToCommit()) {
@@ -156,11 +156,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   @Override
   protected void cleanup() {
-    synchronized (this) {
-      if (containers != null) {
-        containers.clear();
-      }
-    }
+    getContainers().clear();
   }
 
   /**

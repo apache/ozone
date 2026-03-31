@@ -117,8 +117,7 @@ public final class HddsConfigKeys {
   public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT = "1m";
 
   /**
-   * Interval for background sync of open/closed container sets with ContainerManager
-   * in {@code AbstractContainerSafeModeRule}. 0 disables the background thread.
+   * Interval for background refresh of safeMode rules. 0 disables the background thread.
    */
   public static final String HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL =
       "hdds.scm.safemode.container.rule.incremental.sync.interval";
