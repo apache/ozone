@@ -27,6 +27,7 @@ import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -54,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -112,13 +114,48 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    LayoutVersion layoutVersion = LayoutVersion.newBuilder()
+    final LayoutVersion layoutVersion = LayoutVersion.newBuilder()
         .setVersion(ozoneManager.getVersionManager().getMetadataLayoutVersion())
         .build();
-    omRequest = getOmRequest().toBuilder()
+
+    final OMRequest.Builder requestBuilder = getOmRequest().toBuilder()
         .setUserInfo(getUserIfNotExists(ozoneManager))
-        .setLayoutVersion(layoutVersion).build();
+        .setLayoutVersion(layoutVersion);
+
+    if (requestBuilder.hasS3Authentication()) {
+      requestBuilder.setS3Authentication(
+          resolveS3Authentication(requestBuilder.getS3Authentication(), OzoneManager.getStsTokenIdentifier()));
+    }
+
+    omRequest = requestBuilder.build();
     return omRequest;
+  }
+
+  private static OzoneManagerProtocolProtos.S3Authentication resolveS3Authentication(
+      OzoneManagerProtocolProtos.S3Authentication s3Auth, STSTokenIdentifier stsTokenIdentifier) {
+    final OzoneManagerProtocolProtos.S3Authentication.Builder s3AuthBuilder = s3Auth.toBuilder();
+
+    if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty() && stsTokenIdentifier != null) {
+      s3AuthBuilder.setResolvedStsSessionPolicy(
+          StringUtils.defaultString(stsTokenIdentifier.getSessionPolicy()));
+      s3AuthBuilder.setResolvedStsRoleArn(
+          StringUtils.defaultString(stsTokenIdentifier.getRoleArn()));
+      s3AuthBuilder.setResolvedStsOriginalAccessKeyId(
+          StringUtils.defaultString(stsTokenIdentifier.getOriginalAccessKeyId()));
+      s3AuthBuilder.setResolvedStsTempAccessKeyId(
+          StringUtils.defaultString(stsTokenIdentifier.getTempAccessKeyId()));
+      final UUID secretKeyId = stsTokenIdentifier.getSecretKeyId();
+      s3AuthBuilder.setResolvedStsSecretKeyId(
+          secretKeyId != null ? secretKeyId.toString() : "");
+    } else {
+      s3AuthBuilder.clearResolvedStsSessionPolicy();
+      s3AuthBuilder.clearResolvedStsRoleArn();
+      s3AuthBuilder.clearResolvedStsOriginalAccessKeyId();
+      s3AuthBuilder.clearResolvedStsTempAccessKeyId();
+      s3AuthBuilder.clearResolvedStsSecretKeyId();
+    }
+
+    return s3AuthBuilder.build();
   }
 
   /**

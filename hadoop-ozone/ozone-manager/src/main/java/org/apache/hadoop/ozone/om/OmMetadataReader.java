@@ -234,8 +234,24 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-            bucket, args.getKeyName());
+        if (isStsS3Request()) {
+          // We need to be able to tell the difference between being able to download a file and merely seeing the file
+          // name in a list.  Use READ for download ability and LIST (here) for listing.
+          // When keyName is empty (root listing), use listPrefix for auth if set (e.g. from S3 shallow list with
+          // prefix). Otherwise fall back to "*" which requires full bucket LIST permission.
+          final String aclKey;
+          if (args.getKeyName() != null && !args.getKeyName().isEmpty()) {
+            aclKey = args.getKeyName();
+          } else if (args.getListPrefix() != null && !args.getListPrefix().isEmpty()) {
+            aclKey = args.getListPrefix();
+          } else {
+            aclKey = "*";
+          }
+          checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey);
+        } else {
+          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+              bucket, args.getKeyName());
+        }
       }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
@@ -277,8 +293,12 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-            bucket, args.getKeyName());
+        if (isStsS3Request()) {
+          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.LIST, bucket, args.getKeyName());
+        } else {
+          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+              bucket, args.getKeyName());
+        }
       }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
@@ -347,6 +367,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
             bucket.realVolume(), bucket.realBucket(), keyPrefix)
         );
+
+        if (isStsS3Request()) {
+          // With STS we must check acl on the prefix to be compliant with AWS
+          final String aclKey = (keyPrefix == null || keyPrefix.isEmpty()) ? "*" : keyPrefix;
+          captureLatencyNs(
+              perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
+                  ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey));
+        }
       }
       metrics.incNumKeyLists();
       return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
@@ -696,6 +724,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    */
   public boolean isNativeAuthorizerEnabled() {
     return accessAuthorizer.isNative();
+  }
+
+  private boolean isStsS3Request() {
+    return getS3Auth() != null && OzoneManager.getStsTokenIdentifier() != null;
   }
 
   private ResourceType getResourceType(OmKeyArgs args) {

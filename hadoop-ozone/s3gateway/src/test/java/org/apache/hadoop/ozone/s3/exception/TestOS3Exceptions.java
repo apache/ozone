@@ -47,4 +47,27 @@ public class TestOS3Exceptions {
         ex.getRequestId());
     assertEquals(expected, val);
   }
+
+  @Test
+  public void testOS3ExceptionWithToken0() {
+    OS3Exception ex = new OS3Exception("ExpiredToken", "The provided token has expired.", 403);
+    ex = S3ErrorTable.newError(ex, "resource");
+    ex.setRequestId(OzoneUtils.getRequestID());
+    ex.setHostId(OzoneUtils.getRequestID());
+    ex.setToken0("token-value");
+
+    final String val = ex.toXml();
+    final String formatString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n" +
+        "<Error>%n" +
+        "  <Code>%s</Code>%n" +
+        "  <Message>%s</Message>%n" +
+        "  <Resource>%s</Resource>%n" +
+        "  <RequestId>%s</RequestId>%n" +
+        "  <HostId>%s</HostId>%n" +
+        "  <Token-0>%s</Token-0>%n" +
+        "</Error>%n";
+    final String expected = String.format(formatString, ex.getCode(), ex.getErrorMessage(), ex.getResource(),
+        ex.getRequestId(), ex.getHostId(), ex.getToken0());
+    assertEquals(expected, val);
+  }
 }
