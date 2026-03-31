@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
@@ -62,7 +64,6 @@ import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -100,6 +101,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -141,6 +143,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
@@ -166,6 +169,7 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -300,6 +304,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case PrepareStatus:
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
+        break;
+      case Prepare:
+        PrepareResponse prepareResponse = prepare();
+        responseBuilder.setPrepareResponse(prepareResponse);
+        responseBuilder.setMessage("Prepare is no longer required in this version");
+        break;
+      case CancelPrepare:
+        CancelPrepareResponse cancelPrepareResponse = cancelPrepare();
+        responseBuilder.setCancelPrepareResponse(cancelPrepareResponse);
+        responseBuilder.setMessage("Cancel Prepare is no longer required in this version");
         break;
       case GetS3VolumeContext:
         GetS3VolumeContextResponse s3VolumeContextResponse =
@@ -1371,12 +1385,43 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
   }
 
-  private PrepareStatusResponse getPrepareStatus() {
-    OzoneManagerPrepareState.State prepareState =
-        impl.getPrepareState().getState();
+  private PrepareStatusResponse getPrepareStatus() throws IOException {
+    UserGroupInformation ugi = getRemoteUser();
+    if (!impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi +
+          ". Superuser privilege is required to get prepare status for OM.", PERMISSION_DENIED);
+    }
+
+    // Prepare is no longer used, always return PREPARE_COMPLETED for backward compatibility
     return PrepareStatusResponse.newBuilder()
-        .setStatus(prepareState.getStatus())
-        .setCurrentTxnIndex(prepareState.getIndex()).build();
+        .setStatus(PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED)
+        .setCurrentTxnIndex(0).build();
+  }
+
+  private PrepareResponse prepare() throws IOException {
+    // Prepare functionality is no longer supported. An empty successful transaction is returned for compatibility
+    // with older clients and upgrade processes.
+    UserGroupInformation ugi = getRemoteUser();
+    if (!impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi
+          + ". Superuser privilege is required to prepare OM.", PERMISSION_DENIED);
+    }
+
+    return PrepareResponse.newBuilder()
+        .setTxnID(0)  // Dummy transaction ID
+        .build();
+  }
+
+  private CancelPrepareResponse cancelPrepare() throws IOException {
+    // Cancel Prepare functionality is no longer supported. An empty successful transaction is returned for
+    // compatibility with older clients and upgrade processes.
+    UserGroupInformation ugi = getRemoteUser();
+    if (!impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi
+          + ". Superuser privilege is required to cancel prepare for OM.", PERMISSION_DENIED);
+    }
+
+    return CancelPrepareResponse.newBuilder().build();
   }
 
   private GetS3VolumeContextResponse getS3VolumeContext()

@@ -27,3 +27,4 @@ Prepare Ozone Manager
     ${service_id} =      Get OM Service ID
     Pass Execution If    '${service_id}' == ''    OM prepare skipped in non-HA
     Wait Until Keyword Succeeds      3min       10sec     Prepare OM
+
