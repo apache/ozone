@@ -290,8 +290,9 @@ public final class MoveManager implements
    *                   otherwise {@link MoveResult#REPLICATION_NOT_HEALTHY_AFTER_MOVE}
    * @return null if this phase passes, or the result to fail the move with
    */
-  private MoveResult validateReplicationForMovePhase(ContainerHealthResult.HealthState healthState, HddsProtos.LifeCycleState lifecycleState,
-      Set<ContainerReplica> replicas, ContainerInfo containerInfo, boolean beforeMove) {
+  private MoveResult validateReplicationForMovePhase(ContainerHealthResult.HealthState healthState, 
+      HddsProtos.LifeCycleState lifecycleState, Set<ContainerReplica> replicas, 
+      ContainerInfo containerInfo, boolean beforeMove) {
     if (healthState == ContainerHealthResult.HealthState.HEALTHY) {
       return null;
     }
@@ -300,11 +301,13 @@ public final class MoveManager implements
         && (lifecycleState == HddsProtos.LifeCycleState.CLOSED
             || lifecycleState == HddsProtos.LifeCycleState.QUASI_CLOSED);
     if (!allowOverReplicatedNonStandard) {
-      return beforeMove ? MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE : MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE;
+      return beforeMove ? MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE : 
+          MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE;
     }
     if (lifecycleState == HddsProtos.LifeCycleState.CLOSED) {
       if (!hasMinClosedReplicas(containerInfo, replicas)) {
-        return beforeMove ? MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE : MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE;
+        return beforeMove ? MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE : 
+            MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE;
       }
     }
     return null;
@@ -414,7 +417,7 @@ public final class MoveManager implements
       ContainerHealthResult.HealthState futureHealthState = healthResult.getHealthState();
 
       // Allow deletion if future state is HEALTHY, or if it's OVER_REPLICATED
-      // and includeNonStandardContainers is enabled
+      // and includeNonStandardContainers is enabled (balancer can move over-replicated containers)
       if (futureHealthState == ContainerHealthResult.HealthState.HEALTHY ||
           (futureHealthState == ContainerHealthResult.HealthState.OVER_REPLICATED &&
            includeNonStandardContainers)) {
