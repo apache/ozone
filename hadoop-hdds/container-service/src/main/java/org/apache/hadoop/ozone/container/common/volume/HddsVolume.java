@@ -307,7 +307,7 @@ public class HddsVolume extends StorageVolume {
 
   @VisibleForTesting
   public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
-    if (getIoTestCount() == 0) {
+    if (!getDiskCheckEnabled()) {
       return VolumeCheckResult.HEALTHY;
     }
 

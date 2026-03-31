@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
@@ -194,7 +193,7 @@ public class TestStorageVolumeHealthChecks {
   public void testCheckIODisabled(StorageVolume.Builder<?> builder)
       throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setVolumeIOTestCount(0);
+    dnConf.setDiskCheckEnabled(false);
     CONF.setFromObject(dnConf);
 
     builder.conf(CONF);
@@ -214,46 +213,17 @@ public class TestStorageVolumeHealthChecks {
   }
 
   @Test
-  public void testCheckIODefaultConfigs() {
-    CONF.clear();
-    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    // Make sure default values are not invalid.
-    assertThat(dnConf.getVolumeIOFailureTolerance())
-        .isLessThan(dnConf.getVolumeIOTestCount());
-  }
-
-  @Test
   public void testCheckIOInvalidConfig() {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
 
-    // When failure tolerance is above test count, default values should be
-    // used.
-    dnConf.setVolumeIOTestCount(3);
     dnConf.setVolumeIOFailureTolerance(4);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration.class);
-    assertEquals(dnConf.getVolumeIOTestCount(),
-        DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-    assertEquals(dnConf.getVolumeIOFailureTolerance(),
-        DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
-
-    // When test count and failure tolerance are set to the same value,
-    // Default values should be used.
-    dnConf.setVolumeIOTestCount(2);
-    dnConf.setVolumeIOFailureTolerance(2);
-    CONF.setFromObject(dnConf);
-    dnConf = CONF.getObject(DatanodeConfiguration.class);
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT,
-        dnConf.getVolumeIOTestCount());
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
-        dnConf.getVolumeIOFailureTolerance());
+    assertEquals(4, dnConf.getVolumeIOFailureTolerance());
 
     // Negative test count should reset to default value.
-    dnConf.setVolumeIOTestCount(-1);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration .class);
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT,
-        dnConf.getVolumeIOTestCount());
 
     // Negative failure tolerance should reset to default value.
     dnConf.setVolumeIOFailureTolerance(-1);
@@ -308,7 +278,6 @@ public class TestStorageVolumeHealthChecks {
       int ioTestCount, int ioFailureTolerance, boolean... checkResults)
       throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setVolumeIOTestCount(ioTestCount);
     dnConf.setVolumeIOFailureTolerance(ioFailureTolerance);
     dnConf.setDiskCheckSlidingWindowTimeout(Duration.ofMillis(ioTestCount));
     CONF.setFromObject(dnConf);

@@ -89,8 +89,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
-  public static final int DISK_CHECK_IO_TEST_COUNT_DEFAULT = 3;
-
   public static final int DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT = 1;
 
   public static final int DISK_CHECK_FILE_SIZE_DEFAULT = 100;
@@ -352,18 +350,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
-  @Config(key = "hdds.datanode.disk.check.io.test.count",
-      defaultValue = "3",
-      type = ConfigType.INT,
+  @Config(key = "hdds.datanode.disk.check.io.test.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
       tags = { DATANODE },
-      description = "The number of IO tests required to determine if a disk " +
-          " has failed. Each disk check does one IO test. The volume will be " +
-          "failed if more than " +
-          "hdds.datanode.disk.check.io.failures.tolerated out of the last " +
-          "hdds.datanode.disk.check.io.test.count runs failed. Set to 0 " +
-          "to disable disk IO checks."
+      description = "The configuration to enable or disable disk IO checks."
   )
-  private int volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+  private boolean isDiskCheckEnabled = true;
 
   @Config(key = "hdds.datanode.disk.check.io.failures.tolerated",
       defaultValue = "1",
@@ -650,45 +643,21 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
-    if (volumeIOTestCount == 0) {
-      LOG.info("{} set to {}. Disk IO health tests have been disabled.",
-          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount);
+    if (!isDiskCheckEnabled) {
+      LOG.info("Disk IO health tests have been disabled.");
     } else {
-      if (volumeIOTestCount < 0) {
-        LOG.warn("{} must be greater than 0 but was set to {}." +
-                "Defaulting to {}",
-            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
-      }
-
       if (volumeIOFailureTolerance < 0) {
-        LOG.warn("{} must be greater than or equal to 0 but was set to {}. " +
-                "Defaulting to {}",
+        LOG.warn("{} must be greater than or equal to 0 but was set to {}. Defaulting to {}",
             DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
             DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
         volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
       }
 
-      if (volumeIOFailureTolerance >= volumeIOTestCount) {
-        LOG.warn("{} was set to {} but cannot be greater or equals to {} " +
-                "set to {}. Defaulting {} to {} and {} to {}",
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
-            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
-            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
-            DISK_CHECK_IO_TEST_COUNT_KEY, DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
-        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
-      }
-
       if (volumeHealthCheckFileSize < 1) {
-        LOG.warn(DISK_CHECK_FILE_SIZE_KEY +
-                "must be at least 1 byte and was set to {}. Defaulting to {}",
-            volumeHealthCheckFileSize,
+        LOG.warn("{} must be at least 1 byte and was set to {}. Defaulting to {}",
+            DISK_CHECK_FILE_SIZE_KEY, volumeHealthCheckFileSize,
             DISK_CHECK_FILE_SIZE_DEFAULT);
-        volumeHealthCheckFileSize =
-            DISK_CHECK_FILE_SIZE_DEFAULT;
+        volumeHealthCheckFileSize = DISK_CHECK_FILE_SIZE_DEFAULT;
       }
     }
 
@@ -707,20 +676,22 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     }
 
     if (diskCheckSlidingWindowTimeout.isNegative()) {
+      Duration defaultTimeout = Duration.ofMinutes(periodicDiskCheckIntervalMinutes).plus(diskCheckTimeout);
       LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
           DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY, diskCheckSlidingWindowTimeout,
           DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT);
-      diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
+      diskCheckSlidingWindowTimeout = defaultTimeout;
     }
 
     // Do not set window timeout <= periodic disk check interval period, or failures can be missed across sparse checks
     // e.g., every 120m interval with a 60m window rarely accumulates enough failed events
     if (diskCheckSlidingWindowTimeout.compareTo(Duration.ofMinutes(periodicDiskCheckIntervalMinutes)) < 0) {
+      Duration defaultTimeout = Duration.ofMinutes(periodicDiskCheckIntervalMinutes).plus(diskCheckTimeout);
       LOG.warn("{} must be greater than or equal to {} minutes and was set to {} minutes. Defaulting to {}",
           DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY, periodicDiskCheckIntervalMinutes,
           diskCheckSlidingWindowTimeout.toMinutes(),
-          DurationFormatUtils.formatDurationHMS(DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT.toMillis()));
-      diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
+          DurationFormatUtils.formatDurationHMS(defaultTimeout.toMillis()));
+      diskCheckSlidingWindowTimeout = defaultTimeout;
     }
 
     if (blockDeleteCommandWorkerInterval.isNegative()) {
@@ -898,14 +869,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     this.failedDbVolumesTolerated = failedVolumesTolerated;
   }
 
-  public int getVolumeIOTestCount() {
-    return volumeIOTestCount;
-  }
-
-  public void setVolumeIOTestCount(int testCount) {
-    this.volumeIOTestCount = testCount;
-  }
-
   public int getVolumeIOFailureTolerance() {
     return volumeIOFailureTolerance;
   }
@@ -940,6 +903,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setDiskCheckTimeout(Duration duration) {
     diskCheckTimeout = duration;
+  }
+
+  public void setDiskCheckEnabled(boolean diskCheckEnabled) {
+    isDiskCheckEnabled = diskCheckEnabled;
+  }
+
+  public boolean isDiskCheckEnabled() {
+    return isDiskCheckEnabled;
   }
 
   public Duration getDiskCheckSlidingWindowTimeout() {

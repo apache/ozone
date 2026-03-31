@@ -109,7 +109,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   If more than ioFailureTolerance IO checks fail out of the last ioTestCount
   tests run, then the volume is considered failed.
    */
-  private final int ioTestCount;
+  private final boolean isDiskCheckEnabled;
   private SlidingWindow ioTestSlidingWindow;
   private int healthCheckFileSize;
 
@@ -159,7 +159,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
       this.conf = b.conf;
       this.dnConf = conf.getObject(DatanodeConfiguration.class);
-      this.ioTestCount = dnConf.getVolumeIOTestCount();
+      this.isDiskCheckEnabled = dnConf.isDiskCheckEnabled();
       this.ioTestSlidingWindow = new SlidingWindow(dnConf.getVolumeIOFailureTolerance(),
           dnConf.getDiskCheckSlidingWindowTimeout(), b.getClock());
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
@@ -169,7 +169,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
-      this.ioTestCount = 0;
+      this.isDiskCheckEnabled = false;
       this.conf = null;
       this.dnConf = null;
     }
@@ -559,8 +559,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     return this.volumeSet;
   }
 
-  public int getIoTestCount() {
-    return ioTestCount;
+  public boolean getDiskCheckEnabled() {
+    return isDiskCheckEnabled;
   }
 
   public SlidingWindow getIoTestSlidingWindow() {
@@ -701,8 +701,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       return VolumeCheckResult.FAILED;
     }
 
-    // If IO test count is set to 0, IO tests for disk health are disabled.
-    if (ioTestCount == 0) {
+    if (!isDiskCheckEnabled) {
       return VolumeCheckResult.HEALTHY;
     }
 
