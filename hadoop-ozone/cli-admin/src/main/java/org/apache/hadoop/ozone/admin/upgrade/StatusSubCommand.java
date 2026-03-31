@@ -31,7 +31,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "status",
-    description = "Upgrade status of the cluster",
+    description = "Show status of the cluster upgrade",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class StatusSubCommand extends ScmSubcommand {
@@ -42,10 +42,10 @@ public class StatusSubCommand extends ScmSubcommand {
     HddsProtos.UpgradeStatus status = client.queryUpgradeStatus(upgradeClientID, true);
 
     // Temporary output to validate the command is working.
-    System.out.println("Update status:");
-    System.out.println("    SCM Finalized: " + status.getScmFinalized());
-    System.out.println("    Datanodes finalized: " + status.getNumDatanodesFinalized());
-    System.out.println("    Total Datanodes: " + status.getNumDatanodesTotal());
-    System.out.println("    Should Finalize: " + status.getShouldFinalize());
+    out().println("Update status:");
+    out().println("    SCM Finalized: " + status.getScmFinalized());
+    out().println("    Datanodes finalized: " + status.getNumDatanodesFinalized());
+    out().println("    Total Datanodes: " + status.getNumDatanodesTotal());
+    out().println("    Should Finalize: " + status.getShouldFinalize());
   }
 }

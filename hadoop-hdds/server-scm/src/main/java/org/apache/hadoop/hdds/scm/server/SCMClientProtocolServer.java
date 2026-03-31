@@ -1160,12 +1160,14 @@ public class SCMClientProtocolServer implements
       }
 
       // Returning a placeholder for now.
-      return HddsProtos.UpgradeStatus.newBuilder()
+      HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
           .setScmFinalized(true)
           .setNumDatanodesFinalized(10)
           .setNumDatanodesTotal(10)
           .setShouldFinalize(true)
           .build();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, auditMap));
+      return result;
     } catch (IOException ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.QUERY_UPGRADE_STATUS, auditMap, ex));
       throw ex;

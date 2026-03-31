@@ -427,10 +427,10 @@ message UpgradeFinalizationStatus {
 }
 
 message UpgradeStatus {
-  required bool scmFinalized = 1;
-  required int32 numDatanodesFinalized = 2;
-  required int32 numDatanodesTotal = 3;
-  required bool shouldFinalize = 4;
+  optional bool scmFinalized = 1;
+  optional int32 numDatanodesFinalized = 2;
+  optional int32 numDatanodesTotal = 3;
+  optional bool shouldFinalize = 4;
 }
 
 /**

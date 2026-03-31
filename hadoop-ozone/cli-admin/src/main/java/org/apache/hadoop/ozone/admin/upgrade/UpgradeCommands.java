@@ -27,7 +27,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "upgrade",
-    description = "Upgrade specific operations",
+    description = "Operations related to Ozone cluster upgrade",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
