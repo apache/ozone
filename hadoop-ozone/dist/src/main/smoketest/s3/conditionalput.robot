@@ -58,6 +58,11 @@ Conditional Put If-Match With Correct ETag Succeeds
                        Execute         echo "updated-content" > /tmp/${key}-updated
     ${result} =        Execute AWSS3APICli    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key}-updated --if-match ${etag}
                        Should contain    ${result}    ETag
+    ${new_etag} =      Evaluate    __import__('json').loads(r'''${result}''')['ETag'].strip('"')
+                       Should Not Be Equal    ${new_etag}    ${etag}
+    ${head_result} =   Execute AWSS3APICli    head-object --bucket ${BUCKET} --key ${key}
+    ${head_etag} =     Evaluate    __import__('json').loads(r'''${head_result}''')['ETag'].strip('"')
+                       Should Be Equal    ${head_etag}    ${new_etag}
 
 Conditional Put If-Match With Wrong ETag Fails
     [Documentation]    If-Match with wrong ETag should fail with 412
@@ -65,9 +70,13 @@ Conditional Put If-Match With Wrong ETag Fails
                        Execute         echo "initial-content" > /tmp/${key}
     ${result} =        Execute AWSS3APICli    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key}
                        Should contain    ${result}    ETag
+    ${etag} =          Evaluate    __import__('json').loads(r'''${result}''')['ETag'].strip('"')
     # Try to rewrite with a wrong ETag
     ${result} =        Execute AWSS3APICli and ignore error    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key} --if-match wrong-etag
                        Should contain    ${result}    PreconditionFailed
+    ${head_result} =   Execute AWSS3APICli    head-object --bucket ${BUCKET} --key ${key}
+    ${head_etag} =     Evaluate    __import__('json').loads(r'''${head_result}''')['ETag'].strip('"')
+                       Should Be Equal    ${head_etag}    ${etag}
 
 Conditional Put If-Match On Non-Existent Key Fails
     [Documentation]    If-Match on a key that does not exist should fail with 412
@@ -75,3 +84,6 @@ Conditional Put If-Match On Non-Existent Key Fails
                        Execute         echo "test-content" > /tmp/${key}
     ${result} =        Execute AWSS3APICli and ignore error    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key} --if-match some-etag
                        Should contain    ${result}    PreconditionFailed
+    ${head_result} =   Execute AWSS3APICli and ignore error    head-object --bucket ${BUCKET} --key ${key}
+                       Should contain    ${head_result}    404
+                       Should contain    ${head_result}    Not Found

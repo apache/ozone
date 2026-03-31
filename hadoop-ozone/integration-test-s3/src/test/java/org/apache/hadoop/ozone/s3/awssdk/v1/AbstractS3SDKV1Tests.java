@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -431,6 +432,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     PutObjectResult putObjectResult2 = s3Client.putObject(bucketName, keyName, is2, metadata);
     assertNotNull(putObjectResult2.getETag());
+    assertNotEquals(etag, putObjectResult2.getETag());
+
+    ObjectMetadata updatedObjectMetadata = s3Client.getObjectMetadata(bucketName, keyName);
+    assertEquals(putObjectResult2.getETag(), updatedObjectMetadata.getETag());
   }
 
   @Test
@@ -441,7 +446,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     s3Client.createBucket(bucketName);
 
     InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    PutObjectResult initialResult =
+        s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
 
     InputStream is2 = new ByteArrayInputStream("bar2".getBytes(StandardCharsets.UTF_8));
     ObjectMetadata metadata = new ObjectMetadata();
@@ -453,6 +459,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(412, ase.getStatusCode());
     assertEquals("PreconditionFailed", ase.getErrorCode());
+
+    ObjectMetadata existingObjectMetadata = s3Client.getObjectMetadata(bucketName, keyName);
+    assertEquals(initialResult.getETag(), existingObjectMetadata.getETag());
   }
 
   @Test
@@ -472,6 +481,12 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(412, ase.getStatusCode());
     assertEquals("PreconditionFailed", ase.getErrorCode());
+
+    AmazonServiceException missingKey = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(bucketName, keyName));
+    assertEquals(ErrorType.Client, missingKey.getErrorType());
+    assertEquals(404, missingKey.getStatusCode());
+    assertEquals("NoSuchKey", missingKey.getErrorCode());
   }
 
   @Test
