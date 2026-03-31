@@ -207,7 +207,7 @@ public final class OMConfigKeys {
       "ozone.om.ratis.log.purge.gap";
   public static final int OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
   public static final String OZONE_OM_RATIS_LOG_APPEND_ENTRIES_COMPOSE_ENABLED =
-      "ozone.om.ratis.log.append-entries.compose.enabled";
+      "ozone.om.ratis.raft.server.log.append-entries.compose.enabled";
   public static final boolean
       OZONE_OM_RATIS_LOG_APPEND_ENTRIES_COMPOSE_ENABLED_DEFAULT = false;
   public static final String OZONE_OM_RATIS_LOG_PURGE_UPTO_SNAPSHOT_INDEX
