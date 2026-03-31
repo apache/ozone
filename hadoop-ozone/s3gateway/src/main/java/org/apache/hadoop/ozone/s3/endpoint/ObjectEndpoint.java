@@ -315,7 +315,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         final String amzContentSha256Header =
             validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
         try (OzoneOutputStream output = openKeyForPut(
-            volume.getName(), bucketName, bucket, keyPath, length,
+            volume.getName(), bucketName, keyPath, length,
             replicationConfig, customMetadata, tags, ifNoneMatch, ifMatch)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
@@ -1154,12 +1154,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
    * If-None-Match and If-Match headers.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private OzoneOutputStream openKeyForPut(String volumeName, String bucketName,
-      OzoneBucket bucket, String keyPath, long length,
+  private OzoneOutputStream openKeyForPut(String volumeName, String bucketName, String keyPath, long length,
       ReplicationConfig replicationConfig, Map<String, String> customMetadata,
       Map<String, String> tags, String ifNoneMatch, String ifMatch)
       throws IOException {
-    if (ifNoneMatch != null && "*".equals(ifNoneMatch.trim())) {
+    if (ifNoneMatch != null && "*".equals(stripQuotes(ifNoneMatch.trim()))) {
       return getClientProtocol().createKeyIfNotExists(
           volumeName, bucketName, keyPath, length, replicationConfig,
           customMetadata, tags);
@@ -1183,11 +1182,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     if (headerValue == null) {
       return null;
     }
-    String etag = headerValue.trim();
-    if (etag.startsWith("\"") && etag.endsWith("\"")) {
-      return etag.substring(1, etag.length() - 1);
-    }
-    return etag;
+    return stripQuotes(headerValue.trim());
   }
 
   /** Request context shared among {@code ObjectOperationHandler}s. */
