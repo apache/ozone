@@ -28,14 +28,11 @@ import {
 } from 'react-select';
 
 import { selectStyles } from "@/v2/constants/select.constants";
-import MultiSelectMenuList from './multiSelectMenuList';
+import MultiSelectMenuList, { MultiSelectInput, Option } from './multiSelectMenuList';
 
+export type { Option };
 
 // ------------- Types -------------- //
-export type Option = {
-  label: string;
-  value: string;
-}
 
 interface MultiSelectProps extends ReactSelectProps<Option, true> {
   options: Option[];
@@ -72,19 +69,6 @@ const OptionComponent: React.FC<OptionProps<Option, true>> = (props) => {
       </components.Option>
     </div>
   );
-};
-
-// Defined at module level so the reference is stable — no useMemo required.
-// Suppresses react-select's blur-driven menu close while the user interacts
-// with the search box inside the menu.
-// searchInteracting ref is passed through react-select's selectProps.
-const MultiSelectInput = ({ onBlur, ...inputProps }: any) => {
-  const { searchInteracting } = inputProps.selectProps ?? {};
-  const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
-    if (searchInteracting?.current) return;
-    if (onBlur) onBlur(e);
-  };
-  return <input {...inputProps} onBlur={handleBlur} />;
 };
 
 // ------------- Component -------------- //
