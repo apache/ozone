@@ -2311,6 +2311,14 @@ message S3Authentication {
     // If present, indicates this request uses STS temporary credentials
     // and carries the base64-encoded session token for validation.
     optional string sessionToken = 4;
+    // The following fields are resolved from the STS session token by OM.
+    // They are used to enforce STS session policies during Ratis apply.
+    // They must be written or cleared by the OM leader when the token is validated.
+    optional string resolvedStsSessionPolicy = 5;
+    optional string resolvedStsRoleArn = 6;
+    optional string resolvedStsOriginalAccessKeyId = 7;
+    optional string resolvedStsTempAccessKeyId = 8;
+    optional string resolvedStsSecretKeyId = 9;
 }
 
 message RecoverLeaseRequest {

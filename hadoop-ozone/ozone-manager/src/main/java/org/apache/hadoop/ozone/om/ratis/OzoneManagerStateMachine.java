@@ -55,6 +55,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -617,7 +619,29 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+    boolean isStsThreadLocalSet = false;
     try {
+      if (ozoneManager.isSecurityEnabled() && request.hasS3Authentication()) {
+        // STS token verification runs on the leader RPC path so we don't need to recheck here on the apply
+        // after the log is committed
+        STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+
+        final OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
+        if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
+          // ThreadLocal carries session policy for OmMetadataReader
+          final STSTokenIdentifier rehydratedTokenIdentifier = new STSTokenIdentifier(
+                  s3Auth.hasResolvedStsTempAccessKeyId() ? s3Auth.getResolvedStsTempAccessKeyId() : "",
+                  s3Auth.hasResolvedStsOriginalAccessKeyId() ? s3Auth.getResolvedStsOriginalAccessKeyId() : "",
+                  s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "",
+                  java.time.Instant.MAX, // ensure it deterministically is not expired
+                  "", // no secretAccessKey needed
+                  s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "",
+                  null // no encryption key needed
+              );
+          OzoneManager.setStsTokenIdentifier(rehydratedTokenIdentifier);
+          isStsThreadLocalSet = true;
+        }
+      }
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
@@ -636,6 +660,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
+    } finally {
+      if (isStsThreadLocalSet) {
+        OzoneManager.setStsTokenIdentifier(null);
+      }
     }
     return null;
   }

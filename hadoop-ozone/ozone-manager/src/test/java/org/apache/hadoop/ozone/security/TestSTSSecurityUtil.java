@@ -35,7 +35,10 @@ import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.TestClock;
@@ -238,6 +241,8 @@ public class TestSTSSecurityUtil {
     // Create a mock secret key that is expired
     final ManagedSecretKey expiredSecretKey = mock(ManagedSecretKey.class);
     when(expiredSecretKey.isExpired()).thenReturn(true);
+    final Instant now = Instant.now();
+    when(expiredSecretKey.getExpiryTime()).thenReturn(now);
 
     final SecretKeyClient mockKeyClient = mock(SecretKeyClient.class);
     when(mockKeyClient.getSecretKey(any())).thenReturn(expiredSecretKey);
@@ -372,5 +377,77 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
         .isInstanceOf(SecretManager.InvalidToken.class)
         .hasMessage("Invalid STS token - secretAccessKey is null/empty");
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsSuccess() throws Exception {
+    final String tokenString = tokenSecretManager.createSTSTokenString(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .setResolvedStsRoleArn(ROLE_ARN)
+        .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsMissingSessionToken() {
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureResolvedStsFieldsInvariants(request))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Resolved STS fields must be empty when sessionToken is not present");
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsMissingResolvedFields() throws Exception {
+    final String tokenString = tokenSecretManager.createSTSTokenString(
+        TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS,
+        SECRET_ACCESS_KEY, SESSION_POLICY, clock);
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureResolvedStsFieldsInvariants(request))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Resolved STS fields must be present when sessionToken is present");
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsNoS3Auth() throws Exception {
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .build();
+
+    // Should not throw
+    STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
   }
 }
