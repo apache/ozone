@@ -105,8 +105,6 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       LOG.trace("Invoking method {} on target {}", method, ratisHandler);
     }
 
-    final Object[] safeArgs = args != null ? args : new Object[0];
-
     try {
       switch (method.getAnnotation(Replicate.class).invocationType()) {
       case CLIENT:
@@ -115,9 +113,9 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       default:
         if (invoker != null) {
           return invoker.invokeRatisServer(
-              method.getName(), method.getParameterTypes(), safeArgs);
+              method.getName(), method.getParameterTypes(), args);
         }
-        return invokeRatisServer(method, safeArgs);
+        return invokeRatisServer(method, args);
       }
     } catch (Exception e) {
       throw translateException(e);
