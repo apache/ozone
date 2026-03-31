@@ -47,11 +47,8 @@
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
-    <codahale-metrics.version>3.0.2</codahale-metrics.version>
     <com.nimbusds.nimbus-jose-jwt.version>10.4</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
-    <commons-beanutils.version>1.11.0</commons-beanutils.version>
-    <commons-cli.version>1.8.0</commons-cli.version>
     <commons-codec.version>1.21.0</commons-codec.version>
     <commons-collections.version>4.5.0</commons-collections.version>
     <commons-compress.version>1.28.0</commons-compress.version>
@@ -61,16 +58,12 @@
     <commons-io.version>2.21.0</commons-io.version>
     <commons-lang3.version>3.20.0</commons-lang3.version>
     <commons-math3.version>3.6.1</commons-math3.version>
-    <commons-net.version>3.12.0</commons-net.version>
     <commons-text.version>1.15.0</commons-text.version>
     <commons-validator.version>1.10.1</commons-validator.version>
     <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
     <cyclonedx.version>2.9.1</cyclonedx.version>
-    <!-- the version of Hadoop declared in the version resources; can be overridden
-    so that Hadoop 3.x can declare itself a 2.x artifact. -->
-    <declared.hadoop.version>${hadoop.version}</declared.hadoop.version>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
     <derby.version>10.14.2.0</derby.version>
@@ -95,7 +88,6 @@
     <guice.version>6.0.0</guice.version>
     <hadoop.version>3.4.3</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
-    <hamcrest.version>2.2</hamcrest.version>
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <hdds.version>${ozone.version}</hdds.version>
     <hk2.version>2.6.1</hk2.version>
@@ -391,11 +383,6 @@
         <version>${vault.driver.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.codahale.metrics</groupId>
-        <artifactId>metrics-core</artifactId>
-        <version>${codahale-metrics.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.fasterxml.jackson.module</groupId>
         <artifactId>jackson-module-jaxb-annotations</artifactId>
         <version>${jackson2.version}</version>
@@ -515,23 +502,6 @@
         <version>${jersey.version}</version>
       </dependency>
       <dependency>
-        <groupId>commons-beanutils</groupId>
-        <artifactId>commons-beanutils</artifactId>
-        <version>${commons-beanutils.version}</version>
-        <exclusions>
-          <exclusion>
-            <!-- depend on jcl-over-slf4j instead -->
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>commons-cli</groupId>
-        <artifactId>commons-cli</artifactId>
-        <version>${commons-cli.version}</version>
-      </dependency>
-      <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
         <version>${commons-codec.version}</version>
@@ -545,11 +515,6 @@
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
         <version>${commons-io.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-net</groupId>
-        <artifactId>commons-net</artifactId>
-        <version>${commons-net.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-validator</groupId>
@@ -1593,11 +1558,6 @@
             <artifactId>jaxb-api</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.hamcrest</groupId>
-        <artifactId>hamcrest</artifactId>
-        <version>${hamcrest.version}</version>
       </dependency>
       <dependency>
         <groupId>org.jacoco</groupId>
