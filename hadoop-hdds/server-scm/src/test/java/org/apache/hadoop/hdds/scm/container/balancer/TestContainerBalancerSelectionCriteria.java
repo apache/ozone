@@ -189,6 +189,40 @@ public class TestContainerBalancerSelectionCriteria {
   }
 
   @Test
+  public void shouldExcludeOverReplicatedClosedReplicasWhenBelowMinClosedReplicas()
+      throws Exception {
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+
+    // Over-replicated with 2 CLOSED + 2 QUASI_CLOSED (RF=3): not enough CLOSED
+    // to satisfy min required; CLOSED replicas must not be movable.
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        CLOSED, 1L, OzoneConsts.GB, source, source.getID()));
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        CLOSED, 1L, OzoneConsts.GB, dn2, dn2.getID()));
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        QUASI_CLOSED, 1L, OzoneConsts.GB, dn3, dn3.getID()));
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        QUASI_CLOSED, 1L, OzoneConsts.GB, dn4, dn4.getID()));
+
+    when(containerManager.getContainerReplicas(containerID)).thenReturn(replicas);
+    when(replicationManager.getContainerReplicationHealth(eq(containerInfo), anySet()))
+        .thenReturn(new ContainerHealthResult.OverReplicatedHealthResult(containerInfo, 1, false));
+
+    balancerConfiguration.setIncludeNonStandardContainers(true);
+    ContainerBalancerSelectionCriteria configEnabled = new ContainerBalancerSelectionCriteria(
+        balancerConfiguration, nodeManager, replicationManager,
+        containerManager, findSourceStrategy, new HashMap<>());
+
+    assertTrue(configEnabled.shouldBeExcluded(containerID, source, 0L));
+    assertTrue(configEnabled.shouldBeExcluded(containerID, dn2, 0L));
+    assertTrue(configEnabled.shouldBeExcluded(containerID, dn3, 0L));
+    assertTrue(configEnabled.shouldBeExcluded(containerID, dn4, 0L));
+  }
+
+  @Test
   public void shouldExcludeEmptyQuasiClosedReplicas() throws Exception {
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
@@ -231,8 +265,7 @@ public class TestContainerBalancerSelectionCriteria {
     assertFalse(configEnabled.shouldBeExcluded(containerID, dn3, 0L));
 
     // Empty QUASI_CLOSED replica should be EXCLUDED
-    assertTrue(configEnabled.shouldBeExcluded(containerID, dn4, 0L),
-        "Empty QUASI_CLOSED replica should be excluded from balancing");
+    assertTrue(configEnabled.shouldBeExcluded(containerID, dn4, 0L));
   }
 
   @Test
@@ -258,9 +291,9 @@ public class TestContainerBalancerSelectionCriteria {
     when(containerManager.getContainerReplicas(quasiClosedContainerID)).thenReturn(quasiClosedReplicas);
     when(replicationManager.isContainerReplicatingOrDeleting(quasiClosedContainerID)).thenReturn(false);
     when(replicationManager.getContainerReplicationHealth(eq(quasiClosedContainer), anySet()))
-        .thenReturn(new ContainerHealthResult.OverReplicatedHealthResult(quasiClosedContainer, 1, false));
+        .thenReturn(new ContainerHealthResult.HealthyResult(quasiClosedContainer));
 
-    // Test 1: Config ENABLED - should allow balancing of QUASI_CLOSED container
+    // Test 1: Config ENABLED - should allow balancing of HEALTHY QUASI_CLOSED container
     balancerConfiguration.setIncludeNonStandardContainers(true);
     ContainerBalancerSelectionCriteria configEnabled = new ContainerBalancerSelectionCriteria(
         balancerConfiguration, nodeManager, replicationManager,
@@ -268,7 +301,7 @@ public class TestContainerBalancerSelectionCriteria {
 
     // All QUASI_CLOSED replicas can be moved because:
     // - Config is enabled
-    // - Container is QUASI_CLOSED
+    // - Container is QUASI_CLOSED and replication health is HEALTHY
     // - All replicas are non-empty QUASI_CLOSED (consistent state)
     assertFalse(configEnabled.shouldBeExcluded(quasiClosedContainerID, source, 0L));
     assertFalse(configEnabled.shouldBeExcluded(quasiClosedContainerID, dn2, 0L));

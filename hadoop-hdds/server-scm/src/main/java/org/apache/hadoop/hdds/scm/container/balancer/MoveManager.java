@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -177,19 +178,26 @@ public final class MoveManager implements
     synchronized (containerInfo) {
       final Set<ContainerReplica> currentReplicas = containerManager
           .getContainerReplicas(cid);
+      final HddsProtos.LifeCycleState lifecycleState = containerInfo.getState();
 
-      boolean srcExists = false;
+      ContainerReplica srcReplica = null;
       for (ContainerReplica r : currentReplicas) {
         if (r.getDatanodeDetails().equals(src)) {
-          srcExists = true;
+          srcReplica = r;
         }
         if (r.getDatanodeDetails().equals(tgt)) {
           ret.complete(MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET);
           return ret;
         }
       }
-      if (!srcExists) {
+      if (srcReplica == null) {
         ret.complete(MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE);
+        return ret;
+      }
+
+      if (srcReplica.getState() == ContainerReplicaProto.State.QUASI_CLOSED
+          && srcReplica.isEmpty()) {
+        ret.complete(MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE);
         return ret;
       }
 
@@ -206,13 +214,11 @@ public final class MoveManager implements
               currentReplicas);
       ContainerHealthResult.HealthState healthState = healthBeforeMove.getHealthState();
       
-      if (healthState != ContainerHealthResult.HealthState.HEALTHY) {
-        // Allow OVER_REPLICATED if config is enabled
-        if (!(healthState == ContainerHealthResult.HealthState.OVER_REPLICATED &&
-              includeNonStandardContainers)) {
-          ret.complete(MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE);
-          return ret;
-        }
+      MoveResult beforeHealth = validateReplicationForMovePhase(healthState, lifecycleState, 
+          currentReplicas, containerInfo, true);
+      if (beforeHealth != null) {
+        ret.complete(beforeHealth);
+        return ret;
       }
 
       /*
@@ -238,10 +244,8 @@ public final class MoveManager implements
       // Ensure the container is CLOSED
       // If includeNonStandardContainers is enabled and ALL replicas
       // are QUASI_CLOSED, allow moving QUASI_CLOSED containers
-      HddsProtos.LifeCycleState currentContainerStat = containerInfo.getState();
-      if (currentContainerStat != HddsProtos.LifeCycleState.CLOSED) {
-        // Allow QUASI_CLOSED if config is enabled and all replicas are QUASI_CLOSED
-        if (!isQuasiClosed(currentContainerStat, currentReplicas)) {
+      if (lifecycleState != HddsProtos.LifeCycleState.CLOSED) {
+        if (!isQuasiClosed(lifecycleState, currentReplicas)) {
           ret.complete(MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
           return ret;
         }
@@ -256,15 +260,11 @@ public final class MoveManager implements
           .getContainerReplicationHealth(containerInfo, replicasAfterMove);
       ContainerHealthResult.HealthState healthAfterMove = healthResult.getHealthState();
       
-      if (healthAfterMove != ContainerHealthResult.HealthState.HEALTHY) {
-        // Allow OVER_REPLICATED after move if config is enabled
-        // This allows balancing over-replicated containers
-        // ReplicationManager will handle the excess replica deletion separately
-        if (!(healthAfterMove == ContainerHealthResult.HealthState.OVER_REPLICATED &&
-              includeNonStandardContainers)) {
-          ret.complete(MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE);
-          return ret;
-        }
+      MoveResult afterHealth = validateReplicationForMovePhase(healthAfterMove, lifecycleState, 
+          replicasAfterMove, containerInfo, false);
+      if (afterHealth != null) {
+        ret.complete(afterHealth);
+        return ret;
       }
       startMove(containerInfo, src, tgt, ret);
       LOG.debug("Processed a move request for container {}, from {} to {}",
@@ -274,10 +274,47 @@ public final class MoveManager implements
   }
 
   private boolean isQuasiClosed(HddsProtos.LifeCycleState lifeCycleState, Set<ContainerReplica> replicas) {
-    return (lifeCycleState == HddsProtos.LifeCycleState.QUASI_CLOSED &&
-        includeNonStandardContainers &&
-        replicas.stream().allMatch(r ->
-            r.getState() == StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED));
+    return (includeNonStandardContainers &&
+            lifeCycleState == HddsProtos.LifeCycleState.QUASI_CLOSED &&
+            replicas.stream().allMatch(r ->
+                r.getState() == StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED));
+  }
+
+  /**
+   * Shared rules for replication health before scheduling a move and after projecting
+   * the replica set onto the target. If not HEALTHY,
+   * OVER_REPLICATED is allowed only with {@code includeNonStandardContainers} and CLOSED or
+   * QUASI_CLOSED lifecycle; minimum CLOSED replica count applies for CLOSED lifecycle only.
+   *
+   * @param beforeMove if true, use {@link MoveResult#REPLICATION_NOT_HEALTHY_BEFORE_MOVE};
+   *                   otherwise {@link MoveResult#REPLICATION_NOT_HEALTHY_AFTER_MOVE}
+   * @return null if this phase passes, or the result to fail the move with
+   */
+  private MoveResult validateReplicationForMovePhase(ContainerHealthResult.HealthState healthState, HddsProtos.LifeCycleState lifecycleState,
+      Set<ContainerReplica> replicas, ContainerInfo containerInfo, boolean beforeMove) {
+    if (healthState == ContainerHealthResult.HealthState.HEALTHY) {
+      return null;
+    }
+    boolean allowOverReplicatedNonStandard = includeNonStandardContainers
+        && healthState == ContainerHealthResult.HealthState.OVER_REPLICATED
+        && (lifecycleState == HddsProtos.LifeCycleState.CLOSED
+            || lifecycleState == HddsProtos.LifeCycleState.QUASI_CLOSED);
+    if (!allowOverReplicatedNonStandard) {
+      return beforeMove ? MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE : MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE;
+    }
+    if (lifecycleState == HddsProtos.LifeCycleState.CLOSED) {
+      if (!hasMinClosedReplicas(containerInfo, replicas)) {
+        return beforeMove ? MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE : MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE;
+      }
+    }
+    return null;
+  }
+
+  private static boolean hasMinClosedReplicas(ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
+    long count = replicas.stream()
+        .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
+        .count();
+    return count >= containerInfo.getReplicationConfig().getRequiredNodes();
   }
 
   /**
@@ -377,7 +414,7 @@ public final class MoveManager implements
       ContainerHealthResult.HealthState futureHealthState = healthResult.getHealthState();
 
       // Allow deletion if future state is HEALTHY, or if it's OVER_REPLICATED
-      // and includeNonStandardContainers is enabled (balancer can move over-replicated containers)
+      // and includeNonStandardContainers is enabled
       if (futureHealthState == ContainerHealthResult.HealthState.HEALTHY ||
           (futureHealthState == ContainerHealthResult.HealthState.OVER_REPLICATED &&
            includeNonStandardContainers)) {

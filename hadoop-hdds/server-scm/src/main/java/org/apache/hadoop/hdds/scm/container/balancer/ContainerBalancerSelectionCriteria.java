@@ -154,6 +154,12 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
+   * <p>
+   * If {@link ContainerBalancerConfiguration#getIncludeNonStandardContainers()}
+   * is enabled, non-standard containers will also be included:
+   * - OVER_REPLICATED CLOSED containers (subject to minimum CLOSED replica checks)
+   * - OVER_REPLICATED and HEALTHY QUASI_CLOSED containers (subject to all QUASI_CLOSED 
+   *   replica checks and non-empty source replicas)
    * @param node DatanodeDetails for which to find candidate containers.
    * @return true if the container should be excluded, else false
    */
@@ -251,8 +257,12 @@ public class ContainerBalancerSelectionCriteria {
   /**
    * Relaxed version of isContainerClosed used when includeNonStandardContainers is enabled.
    * <p>
-   * - CLOSED containers: Allows moving non-empty QUASI_CLOSED replicas if minimum CLOSED replicas exist
-   * - QUASI_CLOSED containers: Allows moving if all replicas are QUASI_CLOSED and not empty
+   * - CLOSED container, CLOSED replica: if replication health is OVER_REPLICATED, requires
+   *   minimum CLOSED replicas; otherwise allows.
+   * - CLOSED container, QUASI_CLOSED replica: requires minimum CLOSED replicas and a non-empty
+   *   replica on the source datanode.
+   * - QUASI_CLOSED container: all replicas must be QUASI_CLOSED; replica on source must be
+   *   non-empty.
    *
    * @param container container to check
    * @param datanodeDetails datanode on which a replica of the container is present
@@ -262,6 +272,8 @@ public class ContainerBalancerSelectionCriteria {
   private boolean isContainerClosedRelaxed(ContainerInfo container,
                                            DatanodeDetails datanodeDetails,
                                            Set<ContainerReplica> replicas) {
+    ContainerHealthResult.HealthState replicationHealth =
+        replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
     HddsProtos.LifeCycleState containerState = container.getState();
     // Find the specific replica on this datanode
     ContainerReplica targetReplica = replicas.stream()
@@ -276,26 +288,23 @@ public class ContainerBalancerSelectionCriteria {
     // Case 1: Container is CLOSED
     if (containerState == HddsProtos.LifeCycleState.CLOSED) {
       if (replicaState == ContainerReplicaProto.State.CLOSED) {
+        if (replicationHealth == ContainerHealthResult.HealthState.OVER_REPLICATED) {
+          return hasMinClosedReplicas(container, replicas);
+        }
         return true;
       }
       
-      // Allow non-empty QUASI_CLOSED replicas if we have minimum required CLOSED replicas
       if (replicaState == ContainerReplicaProto.State.QUASI_CLOSED) {
-        long numClosedReplicas = replicas.stream()
-            .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
-            .count();
-        int minRequiredReplicas = container.getReplicationConfig().getRequiredNodes();
-        
-        if (numClosedReplicas >= minRequiredReplicas) {
-          return !targetReplica.isEmpty();
+        if (!hasMinClosedReplicas(container, replicas)) {
+          return false;
         }
+        return !targetReplica.isEmpty();
       }
       return false;
     }
     
     // Case 2: Container is QUASI_CLOSED
     if (containerState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
-      // All replicas must be QUASI_CLOSED
       boolean allReplicasQuasiClosed = replicas.stream()
           .allMatch(r -> r.getState() == ContainerReplicaProto.State.QUASI_CLOSED);
       if (!allReplicasQuasiClosed) {
@@ -306,10 +315,17 @@ public class ContainerBalancerSelectionCriteria {
     return false;
   }
 
+  private static boolean hasMinClosedReplicas(ContainerInfo container, Set<ContainerReplica> replicas) {
+    long count = replicas.stream()
+        .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
+        .count();
+    return count >= container.getReplicationConfig().getRequiredNodes();
+  }
+
   /**
    * Relaxed version of isContainerHealthyForMove used when includeNonStandardContainers is enabled.
    * <p>
-   * - OVER_REPLICATED containers are also allowed.
+   * - OVER_REPLICATED CLOSED and QUASI_CLOSED containers are allowed.
    *
    * @param container container to check
    * @param replicas the container's replicas
@@ -318,14 +334,8 @@ public class ContainerBalancerSelectionCriteria {
   private boolean isContainerHealthyForMoveRelaxed(ContainerInfo container, Set<ContainerReplica> replicas) {
     ContainerHealthResult.HealthState state =
         replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
-    if (state == ContainerHealthResult.HealthState.HEALTHY) {
-      return true;
-    }
-
-    // OVER_REPLICATED containers allowed
-    if (state == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      LOG.debug("Container {} is over-replicated but allowed for balancing with " +
-          "includeNonStandardContainers enabled", container);
+    if (state == ContainerHealthResult.HealthState.HEALTHY ||
+        state == ContainerHealthResult.HealthState.OVER_REPLICATED) {
       return true;
     }
 

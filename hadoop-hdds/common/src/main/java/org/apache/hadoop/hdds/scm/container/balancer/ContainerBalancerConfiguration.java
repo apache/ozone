@@ -149,8 +149,7 @@ public final class ContainerBalancerConfiguration {
   @Config(key = "hdds.container.balancer.include.non.standard.containers", type = ConfigType.BOOLEAN,
       defaultValue = "false", tags = {ConfigTag.BALANCER},
       description = "Whether to include containers in non-standard states, such as " +
-          "over-replicated CLOSED containers with additional QUASI_CLOSED replicas " +
-          "or consistent QUASI_CLOSED containers.")
+          "OVER_REPLICATED CLOSED/QUASI_CLOSED and HEALTHY QUASI_CLOSED containers.")
   private boolean includeNonStandardContainers = false;
 
   /**
@@ -504,7 +503,7 @@ public final class ContainerBalancerConfiguration {
         includeNodes.equals("") ? "None" : includeNodes,
         "Datanodes Excluded from Balancing",
         excludeNodes.equals("") ? "None" : excludeNodes,
-        "Whether to include non-standard containers (over-replicated, quasi-closed) for balancing",
+        "Whether to include non-standard containers for balancing",
         includeNonStandardContainers);
   }
 
