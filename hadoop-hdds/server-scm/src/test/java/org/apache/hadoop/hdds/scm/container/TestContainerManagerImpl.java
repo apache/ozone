@@ -26,9 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -109,7 +107,24 @@ public class TestContainerManagerImpl {
     pipelineManager = spy(base);
 
     // Default: allow allocation in tests unless a test overrides it.
-    doReturn(true).when(pipelineManager).hasEnoughSpace(any(Pipeline.class), anyLong());
+    doAnswer(invocation -> {
+      DatanodeDetails dn = invocation.getArgument(0);
+      DatanodeInfo info = new DatanodeInfo(dn,
+          NodeStatus.valueOf(HddsProtos.NodeOperationalState.IN_SERVICE, HddsProtos.NodeState.HEALTHY),
+          null);
+      long gb = 1024L * 1024 * 1024;
+      // 50GB usable => multiple 5GB slots under default OZONE_SCM_CONTAINER_SIZE.
+      StorageContainerDatanodeProtocolProtos.StorageReportProto report = HddsTestUtils.createStorageReport(
+          DatanodeID.of(dn.getUuid()),
+          "/data",
+          100L * gb,
+          0,
+          50L * gb,
+          HddsProtos.StorageTypeProto.DISK,
+          false);
+      info.updateStorageReports(Collections.singletonList(report));
+      return info;
+    }).when(pipelineManager).getDatanodeInfo(any(DatanodeDetails.class));
 
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE));
@@ -189,41 +204,20 @@ public class TestContainerManagerImpl {
   @Test
   public void testGetMatchingContainerReturnsContainerWhenEnoughSpaceInDatanodes() throws IOException {
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
-
-    PipelineManager spyPipelineManager = spy(pipelineManager);
-    doAnswer(invocation -> {
-      DatanodeDetails dn = invocation.getArgument(0);
-      DatanodeInfo info = new DatanodeInfo(dn,
-          NodeStatus.valueOf(HddsProtos.NodeOperationalState.IN_SERVICE, HddsProtos.NodeState.HEALTHY),
-          null);
-      long gb = 1024L * 1024 * 1024;
-      // 50GB usable => multiple 5GB slots under default OZONE_SCM_CONTAINER_SIZE.
-      StorageContainerDatanodeProtocolProtos.StorageReportProto report = HddsTestUtils.createStorageReport(
-          DatanodeID.of(dn.getUuid()),
-          "/data",
-          100L * gb,
-          0,
-          50L * gb,
-          HddsProtos.StorageTypeProto.DISK,
-          false);
-      info.updateStorageReports(Collections.singletonList(report));
-      return info;
-    }).when(spyPipelineManager).getDatanodeInfo(any(DatanodeDetails.class));
-
     File tempDir = new File(testDir, "tempDir");
     OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     ContainerManager manager = new ContainerManagerImpl(conf,
-        scmhaManager, sequenceIdGen, spyPipelineManager,
+        scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
 
-    Pipeline pipeline = spyPipelineManager.getPipelines().iterator().next();
+    Pipeline pipeline = pipelineManager.getPipelines().iterator().next();
     ContainerInfo container = manager
         .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
     assertNotNull(container);
 
     ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
-    spyPipelineManager.createPipeline(ecReplicationConfig);
-    pipeline = spyPipelineManager.getPipelines(ecReplicationConfig).iterator().next();
+    pipelineManager.createPipeline(ecReplicationConfig);
+    pipeline = pipelineManager.getPipelines(ecReplicationConfig).iterator().next();
     container = manager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
     assertNotNull(container);
   }

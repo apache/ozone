@@ -26,8 +26,7 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutV
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -37,6 +36,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -160,7 +160,25 @@ public class TestContainerPlacement {
   ContainerManager createContainerManager()
       throws IOException {
     pipelineManager = spy(pipelineManager);
-    doReturn(true).when(pipelineManager).hasEnoughSpace(any(), anyLong());
+
+    doAnswer(invocation -> {
+      DatanodeDetails dn = invocation.getArgument(0);
+      DatanodeInfo info = new DatanodeInfo(dn,
+          NodeStatus.valueOf(HddsProtos.NodeOperationalState.IN_SERVICE, HddsProtos.NodeState.HEALTHY),
+          null);
+      long gb = 1024L * 1024 * 1024;
+      // 50GB usable => multiple 5GB slots under default OZONE_SCM_CONTAINER_SIZE.
+      StorageContainerDatanodeProtocolProtos.StorageReportProto report = HddsTestUtils.createStorageReport(
+          DatanodeID.of(dn.getUuid()),
+          "/data",
+          100L * gb,
+          0,
+          50L * gb,
+          HddsProtos.StorageTypeProto.DISK,
+          false);
+      info.updateStorageReports(Collections.singletonList(report));
+      return info;
+    }).when(pipelineManager).getDatanodeInfo(any(DatanodeDetails.class));
 
     return new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
