@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT;
 
@@ -92,6 +94,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private long safeModeLogIntervalMs;
   private ScheduledExecutorService safeModeLogExecutor;
   private ScheduledFuture<?> safeModeLogTask;
+  private final long refreshIntervalMs;
 
   public SCMSafeModeManager(final ConfigurationSource conf,
                             final NodeManager nodeManager,
@@ -121,6 +124,31 @@ public class SCMSafeModeManager implements SafeModeManager {
       status.set(SafeModeStatus.OUT_OF_SAFE_MODE);
       emitSafeModeStatus();
     }
+
+    this.refreshIntervalMs = conf.getTimeDuration(
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    startRefreshExecutor(refreshIntervalMs);
+  }
+
+  private void startRefreshExecutor(long refreshIntervalMs) {
+    final boolean enabled = refreshIntervalMs > 0;
+    LOG.info("Container safe mode rule refresh: enabled? {}, {}={}ms",
+        enabled, HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, refreshIntervalMs);
+    if (!enabled) {
+      return;
+    }
+    final ScheduledExecutorService refreshExecutor = Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat(getClass().getSimpleName() + "-refresh-%d")
+            .build());
+    refreshExecutor.scheduleAtFixedRate(
+        () -> refreshAndValidate(refreshExecutor),
+        refreshIntervalMs,
+        refreshIntervalMs,
+        TimeUnit.MILLISECONDS);
   }
 
   public void start() {
@@ -246,6 +274,13 @@ public class SCMSafeModeManager implements SafeModeManager {
    * Refresh Rule state and validate rules.
    */
   public void refreshAndValidate() {
+    if (refreshIntervalMs > 0) {
+      return; // use executor to refresh
+    }
+    refreshAndValidate(null);
+  }
+
+  private void refreshAndValidate(ScheduledExecutorService refreshExecutor) {
     if (getInSafeMode()) {
       exitRules.values().forEach(rule -> {
         rule.refresh(false);
@@ -254,6 +289,8 @@ public class SCMSafeModeManager implements SafeModeManager {
           rule.cleanup();
         }
       });
+    } else if (refreshExecutor != null) {
+      refreshExecutor.shutdownNow(); // Not in safemode
     }
   }
 

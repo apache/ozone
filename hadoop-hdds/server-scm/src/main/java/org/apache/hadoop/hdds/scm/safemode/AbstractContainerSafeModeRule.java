@@ -17,20 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -56,28 +50,12 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   private final double safeModeCutoff;
   private final AtomicInteger totalContainers = new AtomicInteger();
   private final AtomicInteger containersWithMinReplicas = new AtomicInteger();
-
-  private final long refreshInterval;
-  private volatile ScheduledExecutorService refreshExecutor;
   public AbstractContainerSafeModeRule(ConfigurationSource conf, SCMSafeModeManager safeModeManager,
       ContainerManager containerManager, EventQueue eventQueue) {
     super(safeModeManager, eventQueue);
     this.containerManager = containerManager;
     this.safeModeCutoff = getSafeModeCutoff(conf);
-    this.refreshInterval = conf.getTimeDuration(
-        HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL,
-        HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
     initializeRule();
-    startRefreshExecutor();
-  }
-
-  public ContainerManager getContainerManager() {
-    return containerManager;
-  }
-
-  void incrementTotalContainers() {
-    totalContainers.getAndIncrement();
   }
 
   protected abstract ReplicationType getContainerType();
@@ -153,45 +131,12 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
     return total == 0 ? 1 : ((double) getNumberOfContainersWithMinReplica() / total);
   }
 
-
-
-  private void startRefreshExecutor() {
-    if (refreshInterval <= 0) {
-      SCMSafeModeManager.getLogger().info(
-          "Container safe mode rule incremental sync is disabled ({}=0).",
-          HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL);
-      return;
-    }
-    refreshExecutor = Executors.newSingleThreadScheduledExecutor(
-        new ThreadFactoryBuilder()
-            .setDaemon(true)
-            .setNameFormat(
-                "ContainerSafeModeRule-" + getContainerType() + "-refresh-%d")
-            .build());
-    refreshExecutor.scheduleAtFixedRate(
-        this::runRefresh,
-        refreshInterval,
-        refreshInterval,
-        TimeUnit.MILLISECONDS);
-  }
-
-  /**
-   * Background task: reconcile open/closed container tracking with
-   * {@link ContainerManager} while SCM is in safe mode.
-   */
-  private void runRefresh() {
-    synchronized (this) {
-      if (!scmInSafeMode()) {
-        return;
-      }
-      refreshExpectedContainers();
-    }
-  }
-
   @Override
   public synchronized void refresh(boolean forceRefresh) {
     if (forceRefresh) {
       initializeRule();
+    } else {
+      refreshExpectedContainers();
     }
   }
 
@@ -211,29 +156,11 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   @Override
   protected void cleanup() {
-    stopIncrementalSyncExecutor();
     synchronized (this) {
       if (containers != null) {
         containers.clear();
       }
     }
-  }
-
-  private void stopIncrementalSyncExecutor() {
-    if (refreshExecutor != null) {
-      refreshExecutor.shutdownNow();
-      try {
-        refreshExecutor.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-      refreshExecutor = null;
-    }
-  }
-
-  @VisibleForTesting
-  void runIncrementalContainerSyncForTesting() {
-    runRefresh();
   }
 
   /**

@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,8 +66,8 @@ public abstract class AbstractContainerSafeModeRuleTest {
 
     when(safeModeManager.getSafeModeMetrics()).thenReturn(metrics);
     when(conf.getTimeDuration(
-            HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL,
-        HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT,
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(0L);
     containers = new ArrayList<>();
     when(containerManager.getContainers(getReplicationType())).thenReturn(containers);

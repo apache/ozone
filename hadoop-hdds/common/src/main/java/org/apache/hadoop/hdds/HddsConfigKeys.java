@@ -120,10 +120,10 @@ public final class HddsConfigKeys {
    * Interval for background sync of open/closed container sets with ContainerManager
    * in {@code AbstractContainerSafeModeRule}. 0 disables the background thread.
    */
-  public static final String HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL =
+  public static final String HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL =
       "hdds.scm.safemode.container.rule.incremental.sync.interval";
   public static final String
-      HDDS_SCM_SAFEMODE_CONTAINER_RULE_REFRESH_INTERVAL_DEFAULT = "5s";
+      HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT = "5s";
 
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
