@@ -40,7 +40,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.7</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.42.13</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.42.18</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.83</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -49,7 +49,7 @@
     <classpath.skip>true</classpath.skip>
     <com.nimbusds.nimbus-jose-jwt.version>10.4</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
-    <commons-codec.version>1.18.0</commons-codec.version>
+    <commons-codec.version>1.21.0</commons-codec.version>
     <commons-collections.version>4.5.0</commons-collections.version>
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-configuration2.version>2.13.0</commons-configuration2.version>
@@ -113,7 +113,7 @@
     <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.6</jline.version>
+    <jline.version>3.30.9</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.21</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>

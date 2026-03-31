@@ -903,7 +903,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String scmBlockAddress = scmBlockAddressBuilder.toString();
     if (!StringUtils.isBlank(scmBlockAddress)) {
       scmBlockAddress = scmBlockAddress.substring(0,
-          scmBlockAddress.lastIndexOf(","));
+          scmBlockAddress.lastIndexOf(','));
     }
     if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
       LOG.error("clusterId from {} is {}, but is {} in {}",
