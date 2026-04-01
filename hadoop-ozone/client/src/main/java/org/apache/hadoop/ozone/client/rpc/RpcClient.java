@@ -2253,14 +2253,17 @@ public class RpcClient implements ClientProtocol {
   }
 
   private OmKeyArgs prepareOmKeyArgs(String volumeName, String bucketName,
-      String keyName) {
-    return new OmKeyArgs.Builder()
+      String keyName, String listPrefix) {
+    final OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
-        .setLatestVersionLocation(getLatestVersionLocation)
-        .build();
+        .setLatestVersionLocation(getLatestVersionLocation);
+    if (listPrefix != null && !listPrefix.isEmpty()) {
+      builder.setListPrefix(listPrefix);
+    }
+    return builder.build();
   }
 
   @Override
@@ -2288,7 +2291,8 @@ public class RpcClient implements ClientProtocol {
   public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
       String keyName, boolean recursive, String startKey, long numEntries)
       throws IOException {
-    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
+    final OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName,
+        null);
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries);
   }
@@ -2297,7 +2301,7 @@ public class RpcClient implements ClientProtocol {
   public List<OzoneFileStatus> listStatus(String volumeName, String bucketName,
       String keyName, boolean recursive, String startKey,
       long numEntries, boolean allowPartialPrefixes) throws IOException {
-    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
+    final OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName, null);
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries,
             allowPartialPrefixes);
@@ -2306,11 +2310,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
       throws IOException {
-    OmKeyArgs keyArgs = prepareOmKeyArgs(options.getVolumeName(),
-        options.getBucketName(), options.getKeyName());
-    if (options.getListPrefix() != null && !options.getListPrefix().isEmpty()) {
-      keyArgs = keyArgs.toBuilder().setListPrefix(options.getListPrefix()).build();
-    }
+    final OmKeyArgs keyArgs = prepareOmKeyArgs(
+        options.getVolumeName(), options.getBucketName(), options.getKeyName(), options.getListPrefix());
     if (omVersion.compareTo(OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS) >= 0) {
       return ozoneManagerClient.listStatusLight(
           keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
