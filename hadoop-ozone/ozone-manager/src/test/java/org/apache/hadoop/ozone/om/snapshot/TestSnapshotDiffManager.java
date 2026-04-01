@@ -220,7 +220,7 @@ public class TestSnapshotDiffManager {
   public static void initCodecRegistry() {
     codecRegistry = CodecRegistry.newBuilder()
         .addCodec(DiffReportEntry.class, getDiffReportEntryCodec())
-        .addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec())
+        .addCodec(SnapshotDiffJob.class, SnapshotDiffJob.codec())
         .build();
   }
 
