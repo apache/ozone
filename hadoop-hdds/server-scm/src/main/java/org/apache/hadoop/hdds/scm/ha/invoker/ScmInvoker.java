@@ -49,10 +49,11 @@ public abstract class ScmInvoker<T> {
 
   abstract Object invokeLocal(String methodName, Object[] args) throws Exception;
 
-  Object invokeRatisServer(String methodName, Object[] args) throws SCMException {
+  Object invokeRatisServer(String methodName, Class<?>[] paramTypes,
+          Object[] args) throws SCMException {
     try {
       final SCMRatisRequest request = SCMRatisRequest.of(
-          getType(), methodName, getParameterTypes(methodName), args);
+              getType(), methodName, paramTypes, args);
       final SCMRatisResponse response = ratisHandler.submitRequest(request);
       if (response.isSuccess()) {
         return response.getResult();

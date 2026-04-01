@@ -71,18 +71,37 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
   public DeletedBlockLogStateManager getProxy() {
     return new DeletedBlockLogStateManager() {
       @Override
+      public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
+          throws IOException {
+        final Object[] args = {txs};
+        invokeRatisServer("addTransactionsToDB",
+            new Class<?>[] {ArrayList.class}, args);
+      }
+
+      @Override
       public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
           DeletedBlocksTransactionSummary summary) throws IOException {
-        // @Replicate
         final Object[] args = {txs, summary};
-        invokeRatisServer("addTransactionsToDB", args);
+        invokeRatisServer("addTransactionsToDB",
+            new Class<?>[] {ArrayList.class,
+                DeletedBlocksTransactionSummary.class}, args);
+      }
+
+      @Override
+      public void removeTransactionsFromDB(ArrayList<Long> txIDs)
+          throws IOException {
+        final Object[] args = {txIDs};
+        invokeRatisServer("removeTransactionsFromDB",
+            new Class<?>[] {ArrayList.class}, args);
       }
 
       @Override
       public void removeTransactionsFromDB(ArrayList<Long> txIDs,
           DeletedBlocksTransactionSummary summary) throws IOException {
         final Object[] args = {txIDs, summary};
-        invokeRatisServer("removeTransactionsFromDB", args);
+        invokeRatisServer("removeTransactionsFromDB",
+            new Class<?>[] {ArrayList.class,
+                DeletedBlocksTransactionSummary.class}, args);
       }
 
       @Override
@@ -92,7 +111,6 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
 
       @Override
       public void onFlush() {
-        // local
         impl.onFlush();
       }
 
