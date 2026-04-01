@@ -614,6 +614,52 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Creates a key with datastream only if it does not exist already
+   * (S3 If-None-Match: * semantics).
+   *
+   * @param key Name of the key to be created.
+   * @param size Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata Custom key metadata.
+   * @param tags Tags used for S3 object tags
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
+        replicationConfig, keyMetadata, tags);
+  }
+
+  /**
+   * Rewrites a key with datastream only if its ETag matches
+   * (S3 If-Match semantics).
+   *
+   * @param key Name of the key to be rewritten.
+   * @param size Size of the data the key will point to.
+   * @param expectedETag The ETag value the existing key must have.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata Custom key metadata.
+   * @param tags Tags used for S3 object tags
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.rewriteStreamKeyIfMatch(volumeName, name, key, size,
+        expectedETag, replicationConfig, keyMetadata, tags);
+  }
+
+  /**
    * Reads an existing key from the bucket.
    *
    * @param key Name of the key to be read.

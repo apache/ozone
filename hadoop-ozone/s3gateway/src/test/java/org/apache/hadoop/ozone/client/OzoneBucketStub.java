@@ -280,6 +280,38 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags) throws IOException {
+    if (keyDetails.containsKey(key)) {
+      throw new OMException("Key already exists",
+          ResultCodes.KEY_ALREADY_EXISTS);
+    }
+    return createStreamKey(key, size, rConfig, keyMetadata, tags);
+  }
+
+  @Override
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig rConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags)
+      throws IOException {
+    OzoneKeyDetails existing = keyDetails.get(key);
+    if (existing == null) {
+      throw new OMException("Key not found for If-Match",
+          ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!existing.hasEtag()) {
+      throw new OMException("Key does not have an ETag",
+          ResultCodes.ETAG_NOT_AVAILABLE);
+    }
+    if (!existing.isEtagEquals(expectedETag)) {
+      throw new OMException("ETag mismatch",
+          ResultCodes.ETAG_MISMATCH);
+    }
+    return createStreamKey(key, size, rConfig, keyMetadata, tags);
+  }
+
+  @Override
   public OzoneDataStreamOutput createMultipartStreamKey(String key,
                                                         long size,
                                                         int partNumber,

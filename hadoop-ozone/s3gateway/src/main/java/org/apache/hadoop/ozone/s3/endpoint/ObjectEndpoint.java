@@ -329,7 +329,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
                 customMetadata, tags, multiDigestInputStream, getHeaders(),
-                signatureInfo.isSignPayload(), perf);
+                signatureInfo.isSignPayload(), perf, ifNoneMatchTrimmed,
+                ifMatchTrimmed);
         md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
