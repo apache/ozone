@@ -97,6 +97,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;

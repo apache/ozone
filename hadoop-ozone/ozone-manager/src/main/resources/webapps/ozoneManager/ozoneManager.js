@@ -61,12 +61,13 @@
                     }
                 });
 
-            $http.get("jmx?qry=OzoneManager:name=SnapshotDiffManager")
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=SnapshotDiffManager")
                 .then(function (result) {
                     if (result.data.beans && result.data.beans.length > 0) {
                         ctrl.snapshotDiffJobs = result.data.beans[0].SnapshotDiffJobs;
                     }
                 });
+
         }
     });
     angular.module('ozoneManager').component('omMetrics', {

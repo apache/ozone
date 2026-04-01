@@ -94,7 +94,9 @@ public class SnapshotDiffJob {
     this.largestEntryKey = largestEntryKey;
   }
 
-  public static Codec<SnapshotDiffJob> getCodec() {
+  @java.beans.Transient
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public static Codec<SnapshotDiffJob> codec() {
     return CODEC;
   }
 
