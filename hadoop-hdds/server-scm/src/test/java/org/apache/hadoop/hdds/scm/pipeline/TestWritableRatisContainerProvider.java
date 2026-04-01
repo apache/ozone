@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
-import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -142,8 +142,8 @@ class TestWritableRatisContainerProvider {
     when(pipelineManager.createPipeline(REPLICATION_CONFIG))
         .thenThrow(new SCMException(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE));
 
-    ScmConfig.PipelineExcludedNodes pipelineExcludedNodes =
-        ScmConfig.PipelineExcludedNodes.parse(excludedDn.getUuidString());
+    PipelineExcludedNodes pipelineExcludedNodes =
+        PipelineExcludedNodes.parse(excludedDn.getUuidString());
     WritableRatisContainerProvider subject = createSubject(pipelineExcludedNodes);
 
     assertThrows(IOException.class, () -> subject.getContainer(
@@ -175,8 +175,8 @@ class TestWritableRatisContainerProvider {
     when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN))
         .thenReturn(new ArrayList<>(asList(excludedPipeline, allowedPipeline)));
 
-    ScmConfig.PipelineExcludedNodes pipelineExcludedNodes =
-        ScmConfig.PipelineExcludedNodes.parse(excludedDn.getUuidString());
+    PipelineExcludedNodes pipelineExcludedNodes =
+        PipelineExcludedNodes.parse(excludedDn.getUuidString());
 
     ContainerInfo container = createSubject(pipelineExcludedNodes)
         .getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, excludeList);
@@ -232,7 +232,7 @@ class TestWritableRatisContainerProvider {
   }
 
   private WritableRatisContainerProvider createSubject(
-      ScmConfig.PipelineExcludedNodes pipelineExcludedNodes) {
+      PipelineExcludedNodes pipelineExcludedNodes) {
     when(pipelineManager.getPipelineExcludedNodesConfig())
         .thenReturn(pipelineExcludedNodes);
     return new WritableRatisContainerProvider(

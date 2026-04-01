@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -44,7 +44,7 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
-  private final ScmConfig.PipelineExcludedNodes pipelineExcludedNodes;
+  private final PipelineExcludedNodes pipelineExcludedNodes;
 
   public WritableRatisContainerProvider(
       PipelineManager pipelineManager,
@@ -56,16 +56,16 @@ public class WritableRatisContainerProvider
     this.pipelineExcludedNodes = configuredPipelineExcludedNodes(pipelineManager);
   }
 
-  private static ScmConfig.PipelineExcludedNodes configuredPipelineExcludedNodes(
+  private static PipelineExcludedNodes configuredPipelineExcludedNodes(
       PipelineManager pipelineManager) {
     if (pipelineManager instanceof PipelineManagerImpl) {
-      ScmConfig.PipelineExcludedNodes excludedNodes =
+      PipelineExcludedNodes excludedNodes =
           ((PipelineManagerImpl) pipelineManager).getPipelineExcludedNodesConfig();
       if (excludedNodes != null) {
         return excludedNodes;
       }
     }
-    return ScmConfig.PipelineExcludedNodes.EMPTY;
+    return PipelineExcludedNodes.EMPTY;
   }
 
   @Override

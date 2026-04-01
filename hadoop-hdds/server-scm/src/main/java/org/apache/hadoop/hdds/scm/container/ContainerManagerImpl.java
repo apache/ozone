@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
@@ -82,7 +83,7 @@ public class ContainerManagerImpl implements ContainerManager {
   private final Random random = new Random();
 
   private final long maxContainerSize;
-  private final ScmConfig.PipelineExcludedNodes pipelineExcludedNodes;
+  private final PipelineExcludedNodes pipelineExcludedNodes;
 
   /**
    *

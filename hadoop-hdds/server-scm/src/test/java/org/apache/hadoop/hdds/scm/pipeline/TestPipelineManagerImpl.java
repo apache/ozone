@@ -44,6 +44,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -51,6 +52,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -76,6 +78,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -123,6 +126,35 @@ import org.mockito.Mockito;
  * Tests for PipelineManagerImpl.
  */
 public class TestPipelineManagerImpl {
+
+  /**
+   * Mockito mocks do not execute real interface methods; replay resolution using the mock's
+   * stubbed {@link NodeManager#getNode} / {@link NodeManager#getNodesByAddress}.
+   */
+  private static void stubResolvePipelineExcludedDatanodes(NodeManager nodeManager) {
+    lenient().when(nodeManager.resolvePipelineExcludedDatanodes(any()))
+        .thenAnswer(invocation -> {
+          PipelineExcludedNodes spec = invocation.getArgument(0);
+          if (spec == null || spec.isEmpty()) {
+            return Collections.emptySet();
+          }
+          Set<DatanodeDetails> resolved = new HashSet<>();
+          for (DatanodeID datanodeID : spec.getExcludedDatanodeIds()) {
+            DatanodeDetails datanodeDetails = nodeManager.getNode(datanodeID);
+            if (datanodeDetails != null) {
+              resolved.add(datanodeDetails);
+            }
+          }
+          for (String address : spec.getExcludedAddressTokens()) {
+            List<DatanodeDetails> datanodes = nodeManager.getNodesByAddress(address);
+            if (datanodes != null) {
+              resolved.addAll(datanodes);
+            }
+          }
+          return ImmutableSet.copyOf(resolved);
+        });
+  }
+
   private OzoneConfiguration conf;
   private DBStore dbStore;
   private MockNodeManager nodeManager;
@@ -1022,6 +1054,7 @@ public class TestPipelineManagerImpl {
     when(localNodeManager.getNode(excludedByUuid.getID())).thenReturn(excludedByUuid);
     when(localNodeManager.getNodesByAddress(excludedByAddress.getIpAddress()))
         .thenReturn(Collections.singletonList(excludedByAddress));
+    stubResolvePipelineExcludedDatanodes(localNodeManager);
     PipelineStateManager localStateManager = mock(PipelineStateManager.class);
     PipelineFactory localFactory = mock(PipelineFactory.class);
 
@@ -1060,6 +1093,7 @@ public class TestPipelineManagerImpl {
     localContext.updateLeaderAndTerm(true, 1);
     NodeManager localNodeManager = mock(NodeManager.class);
     when(localNodeManager.getNode(excludedByUuid.getID())).thenReturn(excludedByUuid);
+    stubResolvePipelineExcludedDatanodes(localNodeManager);
     PipelineStateManager localStateManager = mock(PipelineStateManager.class);
     PipelineFactory localFactory = mock(PipelineFactory.class);
 
@@ -1087,6 +1121,7 @@ public class TestPipelineManagerImpl {
     localContext.updateLeaderAndTerm(true, 1);
     NodeManager localNodeManager = mock(NodeManager.class);
     when(localNodeManager.getNodesByAddress("unknown-dn-host")).thenReturn(Collections.emptyList());
+    stubResolvePipelineExcludedDatanodes(localNodeManager);
     PipelineStateManager localStateManager = mock(PipelineStateManager.class);
     PipelineFactory localFactory = mock(PipelineFactory.class);
 
@@ -1124,6 +1159,7 @@ public class TestPipelineManagerImpl {
     localContext.updateLeaderAndTerm(true, 1);
     NodeManager localNodeManager = mock(NodeManager.class);
     when(localNodeManager.getNode(excludedByUuid.getID())).thenReturn(excludedByUuid);
+    stubResolvePipelineExcludedDatanodes(localNodeManager);
     PipelineStateManager localStateManager = mock(PipelineStateManager.class);
     PipelineFactory localFactory = mock(PipelineFactory.class);
 

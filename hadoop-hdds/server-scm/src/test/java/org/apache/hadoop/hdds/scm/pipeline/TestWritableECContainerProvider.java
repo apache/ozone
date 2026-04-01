@@ -60,7 +60,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
-import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -592,7 +592,7 @@ public class TestWritableECContainerProvider {
     List<Pipeline> pipelines = new ArrayList<>();
     pipelines.add(excludedPipeline);
     when(localPipelineManager.getPipelines(repConfig, Pipeline.PipelineState.OPEN)).thenReturn(pipelines);
-    when(localPipelineManager.getPipelineExcludedNodesConfig()).thenReturn(ScmConfig.PipelineExcludedNodes.parse(
+    when(localPipelineManager.getPipelineExcludedNodesConfig()).thenReturn(PipelineExcludedNodes.parse(
         excludedDn.getUuidString()));
 
     WritableContainerProvider<ECReplicationConfig> localProvider = new WritableECContainerProvider(

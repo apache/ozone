@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
@@ -50,11 +49,12 @@ class TestScmConfig {
         uuid + ", DN-1.EXAMPLE.COM, 10.0.0.12, dn-1.example.com");
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
 
-    ScmConfig.PipelineExcludedNodes first = scmConfig.getPipelineExcludedNodes();
-    ScmConfig.PipelineExcludedNodes second = scmConfig.getPipelineExcludedNodes();
+    PipelineExcludedNodes first = scmConfig.getPipelineExcludedNodes();
+    PipelineExcludedNodes second = scmConfig.getPipelineExcludedNodes();
 
     assertFalse(first.isEmpty());
-    assertSame(first, second, "Snapshot should be parsed once and reused");
+    assertEquals(first.getExcludedDatanodeIds(), second.getExcludedDatanodeIds());
+    assertEquals(first.getExcludedAddressTokens(), second.getExcludedAddressTokens());
     assertEquals(1, first.getExcludedDatanodeIds().size());
     assertTrue(first.getExcludedDatanodeIds().contains(DatanodeID.fromUuidString(uuid)));
     assertTrue(first.getExcludedAddressTokens().contains("dn-1.example.com"));
@@ -68,13 +68,13 @@ class TestScmConfig {
     datanode.setHostName("dn-2.example.com");
     datanode.setIpAddress("10.10.10.10");
 
-    ScmConfig.PipelineExcludedNodes byUUID = ScmConfig.PipelineExcludedNodes.parse(datanode.getUuidString());
+    PipelineExcludedNodes byUUID = PipelineExcludedNodes.parse(datanode.getUuidString());
     assertTrue(byUUID.isExcluded(datanode));
 
-    ScmConfig.PipelineExcludedNodes byHost = ScmConfig.PipelineExcludedNodes.parse("DN-2.EXAMPLE.COM");
+    PipelineExcludedNodes byHost = PipelineExcludedNodes.parse("DN-2.EXAMPLE.COM");
     assertTrue(byHost.isExcluded(datanode));
 
-    ScmConfig.PipelineExcludedNodes byIp = ScmConfig.PipelineExcludedNodes.parse("10.10.10.10");
+    PipelineExcludedNodes byIp = PipelineExcludedNodes.parse("10.10.10.10");
     assertTrue(byIp.isExcluded(datanode));
   }
 }

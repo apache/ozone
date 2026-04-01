@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Clock;
@@ -44,10 +43,10 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -102,8 +101,7 @@ public class PipelineManagerImpl implements PipelineManager {
   // SCM is already out of SafeMode.
   private AtomicBoolean freezePipelineCreation;
   private final Clock clock;
-  private final ScmConfig.PipelineExcludedNodes pipelineExcludedNodes;
-  private final Set<DatanodeDetails> configuredExcludedDatanodeDetails;
+  private final PipelineExcludedNodes pipelineExcludedNodes;
 
   @SuppressWarnings("checkstyle:parameterNumber")
   protected PipelineManagerImpl(ConfigurationSource conf,
@@ -132,7 +130,6 @@ public class PipelineManagerImpl implements PipelineManager {
         TimeUnit.MILLISECONDS);
     this.freezePipelineCreation = new AtomicBoolean();
     this.pipelineExcludedNodes = conf.getObject(ScmConfig.class).getPipelineExcludedNodes();
-    this.configuredExcludedDatanodeDetails = resolvePipelineExcludedNodesToDatanodeDetails();
   }
 
   @SuppressWarnings("checkstyle:parameterNumber")
@@ -312,6 +309,8 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   private List<DatanodeDetails> mergeConfiguredExcludedNodes(List<DatanodeDetails> excludedNodes) {
+    Set<DatanodeDetails> configuredExcludedDatanodeDetails =
+        nodeManager.resolvePipelineExcludedDatanodes(pipelineExcludedNodes);
     if ((excludedNodes == null || excludedNodes.isEmpty()) && configuredExcludedDatanodeDetails.isEmpty()) {
       return Collections.emptyList();
     }
@@ -326,28 +325,6 @@ public class PipelineManagerImpl implements PipelineManager {
         new HashSet<>(configuredExcludedDatanodeDetails);
     mergedExcludedNodes.addAll(excludedNodes);
     return new ArrayList<>(mergedExcludedNodes);
-  }
-
-  private Set<DatanodeDetails> resolvePipelineExcludedNodesToDatanodeDetails() {
-    if (pipelineExcludedNodes.isEmpty()) {
-      return Collections.emptySet();
-    }
-
-    Set<DatanodeDetails> resolved = new HashSet<>();
-    for (DatanodeID datanodeID : pipelineExcludedNodes.getExcludedDatanodeIds()) {
-      DatanodeDetails datanodeDetails = nodeManager.getNode(datanodeID);
-      if (datanodeDetails != null) {
-        resolved.add(datanodeDetails);
-      }
-    }
-    for (String address : pipelineExcludedNodes.getExcludedAddressTokens()) {
-      List<DatanodeDetails> datanodes = nodeManager.getNodesByAddress(address);
-      if (datanodes != null) {
-        resolved.addAll(datanodes);
-      }
-    }
-
-    return ImmutableSet.copyOf(resolved);
   }
 
   private boolean factorOne(ReplicationConfig replicationConfig) {
@@ -908,7 +885,7 @@ public class PipelineManagerImpl implements PipelineManager {
     return stateManager;
   }
 
-  ScmConfig.PipelineExcludedNodes getPipelineExcludedNodesConfig() {
+  PipelineExcludedNodes getPipelineExcludedNodesConfig() {
     return pipelineExcludedNodes;
   }
 

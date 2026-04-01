@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import com.google.common.collect.ImmutableSet;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -357,6 +359,27 @@ public class SimpleMockNodeManager implements NodeManager {
   @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
     return null;
+  }
+
+  @Override
+  public Set<DatanodeDetails> resolvePipelineExcludedDatanodes(PipelineExcludedNodes pipelineExcludedNodes) {
+    if (pipelineExcludedNodes == null || pipelineExcludedNodes.isEmpty()) {
+      return Collections.emptySet();
+    }
+    Set<DatanodeDetails> resolved = new HashSet<>();
+    for (DatanodeID datanodeID : pipelineExcludedNodes.getExcludedDatanodeIds()) {
+      DatanodeDetails datanodeDetails = getNode(datanodeID);
+      if (datanodeDetails != null) {
+        resolved.add(datanodeDetails);
+      }
+    }
+    for (String address : pipelineExcludedNodes.getExcludedAddressTokens()) {
+      List<DatanodeDetails> datanodes = getNodesByAddress(address);
+      if (datanodes != null) {
+        resolved.addAll(datanodes);
+      }
+    }
+    return ImmutableSet.copyOf(resolved);
   }
 
   @Override
