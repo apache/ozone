@@ -386,10 +386,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     s3Client.createBucket(bucketName);
 
     InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-    ObjectMetadata metadata = new ObjectMetadata();
-    metadata.setHeader("If-None-Match", "*");
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is, new ObjectMetadata()).ifNoneMatch("*");
 
-    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, metadata);
+    PutObjectResult putObjectResult = s3Client.putObject(request);
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
   }
 
@@ -404,11 +404,11 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
 
     InputStream is2 = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-    ObjectMetadata metadata = new ObjectMetadata();
-    metadata.setHeader("If-None-Match", "*");
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is2, new ObjectMetadata()).ifNoneMatch("*");
 
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
-        () -> s3Client.putObject(bucketName, keyName, is2, metadata));
+        () -> s3Client.putObject(request));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(412, ase.getStatusCode());
@@ -427,10 +427,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     String etag = putObjectResult.getETag();
 
     InputStream is2 = new ByteArrayInputStream("bar2".getBytes(StandardCharsets.UTF_8));
-    ObjectMetadata metadata = new ObjectMetadata();
-    metadata.setHeader("If-Match", etag);
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is2, new ObjectMetadata()).ifMatch(etag);
 
-    PutObjectResult putObjectResult2 = s3Client.putObject(bucketName, keyName, is2, metadata);
+    PutObjectResult putObjectResult2 = s3Client.putObject(request);
     assertNotNull(putObjectResult2.getETag());
     assertNotEquals(etag, putObjectResult2.getETag());
 
@@ -450,11 +450,11 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
 
     InputStream is2 = new ByteArrayInputStream("bar2".getBytes(StandardCharsets.UTF_8));
-    ObjectMetadata metadata = new ObjectMetadata();
-    metadata.setHeader("If-Match", "wrong-etag");
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is2, new ObjectMetadata()).ifMatch("wrong-etag");
 
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
-        () -> s3Client.putObject(bucketName, keyName, is2, metadata));
+        () -> s3Client.putObject(request));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(412, ase.getStatusCode());
@@ -472,11 +472,11 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     InputStream is = new ByteArrayInputStream("bar2".getBytes(
         StandardCharsets.UTF_8));
-    ObjectMetadata metadata = new ObjectMetadata();
-    metadata.setHeader("If-Match", "some-etag");
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is, new ObjectMetadata()).ifMatch("some-etag");
 
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
-        () -> s3Client.putObject(bucketName, keyName, is, metadata));
+        () -> s3Client.putObject(request));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(412, ase.getStatusCode());
