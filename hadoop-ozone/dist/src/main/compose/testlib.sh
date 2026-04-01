@@ -278,7 +278,7 @@ reorder_om_nodes() {
         "if [[ -f /etc/hadoop/ozone-site.xml ]]; then \
           sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
           echo 'Replaced OM order with ${new_order} in ${c}'; \
-        fi"
+        fi" || true
     done
   fi
 }
