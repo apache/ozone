@@ -213,13 +213,51 @@ On success, `DeleteObject` still returns `204 No Content`.
 
 ### AWS S3 Conditional Write Implementation
 
-The implementation aims to minimize Redundant RPCs (RTT) while ensuring strict atomicity for conditional operations.
+The implementation aims to minimize redundant RPCs while ensuring
+strict atomicity for conditional operations.
 
 - **If-None-Match** utilizes the atomic "Create-If-Not-Exists"
   capability ([HDDS-13963](https://issues.apache.org/jira/browse/HDDS-13963)).
-- **If-Match** optimizes the happy path by pushing ETag validation
-  directly into the Ozone Manager's write path, avoiding preliminary
-  read operations.
+- **If-Match** reuses the same open-key plus commit workflow as normal
+  writes, but converts the caller's ETag into
+  `expectedDataGeneration` during `createKey`. The gateway sends the
+  caller's ETag directly to OM, OM validates it, resolves the current
+  `updateID`, and then reuses the existing atomic rewrite mechanism from
+  [HDDS-10656](https://issues.apache.org/jira/browse/HDDS-10656). This
+  avoids an extra read RPC to fetch the current ETag and generation
+  before opening the key.
+
+#### Request Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant GW as S3 Gateway
+    participant OM as Ozone Manager
+
+    User->>GW: PUT object with If-None-Match:* or If-Match:etag
+    alt If-None-Match: *
+        GW->>OM: createKey(expectedDataGeneration = -1)
+        OM->>OM: Reject if key already exists
+        OM-->>GW: Open key or KEY_ALREADY_EXISTS
+        opt Open key created
+            GW->>OM: commitKey()
+            OM->>OM: Recheck key absence during commit
+            OM-->>GW: Success or generation mismatch
+        end
+    else If-Match: etag
+        Note over GW,OM: No pre-read for current ETag/updateID on the optimistic path
+        GW->>OM: createKey(expectedETag = etag)
+        OM->>OM: Validate ETag, derive updateID, persist expectedDataGeneration
+        OM-->>GW: Open key with resolved generation or KEY_NOT_FOUND/ETAG_*
+        opt Open key created
+            GW->>OM: commitKey()
+            OM->>OM: Reload open key and reuse atomic rewrite generation check
+            OM-->>GW: Success or KEY_NOT_FOUND
+        end
+    end
+    GW-->>User: 200 OK or 412 Precondition Failed
+```
 
 #### If-None-Match Implementation
 
@@ -270,13 +308,28 @@ create-if-not-exists semantics.
 
 #### If-Match Implementation
 
-To optimize performance and reduce latency, we avoid a pre-flight check
-(`GetS3KeyDetails`) and instead validate the ETag during the OM write
-operation. This requires adding an optional `expectedETag` field to
-`KeyArgs`. This approach optimizes the "happy path" (successful match)
-by removing an extra network round trip. For failing requests, they
-still incur the cost of a write RPC and Raft log entry, but this is
-acceptable under optimistic concurrency control assumptions.
+`If-Match` should be treated as a compare-and-swap rewrite, not as a
+read-then-write sequence in the gateway. The intent is to piggyback on
+the existing atomic rewrite machinery without adding a gateway-side
+metadata fetch:
+
+1. The caller sends the ETag it previously observed.
+2. The gateway forwards that ETag to OM in the create/open request.
+3. OM validates the ETag against the current committed key while
+   holding the normal bucket/key lock.
+4. If the ETag matches, OM extracts the current `updateID` and stores it
+   as `expectedDataGeneration` in the open key created by `createKey`.
+5. The create response returns that open-key state to the client, so the
+   subsequent `commitKey` request carries the resolved generation rather
+   than the original ETag predicate.
+6. The commit phase then reuses the existing atomic rewrite validation
+   to detect races before the new object becomes visible.
+
+This is the optimistic CAS fast path: successful requests avoid an
+extra `GetS3KeyDetails` round trip to fetch the current ETag and
+`updateID` before issuing the write. Instead, the gateway sends only
+the client-supplied ETag, and OM resolves the generation internally as
+part of the normal write path.
 
 ##### S3 Gateway Layer
 
@@ -285,6 +338,11 @@ acceptable under optimistic concurrency control assumptions.
    with the parsed `expectedETag`.
 3. The client populates `KeyArgs.expectedETag` and sends the create
    request to OM.
+4. The gateway does not issue a pre-flight metadata lookup to fetch the
+   current ETag or `updateID`.
+5. Once OM returns the open key with resolved
+   `expectedDataGeneration`, the normal output-stream commit path carries
+   that generation on `commitKey`.
 
 ##### OM Create Phase
 
@@ -302,21 +360,34 @@ ensure atomicity within the Ratis state machine application.
     - **ETag Mismatch**: Compare `existingKey.ETag` with
       `expectedETag`. If they do not match, throw `ETAG_MISMATCH`
       (maps to S3 412).
-4. **Extract Generation**: If ETag matches, extract `existingKey.updateID`.
-5. **Create Open Key**: Create open key entry with `expectedDataGeneration = existingKey.updateID`.
+4. **Extract Generation**: If ETag matches, extract
+   `existingKey.updateID`.
+5. **Bridge to Atomic Rewrite**: Create the open key entry with
+   `expectedDataGeneration = existingKey.updateID`, so the remainder of
+   the flow uses the same atomic rewrite invariant as HDDS-10656.
+6. **Return Resolved State**: The create response returns the open-key
+   metadata containing that generation, so the later `commitKey` request
+   can carry the same resolved rewrite condition.
 
 ##### OM Commit Phase
 
-The commit phase reuses the existing atomic-rewrite validation logic from HDDS-10656:
+The commit phase reuses the existing atomic rewrite validation logic
+from HDDS-10656:
 
-1. Read open key entry (contains `expectedDataGeneration` set during create phase).
+1. Read open key entry (contains `expectedDataGeneration` set during
+   create phase from the ETag-validated key).
 2. Read current committed key from `KeyTable`.
 3. Validate `currentKey.updateID == openKey.expectedDataGeneration`.
-4. If match, commit succeeds. If mismatch (concurrent modification), throw `KEY_NOT_FOUND` (maps to S3 412).
+4. If match, commit succeeds. If mismatch (concurrent modification),
+   throw `KEY_NOT_FOUND` (maps to S3 412).
+5. Clear the conditional fields before persisting the final committed
+   key so they remain open-key state only.
 
 This approach ensures end-to-end atomicity: even if another client
 modifies the key between Create and Commit phases, the commit will
-fail.
+fail. The gateway never needs to fetch `updateID` itself; OM derives it
+from the matched ETag during `createKey`, and the rest of the write then
+rides on the standard atomic rewrite path.
 
 #### Error Mapping
 
@@ -332,6 +403,31 @@ fail.
 
 Conditional reads can be implemented fully in the S3 gateway. Unlike conditional writes, no OM write-path changes are
 required because the operation is read-only and the gateway already fetches object metadata before streaming the body.
+
+### Request Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant GW as S3 Gateway
+    participant OM as Ozone Manager
+
+    User->>GW: GET/HEAD with conditional headers
+    GW->>OM: getS3KeyDetails() / headS3Object()
+    OM-->>GW: ETag, modificationTime, key info
+    GW->>GW: Evaluate ETag/date precedence rules
+    alt Not modified
+        GW-->>User: 304 Not Modified
+    else Precondition failed
+        GW-->>User: 412 Precondition Failed
+    else Preconditions pass
+        opt GET or ranged GET
+            GW->>OM: getKey() / open data stream
+            OM-->>GW: Object data
+        end
+        GW-->>User: 200 OK / 206 Partial Content
+    end
+```
 
 ### Gateway Flow
 
@@ -377,6 +473,33 @@ Conditional copy should reuse both halves of this design:
 
 - the source-side read validator from conditional `GET` / `HEAD`
 - the destination-side atomic write path from conditional `PUT`
+
+### Request Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant GW as S3 Gateway
+    participant OM as Ozone Manager
+
+    User->>GW: COPY with source and destination conditions
+    GW->>OM: get source key details
+    OM-->>GW: Source metadata + bound content stream
+    GW->>GW: Evaluate x-amz-copy-source-if-* headers
+    alt Source precondition failed
+        GW-->>User: 412 Precondition Failed
+    else Source passes
+        GW->>OM: create destination key (normal / If-None-Match / If-Match)
+        OM->>OM: Validate destination state and open key
+        OM-->>GW: Open key or 412-mapped error
+        opt Destination open key created
+            GW->>OM: commit destination key using source snapshot
+            OM->>OM: Revalidate generation for conditional writes
+            OM-->>GW: Success or 412-mapped error
+        end
+        GW-->>User: 200 OK or 412 Precondition Failed
+    end
+```
 
 ### Source Validation
 
@@ -442,6 +565,28 @@ delete path is already a single OM transaction. There is no open-key /
 commit split, so atomicity comes from validating the precondition and
 applying the tombstone while holding the normal delete lock in one
 request.
+
+### Request Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant GW as S3 Gateway
+    participant OM as Ozone Manager
+
+    User->>GW: DELETE with optional If-Match
+    alt No If-Match
+        GW->>OM: deleteKey()
+        OM->>OM: Apply existing delete semantics
+        OM-->>GW: Success or KEY_NOT_FOUND
+        GW-->>User: 204 No Content
+    else If-Match present
+        GW->>OM: deleteKey(expectedETag or *)
+        OM->>OM: Validate current key under lock and write tombstone
+        OM-->>GW: Success or KEY_NOT_FOUND/ETAG_*
+        GW-->>User: 204 No Content or 412 Precondition Failed
+    end
+```
 
 ### Gateway Flow
 
