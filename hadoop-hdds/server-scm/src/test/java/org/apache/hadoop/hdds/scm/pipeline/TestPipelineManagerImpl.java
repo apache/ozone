@@ -127,34 +127,6 @@ import org.mockito.Mockito;
  */
 public class TestPipelineManagerImpl {
 
-  /**
-   * Mockito mocks do not execute real interface methods; replay resolution using the mock's
-   * stubbed {@link NodeManager#getNode} / {@link NodeManager#getNodesByAddress}.
-   */
-  private static void stubResolvePipelineExcludedDatanodes(NodeManager nodeManager) {
-    lenient().when(nodeManager.resolvePipelineExcludedDatanodes(any()))
-        .thenAnswer(invocation -> {
-          PipelineExcludedNodes spec = invocation.getArgument(0);
-          if (spec == null || spec.isEmpty()) {
-            return Collections.emptySet();
-          }
-          Set<DatanodeDetails> resolved = new HashSet<>();
-          for (DatanodeID datanodeID : spec.getExcludedDatanodeIds()) {
-            DatanodeDetails datanodeDetails = nodeManager.getNode(datanodeID);
-            if (datanodeDetails != null) {
-              resolved.add(datanodeDetails);
-            }
-          }
-          for (String address : spec.getExcludedAddressTokens()) {
-            List<DatanodeDetails> datanodes = nodeManager.getNodesByAddress(address);
-            if (datanodes != null) {
-              resolved.addAll(datanodes);
-            }
-          }
-          return ImmutableSet.copyOf(resolved);
-        });
-  }
-
   private OzoneConfiguration conf;
   private DBStore dbStore;
   private MockNodeManager nodeManager;
@@ -1237,5 +1209,29 @@ public class TestPipelineManagerImpl {
     SCMException e = assertThrows(SCMException.class, block::run);
     assertEquals(ResultCodes.SCM_NOT_LEADER, e.getResult());
     assertInstanceOf(NotLeaderException.class, e.getCause());
+  }
+
+  private static void stubResolvePipelineExcludedDatanodes(NodeManager nodeManager) {
+    lenient().when(nodeManager.resolvePipelineExcludedDatanodes(any()))
+        .thenAnswer(invocation -> {
+          PipelineExcludedNodes pipelineExcludedNodes = invocation.getArgument(0);
+          if (pipelineExcludedNodes == null || pipelineExcludedNodes.isEmpty()) {
+            return Collections.emptySet();
+          }
+          Set<DatanodeDetails> resolved = new HashSet<>();
+          for (DatanodeID datanodeID : pipelineExcludedNodes.getExcludedDatanodeIds()) {
+            DatanodeDetails datanodeDetails = nodeManager.getNode(datanodeID);
+            if (datanodeDetails != null) {
+              resolved.add(datanodeDetails);
+            }
+          }
+          for (String address : pipelineExcludedNodes.getExcludedAddressTokens()) {
+            List<DatanodeDetails> datanodes = nodeManager.getNodesByAddress(address);
+            if (datanodes != null) {
+              resolved.addAll(datanodes);
+            }
+          }
+          return ImmutableSet.copyOf(resolved);
+        });
   }
 }
