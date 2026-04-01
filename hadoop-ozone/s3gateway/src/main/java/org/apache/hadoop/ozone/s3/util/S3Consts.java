@@ -98,6 +98,10 @@ public final class S3Consts {
 
   public static final String CHECKSUM_HEADER = "Content-MD5";
 
+  // Conditional request headers
+  public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+  public static final String IF_MATCH_HEADER = "If-Match";
+
   //Never Constructed
   private S3Consts() {
 
