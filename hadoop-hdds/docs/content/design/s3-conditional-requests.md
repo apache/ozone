@@ -3,7 +3,7 @@ title: "S3 Conditional Requests"
 summary: Design to support S3 conditional requests for atomic operations.
 date: 2025-11-20
 jira: HDDS-13117
-status: draft
+status: accepted
 author: Chu Cheng Li
 ---
 <!--
@@ -41,21 +41,6 @@ conditions. This includes:
 - HDDS-10656 implemented atomic rewrite using `expectedDataGeneration`
 - OM HA uses single Raft group with single applier thread (Ratis StateMachineUpdater)
 - S3 gateway doesn't expose conditional headers to OM layer
-- `GetObject` and `HeadObject` currently ignore HTTP conditional headers
-- `CopyObject` currently evaluates only the source modification-time headers in the gateway
-- `DeleteObject` currently ignores `If-Match` and maps missing keys to
-  `204 No Content`
-
-### Delivery Plan
-
-The feature can be delivered incrementally:
-
-1. **Conditional writes** for `PutObject`, which need OM write-path support for atomic destination validation.
-2. **Conditional reads** for `GetObject` and `HeadObject`, which can be implemented entirely in the S3 gateway.
-3. **Conditional copy** for `CopyObject`, which combines source-side
-   read validation with destination-side atomic writes.
-4. **Conditional delete** for `DeleteObject`, which needs single-RPC
-   validation in the OM delete path.
 
 ## Use Cases
 
