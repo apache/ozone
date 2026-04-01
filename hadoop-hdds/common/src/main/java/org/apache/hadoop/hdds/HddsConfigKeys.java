@@ -120,7 +120,7 @@ public final class HddsConfigKeys {
    * Interval for background refresh of safeMode rules. 0 disables the background thread.
    */
   public static final String HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL =
-      "hdds.scm.safemode.container.rule.incremental.sync.interval";
+      "hdds.scm.safemode.rule.refresh.interval";
   public static final String
       HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT = "5s";
 

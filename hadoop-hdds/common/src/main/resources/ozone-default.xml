@@ -1701,6 +1701,13 @@
       reported replica before SCM comes out of safe mode.
     </description>
   </property>
+  <property>
+    <name>hdds.scm.safemode.rule.refresh.interval</name>
+    <value>5s</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description> Refresh interval in SCM Safemode.
+    </description>
+  </property>
 
   <property>
     <name>hdds.scm.wait.time.after.safemode.exit</name>
