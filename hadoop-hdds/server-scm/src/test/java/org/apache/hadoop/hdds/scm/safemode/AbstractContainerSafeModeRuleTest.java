@@ -54,14 +54,13 @@ import org.junit.jupiter.params.provider.EnumSource;
 public abstract class AbstractContainerSafeModeRuleTest {
   private List<ContainerInfo> containers;
   private AbstractContainerSafeModeRule rule;
-  private SCMSafeModeManager safeModeManager;
 
   @BeforeEach
   public void setup() throws ContainerNotFoundException {
     final ContainerManager containerManager = mock(ContainerManager.class);
     final ConfigurationSource conf = mock(ConfigurationSource.class);
     final EventQueue eventQueue = mock(EventQueue.class);
-    safeModeManager = mock(SCMSafeModeManager.class);
+    SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
     final SafeModeMetrics metrics = mock(SafeModeMetrics.class);
 
     when(safeModeManager.getSafeModeMetrics()).thenReturn(metrics);

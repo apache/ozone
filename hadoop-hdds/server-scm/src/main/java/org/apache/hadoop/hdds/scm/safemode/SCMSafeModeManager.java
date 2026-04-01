@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.HashMap;
@@ -36,9 +36,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -132,10 +132,10 @@ public class SCMSafeModeManager implements SafeModeManager {
     startRefreshExecutor(refreshIntervalMs);
   }
 
-  private void startRefreshExecutor(long refreshIntervalMs) {
-    final boolean enabled = refreshIntervalMs > 0;
+  private void startRefreshExecutor(long refreshIntervalMillis) {
+    final boolean enabled = refreshIntervalMillis > 0;
     LOG.info("Container safe mode rule refresh: enabled? {}, {}={}ms",
-        enabled, HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, refreshIntervalMs);
+        enabled, HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, refreshIntervalMillis);
     if (!enabled) {
       return;
     }
@@ -146,8 +146,8 @@ public class SCMSafeModeManager implements SafeModeManager {
             .build());
     refreshExecutor.scheduleAtFixedRate(
         () -> refreshAndValidate(refreshExecutor),
-        refreshIntervalMs,
-        refreshIntervalMs,
+        refreshIntervalMillis,
+        refreshIntervalMillis,
         TimeUnit.MILLISECONDS);
   }
 

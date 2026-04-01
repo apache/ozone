@@ -50,6 +50,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   private final double safeModeCutoff;
   private final AtomicInteger totalContainers = new AtomicInteger();
   private final AtomicInteger containersWithMinReplicas = new AtomicInteger();
+  
   public AbstractContainerSafeModeRule(ConfigurationSource conf, SCMSafeModeManager safeModeManager,
       ContainerManager containerManager, EventQueue eventQueue) {
     super(safeModeManager, eventQueue);
@@ -152,7 +153,6 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
       initializeRule();
     }
   }
-
 
   @Override
   protected void cleanup() {
