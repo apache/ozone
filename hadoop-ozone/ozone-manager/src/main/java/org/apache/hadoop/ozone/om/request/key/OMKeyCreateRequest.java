@@ -500,7 +500,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   }
 
-  private KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
+  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
       KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
     if (!keyArgs.hasExpectedETag()) {
       return keyArgs;
