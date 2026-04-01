@@ -340,11 +340,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(OK, response.getOMResponse().getStatus());
 
-    // Verify open key was created with expectedETag
+    // Verify open key was normalized onto the atomic rewrite generation.
     OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(getOpenKey(id));
     assertNotNull(openKeyInfo);
-    assertEquals(expectedETag, openKeyInfo.getExpectedETag());
+    assertEquals(existingKeyInfo.getUpdateID(),
+        openKeyInfo.getExpectedDataGeneration());
+    assertNull(openKeyInfo.getExpectedETag());
     // Creation time should remain the same on rewrite
     assertEquals(existingKeyInfo.getCreationTime(),
         openKeyInfo.getCreationTime());
