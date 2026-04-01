@@ -37,8 +37,9 @@ source "$TEST_DIR"/testlib.sh
 # Restart one service with the target image.
 rolling_restart_service() {
   SERVICE="$1"
+  local target_image="$2"
 
-  echo "--- RESTARTING ${SERVICE} WITH IMAGE ${OZONE_UPGRADE_TO} ---"
+  echo "--- RESTARTING ${SERVICE} WITH IMAGE ${target_image} ---"
 
   # Stop service
   stop_containers "${SERVICE}"
@@ -60,8 +61,8 @@ rolling_restart_service() {
     callback before_service_restart
   fi
 
-  # Restart service with new image.
-  prepare_for_image "${OZONE_UPGRADE_TO}"
+  # Restart service with the requested image.
+  prepare_for_image "${target_image}"
   create_containers "${SERVICE}"
 
   # The data generation/validation is doing S3 API tests, so skip it in case the S3 gateway is updated
@@ -84,49 +85,64 @@ rolling_restart_service() {
   esac
 }
 
+rolling_restart_all_services() {
+  local stage_prefix="$1"
+  local target_image="$2"
+  local s
+
+  # SCMs first
+  for s in scm2 scm1 scm3; do
+    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
+    rolling_restart_service "$s" "${target_image}"
+  done
+
+  # Recon
+  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-recon"
+  rolling_restart_service "recon" "${target_image}"
+
+  # DNs
+  for s in dn1 dn2 dn3 dn4 dn5; do
+    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
+    rolling_restart_service "$s" "${target_image}"
+  done
+
+  for s in om1 om2 om3; do
+    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
+    rolling_restart_service "$s" "${target_image}"
+  done
+
+  # S3 Gateway
+  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-s3g"
+  rolling_restart_service "s3g" "${target_image}"
+}
+
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-1-original"
-export OM_HA_ARGS='--'
 prepare_for_image "$OZONE_UPGRADE_FROM"
 
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
 start_docker_env
 
-# TODO Add old data generation
+callback with_old_version
 
 echo "--- ROLLING UPGRADE TO $OZONE_UPGRADE_TO PRE-FINALIZED ---"
+rolling_restart_all_services "2-upgrade" "$OZONE_UPGRADE_TO"
 
-# SCMs first
-for s in scm2 scm1 scm3; do
-  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-${s}"
-  rolling_restart_service "$s" "$OZONE_UPGRADE_TO"
-done
+OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-pre-finalized"
+callback with_this_version_pre_finalized
 
-# Recon
-OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-recon"
-rolling_restart_service "recon" "$OZONE_UPGRADE_TO"
+echo "--- ROLLING DOWNGRADE TO $OZONE_UPGRADE_FROM ---"
+rolling_restart_all_services "3-downgrade" "$OZONE_UPGRADE_FROM"
 
-# DNs
-for s in dn1 dn2 dn3 dn4 dn5; do
-  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-${s}"
-  rolling_restart_service "$s" "$OZONE_UPGRADE_TO"
-done
+OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-downgraded"
+callback with_old_version_downgraded
 
-for s in om1 om2 om3; do
-  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-${s}"
-  rolling_restart_service "$s" "$OZONE_UPGRADE_TO"
-done
-
-# S3 Gateway
-OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-s3g"
-rolling_restart_service "s3g" "$OZONE_UPGRADE_TO"
-
-# TODO Add downgrade scenario
+echo "--- ROLLING UPGRADE TO $OZONE_UPGRADE_TO ---"
+rolling_restart_all_services "4-upgrade" "$OZONE_UPGRADE_TO"
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
-OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-finalized"
-
-# TODO Add validation for pre-finalized state
+OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-5-finalized"
 
 # Sends commands to finalize OM and SCM.
 execute_robot_test "$SCM" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot
+callback with_this_version_finalized
