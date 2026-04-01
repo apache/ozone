@@ -1,0 +1,63 @@
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<h1>Snapshot Metrics</h1>
+
+<table class="table table-bordered table-striped">
+    <thead>
+    <tr>
+        <th>Metric Name</th>
+        <th>Value</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr ng-repeat="metric in $ctrl.snapshotMetrics">
+        <td>{{metric.key}}</td>
+        <td>{{metric.value}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h1>Snapshot Diff Jobs</h1>
+
+<table class="table table-bordered table-striped">
+    <thead>
+    <tr>
+        <th>Job ID</th>
+        <th>Status</th>
+        <th>Volume</th>
+        <th>Bucket</th>
+        <th>From Snapshot</th>
+        <th>To Snapshot</th>
+        <th>Progress</th>
+        <th>Total Diff Entries</th>
+        <th>Creation Time</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr ng-repeat="job in $ctrl.snapshotDiffJobs">
+        <td>{{job.JobId}}</td>
+        <td>{{job.Status}}</td>
+        <td>{{job.Volume}}</td>
+        <td>{{job.Bucket}}</td>
+        <td>{{job.FromSnapshot}}</td>
+        <td>{{job.ToSnapshot}}</td>
+        <td>{{job.KeysProcessedPct * 100 | number:2}}%</td>
+        <td>{{job.TotalDiffEntries}}</td>
+        <td>{{job.CreationTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+    </tr>
+    </tbody>
+</table>

@@ -27,7 +27,47 @@
         $routeProvider
             .when("/metrics/ozoneManager", {
                 template: "<om-metrics></om-metrics>"
+            })
+            .when("/snapshots", {
+                template: "<om-snapshots></om-snapshots>"
             });
+    });
+    angular.module('ozoneManager').component('omSnapshots', {
+        templateUrl: 'om-snapshots.html',
+        controller: function ($http) {
+            var ctrl = this;
+            ctrl.snapshotMetrics = [];
+            ctrl.snapshotDiffJobs = [];
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    var metrics = result.data.beans[0];
+                    for (var key in metrics) {
+                        if (key.match(/NumSnapshot|NumCancelSnapshotDiff|NumListSnapshotDiffJob/)) {
+                            ctrl.snapshotMetrics.push({key: key, value: metrics[key]});
+                        }
+                    }
+                });
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OmSnapshotInternalMetrics")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        var metrics = result.data.beans[0];
+                        for (var key in metrics) {
+                            if (!isIgnoredJmxKeys(key)) {
+                                ctrl.snapshotMetrics.push({key: key, value: metrics[key]});
+                            }
+                        }
+                    }
+                });
+
+            $http.get("jmx?qry=OzoneManager:name=SnapshotDiffManager")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        ctrl.snapshotDiffJobs = result.data.beans[0].SnapshotDiffJobs;
+                    }
+                });
+        }
     });
     angular.module('ozoneManager').component('omMetrics', {
         templateUrl: 'om-metrics.html',
