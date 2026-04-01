@@ -50,7 +50,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   private final double safeModeCutoff;
   private final AtomicInteger totalContainers = new AtomicInteger();
   private final AtomicInteger containersWithMinReplicas = new AtomicInteger();
-  
+
   public AbstractContainerSafeModeRule(ConfigurationSource conf, SCMSafeModeManager safeModeManager,
       ContainerManager containerManager, EventQueue eventQueue) {
     super(safeModeManager, eventQueue);
@@ -74,6 +74,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   protected void initializeRule() {
     containers.clear();
     containerManager.getContainers(getContainerType()).stream()
+        .filter(this::isClosed)
         .filter(c -> c.getNumberOfKeys() > 0)
         .forEach(c -> containers.put(c.containerID(), c.getReplicationConfig().getMinimumNodes()));
     totalContainers.set(containers.size());
@@ -134,22 +135,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   @Override
   public synchronized void refresh(boolean forceRefresh) {
-    if (forceRefresh) {
-      initializeRule();
-    } else {
-      refreshExpectedContainers();
-    }
-  }
-
-  /**
-   * Refreshes the expected container list when the rule is
-   * not yet validated and when there are pending transactions to be applied.
-   */
-  private void refreshExpectedContainers() {
-    if (getSafeModeManager().isScmRatisApplyCaughtUpToCommit()) {
-      return;
-    }
-    if (!validate()) {
+    if (forceRefresh || !validate()) {
       initializeRule();
     }
   }

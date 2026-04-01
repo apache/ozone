@@ -170,6 +170,67 @@ public class TestSCMSafeModeManager {
   }
 
   @Test
+  public void testSafeModeExitWithPeriodicContainerRuleRefresh() throws Exception {
+    config.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, "100ms");
+
+    List<ContainerInfo> ratisContainers = new ArrayList<>();
+    ratisContainers.addAll(HddsTestUtils.getContainerInfo(5));
+    for (ContainerInfo container : ratisContainers) {
+      container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
+    }
+
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS))
+        .thenAnswer(invocation -> new ArrayList<>(ratisContainers));
+    when(containerManager.getContainers(ReplicationType.EC))
+        .thenReturn(Collections.emptyList());
+
+    scmSafeModeManager = new SCMSafeModeManager(config, null, null, containerManager,
+        serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+
+    assertTrue(scmSafeModeManager.getInSafeMode());
+
+    RatisContainerSafeModeRule ratisRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(RatisContainerSafeModeRule.class);
+    assertEquals(5, ratisRule.getTotalNumberOfContainers(),
+        "initial Ratis container count from ContainerManager");
+
+    ratisContainers.addAll(HddsTestUtils.getContainerInfo(5));
+    for (int i = 5; i < ratisContainers.size(); i++) {
+      ratisContainers.get(i).setState(HddsProtos.LifeCycleState.CLOSED);
+      ratisContainers.get(i).setNumberOfKeys(10);
+    }
+
+    GenericTestUtils.waitFor(
+        () -> ratisRule.getTotalNumberOfContainers() == 10,
+        100,
+        15000);
+
+    SCMDatanodeProtocolServer.NodeRegistrationContainerReport report =
+        HddsTestUtils.createNodeRegistrationContainerReport(ratisContainers);
+    queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, report);
+    queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, report);
+
+    long cutOff = (long) Math.ceil(10 * config.getDouble(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT));
+
+    assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
+        .getNumContainerWithOneReplicaReportedThreshold().value());
+
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        100, 1000 * 30);
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
+
+    assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
+        .getCurrentContainersWithOneReplicaReportedCount().value());
+  }
+
+  @Test
   public void testSafeModeExitRule() throws Exception {
     containers = new ArrayList<>();
     int numContainers = 100;

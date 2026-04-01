@@ -37,14 +37,10 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,37 +159,6 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   public SafeModeMetrics getSafeModeMetrics() {
     return safeModeMetrics;
-  }
-
-  /**
-   * Returns true when the SCM Ratis state machine has applied all committed log entries
-   * ({@code lastAppliedIndex >= lastCommittedIndex}). In that case incremental
-   * {@link AbstractContainerSafeModeRule} refresh may skip work.
-   * <p>
-   * Returns false if SCM is not {@link StorageContainerManager}, HA/Ratis is unavailable,
-   * or the comparison cannot be made.
-   */
-  public boolean isScmRatisApplyCaughtUpToCommit() {
-    try {
-      OzoneStorageContainerManager ozoneScm = scmContext.getScm();
-      if (!(ozoneScm instanceof StorageContainerManager)) {
-        return false;
-      }
-      SCMHAManager ha = ((StorageContainerManager) ozoneScm).getScmHAManager();
-      if (ha == null) {
-        return false;
-      }
-      SCMRatisServer ratis = ha.getRatisServer();
-      if (ratis == null) {
-        return false;
-      }
-      long applied = ratis.getSCMStateMachine().getLastAppliedTermIndex().getIndex();
-      long committed = ratis.getDivision().getRaftLog().getLastCommittedIndex();
-      return applied >= committed;
-    } catch (Exception e) {
-      LOG.debug("Could not compare Ratis last applied vs last committed index", e);
-      return false;
-    }
   }
 
   private void emitSafeModeStatus() {
