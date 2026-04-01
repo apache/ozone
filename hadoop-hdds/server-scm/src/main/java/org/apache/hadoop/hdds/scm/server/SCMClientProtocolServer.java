@@ -497,7 +497,8 @@ public class SCMClientProtocolServer implements
       ReplicationConfig repConfig,
       Boolean suppressed) throws IOException {
     boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, replicationType, repConfig);
+    Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, 
+        replicationType, repConfig, suppressed);
 
     try {
       Stream<ContainerInfo> containerStream =
@@ -559,7 +560,8 @@ public class SCMClientProtocolServer implements
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig) {
+      ReplicationConfig repConfig,
+      Boolean suppressed) {
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
     auditMap.put("count", String.valueOf(count));
@@ -574,6 +576,9 @@ public class SCMClientProtocolServer implements
     }
     if (repConfig != null) {
       auditMap.put("replicationConfig", repConfig.toString());
+    }
+    if (suppressed != null) {
+      auditMap.put("suppressed", suppressed.toString());
     }
 
     return auditMap;
@@ -1725,14 +1730,27 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void suppressContainer(long longContainerID, boolean suppress) throws IOException {
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
+    SCMAction action = suppress ? SCMAction.SUPPRESS_CONTAINER : SCMAction.UNSUPPRESS_CONTAINER;
+    List<Long> failedContainerIDs = new ArrayList<>();
+    for (long containerId : containerIds) {
+      try {
+        persistContainerSuppression(containerId, suppress, action);
+      } catch (IOException ex) {
+        failedContainerIDs.add(containerId);
+      }
+    }
+    return failedContainerIDs;
+  }
+
+  private void persistContainerSuppression(long longContainerID, boolean suppress, SCMAction action)
+      throws IOException {
     ContainerID containerID = ContainerID.valueOf(longContainerID);
     final Map<String, String> auditMap = new HashMap<>();
     auditMap.put("containerID", containerID.toString());
     auditMap.put("suppress", String.valueOf(suppress));
-    SCMAction action = suppress ? SCMAction.SUPPRESS_CONTAINER : SCMAction.UNSUPPRESS_CONTAINER;
     try {
-      getScm().checkAdminAccess(getRemoteUser(), false);
       ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
       containerInfo.setSuppressed(suppress);
       scm.getContainerManager().updateContainerInfo(containerID, containerInfo.getProtobuf());

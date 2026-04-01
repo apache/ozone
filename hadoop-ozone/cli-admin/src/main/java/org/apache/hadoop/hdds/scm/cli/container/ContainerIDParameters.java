@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.ItemsFromStdin;
 import picocli.CommandLine;
@@ -71,6 +72,6 @@ public class ContainerIDParameters extends ItemsFromStdin {
       throw new CommandLine.ParameterException(spec.commandLine(),
           "Container IDs must be positive integers. Invalid container IDs: " + String.join(" ", invalidIDs));
     }
-    return containerIDs;
+    return new ArrayList<>(new LinkedHashSet<>(containerIDs));
   }
 }

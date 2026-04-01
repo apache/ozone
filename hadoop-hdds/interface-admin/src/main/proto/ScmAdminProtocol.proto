@@ -716,11 +716,13 @@ message ReconcileContainerResponseProto {
 }
 
 message SuppressContainerRequestProto {
-  optional int64 containerID = 1;
+  repeated int64 containerIDs = 1;
   optional bool suppress = 2;
 }
 
 message SuppressContainerResponseProto {
+  // Container IDs that failed to suppress or unsuppress. Empty if all succeeded.
+  repeated int64 failedContainerIDs = 1;
 }
 
 /**

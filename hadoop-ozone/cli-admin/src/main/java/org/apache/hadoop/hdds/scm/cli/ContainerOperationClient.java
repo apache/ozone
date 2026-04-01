@@ -632,7 +632,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public void suppressContainer(long containerId, boolean suppress) throws IOException {
-    storageContainerLocationClient.suppressContainer(containerId, suppress);
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException {
+    return storageContainerLocationClient.suppressContainers(containerIds, suppress);
   }
 }

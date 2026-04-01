@@ -547,11 +547,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
   void reconcileContainer(long containerID) throws IOException;
 
   /**
-   * Suppress or unsuppress the container.
+   * Suppress or unsuppress containers from reports.
    *
-   * @param containerId The ID of the container.
-   * @param suppress true to suppress, false to unsuppress.
+   * @param containerIds container IDs to suppress or unsuppress
+   * @param suppress true to suppress, false to unsuppress
    * @throws IOException
    */
-  void suppressContainer(long containerId, boolean suppress) throws IOException;
+  List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException;
 }

@@ -128,6 +128,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -1327,13 +1328,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void suppressContainer(long containerID, boolean suppress)
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress)
       throws IOException {
     SuppressContainerRequestProto request = SuppressContainerRequestProto.newBuilder()
-        .setContainerID(containerID)
+        .addAllContainerIDs(containerIds)
         .setSuppress(suppress)
         .build();
-    submitRequest(Type.SuppressContainer, builder -> builder.setSuppressContainerRequest(request));
+    SuppressContainerResponseProto response =
+        submitRequest(Type.SuppressContainer, builder -> builder.setSuppressContainerRequest(request))
+            .getSuppressContainerResponse();
+    return response.getFailedContainerIDsList();
   }
 
   /**

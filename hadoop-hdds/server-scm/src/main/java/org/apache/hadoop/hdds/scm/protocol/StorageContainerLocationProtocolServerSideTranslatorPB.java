@@ -1447,7 +1447,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public SuppressContainerResponseProto suppressContainer(SuppressContainerRequestProto request) throws IOException {
-    impl.suppressContainer(request.getContainerID(), request.getSuppress());
-    return SuppressContainerResponseProto.getDefaultInstance();
+    List<Long> failedContainerIDs = impl.suppressContainers(request.getContainerIDsList(), request.getSuppress());
+    return SuppressContainerResponseProto.newBuilder()
+        .addAllFailedContainerIDs(failedContainerIDs)
+        .build();
   }
 }

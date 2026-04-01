@@ -63,14 +63,6 @@ public class ReportSubcommand extends ScmSubcommand {
     @CommandLine.Option(names = {"--unsuppress"},
         description = "Unsuppress container(s) to include in future reports")
     private boolean unsuppress;
-
-    public boolean isSuppress() {
-      return suppress;
-    }
-
-    public boolean isUnsuppress() {
-      return unsuppress;
-    }
   }
 
   @Override
@@ -84,18 +76,17 @@ public class ReportSubcommand extends ScmSubcommand {
   }
 
   private void handleSuppressUnsuppress(ScmClient scmClient) throws IOException {
-    boolean suppress = suppressOptions.isSuppress();
+    boolean suppress = suppressOptions.suppress;
     List<Long> containerIDs = containerList.getValidatedIDs();
+    List<Long> failedContainerIDs = scmClient.suppressContainers(containerIDs, suppress);
 
     int failures = 0;
     for (long id : containerIDs) {
-      try {
-        scmClient.suppressContainer(id, suppress);
-        out().println((suppress ? "Suppressed" : "Unsuppressed") + " container: " + id);
-      } catch (IOException e) {
-        err().println("Failed to " + (suppress ? "suppress" : "unsuppress") + 
-            " container " + id + ": " + e.getMessage());
+      if (failedContainerIDs.contains(id)) {
+        err().println("Failed to " + (suppress ? "suppress" : "unsuppress") + " container " + id + ".");
         failures++;
+      } else {
+        out().println((suppress ? "Suppressed" : "Unsuppressed") + " container: " + id);
       }
     }
 
@@ -106,7 +97,7 @@ public class ReportSubcommand extends ScmSubcommand {
     }
 
     if (failures > 0) {
-      throw new IOException("Failed to " + (suppress ? "suppress" : "unsuppress") + failures + " container(s).");
+      throw new IOException("Failed to " + (suppress ? "suppress " : "unsuppress ") + failures + " container(s).");
     }
   }
 

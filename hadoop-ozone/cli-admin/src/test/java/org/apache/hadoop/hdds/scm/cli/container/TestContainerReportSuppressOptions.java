@@ -22,9 +22,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,6 +34,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -84,8 +86,8 @@ public class TestContainerReportSuppressOptions {
         .thenAnswer(inv -> listNonSuppressedContainers());
 
     // Mock suppress/unsuppress
-    doNothing().when(scmClient).suppressContainer(anyLong(), eq(true));
-    doNothing().when(scmClient).suppressContainer(anyLong(), eq(false));
+    doReturn(Collections.emptyList()).when(scmClient).suppressContainers(anyList(), eq(true));
+    doReturn(Collections.emptyList()).when(scmClient).suppressContainers(anyList(), eq(false));
 
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
