@@ -17,26 +17,25 @@
 
 package org.apache.hadoop.hdds.scm.ha.invoker;
 
+import com.google.protobuf.ByteString;
+import java.io.IOException;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.ha.ScmInvoker;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
  * Invoker for DeletedBlockLogStateManager local (non-@Replicate) methods.
  */
-public class DeletedBlockLogStateManagerInvoker implements ScmInvoker<DeletedBlockLogStateManager> {
+public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockLogStateManager> {
   private final DeletedBlockLogStateManager impl;
-  private final SCMRatisServer ratisHandler;
 
-  public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl, SCMRatisServer ratisHandler) {
+  public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl, SCMRatisServer scmRatisServer) {
+    super(scmRatisServer);
     this.impl = impl;
-    this.ratisHandler = ratisHandler;
   }
 
   @Override
@@ -52,6 +51,58 @@ public class DeletedBlockLogStateManagerInvoker implements ScmInvoker<DeletedBlo
   @Override
   public DeletedBlockLogStateManager getImpl() {
     return impl;
+  }
+
+  @Override
+  protected Class<?>[] getParameterTypes(String methodName) {
+    switch (methodName) {
+    case "addTransactionsToDB":
+      return new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class};
+
+    case "removeTransactionsFromDB":
+      return new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class};
+
+    default:
+      throw new IllegalArgumentException("Unknown method: " + methodName);
+    }
+  }
+
+  @Override
+  public DeletedBlockLogStateManager getProxy() {
+    return new DeletedBlockLogStateManager() {
+      @Override
+      public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
+          DeletedBlocksTransactionSummary summary) throws IOException {
+        // @Replicate
+        final Object[] args = {txs, summary};
+        invokeRatisServer("addTransactionsToDB", args);
+      }
+
+      @Override
+      public void removeTransactionsFromDB(ArrayList<Long> txIDs,
+          DeletedBlocksTransactionSummary summary) throws IOException {
+        final Object[] args = {txIDs, summary};
+        invokeRatisServer("removeTransactionsFromDB", args);
+      }
+
+      @Override
+      public Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator() throws IOException {
+        return impl.getReadOnlyIterator();
+      }
+
+      @Override
+      public void onFlush() {
+        // local
+        impl.onFlush();
+      }
+
+      @Override
+      public void reinitialize(
+          Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
+          Table<String, ByteString> statefulConfigTable) {
+        impl.reinitialize(deletedBlocksTXTable, statefulConfigTable);
+      }
+    };
   }
 
   // Code generated for DeletedBlockLogStateManager.  Do not modify.
@@ -91,19 +142,6 @@ public class DeletedBlockLogStateManagerInvoker implements ScmInvoker<DeletedBlo
     default:
       throw new IllegalArgumentException("Method not found: " + methodName);
     }
-  }
-
-  @Override
-  public Object invokeRatisServer(String methodName, Class<?>[] paramTypes,
-      Object[] args) throws Exception {
-    final SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(
-        getType(), methodName, paramTypes, args);
-    final SCMRatisResponse response = ratisHandler.submitRequest(
-        scmRatisRequest);
-    if (response.isSuccess()) {
-      return response.getResult();
-    }
-    throw response.getException();
   }
 
 }

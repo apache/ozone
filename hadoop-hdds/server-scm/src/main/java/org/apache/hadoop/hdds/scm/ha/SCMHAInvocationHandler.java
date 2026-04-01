@@ -26,9 +26,11 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,10 +88,8 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       LOG.trace("Invoking method {} on target {} with arguments {}",
           method, localHandler, args);
     }
+    Preconditions.assertNull(invoker, "invoker");
     try {
-      if (invoker != null) {
-        return invoker.invokeLocal(method.getName(), args);
-      }
       return method.invoke(localHandler, args);
     } catch (Exception e) {
       throw translateException(e);
@@ -111,10 +111,6 @@ public class SCMHAInvocationHandler implements InvocationHandler {
         return invokeRatisClient(method, args);
       case DIRECT:
       default:
-        if (invoker != null) {
-          return invoker.invokeRatisServer(
-              method.getName(), method.getParameterTypes(), args);
-        }
         return invokeRatisServer(method, args);
       }
     } catch (Exception e) {
@@ -148,7 +144,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     throw response.getException();
   }
 
-  private static SCMException translateException(Throwable t) {
+  public static SCMException translateException(Throwable t) {
     if (t instanceof SCMException) {
       return (SCMException) t;
     }
