@@ -104,7 +104,7 @@ public final class OzoneBucketStub extends OzoneBucket {
       return new OzoneBucketStub(this);
     }
   }
-  
+
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
     return createKey(key, size,
@@ -213,12 +213,11 @@ public final class OzoneBucketStub extends OzoneBucket {
       throw new OMException("Key not found for If-Match",
           ResultCodes.KEY_NOT_FOUND);
     }
-    String currentETag = existing.getMetadata().get(ETAG);
-    if (currentETag == null) {
+    if (!existing.hasEtag()) {
       throw new OMException("Key does not have an ETag",
           ResultCodes.ETAG_NOT_AVAILABLE);
     }
-    if (!currentETag.equals(expectedETag)) {
+    if (!existing.isEtagEquals(expectedETag)) {
       throw new OMException("ETag mismatch",
           ResultCodes.ETAG_MISMATCH);
     }

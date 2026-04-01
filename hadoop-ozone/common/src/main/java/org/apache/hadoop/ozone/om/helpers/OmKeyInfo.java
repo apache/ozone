@@ -1020,6 +1020,21 @@ public final class OmKeyInfo extends WithParentObjectId
     return false;
   }
 
+  public boolean hasEtag() {
+    return getMetadata().containsKey(OzoneConsts.ETAG);
+  }
+
+  public boolean isEtagEquals(String matchingETag) {
+    String currentETag = getMetadata().get(OzoneConsts.ETAG);
+    if (currentETag == null) {
+      return false;
+    }
+    if (matchingETag.equals("*")) {
+      return true;
+    }
+    return currentETag.equals(matchingETag);
+  }
+
   public static boolean isKeyEmpty(@Nullable OmKeyInfo keyInfo) {
     if (keyInfo == null) {
       return true;

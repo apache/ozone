@@ -651,12 +651,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         throw new OMException("Key not found for If-Match at commit",
             OMException.ResultCodes.KEY_NOT_FOUND);
       }
-      String currentETag = existing.getMetadata().get(OzoneConsts.ETAG);
-      if (currentETag == null) {
+      if (!existing.hasEtag()) {
         throw new OMException("Key does not have an ETag at commit",
             OMException.ResultCodes.ETAG_NOT_AVAILABLE);
       }
-      if (!currentETag.equals(expectedETag)) {
+      if (!existing.isEtagEquals(expectedETag)) {
         throw new OMException("ETag changed during write (concurrent modification)",
             OMException.ResultCodes.ETAG_MISMATCH);
       }

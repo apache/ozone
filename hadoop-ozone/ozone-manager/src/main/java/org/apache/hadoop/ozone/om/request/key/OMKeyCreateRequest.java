@@ -503,12 +503,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         throw new OMException("Key not found for If-Match",
             OMException.ResultCodes.KEY_NOT_FOUND);
       }
-      String existingETag = dbKeyInfo.getMetadata().get(OzoneConsts.ETAG);
-      if (existingETag == null) {
+      if (!dbKeyInfo.hasEtag()) {
         throw new OMException("Key does not have an ETag",
             OMException.ResultCodes.ETAG_NOT_AVAILABLE);
       }
-      if (!existingETag.equals(expectedETag)) {
+      if (!dbKeyInfo.isEtagEquals(expectedETag)) {
         throw new OMException("ETag mismatch",
             OMException.ResultCodes.ETAG_MISMATCH);
       }
