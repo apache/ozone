@@ -121,6 +121,15 @@ public final class DiskBalancerConfiguration {
           "Unit could be defined with postfix (ns,ms,s,m,h,d).")
   private long replicaDeletionDelay = Duration.ofMinutes(5).toMillis();
 
+  @Config(key = "hdds.datanode.disk.balancer.include.non.standard.containers",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE, ConfigTag.DISKBALANCER },
+      description = "If true, balancer include non-standard states, i.e, QUASI_CLOSED." +
+          " So both CLOSED and QUASI_CLOSED state containers are eligible for move. " +
+          "If false (default), balancer only moves CLOSED containers.")
+  private boolean includeNonStandardContainers = false;
+
   public DiskBalancerConfiguration(Double threshold,
       Long bandwidthInMB,
       Integer parallelThread,
@@ -260,6 +269,14 @@ public final class DiskBalancerConfiguration {
           "parallelThread must be a value larger than 0.");
     }
     this.parallelThread = parallelThread;
+  }
+
+  public boolean getIncludeNonStandardContainers() {
+    return includeNonStandardContainers;
+  }
+
+  public void setIncludeNonStandardContainers(boolean includeNonStandardContainers) {
+    this.includeNonStandardContainers = includeNonStandardContainers;
   }
 
   @Override

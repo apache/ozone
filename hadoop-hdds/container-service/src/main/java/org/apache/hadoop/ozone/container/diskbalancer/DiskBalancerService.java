@@ -70,7 +70,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy.MovableContainerStates;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -130,6 +130,8 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
 
+  private final MovableContainerStates movableContainerStates;
+
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
       int workerSize, ConfigurationSource conf) throws IOException {
@@ -153,8 +155,9 @@ public class DiskBalancerService extends BackgroundService {
       throw new IOException(e);
     }
 
-    replicaDeletionDelay = conf.getObject(DiskBalancerConfiguration.class)
-        .getReplicaDeletionDelay();
+    DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
+    replicaDeletionDelay = diskBalancerConfiguration.getReplicaDeletionDelay();
+    movableContainerStates = MovableContainerStates.fromConfig(conf);
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
@@ -485,14 +488,10 @@ public class DiskBalancerService extends BackgroundService {
       }
 
       // Double check container state before acquiring lock to start move process.
-      // Container state may have changed after selection. Only CLOSED containers can be moved.
-      // QUASI_CLOSED is allowed when test mode is enabled, this is done to test in production
-      // these containers are rejected.
+      // Container state may have changed after selection.
       State containerState = container.getContainerData().getState();
-      boolean isTestMode = DefaultContainerChoosingPolicy.isTest();
-      if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
-        LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
-            containerId, containerState);
+      if (!movableContainerStates.allows(containerState)) {
+        LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
         postCall(false, startTime);
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
