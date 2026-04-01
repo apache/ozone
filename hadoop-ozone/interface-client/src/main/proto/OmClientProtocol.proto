@@ -2434,6 +2434,10 @@ message LifecycleExpiration {
   optional string date = 2;
 }
 
+message AbortIncompleteMultipartUpload {
+  optional uint32 daysAfterInitiation = 1;
+}
+
 message LifecycleRule {
   required string id = 1;
   required bool enabled = 2;
@@ -2444,6 +2448,7 @@ message LifecycleRule {
 
 message LifecycleAction {
   optional LifecycleExpiration expiration = 1;
+  optional AbortIncompleteMultipartUpload abortIncompleteMultipartUpload = 2;
 }
 
 message LifecycleConfiguration {
