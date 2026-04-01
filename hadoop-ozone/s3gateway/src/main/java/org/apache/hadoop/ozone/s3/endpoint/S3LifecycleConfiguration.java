@@ -28,6 +28,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmLCAbortIncompleteMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
@@ -72,6 +73,9 @@ public class S3LifecycleConfiguration {
     @XmlElement(name = "Expiration")
     private Expiration expiration;
 
+    @XmlElement(name = "AbortIncompleteMultipartUpload")
+    private AbortIncompleteMultipartUpload abortIncompleteMultipartUpload;
+
     @XmlElement(name = "Filter")
     private Filter filter;
 
@@ -105,6 +109,14 @@ public class S3LifecycleConfiguration {
 
     public void setExpiration(Expiration expiration) {
       this.expiration = expiration;
+    }
+
+    public AbortIncompleteMultipartUpload getAbortIncompleteMultipartUpload() {
+      return abortIncompleteMultipartUpload;
+    }
+
+    public void setAbortIncompleteMultipartUpload(AbortIncompleteMultipartUpload abortIncompleteMultipartUpload) {
+      this.abortIncompleteMultipartUpload = abortIncompleteMultipartUpload;
     }
 
     public Filter getFilter() {
@@ -142,6 +154,24 @@ public class S3LifecycleConfiguration {
 
     public void setDate(String date) {
       this.date = date;
+    }
+  }
+
+  /**
+   * AbortIncompleteMultipartUpload entity for lifecycle rule.
+   */
+  @XmlAccessorType(XmlAccessType.FIELD)
+  @XmlRootElement(name = "AbortIncompleteMultipartUpload")
+  public static class AbortIncompleteMultipartUpload {
+    @XmlElement(name = "DaysAfterInitiation")
+    private Integer daysAfterInitiation;
+
+    public Integer getDaysAfterInitiation() {
+      return daysAfterInitiation;
+    }
+
+    public void setDaysAfterInitiation(Integer daysAfterInitiation) {
+      this.daysAfterInitiation = daysAfterInitiation;
     }
   }
 
@@ -293,7 +323,10 @@ public class S3LifecycleConfiguration {
         .setPrefix(rule.getPrefix());
 
     if (rule.getExpiration() != null) {
-      builder.setAction(convertToOmExpiration(rule.getExpiration()));
+      builder.addAction(convertToOmExpiration(rule.getExpiration()));
+    }
+    if (rule.getAbortIncompleteMultipartUpload() != null) {
+      builder.addAction(convertToOmAbortIncompleteMultipartUpload(rule.getAbortIncompleteMultipartUpload()));
     }
     if (rule.getFilter() != null) {
       builder.setFilter(convertToOmFilter(rule.getFilter()));
@@ -316,6 +349,24 @@ public class S3LifecycleConfiguration {
     }
     if (expiration.getDate() != null) {
       builder.setDate(expiration.getDate());
+    }
+
+    return builder.build();
+  }
+
+  /**
+   * Converts S3 AbortIncompleteMultipartUpload to internal representation.
+   *
+   * @param abortIncompleteMultipartUpload the S3 AbortIncompleteMultipartUpload
+   * @return OmLCAbortIncompleteMultipartUpload internal representation
+   */
+  private OmLCAbortIncompleteMultipartUpload convertToOmAbortIncompleteMultipartUpload(
+      AbortIncompleteMultipartUpload abortIncompleteMultipartUpload) throws OMException {
+    OmLCAbortIncompleteMultipartUpload.Builder builder =
+        new OmLCAbortIncompleteMultipartUpload.Builder();
+
+    if (abortIncompleteMultipartUpload.getDaysAfterInitiation() != null) {
+      builder.setDaysAfterInitiation(abortIncompleteMultipartUpload.getDaysAfterInitiation());
     }
 
     return builder.build();
@@ -402,6 +453,10 @@ public class S3LifecycleConfiguration {
     if (ozoneRule.getExpiration() != null) {
       rule.setExpiration(convertFromOzoneExpiration(ozoneRule.getExpiration()));
     }
+    if (ozoneRule.getAbortIncompleteMultipartUpload() != null) {
+      rule.setAbortIncompleteMultipartUpload(
+          convertFromOzoneAbortIncompleteMultipartUpload(ozoneRule.getAbortIncompleteMultipartUpload()));
+    }
     if (ozoneRule.getFilter() != null) {
       rule.setFilter(convertFromOzoneFilter(ozoneRule.getFilter()));
     }
@@ -429,6 +484,25 @@ public class S3LifecycleConfiguration {
     }
 
     return expiration;
+  }
+
+  /**
+   * Converts an Ozone internal AbortIncompleteMultipartUpload to S3 representation.
+   *
+   * @param ozoneAbortIncompleteMultipartUpload internal AbortIncompleteMultipartUpload
+   * @return AbortIncompleteMultipartUpload S3 representation
+   */
+  private static AbortIncompleteMultipartUpload convertFromOzoneAbortIncompleteMultipartUpload(
+      OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload ozoneAbortIncompleteMultipartUpload) {
+
+    AbortIncompleteMultipartUpload abortIncompleteMultipartUpload = new AbortIncompleteMultipartUpload();
+
+    if (ozoneAbortIncompleteMultipartUpload.getDaysAfterInitiation() > 0) {
+      abortIncompleteMultipartUpload.setDaysAfterInitiation(
+          ozoneAbortIncompleteMultipartUpload.getDaysAfterInitiation());
+    }
+
+    return abortIncompleteMultipartUpload;
   }
 
   /**
