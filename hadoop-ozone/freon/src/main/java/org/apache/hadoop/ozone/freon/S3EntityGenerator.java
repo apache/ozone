@@ -46,11 +46,12 @@ public class S3EntityGenerator extends BaseFreonGenerator {
       amazonS3ClientBuilder
           .withPathStyleAccessEnabled(true)
           .withEndpointConfiguration(
-                  new EndpointConfiguration(endpoint, "us-east-1"));
+              new EndpointConfiguration(endpoint, "us-east-1"));
     } else {
       amazonS3ClientBuilder.withRegion(Regions.DEFAULT_REGION);
     }
 
+    amazonS3ClientBuilder.withRequestHandlers(new FreonS3TraceContextRequestHandler());
     s3 = amazonS3ClientBuilder.build();
   }
 
