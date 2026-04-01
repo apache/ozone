@@ -256,6 +256,8 @@
       ioLinkHref: '@',
       scanner: '<',
       scannerLinkHref: '@',
+      snapshot: '@',
+      snapshotLinkHref: '@'
     },
     templateUrl: 'static/templates/menu.html',
     controller: function($http) {
