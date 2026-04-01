@@ -299,11 +299,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
-      boolean hasConditionalHeaders = ifNoneMatch != null || ifMatch != null;
       long putLength;
       final String md5Hash;
-      if (isDatastreamEnabled() && !enableEC
-          && length > getDatastreamMinLength() && !hasConditionalHeaders) {
+      if (isDatastreamEnabled() && !enableEC && length > getDatastreamMinLength()) {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
