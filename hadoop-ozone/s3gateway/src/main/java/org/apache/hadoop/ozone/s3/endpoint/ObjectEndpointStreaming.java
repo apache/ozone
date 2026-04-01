@@ -159,6 +159,7 @@ final class ObjectEndpointStreaming {
     return Pair.of(md5Hash, writeLen);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private static OzoneDataStreamOutput openStreamKeyForPut(OzoneBucket bucket,
       String keyPath, long length, ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata, Map<String, String> tags,
