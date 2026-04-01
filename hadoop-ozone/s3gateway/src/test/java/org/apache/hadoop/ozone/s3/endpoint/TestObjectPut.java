@@ -621,6 +621,37 @@ class TestObjectPut {
     OS3Exception ex = assertErrorResponse(
         INVALID_REQUEST, () -> putObject(CONTENT));
     assertNotNull(ex);
+    assertThat(ex.getErrorMessage()).contains(
+        "If-Match and If-None-Match cannot be specified together");
+  }
+
+  @Test
+  void testBlankIfNoneMatchInvalidRequest() throws Exception {
+    when(headers.getHeaderString("If-None-Match")).thenReturn(" ");
+
+    OS3Exception ex = assertErrorResponse(
+        INVALID_REQUEST, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains(
+        "If-None-Match header cannot be empty");
+  }
+
+  @Test
+  void testBlankIfMatchInvalidRequest() throws Exception {
+    when(headers.getHeaderString("If-Match")).thenReturn(" ");
+
+    OS3Exception ex = assertErrorResponse(
+        INVALID_REQUEST, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains("If-Match header cannot be empty");
+  }
+
+  @Test
+  void testIfNoneMatchNotStarInvalidRequest() throws Exception {
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"etag\"");
+
+    OS3Exception ex = assertErrorResponse(
+        INVALID_REQUEST, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains(
+        "Only If-None-Match: * is supported");
   }
 
   @Test

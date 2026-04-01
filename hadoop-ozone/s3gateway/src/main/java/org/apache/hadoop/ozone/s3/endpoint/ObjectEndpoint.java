@@ -285,8 +285,31 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       String ifMatch = getHeaders().getHeaderString(
           S3Consts.IF_MATCH_HEADER);
 
-      if (ifNoneMatch != null && ifMatch != null) {
-        throw newError(INVALID_REQUEST, keyPath);
+      if (ifNoneMatch != null && StringUtils.isBlank(ifNoneMatch)) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage("If-None-Match header cannot be empty.");
+        throw ex;
+      }
+      if (ifMatch != null && StringUtils.isBlank(ifMatch)) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage("If-Match header cannot be empty.");
+        throw ex;
+      }
+
+      String ifNoneMatchTrimmed = ifNoneMatch == null ? null : ifNoneMatch.trim();
+      String ifMatchTrimmed = ifMatch == null ? null : ifMatch.trim();
+
+      if (ifNoneMatchTrimmed != null && ifMatchTrimmed != null) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage("If-Match and If-None-Match cannot be specified together.");
+        throw ex;
+      }
+
+      if (ifNoneMatchTrimmed != null
+          && !"*".equals(stripQuotes(ifNoneMatchTrimmed))) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage("Only If-None-Match: * is supported for conditional put.");
+        throw ex;
       }
 
       // Normal put object
@@ -314,7 +337,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
         try (OzoneOutputStream output = openKeyForPut(
             volume.getName(), bucketName, keyPath, length,
-            replicationConfig, customMetadata, tags, ifNoneMatch, ifMatch)) {
+            replicationConfig, customMetadata, tags, ifNoneMatchTrimmed,
+            ifMatchTrimmed)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
