@@ -663,6 +663,18 @@ public class SCMDeletedBlockTransactionStatusManager {
     disableDataDistributionForTest = disabled;
   }
 
+  /**
+   * Resets the in-memory atomic counters to the values from {@code summary}.
+   * Called under the deletion lock when a repair has been confirmed and the
+   * persisted DB summary has already been updated.
+   */
+  public void resetToSummary(DeletedBlocksTransactionSummary summary) {
+    totalTxCount.set(summary.getTotalTransactionCount());
+    totalBlockCount.set(summary.getTotalBlockCount());
+    totalBlocksSize.set(summary.getTotalBlockSize());
+    totalReplicatedBlocksSize.set(summary.getTotalBlockReplicatedSize());
+  }
+
   @Nullable
   public DeletedBlocksTransactionSummary getTransactionSummary() {
     return DeletedBlocksTransactionSummary.newBuilder()

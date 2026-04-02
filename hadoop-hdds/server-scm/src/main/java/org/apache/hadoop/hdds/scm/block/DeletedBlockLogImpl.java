@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +58,9 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -81,6 +85,7 @@ public class DeletedBlockLogImpl
       LoggerFactory.getLogger(DeletedBlockLogImpl.class);
 
   private final ContainerManager containerManager;
+  private final StorageContainerManager scm;
   private final Lock lock;
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
@@ -101,6 +106,7 @@ public class DeletedBlockLogImpl
       SCMHADBTransactionBuffer dbTxBuffer,
       ScmBlockDeletingServiceMetrics metrics) throws IOException {
     this.containerManager = containerManager;
+    this.scm = scm;
     this.lock = new ReentrantLock();
 
     this.deletedBlockLogStateManager = DeletedBlockLogStateManagerImpl
@@ -482,6 +488,141 @@ public class DeletedBlockLogImpl
   @Override
   public DeletedBlocksTransactionSummary getTransactionSummary() {
     return transactionStatusManager.getTransactionSummary();
+  }
+
+  @Override
+  public CheckpointSummaryResult getTransactionSummaryFromCheckpoint(boolean repair)
+      throws IOException {
+    //Take a RocksDB checkpoint (hard-linked snapshot; fast)
+    DBStore store = scm.getScmMetadataStore().getStore();
+    DBCheckpoint checkpoint = store.getCheckpoint(false);
+    try {
+      //Open the checkpoint read-only
+      Path checkpointLocation = checkpoint.getCheckpointLocation();
+      Path checkpointFileName = checkpointLocation.getFileName();
+      if (checkpointFileName == null) {
+        throw new IOException(
+            "Cannot determine checkpoint directory name from path: " + checkpointLocation);
+      }
+      DBStore cpStore = DBStoreBuilder
+          .newBuilder(scm.getConfiguration(),
+              org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.get(),
+              checkpointFileName.toString(),
+              checkpointLocation.getParent())
+          .setOpenReadOnly(true)
+          .build();
+      try {
+        //Scan deletedBlocks table in checkpoint
+        // NOTE: deletingTxIDs is NOT applied here because this is a raw
+        // snapshot; those rows are physically present in the checkpoint.
+        long cpTxCount = 0, cpBlockCount = 0;
+        long cpBlockSize = 0, cpReplicatedSize = 0;
+
+        Table<Long, DeletedBlocksTransaction> cpDeletedTable =
+            org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS.getTable(cpStore);
+        try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
+                 cpDeletedTable.iterator()) {
+          while (iter.hasNext()) {
+            DeletedBlocksTransaction tx = iter.next().getValue();
+            if (tx != null && tx.hasTotalBlockSize()) {
+              cpTxCount++;
+              cpBlockCount += tx.getLocalIDCount();
+              cpBlockSize  += tx.getTotalBlockSize();
+              if (tx.hasTotalBlockReplicatedSize()) {
+                cpReplicatedSize += tx.getTotalBlockReplicatedSize();
+              }
+            }
+          }
+        }
+
+        //Read persisted summary from checkpoint
+        DeletedBlocksTransactionSummary cpPersisted = null;
+        Table<String, com.google.protobuf.ByteString> cpConfigTable =
+            org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.STATEFUL_SERVICE_CONFIG.getTable(cpStore);
+        com.google.protobuf.ByteString bytes =
+            cpConfigTable.get(DeletedBlockLogStateManagerImpl.SERVICE_NAME);
+        if (bytes != null) {
+          cpPersisted = DeletedBlocksTransactionSummary.parseFrom(bytes);
+        }
+        if (cpPersisted == null) {
+          cpPersisted = DeletedBlocksTransactionSummary.newBuilder().build();
+        }
+
+        DeletedBlocksTransactionSummary cpActual =
+            DeletedBlocksTransactionSummary.newBuilder()
+                .setTotalTransactionCount(cpTxCount)
+                .setTotalBlockCount(cpBlockCount)
+                .setTotalBlockSize(cpBlockSize)
+                .setTotalBlockReplicatedSize(cpReplicatedSize)
+                .build();
+
+        //Capture live in-memory state before any repair
+        DeletedBlocksTransactionSummary liveInMemBefore;
+        DeletedBlocksTransactionSummary liveInMemAfter;
+        lock.lock();
+        try {
+          liveInMemBefore = transactionStatusManager.getTransactionSummary();
+
+          if (repair) {
+            // Diff = cpActual - cpPersisted; apply to live-in-memory.
+            long diffTx   = cpTxCount       - cpPersisted.getTotalTransactionCount();
+            long diffBlk  = cpBlockCount    - cpPersisted.getTotalBlockCount();
+            long diffSize = cpBlockSize     - cpPersisted.getTotalBlockSize();
+            long diffRepl = cpReplicatedSize - cpPersisted.getTotalBlockReplicatedSize();
+
+            boolean hasDiff = diffTx != 0 || diffBlk != 0 || diffSize != 0 || diffRepl != 0;
+            if (hasDiff) {
+              long newTx   = liveInMemBefore.getTotalTransactionCount()    + diffTx;
+              long newBlk  = liveInMemBefore.getTotalBlockCount()          + diffBlk;
+              long newSize = liveInMemBefore.getTotalBlockSize()           + diffSize;
+              long newRepl = liveInMemBefore.getTotalBlockReplicatedSize() + diffRepl;
+              // Clamp to zero to avoid negative counters from stale checkpoints.
+              newTx   = Math.max(0, newTx);
+              newBlk  = Math.max(0, newBlk);
+              newSize = Math.max(0, newSize);
+              newRepl = Math.max(0, newRepl);
+
+              LOG.warn("Checkpoint repair: cpActual txns={} blk={} size={} repl={} "
+                  + "vs cpPersisted txns={} blk={} size={} repl={} "
+                  + "— applying diff to live inMem (before: txns={} blk={} size={} repl={}).",
+                  cpTxCount, cpBlockCount, cpBlockSize, cpReplicatedSize,
+                  cpPersisted.getTotalTransactionCount(), cpPersisted.getTotalBlockCount(),
+                  cpPersisted.getTotalBlockSize(), cpPersisted.getTotalBlockReplicatedSize(),
+                  liveInMemBefore.getTotalTransactionCount(), liveInMemBefore.getTotalBlockCount(),
+                  liveInMemBefore.getTotalBlockSize(), liveInMemBefore.getTotalBlockReplicatedSize());
+
+              doRepair(newTx, newBlk, newSize, newRepl);
+            } else {
+              LOG.info("Checkpoint repair: checkpoint is consistent "
+                  + "(cpActual == cpPersisted), no changes applied to live state.");
+            }
+          }
+          liveInMemAfter = transactionStatusManager.getTransactionSummary();
+        } finally {
+          lock.unlock();
+        }
+
+        return new CheckpointSummaryResult(cpActual, cpPersisted,
+            liveInMemBefore, liveInMemAfter);
+      } finally {
+        cpStore.close();
+      }
+    } finally {
+      checkpoint.cleanupCheckpoint();
+    }
+  }
+
+  private void doRepair(long newTx, long newBlk, long newSize, long newRepl)
+      throws IOException {
+    DeletedBlocksTransactionSummary newSummary =
+        DeletedBlocksTransactionSummary.newBuilder()
+            .setTotalTransactionCount(newTx)
+            .setTotalBlockCount(newBlk)
+            .setTotalBlockSize(newSize)
+            .setTotalBlockReplicatedSize(newRepl)
+            .build();
+    transactionStatusManager.resetToSummary(newSummary);
+    deletedBlockLogStateManager.updateSummaryInDb(newSummary);
   }
 
   @Override

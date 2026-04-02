@@ -174,6 +174,11 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
+  public void updateSummaryInDb(DeletedBlocksTransactionSummary summary) throws IOException {
+    transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+  }
+
+  @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Objects.requireNonNull(deletingTxIDs, "deletingTxIDs == null");

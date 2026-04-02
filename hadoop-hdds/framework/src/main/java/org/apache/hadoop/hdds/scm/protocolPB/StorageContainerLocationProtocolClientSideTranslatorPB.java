@@ -82,6 +82,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryFromCheckpointRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
@@ -103,6 +104,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RepairDeletedBlocksTxnSummaryFromCheckpointRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
@@ -847,6 +850,28 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     GetDeletedBlocksTxnSummaryResponseProto response =
         scmContainerLocationResponse.getGetDeletedBlocksTxnSummaryResponse();
     return response.hasSummary() ? response.getSummary() : null;
+  }
+
+  @Override
+  public RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      getDeletedBlockSummaryFromCheckpoint() throws IOException {
+    GetDeletedBlocksTxnSummaryFromCheckpointRequestProto request =
+        GetDeletedBlocksTxnSummaryFromCheckpointRequestProto.newBuilder().build();
+    ScmContainerLocationResponse resp = submitRequest(
+        Type.GetDeletedBlocksTransactionSummaryFromCheckpoint,
+        builder -> builder.setGetDeletedBlocksTxnSummaryFromCheckpointRequest(request));
+    return resp.getGetDeletedBlocksTxnSummaryFromCheckpointResponse();
+  }
+
+  @Override
+  public RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      repairDeletedBlockSummaryFromCheckpoint() throws IOException {
+    RepairDeletedBlocksTxnSummaryFromCheckpointRequestProto request =
+        RepairDeletedBlocksTxnSummaryFromCheckpointRequestProto.newBuilder().build();
+    ScmContainerLocationResponse resp = submitRequest(
+        Type.RepairDeletedBlocksTransactionSummaryFromCheckpoint,
+        builder -> builder.setRepairDeletedBlocksTxnSummaryFromCheckpointRequest(request));
+    return resp.getRepairDeletedBlocksTxnSummaryFromCheckpointResponse();
   }
 
   /**

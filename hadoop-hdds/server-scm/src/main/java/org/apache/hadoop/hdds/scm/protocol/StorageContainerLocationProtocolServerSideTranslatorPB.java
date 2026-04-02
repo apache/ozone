@@ -83,6 +83,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryFromCheckpointRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
@@ -107,6 +108,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RepairDeletedBlocksTxnSummaryFromCheckpointRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
@@ -726,6 +729,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetDeletedBlocksTxnSummaryResponse(
                 getDeletedBlocksTxnSummary(
                     request.getGetDeletedBlocksTxnSummaryRequest()))
+            .build();
+      case GetDeletedBlocksTransactionSummaryFromCheckpoint:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetDeletedBlocksTxnSummaryFromCheckpointResponse(
+                getDeletedBlocksTxnSummaryFromCheckpoint(
+                    request.getGetDeletedBlocksTxnSummaryFromCheckpointRequest()))
+            .build();
+      case RepairDeletedBlocksTransactionSummaryFromCheckpoint:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setRepairDeletedBlocksTxnSummaryFromCheckpointResponse(
+                repairDeletedBlocksTxnSummaryFromCheckpoint(
+                    request.getRepairDeletedBlocksTxnSummaryFromCheckpointRequest()))
             .build();
       case TransferLeadership:
         return ScmContainerLocationResponse.newBuilder()
@@ -1385,6 +1404,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .setSummary(summary)
           .build();
     }
+  }
+
+  public RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      getDeletedBlocksTxnSummaryFromCheckpoint(
+          GetDeletedBlocksTxnSummaryFromCheckpointRequestProto request)
+          throws IOException {
+    return impl.getDeletedBlockSummaryFromCheckpoint();
+  }
+
+  public RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      repairDeletedBlocksTxnSummaryFromCheckpoint(
+          RepairDeletedBlocksTxnSummaryFromCheckpointRequestProto request)
+          throws IOException {
+    return impl.repairDeletedBlockSummaryFromCheckpoint();
   }
 
   public TransferLeadershipResponseProto transferScmLeadership(
