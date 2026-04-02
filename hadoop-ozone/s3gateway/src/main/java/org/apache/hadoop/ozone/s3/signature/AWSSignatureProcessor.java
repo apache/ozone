@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.OSTSException;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
@@ -209,7 +210,8 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     int n;
     while ((n = in.read(chunk)) != -1) {
       if (totalRead + n > OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE) {
-        throw PAYLOAD_TOO_LARGE;
+        throw new OSTSException(
+            PAYLOAD_TOO_LARGE.getCode(), PAYLOAD_TOO_LARGE.getErrorMessage(), PAYLOAD_TOO_LARGE.getHttpCode());
       }
       buffer.write(chunk, 0, n);
       totalRead += n;
