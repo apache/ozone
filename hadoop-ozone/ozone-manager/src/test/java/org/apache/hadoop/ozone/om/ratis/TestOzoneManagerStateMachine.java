@@ -45,6 +45,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.NettyMetrics;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -54,6 +56,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -1036,5 +1039,38 @@ public class TestOzoneManagerStateMachine {
             OMRatisHelper.convertRequestToByteString(omRequest)))
         .setType(RaftClientRequest.writeRequestType())
         .build();
+  }
+
+  @Test
+  public void testRatisEventsRecording() {
+    OzoneManager om = mock(OzoneManager.class);
+    OMMetrics metrics = OMMetrics.create();
+    when(om.getMetrics()).thenReturn(metrics);
+    when(om.getOmSnapshotManager()).thenReturn(mock(OmSnapshotManager.class));
+    when(om.getConfiguration()).thenReturn(new OzoneConfiguration());
+    AuditMessage auditMessage = mock(AuditMessage.class);
+    when(auditMessage.getOp()).thenReturn("LEADER_CHANGE");
+    when(om.buildAuditMessageForSuccess(any(), any())).thenReturn(auditMessage);
+
+    OzoneManagerStateMachine sm = new OzoneManagerStateMachine(
+        om,
+        mock(OzoneManagerDoubleBuffer.class),
+        mock(RequestHandler.class),
+        mock(ExecutorService.class),
+        mock(NettyMetrics.class)
+    );
+
+    sm.notifyLeaderReady();
+    assertTrue(metrics.getRatisEvents().contains("notifyLeaderReady"));
+
+    RaftGroupMemberId groupMemberId = mock(RaftGroupMemberId.class);
+    when(groupMemberId.getPeerId()).thenReturn(RaftPeerId.valueOf("peer1"));
+    sm.notifyLeaderChanged(groupMemberId, RaftPeerId.valueOf("peer1"));
+    assertTrue(metrics.getRatisEvents().contains("notifyLeaderChanged: newLeaderId=peer1"));
+
+    sm.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
+    assertTrue(metrics.getRatisEvents().contains("notifyConfigurationChanged"));
+
+    metrics.unRegister();
   }
 }
