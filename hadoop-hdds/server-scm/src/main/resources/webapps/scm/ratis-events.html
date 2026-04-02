@@ -19,12 +19,14 @@
 <table class="table table-striped">
     <thead>
     <tr>
-        <th>Event</th>
+        <th class="col-md-3">Timestamp</th>
+        <th class="col-md-9">Event description</th>
     </tr>
     </thead>
     <tbody>
     <tr ng-repeat="event in $ctrl.events track by $index">
-        <td>{{event}}</td>
+        <td>{{event.timestamp}}</td>
+        <td>{{event.description}}</td>
     </tr>
     </tbody>
 </table>
