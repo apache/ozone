@@ -83,6 +83,7 @@ export const COLUMNS: ColumnsType<Datanode> = [
     title: 'Hostname',
     dataIndex: 'hostname',
     key: 'hostname',
+    fixed: 'left' as const,
     sorter: (a: Datanode, b: Datanode) => a.hostname.localeCompare(
       b.hostname, undefined, { numeric: true }
     ),
