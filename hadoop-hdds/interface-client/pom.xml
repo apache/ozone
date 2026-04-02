@@ -23,13 +23,17 @@
   <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone HDDS Client Interface</name>
-  <description>Apache Ozone Distributed Data Store Client interface</description>
+  <description>Apache Ozone Distributed Data Store Client interface.
+    Also contains the ContainerProtos message classes generated from DatanodeClientProtocol.proto
+    and rewritten to the ratis-thirdparty shaded namespace so that hdds-common and other
+    foundational modules can depend on the shaded types without pulling in the gRPC stubs.</description>
 
   <properties>
     <!-- used in temp dir names; must be filesystem/protoc-safe (no ':') -->
     <maven.build.timestamp.format>yyyyMMddHHmmss</maven.build.timestamp.format>
     <!-- no testable code in this module -->
     <maven.test.skip>true</maven.test.skip>
+    <mdep.analyze.skip>true</mdep.analyze.skip>
     <!-- only generated code in this module -->
     <spotbugs.skip>true</spotbugs.skip>
   </properties>
@@ -38,6 +42,16 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <dependency>
+      <!--
+        Shaded gRPC / Netty / protobuf runtime.  DatanodeClientProtocol.proto is compiled here
+        (messages only, no gRPC stubs) and its generated sources are rewritten to
+        org.apache.ratis.thirdparty.* before javac compiles them, so this dependency must be
+        on the compile classpath and is exposed transitively to consumers (e.g. hdds-common).
+      -->
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
     <dependency>
       <!-- for generated sources, Java 11+ -->
@@ -63,6 +77,12 @@
                   </outputs>
                 </plugin>
                 <plugin>
+                  <artifactId>maven-antrun-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>rewrites generated source files</notCacheableBecause>
+                  </outputs>
+                </plugin>
+                <plugin>
                   <artifactId>protobuf-maven-plugin</artifactId>
                   <outputs>
                     <notCacheableBecause>generates sources</notCacheableBecause>
@@ -84,6 +104,7 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
           <proc>none</proc>
+          <useIncrementalCompilation>false</useIncrementalCompilation>
         </configuration>
       </plugin>
       <plugin>
@@ -101,6 +122,58 @@
               <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf.version}</outputDirectory>
               <temporaryProtoFileDirectory>${java.io.tmpdir}/ozone-protoc-dependencies/${project.artifactId}/protobuf-${protobuf.version}-${maven.build.timestamp}</temporaryProtoFileDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
+              <excludes>
+                <!-- DatanodeClientProtocol.proto is compiled separately below with ratis protoc -->
+                <exclude>DatanodeClientProtocol.proto</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+          <execution>
+            <!--
+              Generate ContainerProtos message classes from DatanodeClientProtocol.proto using
+              the same protoc version as ratis-thirdparty, output to proto-java-ratis/ so that
+              the antrun shading below can rewrite them in-place.  The IDE/LSP also uses
+              proto-java-ratis/ as a source root, so it compiles the same shaded sources.
+              No gRPC stubs are generated here; those live in hdds-datanode-grpc-client.
+            -->
+            <id>compile-proto-datanode-ratis</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <phase>generate-sources</phase>
+            <configuration>
+              <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <outputDirectory>${project.build.directory}/generated-sources/proto-java-ratis</outputDirectory>
+              <temporaryProtoFileDirectory>${java.io.tmpdir}/ozone-protoc-dependencies/${project.artifactId}/ratis-${maven.build.timestamp}</temporaryProtoFileDirectory>
+              <clearOutputDirectory>false</clearOutputDirectory>
+              <includes>
+                <include>DatanodeClientProtocol.proto</include>
+              </includes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <!--
+              Rewrite vanilla package names produced by protoc for DatanodeClientProtocol.proto
+              in-place inside proto-java-ratis/.  The IDE/LSP also uses proto-java-ratis/ as its
+              Java source root, so it compiles the same shaded sources and writes shaded class
+              files to target/classes/ – no race between Maven javac and the LSP.
+            -->
+            <id>rewrite-generated-sources-to-ratis-ns</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>process-sources</phase>
+            <configuration>
+              <target>
+                <replace dir="${project.build.directory}/generated-sources/proto-java-ratis" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
+                <replace dir="${project.build.directory}/generated-sources/proto-java-ratis" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
+              </target>
             </configuration>
           </execution>
         </executions>

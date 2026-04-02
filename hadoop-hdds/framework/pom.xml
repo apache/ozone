@@ -314,6 +314,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-datanode-grpc-client</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-managed-rocksdb</artifactId>
       <type>test-jar</type>
       <scope>test</scope>

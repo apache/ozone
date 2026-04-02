@@ -24,10 +24,11 @@
   <packaging>jar</packaging>
   <name>Apache Ozone HDDS DataNode gRPC Client</name>
   <description>DataNode XCeiver and IntraDatanode gRPC stubs generated from DatanodeClientProtocol.proto.
-    Package names in generated sources are rewritten by maven-antrun-plugin (Ant replace task, pure Java)
-    from vanilla com.google.protobuf / io.grpc / com.google.common to their ratis-thirdparty counterparts
-    before compilation, so target/classes/ already contains the shaded namespace and downstream modules
-    in the same Maven reactor can compile against the correct types.</description>
+    The proto file lives in hdds-interface-client (which also generates the shaded ContainerProtos
+    message classes); this module generates only the gRPC service stubs.  Package names in generated
+    sources are rewritten by maven-antrun-plugin (Ant replace task, pure Java) from vanilla
+    com.google.protobuf / io.grpc / com.google.common to their ratis-thirdparty counterparts
+    before compilation.</description>
 
   <properties>
     <!-- used in temp dir names; must be filesystem/protoc-safe (no ':') -->
@@ -39,6 +40,14 @@
   </properties>
 
   <dependencies>
+    <!--
+      ContainerProtos message classes (shaded) live in hdds-interface-client.  The generated
+      gRPC stubs reference those types, so hdds-interface-client must be on the compile classpath.
+    -->
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-client</artifactId>
+    </dependency>
     <!--
       Shaded gRPC / Netty / protobuf runtime. The generated sources are rewritten to reference
       org.apache.ratis.thirdparty.* directly, so ratis-thirdparty-misc must be on the compile
@@ -109,7 +118,12 @@
           <execution>
             <id>compile-proto-datanode</id>
             <goals>
-              <goal>compile</goal>
+              <!--
+                compile-custom only: generates gRPC service stubs (XceiverClientProtocolServiceGrpc,
+                IntraDatanodeProtocolServiceGrpc).  The proto messages (ContainerProtos) are compiled
+                in hdds-interface-client with the same ratis-compatible protoc; no need to regenerate
+                them here.
+              -->
               <goal>compile-custom</goal>
             </goals>
             <phase>generate-sources</phase>
@@ -120,6 +134,8 @@
                 Output directly to proto-java-ratis so that both Maven and the IDE/LSP compile the
                 same ratis-shaded source tree, eliminating any race between Maven's javac and the
                 LSP writing vanilla class files to target/classes/.
+                DatanodeClientProtocol.proto lives in hdds-interface-client; point protoSourceRoot
+                there so protoc finds it without duplicating the file.
               -->
               <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <outputDirectory>${project.build.directory}/generated-sources/proto-java-ratis</outputDirectory>
@@ -127,6 +143,10 @@
               <clearOutputDirectory>false</clearOutputDirectory>
               <pluginId>grpc-java</pluginId>
               <pluginArtifact>io.grpc:protoc-gen-grpc-java:${ratis-thirdparty.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+              <protoSourceRoot>${project.basedir}/../interface-client/src/main/proto</protoSourceRoot>
+              <includes>
+                <include>DatanodeClientProtocol.proto</include>
+              </includes>
             </configuration>
           </execution>
         </executions>

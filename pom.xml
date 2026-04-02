@@ -2514,7 +2514,7 @@
                   </fileset>
                 </delete>
                 <!--
-                  Refresh the three foundation modules (hdds-common, hdds-datanode-grpc-client,
+                  Refresh the three foundation modules (hdds-common, hdds-interface-client,
                   hdds-scm-grpc-client) from their build-local JARs before every module's
                   compile phase.  The LSP can corrupt these modules' target/classes/ directories
                   in the window between when Maven compiles them and when a later downstream
@@ -2537,9 +2537,9 @@
                 </exec>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
-                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/hdds-datanode-grpc-client-${project.version}.jar" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/interface-client/target/hdds-interface-client-${project.version}.jar" />
                   <arg value="-d" />
-                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/classes" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/interface-client/target/classes" />
                 </exec>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
@@ -2577,9 +2577,9 @@
                 </exec>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
-                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/hdds-datanode-grpc-client-${project.version}.jar" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/interface-client/target/hdds-interface-client-${project.version}.jar" />
                   <arg value="-d" />
-                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/classes" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/interface-client/target/classes" />
                 </exec>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
