@@ -32,6 +32,7 @@ import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.Server;
@@ -234,8 +235,34 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-            bucket, args.getKeyName());
+        if (isStsS3Request()) {
+          // We need to be able to tell the difference between being able to download a file and merely seeing the file
+          // name in a list.  Use READ for download ability and LIST (here) for listing.
+          // When listPrefix is set (original S3 ListObjects prefix), authorize LIST on that prefix for the whole
+          // listing, including FSO traversal where keyName is an internal directory (e.g. userA) under prefix user.
+          final String listPrefix = args.getListPrefix();
+          final String keyName = args.getKeyName();
+          final String aclKey;
+          if (StringUtils.isNotBlank(listPrefix)) {
+            if (StringUtils.isBlank(keyName)) {
+              aclKey = listPrefix;
+            } else if (isStsListPathUnderRequestPrefix(keyName, listPrefix)) {
+              aclKey = listPrefix;
+            } else {
+              throw new OMException(
+                  "STS listStatus: key path: " + keyName + " does not match authorized list prefix: " + listPrefix,
+                  ResultCodes.PERMISSION_DENIED);
+            }
+          } else if (keyName != null && !keyName.isEmpty()) {
+            aclKey = keyName;
+          } else {
+            aclKey = "*";
+          }
+          checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey);
+        } else {
+          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+              bucket, args.getKeyName());
+        }
       }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
@@ -277,8 +304,12 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-            bucket, args.getKeyName());
+        if (isStsS3Request()) {
+          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.LIST, bucket, args.getKeyName());
+        } else {
+          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+              bucket, args.getKeyName());
+        }
       }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
@@ -343,10 +374,23 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
-            checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-            bucket.realVolume(), bucket.realBucket(), keyPrefix)
-        );
+        if (isStsS3Request()) {
+          // Check with key null to ensure there is LIST permission on the bucket
+          captureLatencyNs(
+              perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
+                  ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(),
+                  null));
+          // With STS we must check acl on the prefix to be compliant with AWS
+          final String aclKey = (keyPrefix == null || keyPrefix.isEmpty()) ? "*" : keyPrefix;
+          captureLatencyNs(
+              perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
+                  ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey));
+        } else {
+          captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
+              checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+                  bucket.realVolume(), bucket.realBucket(), keyPrefix)
+          );
+        }
       }
       metrics.incNumKeyLists();
       return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
@@ -696,6 +740,29 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    */
   public boolean isNativeAuthorizerEnabled() {
     return accessAuthorizer.isNative();
+  }
+
+  private boolean isStsS3Request() {
+    return getS3Auth() != null && OzoneManager.getStsTokenIdentifier() != null;
+  }
+
+  /**
+   * For STS, {@code listPrefix} is the original S3 ListObjects prefix. Internal FSO listing may call
+   * {@code listStatus} with {@code keyName} set to a subdirectory (e.g. userA) while the session policy
+   * still authorizes only the request prefix (e.g. user). This returns true when {@code keyName} is the
+   * prefix itself, a key path under that prefix, or an ancestor directory on the way to a deeper prefix.
+   */
+  private static boolean isStsListPathUnderRequestPrefix(String keyName, String listPrefix) {
+    if (StringUtils.isBlank(listPrefix) || StringUtils.isBlank(keyName)) {
+      return false;
+    }
+    if (keyName.equals(listPrefix)) {
+      return true;
+    }
+    if (keyName.startsWith(listPrefix)) {
+      return true;
+    }
+    return listPrefix.startsWith(keyName + "/");
   }
 
   private ResourceType getResourceType(OmKeyArgs args) {
