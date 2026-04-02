@@ -27,7 +27,21 @@
         $routeProvider
             .when("/metrics/ozoneManager", {
                 template: "<om-metrics></om-metrics>"
+            })
+            .when("/ratis_events", {
+                template: "<ratis-events></ratis-events>"
             });
+    });
+    angular.module('ozoneManager').component('ratisEvents', {
+        templateUrl: 'ratis-events.html',
+        controller: function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    var metrics = result.data.beans[0];
+                    ctrl.events = metrics.RatisEvents ? metrics.RatisEvents.split('\n') : [];
+                });
+        }
     });
     angular.module('ozoneManager').component('omMetrics', {
         templateUrl: 'om-metrics.html',
