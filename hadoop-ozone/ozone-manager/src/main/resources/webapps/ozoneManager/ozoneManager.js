@@ -141,7 +141,7 @@
             $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
                 .then(function (result) {
                     var metrics = result.data.beans[0];
-                    var rawEvents = metrics.RatisEvents ? metrics.RatisEvents.split('\n') : [];
+                    var rawEvents = metrics['tag.RatisEvents'] ? metrics['tag.RatisEvents'].split('\n') : [];
                     ctrl.events = rawEvents.map(function(e) {
                         var parts = e.split('|');
                         return {
