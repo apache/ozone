@@ -21,40 +21,40 @@ source "$TEST_DIR"/testlib.sh
 
 with_old_version() {
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
-  generate old1
-  validate old1
+  generate old1 "$SCM"
+  validate old1 "$SCM"
 }
 
 with_this_version_pre_finalized() {
   # No check for pre-finalized status here, because the release may not have
   # added layout features to OM or HDDS.
-  validate old1
+  validate old1 "$SCM"
   # HDDS-6261: overwrite the same keys intentionally
-  generate old1 --exclude create-volume-and-bucket
+  generate old1 "$SCM" --exclude create-volume-and-bucket
 
-  generate new1
-  validate new1
+  generate new1 "$SCM"
+  validate new1 "$SCM"
 }
 
 with_old_version_downgraded() {
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
-  validate old1
-  validate new1
+  validate old1 "$SCM"
+  validate new1 "$SCM"
 
-  generate old2
-  validate old2
+  generate old2 "$SCM"
+  validate old2 "$SCM"
 
   # HDDS-6261: overwrite the same keys again to trigger the precondition check
   # that exists <= 1.1.0 OM
-  generate old1 --exclude create-volume-and-bucket
+  generate old1 "$SCM" --exclude create-volume-and-bucket
 }
 
 with_this_version_finalized() {
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
-  validate old1
-  validate new1
-  validate old2
+  validate old1 "$SCM"
+  validate new1 "$SCM"
+  validate old2 "$SCM"
 
-  generate new2
-  validate new2
+  generate new2 "$SCM"
+  validate new2 "$SCM"
 }
