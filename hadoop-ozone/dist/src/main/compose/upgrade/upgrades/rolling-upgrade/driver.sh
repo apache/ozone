@@ -86,7 +86,7 @@ rolling_restart_service() {
 }
 
 rolling_restart_all_services() {
-  local stage_prefix="$1"
+  STAGE_PREFIX="$1"
   local target_image="$2"
   local s
 
