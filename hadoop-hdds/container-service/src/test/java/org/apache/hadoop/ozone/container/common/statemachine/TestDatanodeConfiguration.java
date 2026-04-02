@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DB_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
@@ -184,12 +185,22 @@ public class TestDatanodeConfiguration {
         subject.getBlockDeleteCommandWorkerInterval());
     assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace());
     assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT, subject.getMinFreeSpaceRatio());
+    assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT,
+        subject.getMinFreeSpaceHardLimitRatio());
     final long oneGB = 1024 * 1024 * 1024;
     // capacity is less, consider default min_free_space
     assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace(oneGB));
+    assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getHardLimitMinFreeSpace(oneGB));
+    assertEquals(0L, subject.getSoftBandMinFreeSpaceWidth(oneGB));
     // capacity is large, consider min_free_space_percent, max(min_free_space, min_free_space_percent * capacity)ß
     assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT * oneGB * oneGB,
         subject.getMinFreeSpace(oneGB * oneGB));
+    assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT * oneGB * oneGB,
+        subject.getHardLimitMinFreeSpace(oneGB * oneGB));
+    // e.g. 2000GB: 40GB reported − 30GB hard = 10GB soft bandwidth (derived, not configured)
+    assertEquals(
+        subject.getMinFreeSpace(oneGB * oneGB) - subject.getHardLimitMinFreeSpace(oneGB * oneGB),
+        subject.getSoftBandMinFreeSpaceWidth(oneGB * oneGB));
 
     // Verify that no warnings were logged when using default values
     String logOutput = logCapturer.getOutput();
@@ -222,6 +233,15 @@ public class TestDatanodeConfiguration {
       // disk percent is higher than minFreeSpace configured 10000 bytes
       assertEquals((long)(capacity * 0.5f), subject.getMinFreeSpace(capacity));
     }
+  }
+
+  @Test
+  void rejectsInvalidMinFreeSpaceHardLimitRatio() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT, 1.5f);
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+    assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT,
+        subject.getMinFreeSpaceHardLimitRatio());
   }
 
   @ParameterizedTest
