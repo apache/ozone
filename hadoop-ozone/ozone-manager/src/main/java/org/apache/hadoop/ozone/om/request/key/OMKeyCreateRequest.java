@@ -496,5 +496,21 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         }
       }
     }
+
+    if (keyArgs.hasExpectedETag()) {
+      String expectedETag = keyArgs.getExpectedETag();
+      if (dbKeyInfo == null) {
+        throw new OMException("Key not found for If-Match",
+            OMException.ResultCodes.KEY_NOT_FOUND);
+      }
+      if (!dbKeyInfo.hasEtag()) {
+        throw new OMException("Key does not have an ETag",
+            OMException.ResultCodes.ETAG_NOT_AVAILABLE);
+      }
+      if (!dbKeyInfo.isEtagEquals(expectedETag)) {
+        throw new OMException("ETag mismatch",
+            OMException.ResultCodes.ETAG_MISMATCH);
+      }
+    }
   }
 }
