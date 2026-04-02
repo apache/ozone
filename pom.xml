@@ -2515,31 +2515,35 @@
                 </delete>
                 <!--
                   Refresh the three foundation modules (hdds-common, hdds-datanode-grpc-client,
-                  hdds-scm-grpc-client) from their installed .m2/ JARs before every module's
+                  hdds-scm-grpc-client) from their build-local JARs before every module's
                   compile phase.  The LSP can corrupt these modules' target/classes/ directories
                   in the window between when Maven compiles them and when a later downstream
-                  module reads them.  unzip -o overwrites any LSP-corrupted files with the
-                  known-good installed versions; if the JAR does not yet exist (e.g. a fresh CI
-                  build) unzip exits silently (failonerror=false) and the freshly Maven-compiled
-                  class files are left undisturbed.
-                  Prerequisite for local dev: run "mvn install -pl <module> -am" after modifying
-                  a foundation module so that the .m2/ JAR reflects the latest changes.
+                  module reads them.  Using the local target/ JAR (created during the package
+                  phase of each module's own build) rather than the .m2/ JAR ensures the
+                  restoration always works on CI (where no Ozone artifacts are pre-installed),
+                  while still protecting against LSP corruption on local machines.  unzip -qo
+                  overwrites any stale/corrupted files with the known-good packaged versions.
+                  If the JAR does not yet exist (e.g. the foundation module hasn't been
+                  packaged yet in the current build) unzip exits silently (failonerror=false)
+                  and the freshly Maven-compiled class files are left undisturbed.
+                  Prerequisite for local dev: run "mvn package -pl <module>" after modifying a
+                  foundation module so that the target/ JAR reflects the latest changes.
                 -->
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
-                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-common/${project.version}/hdds-common-${project.version}.jar" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/common/target/hdds-common-${project.version}.jar" />
                   <arg value="-d" />
                   <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/common/target/classes" />
                 </exec>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
-                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-datanode-grpc-client/${project.version}/hdds-datanode-grpc-client-${project.version}.jar" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/hdds-datanode-grpc-client-${project.version}.jar" />
                   <arg value="-d" />
                   <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/classes" />
                 </exec>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
-                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-scm-grpc-client/${project.version}/hdds-scm-grpc-client-${project.version}.jar" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/scm-grpc-client/target/hdds-scm-grpc-client-${project.version}.jar" />
                   <arg value="-d" />
                   <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/scm-grpc-client/target/classes" />
                 </exec>
@@ -2567,19 +2571,19 @@
                 </delete>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
-                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-common/${project.version}/hdds-common-${project.version}.jar" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/common/target/hdds-common-${project.version}.jar" />
                   <arg value="-d" />
                   <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/common/target/classes" />
                 </exec>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
-                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-datanode-grpc-client/${project.version}/hdds-datanode-grpc-client-${project.version}.jar" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/hdds-datanode-grpc-client-${project.version}.jar" />
                   <arg value="-d" />
                   <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/classes" />
                 </exec>
                 <exec executable="unzip" failonerror="false">
                   <arg value="-qo" />
-                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-scm-grpc-client/${project.version}/hdds-scm-grpc-client-${project.version}.jar" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/scm-grpc-client/target/hdds-scm-grpc-client-${project.version}.jar" />
                   <arg value="-d" />
                   <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/scm-grpc-client/target/classes" />
                 </exec>
