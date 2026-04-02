@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
+
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -24,11 +29,6 @@ import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
 
 /**
  * Test SCMStateMachine events recording.
@@ -48,7 +48,7 @@ public class TestSCMStateMachine {
       scmStaticMock.when(StorageContainerManager::getMetrics).thenReturn(metrics);
 
       stateMachine.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
-      assertTrue(metrics.getRatisEvents().contains("notifyConfigurationChanged"));
+      assertTrue(metrics.getRatisEvents().contains("New peers [] added at term index"));
     }
 
     metrics.unRegister();

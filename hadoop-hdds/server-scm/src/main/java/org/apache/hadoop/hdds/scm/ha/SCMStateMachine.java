@@ -438,7 +438,7 @@ public class SCMStateMachine extends BaseStateMachine {
       }
       metrics.addRatisEvent(
           "New peers " + newPeerIds +
-              (newListenersIds.isEmpty()? "" : ", new listeners " + newListenersIds) +
+              (newListenersIds.isEmpty() ? "" : ", new listeners " + newListenersIds) +
               " added at term index (" +
               term + ", " + index + ")");
     }

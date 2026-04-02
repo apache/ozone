@@ -45,8 +45,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.NettyMetrics;
-import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -1043,7 +1041,6 @@ public class TestOzoneManagerStateMachine {
 
   @Test
   public void testRatisEventsRecording() {
-    OzoneManager om = mock(OzoneManager.class);
     OMMetrics metrics = OMMetrics.create();
     when(om.getMetrics()).thenReturn(metrics);
     when(om.getOmSnapshotManager()).thenReturn(mock(OmSnapshotManager.class));
@@ -1051,25 +1048,16 @@ public class TestOzoneManagerStateMachine {
     AuditMessage auditMessage = mock(AuditMessage.class);
     when(auditMessage.getOp()).thenReturn("LEADER_CHANGE");
     when(om.buildAuditMessageForSuccess(any(), any())).thenReturn(auditMessage);
-
-    OzoneManagerStateMachine sm = new OzoneManagerStateMachine(
-        om,
-        mock(OzoneManagerDoubleBuffer.class),
-        mock(RequestHandler.class),
-        mock(ExecutorService.class),
-        mock(NettyMetrics.class)
-    );
-
     sm.notifyLeaderReady();
-    assertTrue(metrics.getRatisEvents().contains("notifyLeaderReady"));
+    assertTrue(metrics.getRatisEvents().contains("Ready to serve requests as the leader"));
 
     RaftGroupMemberId groupMemberId = mock(RaftGroupMemberId.class);
     when(groupMemberId.getPeerId()).thenReturn(RaftPeerId.valueOf("peer1"));
     sm.notifyLeaderChanged(groupMemberId, RaftPeerId.valueOf("peer1"));
-    assertTrue(metrics.getRatisEvents().contains("notifyLeaderChanged: newLeaderId=peer1"));
+    assertTrue(metrics.getRatisEvents().contains("Leader changed to peer1"));
 
     sm.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
-    assertTrue(metrics.getRatisEvents().contains("notifyConfigurationChanged"));
+    assertTrue(metrics.getRatisEvents().contains("New peers [] added at term index "));
 
     metrics.unRegister();
   }

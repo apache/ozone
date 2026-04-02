@@ -314,7 +314,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (metrics != null) {
       metrics.addRatisEvent(
           "New peers " + newPeerIds +
-              (newListenersIds.isEmpty()? "" : ", new listeners " + newListenersIds) +
+              (newListenersIds.isEmpty() ? "" : ", new listeners " + newListenersIds) +
               " added at term index (" +
               term + ", " + index + ")");
     }
