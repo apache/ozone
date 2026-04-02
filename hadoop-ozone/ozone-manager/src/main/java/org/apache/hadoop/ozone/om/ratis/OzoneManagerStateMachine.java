@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -170,6 +171,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final TermIndex lastApplied = getLastAppliedTermIndex();
       unpause(lastApplied.getIndex(), lastApplied.getTerm());
       LOG.info("{}: reinitialize {} with {}", getId(), getGroupId(), lastApplied);
+      OMMetrics metrics = ozoneManager.getMetrics();
+      if (metrics != null) {
+        metrics.addRatisEvent("reinitialize: " + lastApplied);
+      }
     }
   }
 
@@ -183,6 +188,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void notifyLeaderReady() {
     ozoneManager.getOmSnapshotManager().resetInFlightSnapshotCount();
+    OMMetrics metrics = ozoneManager.getMetrics();
+    if (metrics != null) {
+      metrics.addRatisEvent("notifyLeaderReady");
+    }
   }
 
   @Override
@@ -208,6 +217,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.LEADER_CHANGE, auditParams));
 
     LOG.info("{}: leader changed to {}", groupMemberId, newLeaderId);
+    OMMetrics metrics = ozoneManager.getMetrics();
+    if (metrics != null) {
+      metrics.addRatisEvent("notifyLeaderChanged: newLeaderId=" + newLeaderId);
+    }
   }
 
   /** Notified by Ratis for non-StateMachine term-index update. */
@@ -287,6 +300,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
     // Check and update the peer list in OzoneManager
     ozoneManager.updatePeerList(newPeerIds);
+    OMMetrics metrics = ozoneManager.getMetrics();
+    if (metrics != null) {
+      metrics.addRatisEvent("notifyConfigurationChanged: " +
+          "term=" + term + ", index=" + index + ", newPeers=" + newPeerIds);
+    }
   }
 
   /**
@@ -301,6 +319,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
                                       long snapshotIndex, RaftPeer peer) {
     LOG.info("Receive notifySnapshotInstalled event {} for the peer: {}" +
         " snapshotIndex: {}.", result, peer.getId(), snapshotIndex);
+    OMMetrics metrics = ozoneManager.getMetrics();
+    if (metrics != null) {
+      metrics.addRatisEvent("notifySnapshotInstalled: " +
+          "result=" + result + ", snapshotIndex=" + snapshotIndex + ", peer=" + peer.getId());
+    }
     switch (result) {
     case SUCCESS:
     case SNAPSHOT_UNAVAILABLE:
@@ -581,6 +604,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .getLeaderInfo().getId().getId()).toString();
     LOG.info("Received install snapshot notification from OM leader: {} with " +
             "term index: {}", leaderNodeId, firstTermIndexInLog);
+    OMMetrics metrics = ozoneManager.getMetrics();
+    if (metrics != null) {
+      metrics.addRatisEvent("notifyInstallSnapshotFromLeader: " +
+          "leaderNodeId=" + leaderNodeId + ", firstTermIndexInLog=" + firstTermIndexInLog);
+    }
 
     return CompletableFuture.supplyAsync(
         () -> {
