@@ -38,12 +38,27 @@
             var ctrl = this;
             ctrl.snapshotMetrics = [];
             ctrl.snapshotDiffJobs = [];
+            ctrl.snapshotUsageMetrics = {
+                'NumSnapshotActive': 0,
+                'NumSnapshotDeleted': 0,
+                'NumSnapshotCacheSize': 0
+            };
             $scope.reverse = false;
             $scope.columnName = "jobId";
             let snapDiffJobsCopy = [];
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        var metrics = result.data.beans[0];
+                        ctrl.snapshotUsageMetrics.NumSnapshotActive = metrics.NumSnapshotActive || 0;
+                        ctrl.snapshotUsageMetrics.NumSnapshotDeleted = metrics.NumSnapshotDeleted || 0;
+                        ctrl.snapshotUsageMetrics.NumSnapshotCacheSize = metrics.NumSnapshotCacheSize || 0;
+                    }
+                });
 
             $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OmSnapshotInternalMetrics")
                 .then(function (result) {
