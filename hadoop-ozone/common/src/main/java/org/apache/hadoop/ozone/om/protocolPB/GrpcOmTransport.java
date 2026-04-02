@@ -118,7 +118,6 @@ public class GrpcOmTransport implements OmTransport {
   private final int maxSize;
   private final SecurityConfig secConfig;
   private EventLoopGroup eventLoopGroup;
-  private Class<? extends Channel> channelType;
 
   private RetryPolicy retryPolicy;
   private final GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
@@ -165,6 +164,7 @@ public class GrpcOmTransport implements OmTransport {
         .setNameFormat(CLIENT_NAME + "-ELG-%d")
         .build();
 
+    final Class<? extends Channel> channelType;
     if (Epoll.isAvailable()) {
       eventLoopGroup = new EpollEventLoopGroup(0, factory);
       channelType = EpollSocketChannel.class;
