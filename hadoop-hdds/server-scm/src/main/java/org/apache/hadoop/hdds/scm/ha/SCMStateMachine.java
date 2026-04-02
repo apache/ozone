@@ -26,6 +26,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -216,7 +217,7 @@ public class SCMStateMachine extends BaseStateMachine {
     LOG.info("current leader SCM steps down.");
     SCMMetrics metrics = StorageContainerManager.getMetrics();
     if (metrics != null) {
-      metrics.addRatisEvent("notifyNotLeader");
+      metrics.addRatisEvent("current leader SCM steps down.");
     }
 
     scm.getScmContext().updateLeaderAndTerm(false, 0);
@@ -251,8 +252,8 @@ public class SCMStateMachine extends BaseStateMachine {
     SCMMetrics metrics = StorageContainerManager.getMetrics();
     if (metrics != null) {
       metrics.addRatisEvent(
-          "notifyInstallSnapshotFromLeader: leaderNodeId=" + leaderNodeId +
-              ", firstTermIndexInLog=" + firstTermIndexInLog);
+          "Installing snapshot from SCM leader " + leaderNodeId +
+              ", term index: " + firstTermIndexInLog);
     }
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
@@ -295,9 +296,6 @@ public class SCMStateMachine extends BaseStateMachine {
       return;
     }
     SCMMetrics metrics = StorageContainerManager.getMetrics();
-    if (metrics != null) {
-      metrics.addRatisEvent("notifyLeaderChanged: newLeaderId=" + newLeaderId);
-    }
 
     currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
         .getInfo().getCurrentTerm());
@@ -312,10 +310,16 @@ public class SCMStateMachine extends BaseStateMachine {
 
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
       LOG.info("leader changed, yet current SCM is still follower.");
+      if (metrics != null) {
+        metrics.addRatisEvent("Leader changed to " + newLeaderId + ", yet current SCM is still follower.");
+      }
       return;
     }
 
     LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
+    if (metrics != null) {
+      metrics.addRatisEvent("current SCM becomes leader of term " + currentLeaderTerm);
+    }
 
     scm.getScmContext().updateLeaderAndTerm(true,
         currentLeaderTerm.get());
@@ -411,7 +415,7 @@ public class SCMStateMachine extends BaseStateMachine {
     scm.getFinalizationManager().onLeaderReady();
     SCMMetrics metrics = StorageContainerManager.getMetrics();
     if (metrics != null) {
-      metrics.addRatisEvent("notifyLeaderReady");
+      metrics.addRatisEvent("Ready to serve requests as the leader");
     }
   }
 
@@ -420,8 +424,23 @@ public class SCMStateMachine extends BaseStateMachine {
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
     SCMMetrics metrics = StorageContainerManager.getMetrics();
     if (metrics != null) {
+      List<RaftProtos.RaftPeerProto> newPeers =
+          newRaftConfiguration.getPeersList();
+      List<RaftProtos.RaftPeerProto> newListeners =
+          newRaftConfiguration.getListenersList();
+      List<String> newPeerIds = new ArrayList<>();
+      List<String> newListenersIds = new ArrayList<>();
+      for (RaftProtos.RaftPeerProto raftPeerProto : newPeers) {
+        newPeerIds.add(RaftPeerId.valueOf(raftPeerProto.getId()).toString());
+      }
+      for (RaftProtos.RaftPeerProto raftListenerProto : newListeners) {
+        newListenersIds.add(RaftPeerId.valueOf(raftListenerProto.getId()).toString());
+      }
       metrics.addRatisEvent(
-          "notifyConfigurationChanged: term=" + term + ", index=" + index);
+          "New peers " + newPeerIds +
+              (newListenersIds.isEmpty()? "" : ", new listeners " + newListenersIds) +
+              " added at term index (" +
+              term + ", " + index + ")");
     }
   }
 
