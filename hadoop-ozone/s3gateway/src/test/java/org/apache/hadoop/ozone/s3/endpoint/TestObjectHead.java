@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
@@ -134,9 +135,8 @@ public class TestObjectHead {
         .thenReturn(formatHttpDate(bucket.getKey("etag-key")
             .getModificationTime().minusSeconds(60)));
 
-    OS3Exception ex = org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils
-        .assertErrorResponse(PRECOND_FAILED,
-            () -> keyEndpoint.head(bucketName, "etag-key"));
+    OS3Exception ex = assertErrorResponse(PRECOND_FAILED,
+        () -> keyEndpoint.head(bucketName, "etag-key"));
     assertNotNull(ex);
   }
 
