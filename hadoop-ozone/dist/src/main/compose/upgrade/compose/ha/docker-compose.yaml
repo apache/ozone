@@ -295,7 +295,7 @@ services:
       - "scm2.org:10.9.0.15"
       - "scm3.org:10.9.0.16"
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
-    hostname: upgrade-client
+    hostname: scm
     networks:
       net:
         ipv4_address: 10.9.0.24
