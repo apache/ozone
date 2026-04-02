@@ -469,8 +469,17 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT =
       "network-topology-default.xml";
 
-  public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
-  public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
+  public static final String OZONE_TRACING_ENABLED = "ozone.tracing.enabled";
+  public static final boolean OZONE_TRACING_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_TRACING_ENDPOINT = "ozone.tracing.endpoint";
+  public static final String OZONE_TRACING_ENDPOINT_DEFAULT = "http://localhost:4317";
+
+  public static final String OZONE_TRACING_SAMPLER = "ozone.tracing.sampler";
+  public static final double OZONE_TRACING_SAMPLER_DEFAULT = 1.0;
+
+  public static final String OZONE_TRACING_SPAN_SAMPLING = "ozone.tracing.span.sampling";
+  public static final String OZONE_TRACING_SPAN_SAMPLING_DEFAULT = "";
 
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
