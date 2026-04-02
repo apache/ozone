@@ -202,7 +202,6 @@ public final class TracingUtil {
         new TraceAllMethod<>(delegate, itf.getSimpleName())));
   }
 
-
   public static boolean isTracingEnabled(
       ConfigurationSource conf) {
     return conf.getBoolean(

@@ -56,11 +56,11 @@ public class TestTracingUtil {
     }
   }
 
-private static MutableConfigurationSource tracingEnabled() {
-  MutableConfigurationSource config = new InMemoryConfigurationForTesting();
-  config.setBoolean(ScmConfigKeys.OZONE_TRACING_ENABLED, true);
-  return config;
-}
+  private static MutableConfigurationSource tracingEnabled() {
+    MutableConfigurationSource config = new InMemoryConfigurationForTesting();
+    config.setBoolean(ScmConfigKeys.OZONE_TRACING_ENABLED, true);
+    return config;
+  }
 
   /**
    * Test for checking if span was not created when a regular method
