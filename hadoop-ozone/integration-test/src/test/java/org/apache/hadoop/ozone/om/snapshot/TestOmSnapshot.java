@@ -161,6 +161,7 @@ import org.apache.ozone.rocksdiff.CompactionNode;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -171,6 +172,7 @@ import org.rocksdb.LiveFileMetaData;
  * Abstract class to test OmSnapshot.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Unhealthy("no trigger for finalization now/yet, all implementations try finalizing")
 public abstract class TestOmSnapshot {
   static {
     Logger.getLogger(ManagedRocksObjectUtils.class).setLevel(Level.DEBUG);

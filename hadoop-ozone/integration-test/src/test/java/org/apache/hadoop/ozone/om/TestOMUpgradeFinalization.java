@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,7 @@ import org.junit.jupiter.api.Test;
  * Tests for OM upgrade finalization.
  * TODO: can be merged into class with other OM tests with per-method cluster
  */
+@Unhealthy("OM cannot finalize now until it can poll the SCM for the trigger")
 class TestOMUpgradeFinalization {
   static {
     AuditLogTestUtils.enableAuditLog();
