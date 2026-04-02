@@ -551,12 +551,12 @@ public final class IamSessionPolicyResolver {
         if (prefixes != null && !prefixes.isEmpty()) {
           for (String prefix : prefixes) {
             createObjectResourcesFromConditionPrefix(
-                volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, EnumSet.of(READ));
+                volumeName, authorizerType, resourceSpec, prefix, objToAclsMap, EnumSet.of(LIST));
           }
         } else {
-          // No condition prefixes, but we need READ access to all objects, so use "*" as the prefix
+          // No condition prefixes, but we need LIST access to all objects, so use "*" as the prefix
           createObjectResourcesFromConditionPrefix(
-              volumeName, authorizerType, resourceSpec, "*", objToAclsMap, EnumSet.of(READ));
+              volumeName, authorizerType, resourceSpec, "*", objToAclsMap, EnumSet.of(LIST));
         }
       }
     }
@@ -809,7 +809,7 @@ public final class IamSessionPolicyResolver {
     GET_BUCKET_LOCATION("s3:GetBucketLocation", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
         EnumSet.noneOf(ACLType.class)),
     // Used for HeadBucket, ListObjects and ListObjectsV2 apis
-    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST), EnumSet.of(READ)),
+    LIST_BUCKET("s3:ListBucket", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, LIST), EnumSet.of(LIST)),
     // Used for ListMultipartUploads API
     LIST_BUCKET_MULTIPART_UPLOADS("s3:ListBucketMultipartUploads", ActionKind.BUCKET, EnumSet.of(READ),
         EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),
