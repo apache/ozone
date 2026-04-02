@@ -31,6 +31,7 @@ public class TestOmSnapshotDiffJobCodec {
   private final OldSnapshotDiffJobCodecForTesting oldCodec
       = new OldSnapshotDiffJobCodecForTesting();
   private final Codec<SnapshotDiffJob> newCodec = SnapshotDiffJob.codec();
+
   @Test
   public void testOldJsonSerializedDataCanBeReadByNewCodec() throws Exception {
     // Step 1: Construct a SnapshotDiffJob instance
