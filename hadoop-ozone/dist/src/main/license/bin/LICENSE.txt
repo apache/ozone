@@ -316,13 +316,9 @@ Apache License 2.0
    io.airlift:aircompressor
    io.dropwizard.metrics:metrics-core
    io.grpc:grpc-api
-   io.grpc:grpc-context
-   io.grpc:grpc-core
-   io.grpc:grpc-netty
    io.grpc:grpc-protobuf
    io.grpc:grpc-protobuf-lite
    io.grpc:grpc-stub
-   io.grpc:grpc-util
    io.netty:netty-buffer
    io.netty:netty-codec
    io.netty:netty-codec-http
@@ -354,7 +350,6 @@ Apache License 2.0
    io.opentelemetry:opentelemetry-sdk-logs
    io.opentelemetry:opentelemetry-sdk-metrics
    io.opentelemetry:opentelemetry-sdk-trace
-   io.perfmark:perfmark-api
    io.prometheus:simpleclient
    io.prometheus:simpleclient_common
    io.prometheus:simpleclient_dropwizard
