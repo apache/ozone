@@ -166,7 +166,7 @@ public class SCMMetrics {
       if (ratisEvents.size() >= MAX_RATIS_EVENTS) {
         ratisEvents.remove(0);
       }
-      ratisEvents.add(Time.formatTime(Time.now()) + ": " + event);
+      ratisEvents.add(Time.formatTime(Time.now()) + "|" + event);
     }
   }
 
