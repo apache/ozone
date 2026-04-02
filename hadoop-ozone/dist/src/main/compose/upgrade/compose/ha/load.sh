@@ -24,6 +24,7 @@ set +u
 source "$TEST_DIR/testlib.sh"
 
 export COMPOSE_FILE="$TEST_DIR/compose/ha/docker-compose.yaml"
+export CLIENT=upgrade_client
 export OM_SERVICE_ID=omservice
 export SECURITY_ENABLED="true"
 
