@@ -96,7 +96,11 @@ public class TestSnapshotDiffManagerMXBean {
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     when(ozoneManager.getMetrics()).thenReturn(mock(OMMetrics.class));
     OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
-    when(omMetadataManager.getStore()).thenReturn(mock(org.apache.hadoop.hdds.utils.db.RDBStore.class));
+    org.apache.hadoop.hdds.utils.db.RDBStore rdbStore =
+        mock(org.apache.hadoop.hdds.utils.db.RDBStore.class);
+    when(rdbStore.getSnapshotMetadataDir())
+        .thenReturn(tempDir.toAbsolutePath().toString());
+    when(omMetadataManager.getStore()).thenReturn(rdbStore);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(mock(OmSnapshotManager.class));
 
