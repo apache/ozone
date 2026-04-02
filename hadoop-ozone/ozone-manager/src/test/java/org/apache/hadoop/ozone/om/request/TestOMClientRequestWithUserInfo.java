@@ -27,7 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import io.grpc.Context;
+import org.apache.ratis.thirdparty.io.grpc.Context;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;

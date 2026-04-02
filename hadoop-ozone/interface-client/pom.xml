@@ -87,6 +87,34 @@
     </dependency>
   </dependencies>
   <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>com.gradle</groupId>
+          <artifactId>develocity-maven-extension</artifactId>
+          <configuration>
+            <develocity>
+              <plugins>
+                <!-- This module has only generated sources (protobuf/grpc). Develocity's
+                     Maven build cache can otherwise replay stale compiler outputs. -->
+                <plugin>
+                  <artifactId>maven-compiler-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>compiles generated sources</notCacheableBecause>
+                  </outputs>
+                </plugin>
+                <plugin>
+                  <artifactId>protobuf-maven-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>generates sources</notCacheableBecause>
+                  </outputs>
+                </plugin>
+              </plugins>
+            </develocity>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>com.salesforce.servicelibs</groupId>

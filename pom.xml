@@ -1160,6 +1160,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-datanode-grpc-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-docs</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -1209,6 +1214,11 @@
         <artifactId>hdds-rocks-native</artifactId>
         <version>${hdds.rocks.native.version}</version>
         <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-scm-grpc-client</artifactId>
+        <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -1724,6 +1734,37 @@
           <groupId>com.github.ekryd.sortpom</groupId>
           <artifactId>sortpom-maven-plugin</artifactId>
           <version>${sortpom-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>com.gradle</groupId>
+          <artifactId>develocity-maven-extension</artifactId>
+          <configuration>
+            <develocity>
+              <plugins>
+                <!-- This build uses generated sources (protobuf/grpc) across multiple
+                     modules. Caching the associated goals can replay stale outputs
+                     (e.g. missing generated classes) and break downstream compilation. -->
+                <plugin>
+                  <artifactId>maven-antrun-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>mutates generated sources</notCacheableBecause>
+                  </outputs>
+                </plugin>
+                <plugin>
+                  <artifactId>maven-compiler-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>compiles generated sources</notCacheableBecause>
+                  </outputs>
+                </plugin>
+                <plugin>
+                  <artifactId>protobuf-maven-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>generates sources</notCacheableBecause>
+                  </outputs>
+                </plugin>
+              </plugins>
+            </develocity>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>com.google.code.maven-replacer-plugin</groupId>
@@ -2246,11 +2287,32 @@
                 <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.commons:commons-compress:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:hdds-datanode-grpc-client:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:hdds-scm-grpc-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.rocksdb:rocksdbjni:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.springframework:spring-core:jar</ignoredNonTestScopedDependency>
               </ignoredNonTestScopedDependencies>
+              <ignoredUnusedDeclaredDependencies>
+                <!--
+                  rocksdbjni is declared in hdds-rocks-native to enable the maven-dependency-plugin:unpack
+                  execution that extracts the native library. The Java source in that module does not
+                  directly import org.rocksdb.* (the dependency is resolved transitively via
+                  hdds-managed-rocksdb at runtime), so the analyzer flags it as unused.
+                -->
+                <ignoredUnusedDeclaredDependency>org.rocksdb:rocksdbjni:jar</ignoredUnusedDeclaredDependency>
+                <!--
+                  hdds-config provides annotation types with @Retention(SOURCE) (e.g. @ConfigGroup).
+                  These annotations are not present in compiled bytecode, so the analyzer always
+                  flags hdds-config as unused even when it is the active annotation processor.
+                -->
+                <ignoredUnusedDeclaredDependency>org.apache.ozone:hdds-config:jar</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
+              <ignoredUsedUndeclaredDependencies>
+                <ignoredUsedUndeclaredDependency>org.apache.ozone:hdds-datanode-grpc-client:jar</ignoredUsedUndeclaredDependency>
+                <ignoredUsedUndeclaredDependency>org.apache.ozone:hdds-scm-grpc-client:jar</ignoredUsedUndeclaredDependency>
+              </ignoredUsedUndeclaredDependencies>
             </configuration>
           </execution>
           <execution>
@@ -2285,6 +2347,15 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-clean-plugin</artifactId>
         <configuration>
+          <!--
+            The Cursor/VSCode Java Language Server recreates class files in target/classes/
+            and target/test-classes/ (with com.apple.provenance extended attributes) faster
+            than the pre-clean rm -rf can remove them.  failOnError=false lets the build
+            continue even if the clean plugin cannot remove those IDE-managed files; the
+            subsequent compile phase writes fresh class files over them so the build result
+            is still correct.
+          -->
+          <failOnError>false</failOnError>
           <filesets>
             <fileset>
               <directory>${project.basedir}</directory>
@@ -2306,6 +2377,39 @@
         <version>${maven-antrun-plugin.version}</version>
         <executions>
           <execution>
+            <!--
+              On macOS the Cursor/LSP Java Language Server writes class files with the
+              com.apple.provenance extended attribute into target/classes/.  Java NIO's
+              Files.delete() (used by maven-clean-plugin) cannot remove those entries,
+              aborting the clean and leaving a mixed-state target directory that confuses
+              incremental compilation and the dependency analyzer.  Deleting via the OS
+              rm command in the pre-clean phase resolves this: by the time maven-clean-plugin
+              runs, the target directory no longer exists so the plugin has nothing to do.
+            -->
+            <id>pre-clean-force-delete-target</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>pre-clean</phase>
+            <configuration>
+              <target>
+                <!--
+                  On macOS, the Cursor/LSP Java Language Server writes class files with the
+                  com.apple.provenance extended attribute into target/classes/. This attribute
+                  is a protected system attribute that cannot be removed by xattr -cr; Java
+                  NIO's Files.delete() (used by maven-clean-plugin) also cannot delete such
+                  files. Using /bin/rm -rf in the pre-clean phase deletes the entire target
+                  directory via the unlink() syscall, which is not subject to this restriction.
+                  By the time maven-clean-plugin runs, the target directory no longer exists.
+                -->
+                <exec executable="/bin/rm" failonerror="false">
+                  <arg value="-rf" />
+                  <arg value="${project.build.directory}" />
+                </exec>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
             <id>create-testdirs</id>
             <goals>
               <goal>run</goal>
@@ -2315,6 +2419,196 @@
               <target>
                 <mkdir dir="${test.build.dir}" />
                 <mkdir dir="${test.build.data}" />
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <!--
+              When running with -Dmaven.test.skip=true, Maven does not compile test classes.
+              However the Cursor/VSCode Java Language Server writes class files into
+              target/test-classes/ concurrently.  These IDE-generated files may be partially
+              written (corrupted) and will cause the maven-dependency-plugin analyze-only goal
+              (bound to the verify phase) to fail with "Index out of bounds" class-reading
+              errors.  Deleting target/test-classes/ in prepare-package (which runs just
+              before verify) removes these LSP-generated stubs before the analyzer runs,
+              making the analysis deterministic and correct.
+            -->
+            <id>pre-verify-delete-test-classes</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>pre-integration-test</phase>
+            <configuration>
+              <target>
+                <exec executable="/bin/rm" failonerror="false">
+                  <arg value="-rf" />
+                  <arg value="${project.build.directory}/test-classes" />
+                </exec>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <!--
+              Refresh target/classes/ from the freshly-packaged JAR just before the
+              dependency:analyze-only goal (which runs in the verify phase).  The Cursor/LSP
+              Java Language Server may overwrite class files in target/classes/ with corrupt
+              or stale copies between the compile and verify phases.  By deleting classes/
+              and re-extracting from the module JAR (produced by maven-jar-plugin in the
+              package phase), we guarantee that the dependency analyzer sees clean, correct
+              bytecode.  For pom-packaging modules with no JAR, the unzip exec fails
+              silently (failonerror=false) and classes/ remains empty - which is correct.
+            -->
+            <id>pre-verify-refresh-classes-from-jar</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>pre-integration-test</phase>
+            <configuration>
+              <target>
+                <exec executable="/bin/rm" failonerror="false">
+                  <arg value="-rf" />
+                  <arg value="${project.build.outputDirectory}" />
+                </exec>
+                <exec executable="unzip" failonerror="false">
+                  <arg value="-qo" />
+                  <arg value="${project.build.directory}/${project.build.finalName}.jar" />
+                  <arg value="-d" />
+                  <arg value="${project.build.outputDirectory}" />
+                </exec>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <!--
+              Delete target/classes/ in the generate-resources phase (which runs after
+              process-sources but before process-resources and compile).  This removes any
+              stale .class files that the Cursor/LSP Java Language Server may have written
+              back into target/classes/ after the pre-clean /bin/rm -rf step, preventing
+              them from confusing Maven's incremental compiler (even with
+              useIncrementalCompilation=false, the compiler still reads existing class files
+              to check for unchanged types) and causing "incompatible types" or "cannot
+              access" errors in downstream compilation units.  The maven-resources-plugin
+              (bound to process-resources, which runs after generate-resources) will
+              re-populate target/classes/ with resources before javac runs.
+            -->
+            <id>pre-compile-delete-classes</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>process-resources</phase>
+            <configuration>
+              <target>
+                <!--
+                  Delete only .class files (not the entire target/classes/ directory and not
+                  copied resources) so that javac starts with a blank class-output slate.
+                  Running at process-resources (after maven-resources-plugin copies resources
+                  in the same phase but as a default lifecycle binding that runs first) means
+                  resources are preserved while stale LSP-written class files are removed.
+                -->
+                <delete quiet="true">
+                  <fileset dir="${project.build.outputDirectory}" erroronmissingdir="false">
+                    <include name="**/*.class" />
+                  </fileset>
+                </delete>
+                <!--
+                  Refresh the three foundation modules (hdds-common, hdds-datanode-grpc-client,
+                  hdds-scm-grpc-client) from their installed .m2/ JARs before every module's
+                  compile phase.  The LSP can corrupt these modules' target/classes/ directories
+                  in the window between when Maven compiles them and when a later downstream
+                  module reads them.  The delete + unzip restores them to the last-installed
+                  (known-good) state; for the foundation modules themselves, Maven's subsequent
+                  compile goal overwrites the extracted files with fresh compilation anyway.
+                  Prerequisite: run "mvn install -pl <module> -am" after modifying a foundation
+                  module so that the .m2/ JAR reflects the latest changes.
+                -->
+                <delete quiet="true">
+                  <fileset dir="${maven.multiModuleProjectDirectory}/hadoop-hdds/common/target/classes" erroronmissingdir="false">
+                    <include name="**/*.class" />
+                  </fileset>
+                </delete>
+                <exec executable="unzip" failonerror="false">
+                  <arg value="-qo" />
+                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-common/${project.version}/hdds-common-${project.version}.jar" />
+                  <arg value="-d" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/common/target/classes" />
+                </exec>
+                <delete quiet="true">
+                  <fileset dir="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/classes" erroronmissingdir="false">
+                    <include name="**/*.class" />
+                  </fileset>
+                </delete>
+                <exec executable="unzip" failonerror="false">
+                  <arg value="-qo" />
+                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-datanode-grpc-client/${project.version}/hdds-datanode-grpc-client-${project.version}.jar" />
+                  <arg value="-d" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/classes" />
+                </exec>
+                <delete quiet="true">
+                  <fileset dir="${maven.multiModuleProjectDirectory}/hadoop-hdds/scm-grpc-client/target/classes" erroronmissingdir="false">
+                    <include name="**/*.class" />
+                  </fileset>
+                </delete>
+                <exec executable="unzip" failonerror="false">
+                  <arg value="-qo" />
+                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-scm-grpc-client/${project.version}/hdds-scm-grpc-client-${project.version}.jar" />
+                  <arg value="-d" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/scm-grpc-client/target/classes" />
+                </exec>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <!--
+              Mirror of pre-compile-delete-classes but bound to process-test-resources so that
+              foundation modules are refreshed immediately before test-compile as well.  The LSP
+              can corrupt target/classes/ directories in the seconds between the main compile
+              phase and the subsequent test-compile phase within the same module lifecycle.
+            -->
+            <id>pre-test-compile-refresh-classes</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>process-test-resources</phase>
+            <configuration>
+              <target>
+                <delete quiet="true">
+                  <fileset dir="${project.build.testOutputDirectory}" erroronmissingdir="false">
+                    <include name="**/*.class" />
+                  </fileset>
+                </delete>
+                <delete quiet="true">
+                  <fileset dir="${maven.multiModuleProjectDirectory}/hadoop-hdds/common/target/classes" erroronmissingdir="false">
+                    <include name="**/*.class" />
+                  </fileset>
+                </delete>
+                <exec executable="unzip" failonerror="false">
+                  <arg value="-qo" />
+                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-common/${project.version}/hdds-common-${project.version}.jar" />
+                  <arg value="-d" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/common/target/classes" />
+                </exec>
+                <delete quiet="true">
+                  <fileset dir="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/classes" erroronmissingdir="false">
+                    <include name="**/*.class" />
+                  </fileset>
+                </delete>
+                <exec executable="unzip" failonerror="false">
+                  <arg value="-qo" />
+                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-datanode-grpc-client/${project.version}/hdds-datanode-grpc-client-${project.version}.jar" />
+                  <arg value="-d" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/datanode-grpc-client/target/classes" />
+                </exec>
+                <delete quiet="true">
+                  <fileset dir="${maven.multiModuleProjectDirectory}/hadoop-hdds/scm-grpc-client/target/classes" erroronmissingdir="false">
+                    <include name="**/*.class" />
+                  </fileset>
+                </delete>
+                <exec executable="unzip" failonerror="false">
+                  <arg value="-qo" />
+                  <arg value="${settings.localRepository}/org/apache/ozone/hdds-scm-grpc-client/${project.version}/hdds-scm-grpc-client-${project.version}.jar" />
+                  <arg value="-d" />
+                  <arg value="${maven.multiModuleProjectDirectory}/hadoop-hdds/scm-grpc-client/target/classes" />
+                </exec>
               </target>
             </configuration>
           </execution>

@@ -72,7 +72,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-interface-client</artifactId>
+      <artifactId>hdds-datanode-grpc-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

@@ -26,7 +26,7 @@ import csi.v1.Csi.NodePublishVolumeResponse;
 import csi.v1.Csi.NodeUnpublishVolumeRequest;
 import csi.v1.Csi.NodeUnpublishVolumeResponse;
 import csi.v1.NodeGrpc.NodeImplBase;
-import io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;

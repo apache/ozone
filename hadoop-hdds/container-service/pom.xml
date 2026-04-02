@@ -336,6 +336,24 @@
               <overWriteSnapshots>true</overWriteSnapshots>
             </configuration>
           </execution>
+          <execution>
+            <id>analyze</id>
+            <configuration>
+              <ignoredUnusedDeclaredDependencies combine.children="append">
+                <!--
+                  hadoop-auth is used by Hadoop delegation tokens at runtime; its types
+                  are accessed through hadoop-common's service-loader mechanism and not
+                  directly imported in compiled bytecode.
+                -->
+                <ignoredUnusedDeclaredDependency>org.apache.hadoop:hadoop-auth</ignoredUnusedDeclaredDependency>
+                <!--
+                  ratis-netty is a Ratis transport module loaded at runtime via service
+                  discovery. Its classes are not referenced directly in compiled bytecode.
+                -->
+                <ignoredUnusedDeclaredDependency>org.apache.ratis:ratis-netty</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
     </plugins>

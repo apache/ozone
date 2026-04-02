@@ -23,14 +23,11 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SSL_
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.HostAndPort;
-import io.grpc.Context;
-import io.grpc.ManagedChannel;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyChannelBuilder;
-import io.netty.handler.ssl.SslContextBuilder;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
@@ -38,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -55,12 +53,30 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.ha.GrpcOMFailoverProxyProvider;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressClientInterceptor;
-import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.thirdparty.io.grpc.CallOptions;
+import org.apache.ratis.thirdparty.io.grpc.ClientCall;
+import org.apache.ratis.thirdparty.io.grpc.ClientInterceptor;
+import org.apache.ratis.thirdparty.io.grpc.ClientInterceptors;
+import org.apache.ratis.thirdparty.io.grpc.ForwardingClientCall;
+import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+import org.apache.ratis.thirdparty.io.grpc.Metadata;
+import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
+import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCalls;
+import org.apache.ratis.thirdparty.io.netty.channel.Channel;
+import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.Epoll;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollEventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollSocketChannel;
+import org.apache.ratis.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
+import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioSocketChannel;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +88,7 @@ public class GrpcOmTransport implements OmTransport {
       LoggerFactory.getLogger(GrpcOmTransport.class);
 
   private static final String CLIENT_NAME = "GrpcOmTransport";
+  private static final String SERVICE_NAME = "hadoop.ozone.OzoneManagerService";
   private static final int SHUTDOWN_WAIT_INTERVAL = 100;
   private static final int SHUTDOWN_MAX_WAIT_SECONDS = 5;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
@@ -79,8 +96,20 @@ public class GrpcOmTransport implements OmTransport {
   // gRPC specific
   private static List<X509Certificate> caCerts = null;
 
-  private final Map<String,
-      OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub> clients;
+  private static final Metadata.Key<String> CLIENT_HOSTNAME_METADATA_KEY =
+      Metadata.Key.of("CLIENT_HOSTNAME", Metadata.ASCII_STRING_MARSHALLER);
+  private static final Metadata.Key<String> CLIENT_IP_ADDRESS_METADATA_KEY =
+      Metadata.Key.of("CLIENT_IP_ADDRESS", Metadata.ASCII_STRING_MARSHALLER);
+
+  private static final MethodDescriptor<OMRequest, OMResponse>
+      SUBMIT_REQUEST_METHOD = MethodDescriptor.<OMRequest, OMResponse>newBuilder()
+      .setType(MethodDescriptor.MethodType.UNARY)
+      .setFullMethodName(MethodDescriptor.generateFullMethodName(
+          SERVICE_NAME, "submitRequest"))
+      .setRequestMarshaller(new Proto2Marshaller<>(OMRequest::parseFrom))
+      .setResponseMarshaller(new Proto2Marshaller<>(OMResponse::parseFrom))
+      .build();
+
   private final Map<String, ManagedChannel> channels;
   private final ConfigurationSource conf;
 
@@ -88,6 +117,8 @@ public class GrpcOmTransport implements OmTransport {
   private AtomicInteger globalFailoverCount;
   private final int maxSize;
   private final SecurityConfig secConfig;
+  private EventLoopGroup eventLoopGroup;
+  private Class<? extends Channel> channelType;
 
   private RetryPolicy retryPolicy;
   private final GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
@@ -102,7 +133,6 @@ public class GrpcOmTransport implements OmTransport {
       throws IOException {
 
     this.channels = new HashMap<>();
-    this.clients = new HashMap<>();
     this.conf = conf;
     this.host = new AtomicReference<>();
     this.globalFailoverCount = new AtomicInteger();
@@ -130,6 +160,20 @@ public class GrpcOmTransport implements OmTransport {
       return;
     }
 
+    ThreadFactory factory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(CLIENT_NAME + "-ELG-%d")
+        .build();
+
+    if (Epoll.isAvailable()) {
+      eventLoopGroup = new EpollEventLoopGroup(0, factory);
+      channelType = EpollSocketChannel.class;
+    } else {
+      eventLoopGroup = new NioEventLoopGroup(0, factory);
+      channelType = NioSocketChannel.class;
+    }
+    LOG.info("{} channel type {}", CLIENT_NAME, channelType.getSimpleName());
+
     for (String nodeId : omFailoverProxyProvider.getOMProxyMap().getNodeIds()) {
       String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
       HostAndPort hp = HostAndPort.fromString(hostaddr);
@@ -137,6 +181,8 @@ public class GrpcOmTransport implements OmTransport {
       NettyChannelBuilder channelBuilder =
           NettyChannelBuilder.forAddress(hp.getHost(), hp.getPort())
               .usePlaintext()
+              .eventLoopGroup(eventLoopGroup)
+              .channelType(channelType)
               .proxyDetector(uri -> null)
               .maxInboundMessageSize(maxSize);
 
@@ -158,11 +204,7 @@ public class GrpcOmTransport implements OmTransport {
       }
 
       channels.put(hostaddr,
-          channelBuilder.intercept(new ClientAddressClientInterceptor())
-              .build());
-      clients.put(hostaddr,
-          OzoneManagerServiceGrpc
-              .newBlockingStub(channels.get(hostaddr)));
+          channelBuilder.build());
     }
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
@@ -184,13 +226,12 @@ public class GrpcOmTransport implements OmTransport {
       expectedFailoverCount = globalFailoverCount.get();
       try {
         InetAddress inetAddress = InetAddress.getLocalHost();
-        Context.current()
-            .withValue(GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY,
-                inetAddress.getHostAddress())
-            .withValue(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY,
-                inetAddress.getHostName())
-            .run(() -> resp.set(clients.get(host.get())
-                .submitRequest(payload)));
+        final ManagedChannel channel = channels.get(host.get());
+        if (channel == null) {
+          throw new OMException(ResultCodes.INTERNAL_ERROR);
+        }
+        resp.set(submitRequest(channel, payload,
+            inetAddress.getHostName(), inetAddress.getHostAddress()));
       } catch (StatusRuntimeException e) {
         LOG.error("Failed to submit request", e);
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
@@ -330,12 +371,90 @@ public class GrpcOmTransport implements OmTransport {
       LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
     }
 
+    if (eventLoopGroup != null) {
+      try {
+        eventLoopGroup.shutdownGracefully().sync();
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted while shutting down event loop group", e);
+        Thread.currentThread().interrupt();
+      }
+    }
+
     LOG.info("{}: stopped", CLIENT_NAME);
   }
 
   @Override
   public void close() throws IOException {
     shutdown();
+  }
+
+  private OMResponse submitRequest(ManagedChannel channel, OMRequest request,
+      String clientHostname, String clientIpAddress) {
+    Metadata headers = new Metadata();
+    if (clientHostname != null) {
+      headers.put(CLIENT_HOSTNAME_METADATA_KEY, clientHostname);
+    }
+    if (clientIpAddress != null) {
+      headers.put(CLIENT_IP_ADDRESS_METADATA_KEY, clientIpAddress);
+    }
+
+    org.apache.ratis.thirdparty.io.grpc.Channel intercepted =
+        ClientInterceptors.intercept(channel, new FixedHeadersInterceptor(headers));
+    return ClientCalls.blockingUnaryCall(intercepted, SUBMIT_REQUEST_METHOD,
+        CallOptions.DEFAULT, request);
+  }
+
+  private static final class FixedHeadersInterceptor implements ClientInterceptor {
+    private final Metadata headers;
+
+    private FixedHeadersInterceptor(Metadata headers) {
+      this.headers = headers;
+    }
+
+    @Override
+    public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
+        MethodDescriptor<ReqT, RespT> methodDescriptor,
+        CallOptions callOptions,
+        org.apache.ratis.thirdparty.io.grpc.Channel channel) {
+      return new ForwardingClientCall.SimpleForwardingClientCall<ReqT, RespT>(
+          channel.newCall(methodDescriptor, callOptions)) {
+        @Override
+        public void start(Listener<RespT> responseListener, Metadata metadata) {
+          metadata.merge(headers);
+          super.start(responseListener, metadata);
+        }
+      };
+    }
+  }
+
+  private static final class Proto2Marshaller<T> implements MethodDescriptor.Marshaller<T> {
+    private final Proto2Parser<T> parser;
+
+    private Proto2Marshaller(Proto2Parser<T> parser) {
+      this.parser = parser;
+    }
+
+    @Override
+    public InputStream stream(T value) {
+      if (!(value instanceof com.google.protobuf.MessageLite)) {
+        throw new IllegalArgumentException("Expected protobuf request/response");
+      }
+      return new ByteArrayInputStream(((com.google.protobuf.MessageLite) value).toByteArray());
+    }
+
+    @Override
+    public T parse(InputStream stream) {
+      try {
+        return parser.parse(stream);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
+  }
+
+  @FunctionalInterface
+  private interface Proto2Parser<T> {
+    T parse(InputStream stream) throws IOException;
   }
 
   /**
@@ -364,9 +483,7 @@ public class GrpcOmTransport implements OmTransport {
     for (String nodeId : omFailoverProxyProvider.getOMProxyMap().getNodeIds()) {
       String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
 
-      clients.put(hostaddr,
-          OzoneManagerServiceGrpc
-              .newBlockingStub(testChannel));
+      channels.put(hostaddr, testChannel);
     }
     LOG.info("{}: started", CLIENT_NAME);
   }

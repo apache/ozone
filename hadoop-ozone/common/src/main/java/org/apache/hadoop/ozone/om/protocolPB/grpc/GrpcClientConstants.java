@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.protocolPB.grpc;
 
-import io.grpc.Context;
-import io.grpc.Metadata;
+import org.apache.ratis.thirdparty.io.grpc.Context;
+import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
 /**
  * Constants to store grpc-client specific header values.

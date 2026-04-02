@@ -29,7 +29,7 @@ import csi.v1.Csi.CreateVolumeResponse;
 import csi.v1.Csi.DeleteVolumeRequest;
 import csi.v1.Csi.DeleteVolumeResponse;
 import csi.v1.Csi.Volume;
-import io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import org.apache.hadoop.ozone.client.OzoneClient;
 

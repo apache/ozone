@@ -1,0 +1,1831 @@
+{
+  "definitions": [
+    {
+      "protopath": "DatanodeClientProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Type",
+            "enum_fields": [
+              {
+                "name": "CreateContainer",
+                "integer": 1
+              },
+              {
+                "name": "ReadContainer",
+                "integer": 2
+              },
+              {
+                "name": "UpdateContainer",
+                "integer": 3
+              },
+              {
+                "name": "DeleteContainer",
+                "integer": 4
+              },
+              {
+                "name": "ListContainer",
+                "integer": 5
+              },
+              {
+                "name": "PutBlock",
+                "integer": 6
+              },
+              {
+                "name": "GetBlock",
+                "integer": 7
+              },
+              {
+                "name": "DeleteBlock",
+                "integer": 8
+              },
+              {
+                "name": "ListBlock",
+                "integer": 9
+              },
+              {
+                "name": "ReadChunk",
+                "integer": 10
+              },
+              {
+                "name": "DeleteChunk",
+                "integer": 11
+              },
+              {
+                "name": "WriteChunk",
+                "integer": 12
+              },
+              {
+                "name": "ListChunk",
+                "integer": 13
+              },
+              {
+                "name": "CompactChunk",
+                "integer": 14
+              },
+              {
+                "name": "PutSmallFile",
+                "integer": 15
+              },
+              {
+                "name": "GetSmallFile",
+                "integer": 16
+              },
+              {
+                "name": "CloseContainer",
+                "integer": 17
+              },
+              {
+                "name": "GetCommittedBlockLength",
+                "integer": 18
+              },
+              {
+                "name": "StreamInit",
+                "integer": 19
+              },
+              {
+                "name": "StreamWrite",
+                "integer": 20
+              },
+              {
+                "name": "FinalizeBlock",
+                "integer": 21
+              },
+              {
+                "name": "Echo",
+                "integer": 22
+              },
+              {
+                "name": "GetContainerChecksumInfo",
+                "integer": 23
+              }
+            ]
+          },
+          {
+            "name": "Result",
+            "enum_fields": [
+              {
+                "name": "SUCCESS",
+                "integer": 1
+              },
+              {
+                "name": "UNSUPPORTED_REQUEST",
+                "integer": 2
+              },
+              {
+                "name": "MALFORMED_REQUEST",
+                "integer": 3
+              },
+              {
+                "name": "CONTAINER_INTERNAL_ERROR",
+                "integer": 4
+              },
+              {
+                "name": "INVALID_CONFIG",
+                "integer": 5
+              },
+              {
+                "name": "INVALID_FILE_HASH_FOUND",
+                "integer": 6
+              },
+              {
+                "name": "CONTAINER_EXISTS",
+                "integer": 7
+              },
+              {
+                "name": "NO_SUCH_ALGORITHM",
+                "integer": 8
+              },
+              {
+                "name": "CONTAINER_NOT_FOUND",
+                "integer": 9
+              },
+              {
+                "name": "IO_EXCEPTION",
+                "integer": 10
+              },
+              {
+                "name": "UNABLE_TO_READ_METADATA_DB",
+                "integer": 11
+              },
+              {
+                "name": "NO_SUCH_BLOCK",
+                "integer": 12
+              },
+              {
+                "name": "OVERWRITE_FLAG_REQUIRED",
+                "integer": 13
+              },
+              {
+                "name": "UNABLE_TO_FIND_DATA_DIR",
+                "integer": 14
+              },
+              {
+                "name": "INVALID_WRITE_SIZE",
+                "integer": 15
+              },
+              {
+                "name": "CHECKSUM_MISMATCH",
+                "integer": 16
+              },
+              {
+                "name": "UNABLE_TO_FIND_CHUNK",
+                "integer": 17
+              },
+              {
+                "name": "PROTOC_DECODING_ERROR",
+                "integer": 18
+              },
+              {
+                "name": "INVALID_ARGUMENT",
+                "integer": 19
+              },
+              {
+                "name": "PUT_SMALL_FILE_ERROR",
+                "integer": 20
+              },
+              {
+                "name": "GET_SMALL_FILE_ERROR",
+                "integer": 21
+              },
+              {
+                "name": "CLOSED_CONTAINER_IO",
+                "integer": 22
+              },
+              {
+                "name": "ERROR_IN_COMPACT_DB",
+                "integer": 24
+              },
+              {
+                "name": "UNCLOSED_CONTAINER_IO",
+                "integer": 25
+              },
+              {
+                "name": "DELETE_ON_OPEN_CONTAINER",
+                "integer": 26
+              },
+              {
+                "name": "CLOSED_CONTAINER_RETRY",
+                "integer": 27
+              },
+              {
+                "name": "INVALID_CONTAINER_STATE",
+                "integer": 28
+              },
+              {
+                "name": "DISK_OUT_OF_SPACE",
+                "integer": 29
+              },
+              {
+                "name": "CONTAINER_ALREADY_EXISTS",
+                "integer": 30
+              },
+              {
+                "name": "CONTAINER_METADATA_ERROR",
+                "integer": 31
+              },
+              {
+                "name": "CONTAINER_FILES_CREATE_ERROR",
+                "integer": 32
+              },
+              {
+                "name": "CONTAINER_CHECKSUM_ERROR",
+                "integer": 33
+              },
+              {
+                "name": "UNKNOWN_CONTAINER_TYPE",
+                "integer": 34
+              },
+              {
+                "name": "BLOCK_NOT_COMMITTED",
+                "integer": 35
+              },
+              {
+                "name": "CONTAINER_UNHEALTHY",
+                "integer": 36
+              },
+              {
+                "name": "UNKNOWN_BCSID",
+                "integer": 37
+              },
+              {
+                "name": "BCSID_MISMATCH",
+                "integer": 38
+              },
+              {
+                "name": "CONTAINER_NOT_OPEN",
+                "integer": 39
+              },
+              {
+                "name": "CONTAINER_MISSING",
+                "integer": 40
+              },
+              {
+                "name": "BLOCK_TOKEN_VERIFICATION_FAILED",
+                "integer": 41
+              },
+              {
+                "name": "ERROR_IN_DB_SYNC",
+                "integer": 42
+              },
+              {
+                "name": "CHUNK_FILE_INCONSISTENCY",
+                "integer": 43
+              },
+              {
+                "name": "DELETE_ON_NON_EMPTY_CONTAINER",
+                "integer": 44
+              },
+              {
+                "name": "EXPORT_CONTAINER_METADATA_FAILED",
+                "integer": 45
+              },
+              {
+                "name": "IMPORT_CONTAINER_METADATA_FAILED",
+                "integer": 46
+              },
+              {
+                "name": "BLOCK_ALREADY_FINALIZED",
+                "integer": 47
+              },
+              {
+                "name": "CONTAINER_ID_MISMATCH",
+                "integer": 48
+              }
+            ]
+          },
+          {
+            "name": "ContainerDataProto.State",
+            "enum_fields": [
+              {
+                "name": "OPEN",
+                "integer": 1
+              },
+              {
+                "name": "CLOSING",
+                "integer": 2
+              },
+              {
+                "name": "QUASI_CLOSED",
+                "integer": 3
+              },
+              {
+                "name": "CLOSED",
+                "integer": 4
+              },
+              {
+                "name": "UNHEALTHY",
+                "integer": 5
+              },
+              {
+                "name": "INVALID",
+                "integer": 6
+              },
+              {
+                "name": "DELETED",
+                "integer": 7
+              },
+              {
+                "name": "RECOVERING",
+                "integer": 8
+              }
+            ]
+          },
+          {
+            "name": "ContainerType",
+            "enum_fields": [
+              {
+                "name": "KeyValueContainer",
+                "integer": 1
+              }
+            ]
+          },
+          {
+            "name": "ChecksumType",
+            "enum_fields": [
+              {
+                "name": "NONE",
+                "integer": 1
+              },
+              {
+                "name": "CRC32",
+                "integer": 2
+              },
+              {
+                "name": "CRC32C",
+                "integer": 3
+              },
+              {
+                "name": "SHA256",
+                "integer": 4
+              },
+              {
+                "name": "MD5",
+                "integer": 5
+              }
+            ]
+          },
+          {
+            "name": "ReadChunkVersion",
+            "enum_fields": [
+              {
+                "name": "V0"
+              },
+              {
+                "name": "V1",
+                "integer": 1
+              }
+            ]
+          },
+          {
+            "name": "CopyContainerCompressProto",
+            "enum_fields": [
+              {
+                "name": "NO_COMPRESSION",
+                "integer": 1
+              },
+              {
+                "name": "GZIP",
+                "integer": 2
+              },
+              {
+                "name": "LZ4",
+                "integer": 3
+              },
+              {
+                "name": "SNAPPY",
+                "integer": 4
+              },
+              {
+                "name": "ZSTD",
+                "integer": 5
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "DatanodeBlockID",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "localID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "blockCommitSequenceId",
+                "type": "uint64",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "replicaIndex",
+                "type": "int32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "KeyValue",
+            "fields": [
+              {
+                "id": 1,
+                "name": "key",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "value",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerCommandRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "datanodeUuid",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "pipelineID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "createContainer",
+                "type": "CreateContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "readContainer",
+                "type": "ReadContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "updateContainer",
+                "type": "UpdateContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "deleteContainer",
+                "type": "DeleteContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "listContainer",
+                "type": "ListContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "closeContainer",
+                "type": "CloseContainerRequestProto",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "putBlock",
+                "type": "PutBlockRequestProto",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "getBlock",
+                "type": "GetBlockRequestProto",
+                "optional": true
+              },
+              {
+                "id": 14,
+                "name": "deleteBlock",
+                "type": "DeleteBlockRequestProto",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 15,
+                "name": "listBlock",
+                "type": "ListBlockRequestProto",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "readChunk",
+                "type": "ReadChunkRequestProto",
+                "optional": true
+              },
+              {
+                "id": 17,
+                "name": "writeChunk",
+                "type": "WriteChunkRequestProto",
+                "optional": true
+              },
+              {
+                "id": 18,
+                "name": "deleteChunk",
+                "type": "DeleteChunkRequestProto",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 19,
+                "name": "listChunk",
+                "type": "ListChunkRequestProto",
+                "optional": true
+              },
+              {
+                "id": 20,
+                "name": "putSmallFile",
+                "type": "PutSmallFileRequestProto",
+                "optional": true
+              },
+              {
+                "id": 21,
+                "name": "getSmallFile",
+                "type": "GetSmallFileRequestProto",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "getCommittedBlockLength",
+                "type": "GetCommittedBlockLengthRequestProto",
+                "optional": true
+              },
+              {
+                "id": 23,
+                "name": "encodedToken",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 24,
+                "name": "version",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 25,
+                "name": "finalizeBlock",
+                "type": "FinalizeBlockRequestProto",
+                "optional": true
+              },
+              {
+                "id": 26,
+                "name": "echo",
+                "type": "EchoRequestProto",
+                "optional": true
+              },
+              {
+                "id": 27,
+                "name": "getContainerChecksumInfo",
+                "type": "GetContainerChecksumInfoRequestProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerCommandResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "result",
+                "type": "Result",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "message",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "createContainer",
+                "type": "CreateContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "readContainer",
+                "type": "ReadContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "updateContainer",
+                "type": "UpdateContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "deleteContainer",
+                "type": "DeleteContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "listContainer",
+                "type": "ListContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "closeContainer",
+                "type": "CloseContainerResponseProto",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "putBlock",
+                "type": "PutBlockResponseProto",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "getBlock",
+                "type": "GetBlockResponseProto",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "deleteBlock",
+                "type": "DeleteBlockResponseProto",
+                "optional": true
+              },
+              {
+                "id": 14,
+                "name": "listBlock",
+                "type": "ListBlockResponseProto",
+                "optional": true
+              },
+              {
+                "id": 15,
+                "name": "writeChunk",
+                "type": "WriteChunkResponseProto",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "readChunk",
+                "type": "ReadChunkResponseProto",
+                "optional": true
+              },
+              {
+                "id": 17,
+                "name": "deleteChunk",
+                "type": "DeleteChunkResponseProto",
+                "optional": true
+              },
+              {
+                "id": 18,
+                "name": "listChunk",
+                "type": "ListChunkResponseProto",
+                "optional": true
+              },
+              {
+                "id": 19,
+                "name": "putSmallFile",
+                "type": "PutSmallFileResponseProto",
+                "optional": true
+              },
+              {
+                "id": 20,
+                "name": "getSmallFile",
+                "type": "GetSmallFileResponseProto",
+                "optional": true
+              },
+              {
+                "id": 21,
+                "name": "getCommittedBlockLength",
+                "type": "GetCommittedBlockLengthResponseProto",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "finalizeBlock",
+                "type": "FinalizeBlockResponseProto",
+                "optional": true
+              },
+              {
+                "id": 23,
+                "name": "echo",
+                "type": "EchoResponseProto",
+                "optional": true
+              },
+              {
+                "id": 24,
+                "name": "getContainerChecksumInfo",
+                "type": "GetContainerChecksumInfoResponseProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerDataProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "metadata",
+                "type": "KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "containerPath",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "bytesUsed",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "size",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "blockCount",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "state",
+                "type": "State",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "OPEN"
+                  }
+                ]
+              },
+              {
+                "id": 10,
+                "name": "containerType",
+                "type": "ContainerType",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "KeyValueContainer"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Container2BCSIDMapProto",
+            "maps": [
+              {
+                "key_type": "int64",
+                "field": {
+                  "id": 1,
+                  "name": "container2BCSID",
+                  "type": "int64"
+                }
+              }
+            ]
+          },
+          {
+            "name": "CreateContainerRequestProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "metadata",
+                "type": "KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "containerType",
+                "type": "ContainerType",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "KeyValueContainer"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "replicaIndex",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "state",
+                "type": "ContainerDataProto.State",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "CreateContainerResponseProto"
+          },
+          {
+            "name": "ReadContainerRequestProto"
+          },
+          {
+            "name": "ReadContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerData",
+                "type": "ContainerDataProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "UpdateContainerRequestProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "metadata",
+                "type": "KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "forceUpdate",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "UpdateContainerResponseProto"
+          },
+          {
+            "name": "DeleteContainerRequestProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "forceDelete",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "DeleteContainerResponseProto"
+          },
+          {
+            "name": "ListContainerRequestProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "count",
+                "type": "uint32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerData",
+                "type": "ContainerDataProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "CloseContainerRequestProto"
+          },
+          {
+            "name": "CloseContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "hash",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "BlockData",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "flags",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "metadata",
+                "type": "KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "chunks",
+                "type": "ChunkInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "size",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "PutBlockRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockData",
+                "type": "BlockData",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "eof",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "PutBlockResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "committedBlockLength",
+                "type": "GetCommittedBlockLengthResponseProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "FinalizeBlockRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "FinalizeBlockResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockData",
+                "type": "BlockData",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetBlockRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetBlockResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockData",
+                "type": "BlockData",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteBlockRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetCommittedBlockLengthRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetCommittedBlockLengthResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "blockLength",
+                "type": "int64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteBlockResponseProto"
+          },
+          {
+            "name": "ListBlockRequestProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "startLocalID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "count",
+                "type": "uint32",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ListBlockResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockData",
+                "type": "BlockData",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "EchoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "payload",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "payloadSizeResp",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "sleepTimeMs",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "readOnly",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "EchoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "payload",
+                "type": "bytes",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerChecksumInfoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerChecksumInfoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerChecksumInfo",
+                "type": "bytes",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ChunkInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "chunkName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "offset",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "len",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "metadata",
+                "type": "KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "checksumData",
+                "type": "ChecksumData",
+                "required": true
+              },
+              {
+                "id": 6,
+                "name": "stripeChecksum",
+                "type": "bytes",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ChunkInfoList",
+            "fields": [
+              {
+                "id": 1,
+                "name": "chunks",
+                "type": "ChunkInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ChecksumData",
+            "fields": [
+              {
+                "id": 1,
+                "name": "type",
+                "type": "ChecksumType",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "bytesPerChecksum",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "checksums",
+                "type": "bytes",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "WriteChunkRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "chunkData",
+                "type": "ChunkInfo",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "data",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "block",
+                "type": "PutBlockRequestProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "WriteChunkResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "committedBlockLength",
+                "type": "GetCommittedBlockLengthResponseProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ReadChunkRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "chunkData",
+                "type": "ChunkInfo",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "readChunkVersion",
+                "type": "ReadChunkVersion",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ReadChunkResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "chunkData",
+                "type": "ChunkInfo",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "data",
+                "type": "bytes",
+                "oneof_parent": "responseData"
+              },
+              {
+                "id": 4,
+                "name": "dataBuffers",
+                "type": "DataBuffers",
+                "oneof_parent": "responseData"
+              }
+            ]
+          },
+          {
+            "name": "DataBuffers",
+            "fields": [
+              {
+                "id": 1,
+                "name": "buffers",
+                "type": "bytes",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteChunkRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "chunkData",
+                "type": "ChunkInfo",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteChunkResponseProto"
+          },
+          {
+            "name": "ListChunkRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "prevChunkName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "count",
+                "type": "uint32",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ListChunkResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "chunkData",
+                "type": "ChunkInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PutSmallFileRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "block",
+                "type": "PutBlockRequestProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "chunkInfo",
+                "type": "ChunkInfo",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "data",
+                "type": "bytes",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "PutSmallFileResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "committedBlockLength",
+                "type": "GetCommittedBlockLengthResponseProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetSmallFileRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "block",
+                "type": "GetBlockRequestProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "readChunkVersion",
+                "type": "ReadChunkVersion",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetSmallFileResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "data",
+                "type": "ReadChunkResponseProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "CopyContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "readOffset",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "len",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "version",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "compression",
+                "type": "CopyContainerCompressProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "CopyContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "readOffset",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "len",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "eof",
+                "type": "bool",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "data",
+                "type": "bytes",
+                "required": true
+              },
+              {
+                "id": 6,
+                "name": "checksum",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SendContainerRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "offset",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "data",
+                "type": "bytes",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "checksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "compression",
+                "type": "CopyContainerCompressProto",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "size",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SendContainerResponse"
+          },
+          {
+            "name": "ChunkMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "offset",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "length",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "checksumMatches",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "BlockMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "chunkMerkleTree",
+                "type": "ChunkMerkleTree",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "deleted",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "blockMerkleTree",
+                "type": "BlockMerkleTree",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerChecksumInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerMerkleTree",
+                "type": "ContainerMerkleTree",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerCreateInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "state",
+                "type": "ContainerDataProto.State",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "replicaIndex",
+                "type": "int32",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-1"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "XceiverClientProtocolService",
+            "rpcs": [
+              {
+                "name": "send",
+                "in_type": "ContainerCommandRequestProto",
+                "out_type": "ContainerCommandResponseProto",
+                "in_streamed": true,
+                "out_streamed": true
+              }
+            ]
+          },
+          {
+            "name": "IntraDatanodeProtocolService",
+            "rpcs": [
+              {
+                "name": "download",
+                "in_type": "CopyContainerRequestProto",
+                "out_type": "CopyContainerResponseProto",
+                "out_streamed": true
+              },
+              {
+                "name": "upload",
+                "in_type": "SendContainerRequest",
+                "out_type": "SendContainerResponse",
+                "in_streamed": true
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds.datanode"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.datanode.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "ContainerProtos"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    }
+  ]
+}

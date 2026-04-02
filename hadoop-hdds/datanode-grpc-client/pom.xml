@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
+    <version>2.2.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>hdds-datanode-grpc-client</artifactId>
+  <version>2.2.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>Apache Ozone HDDS DataNode gRPC Client</name>
+  <description>DataNode XCeiver and IntraDatanode gRPC stubs generated from DatanodeClientProtocol.proto.
+    Package names in generated sources are rewritten by maven-antrun-plugin (Ant replace task, pure Java)
+    from vanilla com.google.protobuf / io.grpc / com.google.common to their ratis-thirdparty counterparts
+    before compilation, so target/classes/ already contains the shaded namespace and downstream modules
+    in the same Maven reactor can compile against the correct types.</description>
+
+  <properties>
+    <!-- used in temp dir names; must be filesystem/protoc-safe (no ':') -->
+    <maven.build.timestamp.format>yyyyMMddHHmmss</maven.build.timestamp.format>
+    <!-- no testable code in this module -->
+    <maven.test.skip>true</maven.test.skip>
+    <mdep.analyze.skip>true</mdep.analyze.skip>
+    <spotbugs.skip>true</spotbugs.skip>
+  </properties>
+
+  <dependencies>
+    <!--
+      Shaded gRPC / Netty / protobuf runtime. The generated sources are rewritten to reference
+      org.apache.ratis.thirdparty.* directly, so ratis-thirdparty-misc must be on the compile
+      classpath and is exposed transitively to all consumers of this module.
+    -->
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-thirdparty-misc</artifactId>
+    </dependency>
+    <dependency>
+      <!-- for @Generated annotation in generated sources (Java 11+) -->
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>com.gradle</groupId>
+          <artifactId>develocity-maven-extension</artifactId>
+          <configuration>
+            <develocity>
+              <plugins>
+                <plugin>
+                  <artifactId>maven-compiler-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>compiles generated + rewritten sources</notCacheableBecause>
+                  </outputs>
+                </plugin>
+                <plugin>
+                  <artifactId>maven-antrun-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>rewrites generated source files</notCacheableBecause>
+                  </outputs>
+                </plugin>
+                <plugin>
+                  <artifactId>protobuf-maven-plugin</artifactId>
+                  <outputs>
+                    <notCacheableBecause>generates sources</notCacheableBecause>
+                  </outputs>
+                </plugin>
+              </plugins>
+            </develocity>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>com.salesforce.servicelibs</groupId>
+        <artifactId>proto-backwards-compatibility</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+          <useIncrementalCompilation>false</useIncrementalCompilation>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.xolstice.maven.plugins</groupId>
+        <artifactId>protobuf-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>compile-proto-datanode</id>
+            <goals>
+              <goal>compile</goal>
+              <goal>compile-custom</goal>
+            </goals>
+            <phase>generate-sources</phase>
+            <configuration>
+              <!--
+                Use the same protoc/grpc-java versions as ratis-thirdparty so that the generated
+                API surface is compatible with the shaded runtime in ratis-thirdparty-misc.
+                Output directly to proto-java-ratis so that both Maven and the IDE/LSP compile the
+                same ratis-shaded source tree, eliminating any race between Maven's javac and the
+                LSP writing vanilla class files to target/classes/.
+              -->
+              <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <outputDirectory>${project.build.directory}/generated-sources/proto-java-ratis</outputDirectory>
+              <temporaryProtoFileDirectory>${java.io.tmpdir}/ozone-protoc-dependencies/${project.artifactId}/${maven.build.timestamp}</temporaryProtoFileDirectory>
+              <clearOutputDirectory>false</clearOutputDirectory>
+              <pluginId>grpc-java</pluginId>
+              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${ratis-thirdparty.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <!--
+              Rewrite vanilla package names produced by protoc/grpc-java in-place inside
+              proto-java-ratis/ (the protobuf-maven-plugin outputDirectory).  Because the
+              IDE/LSP also uses proto-java-ratis/ as its Java source root, it will compile
+              the same shaded sources and write shaded class files to target/classes/, which
+              means both Maven javac and the LSP produce identical bytecode – no more race
+              where the LSP overwrites Maven's correctly-shaded class files.
+            -->
+            <id>rewrite-generated-sources-to-ratis-ns</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>process-sources</phase>
+            <configuration>
+              <target>
+                <replace dir="${project.build.directory}/generated-sources/proto-java-ratis" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
+                <replace dir="${project.build.directory}/generated-sources/proto-java-ratis" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
+                <replace dir="${project.build.directory}/generated-sources/proto-java-ratis" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
