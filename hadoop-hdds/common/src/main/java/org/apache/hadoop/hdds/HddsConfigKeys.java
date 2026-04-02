@@ -434,6 +434,9 @@ public final class HddsConfigKeys {
   public static final String HDDS_METRICS_PERCENTILES_INTERVALS_KEY =
       "hdds.metrics.percentiles.intervals";
 
+  public static final String HDDS_DATANODE_DISK_CHECK_IO_TEST_ENABLED_KEY =
+      "hdds.datanode.disk.check.io.test.enabled";
+
   /** Do not instantiate. */
   private HddsConfigKeys() {
   }

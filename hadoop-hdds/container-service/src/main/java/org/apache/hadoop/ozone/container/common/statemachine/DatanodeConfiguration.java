@@ -89,6 +89,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
+  public static final int DISK_CHECK_IO_TEST_COUNT_DEFAULT = 3;
+
   public static final int DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT = 1;
 
   public static final int DISK_CHECK_FILE_SIZE_DEFAULT = 100;
@@ -349,6 +351,19 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + "at least one good volume left."
   )
   private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
+
+  @Config(key = "hdds.datanode.disk.check.io.test.count",
+      defaultValue = "3",
+      type = ConfigType.INT,
+      tags = {DATANODE},
+      description = "The number of IO tests required to determine if a disk " +
+          " has failed. Each disk check does one IO test. The volume will be " +
+          "failed if more than " +
+          "hdds.datanode.disk.check.io.failures.tolerated out of the last " +
+          "hdds.datanode.disk.check.io.test.count runs failed. Set to 0 " +
+          "to disable disk IO checks."
+  )
+  private int volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
 
   @Config(key = "hdds.datanode.disk.check.io.test.enabled",
       defaultValue = "true",
@@ -867,6 +882,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setFailedDbVolumesTolerated(int failedVolumesTolerated) {
     this.failedDbVolumesTolerated = failedVolumesTolerated;
+  }
+
+  public int getVolumeIOTestCount() {
+    return volumeIOTestCount;
+  }
+
+  public void setVolumeIOTestCount(int testCount) {
+    this.volumeIOTestCount = testCount;
   }
 
   public int getVolumeIOFailureTolerance() {
