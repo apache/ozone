@@ -17,10 +17,9 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import java.util.List;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
-
-import java.util.List;
 
 /**
  * JMX interface for SnapshotDiffManager.

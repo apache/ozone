@@ -17,6 +17,22 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import javax.management.openmbean.CompositeData;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -35,22 +51,6 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-import javax.management.openmbean.CompositeData;
-import java.io.IOException;
-import java.lang.management.ManagementFactory;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
-import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 /**
  * Tests for SnapshotDiffManagerMXBean registration.
  */
@@ -59,7 +59,6 @@ public class TestSnapshotDiffManagerMXBean {
   private SnapshotDiffManager snapshotDiffManager;
   private ManagedRocksDB db;
   private PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
-  private PersistentMap<String, String> snapDiffReportTable;
   private MBeanServer mbs;
 
   @BeforeEach
@@ -71,7 +70,7 @@ public class TestSnapshotDiffManagerMXBean {
 
     List<ColumnFamilyDescriptor> columnFamilyDescriptors =
         Collections.singletonList(new ColumnFamilyDescriptor(
-            DEFAULT_COLUMN_FAMILY_NAME.getBytes(),
+            DEFAULT_COLUMN_FAMILY_NAME.getBytes(StandardCharsets.UTF_8),
             columnFamilyOptions));
 
     List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
@@ -84,15 +83,14 @@ public class TestSnapshotDiffManagerMXBean {
         .build();
 
     ColumnFamilyHandle jobCFH = db.get().createColumnFamily(
-        new ColumnFamilyDescriptor("jobTable".getBytes(), columnFamilyOptions));
+        new ColumnFamilyDescriptor("jobTable".getBytes(StandardCharsets.UTF_8),
+            columnFamilyOptions));
     ColumnFamilyHandle reportCFH = db.get().createColumnFamily(
-        new ColumnFamilyDescriptor("reportTable".getBytes(), columnFamilyOptions));
+        new ColumnFamilyDescriptor("reportTable".getBytes(StandardCharsets.UTF_8),
+            columnFamilyOptions));
 
     snapDiffJobTable = new RocksDbPersistentMap<>(db, jobCFH,
         codecRegistry, String.class, SnapshotDiffJob.class);
-
-    snapDiffReportTable = new RocksDbPersistentMap<>(db, reportCFH,
-        codecRegistry, String.class, String.class);
 
     OzoneManager ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
