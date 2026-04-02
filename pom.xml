@@ -93,6 +93,7 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
+    <iceberg.version>1.10.0</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
     <jackson2-bom.version>2.21.1</jackson2-bom.version>
     <jackson2.version>2.21.2</jackson2.version>
@@ -1322,6 +1323,11 @@
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-httpfsgateway</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-iceberg</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
