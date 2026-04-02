@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -58,21 +57,27 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
 
   @Test
   public void testAllowLeaderSkipLinearizableRead() throws Exception {
-    super.testListAllKeysInternal("skipvol1");
-    long lastMetrics = getCluster().getOMLeader().getMetrics().getNumLeaderSkipLinearizableRead();
-    Assertions.assertTrue(lastMetrics > 0);
-
     OzoneConfiguration oldConf = getCluster().getConf();
-    OzoneConfiguration newConf = new OzoneConfiguration(oldConf);
-    newConf.setBoolean("ozone.om.allow.leader.skip.linearizable.read", false);
-    getCluster().getOMLeader().setConfiguration(newConf);
-
-    super.testListAllKeysInternal("skipvol2");
-
-    long curMetrics = getCluster().getOMLeader().getMetrics().getNumLeaderSkipLinearizableRead();
-    assertEquals(lastMetrics, curMetrics);
-
-    getCluster().getOMLeader().setConfiguration(oldConf);
+    try {
+      String[] args = new String[]{"volume", "list"};
+      OzoneShell ozoneShell = new OzoneShell();
+      ozoneShell.getOzoneConf().setBoolean("ozone.client.follower.read.enabled", true);
+      for (int i = 0; i < 100; i++) {
+        execute(ozoneShell, args);
+      }
+      long lastMetrics = getCluster().getOMLeader().getMetrics().getNumLeaderSkipLinearizableRead();
+      assertThat(lastMetrics).isGreaterThan(0);
+      OzoneConfiguration newConf = new OzoneConfiguration(oldConf);
+      newConf.setBoolean("ozone.om.allow.leader.skip.linearizable.read", false);
+      getCluster().getOMLeader().setConfiguration(newConf);
+      for (int i = 0; i < 100; i++) {
+        execute(ozoneShell, args);
+      }
+      long curMetrics = getCluster().getOMLeader().getMetrics().getNumLeaderSkipLinearizableRead();
+      assertEquals(lastMetrics, curMetrics);
+    } finally {
+      getCluster().getOMLeader().setConfiguration(oldConf);
+    }
   }
 
   @Test

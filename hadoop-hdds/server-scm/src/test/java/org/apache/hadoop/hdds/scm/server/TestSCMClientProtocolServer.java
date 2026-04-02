@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,6 +35,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -130,12 +133,27 @@ public class TestSCMClientProtocolServer {
     SCMClientProtocolServer scmServer =
         new SCMClientProtocolServer(new OzoneConfiguration(),
             mockStorageContainerManager(), mock(ReconfigurationHandler.class));
+    try {
+      assertEquals(10, scmServer.listContainer(1, 10,
+          null, HddsProtos.ReplicationType.RATIS, null).getContainerInfoList().size());
+      // Test call from a legacy client, which uses a different method of listContainer
+      assertEquals(10, scmServer.listContainer(1, 10, null,
+          HddsProtos.ReplicationFactor.THREE).getContainerInfoList().size());
+    } finally {
+      scmServer.stop();
+    }
+  }
 
-    assertEquals(10, scmServer.listContainer(1, 10,
-        null, HddsProtos.ReplicationType.RATIS, null).getContainerInfoList().size());
-    // Test call from a legacy client, which uses a different method of listContainer
-    assertEquals(10, scmServer.listContainer(1, 10, null,
-        HddsProtos.ReplicationFactor.THREE).getContainerInfoList().size());
+  @Test
+  public void testScmGetContainerCount() throws IOException {
+    SCMClientProtocolServer scmServer =
+        new SCMClientProtocolServer(new OzoneConfiguration(),
+            mockStorageContainerManager(), mock(ReconfigurationHandler.class));
+    try {
+      assertEquals(10, scmServer.getContainerCount(CLOSED));
+    } finally {
+      scmServer.stop();
+    }
   }
 
   private StorageContainerManager mockStorageContainerManager() {
@@ -145,11 +163,12 @@ public class TestSCMClientProtocolServer {
     }
     ContainerManagerImpl containerManager = mock(ContainerManagerImpl.class);
     when(containerManager.getContainers()).thenReturn(infos);
+    when(containerManager.getContainerStateCount(any(LifeCycleState.class))).thenReturn(infos.size());
     StorageContainerManager storageContainerManager = mock(StorageContainerManager.class);
     when(storageContainerManager.getContainerManager()).thenReturn(containerManager);
 
     SCMNodeDetails scmNodeDetails = mock(SCMNodeDetails.class);
-    when(scmNodeDetails.getClientProtocolServerAddress()).thenReturn(new InetSocketAddress("localhost", 9876));
+    when(scmNodeDetails.getClientProtocolServerAddress()).thenReturn(new InetSocketAddress("localhost", 0));
     when(scmNodeDetails.getClientProtocolServerAddressKey()).thenReturn("test");
     when(storageContainerManager.getScmNodeDetails()).thenReturn(scmNodeDetails);
     return storageContainerManager;

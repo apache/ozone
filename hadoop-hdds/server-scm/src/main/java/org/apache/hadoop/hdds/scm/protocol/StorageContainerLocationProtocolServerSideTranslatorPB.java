@@ -117,6 +117,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -752,6 +754,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
             .build();
+      case ListContainerIDs:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setScmListContainerIDsResponse(listContainerIDs(request.getScmListContainerIDsRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1146,6 +1154,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<String> includeNodes = Optional.empty();
     Optional<String> excludeNodes = Optional.empty();
     Optional<String> excludeContainers = Optional.empty();
+    Optional<String> includeContainers = Optional.empty();
 
     if (request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
@@ -1210,12 +1219,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       excludeContainers = Optional.of(request.getExcludeContainers());
     }
 
+    if (request.hasIncludeContainers()) {
+      includeContainers = Optional.of(request.getIncludeContainers());
+    }
+
     return impl.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes, excludeContainers);
+        excludeNodes, excludeContainers, includeContainers);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(
@@ -1396,4 +1409,29 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
 
+  public SCMListContainerIDsResponseProto listContainerIDs(
+      SCMListContainerIDsRequestProto request) throws IOException {
+    ContainerID startContainerID = ContainerID.valueOf(0);
+
+    if (request.hasStartContainerID()) {
+      startContainerID = ContainerID.valueOf(request.getStartContainerID().getId());
+    }
+
+    HddsProtos.LifeCycleState state = null;
+    if (request.hasState()) {
+      state = request.getState();
+    }
+
+    SCMListContainerIDsResponseProto.Builder builder =
+        SCMListContainerIDsResponseProto.newBuilder();
+
+    List<ContainerID> containerIDs = impl.getListOfContainerIDs(
+        startContainerID, request.getCount(), state);
+
+    containerIDs.stream()
+        .map(ContainerID::getProtobuf)
+        .forEach(builder::addContainerIDs);
+
+    return builder.build();
+  }
 }

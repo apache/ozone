@@ -24,10 +24,10 @@
   <packaging>jar</packaging>
   <name>Apache Ozone Distribution</name>
   <properties>
-    <!-- Hadoop Docker image for current version; multi-arch Hadoop 3.4.2-lean only available from ghcr.io currently -->
+    <!-- Hadoop Docker image for current version; multi-arch Hadoop only available from ghcr.io currently -->
     <docker.hadoop.image>ghcr.io/apache/hadoop</docker.hadoop.image>
     <!-- suffix appended to Hadoop version to get Docker image version -->
-    <docker.hadoop.image.flavor>-lean</docker.hadoop.image.flavor>
+    <docker.hadoop.image.flavor />
     <docker.ozone-runner.client.version>20260207-1-jdk8</docker.ozone-runner.client.version>
     <docker.ozone-runner.version>20260206-2-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
@@ -141,6 +141,11 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-tools</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-vapor</artifactId>
       <scope>runtime</scope>
     </dependency>
   </dependencies>

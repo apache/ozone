@@ -28,7 +28,6 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -53,7 +52,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,10 +98,11 @@ public class ClusterStateEndpoint {
     ContainerStateCounts containerStateCounts = new ContainerStateCounts();
     int pipelines = this.pipelineManager.getPipelines().size();
 
-    List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> missingContainers =
+        containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-            0L, Optional.empty(), MISSING_CONTAINER_COUNT_LIMIT);
+            0L, 0L, MISSING_CONTAINER_COUNT_LIMIT);
 
     containerStateCounts.setMissingContainerCount(
         missingContainers.size() == MISSING_CONTAINER_COUNT_LIMIT ?

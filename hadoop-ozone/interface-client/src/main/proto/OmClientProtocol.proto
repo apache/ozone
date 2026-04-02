@@ -568,6 +568,10 @@ enum Status {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
 
     TOO_MANY_SNAPSHOTS = 98;
+
+    ETAG_MISMATCH = 99;
+
+    ETAG_NOT_AVAILABLE = 100;
 }
 
 /**
@@ -917,6 +921,7 @@ message SnapshotDiffJobProto {
   optional bool disableNativeDiff = 11;
   optional SnapshotDiffResponse.SubStatus subStatus = 12;
   optional double keysProcessedPct = 13;
+  optional string largestEntryKey = 14;
 }
 
 message OzoneObj {
@@ -1084,6 +1089,11 @@ message KeyArgs {
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
     optional uint64 expectedDataGeneration = 23;
+
+    // expectedETag, when set, indicates that the existing key must have
+    // the given ETag for the operation to succeed. This is used for
+    // S3 conditional writes with the If-Match header.
+    optional string expectedETag = 24;
 }
 
 message KeyLocation {
@@ -1175,6 +1185,11 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+
+    // expectedETag, when set, indicates that the existing key must have
+    // the given ETag for the operation to succeed. This is used for
+    // S3 conditional writes with the If-Match header.
+    optional string expectedETag = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -1713,17 +1728,36 @@ message MultipartKeyInfo {
     required uint64 creationTime = 2;
     required hadoop.hdds.ReplicationType type = 3;
     optional hadoop.hdds.ReplicationFactor factor = 4;
-    repeated PartKeyInfo partKeyInfoList = 5;
+    repeated PartKeyInfo partKeyInfoList = 5 [deprecated = true];
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
     optional uint64 parentID = 8;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
+    optional uint32 schemaVersion = 10;
+    optional string volumeName = 11;
+    optional string bucketName = 12;
+    optional string keyName = 13;
+    optional string ownerName = 14;
+    repeated OzoneAclInfo acls = 15;
 }
 
 message PartKeyInfo {
     required string partName = 1;
     required uint32 partNumber = 2;
     required KeyInfo partKeyInfo = 3;
+}
+
+message MultipartPartInfo {
+  optional string partName = 1;
+  optional uint32 partNumber = 2;
+  optional string eTag = 3;
+  optional KeyLocationList keyLocationList = 4; 
+  optional uint64 dataSize = 5;
+  optional uint64 modificationTime = 6;
+  optional uint64 objectID = 7;
+  optional uint64 updateID = 8;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 9;
+  optional FileChecksumProto fileChecksum = 10;
 }
 
 message MultipartCommitUploadPartRequest {

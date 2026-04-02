@@ -96,8 +96,8 @@ public class ContainerReader implements Runnable {
     try {
       readVolume(hddsVolumeDir);
     } catch (Throwable t) {
-      LOG.error("Caught an exception during reading container files" +
-          " from Volume {} {}", hddsVolumeDir, t);
+      LOG.error("Could not read container files from the volume {}. " +
+          "Marking the volume as failed", hddsVolumeDir, t);
       volumeSet.failVolume(hddsVolumeDir.getPath());
     }
   }

@@ -52,7 +52,7 @@ public class TestScmX509CertificateCodec {
     ScmX509CertificateCodec scmX509CertificateCodec = new ScmX509CertificateCodec();
     ByteString byteString = scmX509CertificateCodec.serialize(x509Certificate);
 
-    X509Certificate actual = scmX509CertificateCodec.deserialize(X509Certificate.class, byteString);
+    X509Certificate actual = scmX509CertificateCodec.deserialize(byteString);
 
     assertEquals(x509Certificate, actual);
 
@@ -65,6 +65,6 @@ public class TestScmX509CertificateCodec {
     final ByteString byteString = UnsafeByteOperations.unsafeWrap("dummy".getBytes(UTF_8));
 
     assertThrows(InvalidProtocolBufferException.class, () ->
-        scmX509CertificateCodec.deserialize(X509Certificate.class, byteString));
+        scmX509CertificateCodec.deserialize(byteString));
   }
 }

@@ -396,7 +396,9 @@ public final class RocksDatabase implements Closeable {
   }
 
   private void waitAndClose() {
-    // wait till all access to rocks db is process to avoid crash while close
+    // Wait until all active operations (including open iterators) complete.
+    // Iterators acquired after DB close is triggered will fast-fail in
+    // hasNext(), so this loop is expected to complete quickly in practice.
     while (!counter.compareAndSet(0, Long.MIN_VALUE)) {
       try {
         Thread.currentThread().sleep(1);
@@ -427,7 +429,7 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  private UncheckedAutoCloseable acquire() throws RocksDatabaseException {
+  UncheckedAutoCloseable acquire() throws RocksDatabaseException {
     if (isClosed()) {
       throw new RocksDatabaseException("Rocks Database is closed");
     }
@@ -770,17 +772,24 @@ public final class RocksDatabase implements Closeable {
 
   public ManagedRocksIterator newIterator(ColumnFamily family)
       throws RocksDatabaseException {
-    try (UncheckedAutoCloseable ignored = acquire()) {
-      return managed(db.get().newIterator(family.getHandle()));
+    final UncheckedAutoCloseable ref = acquire();
+    try {
+      return managed(db.get().newIterator(family.getHandle()), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
     }
   }
 
   public ManagedRocksIterator newIterator(ColumnFamily family,
       boolean fillCache) throws RocksDatabaseException {
-    try (UncheckedAutoCloseable ignored = acquire();
-         ManagedReadOptions readOptions = new ManagedReadOptions()) {
+    final UncheckedAutoCloseable ref = acquire();
+    try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
       readOptions.setFillCache(fillCache);
-      return managed(db.get().newIterator(family.getHandle(), readOptions));
+      return managed(db.get().newIterator(family.getHandle(), readOptions), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
     }
   }
 

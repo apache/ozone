@@ -182,7 +182,7 @@ public class TestListInfoSubcommand {
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
 
-    p = Pattern.compile(nodes.get(0).getNodeID().getUuid().toString(),
+    p = Pattern.compile(nodes.get(0).getNodeID().getUuid(),
         Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());

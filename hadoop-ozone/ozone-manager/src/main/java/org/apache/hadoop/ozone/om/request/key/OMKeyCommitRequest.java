@@ -94,7 +94,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
 
     if (keyArgs.hasExpectedDataGeneration()) {
-      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+      if (keyArgs.getExpectedDataGeneration()
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+        ozoneManager.checkFeatureEnabled(
+            OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
+      } else {
+        ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+      }
     }
 
     if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
@@ -303,6 +309,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
           .setExpectedDataGeneration(null)
+          .setExpectedETag(null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
           .setUpdateID(trxnLogIndex)
@@ -616,14 +623,41 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     if (toCommit.getExpectedDataGeneration() != null) {
       // These values are not passed in the request keyArgs, so add them into the auditMap if they are present
       // in the open key entry.
-      auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(toCommit.getExpectedDataGeneration()));
-      if (existing == null) {
-        throw new OMException("Atomic rewrite is not allowed for a new key", KEY_NOT_FOUND);
+      Long expectedGen = toCommit.getExpectedDataGeneration();
+      auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
+
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+        if (existing != null) {
+          throw new OMException("Key already exists",
+              OMException.ResultCodes.KEY_ALREADY_EXISTS);
+        }
+      } else {
+        if (existing == null) {
+          throw new OMException("Atomic rewrite is not allowed for a new key", KEY_NOT_FOUND);
+        }
+        if (expectedGen != existing.getUpdateID()) {
+          throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
+              ") does not match the expected generation to rewrite (" + expectedGen + ")",
+              KEY_NOT_FOUND);
+        }
       }
-      if (!toCommit.getExpectedDataGeneration().equals(existing.getUpdateID())) {
-        throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
-            ") does not match the expected generation to rewrite (" + toCommit.getExpectedDataGeneration() + ")",
-            KEY_NOT_FOUND);
+    }
+
+    if (toCommit.getExpectedETag() != null) {
+      String expectedETag = toCommit.getExpectedETag();
+      auditMap.put("expectedETag", expectedETag);
+
+      if (existing == null) {
+        throw new OMException("Key not found for If-Match at commit",
+            OMException.ResultCodes.KEY_NOT_FOUND);
+      }
+      if (!existing.hasEtag()) {
+        throw new OMException("Key does not have an ETag at commit",
+            OMException.ResultCodes.ETAG_NOT_AVAILABLE);
+      }
+      if (!existing.isEtagEquals(expectedETag)) {
+        throw new OMException("ETag changed during write (concurrent modification)",
+            OMException.ResultCodes.ETAG_MISMATCH);
       }
     }
   }

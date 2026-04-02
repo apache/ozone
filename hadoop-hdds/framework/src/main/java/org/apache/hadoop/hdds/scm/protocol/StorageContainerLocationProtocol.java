@@ -442,7 +442,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes,
-      Optional<String> excludeContainers) throws IOException;
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException;
 
   /**
    * Stop ContainerBalancer.
@@ -504,8 +505,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
   long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException;
 
-  List<ContainerInfo> getListOfContainers(
-      long startContainerID, int count, HddsProtos.LifeCycleState state)
+  List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException;
 
   DecommissionScmResponseProto decommissionScm(

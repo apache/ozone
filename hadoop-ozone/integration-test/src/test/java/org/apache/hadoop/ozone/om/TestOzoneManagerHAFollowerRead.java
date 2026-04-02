@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.ratis.protocol.exceptions.RaftException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
@@ -423,6 +424,31 @@ public abstract class TestOzoneManagerHAFollowerRead {
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
           assertThat(e).hasMessageContaining("is not the leader");
+        } else if (e instanceof ConnectException) {
+          assertThat(e).hasMessageContaining("Connection refused");
+        } else {
+          assertThat(e).hasMessageContaining("Could not determine or connect to OM Leader");
+        }
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  protected void listVolumes(boolean checkSuccess)
+      throws Exception {
+    try {
+      getObjectStore().getClientProxy().listVolumes(null, null, 100);
+    } catch (IOException e) {
+      if (!checkSuccess) {
+        // If the last OM to be tried by the RetryProxy is down, we would get
+        // ConnectException. Otherwise, we would get a RemoteException from the
+        // last running OM as it would fail to get a quorum.
+        if (e instanceof RemoteException) {
+          // Linearizable read will fail with ReadIndexException if the follower does not recognize any leader
+          // or leader is uncontactable. It will throw ReadException if the read submitted to Ratis encounters
+          // timeout.
+          assertThat(((RemoteException) e).unwrapRemoteException()).isInstanceOf(RaftException.class);
         } else if (e instanceof ConnectException) {
           assertThat(e).hasMessageContaining("Connection refused");
         } else {
