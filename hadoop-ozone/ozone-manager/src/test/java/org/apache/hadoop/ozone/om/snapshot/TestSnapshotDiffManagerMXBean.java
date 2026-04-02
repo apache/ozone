@@ -146,5 +146,6 @@ public class TestSnapshotDiffManagerMXBean {
     assertEquals("job-1", jobs[0].get("jobId"));
     assertEquals("snap1", jobs[0].get("fromSnapshot"));
     assertEquals("snap2", jobs[0].get("toSnapshot"));
+    assertEquals("OBJECT_ID_MAP_GEN_FSO", jobs[0].get("subStatus"));
   }
 }

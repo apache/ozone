@@ -14,23 +14,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-<h1>Snapshot Internal Metrics</h1>
-
-<table class="table table-bordered table-striped">
-    <thead>
-    <tr>
-        <th>Metric Name</th>
-        <th>Value</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr ng-repeat="metric in $ctrl.snapshotMetrics">
-        <td>{{metric.key}}</td>
-        <td>{{metric.value}}</td>
-    </tr>
-    </tbody>
-</table>
-
 <h1>Snapshot Diff Jobs</h1>
 
 <div class="row">
@@ -88,6 +71,9 @@
             <div ng-if="job.status === 'FAILED' && job.reason">
                 <span class="label label-danger">Reason: {{job.reason}}</span>
             </div>
+            <div ng-if="job.status === 'IN_PROGRESS' && job.subStatus">
+                <span class="label label-info">Sub-status: {{job.subStatus}}</span>
+            </div>
         </td>
         <td>{{job.volume}}</td>
         <td>{{job.bucket}}</td>
@@ -132,3 +118,22 @@
         </nav>
     </div>
 </div>
+
+<div style="margin-bottom: 20px;"></div>
+
+<h1>Snapshot Internal Metrics</h1>
+
+<table class="table table-bordered table-striped">
+    <thead>
+    <tr>
+        <th>Metric Name</th>
+        <th>Value</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr ng-repeat="metric in $ctrl.snapshotMetrics">
+        <td>{{metric.key}}</td>
+        <td>{{metric.value}}</td>
+    </tr>
+    </tbody>
+</table>
