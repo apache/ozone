@@ -19,12 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.protobuf.MessageLite;
 import com.google.protobuf.RpcController;
-import org.apache.ratis.thirdparty.io.grpc.BindableService;
-import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
-import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
-import org.apache.ratis.thirdparty.io.grpc.Status;
-import org.apache.ratis.thirdparty.io.grpc.stub.ServerCalls;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,6 +30,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.util.UUIDUtil;
+import org.apache.ratis.thirdparty.io.grpc.BindableService;
+import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
+import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.stub.ServerCalls;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

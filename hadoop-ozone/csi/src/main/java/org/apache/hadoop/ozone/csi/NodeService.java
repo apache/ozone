@@ -26,7 +26,6 @@ import csi.v1.Csi.NodePublishVolumeResponse;
 import csi.v1.Csi.NodeUnpublishVolumeRequest;
 import csi.v1.Csi.NodeUnpublishVolumeResponse;
 import csi.v1.NodeGrpc.NodeImplBase;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -36,6 +35,7 @@ import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.csi.CsiServer.CsiConfig;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
