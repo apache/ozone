@@ -250,7 +250,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
               aclKey = listPrefix;
             } else {
               throw new OMException(
-                  "STS listStatus: key path does not match authorized list prefix", ResultCodes.PERMISSION_DENIED);
+                  "STS listStatus: key path: " + keyName + " does not match authorized list prefix: " + listPrefix,
+                  ResultCodes.PERMISSION_DENIED);
             }
           } else if (keyName != null && !keyName.isEmpty()) {
             aclKey = keyName;
