@@ -137,6 +137,17 @@
         <executions>
           <execution>
             <!--
+              mdep.analyze.skip=true for this module so pre-verify-refresh-classes-from-jar
+              (inherited from the root POM) is not needed.  Binding it to "none" prevents the
+              inherited execution from wiping target/classes/ at pre-integration-test, which
+              would leave the directory temporarily empty and cause downstream reactor modules
+              to fail with "class file not found" errors during compilation.
+            -->
+            <id>pre-verify-refresh-classes-from-jar</id>
+            <phase>none</phase>
+          </execution>
+          <execution>
+            <!--
               Rewrite vanilla package names produced by protoc/grpc-java in-place inside
               proto-java-ratis/ (the protobuf-maven-plugin outputDirectory).  Because the
               IDE/LSP also uses proto-java-ratis/ as its Java source root, it will compile

@@ -2465,15 +2465,18 @@
             <phase>pre-integration-test</phase>
             <configuration>
               <target>
-                <exec executable="/bin/rm" failonerror="false">
-                  <arg value="-rf" />
-                  <arg value="${project.build.outputDirectory}" />
-                </exec>
-                <exec executable="unzip" failonerror="false">
-                  <arg value="-qo" />
-                  <arg value="${project.build.directory}/${project.build.finalName}.jar" />
-                  <arg value="-d" />
-                  <arg value="${project.build.outputDirectory}" />
+                <!--
+                  Only wipe and restore target/classes/ when the module JAR was actually produced
+                  (i.e. this is a jar-packaging module whose package phase ran successfully).
+                  For pom-packaging modules – and for any edge case where the JAR is absent –
+                  we skip the destructive rm -rf so that the freshly compiled class files are
+                  left undisturbed for downstream reactor modules to compile against.
+                  A POSIX shell one-liner is used because the Ant bundled with
+                  maven-antrun-plugin does not support if/unless on <exec>.
+                -->
+                <exec executable="/bin/sh" failonerror="false">
+                  <arg value="-c" />
+                  <arg value="JAR='${project.build.directory}/${project.build.finalName}.jar'; test -f &quot;$JAR&quot; &amp;&amp; /bin/rm -rf '${project.build.outputDirectory}' &amp;&amp; unzip -qo &quot;$JAR&quot; -d '${project.build.outputDirectory}'" />
                 </exec>
               </target>
             </configuration>
