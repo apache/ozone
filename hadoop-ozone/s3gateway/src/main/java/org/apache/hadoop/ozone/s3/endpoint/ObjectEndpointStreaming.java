@@ -92,6 +92,8 @@ final class ObjectEndpointStreaming {
               " considered as Unix Paths. Path has Violated FS Semantics " +
               "which caused put operation to fail.");
           throw os3Exception;
+        } else if ((((OMException) ex).getResult() == OMException.ResultCodes.TOKEN_EXPIRED)) {
+          throw S3ErrorTable.newError(S3ErrorTable.EXPIRED_TOKEN, keyPath);
         } else if ((((OMException) ex).getResult() ==
             OMException.ResultCodes.PERMISSION_DENIED)) {
           throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, keyPath);
@@ -230,6 +232,8 @@ final class ObjectEndpointStreaming {
           OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
             uploadID);
+      } else if (ex.getResult() == OMException.ResultCodes.TOKEN_EXPIRED) {
+        throw S3ErrorTable.newError(S3ErrorTable.EXPIRED_TOKEN, ozoneBucket.getName() + "/" + key);
       } else if (ex.getResult() == OMException.ResultCodes.PERMISSION_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
             ozoneBucket.getName() + "/" + key);

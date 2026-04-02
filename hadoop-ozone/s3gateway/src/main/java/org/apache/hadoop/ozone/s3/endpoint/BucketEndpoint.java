@@ -163,14 +163,7 @@ public class BucketEndpoint extends EndpointBase {
     } catch (OMException ex) {
       auditReadFailure(s3GAction, ex);
       getMetrics().updateGetBucketFailureStats(startNanos);
-      if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
-        // File not found, continue and send normal response with 0 keyCount
-        LOG.debug("Key Not found prefix: {}", prefix);
-      } else {
-        throw ex;
-      }
+      handleOMException(ex, bucketName, prefix);
     } catch (Exception ex) {
       getMetrics().updateGetBucketFailureStats(startNanos);
       auditReadFailure(s3GAction, ex);
@@ -210,53 +203,64 @@ public class BucketEndpoint extends EndpointBase {
     String lastKey = null;
     int count = 0;
     if (maxKeys > 0) {
-      while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
-        OzoneKey next = ozoneKeyIterator.next();
-        if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
-            StringUtils.isNotEmpty(prefix) &&
-            !next.getName().startsWith(prefix)) {
-          // prefix has delimiter but key don't have
-          // example prefix: dir1/ key: dir123
-          continue;
-        }
-        if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
-          continue;
-        }
-        String relativeKeyName = next.getName().substring(prefix.length());
+      try {
+        while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
+          OzoneKey next = ozoneKeyIterator.next();
+          if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
+              StringUtils.isNotEmpty(prefix) &&
+              !next.getName().startsWith(prefix)) {
+            // prefix has delimiter but key don't have
+            // example prefix: dir1/ key: dir123
+            continue;
+          }
+          if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
+            continue;
+          }
+          String relativeKeyName = next.getName().substring(prefix.length());
 
-        int depth = StringUtils.countMatches(relativeKeyName, delimiter);
-        if (!StringUtils.isEmpty(delimiter)) {
-          if (depth > 0) {
-            // means key has multiple delimiters in its value.
-            // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
-            String dirName = relativeKeyName.substring(0, relativeKeyName
-                .indexOf(delimiter));
-            if (!dirName.equals(prevDir)) {
-              response.addPrefix(EncodingTypeObject.createNullable(
-                  prefix + dirName + delimiter, encodingType));
-              prevDir = dirName;
+          int depth = StringUtils.countMatches(relativeKeyName, delimiter);
+          if (!StringUtils.isEmpty(delimiter)) {
+            if (depth > 0) {
+              // means key has multiple delimiters in its value.
+              // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
+              String dirName = relativeKeyName.substring(0, relativeKeyName
+                  .indexOf(delimiter));
+              if (!dirName.equals(prevDir)) {
+                response.addPrefix(EncodingTypeObject.createNullable(
+                    prefix + dirName + delimiter, encodingType));
+                prevDir = dirName;
+                count++;
+              }
+            } else if (relativeKeyName.endsWith(delimiter)) {
+              // means or key is same as prefix with delimiter at end and ends with
+              // delimiter. ex: dir/, where prefix is dir and delimiter is /
+              response.addPrefix(
+                  EncodingTypeObject.createNullable(relativeKeyName, encodingType));
+              count++;
+            } else {
+              // means our key is matched with prefix if prefix is given and it
+              // does not have any common prefix.
+              addKey(response, next);
               count++;
             }
-          } else if (relativeKeyName.endsWith(delimiter)) {
-            // means or key is same as prefix with delimiter at end and ends with
-            // delimiter. ex: dir/, where prefix is dir and delimiter is /
-            response.addPrefix(
-                EncodingTypeObject.createNullable(relativeKeyName, encodingType));
-            count++;
           } else {
-            // means our key is matched with prefix if prefix is given and it
-            // does not have any common prefix.
             addKey(response, next);
             count++;
           }
-        } else {
-          addKey(response, next);
-          count++;
-        }
 
-        if (count == maxKeys) {
-          lastKey = next.getName();
-          break;
+          if (count == maxKeys) {
+            lastKey = next.getName();
+            break;
+          }
+        }
+      } catch (RuntimeException ex) {
+        getMetrics().updateGetBucketFailureStats(startNanos);
+        auditReadFailure(s3GAction, ex);
+        if (ex.getCause() instanceof OMException) {
+          final OMException omException = (OMException) ex.getCause();
+          handleOMException(omException, bucketName, prefix);
+        } else {
+          throw ex;
         }
       }
     }
@@ -362,7 +366,9 @@ public class BucketEndpoint extends EndpointBase {
     } catch (OMException exception) {
       auditReadFailure(s3GAction, exception);
       getMetrics().updateListMultipartUploadsFailureStats(startNanos);
-      if (isAccessDenied(exception)) {
+      if (isExpiredToken(exception)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, prefix, exception);
+      } else if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
       throw exception;
@@ -516,5 +522,18 @@ public class BucketEndpoint extends EndpointBase {
   private void addHandler(BucketOperationHandler handler) {
     copyDependenciesTo(handler);
     handlers.add(handler);
+  }
+
+  private void handleOMException(OMException ex, String bucketName, String prefix) throws OMException {
+    if (isExpiredToken(ex)) {
+      throw newError(S3ErrorTable.EXPIRED_TOKEN, bucketName, ex);
+    } else if (isAccessDenied(ex)) {
+      throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+    } else if (ex.getResult() == ResultCodes.FILE_NOT_FOUND) {
+      // File not found, continue and send normal response with 0 keyCount
+      LOG.debug("Key Not found prefix: {}", prefix);
+    } else {
+      throw ex;
+    }
   }
 }
