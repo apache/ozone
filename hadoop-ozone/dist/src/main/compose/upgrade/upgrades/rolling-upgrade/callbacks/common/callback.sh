@@ -20,11 +20,11 @@ source "$TEST_DIR"/testlib.sh
 ### CALLBACKS ###
 
 before_service_restart() {
-  generate "generate-${SERVICE}"
+  generate "generate-${OUTPUT_NAME}"
 }
 
 after_service_restart() {
-  validate "generate-${SERVICE}"
+  validate "generate-${OUTPUT_NAME}"
 }
 
 with_old_version() {
