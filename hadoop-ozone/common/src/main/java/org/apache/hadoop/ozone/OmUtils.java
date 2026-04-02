@@ -281,6 +281,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    case FinalizeUpgrade:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -314,7 +315,6 @@ public final class OmUtils {
       // As protobuf currently doesn't support deprecating enum fields
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
-    case FinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
     case DeleteOpenKeys:
@@ -396,6 +396,7 @@ public final class OmUtils {
     case GetKeyInfo:
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case FinalizeUpgrade:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -429,7 +430,6 @@ public final class OmUtils {
       // As protobuf currently doesn't support deprecating enum fields
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
-    case FinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
     case DeleteOpenKeys:

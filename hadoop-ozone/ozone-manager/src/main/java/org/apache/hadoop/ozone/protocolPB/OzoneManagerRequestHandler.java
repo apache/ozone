@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
@@ -108,6 +109,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
@@ -166,6 +168,7 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -390,6 +393,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.GetObjectTaggingResponse getObjectTaggingResponse =
             getObjectTagging(request.getGetObjectTaggingRequest());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
+        break;
+      case FinalizeUpgrade:
+        FinalizeUpgradeResponse finalizeUpgradeResponse = finalizeUpgrade();
+        responseBuilder.setFinalizeUpgradeResponse(finalizeUpgradeResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1547,6 +1554,35 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     resp.addAllTags(KeyValueUtil.toProtobuf(result));
     return resp.build();
+  }
+
+  private FinalizeUpgradeResponse finalizeUpgrade()
+      throws IOException {
+    FinalizeUpgradeResponse response = null;
+
+    UserGroupInformation ugi = getRemoteUser();
+    if (!impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi + ". "
+          + "Superuser privilege is required to finalize upgrade.",
+          OMException.ResultCodes.ACCESS_DENIED);
+    }
+
+    UpgradeFinalizationStatus.Status protoStatus =
+        UpgradeFinalizationStatus.Status.ALREADY_FINALIZED;
+
+    UpgradeFinalizationStatus responseStatus =
+        UpgradeFinalizationStatus.newBuilder()
+            .setStatus(protoStatus)
+            .build();
+
+    response =
+        FinalizeUpgradeResponse.newBuilder()
+            .setStatus(responseStatus)
+            .build();
+
+    LOG.trace("Returning response: {}", response);
+    return response;
+
   }
 
   private SafeModeAction toSafeModeAction(
