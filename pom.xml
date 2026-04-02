@@ -2308,6 +2308,24 @@
                   flags hdds-config as unused even when it is the active annotation processor.
                 -->
                 <ignoredUnusedDeclaredDependency>org.apache.ozone:hdds-config:jar</ignoredUnusedDeclaredDependency>
+                <!--
+                  jackson-databind is needed on the runtime classpath by the SCM (hdds-server-scm)
+                  because it is loaded indirectly at runtime (not directly imported in main sources).
+                  Declaring it at compile scope ensures it appears in the generated classpath descriptor.
+                -->
+                <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.core:jackson-databind:jar</ignoredUnusedDeclaredDependency>
+                <!--
+                  commons-compress is needed on the runtime classpath by the SCM (hdds-server-scm)
+                  because it is loaded indirectly at runtime (not directly imported in main sources).
+                  Declaring it at compile scope ensures it appears in the generated classpath descriptor.
+                -->
+                <ignoredUnusedDeclaredDependency>org.apache.commons:commons-compress:jar</ignoredUnusedDeclaredDependency>
+                <!--
+                  hdds-client is needed on the runtime classpath by the SCM (hdds-server-scm)
+                  because it is loaded indirectly at runtime (not directly imported in main sources).
+                  Declaring it at compile scope ensures it appears in the generated classpath descriptor.
+                -->
+                <ignoredUnusedDeclaredDependency>org.apache.ozone:hdds-client:jar</ignoredUnusedDeclaredDependency>
               </ignoredUnusedDeclaredDependencies>
               <ignoredUsedUndeclaredDependencies>
                 <ignoredUsedUndeclaredDependency>org.apache.ozone:hdds-datanode-grpc-client:jar</ignoredUsedUndeclaredDependency>

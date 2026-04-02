@@ -39,6 +39,12 @@
       <artifactId>jackson-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <!-- no scope = compile; also transitive via hdds-server-framework, but
+           explicit compile scope keeps it on the runtime classpath -->
+    </dependency>
+    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
@@ -68,6 +74,12 @@
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+      <!-- no scope = compile; also transitive via hdds-server-framework, but
+           explicit compile scope keeps it on the runtime classpath -->
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
@@ -81,6 +93,12 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-cli-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-client</artifactId>
+      <!-- no scope = compile; also transitive via hdds-container-service, but
+           explicit compile scope keeps it on the runtime classpath -->
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -168,16 +186,6 @@
       <artifactId>slf4j-reload4j</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-compress</artifactId>
-      <scope>test</scope>
-    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
@@ -200,11 +208,6 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs-client</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-client</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
