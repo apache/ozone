@@ -55,7 +55,6 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -109,7 +108,6 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
-import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -282,37 +280,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
-      String ifNoneMatch = getHeaders().getHeaderString(
-          S3Consts.IF_NONE_MATCH_HEADER);
-      String ifMatch = getHeaders().getHeaderString(
-          S3Consts.IF_MATCH_HEADER);
-
-      if (ifNoneMatch != null && StringUtils.isBlank(ifNoneMatch)) {
-        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-        ex.setErrorMessage("If-None-Match header cannot be empty.");
-        throw ex;
-      }
-      if (ifMatch != null && StringUtils.isBlank(ifMatch)) {
-        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-        ex.setErrorMessage("If-Match header cannot be empty.");
-        throw ex;
-      }
-
-      String ifNoneMatchTrimmed = ifNoneMatch == null ? null : ifNoneMatch.trim();
-      String ifMatchTrimmed = ifMatch == null ? null : ifMatch.trim();
-
-      if (ifNoneMatchTrimmed != null && ifMatchTrimmed != null) {
-        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-        ex.setErrorMessage("If-Match and If-None-Match cannot be specified together.");
-        throw ex;
-      }
-
-      if (ifNoneMatchTrimmed != null
-          && !"*".equals(stripQuotes(ifNoneMatchTrimmed))) {
-        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-        ex.setErrorMessage("Only If-None-Match: * is supported for conditional put.");
-        throw ex;
-      }
+      S3ConditionalRequest.WriteConditions writeConditions =
+          S3ConditionalRequest.parseWriteConditions(getHeaders(), keyPath);
 
       // Normal put object
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
@@ -331,8 +300,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
                 customMetadata, tags, multiDigestInputStream, getHeaders(),
-                signatureInfo.isSignPayload(), perf, ifNoneMatchTrimmed,
-                ifMatchTrimmed);
+                signatureInfo.isSignPayload(), perf, writeConditions);
         md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
@@ -340,8 +308,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
         try (OzoneOutputStream output = openKeyForPut(
             volume.getName(), bucketName, keyPath, length,
-            replicationConfig, customMetadata, tags, ifNoneMatchTrimmed,
-            ifMatchTrimmed)) {
+            replicationConfig, customMetadata, tags, writeConditions)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -931,7 +898,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             getHeaders().getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
         String copySourceIfUnmodifiedSince =
             getHeaders().getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
-        if (!checkCopySourceModificationTime(sourceKeyModificationTime,
+        if (!S3ConditionalRequest.checkCopySourceModificationTime(
+            sourceKeyModificationTime,
             copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
           throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
         }
@@ -1194,16 +1162,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OzoneOutputStream openKeyForPut(String volumeName, String bucketName, String keyPath, long length,
       ReplicationConfig replicationConfig, Map<String, String> customMetadata,
-      Map<String, String> tags, String ifNoneMatch, String ifMatch)
+      Map<String, String> tags,
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
-    if (ifNoneMatch != null && "*".equals(stripQuotes(ifNoneMatch.trim()))) {
+    if (writeConditions.hasIfNoneMatch()) {
       return getClientProtocol().createKeyIfNotExists(
           volumeName, bucketName, keyPath, length, replicationConfig,
           customMetadata, tags);
-    } else if (ifMatch != null) {
-      String expectedETag = parseETag(ifMatch);
+    } else if (writeConditions.hasIfMatch()) {
       return getClientProtocol().rewriteKeyIfMatch(
-          volumeName, bucketName, keyPath, length, expectedETag,
+          volumeName, bucketName, keyPath, length,
+          writeConditions.getExpectedETag(),
           replicationConfig, customMetadata, tags);
     } else {
       return getClientProtocol().createKey(
@@ -1217,102 +1186,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
    * quotes if present.
    */
   static String parseETag(String headerValue) {
-    if (headerValue == null) {
-      return null;
-    }
-    return stripQuotes(headerValue.trim());
+    return S3ConditionalRequest.parseETag(headerValue);
   }
 
   private Response createConditionalReadResponse(String keyPath, OzoneKey key)
       throws OS3Exception {
-    String currentETag = key.getMetadata().get(OzoneConsts.ETAG);
-    String ifMatch = getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER);
-    if (ifMatch != null && !eTagMatches(ifMatch, currentETag)) {
-      throw newError(PRECOND_FAILED, keyPath);
-    }
-
-    String ifUnmodifiedSince = getHeaders().getHeaderString(
-        S3Consts.IF_UNMODIFIED_SINCE_HEADER);
-    if (ifMatch == null && ifUnmodifiedSince != null
-        && !matchesIfUnmodifiedSince(key, ifUnmodifiedSince)) {
-      throw newError(PRECOND_FAILED, keyPath);
-    }
-
-    String ifNoneMatch = getHeaders().getHeaderString(
-        S3Consts.IF_NONE_MATCH_HEADER);
-    if (ifNoneMatch != null) {
-      if (eTagMatches(ifNoneMatch, currentETag)) {
-        return buildNotModifiedResponse(key);
-      }
-      return null;
-    }
-
-    String ifModifiedSince = getHeaders().getHeaderString(
-        S3Consts.IF_MODIFIED_SINCE_HEADER);
-    if (ifModifiedSince != null
-        && !matchesIfModifiedSince(key, ifModifiedSince)) {
-      return buildNotModifiedResponse(key);
-    }
-
-    return null;
-  }
-
-  private static Response buildNotModifiedResponse(OzoneKey key) {
-    ResponseBuilder responseBuilder = Response.status(Status.NOT_MODIFIED);
-    addEntityTagHeader(responseBuilder, key);
-    addLastModifiedDate(responseBuilder, key);
-    return responseBuilder.build();
-  }
-
-  static boolean eTagMatches(String headerValue, String currentETag) {
-    if (headerValue == null) {
-      return false;
-    }
-    for (String candidate : headerValue.split(",")) {
-      String trimmedCandidate = candidate.trim();
-      if ("*".equals(trimmedCandidate)) {
-        return true;
-      }
-      if (currentETag != null
-          && currentETag.equals(parseETag(trimmedCandidate))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static boolean matchesIfModifiedSince(OzoneKey key,
-      String headerValue) {
-    Instant since = parseConditionalInstant(headerValue);
-    if (since == null) {
-      return true;
-    }
-    Instant lastModified = key.getModificationTime().truncatedTo(
-        ChronoUnit.SECONDS);
-    return lastModified.isAfter(since);
-  }
-
-  private static boolean matchesIfUnmodifiedSince(OzoneKey key,
-      String headerValue) {
-    Instant since = parseConditionalInstant(headerValue);
-    if (since == null) {
-      return true;
-    }
-    Instant lastModified = key.getModificationTime().truncatedTo(
-        ChronoUnit.SECONDS);
-    return !lastModified.isAfter(since);
-  }
-
-  private static Instant parseConditionalInstant(String headerValue) {
-    if (headerValue == null) {
-      return null;
-    }
-    try {
-      return Instant.ofEpochMilli(OzoneUtils.formatDate(headerValue))
-          .truncatedTo(ChronoUnit.SECONDS);
-    } catch (IllegalArgumentException | java.text.ParseException ex) {
-      return null;
-    }
+    return S3ConditionalRequest.evaluateReadPreconditions(getHeaders(),
+        keyPath, key);
   }
 
   /** Request context shared among {@code ObjectOperationHandler}s. */
