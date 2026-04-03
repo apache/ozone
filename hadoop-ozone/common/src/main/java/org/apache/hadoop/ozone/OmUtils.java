@@ -39,6 +39,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED;
+import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.FOLLOWER;
+import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -1090,7 +1092,8 @@ public final class OmUtils {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
         String nodeId = info.getOmRoleInfo().getNodeId();
-        String role = nodeId.equals(leaderId) ? "LEADER" : "FOLLOWER";
+        String role = nodeId.equals(leaderId) ?
+            LEADER.name() : FOLLOWER.name();
         String leaderReadiness = nodeId.equals(leaderId)
             ? "LEADER_AND_READY" : "NOT_LEADER";
         List<String> omInfo = new ArrayList<>();
