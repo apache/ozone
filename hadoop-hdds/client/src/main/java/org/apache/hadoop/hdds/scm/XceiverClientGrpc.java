@@ -166,20 +166,25 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throw new IOException("Client is closed.");
     }
 
-    dnChannelInfoMap.compute(dn.getID(), (dnId, channelInfo) -> {
-      // channel is absent or stale
-      if (channelInfo == null || channelInfo.isChannelInactive()) {
-        LOG.debug("Connecting to server: {}; nodes in pipeline: {}", dn, pipeline.getNodes());
-        try {
-          return generateNewChannel(dn);
-        } catch (IOException e) {
-          throw new UncheckedIOException(e);
+    try {
+      dnChannelInfoMap.compute(dn.getID(), (dnId, channelInfo) -> {
+        // channel is absent or stale
+        if (channelInfo == null || channelInfo.isChannelInactive()) {
+          LOG.debug("Connecting to server: {}; nodes in pipeline: {}", dn, pipeline.getNodes());
+          try {
+            return generateNewChannel(dn);
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
         }
-      }
 
-      // channel is present and active
-      return channelInfo;
-    });
+        // channel is present and active
+        return channelInfo;
+      });
+    } catch (UncheckedIOException e) {
+      LOG.error("Failed to create channel to datanode {}", dn, e);
+      throw e.getCause();
+    }
   }
 
   private ChannelInfo generateNewChannel(DatanodeDetails dn) throws IOException {
@@ -236,11 +241,12 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    */
   @VisibleForTesting
   public boolean isConnected(DatanodeDetails details) {
-    if (details == null || !dnChannelInfoMap.containsKey(details.getID())) {
+    if (details == null) {
       return false;
     }
 
-    return !dnChannelInfoMap.get(details.getID()).isChannelInactive();
+    ChannelInfo channelInfo = dnChannelInfoMap.get(details.getID());
+    return channelInfo != null && !channelInfo.isChannelInactive();
   }
 
   /**
@@ -264,6 +270,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     List<ManagedChannel> nonTerminatedChannels = dnChannelInfoMap.values()
         .stream()
         .map(ChannelInfo::getChannel)
+        .filter(Objects::nonNull)
         .collect(Collectors.toList());
 
     while (!nonTerminatedChannels.isEmpty() && System.nanoTime() < deadline) {
@@ -730,18 +737,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private void checkOpen(DatanodeDetails dn)
-      throws IOException {
-    if (isClosed.get()) {
-      throw new IOException("This channel is not connected.");
-    }
-
-    // If the channel doesn't exist for this specific datanode or the channel is closed, just reconnect
-    if (!isConnected(dn)) {
-      reconnect(dn);
-    }
-  }
-
-  private void reconnect(DatanodeDetails dn)
       throws IOException {
     try {
       connectToDatanode(dn);
