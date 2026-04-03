@@ -29,8 +29,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
  * Invokes methods without using reflection.
  */
 public abstract class ScmInvoker<T> {
-  static final Object[] NO_ARGS = {};
-
   private final SCMRatisServer ratisHandler;
 
   ScmInvoker(SCMRatisServer ratisHandler) {
