@@ -3574,38 +3574,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.tracing.enabled</name>
-    <value>false</value>
-    <tag>OZONE, HDDS</tag>
-    <description>
-      If enabled, tracing information is sent to tracing server.
-    </description>
-  </property>
-  <property>
-    <name>ozone.tracing.endpoint</name>
-    <value>http://localhost:4317</value>
-    <tag>OZONE, HDDS</tag>
-    <description>
-      OTLP gRPC receiver endpoint.
-    </description>
-  </property>
-  <property>
-    <name>ozone.tracing.sampler</name>
-    <value>1.0</value>
-    <tag>OZONE, HDDS</tag>
-    <description>
-      Trace sampling ratio for root spans (0.0 to 1.0).
-    </description>
-  </property>
-  <property>
-    <name>ozone.tracing.span.sampling</name>
-    <value></value>
-    <tag>OZONE, HDDS</tag>
-    <description>
-      Optional per-span sampling: comma-separated spanName:rate entries.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.task.thread.count</name>
     <value>1</value>
     <tag>OZONE, RECON</tag>

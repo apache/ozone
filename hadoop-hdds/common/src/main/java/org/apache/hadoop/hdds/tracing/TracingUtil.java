@@ -37,7 +37,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
@@ -75,12 +74,12 @@ public final class TracingUtil {
   }
 
   private static void initialize(String serviceName, ConfigurationSource conf) {
-    String otelEndPoint = resolveTracingEndpoint(conf);
-
-    double samplerRatio = resolveTraceSamplerRatio(conf);
+    //Fetch and log the right tracing parameters based on config, environment variable and default value priority.
+    TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
+    String otelEndPoint = tracingConfig.getTracingEndpoint(conf);
+    double samplerRatio = tracingConfig.getTraceSamplerRatio(conf);
     LOG.info("Sampling Trace Config = '{}'", samplerRatio);
-
-    String spanSamplingConfig = resolveSpanSamplingConfig(conf);
+    String spanSamplingConfig = tracingConfig.getSpanSampling(conf);
     LOG.info("Sampling Span Config = '{}'", spanSamplingConfig);
 
     Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);
@@ -111,36 +110,6 @@ public final class TracingUtil {
         .setTracerProvider(tracerProvider)
         .build();
     tracer = openTelemetry.getTracer(serviceName);
-  }
-
-  private static String resolveTracingEndpoint(ConfigurationSource conf) {
-    String fromConf = conf.getTrimmed(ScmConfigKeys.OZONE_TRACING_ENDPOINT);
-    if (fromConf != null && !fromConf.isEmpty()) {
-      return fromConf;
-    }
-    return ScmConfigKeys.OZONE_TRACING_ENDPOINT_DEFAULT;
-  }
-
-  private static double resolveTraceSamplerRatio(ConfigurationSource conf) {
-    String fromConf = conf.getTrimmed(ScmConfigKeys.OZONE_TRACING_SAMPLER);
-    if (fromConf != null && !fromConf.isEmpty()) {
-      try {
-        return Double.parseDouble(fromConf);
-      } catch (NumberFormatException ex) {
-        LOG.warn("Invalid value for {}: '{}'. Falling back to default: {}",
-            ScmConfigKeys.OZONE_TRACING_SAMPLER, fromConf,
-            ScmConfigKeys.OZONE_TRACING_SAMPLER_DEFAULT, ex);
-      }
-    }
-    return ScmConfigKeys.OZONE_TRACING_SAMPLER_DEFAULT;
-  }
-
-  private static String resolveSpanSamplingConfig(ConfigurationSource conf) {
-    String fromConf = conf.getTrimmed(ScmConfigKeys.OZONE_TRACING_SPAN_SAMPLING);
-    if (fromConf != null && !fromConf.isEmpty()) {
-      return fromConf;
-    }
-    return ScmConfigKeys.OZONE_TRACING_SPAN_SAMPLING_DEFAULT;
   }
 
   /**
@@ -202,11 +171,8 @@ public final class TracingUtil {
         new TraceAllMethod<>(delegate, itf.getSimpleName())));
   }
 
-  public static boolean isTracingEnabled(
-      ConfigurationSource conf) {
-    return conf.getBoolean(
-        ScmConfigKeys.OZONE_TRACING_ENABLED,
-        ScmConfigKeys.OZONE_TRACING_ENABLED_DEFAULT);
+  public static boolean isTracingEnabled(ConfigurationSource conf) {
+    return conf.getObject(TracingConfig.class).isTracingEnabled();
   }
 
   /**
