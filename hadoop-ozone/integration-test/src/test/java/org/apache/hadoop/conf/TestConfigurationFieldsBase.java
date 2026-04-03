@@ -434,13 +434,13 @@ public abstract class TestConfigurationFieldsBase {
     LOG.info("({} member variables)\n", configurationMemberVariables.size());
     StringBuilder xmlErrorMsg = new StringBuilder();
     for (Class c : configurationClasses) {
-      xmlErrorMsg.append(c);
-      xmlErrorMsg.append(' ');
+      xmlErrorMsg.append(c)
+          .append(' ');
     }
-    xmlErrorMsg.append("has ");
-    xmlErrorMsg.append(missingXmlSize);
-    xmlErrorMsg.append(" variables missing in ");
-    xmlErrorMsg.append(xmlFilename);
+    xmlErrorMsg.append("has ")
+        .append(missingXmlSize)
+        .append(" variables missing in ")
+        .append(xmlFilename);
     LOG.error(xmlErrorMsg.toString());
     if (missingXmlSize == 0) {
       LOG.info("  (None)");
@@ -482,10 +482,10 @@ public abstract class TestConfigurationFieldsBase {
 
     LOG.info("File {} ({} properties)", xmlFilename, xmlKeyValueMap.size());
     StringBuilder configErrorMsg = new StringBuilder();
-    configErrorMsg.append(xmlFilename);
-    configErrorMsg.append(" has ");
-    configErrorMsg.append(missingConfigSize);
-    configErrorMsg.append(" properties missing in");
+    configErrorMsg.append(xmlFilename)
+        .append(" has ")
+        .append(missingConfigSize)
+        .append(" properties missing in");
     Arrays.stream(configurationClasses)
         .forEach(c -> configErrorMsg.append("  ").append(c));
     LOG.info(configErrorMsg.toString());

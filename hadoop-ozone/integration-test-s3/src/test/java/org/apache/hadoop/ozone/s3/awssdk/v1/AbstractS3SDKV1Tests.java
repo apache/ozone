@@ -1534,10 +1534,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       StringBuilder completionXml = new StringBuilder();
       completionXml.append("<CompleteMultipartUpload>\n");
       for (PartETag part : completedParts) {
-        completionXml.append("  <Part>\n");
-        completionXml.append("    <PartNumber>").append(part.getPartNumber()).append("</PartNumber>\n");
-        completionXml.append("    <ETag>").append(stripQuotes(part.getETag())).append("</ETag>\n");
-        completionXml.append("  </Part>\n");
+        completionXml.append("  <Part>\n")
+            .append("    <PartNumber>").append(part.getPartNumber()).append("</PartNumber>\n")
+            .append("    <ETag>").append(stripQuotes(part.getETag())).append("</ETag>\n")
+            .append("  </Part>\n");
       }
       completionXml.append("</CompleteMultipartUpload>");
 
