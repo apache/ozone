@@ -76,10 +76,10 @@ public final class TracingUtil {
   private static void initialize(String serviceName, ConfigurationSource conf) {
     //Fetch and log the right tracing parameters based on config, environment variable and default value priority.
     TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
-    String otelEndPoint = tracingConfig.getTracingEndpoint(conf);
-    double samplerRatio = tracingConfig.getTraceSamplerRatio(conf);
+    String otelEndPoint = tracingConfig.getTracingEndpoint();
+    double samplerRatio = tracingConfig.getTraceSamplerRatio();
     LOG.info("Sampling Trace Config = '{}'", samplerRatio);
-    String spanSamplingConfig = tracingConfig.getSpanSampling(conf);
+    String spanSamplingConfig = tracingConfig.getSpanSampling();
     LOG.info("Sampling Span Config = '{}'", spanSamplingConfig);
 
     Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);

@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.hdds.tracing;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 
 /**
@@ -49,7 +50,7 @@ public class TracingConfig extends ReconfigurableConfig {
 
   @Config(
       key = "ozone.tracing.endpoint",
-      defaultValue = "http://localhost:4317",
+      defaultValue = "",
       type = ConfigType.STRING,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
       description = "OTLP gRPC receiver endpoint URL."
@@ -58,7 +59,7 @@ public class TracingConfig extends ReconfigurableConfig {
 
   @Config(
       key = "ozone.tracing.sampler",
-      defaultValue = "1.0",
+      defaultValue = "-1",
       type = ConfigType.DOUBLE,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
       description = "Root trace sampling ratio (0.0 to 1.0)."
@@ -78,56 +79,45 @@ public class TracingConfig extends ReconfigurableConfig {
     return tracingEnabled;
   }
 
-  /**
-   * Checks if configuration value is set for endpoint.
-   * Checks environment variable if config is default value.
-   * Returns default value if environment variable is not set
-   */
-  public String getTracingEndpoint(ConfigurationSource conf) {
-    String configEndpoint = conf.get("ozone.tracing.endpoint");
-    if (configEndpoint != null && !configEndpoint.equals("http://localhost:4317")) {
-      return configEndpoint.trim();
+  @PostConstruct
+  public void validate() {
+    if (tracingEndpoint.isEmpty()) {
+      tracingEndpoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
     }
-    String envEndpoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
-    if (envEndpoint != null && !envEndpoint.equals("http://localhost:4317")) {
-      return envEndpoint.trim();
+    if (StringUtils.isBlank(tracingEndpoint)) {
+      tracingEndpoint = "http://localhost:4317";
     }
+
+    if (traceSamplerRatio < 0) {
+      String envTraceRatio = System.getenv(OTEL_TRACES_SAMPLER_ARG);
+      if (envTraceRatio != null) {
+        try {
+          traceSamplerRatio = Double.parseDouble(envTraceRatio.trim());
+        } catch (NumberFormatException ignored) {
+        }
+      }
+    }
+    if (traceSamplerRatio < 0 || traceSamplerRatio > 1) {
+      traceSamplerRatio = 1.0;
+    }
+
+    if (spanSampling.isEmpty()) {
+      String envSampling = System.getenv(OTEL_SPAN_SAMPLING_ARG);
+      if (!StringUtils.isBlank(envSampling)) {
+        spanSampling = envSampling;
+      }
+    }
+  }
+
+  public String getTracingEndpoint() {
     return tracingEndpoint;
   }
 
-  /**
-   * Checks if configuration value is set for trace ratio.
-   * Checks environment variable if config is default value.
-   * Returns default value if environment variable is not set
-   */
-  public double getTraceSamplerRatio(ConfigurationSource conf) {
-    String configTraceRatio = conf.get("ozone.tracing.sampler");
-    //if config value is set to something other than default and null then return it
-    if (configTraceRatio != null && !configTraceRatio.equals("1.0")) {
-      return Double.parseDouble(configTraceRatio.trim());
-    }
-    String envTraceRatio = System.getenv(OTEL_TRACES_SAMPLER_ARG);
-    //if environment variable is set ot something other than default and null then return it
-    if (envTraceRatio != null && !envTraceRatio.equals("1.0")) {
-      return Double.parseDouble(envTraceRatio.trim());
-    }
+  public double getTraceSamplerRatio() {
     return traceSamplerRatio;
   }
 
-  /**
-   * Checks if configuration value is set for span ratio.
-   * Checks environment variable if config is default value.
-   * Returns default value if environment variable is not set
-   */
-  public String getSpanSampling(ConfigurationSource conf) {
-    String configSpanRatio = conf.get("ozone.tracing.span.sampling");
-    if (configSpanRatio != null && !configSpanRatio.isEmpty()) {
-      return configSpanRatio.trim();
-    }
-    String envSpanRatio = System.getenv(OTEL_SPAN_SAMPLING_ARG);
-    if (envSpanRatio != null && !envSpanRatio.isEmpty()) {
-      return envSpanRatio;
-    }
+  public String getSpanSampling() {
     return spanSampling;
   }
 
