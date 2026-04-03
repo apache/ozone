@@ -27,6 +27,10 @@
   </properties>
   <dependencies>
     <dependency>
+      <groupId>${rocksdbjni.groupId}</groupId>
+      <artifactId>rocksdbjni</artifactId>
+    </dependency>
+    <dependency>
       <groupId>aopalliance</groupId>
       <artifactId>aopalliance</artifactId>
     </dependency>
@@ -232,10 +236,6 @@
     <dependency>
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

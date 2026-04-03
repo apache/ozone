@@ -27,6 +27,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>${rocksdbjni.groupId}</groupId>
+      <artifactId>rocksdbjni</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>
     </dependency>
@@ -185,10 +189,6 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

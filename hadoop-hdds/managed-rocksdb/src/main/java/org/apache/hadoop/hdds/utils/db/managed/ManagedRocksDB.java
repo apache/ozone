@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import java.io.File;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -112,18 +113,23 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
   }
 
   /**
-   * Delete liveMetaDataFile from rocks db using RocksDB#deleteFile Api.
-   * This function makes the RocksDB#deleteFile Api synchronized by waiting
-   * for the deletes to happen.
-   * @param fileToBeDeleted File to be deleted.
+   * Delete the SST file range from rocks db and wait for file deletion.
+   * @param columnFamilyHandle column family of the target sst file.
+   * @param fileToBeDeleted file metadata to be deleted.
    * @throws RocksDatabaseException if the underlying db throws an exception
    *                                or the file is not deleted within a time limit.
    */
-  public void deleteFile(LiveFileMetaData fileToBeDeleted) throws RocksDatabaseException {
-    String sstFileName = fileToBeDeleted.fileName();
+  public void deleteFile(
+      ColumnFamilyHandle columnFamilyHandle,
+      LiveFileMetaData fileToBeDeleted) throws RocksDatabaseException {
     File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
+    final byte[] smallestKey = fileToBeDeleted.smallestKey();
+    final byte[] largestKey = fileToBeDeleted.largestKey();
     try {
-      get().deleteFile(sstFileName);
+      get().deleteFilesInRanges(
+          columnFamilyHandle,
+          Arrays.asList(smallestKey, largestKey),
+          true);
     } catch (RocksDBException e) {
       throw new RocksDatabaseException("Failed to delete " + file, e);
     }

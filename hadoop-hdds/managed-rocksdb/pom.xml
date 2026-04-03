@@ -27,6 +27,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>${rocksdbjni.groupId}</groupId>
+      <artifactId>rocksdbjni</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
@@ -49,10 +53,6 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
