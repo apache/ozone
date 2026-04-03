@@ -45,15 +45,12 @@ public abstract class ScmInvoker<T> {
 
   public abstract T getProxy();
 
-  abstract Class<?>[] getParameterTypes(String methodName);
-
   abstract Object invokeLocal(String methodName, Object[] args) throws Exception;
 
-  Object invokeRatisServer(String methodName, Class<?>[] paramTypes,
-          Object[] args) throws SCMException {
+  Object invokeRatisServer(NameAndParameterTypes method, Object[] args) throws SCMException {
     try {
       final SCMRatisRequest request = SCMRatisRequest.of(
-              getType(), methodName, paramTypes, args);
+              getType(),  method.getName(), method.getParameterTypes(args.length), args);
       final SCMRatisResponse response = ratisHandler.submitRequest(request);
       if (response.isSuccess()) {
         return response.getResult();
@@ -62,5 +59,11 @@ public abstract class ScmInvoker<T> {
     } catch (Exception e) {
       throw translateException(e);
     }
+  }
+
+  interface NameAndParameterTypes {
+    String getName();
+    
+    Class<?>[] getParameterTypes(int numArgs);
   }
 }

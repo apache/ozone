@@ -26,11 +26,9 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
-import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,15 +44,12 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   private final RequestType requestType;
   private final Object localHandler;
   private final SCMRatisServer ratisHandler;
-  private final ScmInvoker<?> invoker;
 
   public SCMHAInvocationHandler(final RequestType requestType,
       final Object localHandler,
-      final ScmInvoker<?> invoker,
       final SCMRatisServer ratisHandler) {
     this.requestType = requestType;
     this.localHandler = localHandler;
-    this.invoker = invoker;
     this.ratisHandler = ratisHandler;
     if (ratisHandler != null) {
       ratisHandler.registerStateMachineHandler(requestType, localHandler);
@@ -88,7 +83,6 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       LOG.trace("Invoking method {} on target {} with arguments {}",
           method, localHandler, args);
     }
-    Preconditions.assertNull(invoker, "invoker");
     try {
       return method.invoke(localHandler, args);
     } catch (Exception e) {

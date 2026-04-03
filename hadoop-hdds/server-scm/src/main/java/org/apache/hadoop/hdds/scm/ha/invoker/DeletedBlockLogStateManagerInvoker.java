@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha.invoker;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -32,6 +33,31 @@ import org.apache.hadoop.hdds.utils.db.Table;
  */
 public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockLogStateManager> {
   private final DeletedBlockLogStateManager impl;
+
+  enum ReplicateMethod implements NameAndParameterTypes {
+    addTransactionsToDB(new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}),
+    removeTransactionsFromDB(new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}),;
+
+    private final Class<?>[][] parameterTypes;
+
+    ReplicateMethod(Class<?>[] parameterTypes) {
+      final Class<?>[][] types = new Class<?>[parameterTypes.length + 1][];
+      for (int i = 0; i <= parameterTypes.length; ++i) {
+        types[i] = Arrays.copyOf(parameterTypes, i);
+      }
+      this.parameterTypes = types;
+    }
+
+    @Override
+    public String getName() {
+      return name();
+    }
+
+    @Override
+    public Class<?>[] getParameterTypes(int numArgs) {
+      return parameterTypes[numArgs];
+    }
+  }
 
   public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl, SCMRatisServer scmRatisServer) {
     super(scmRatisServer);
@@ -54,54 +80,34 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
   }
 
   @Override
-  protected Class<?>[] getParameterTypes(String methodName) {
-    switch (methodName) {
-    case "addTransactionsToDB":
-      return new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class};
-
-    case "removeTransactionsFromDB":
-      return new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class};
-
-    default:
-      throw new IllegalArgumentException("Unknown method: " + methodName);
-    }
-  }
-
-  @Override
   public DeletedBlockLogStateManager getProxy() {
     return new DeletedBlockLogStateManager() {
       @Override
       public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
           throws IOException {
         final Object[] args = {txs};
-        invokeRatisServer("addTransactionsToDB",
-            new Class<?>[] {ArrayList.class}, args);
+        invokeRatisServer(ReplicateMethod.addTransactionsToDB, args);
       }
 
       @Override
       public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
           DeletedBlocksTransactionSummary summary) throws IOException {
         final Object[] args = {txs, summary};
-        invokeRatisServer("addTransactionsToDB",
-            new Class<?>[] {ArrayList.class,
-                DeletedBlocksTransactionSummary.class}, args);
+        invokeRatisServer(ReplicateMethod.addTransactionsToDB, args);
       }
 
       @Override
       public void removeTransactionsFromDB(ArrayList<Long> txIDs)
           throws IOException {
         final Object[] args = {txIDs};
-        invokeRatisServer("removeTransactionsFromDB",
-            new Class<?>[] {ArrayList.class}, args);
+        invokeRatisServer(ReplicateMethod.removeTransactionsFromDB, args);
       }
 
       @Override
       public void removeTransactionsFromDB(ArrayList<Long> txIDs,
           DeletedBlocksTransactionSummary summary) throws IOException {
         final Object[] args = {txIDs, summary};
-        invokeRatisServer("removeTransactionsFromDB",
-            new Class<?>[] {ArrayList.class,
-                DeletedBlocksTransactionSummary.class}, args);
+        invokeRatisServer(ReplicateMethod.removeTransactionsFromDB, args);
       }
 
       @Override
