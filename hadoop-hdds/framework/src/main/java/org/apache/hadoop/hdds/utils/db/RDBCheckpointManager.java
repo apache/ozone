@@ -66,10 +66,14 @@ public class RDBCheckpointManager implements Closeable {
       if (StringUtils.isNotEmpty(checkpointNamePrefix)) {
         checkpointDir.append(checkpointNamePrefix);
       }
+
       if (name == null) {
-        name = "_" + RDB_CHECKPOINT_DIR_PREFIX + currentTime;
+        checkpointDir.append('_')
+            .append(RDB_CHECKPOINT_DIR_PREFIX)
+            .append(currentTime);
+      } else {
+        checkpointDir.append(name);
       }
-      checkpointDir.append(name);
 
       Path checkpointPath = Paths.get(parentDir, checkpointDir.toString());
       Instant start = Instant.now();

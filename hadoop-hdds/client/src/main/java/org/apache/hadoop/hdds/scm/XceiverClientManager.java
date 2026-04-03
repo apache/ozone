@@ -164,7 +164,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   private String getPipelineCacheKey(Pipeline pipeline,
                                      boolean topologyAware) {
     StringBuilder key = new StringBuilder()
-        .append(pipeline.getId().getId().toString())
+        .append(pipeline.getId().getId())
         .append(pipeline.getType());
     boolean isEC = pipeline.getType() == HddsProtos.ReplicationType.EC;
     if (topologyAware || isEC) {

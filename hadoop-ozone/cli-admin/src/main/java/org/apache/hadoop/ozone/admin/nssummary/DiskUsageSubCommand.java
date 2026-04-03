@@ -84,7 +84,6 @@ public class DiskUsageSubCommand implements Callable {
   private static final int PATH_INDENT = 27;
 
   @Override
-  @SuppressWarnings(value = "PMD.UseStringBufferForStringAppends")
   public Void call() throws Exception {
     if (path == null || path.isEmpty()) {
       printEmptyPathRequest();
@@ -163,13 +162,14 @@ public class DiskUsageSubCommand implements Callable {
           if (cnt >= limit) {
             break;
           }
-          String subPath = subPathDU.path("path").asText("");
+          StringBuilder sb = new StringBuilder(subPathDU.path("path").asText(""));
           // differentiate key from other types
           if (!subPathDU.path("isKey").asBoolean(false)) {
-            subPath += OM_KEY_PREFIX;
+            sb.append(OM_KEY_PREFIX);
           }
           long size = subPathDU.path("size").asLong(-1);
           long sizeWithReplica = subPathDU.path("sizeWithReplica").asLong(-1);
+          String subPath = sb.toString();
           if (subPath.startsWith(seekStr)) {
             printDURow(subPath, size, sizeWithReplica);
             ++cnt;
