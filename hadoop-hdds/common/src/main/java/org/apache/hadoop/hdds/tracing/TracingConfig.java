@@ -80,7 +80,7 @@ public class TracingConfig extends ReconfigurableConfig {
   }
 
   @PostConstruct
-  public void validate() {
+  void validate() {
     if (tracingEndpoint.isEmpty()) {
       tracingEndpoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
     }
