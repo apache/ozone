@@ -46,6 +46,10 @@ public class StaleNodeHandler implements EventHandler<DatanodeDetails> {
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
+    PendingContainerTracker pending = nodeManager.getPendingContainerTracker();
+    if (pending != null) {
+      pending.clearPendingForDatanode(datanodeDetails);
+    }
     Set<PipelineID> pipelineIds =
         nodeManager.getPipelines(datanodeDetails);
     LOG.info("Datanode {} moved to stale state. Finalizing its pipelines {}",

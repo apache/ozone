@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
@@ -175,6 +176,17 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
           if (!alreadyInDn) {
             // This is a new Container not in the nodeManager -> dn map yet
             getNodeManager().addContainer(datanodeDetails, cid);
+            
+            // Remove from pending tracker when container is added to DN
+            // This container was just confirmed for the first time on this DN
+            // No need to remove on subsequent reports (it's already been removed)
+            if (container != null) {
+              PendingContainerTracker tracker =
+                  getNodeManager().getPendingContainerTracker();
+              if (tracker != null) {
+                tracker.removePendingAllocation(datanodeDetails, cid);
+              }
+            }
           }
           if (container == null || ContainerReportValidator
                   .validate(container, datanodeDetails, replica)) {

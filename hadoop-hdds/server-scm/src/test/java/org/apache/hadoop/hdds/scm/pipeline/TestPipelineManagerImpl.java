@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -976,6 +977,12 @@ public class TestPipelineManagerImpl {
       doReturn(info).when(mockedNodeManager).getDatanodeInfo(dn);
       datanodeInfoList.add(info);
     }
+    doAnswer(invocation -> {
+      DatanodeDetails dn = invocation.getArgument(0);
+      long cs = invocation.getArgument(1);
+      DatanodeInfo info = mockedNodeManager.getDatanodeInfo(dn);
+      return SCMCommonPlacementPolicy.hasEnoughSpace(info, 0, cs);
+    }).when(mockedNodeManager).hasSpaceForNewContainerAllocation(any(DatanodeDetails.class), anyLong());
     assertTrue(pipelineManager.hasEnoughSpace(pipeline, containerSize));
 
     // Case 2: One node does not have enough space.

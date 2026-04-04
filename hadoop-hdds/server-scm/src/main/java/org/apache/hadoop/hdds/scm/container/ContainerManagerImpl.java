@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
@@ -44,6 +45,8 @@ import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -80,6 +83,7 @@ public class ContainerManagerImpl implements ContainerManager {
   private final Random random = new Random();
 
   private final long maxContainerSize;
+  private final PendingContainerTracker pendingContainerTracker;
 
   /**
    *
@@ -90,7 +94,8 @@ public class ContainerManagerImpl implements ContainerManager {
       final SequenceIdGenerator sequenceIdGen,
       final PipelineManager pipelineManager,
       final Table<ContainerID, ContainerInfo> containerStore,
-      final ContainerReplicaPendingOps containerReplicaPendingOps)
+      final ContainerReplicaPendingOps containerReplicaPendingOps,
+      final NodeManager nodeManager)
       throws IOException {
     // Introduce builder for this class?
     this.lock = new ReentrantLock();
@@ -110,6 +115,8 @@ public class ContainerManagerImpl implements ContainerManager {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+    this.pendingContainerTracker = Objects.requireNonNull(
+        nodeManager.getPendingContainerTracker(), "pendingContainerTracker");
   }
 
   @Override
@@ -278,6 +285,11 @@ public class ContainerManagerImpl implements ContainerManager {
 
     containerStateManager.addContainer(containerInfoBuilder.build());
     scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
+    // Record pending allocation - tracks containers scheduled but not yet written
+    pendingContainerTracker.recordPendingAllocation(pipeline, containerID);
+    LOG.debug("Allocated container {} on pipeline {}. Recorded as pending on {} DataNodes",
+        containerID, pipeline.getId(), pipeline.getNodes().size());
+
     return containerStateManager.getContainer(containerID);
   }
 

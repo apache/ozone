@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -62,6 +63,7 @@ public class SimpleMockNodeManager implements NodeManager {
   private Map<DatanodeID, DatanodeInfo> nodeMap = new ConcurrentHashMap<>();
   private Map<DatanodeID, Set<PipelineID>> pipelineMap = new ConcurrentHashMap<>();
   private Map<DatanodeID, Set<ContainerID>> containerMap = new ConcurrentHashMap<>();
+  private PendingContainerTracker pendingContainerTracker;
 
   public void register(DatanodeDetails dd, NodeStatus status) {
     dd.setPersistedOpState(status.getOperationalState());
@@ -433,6 +435,19 @@ public class SimpleMockNodeManager implements NodeManager {
   @Override
   public Boolean isNodeRegistered(DatanodeDetails datanodeDetails) {
     return false;
+  }
+
+  @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    if (pendingContainerTracker == null) {
+      pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024);
+    }
+    return pendingContainerTracker;
+  }
+
+  @Override
+  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node, long containerSize) {
+    return true;
   }
 
 }

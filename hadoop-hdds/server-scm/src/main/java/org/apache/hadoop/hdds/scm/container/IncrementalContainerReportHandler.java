@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.container.report.ContainerReportValidator;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -103,6 +104,12 @@ public class IncrementalContainerReportHandler
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
             processContainerReplica(dd, container, replicaProto, publisher, detailsForLogging);
+
+            PendingContainerTracker tracker =
+                getNodeManager().getPendingContainerTracker();
+            if (tracker != null) {
+              tracker.removePendingAllocation(dd, id);
+            }
           }
           success = true;
         } catch (ContainerNotFoundException e) {

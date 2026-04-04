@@ -84,6 +84,7 @@ public class TestContainerManagerImpl {
   private SequenceIdGenerator sequenceIdGen;
   private ContainerReplicaPendingOps pendingOpsMock;
   private PipelineManager pipelineManager;
+  private NodeManager nodeManager;
 
   @BeforeAll
   static void init() {
@@ -96,7 +97,7 @@ public class TestContainerManagerImpl {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    NodeManager nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 10);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     PipelineManager base = new MockPipelineManager(dbStore, scmhaManager, nodeManager);
@@ -111,7 +112,8 @@ public class TestContainerManagerImpl {
     pendingOpsMock = mock(ContainerReplicaPendingOps.class);
     containerManager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
-        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
+        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock,
+        nodeManager);
   }
 
   @AfterEach
@@ -173,7 +175,7 @@ public class TestContainerManagerImpl {
     OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     ContainerManager manager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, spyPipelineManager,
-        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
+        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock, nodeManager);
 
     Pipeline pipeline = spyPipelineManager.getPipelines().iterator().next();
     // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer

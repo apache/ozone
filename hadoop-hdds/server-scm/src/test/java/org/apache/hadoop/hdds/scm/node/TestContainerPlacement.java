@@ -96,6 +96,7 @@ public class TestContainerPlacement {
   private SequenceIdGenerator sequenceIdGen;
   private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
+  private NodeManager nodeManager;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -105,7 +106,7 @@ public class TestContainerPlacement {
     scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    NodeManager nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 10);
     pipelineManager = new MockPipelineManager(dbStore,
         scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
@@ -166,7 +167,8 @@ public class TestContainerPlacement {
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore),
         new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault()), null));
+            Clock.system(ZoneId.systemDefault()), null),
+        nodeManager);
   }
 
   /**
