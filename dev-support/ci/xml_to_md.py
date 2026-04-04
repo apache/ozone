@@ -107,13 +107,20 @@ This page provides a comprehensive overview of the configuration keys available 
 """
 
   placeholder_pattern = re.compile(r'(\$)?\{([^}]+)\}')
+  multi_space_pattern = re.compile(r'  +')
 
   for prop in sorted(properties.values(), key=lambda p: p.name):
     # Escape pipe characters and wrap {placeholders} in backticks
     description = prop.description.replace('|', '\\|')
     description = placeholder_pattern.sub(r'`\1{\2}`', description)
-    value = prop.value.replace('|', '\\|') if prop.value else ''
-    value = placeholder_pattern.sub(r'`\1{\2}`', value) if value else ''
+
+    value = prop.value
+    if value:
+      value = value.strip()
+      value = value.replace('|', '\\|')
+      value = placeholder_pattern.sub(r'`\1{\2}`', value)
+      value = value.replace('\n', ' ')
+      value = multi_space_pattern.sub(' ', value)
     
     markdown += f"| `{prop.name}` | {value} | {prop.tag} | {description} |\n"
   
