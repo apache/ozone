@@ -51,12 +51,7 @@ import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.Cancel
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_NON_CANCELLABLE;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_SUCCEEDED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntry;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELLED;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.*;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.DIFF_REPORT_GEN;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_OBS;
@@ -133,6 +128,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
@@ -479,6 +475,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @SuppressWarnings("parameternumber")
+  @Deprecated
   public SnapshotDiffResponse getSnapshotDiffReport(
       final String volumeName,
       final String bucketName,
@@ -546,6 +543,132 @@ public class SnapshotDiffManager implements AutoCloseable {
     default:
       throw new IllegalStateException("Unknown snapshot job status: " +
           snapDiffJob.getStatus());
+    }
+  }
+
+  public SnapshotDiffResponse getSnapshotDiffReport(
+      final String volumeName,
+      final String bucketName,
+      final String fromSnapshotName,
+      final String toSnapshotName,
+      final String index,
+      final int pageSize
+  ) throws IOException {
+
+    SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
+        volumeName, bucketName, fromSnapshotName);
+    SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
+        volumeName, bucketName, toSnapshotName);
+
+    String snapDiffJobKey = generateSnapDiffJobKey.apply(fsInfo, tsInfo);
+    SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(snapDiffJobKey);
+    OFSPath snapshotRoot = getSnapshotRootPath(volumeName, bucketName);
+
+    if (snapDiffJob == null) {
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName, bucketName,
+              fromSnapshotName, toSnapshotName,
+              new ArrayList<>(), null), NOT_FOUND, defaultWaitTime);
+    }
+
+    switch (snapDiffJob.getStatus()) {
+    case QUEUED:
+    case REJECTED:
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
+              bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
+              null),
+          snapDiffJob.getStatus(), defaultWaitTime, true);
+    case IN_PROGRESS:
+      SnapshotDiffResponse response = new SnapshotDiffResponse(
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName, bucketName,
+              fromSnapshotName, toSnapshotName,
+              new ArrayList<>(), null), IN_PROGRESS, defaultWaitTime, true);
+      response.setSubStatus(snapDiffJob.getSubStatus());
+      response.setProgressPercent(snapDiffJob.getKeysProcessedPct());
+      return response;
+    case FAILED:
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
+              bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
+              null), FAILED,
+          // waitTime is equal to clean up internal. After that job will be
+          // removed and client can retry.
+          ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval(),
+          snapDiffJob.getReason(), true);
+    case DONE:
+      SnapshotDiffReportOzone report = createPageResponse(snapDiffJob,
+          volumeName, bucketName, fromSnapshotName, toSnapshotName, index,
+          pageSize);
+      return new SnapshotDiffResponse(report, DONE, 0L, true);
+    case CANCELLED:
+      return new SnapshotDiffResponse(
+          new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
+              bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
+              null),
+          CANCELLED, 0L, true);
+    default:
+      throw new IllegalStateException("Unknown snapshot job status: " +
+          snapDiffJob.getStatus());
+    }
+  }
+
+  public synchronized SubmitSnapshotDiffResponse submitSnapshotDiff(
+      final String volumeName,
+      final String bucketName,
+      final String fromSnapshotName,
+      final String toSnapshotName,
+      final boolean forceFullDiff,
+      final boolean disableNativeDiff
+  ) throws IOException {
+    SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
+        volumeName, bucketName, fromSnapshotName);
+    SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
+        volumeName, bucketName, toSnapshotName);
+
+    String snapDiffJobKey = generateSnapDiffJobKey.apply(fsInfo, tsInfo);
+
+    SnapshotDiffJob snapDiffJob = getSnapDiffReportStatus(snapDiffJobKey,
+        volumeName, bucketName, fromSnapshotName, toSnapshotName,
+        forceFullDiff, disableNativeDiff);
+
+    JobStatus prevStatus = snapDiffJob.getStatus();
+    String prevReason = snapDiffJob.getReason();
+
+    switch (prevStatus) {
+    case QUEUED:
+    case FAILED:
+    case REJECTED:
+    case CANCELLED:
+      LOG.info("Submitting snapshot diff generation request for" +
+              " volume: {}, bucket: {}, fromSnapshot: {} and toSnapshot: {}",
+          volumeName, bucketName, fromSnapshotName, toSnapshotName);
+      try {
+        updateJobStatus(snapDiffJobKey, prevStatus, IN_PROGRESS);
+        snapDiffExecutor.execute(() -> generateSnapshotDiffReport(snapDiffJobKey, snapDiffJob.getJobId(),
+            volumeName, bucketName, fromSnapshotName, toSnapshotName,
+            forceFullDiff, disableNativeDiff));
+        if (prevStatus == QUEUED) {
+          return new SubmitSnapshotDiffResponse(defaultWaitTime, null, null);
+        } else {
+          return new SubmitSnapshotDiffResponse(defaultWaitTime, prevStatus, prevReason);
+        }
+      } catch (RejectedExecutionException exception) {
+        updateJobStatus(snapDiffJobKey, IN_PROGRESS, REJECTED);
+        LOG.warn("Exceeded the snapDiff parallel requests processing " +
+                "limit. Rejecting the snapDiff job: {}.", snapDiffJobKey);
+        return new SubmitSnapshotDiffResponse("Snapshot diff job was rejected because parallel processing of " +
+            "snap diff jobs exceeded the limit. Please try again in " + defaultWaitTime + " ms.");
+      } catch (Exception exception) {
+        updateJobStatusToFailed(snapDiffJobKey, exception.getMessage());
+        LOG.error("Snapshot diff job: {} failed.", snapDiffJobKey, exception);
+        return new SubmitSnapshotDiffResponse("Snapshot diff job submission failed. Reason: " + exception.getMessage());
+      }
+    case IN_PROGRESS:
+    case DONE:
+      return new SubmitSnapshotDiffResponse(defaultWaitTime, IN_PROGRESS, null);
+    default:
+      throw new IllegalStateException("Unknown snapshot job status: " + snapDiffJob.getStatus());
     }
   }
 
