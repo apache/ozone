@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -26,6 +28,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class is for maintaining Ozone Manager statistics.
@@ -35,6 +38,9 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 public class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
+
+  private final List<String> ratisEvents = new ArrayList<>();
+  private static final int MAX_RATIS_EVENTS = 100;
 
   // OM request type op metrics
   private @Metric MutableCounterLong numVolumeOps;
@@ -1543,6 +1549,22 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumRecoverLeaseFails() {
     numRecoverLeaseFails.incr();
+  }
+
+  public void addRatisEvent(String event) {
+    synchronized (ratisEvents) {
+      if (ratisEvents.size() >= MAX_RATIS_EVENTS) {
+        ratisEvents.remove(0);
+      }
+      ratisEvents.add(Time.formatTime(Time.now()) + "|" + event);
+    }
+  }
+
+  @Metric("Ratis state machine events")
+  public String getRatisEvents() {
+    synchronized (ratisEvents) {
+      return String.join("\n", ratisEvents);
+    }
   }
 
   public void unRegister() {

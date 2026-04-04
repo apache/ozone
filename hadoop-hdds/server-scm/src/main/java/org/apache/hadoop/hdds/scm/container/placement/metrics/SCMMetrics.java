@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -24,6 +26,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class is for maintaining StorageContainerManager statistics.
@@ -32,6 +35,9 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 public class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
+
+  private final List<String> ratisEvents = new ArrayList<>();
+  private static final int MAX_RATIS_EVENTS = 100;
 
   /**
    * Container stat metrics, the meaning of following metrics
@@ -153,6 +159,22 @@ public class SCMMetrics {
     this.containerReportWriteBytes.incr(-1 * deltaStat.getWriteBytes().get());
     this.containerReportReadCount.incr(-1 * deltaStat.getReadCount().get());
     this.containerReportWriteCount.incr(-1 * deltaStat.getWriteCount().get());
+  }
+
+  public void addRatisEvent(String event) {
+    synchronized (ratisEvents) {
+      if (ratisEvents.size() >= MAX_RATIS_EVENTS) {
+        ratisEvents.remove(0);
+      }
+      ratisEvents.add(Time.formatTime(Time.now()) + "|" + event);
+    }
+  }
+
+  @Metric("Ratis state machine events")
+  public String getRatisEvents() {
+    synchronized (ratisEvents) {
+      return String.join("\n", ratisEvents);
+    }
   }
 
   public void unRegister() {
