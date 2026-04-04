@@ -738,11 +738,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   private void checkOpen(DatanodeDetails dn)
       throws IOException {
-    try {
-      connectToDatanode(dn);
-    } catch (Exception e) {
-      throw new IOException("Error while connecting", e);
-    }
+    connectToDatanode(dn);
 
     if (!isConnected(dn)) {
       throw new IOException("This channel is not connected.");
