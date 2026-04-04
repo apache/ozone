@@ -832,7 +832,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       containerManager = new ContainerManagerImpl(conf, scmHAManager,
           sequenceIdGen, pipelineManager, scmMetadataStore.getContainerTable(),
-          containerReplicaPendingOps);
+          containerReplicaPendingOps, scmNodeManager);
     }
 
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);

@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -335,14 +336,16 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public boolean hasEnoughSpace(Pipeline pipeline) {
-    return false;
+    for (DatanodeDetails node : pipeline.getNodes()) {
+      if (!nodeManager.hasSpaceForNewContainerAllocation(node)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
   public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
-    }
   }
 
   @Override
@@ -357,7 +360,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public org.apache.hadoop.hdds.scm.node.DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
-    return null;
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    return nodeManager.getDatanodeInfo(datanodeDetails);
   }
 }

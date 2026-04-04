@@ -136,15 +136,15 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public List<ContainerID> getContainerIDs(final ContainerID startID,
-                                           final int count,
-                                           final LifeCycleState state) {
+      final int count,
+      final LifeCycleState state) {
     scmContainerManagerMetrics.incNumListContainersOps();
     return containerStateManager.getContainerIDs(state, startID, count);
   }
 
   @Override
   public List<ContainerInfo> getContainers(final ContainerID startID,
-                                           final int count) {
+      final int count) {
     scmContainerManagerMetrics.incNumListContainersOps();
     return containerStateManager.getContainerInfos(startID, count);
   }
@@ -157,8 +157,8 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public List<ContainerInfo> getContainers(final ContainerID startID,
-                                           final int count,
-                                           final LifeCycleState state) {
+      final int count,
+      final LifeCycleState state) {
     scmContainerManagerMetrics.incNumListContainersOps();
     return containerStateManager.getContainerInfos(state, startID, count);
   }
@@ -236,7 +236,7 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   private ContainerInfo allocateContainer(final Pipeline pipeline,
-                                          final String owner)
+      final String owner)
       throws IOException {
     if (!pipelineManager.hasEnoughSpace(pipeline)) {
       LOG.debug("Cannot allocate a new container because pipeline {} does not have enough space.", pipeline);
@@ -269,15 +269,14 @@ public class ContainerManagerImpl implements ContainerManager {
     }
 
     containerStateManager.addContainer(containerInfoBuilder.build());
-    scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
-    // Record pending allocation - tracks containers scheduled but not yet written
     pipelineManager.recordPendingAllocation(pipeline, containerID);
+    scmContainerManagerMetrics.incNumSuccessfulCreateContainers();
     return containerStateManager.getContainer(containerID);
   }
 
   @Override
   public void updateContainerState(final ContainerID cid,
-                                   final LifeCycleEvent event)
+      final LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
     lock.lock();
@@ -313,7 +312,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void transitionDeletingOrDeletedToTargetState(ContainerID containerID, LifeCycleState targetState)
-          throws IOException {
+      throws IOException {
     HddsProtos.ContainerID proto = containerID.getProtobuf();
     lock.lock();
     try {
@@ -339,7 +338,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void updateContainerReplica(final ContainerID cid,
-                                     final ContainerReplica replica)
+      final ContainerReplica replica)
       throws ContainerNotFoundException {
     if (containerExist(cid)) {
       containerStateManager.updateContainerReplica(replica);
@@ -350,7 +349,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void removeContainerReplica(final ContainerID cid,
-                                     final ContainerReplica replica)
+      final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     if (containerExist(cid)) {
       containerStateManager.removeContainerReplica(replica);
@@ -421,7 +420,7 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public void notifyContainerReportProcessing(final boolean isFullReport,
-                                              final boolean success) {
+      final boolean success) {
     if (isFullReport) {
       if (success) {
         scmContainerManagerMetrics.incNumContainerReportsProcessedSuccessful();

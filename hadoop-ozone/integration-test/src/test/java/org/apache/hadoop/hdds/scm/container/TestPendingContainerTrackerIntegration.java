@@ -31,7 +31,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
+import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -60,7 +62,7 @@ public class TestPendingContainerTrackerIntegration {
   private OzoneClient client;
   private ContainerManager containerManager;
   private PendingContainerTracker pendingTracker;
-  private SCMContainerManagerMetrics metrics;
+  private SCMNodeMetrics metrics;
   private OzoneBucket bucket;
 
   @BeforeEach
@@ -90,23 +92,17 @@ public class TestPendingContainerTrackerIntegration {
     // Create bucket for testing
     bucket = TestDataUtil.createVolumeAndBucket(client);
     
-    // Get the pending tracker
-    if (containerManager instanceof ContainerManagerImpl) {
-      pendingTracker = ((ContainerManagerImpl) containerManager)
-          .getPendingContainerTracker();
-      assertNotNull(pendingTracker, "PendingContainerTracker should be initialized");
-    }
+    SCMNodeManager nodeManager = (SCMNodeManager) scm.getScmNodeManager();
+    assertNotNull(nodeManager);
+    pendingTracker = nodeManager.getPendingContainerTracker();
+    assertNotNull(pendingTracker, "PendingContainerTracker should be initialized");
     metrics = pendingTracker.getMetrics();
-    // metrics = SCMContainerManagerMetrics.create();
     
     LOG.info("Test setup complete - ICR interval: 5s, Heartbeat interval: 1s");
   }
 
   @AfterEach
   public void cleanup() throws Exception {
-    if (metrics != null) {
-      metrics.unRegister();
-    }
     if (client != null) {
       client.close();
     }
