@@ -21,6 +21,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -72,7 +73,7 @@ public class TestDatanodeMinFreeSpaceIntegration {
 
       DatanodeInfo info = nm.getDatanodeInfo(dn);
       assertNotNull(info);
-      assertTrue(info.getStorageReports().size() > 0);
+      assertFalse(info.getStorageReports().isEmpty());
 
       for (StorageReportProto report : info.getStorageReports()) {
         if (report.getFailed()) {
