@@ -166,3 +166,15 @@ export type DatanodeTableProps = {
   selectedColumns: MultiOption[];
   handleSelectionChange: (arg0: React.Key[]) => void;
 }
+
+// Types for Unhealthy Container-to-DataNode mapping
+export type DatanodeUnhealthySummary = {
+  datanodeUuid: string;
+  datanodeHost: string;
+  totalUnhealthyContainers: number;
+  stateCounts: Record<string, number>;
+}
+
+export type DatanodeUnhealthyByDatanodeResponse = {
+  datanodes: DatanodeUnhealthySummary[];
+}
