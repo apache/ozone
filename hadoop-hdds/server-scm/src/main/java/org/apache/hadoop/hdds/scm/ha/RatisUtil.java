@@ -196,6 +196,12 @@ public final class RatisUtil {
             ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
+    properties.setBoolean(
+        "raft.server.log.append-entries.compose.enabled",
+        ozoneConf.getBoolean(
+            ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPEND_ENTRIES_COMPOSE_ENABLED,
+            ScmConfigKeys.
+                OZONE_SCM_HA_RAFT_LOG_APPEND_ENTRIES_COMPOSE_ENABLED_DEFAULT));
 
     return logAppenderQueueByteLimit;
   }
