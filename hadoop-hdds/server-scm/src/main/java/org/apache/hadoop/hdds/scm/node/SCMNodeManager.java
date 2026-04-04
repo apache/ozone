@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -144,6 +145,13 @@ public class SCMNodeManager implements NodeManager {
   private final int numContainerPerVolume;
 
   /**
+   * SCM-side pending container allocations per datanode (not yet in container reports).
+   */
+  private final PendingContainerTracker pendingContainerTracker;
+
+  private final long maxContainerSizeBytes;
+
+  /**
    * Lock used to synchronize some operation in Node manager to ensure a
    * consistent view of the node state.
    */
@@ -205,6 +213,14 @@ public class SCMNodeManager implements NodeManager {
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
     this.nonWritableNodeFilter = new NonWritableNodeFilter(conf);
+
+    this.maxContainerSizeBytes = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    long rollIntervalMs = scmConfig.getPendingContainerAllocationRollInterval().toMillis();
+    this.pendingContainerTracker = new PendingContainerTracker(
+        maxContainerSizeBytes, rollIntervalMs, this.metrics);
   }
 
   @Override
@@ -222,6 +238,35 @@ public class SCMNodeManager implements NodeManager {
     if (this.nmInfoBean != null) {
       MBeans.unregister(this.nmInfoBean);
       this.nmInfoBean = null;
+    }
+  }
+
+  @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    return pendingContainerTracker;
+  }
+
+  /**
+   * Effective space check aligned with container allocation: per-disk slot model minus
+   * SCM pending allocations.
+   */
+  @Override
+  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node,
+      long containerSize) {
+    if (node == null) {
+      return false;
+    }
+    try {
+      DatanodeInfo datanodeInfo = getDatanodeInfo(node);
+      if (datanodeInfo == null) {
+        LOG.warn("DatanodeInfo not found for node {}", node.getUuidString());
+        return false;
+      }
+      return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(
+          node, datanodeInfo, containerSize);
+    } catch (Exception e) {
+      LOG.warn("Error checking allocatable space for node {}", node.getUuidString(), e);
+      return false;
     }
   }
 
@@ -706,6 +751,7 @@ public class SCMNodeManager implements NodeManager {
         datanodeInfo.updateStorageReports(nodeReport.getStorageReportList());
         datanodeInfo.updateMetaDataStorageReports(nodeReport.
             getMetadataStorageReportList());
+        pendingContainerTracker.rollWindowsIfNeeded(datanodeDetails);
         metrics.incNumNodeReportProcessed();
       }
     } catch (NodeNotFoundException e) {
@@ -1099,6 +1145,8 @@ public class SCMNodeManager implements NodeManager {
         freeSpaceToSpare += reportProto.getFreeSpaceToSpare();
         reserved += reportProto.getReserved();
       }
+      // SCM-side pending container allocations (not yet in DN reports) count toward committed.
+      committed += pendingContainerTracker.getPendingAllocationSize(datanodeDetails);
       return new SCMNodeStat(capacity, used, remaining, committed,
           freeSpaceToSpare, reserved);
     } catch (NodeNotFoundException e) {

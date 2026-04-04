@@ -138,8 +138,8 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private int transactionToDNsCommitMapLimit = 5000000;
 
-  @Config(key = "hdds.scm.container.pending-allocation.roll-interval",
-      defaultValue = "10m",
+  @Config(key = "hdds.scm.container.pending.allocation.roll.interval",
+      defaultValue = "5m",
       type = ConfigType.TIME,
       tags = { ConfigTag.SCM, ConfigTag.CONTAINER },
       description =
@@ -149,7 +149,7 @@ public class ScmConfig extends ReconfigurableConfig {
               "After 2x this interval, allocations that haven't been confirmed via " +
               "container reports will automatically age out. Default is 10 minutes."
   )
-  private Duration pendingContainerAllocationRollInterval = Duration.ofMinutes(10);
+  private Duration pendingContainerAllocationRollInterval = Duration.ofMinutes(5);
 
   public int getTransactionToDNsCommitMapLimit() {
     return transactionToDNsCommitMapLimit;

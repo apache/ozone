@@ -422,4 +422,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  /**
+   * SCM-side tracker for container allocations not yet reported by datanodes.
+   */
+  PendingContainerTracker getPendingContainerTracker();
+
+  /**
+   * True if the node can accept another container of the given size, accounting for
+   * {@link #getPendingContainerTracker()}.
+   */
+  boolean hasSpaceForNewContainerAllocation(DatanodeDetails node, long containerSize);
 }

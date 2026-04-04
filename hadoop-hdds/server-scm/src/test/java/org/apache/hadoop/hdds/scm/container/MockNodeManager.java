@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -531,6 +532,13 @@ public class MockNodeManager implements NodeManager {
   @Override
   public void addPipeline(Pipeline pipeline) {
     node2PipelineMap.addPipeline(pipeline);
+    // Pipeline creation uses DNs that may not be the pre-registered fake nodes; ensure each
+    // pipeline member has metrics so {@link #getDatanodeInfo} and space checks work.
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (nodeMetricMap.get(dn) == null) {
+        populateNodeMetric(dn, 0);
+      }
+    }
   }
 
   /**
@@ -939,6 +947,26 @@ public class MockNodeManager implements NodeManager {
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
+  }
+
+  private PendingContainerTracker pendingContainerTracker;
+
+  @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    if (pendingContainerTracker == null) {
+      pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024);
+    }
+    return pendingContainerTracker;
+  }
+
+  @Override
+  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node, long containerSize) {
+    DatanodeInfo info = getDatanodeInfo(node);
+    if (info == null) {
+      return false;
+    }
+    return getPendingContainerTracker()
+        .hasEffectiveAllocatableSpaceForNewContainer(node, info, containerSize);
   }
 
   /**

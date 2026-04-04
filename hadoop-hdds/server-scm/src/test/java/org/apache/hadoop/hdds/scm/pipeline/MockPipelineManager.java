@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -50,9 +51,11 @@ import org.apache.hadoop.ozone.ClientVersion;
 public class MockPipelineManager implements PipelineManager {
 
   private final PipelineStateManager stateManager;
+  private final NodeManager nodeManager;
 
   public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager, NodeManager nodeManager)
       throws RocksDatabaseException, CodecException, DuplicatedPipelineIdException {
+    this.nodeManager = nodeManager;
     stateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(nodeManager)
         .setRatisServer(scmhaManager.getRatisServer())
@@ -333,7 +336,12 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
-    return false;
+    for (DatanodeDetails node : pipeline.getNodes()) {
+      if (!nodeManager.hasSpaceForNewContainerAllocation(node, containerSize)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
@@ -348,7 +356,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public org.apache.hadoop.hdds.scm.node.DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
-    return null;
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    return nodeManager.getDatanodeInfo(datanodeDetails);
   }
 }

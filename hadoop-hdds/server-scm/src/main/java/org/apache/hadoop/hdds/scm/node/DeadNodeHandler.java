@@ -97,6 +97,10 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
        * action.
        */
       LOG.info("A dead datanode is detected. {}", datanodeDetails);
+      PendingContainerTracker pending = nodeManager.getPendingContainerTracker();
+      if (pending != null) {
+        pending.clearPendingForDatanode(datanodeDetails);
+      }
       closeContainers(datanodeDetails, publisher);
       destroyPipelines(datanodeDetails);
 

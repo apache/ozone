@@ -246,7 +246,7 @@ public class ReconStorageContainerManagerFacade
         pipelineManager, scmServiceProvider,
         containerHealthSchemaManager,
         reconContainerMetadataManager,
-        scmhaManager, sequenceIdGen, pendingOps);
+        scmhaManager, sequenceIdGen, pendingOps, nodeManager);
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();
     this.containerCountBySizeDao = containerCountBySizeDao;
