@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -339,6 +341,81 @@ public class TestStorageVolumeHealthChecks {
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
     volume.check(false);
+  }
+
+  /**
+   * With the default settings (ioFailureTolerance=1), the first simulated
+   * check timeout must be tolerated: {@code consecutiveTimeoutCount} becomes 1
+   * which is NOT {@code > 1}, so {@code recordTimeoutAsIOFailure()} returns
+   * {@code false}.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testFirstTimeoutIsTolerated(StorageVolume.Builder<?> builder)
+      throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertEquals(0, volume.getConsecutiveTimeoutCount());
+    assertFalse(volume.recordTimeoutAsIOFailure(),
+        "First timeout should be tolerated (count 1 is not > tolerance 1)");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
+  }
+
+  /**
+   * With the default settings (ioFailureTolerance=1), the second consecutive
+   * timeout must cause {@code recordTimeoutAsIOFailure()} to return
+   * {@code true}: count becomes 2 which IS {@code > 1}.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testSecondConsecutiveTimeoutFails(StorageVolume.Builder<?> builder)
+      throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAsIOFailure(), "First timeout should be tolerated");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
+
+    assertTrue(volume.recordTimeoutAsIOFailure(),
+        "Second consecutive timeout should exceed tolerance and return true");
+    assertEquals(2, volume.getConsecutiveTimeoutCount());
+  }
+
+  /**
+   * {@code resetTimeoutCount()} resets the consecutive-timeout counter to 0,
+   * so a subsequent single timeout is tolerated again — the streak does not
+   * carry over past a successful check cycle.
+   *
+   * <p>{@code resetTimeoutCount()} is called by {@link StorageVolumeChecker}
+   * whenever a volume completes a healthy check (either via
+   * {@code checkAllVolumes()} or via {@code checkVolume()}).
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testResetTimeoutCountResetsConsecutiveCounter(
+      StorageVolume.Builder<?> builder) throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    // Simulate one tolerated timeout.
+    assertFalse(volume.recordTimeoutAsIOFailure(),
+        "First timeout should be tolerated");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
+
+    // StorageVolumeChecker calls resetTimeoutCount() when the volume's check
+    // eventually completes successfully. Simulate that here.
+    volume.resetTimeoutCount();
+    assertEquals(0, volume.getConsecutiveTimeoutCount(),
+        "Counter must be reset to 0 after a successful check");
+
+    // A new single timeout after reset is tolerated again.
+    assertFalse(volume.recordTimeoutAsIOFailure(),
+        "Timeout after reset should be tolerated again");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
   }
 
   /**
