@@ -36,6 +36,7 @@ import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.records.UnhealthyContainersRecord;
 import org.jooq.Condition;
+import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.OrderField;
 import org.jooq.Record;
@@ -379,6 +380,35 @@ public class ContainerHealthSchemaManager {
       LOG.error("Failed to query UNHEALTHY_CONTAINERS table", e);
       return new ArrayList<>();
     }
+  }
+
+  /**
+   * Returns a streaming cursor over unhealthy container records.
+   * Caller MUST close the cursor.
+   *
+   * @param state filter by state, or null for all states
+   * @param limit max records to return, 0 = unlimited
+   * @return Cursor returning UnhealthyContainersRecord
+   */
+  public Cursor<UnhealthyContainersRecord> getUnhealthyContainersCursor(
+      UnHealthyContainerStates state, int limit) {
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    org.jooq.SelectQuery<UnhealthyContainersRecord> query = dslContext.selectFrom(UNHEALTHY_CONTAINERS).getQuery();
+
+    if (state != null) {
+      query.addConditions(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(state.toString()));
+    }
+
+    query.addOrderBy(
+        UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc(),
+        UNHEALTHY_CONTAINERS.CONTAINER_ID.asc()
+    );
+
+    if (limit > 0) {
+      query.addLimit(limit);
+    }
+
+    return query.fetchLazy();
   }
 
   /**

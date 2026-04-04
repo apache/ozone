@@ -253,6 +253,10 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.container.id.batch.size";
   public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
 
+  public static final String OZONE_RECON_CSV_EXPORT_MAX_RECORDS_KEY =
+      "ozone.recon.csv.export.max.records";
+  public static final int OZONE_RECON_CSV_EXPORT_MAX_RECORDS_DEFAULT = 5000000;
+
   /**
    * Private constructor for utility class.
    */
