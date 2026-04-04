@@ -1563,7 +1563,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         out.write(newContent);
       }
     });
-    assertEquals(OMException.ResultCodes.ETAG_MISMATCH, e.getResult());
+    assertEquals(ETAG_MISMATCH, e.getResult());
   }
 
   @ParameterizedTest
