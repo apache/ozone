@@ -572,6 +572,8 @@ enum Status {
     ETAG_MISMATCH = 99;
 
     ETAG_NOT_AVAILABLE = 100;
+
+    ATOMIC_WRITE_CONFLICT = 101;
 }
 
 /**

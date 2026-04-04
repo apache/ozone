@@ -1043,6 +1043,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setUpdateID(transactionLogIndex)
             .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
+    if (keyArgs.hasExpectedDataGeneration()) {
+      builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+    }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
       OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
