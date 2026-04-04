@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -126,6 +127,19 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
+      final String aclMarker = queryParams().get(QueryParams.ACL);
+      if (aclMarker != null) {
+        s3GAction = S3GAction.GET_ACL;
+        S3BucketAcl result = getAcl(bucketName);
+        getMetrics().updateGetAclSuccessStats(startNanos);
+        auditReadSuccess(s3GAction);
+        return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
+      }
+
+      if (prefix == null) {
+        prefix = "";
+      }
+      
       final String uploads = queryParams().get(QueryParams.UPLOADS);
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
@@ -135,10 +149,6 @@ public class BucketEndpoint extends EndpointBase {
       }
 
       maxKeys = validateMaxKeys(maxKeys);
-
-      if (prefix == null) {
-        prefix = "";
-      }
 
       // Assign marker to startAfter. for the compatibility of aws api v1
       if (startAfter == null && marker != null) {
@@ -317,17 +327,15 @@ public class BucketEndpoint extends EndpointBase {
   public Response listMultipartUploads(
       String bucketName,
       String prefix,
+      String delimiter,
+      String encodingType,
       String keyMarker,
       String uploadIdMarker,
       int maxUploads)
       throws OS3Exception, IOException {
 
-    if (maxUploads < 1) {
-      throw newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads",
-          new Exception("max-uploads must be positive"));
-    } else {
-      maxUploads = Math.min(maxUploads, 1000);
-    }
+    int sanitizedMaxUploads = sanitizeMaxUploads(maxUploads);
+    validateEncodingType(encodingType);
 
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
@@ -337,26 +345,17 @@ public class BucketEndpoint extends EndpointBase {
     try {
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       OzoneMultipartUploadList ozoneMultipartUploadList =
-          bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
+          bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker,
+              sanitizedMaxUploads);
 
-      ListMultipartUploadsResult result = new ListMultipartUploadsResult();
-      result.setBucket(bucketName);
-      result.setKeyMarker(keyMarker);
-      result.setUploadIdMarker(uploadIdMarker);
-      result.setNextKeyMarker(ozoneMultipartUploadList.getNextKeyMarker());
-      result.setPrefix(prefix);
-      result.setNextUploadIdMarker(ozoneMultipartUploadList.getNextUploadIdMarker());
-      result.setMaxUploads(maxUploads);
-      result.setTruncated(ozoneMultipartUploadList.isTruncated());
+      ListMultipartUploadsResult result =
+          buildMultipartUploadsResult(bucket, prefix, delimiter, encodingType,
+              keyMarker, uploadIdMarker, sanitizedMaxUploads,
+              ozoneMultipartUploadList);
 
-      ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
-          new ListMultipartUploadsResult.Upload(
-              upload.getKeyName(),
-              upload.getUploadId(),
-              upload.getCreationTime(),
-              S3StorageType.fromReplicationConfig(upload.getReplicationConfig())
-          )));
-      auditReadSuccess(s3GAction);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
+          getAuditParameters()));
+
       getMetrics().updateListMultipartUploadsSuccessStats(startNanos);
       return Response.ok(result).build();
     } catch (OMException exception) {
@@ -370,6 +369,139 @@ public class BucketEndpoint extends EndpointBase {
       auditReadFailure(s3GAction, ex);
       throw ex;
     }
+  }
+
+  private int sanitizeMaxUploads(int maxUploads) throws OS3Exception {
+    if (maxUploads < 1) {
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads",
+          new Exception("max-uploads must be positive"));
+    }
+    return Math.min(maxUploads, 1000);
+  }
+
+  private void validateEncodingType(String encodingType) throws OS3Exception {
+    if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
+    }
+  }
+
+  private ListMultipartUploadsResult buildMultipartUploadsResult(
+      OzoneBucket bucket,
+      String prefix,
+      String delimiter,
+      String encodingType,
+      String keyMarker,
+      String uploadIdMarker,
+      int maxUploads,
+      OzoneMultipartUploadList ozoneMultipartUploadList) {
+
+    ListMultipartUploadsResult result = new ListMultipartUploadsResult();
+    result.setBucket(bucket.getName());
+    result.setKeyMarker(EncodingTypeObject.createNullable(keyMarker, encodingType));
+    result.setUploadIdMarker(uploadIdMarker);
+    result.setNextKeyMarker(EncodingTypeObject.createNullable(
+        ozoneMultipartUploadList.getNextKeyMarker(), encodingType));
+    result.setPrefix(EncodingTypeObject.createNullable(prefix, encodingType));
+    result.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
+    result.setEncodingType(encodingType);
+    result.setNextUploadIdMarker(ozoneMultipartUploadList.getNextUploadIdMarker());
+    result.setMaxUploads(maxUploads);
+    result.setTruncated(ozoneMultipartUploadList.isTruncated());
+
+    final String normalizedPrefix = prefix == null ? "" : prefix;
+    String prevDir = null;
+    String lastProcessedKey = null;
+    String lastProcessedUploadId = null;
+    int responseItemCount = 0;
+
+    List<OzoneMultipartUpload> pendingUploads =
+        ozoneMultipartUploadList.getUploads();
+    int processedUploads = 0;
+    for (OzoneMultipartUpload upload : pendingUploads) {
+      String keyName = upload.getKeyName();
+
+      if (bucket.getBucketLayout().isFileSystemOptimized()
+          && StringUtils.isNotEmpty(normalizedPrefix)
+          && !keyName.startsWith(normalizedPrefix)) {
+        continue;
+      }
+      if (keyName.length() < normalizedPrefix.length()) {
+        continue;
+      }
+
+      String relativeKeyName = keyName.substring(normalizedPrefix.length());
+      String currentDirName = null;
+      boolean isDirectoryPlaceholder = false;
+      if (StringUtils.isNotBlank(delimiter)) {
+        int depth = StringUtils.countMatches(relativeKeyName, delimiter);
+        if (depth > 0) {
+          int delimiterIndex = relativeKeyName.indexOf(delimiter);
+          currentDirName = relativeKeyName.substring(0, delimiterIndex);
+        } else if (relativeKeyName.endsWith(delimiter)) {
+          currentDirName = relativeKeyName.substring(
+              0, relativeKeyName.length() - delimiter.length());
+          isDirectoryPlaceholder = true;
+        }
+      }
+
+      if (responseItemCount >= maxUploads) {
+        if (StringUtils.isNotBlank(delimiter)
+            && currentDirName != null
+            && currentDirName.equals(prevDir)) {
+          lastProcessedKey = keyName;
+          lastProcessedUploadId = upload.getUploadId();
+          continue;
+        }
+        break;
+      }
+
+      boolean addedAsPrefix = false;
+
+      if (StringUtils.isNotBlank(delimiter)) {
+        if (currentDirName != null && !currentDirName.equals(prevDir)) {
+          result.addCommonPrefix(EncodingTypeObject.createNullable(
+              normalizedPrefix + currentDirName + delimiter, encodingType));
+          prevDir = currentDirName;
+          responseItemCount++;
+          addedAsPrefix = true;
+        } else if (isDirectoryPlaceholder) {
+          result.addCommonPrefix(EncodingTypeObject.createNullable(
+              normalizedPrefix + relativeKeyName, encodingType));
+          responseItemCount++;
+          addedAsPrefix = true;
+        } else if (currentDirName != null) {
+          addedAsPrefix = true;
+        }
+      }
+
+      if (!addedAsPrefix) {
+        result.addUpload(new ListMultipartUploadsResult.Upload(
+            EncodingTypeObject.createNullable(upload.getKeyName(), encodingType),
+            upload.getUploadId(),
+            upload.getCreationTime(),
+            S3StorageType.fromReplicationConfig(upload.getReplicationConfig())
+        ));
+        responseItemCount++;
+      }
+
+      lastProcessedKey = keyName;
+      lastProcessedUploadId = upload.getUploadId();
+      processedUploads++;
+    }
+
+    boolean hasMoreUploads =
+        processedUploads < pendingUploads.size()
+            || ozoneMultipartUploadList.isTruncated();
+
+    if (responseItemCount >= maxUploads && lastProcessedKey != null
+        && hasMoreUploads) {
+      result.setNextKeyMarker(EncodingTypeObject.createNullable(lastProcessedKey, encodingType));
+      result.setNextUploadIdMarker(lastProcessedUploadId);
+      result.setTruncated(true);
+    } else {
+      result.setTruncated(ozoneMultipartUploadList.isTruncated());
+    }
+    return result;
   }
 
   /**
