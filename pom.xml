@@ -2493,6 +2493,40 @@
     </extensions>
   </build>
 
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>${maven-javadoc-plugin.version}</version>
+        <inherited>false</inherited>
+        <reportSets>
+          <reportSet>
+            <id>aggregate</id>
+            <reports>
+              <report>aggregate</report>
+            </reports>
+            <configuration>
+              <!-- Increase memory available to the javadoc JVM -->
+              <maxmemory>1024m</maxmemory>
+
+              <!-- Titles shown in the generated Javadoc -->
+              <doctitle>Apache Ozone API - ${project.version}</doctitle>
+              <windowtitle>Apache Ozone ${project.version} API</windowtitle>
+
+              <!-- Output report encoding -->
+              <source>${maven.compiler.release}</source>
+              <charset>${project.reporting.outputEncoding}</charset>
+
+              <useStandardDocletOptions>true</useStandardDocletOptions>
+              <includeDependencySources>false</includeDependencySources>
+            </configuration>
+          </reportSet>
+        </reportSets>
+      </plugin>
+    </plugins>
+  </reporting>
+
   <organization>
     <name>Apache Software Foundation</name>
     <url>http://www.apache.org</url>
