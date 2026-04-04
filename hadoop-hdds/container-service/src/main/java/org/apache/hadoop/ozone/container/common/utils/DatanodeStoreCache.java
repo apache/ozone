@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.container.common.utils;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.slf4j.Logger;
@@ -40,9 +42,20 @@ public final class DatanodeStoreCache {
    * Use container db absolute path as key.
    */
   private final Map<String, RawDB> datanodeStoreMap;
+  private static final StoreFactory DEFAULT_STORE_FACTORY =
+      (conf, containerDBPath, readOnly) -> new DatanodeStoreSchemaThreeImpl(conf, containerDBPath, readOnly);
+  private volatile StoreFactory storeFactory = DEFAULT_STORE_FACTORY;
 
   private static DatanodeStoreCache cache;
   private boolean miniClusterMode;
+
+  /**
+   * Factory to create per-volume schema v3 stores (done this way mainly to ease testing).
+   */
+  @FunctionalInterface
+  public interface StoreFactory {
+    DatanodeStore create(ConfigurationSource conf, String containerDBPath, boolean readOnly) throws IOException;
+  }
 
   private DatanodeStoreCache() {
     datanodeStoreMap = new ConcurrentHashMap<>();
@@ -65,27 +78,73 @@ public final class DatanodeStoreCache {
     getInstance().miniClusterMode = isMiniCluster;
   }
 
+  @VisibleForTesting
+  public synchronized void setStoreFactory(StoreFactory newStoreFactory) {
+    storeFactory = Objects.requireNonNull(newStoreFactory, "newStoreFactory == null");
+  }
+
+  @VisibleForTesting
+  public synchronized void resetStoreFactory() {
+    storeFactory = DEFAULT_STORE_FACTORY;
+  }
+
   public void addDB(String containerDBPath, RawDB db) {
     datanodeStoreMap.putIfAbsent(containerDBPath, db);
     LOG.info("Added db {} to cache", containerDBPath);
   }
 
+  private RawDB createRawDB(String containerDBPath, ConfigurationSource conf,
+      boolean readOnly) throws IOException {
+    DatanodeStore store = storeFactory.create(conf, containerDBPath, readOnly);
+    return new RawDB(store, containerDBPath);
+  }
+
+  private RawDB createRawDBWithReadOnlyFallback(String containerDBPath,
+      ConfigurationSource conf) throws IOException {
+    try {
+      RawDB readWriteDb = createRawDB(containerDBPath, conf, false);
+      LOG.info("Opened db {} in read-write mode", containerDBPath);
+      return readWriteDb;
+    } catch (IOException readWriteOpenException) {
+      if (!RocksDatabaseException.isNoSpaceError(readWriteOpenException)) {
+        throw readWriteOpenException;
+      }
+      LOG.warn("Failed to open db {} in read-write mode due to no space. "
+              + "Retrying read-only.", containerDBPath, readWriteOpenException);
+      try {
+        RawDB readOnlyDb = createRawDB(containerDBPath, conf, true);
+        LOG.warn("Opened db {} in read-only mode after read-write open "
+            + "failed due to no space", containerDBPath);
+        return readOnlyDb;
+      } catch (IOException readOnlyOpenException) {
+        LOG.error("Failed to open db {} in read-only mode after read-write "
+            + "open failed due to no space", containerDBPath,
+            readOnlyOpenException);
+        readOnlyOpenException.addSuppressed(readWriteOpenException);
+        throw readOnlyOpenException;
+      }
+    }
+  }
+
   public RawDB getDB(String containerDBPath, ConfigurationSource conf)
       throws IOException {
     RawDB db = datanodeStoreMap.get(containerDBPath);
-    if (db == null) {
+    if (db == null || db.getStore().isClosed()) {
       synchronized (this) {
         db = datanodeStoreMap.get(containerDBPath);
+        if (db != null && db.getStore().isClosed()) {
+          datanodeStoreMap.remove(containerDBPath, db);
+          db.getStore().stop();
+          db = null;
+          LOG.info("Removed closed db {} from cache", containerDBPath);
+        }
         if (db == null) {
           try {
-            DatanodeStore store = new DatanodeStoreSchemaThreeImpl(
-                conf, containerDBPath, false);
-            db = new RawDB(store, containerDBPath);
+            db = createRawDBWithReadOnlyFallback(containerDBPath, conf);
             datanodeStoreMap.put(containerDBPath, db);
           } catch (IOException e) {
             LOG.error("Failed to get DB store {}", containerDBPath, e);
-            throw new IOException("Failed to get DB store " +
-                containerDBPath, e);
+            throw new IOException("Failed to get DB store " + containerDBPath, e);
           }
         }
       }
