@@ -86,7 +86,7 @@
     <gson.version>2.13.1</gson.version>
     <guava.version>33.5.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
-    <hadoop.version>3.4.3</hadoop.version>
+    <hadoop.version>3.5.0</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <hdds.version>${ozone.version}</hdds.version>
