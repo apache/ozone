@@ -3574,14 +3574,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.tracing.enabled</name>
-    <value>false</value>
-    <tag>OZONE, HDDS</tag>
-    <description>
-      If enabled, tracing information is sent to tracing server.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.task.thread.count</name>
     <value>1</value>
     <tag>OZONE, RECON</tag>
