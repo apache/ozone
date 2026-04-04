@@ -236,7 +236,7 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   private ContainerInfo allocateContainer(final Pipeline pipeline,
-      final String owner)
+                                          final String owner)
       throws IOException {
     if (!pipelineManager.hasEnoughSpace(pipeline)) {
       LOG.debug("Cannot allocate a new container because pipeline {} does not have enough space.", pipeline);

@@ -116,7 +116,6 @@ public class MockNodeManager implements NodeManager {
   private int numPipelinePerDatanode;
   private PendingContainerTracker pendingContainerTracker;
   private final OzoneConfiguration conf = new OzoneConfiguration();
-
   {
     this.healthyNodes = new LinkedList<>();
     this.staleNodes = new LinkedList<>();
