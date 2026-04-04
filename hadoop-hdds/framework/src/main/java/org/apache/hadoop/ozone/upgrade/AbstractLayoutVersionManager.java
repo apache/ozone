@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.management.ObjectName;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -51,8 +50,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
 
   private final AtomicReference<State> state = new AtomicReference<>();
 
-  private final AtomicBoolean initialized = new AtomicBoolean(false);
-
   @VisibleForTesting
   protected volatile NavigableMap<Integer, LayoutFeature> features =
       Collections.unmodifiableNavigableMap(new TreeMap<>());
@@ -62,7 +59,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   // Allows querying upgrade state while an upgrade is in progress.
   // Note that MLV may have been incremented during the upgrade
   // by the time the value is read/used.
-  private ObjectName mBean;
+  private volatile ObjectName mBean;
 
   private static final class State {
     final int metadataLayoutVersion; // MLV
@@ -84,7 +81,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
 
     private State withMlv(int newMlv) {
-      return new State(newMlv, softwareLayoutVersion, computeStatus(newMlv, softwareLayoutVersion));
+      return new State(newMlv, softwareLayoutVersion, currentUpgradeState);
     }
   }
   
@@ -95,8 +92,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   }
 
   protected void init(int version, T[] lfs) throws IOException {
-    Preconditions.checkArgument(initialized.compareAndSet(false, true),
-        "LayoutVersionManager is already initialized.");
     final TreeMap<Integer, LayoutFeature> localFeatures = new TreeMap<>();
     final Map<String, LayoutFeature> localFeatureMap = new HashMap<>();
     Arrays.stream(lfs).forEach(f -> {
@@ -123,8 +118,11 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     this.features = Collections.unmodifiableNavigableMap(localFeatures);
     this.featureMap = Collections.unmodifiableMap(localFeatureMap);
 
-    // set atomic state snapshot once
-    state.set(new State(mlv, slv, State.computeStatus(mlv, slv)));
+    final State newState =
+        new State(mlv, slv, State.computeStatus(mlv, slv));
+
+    Preconditions.checkArgument(state.compareAndSet(null, newState),
+        "LayoutVersionManager is already initialized.");
 
     LayoutFeature mlvFeature = features.get(mlv);
     LayoutFeature slvFeature = features.get(slv);
