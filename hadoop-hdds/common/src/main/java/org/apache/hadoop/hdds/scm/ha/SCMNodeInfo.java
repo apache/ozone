@@ -32,6 +32,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_NODEID;
@@ -77,6 +78,7 @@ public class SCMNodeInfo {
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
     String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
+      LOG.info("{} for StorageContainerManager is {}", OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
       ArrayList< String > scmNodeIds = new ArrayList<>(
           HddsUtils.getSCMNodeIds(conf, scmServiceId));
       if (scmNodeIds.isEmpty()) {
@@ -123,6 +125,7 @@ public class SCMNodeInfo {
       return scmNodeInfoList;
     } else {
       scmServiceId = SCM_DUMMY_SERVICE_ID;
+      LOG.info("ServiceID for StorageContainerManager is dummy service ID {}", scmServiceId);
 
       // Following current approach of fall back to
       // OZONE_SCM_CLIENT_ADDRESS_KEY to figure out hostname.
