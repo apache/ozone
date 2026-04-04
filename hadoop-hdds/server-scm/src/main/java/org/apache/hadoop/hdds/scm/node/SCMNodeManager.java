@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.hasEnoughSpace
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.math.RoundingMode;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -1892,6 +1894,27 @@ public class SCMNodeManager implements NodeManager {
     return datanodeIDS.stream()
         .map(this::getNode)
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public Set<DatanodeDetails> resolvePipelineExcludedDatanodes(PipelineExcludedNodes pipelineExcludedNodes) {
+    if (pipelineExcludedNodes == null || pipelineExcludedNodes.isEmpty()) {
+      return Collections.emptySet();
+    }
+    Set<DatanodeDetails> resolved = new HashSet<>();
+    for (DatanodeID datanodeID : pipelineExcludedNodes.getExcludedDatanodeIds()) {
+      DatanodeDetails datanodeDetails = getNode(datanodeID);
+      if (datanodeDetails != null) {
+        resolved.add(datanodeDetails);
+      }
+    }
+    for (String address : pipelineExcludedNodes.getExcludedAddressTokens()) {
+      List<DatanodeDetails> datanodes = getNodesByAddress(address);
+      if (datanodes != null) {
+        resolved.addAll(datanodes);
+      }
+    }
+    return ImmutableSet.copyOf(resolved);
   }
 
   /**

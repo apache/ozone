@@ -102,6 +102,17 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String ecPipelineChoosePolicyName;
 
+  @Config(key = "hdds.scm.pipeline.exclude.datanodes",
+      type = ConfigType.STRING,
+      defaultValue = "",
+      tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
+      description =
+          "Comma-separated list of Datanodes to exclude from SCM pipeline creation and pipeline selection. "
+              + "Each entry may be a Datanode UUID, hostname, or IP address. "
+              + "Example: \"<uuid>,dn-1.example.com,10.0.0.12\"."
+  )
+  private String pipelineExcludeDatanodes = "";
+
   @Config(key = "hdds.scm.block.deletion.per-interval.max",
       type = ConfigType.INT,
       defaultValue = "500000",
@@ -192,6 +203,14 @@ public class ScmConfig extends ReconfigurableConfig {
 
   public String getECPipelineChoosePolicyName() {
     return ecPipelineChoosePolicyName;
+  }
+
+  /**
+   * Parsed view of {@link #pipelineExcludeDatanodes}. Computed on each call so it stays aligned
+   * with the current config string (including dynamic reconfiguration).
+   */
+  public PipelineExcludedNodes getPipelineExcludedNodes() {
+    return PipelineExcludedNodes.parse(pipelineExcludeDatanodes);
   }
 
   public int getBlockDeletionLimit() {

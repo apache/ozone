@@ -23,9 +23,11 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -44,7 +46,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -97,6 +101,7 @@ public class PipelineManagerImpl implements PipelineManager {
   // SCM is already out of SafeMode.
   private AtomicBoolean freezePipelineCreation;
   private final Clock clock;
+  private final PipelineExcludedNodes pipelineExcludedNodes;
 
   @SuppressWarnings("checkstyle:parameterNumber")
   protected PipelineManagerImpl(ConfigurationSource conf,
@@ -124,6 +129,7 @@ public class PipelineManagerImpl implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.freezePipelineCreation = new AtomicBoolean();
+    this.pipelineExcludedNodes = conf.getObject(ScmConfig.class).getPipelineExcludedNodes();
   }
 
   @SuppressWarnings("checkstyle:parameterNumber")
@@ -216,8 +222,8 @@ public class PipelineManagerImpl implements PipelineManager {
       throw new IllegalArgumentException("Replication type must be EC");
     }
     checkIfPipelineCreationIsAllowed(replicationConfig);
-    return pipelineFactory.create(replicationConfig, excludedNodes,
-        favoredNodes);
+    List<DatanodeDetails> allExcludedNodes = mergeConfiguredExcludedNodes(excludedNodes);
+    return pipelineFactory.create(replicationConfig, allExcludedNodes, favoredNodes);
   }
 
   /**
@@ -250,13 +256,13 @@ public class PipelineManagerImpl implements PipelineManager {
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     checkIfPipelineCreationIsAllowed(replicationConfig);
+    List<DatanodeDetails> allExcludedNodes = mergeConfiguredExcludedNodes(excludedNodes);
 
     acquireWriteLock();
     final Pipeline pipeline;
     try {
       try {
-        pipeline = pipelineFactory.create(replicationConfig,
-            excludedNodes, favoredNodes);
+        pipeline = pipelineFactory.create(replicationConfig, allExcludedNodes, favoredNodes);
       } catch (IOException e) {
         metrics.incNumPipelineCreationFailed();
         throw e;
@@ -300,6 +306,25 @@ public class PipelineManagerImpl implements PipelineManager {
       releaseWriteLock();
     }
     recordMetricsForPipeline(pipeline);
+  }
+
+  private List<DatanodeDetails> mergeConfiguredExcludedNodes(List<DatanodeDetails> excludedNodes) {
+    Set<DatanodeDetails> configuredExcludedDatanodeDetails =
+        nodeManager.resolvePipelineExcludedDatanodes(pipelineExcludedNodes);
+    if ((excludedNodes == null || excludedNodes.isEmpty()) && configuredExcludedDatanodeDetails.isEmpty()) {
+      return Collections.emptyList();
+    }
+    if (excludedNodes == null || excludedNodes.isEmpty()) {
+      return new ArrayList<>(configuredExcludedDatanodeDetails);
+    }
+    if (configuredExcludedDatanodeDetails.isEmpty()) {
+      return excludedNodes;
+    }
+
+    Set<DatanodeDetails> mergedExcludedNodes =
+        new HashSet<>(configuredExcludedDatanodeDetails);
+    mergedExcludedNodes.addAll(excludedNodes);
+    return new ArrayList<>(mergedExcludedNodes);
   }
 
   private boolean factorOne(ReplicationConfig replicationConfig) {
@@ -858,6 +883,10 @@ public class PipelineManagerImpl implements PipelineManager {
   @VisibleForTesting
   public PipelineStateManager getStateManager() {
     return stateManager;
+  }
+
+  PipelineExcludedNodes getPipelineExcludedNodesConfig() {
+    return pipelineExcludedNodes;
   }
 
   @VisibleForTesting

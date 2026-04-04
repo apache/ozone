@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -60,6 +61,7 @@ public class WritableECContainerProvider
   private final ContainerManager containerManager;
   private final long containerSize;
   private final WritableECContainerProviderConfig providerConfig;
+  private final PipelineExcludedNodes pipelineExcludedNodes;
 
   public WritableECContainerProvider(WritableECContainerProviderConfig config,
       long containerSize,
@@ -73,6 +75,19 @@ public class WritableECContainerProvider
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
     this.containerSize = containerSize;
+    this.pipelineExcludedNodes = configuredPipelineExcludedNodes(pipelineManager);
+  }
+
+  private static PipelineExcludedNodes configuredPipelineExcludedNodes(
+      PipelineManager pipelineManager) {
+    if (pipelineManager instanceof PipelineManagerImpl) {
+      PipelineExcludedNodes excludedNodes =
+          ((PipelineManagerImpl) pipelineManager).getPipelineExcludedNodesConfig();
+      if (excludedNodes != null) {
+        return excludedNodes;
+      }
+    }
+    return PipelineExcludedNodes.EMPTY;
   }
 
   /**
@@ -115,6 +130,7 @@ public class WritableECContainerProvider
     }
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN);
+    existingPipelines.removeIf(pipelineExcludedNodes::isExcluded);
     final int pipelineCount = existingPipelines.size();
     LOG.debug("Checking existing pipelines: {}", existingPipelines);
 

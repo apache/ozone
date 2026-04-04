@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -369,6 +370,18 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   /** @return the datanode of the given id if it exists; otherwise, return null. */
   @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
+
+  /**
+   * Resolves pipeline exclusion configuration against datanodes currently known to this manager. 
+   * Call each time an exclusion set is needed (for example when creating a pipeline);
+   * do not cache the result across calls, so DNs that register after SCM startup are included when
+   * they match a configured hostname or IP, and UUIDs resolve as soon as the node exists.
+   * Removed DNs simply stop appearing in the result on the next call.
+   *
+   * @param pipelineExcludedNodes parsed {@code hdds.scm.pipeline.exclude.datanodes}; null or empty yields an empty set
+   * @return immutable copy of matching registered datanodes
+   */
+  Set<DatanodeDetails> resolvePipelineExcludedDatanodes(PipelineExcludedNodes pipelineExcludedNodes);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of

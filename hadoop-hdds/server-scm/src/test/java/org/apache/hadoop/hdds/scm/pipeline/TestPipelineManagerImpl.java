@@ -44,6 +44,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -51,6 +52,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -76,6 +78,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -123,6 +126,7 @@ import org.mockito.Mockito;
  * Tests for PipelineManagerImpl.
  */
 public class TestPipelineManagerImpl {
+
   private OzoneConfiguration conf;
   private DBStore dbStore;
   private MockNodeManager nodeManager;
@@ -999,6 +1003,163 @@ public class TestPipelineManagerImpl {
     assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
   }
 
+  /**
+   * {@link PipelineManagerImpl#createPipeline(ReplicationConfig, List, List)} calls
+   * {@link PipelineFactory#create(ReplicationConfig, List, List)} to create a pipeline. This test asserts that
+   * {@link PipelineManagerImpl#createPipeline(ReplicationConfig, List, List)} creates a merged list of both configured
+   * excluded nodes (hdds.scm.pipeline.exclude.datanodes) and client provided excluded nodes to pass as argument to the
+   * PipelineFactory create method.
+   */
+  @Test
+  public void testConfiguredExcludedNodesMergedForCreatePipeline() throws Exception {
+    DatanodeDetails excludedByUuid = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails excludedByAddress = MockDatanodeDetails.randomDatanodeDetails();
+    excludedByAddress.setIpAddress("10.0.0.25");
+    DatanodeDetails excludedByClient = MockDatanodeDetails.randomDatanodeDetails();
+
+    conf.set("hdds.scm.pipeline.exclude.datanodes",
+        excludedByUuid.getUuidString() + "," + excludedByAddress.getIpAddress());
+
+    SCMContext localContext = SCMContext.emptyContext();
+    localContext.updateLeaderAndTerm(true, 1);
+    NodeManager localNodeManager = mock(NodeManager.class);
+    when(localNodeManager.getNode(excludedByUuid.getID())).thenReturn(excludedByUuid);
+    when(localNodeManager.getNodesByAddress(excludedByAddress.getIpAddress()))
+        .thenReturn(Collections.singletonList(excludedByAddress));
+    stubResolvePipelineExcludedDatanodes(localNodeManager);
+    PipelineStateManager localStateManager = mock(PipelineStateManager.class);
+    PipelineFactory localFactory = mock(PipelineFactory.class);
+
+    try (PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,
+        SCMHAManagerStub.getInstance(true), localNodeManager, localStateManager,
+        localFactory, new EventQueue(), localContext, testClock)) {
+      RatisReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+      Pipeline createdPipeline = Pipeline.newBuilder()
+          .setId(PipelineID.randomId())
+          .setState(Pipeline.PipelineState.ALLOCATED)
+          .setReplicationConfig(replicationConfig)
+          .setNodes(ImmutableList.of(
+              MockDatanodeDetails.randomDatanodeDetails(),
+              MockDatanodeDetails.randomDatanodeDetails(),
+              MockDatanodeDetails.randomDatanodeDetails()))
+          .build();
+
+      when(localFactory.create(eq(replicationConfig), any(), eq(Collections.emptyList()))).thenReturn(createdPipeline);
+
+      pipelineManager.createPipeline(replicationConfig,
+          Collections.singletonList(excludedByClient), Collections.emptyList());
+
+      ArgumentCaptor<List<DatanodeDetails>> excludedCaptor = ArgumentCaptor.forClass(List.class);
+      verify(localFactory).create(eq(replicationConfig), excludedCaptor.capture(), eq(Collections.emptyList()));
+      List<DatanodeDetails> allExcluded = excludedCaptor.getValue();
+      assertThat(allExcluded).contains(excludedByClient, excludedByUuid, excludedByAddress);
+    }
+  }
+
+  @Test
+  public void testConfiguredExcludedNodesMergedForBuildECPipeline() throws Exception {
+    DatanodeDetails excludedByUuid = MockDatanodeDetails.randomDatanodeDetails();
+    conf.set("hdds.scm.pipeline.exclude.datanodes", excludedByUuid.getUuidString());
+
+    SCMContext localContext = SCMContext.emptyContext();
+    localContext.updateLeaderAndTerm(true, 1);
+    NodeManager localNodeManager = mock(NodeManager.class);
+    when(localNodeManager.getNode(excludedByUuid.getID())).thenReturn(excludedByUuid);
+    stubResolvePipelineExcludedDatanodes(localNodeManager);
+    PipelineStateManager localStateManager = mock(PipelineStateManager.class);
+    PipelineFactory localFactory = mock(PipelineFactory.class);
+
+    try (PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,
+        SCMHAManagerStub.getInstance(true), localNodeManager, localStateManager,
+        localFactory, new EventQueue(), localContext, testClock)) {
+      ECReplicationConfig ecConfig = new ECReplicationConfig(3, 2);
+      Pipeline builtPipeline = MockPipeline.createEcPipeline(ecConfig);
+      when(localFactory.create(eq(ecConfig), any(), eq(Collections.emptyList()))).thenReturn(builtPipeline);
+
+      pipelineManager.buildECPipeline(ecConfig, new ArrayList<>(), Collections.emptyList());
+
+      ArgumentCaptor<List<DatanodeDetails>> excludedCaptor = ArgumentCaptor.forClass(List.class);
+      verify(localFactory).create(eq(ecConfig), excludedCaptor.capture(), eq(Collections.emptyList()));
+      assertThat(excludedCaptor.getValue()).contains(excludedByUuid);
+    }
+  }
+
+  @Test
+  public void testConfiguredUnknownAddressTokenIgnoredInCreatePipeline() throws Exception {
+    DatanodeDetails callerExcluded = MockDatanodeDetails.randomDatanodeDetails();
+    conf.set("hdds.scm.pipeline.exclude.datanodes", "unknown-dn-host");
+
+    SCMContext localContext = SCMContext.emptyContext();
+    localContext.updateLeaderAndTerm(true, 1);
+    NodeManager localNodeManager = mock(NodeManager.class);
+    when(localNodeManager.getNodesByAddress("unknown-dn-host")).thenReturn(Collections.emptyList());
+    stubResolvePipelineExcludedDatanodes(localNodeManager);
+    PipelineStateManager localStateManager = mock(PipelineStateManager.class);
+    PipelineFactory localFactory = mock(PipelineFactory.class);
+
+    try (PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,
+        SCMHAManagerStub.getInstance(true), localNodeManager, localStateManager,
+        localFactory, new EventQueue(), localContext, testClock)) {
+      RatisReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+      Pipeline createdPipeline = Pipeline.newBuilder()
+          .setId(PipelineID.randomId())
+          .setState(Pipeline.PipelineState.ALLOCATED)
+          .setReplicationConfig(replicationConfig)
+          .setNodes(ImmutableList.of(
+              MockDatanodeDetails.randomDatanodeDetails(),
+              MockDatanodeDetails.randomDatanodeDetails(),
+              MockDatanodeDetails.randomDatanodeDetails()))
+          .build();
+
+      when(localFactory.create(eq(replicationConfig), any(), eq(Collections.emptyList()))).thenReturn(createdPipeline);
+
+      pipelineManager.createPipeline(replicationConfig,
+          Collections.singletonList(callerExcluded), Collections.emptyList());
+
+      ArgumentCaptor<List<DatanodeDetails>> excludedCaptor = ArgumentCaptor.forClass(List.class);
+      verify(localFactory).create(eq(replicationConfig), excludedCaptor.capture(), eq(Collections.emptyList()));
+      assertThat(excludedCaptor.getValue()).containsExactly(callerExcluded);
+    }
+  }
+
+  @Test
+  public void testConfiguredAndCallerExcludedNodesAreDeduplicated() throws Exception {
+    DatanodeDetails excludedByUuid = MockDatanodeDetails.randomDatanodeDetails();
+    conf.set("hdds.scm.pipeline.exclude.datanodes", excludedByUuid.getUuidString());
+
+    SCMContext localContext = SCMContext.emptyContext();
+    localContext.updateLeaderAndTerm(true, 1);
+    NodeManager localNodeManager = mock(NodeManager.class);
+    when(localNodeManager.getNode(excludedByUuid.getID())).thenReturn(excludedByUuid);
+    stubResolvePipelineExcludedDatanodes(localNodeManager);
+    PipelineStateManager localStateManager = mock(PipelineStateManager.class);
+    PipelineFactory localFactory = mock(PipelineFactory.class);
+
+    try (PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,
+        SCMHAManagerStub.getInstance(true), localNodeManager, localStateManager,
+        localFactory, new EventQueue(), localContext, testClock)) {
+      RatisReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+      Pipeline createdPipeline = Pipeline.newBuilder()
+          .setId(PipelineID.randomId())
+          .setState(Pipeline.PipelineState.ALLOCATED)
+          .setReplicationConfig(replicationConfig)
+          .setNodes(ImmutableList.of(
+              MockDatanodeDetails.randomDatanodeDetails(),
+              MockDatanodeDetails.randomDatanodeDetails(),
+              MockDatanodeDetails.randomDatanodeDetails()))
+          .build();
+
+      when(localFactory.create(eq(replicationConfig), any(), eq(Collections.emptyList()))).thenReturn(createdPipeline);
+
+      pipelineManager.createPipeline(replicationConfig,
+          Collections.singletonList(excludedByUuid), Collections.emptyList());
+
+      ArgumentCaptor<List<DatanodeDetails>> excludedCaptor = ArgumentCaptor.forClass(List.class);
+      verify(localFactory).create(eq(replicationConfig), excludedCaptor.capture(), eq(Collections.emptyList()));
+      assertThat(excludedCaptor.getValue()).containsExactly(excludedByUuid);
+    }
+  }
+
   private Set<ContainerReplica> createContainerReplicasList(
       List <DatanodeDetails> dns) {
     Set<ContainerReplica> replicas = new HashSet<>();
@@ -1048,5 +1209,29 @@ public class TestPipelineManagerImpl {
     SCMException e = assertThrows(SCMException.class, block::run);
     assertEquals(ResultCodes.SCM_NOT_LEADER, e.getResult());
     assertInstanceOf(NotLeaderException.class, e.getCause());
+  }
+
+  private static void stubResolvePipelineExcludedDatanodes(NodeManager nodeManager) {
+    lenient().when(nodeManager.resolvePipelineExcludedDatanodes(any()))
+        .thenAnswer(invocation -> {
+          PipelineExcludedNodes pipelineExcludedNodes = invocation.getArgument(0);
+          if (pipelineExcludedNodes == null || pipelineExcludedNodes.isEmpty()) {
+            return Collections.emptySet();
+          }
+          Set<DatanodeDetails> resolved = new HashSet<>();
+          for (DatanodeID datanodeID : pipelineExcludedNodes.getExcludedDatanodeIds()) {
+            DatanodeDetails datanodeDetails = nodeManager.getNode(datanodeID);
+            if (datanodeDetails != null) {
+              resolved.add(datanodeDetails);
+            }
+          }
+          for (String address : pipelineExcludedNodes.getExcludedAddressTokens()) {
+            List<DatanodeDetails> datanodes = nodeManager.getNodesByAddress(address);
+            if (datanodes != null) {
+              resolved.addAll(datanodes);
+            }
+          }
+          return ImmutableSet.copyOf(resolved);
+        });
   }
 }

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -43,6 +44,7 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
+  private final PipelineExcludedNodes pipelineExcludedNodes;
 
   public WritableRatisContainerProvider(
       PipelineManager pipelineManager,
@@ -51,6 +53,19 @@ public class WritableRatisContainerProvider
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
+    this.pipelineExcludedNodes = configuredPipelineExcludedNodes(pipelineManager);
+  }
+
+  private static PipelineExcludedNodes configuredPipelineExcludedNodes(
+      PipelineManager pipelineManager) {
+    if (pipelineManager instanceof PipelineManagerImpl) {
+      PipelineExcludedNodes excludedNodes =
+          ((PipelineManagerImpl) pipelineManager).getPipelineExcludedNodesConfig();
+      if (excludedNodes != null) {
+        return excludedNodes;
+      }
+    }
+    return PipelineExcludedNodes.EMPTY;
   }
 
   @Override
@@ -164,10 +179,13 @@ public class WritableRatisContainerProvider
     List<Pipeline> pipelines = pipelineManager.getPipelines(repConfig,
             pipelineState, excludeList.getDatanodes(),
             excludeList.getPipelineIds());
+    pipelines.removeIf(pipelineExcludedNodes::isExcluded);
     if (pipelines.isEmpty() && !excludeList.isEmpty()) {
       // if no pipelines can be found, try finding pipeline without
       // exclusion
       pipelines = pipelineManager.getPipelines(repConfig, pipelineState);
+      // but still, configured excluded nodes must be excluded
+      pipelines.removeIf(pipelineExcludedNodes::isExcluded);
     }
     return pipelines;
   }

@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
+import com.google.common.collect.ImmutableSet;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.PipelineExcludedNodes;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
@@ -901,6 +904,27 @@ public class MockNodeManager implements NodeManager {
       }
     }
     return results;
+  }
+
+  @Override
+  public Set<DatanodeDetails> resolvePipelineExcludedDatanodes(PipelineExcludedNodes pipelineExcludedNodes) {
+    if (pipelineExcludedNodes == null || pipelineExcludedNodes.isEmpty()) {
+      return Collections.emptySet();
+    }
+    Set<DatanodeDetails> resolved = new HashSet<>();
+    for (DatanodeID datanodeID : pipelineExcludedNodes.getExcludedDatanodeIds()) {
+      DatanodeDetails datanodeDetails = getNode(datanodeID);
+      if (datanodeDetails != null) {
+        resolved.add(datanodeDetails);
+      }
+    }
+    for (String address : pipelineExcludedNodes.getExcludedAddressTokens()) {
+      List<DatanodeDetails> datanodes = getNodesByAddress(address);
+      if (datanodes != null) {
+        resolved.addAll(datanodes);
+      }
+    }
+    return ImmutableSet.copyOf(resolved);
   }
 
   @Override
