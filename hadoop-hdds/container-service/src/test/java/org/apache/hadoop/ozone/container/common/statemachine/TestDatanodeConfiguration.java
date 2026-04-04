@@ -235,6 +235,25 @@ public class TestDatanodeConfiguration {
     }
   }
 
+  /**
+   * If hard limit percent is greater than soft (reported) percent, {@link DatanodeConfiguration}
+   * uses the hard threshold for SCM-reported spare as well, so there is no negative "soft band".
+   */
+  @Test
+  void whenHardRatioExceedsSoftRatioReportedSpareMatchesHardOnly() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 0.01f);
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT, 0.02f);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+    long capacityBytes = 1000L * 1024 * 1024 * 1024;
+
+    assertEquals(subject.getHardLimitMinFreeSpace(capacityBytes),
+        subject.getMinFreeSpace(capacityBytes));
+    assertEquals(0L, subject.getSoftBandMinFreeSpaceWidth(capacityBytes));
+  }
+
   @Test
   void rejectsInvalidMinFreeSpaceHardLimitRatio() {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -251,6 +270,8 @@ public class TestDatanodeConfiguration {
     conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, bytes);
     // keeping %cent low so that min free space is picked up
     conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 0.00001f);
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
+        0.00001f);
 
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
@@ -267,7 +288,10 @@ public class TestDatanodeConfiguration {
     OzoneConfiguration conf = new OzoneConfiguration();
     // keeping min free space low so that %cent is picked up after calculation
     conf.set(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, "1000"); // set in ozone-site.xml
-    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, percent / 100.0f);
+    float softRatio = percent / 100.0f;
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, softRatio);
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
+        Math.min(softRatio, 0.01f));
 
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 

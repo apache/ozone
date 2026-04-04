@@ -776,8 +776,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
     }
     if (minFreeSpaceHardLimitRatio > minFreeSpaceRatio) {
-      LOG.warn("{} = {} is greater than {} = {}. Hard limit should be <= reported "
-              + "percent so SCM headroom is at least the local enforcement threshold.",
+      LOG.warn("{} = {} is greater than {} = {}. SCM-reported spare will match the "
+              + "hard limit only (see getMinFreeSpace(long)).",
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
           minFreeSpaceHardLimitRatio,
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
@@ -851,8 +851,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   /**
    * Minimum free space reported to SCM (freeSpaceToSpare in storage reports).
+   * <p>If {@code min.free.space.hard.limit.percent &gt; min.free.space.percent} (invalid combo),
+   * this returns the same value as {@link #getHardLimitMinFreeSpace(long)} so SCM uses the
+   * hard-limit threshold only; there is no soft band until ratios are fixed.</p>
    */
   public long getMinFreeSpace(long capacity) {
+    if (minFreeSpaceHardLimitRatio > minFreeSpaceRatio) {
+      return getHardLimitMinFreeSpace(capacity);
+    }
     return Math.max((long) (capacity * minFreeSpaceRatio), minFreeSpace);
   }
 

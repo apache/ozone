@@ -39,6 +39,9 @@ public class TestOmConf {
         OzoneManagerRatisServerConfig.class);
     assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
+    // Ensure Ozone defaults are written so Ratis does not apply its own
+    // non-zero WAIT_TIME_MIN_DEFAULT when the key is unset.
+    conf.setFromObject(ratisConf);
     assertWaitTimeMin(TimeDuration.ZERO, conf);
 
     ratisConf.setLogAppenderWaitTimeMin(1);
