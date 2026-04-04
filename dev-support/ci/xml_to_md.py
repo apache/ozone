@@ -31,7 +31,7 @@ def extract_xml_from_jar(jar_path, xml_filename):
   xml_files = []
   with zipfile.ZipFile(jar_path, 'r') as jar:
     for file_info in jar.infolist():
-      if file_info.filename.endswith(xml_filename):
+      if file_info.filename.endswith(xml_filename) and 'network-topology-default.xml' != file_info.filename:
         with jar.open(file_info.filename) as xml_file:
           xml_files.append(xml_file.read())
   return xml_files
@@ -137,11 +137,13 @@ def main():
     raise ValueError("SNAPSHOT directory not found in the specified base path.")
 
   extract_path = os.path.join(snapshot_dir, 'share', 'ozone', 'lib')
-  xml_filename = 'ozone-default.xml'
+  xml_filename = '-default.xml'
 
   property_map = {}
   for file_name in os.listdir(extract_path):
-    if file_name.startswith('hdds-common-') and file_name.endswith('.jar'):
+    if (file_name.startswith('hdds-') or file_name.startswith('ozone-')) \
+        and not file_name.startswith('ozone-filesystem-hadoop') \
+        and file_name.endswith('.jar'):
       jar_path = os.path.join(extract_path, file_name)
       xml_contents = extract_xml_from_jar(jar_path, xml_filename)
       for xml_content in xml_contents:
