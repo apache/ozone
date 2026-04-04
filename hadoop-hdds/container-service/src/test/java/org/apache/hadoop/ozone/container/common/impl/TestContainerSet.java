@@ -278,6 +278,60 @@ public class TestContainerSet {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
+  public void testIteratorOrderWhenScanAborted(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
+    HddsVolume vol = mockHddsVolume("uuid-1");
+    ContainerSet containerSet = newContainerSet();
+    
+    // Create 3 containers
+    KeyValueContainerData data1 = new KeyValueContainerData(1, layout, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    data1.setVolume(vol);
+    data1.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+    // c1 was scanned the farthest in the past.
+    data1.updateDataScanTime(Instant.now().minusMillis(10_000));
+    Container<?> c1 = new KeyValueContainer(data1, new OzoneConfiguration());
+    containerSet.addContainer(c1);
+
+    KeyValueContainerData data2 = new KeyValueContainerData(2, layout, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    data2.setVolume(vol);
+    data2.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+    // c2 was scanned the second farthest
+    data2.updateDataScanTime(Instant.now().minusMillis(5_000));
+    Container<?> c2 = new KeyValueContainer(data2, new OzoneConfiguration());
+    containerSet.addContainer(c2);
+    
+    KeyValueContainerData data3 = new KeyValueContainerData(3, layout, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    data3.setVolume(vol);
+    data3.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+    // c3 was scanned the most recently.
+    data3.updateDataScanTime(Instant.now().minusMillis(1_000));
+    Container<?> c3 = new KeyValueContainer(data3, new OzoneConfiguration());
+    containerSet.addContainer(c3);
+
+    // Initial order should be c1, c2, c3 based on when they were last scanned.
+    Iterator<Container<?>> iter = containerSet.getContainerIterator(vol);
+    assertEquals(1, iter.next().getContainerData().getContainerID());
+    data1.updateDataScanTime(Instant.now());
+    assertEquals(2, iter.next().getContainerData().getContainerID());
+    // Simulate c2's scan being aborted, so do not update its timestamp.
+    // Despite c2's scan time not being updated, c3 should still be processed next and then the iterator should end.
+    assertEquals(3, iter.next().getContainerData().getContainerID());
+    data3.updateDataScanTime(Instant.now());
+    assertFalse(iter.hasNext());
+
+    // c2 should now come up first when we recreate the iterator since it was not marked as having a complete scan.
+    // Then 1 and 3 which were already scanned should come up.
+    Iterator<Container<?>> iter2 = containerSet.getContainerIterator(vol);
+    assertEquals(2, iter2.next().getContainerData().getContainerID());
+    assertEquals(1, iter2.next().getContainerData().getContainerID());
+    assertEquals(3, iter2.next().getContainerData().getContainerID());
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
   public void testGetContainerReport(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
