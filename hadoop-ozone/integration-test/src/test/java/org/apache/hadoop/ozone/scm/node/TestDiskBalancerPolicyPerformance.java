@@ -119,7 +119,7 @@ public class TestDiskBalancerPolicyPerformance {
     ContainerController containerController = new ContainerController(containerSet, null);
     when(ozoneContainer.getController()).thenReturn(containerController);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
-    policy = new DefaultContainerChoosingPolicy(new ReentrantLock());
+    policy = new DefaultContainerChoosingPolicy(new ReentrantLock(), conf);
     executor = Executors.newFixedThreadPool(NUM_THREADS);
   }
 

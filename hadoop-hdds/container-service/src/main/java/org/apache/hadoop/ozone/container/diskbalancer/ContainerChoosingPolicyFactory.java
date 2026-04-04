@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
-import org.apache.ratis.util.ReflectionUtils;
 
 /**
  * A factory to create {@link ContainerChoosingPolicy} instances for the DiskBalancer.
@@ -49,7 +48,14 @@ public final class ContainerChoosingPolicyFactory {
     Class<? extends ContainerChoosingPolicy> policyClass = conf.getClass(
         HDDS_DATANODE_DISKBALANCER_CONTAINER_CHOOSING_POLICY,
         DEFAULT_CONTAINER_CHOOSING_POLICY, ContainerChoosingPolicy.class);
-    return ReflectionUtils.newInstance(policyClass, new Class<?>[]{ReentrantLock.class},
-        VolumeChoosingPolicyFactory.getVolumeSpaceReservationLock());
+    ReentrantLock lock = VolumeChoosingPolicyFactory.getVolumeSpaceReservationLock();
+    try {
+      return policyClass.getConstructor(ReentrantLock.class, ConfigurationSource.class)
+          .newInstance(lock, conf);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException(
+          "Disk balancer container choosing policy must implement "
+              + "(ReentrantLock, ConfigurationSource): " + policyClass.getName(), e);
+    }
   }
 }

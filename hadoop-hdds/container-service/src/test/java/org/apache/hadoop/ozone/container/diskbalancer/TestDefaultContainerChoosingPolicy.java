@@ -69,6 +69,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class tests for volume and container selection in DefaultContainerChoosingPolicy.
@@ -95,7 +96,7 @@ public class TestDefaultContainerChoosingPolicy {
   @BeforeEach
   public void setup() throws Exception {
     datanodeUuid = UUID.randomUUID().toString();
-    policy = new DefaultContainerChoosingPolicy(new ReentrantLock());
+    policy = new DefaultContainerChoosingPolicy(new ReentrantLock(), CONF);
     deltaMap = new HashMap<>();
     inProgressContainerIDs = new HashSet<>();
   }
@@ -295,13 +296,18 @@ public class TestDefaultContainerChoosingPolicy {
 
   private void createContainer(long id, long usedBytes, HddsVolume vol, ContainerSet targetSet)
       throws IOException {
+    createContainer(id, usedBytes, vol, targetSet, ContainerDataProto.State.CLOSED);
+  }
+
+  private void createContainer(long id, long usedBytes, HddsVolume vol, ContainerSet targetSet,
+      ContainerDataProto.State state) throws IOException {
     long maxSize = usedBytes > 0 ? usedBytes : (long) CONF.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     KeyValueContainerData containerData = new KeyValueContainerData(id,
         ContainerLayoutVersion.FILE_PER_BLOCK, maxSize,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
-    containerData.setState(ContainerDataProto.State.CLOSED);
+    containerData.setState(state);
     containerData.setVolume(vol);
     containerData.getStatistics().setBlockBytesForTesting(usedBytes);
     KeyValueContainer container = new KeyValueContainer(containerData, CONF);
@@ -343,11 +349,14 @@ public class TestDefaultContainerChoosingPolicy {
         inProgressContainerIDs.add(ContainerID.valueOf(id));
       }
     }
+    mockContainerSet(containerSet);
+  }
 
+  private void mockContainerSet(ContainerSet cs) {
     ozoneContainer = mock(OzoneContainer.class);
-    ContainerController controller = new ContainerController(containerSet, null);
+    ContainerController controller = new ContainerController(cs, null);
     when(ozoneContainer.getController()).thenReturn(controller);
-    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    when(ozoneContainer.getContainerSet()).thenReturn(cs);
   }
 
   private MutableVolumeSet createVolumeSetForUsages(List<HddsVolume> volumes) throws IOException {
@@ -361,6 +370,62 @@ public class TestDefaultContainerChoosingPolicy {
     }
     vs.setVolumeMapForTesting(volumeMap);
     return vs;
+  }
+
+  /**
+   * With {@link DiskBalancerConfiguration#getIncludeNonStandardContainers()} true, QUASI_CLOSED is
+   * chosen;
+   * with false (default), only CLOSED is eligible to move.
+   */
+  @ParameterizedTest(name = "includeNonStandardContainers={0}")
+  @ValueSource(booleans = {true, false})
+  public void testQuasiClosedEligibilityDependsOnIncludeNonStandard(boolean includeNonStandardContainers)
+      throws IOException {
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    DiskBalancerConfiguration dbc = testConf.getObject(DiskBalancerConfiguration.class);
+    dbc.setIncludeNonStandardContainers(includeNonStandardContainers);
+    testConf.setFromObject(dbc);
+    ContainerChoosingPolicy policyUnderTest = new DefaultContainerChoosingPolicy(
+        new ReentrantLock(), testConf);
+
+    inProgressContainerIDs.clear();
+    deltaMap.clear();
+
+    List<VolumeTestConfig> configs = Arrays.asList(
+        new VolumeTestConfig("disk3", 0.15),
+        new VolumeTestConfig("disk2", 0.85),
+        new VolumeTestConfig("disk1", 0.90)
+    );
+    List<HddsVolume> volumes = createVolumes(configs);
+    volumeSet = createVolumeSetForUsages(volumes);
+    List<VolumeFixedUsage> sortedUsages = getVolumeUsages(volumeSet, deltaMap);
+    sortedUsages.sort(Comparator.comparingDouble(VolumeFixedUsage::getUtilization));
+    HddsVolume sourceVolume = sortedUsages.get(sortedUsages.size() - 1).getVolume();
+    HddsVolume destVolume = sortedUsages.get(0).getVolume();
+
+    containerSet = newContainerSet();
+    createContainer(1L, 1500L * MB, sourceVolume, containerSet, ContainerDataProto.State.CLOSED);
+    createContainer(2L, 50L * MB, sourceVolume, containerSet, ContainerDataProto.State.QUASI_CLOSED);
+    createContainer(3L, 200L * MB, sourceVolume, containerSet, ContainerDataProto.State.CLOSED);
+
+    mockContainerSet(containerSet);
+
+    ContainerCandidate candidate = policyUnderTest.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
+
+    if (includeNonStandardContainers) {
+      assertNotNull(candidate);
+      assertEquals(sourceVolume, candidate.getSourceVolume());
+      assertEquals(destVolume, candidate.getDestVolume());
+      assertEquals(2L, candidate.getContainerData().getContainerID());
+      assertTrue(candidate.getContainerData().isQuasiClosed());
+    } else {
+      assertNotNull(candidate);
+      assertEquals(sourceVolume, candidate.getSourceVolume());
+      assertEquals(destVolume, candidate.getDestVolume());
+      assertEquals(3L, candidate.getContainerData().getContainerID());
+      assertTrue(candidate.getContainerData().isClosed());
+    }
   }
 
   /**
