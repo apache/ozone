@@ -17,20 +17,50 @@
 
 package org.apache.hadoop.hdds.scm.ha.invoker;
 
+import com.google.protobuf.ByteString;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
-import org.apache.hadoop.hdds.scm.ha.ScmInvoker;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
  * Invoker for DeletedBlockLogStateManager local (non-@Replicate) methods.
  */
-public class DeletedBlockLogStateManagerInvoker implements ScmInvoker<DeletedBlockLogStateManager> {
+public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockLogStateManager> {
   private final DeletedBlockLogStateManager impl;
 
-  public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl) {
+  enum ReplicateMethod implements NameAndParameterTypes {
+    addTransactionsToDB(new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}),
+    removeTransactionsFromDB(new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}),;
+
+    private final Class<?>[][] parameterTypes;
+
+    ReplicateMethod(Class<?>[] parameterTypes) {
+      final Class<?>[][] types = new Class<?>[parameterTypes.length + 1][];
+      for (int i = 0; i <= parameterTypes.length; ++i) {
+        types[i] = Arrays.copyOf(parameterTypes, i);
+      }
+      this.parameterTypes = types;
+    }
+
+    @Override
+    public String getName() {
+      return name();
+    }
+
+    @Override
+    public Class<?>[] getParameterTypes(int numArgs) {
+      return parameterTypes[numArgs];
+    }
+  }
+
+  public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl, SCMRatisServer scmRatisServer) {
+    super(scmRatisServer);
     this.impl = impl;
   }
 
@@ -47,6 +77,56 @@ public class DeletedBlockLogStateManagerInvoker implements ScmInvoker<DeletedBlo
   @Override
   public DeletedBlockLogStateManager getImpl() {
     return impl;
+  }
+
+  @Override
+  public DeletedBlockLogStateManager getProxy() {
+    return new DeletedBlockLogStateManager() {
+      @Override
+      public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
+          throws IOException {
+        final Object[] args = {txs};
+        invokeRatisServer(ReplicateMethod.addTransactionsToDB, args);
+      }
+
+      @Override
+      public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
+          DeletedBlocksTransactionSummary summary) throws IOException {
+        final Object[] args = {txs, summary};
+        invokeRatisServer(ReplicateMethod.addTransactionsToDB, args);
+      }
+
+      @Override
+      public void removeTransactionsFromDB(ArrayList<Long> txIDs)
+          throws IOException {
+        final Object[] args = {txIDs};
+        invokeRatisServer(ReplicateMethod.removeTransactionsFromDB, args);
+      }
+
+      @Override
+      public void removeTransactionsFromDB(ArrayList<Long> txIDs,
+          DeletedBlocksTransactionSummary summary) throws IOException {
+        final Object[] args = {txIDs, summary};
+        invokeRatisServer(ReplicateMethod.removeTransactionsFromDB, args);
+      }
+
+      @Override
+      public Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator() throws IOException {
+        return impl.getReadOnlyIterator();
+      }
+
+      @Override
+      public void onFlush() {
+        impl.onFlush();
+      }
+
+      @Override
+      public void reinitialize(
+          Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
+          Table<String, ByteString> statefulConfigTable) {
+        impl.reinitialize(deletedBlocksTXTable, statefulConfigTable);
+      }
+    };
   }
 
   // Code generated for DeletedBlockLogStateManager.  Do not modify.
