@@ -189,6 +189,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw newError(S3ErrorTable.NO_OVERWRITE, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS) {
         throw newError(PRECOND_FAILED, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.ATOMIC_WRITE_CONFLICT) {
+        throw newError(S3ErrorTable.CONDITIONAL_REQUEST_CONFLICT, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.ETAG_MISMATCH) {
         throw newError(PRECOND_FAILED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {

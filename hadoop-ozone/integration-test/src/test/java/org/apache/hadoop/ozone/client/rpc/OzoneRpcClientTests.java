@@ -42,6 +42,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ATOMIC_WRITE_CONFLICT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ETAG_MISMATCH;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
@@ -1424,7 +1426,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       keyInfo = ozoneManager.lookupKey(keyArgs);
 
       OMException e = assertThrows(OMException.class, out::close);
-      assertEquals(KEY_NOT_FOUND, e.getResult());
+      assertEquals(ATOMIC_WRITE_CONFLICT, e.getResult());
       assertThat(e).hasMessageContaining("does not match the expected generation to rewrite");
     } finally {
       if (out != null) {
@@ -1561,7 +1563,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         out.write(newContent);
       }
     });
-    assertEquals(OMException.ResultCodes.ETAG_MISMATCH, e.getResult());
+    assertEquals(ETAG_MISMATCH, e.getResult());
   }
 
   @ParameterizedTest

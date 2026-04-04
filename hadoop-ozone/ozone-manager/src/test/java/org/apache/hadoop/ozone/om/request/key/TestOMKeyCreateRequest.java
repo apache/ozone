@@ -166,6 +166,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     checkResponse(modifiedOmRequest, response, id, false, getBucketLayout());
+
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(id));
+    assertNotNull(openKeyInfo);
+    assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
+        openKeyInfo.getExpectedDataGeneration());
+    assertNull(openKeyInfo.getExpectedETag());
   }
 
   @ParameterizedTest
