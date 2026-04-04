@@ -17,38 +17,37 @@
 
 package org.apache.hadoop.ozone.debug.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
+import static org.apache.hadoop.ozone.OzoneConsts.FLUSH_LOG_TABLE;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.apache.ozone.compaction.log.CompactionLogEntry;
+import org.apache.ozone.compaction.log.FlushFileInfo;
+import org.apache.ozone.compaction.log.FlushLogEntry;
 import org.apache.ozone.graph.PrintableGraph;
-import org.apache.ozone.rocksdiff.CompactionDag;
+import org.apache.ozone.rocksdiff.FlushLinkedList;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
 /**
- * Handler to generate image for current compaction DAG.
- * ozone debug om generate-compaction-dag.
+ * Handler to generate image for current flush log timeline.
+ * ozone debug om generate-flush-log
  */
 @CommandLine.Command(
-    name = "generate-compaction-dag",
-    aliases = "gcd",
-    description = "Create an image of the current compaction log DAG. " +
+    name = "generate-flush-log",
+    aliases = "gfl",
+    description = "Create an image of the current flush log timeline. " +
         "This command is an offline command. i.e., it can run on any instance of om.db " +
         "and does not require OM to be up.")
-public class CompactionLogDagPrinter extends AbstractSubcommand implements Callable<Void> {
+public class FlushLogPrinter extends AbstractSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private OMDebug parent;
@@ -59,20 +58,32 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
           "Should include the image file name with \".png\" extension.")
   private String imageLocation;
 
+  @CommandLine.Option(names = {"-t", "--type"},
+      defaultValue = "FILE_NAME",
+      description = "Graph type: FILE_NAME, SEQUENCE_NUMBER, FLUSH_TIME, DETAILED. Default: ${DEFAULT-VALUE}")
+  private PrintableGraph.GraphType graphType;
+
   @Override
   public Void call() throws Exception {
     try {
       final List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
       List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
       ManagedRocksDB activeRocksDB = ManagedRocksDB.openReadOnly(parent.getDbPath(), cfDescList, cfHandleList);
-      ColumnFamilyHandle compactionLogTableCFHandle =
-          RocksDBUtils.getColumnFamilyHandle(COMPACTION_LOG_TABLE, cfHandleList);
+      ColumnFamilyHandle flushLogTableCFHandle =
+          RocksDBUtils.getColumnFamilyHandle(FLUSH_LOG_TABLE, cfHandleList);
 
-      CompactionDag compactionDag = new CompactionDag();
-      loadCompactionDagFromDB(activeRocksDB, compactionLogTableCFHandle, compactionDag);
+      FlushLinkedList flushLinkedList = new FlushLinkedList();
+      loadFlushLogFromDB(activeRocksDB, flushLogTableCFHandle, flushLinkedList);
 
-      pngPrintMutableGraph(compactionDag, imageLocation);
+      if (flushLinkedList.isEmpty()) {
+        out().println("Flush log is empty. No graph generated.");
+        return null;
+      }
+
+      PrintableGraph graph = new PrintableGraph(flushLinkedList, graphType);
+      graph.generateImage(imageLocation);
       out().println("Graph was generated at '" + imageLocation + "'.");
+      out().println("Total flush entries: " + flushLinkedList.size());
     } catch (RocksDBException ex) {
       err().println("Failed to open RocksDB: " + ex);
       throw ex;
@@ -81,31 +92,31 @@ public class CompactionLogDagPrinter extends AbstractSubcommand implements Calla
   }
 
   /**
-   * Read a compactionLofTable and create entries in the dags.
+   * Read FlushLogTable and populate the FlushLinkedList.
    */
-  private void loadCompactionDagFromDB(ManagedRocksDB activeRocksDB,
-      ColumnFamilyHandle compactionLogTableCFHandle, CompactionDag compactionDag) {
+  private void loadFlushLogFromDB(ManagedRocksDB activeRocksDB,
+      ColumnFamilyHandle flushLogTableCFHandle, FlushLinkedList flushLinkedList) {
     try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
-        activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
+        activeRocksDB.get().newIterator(flushLogTableCFHandle))) {
       managedRocksIterator.get().seekToFirst();
       while (managedRocksIterator.get().isValid()) {
         byte[] value = managedRocksIterator.get().value();
-        CompactionLogEntry compactionLogEntry =
-            CompactionLogEntry.getFromProtobuf(HddsProtos.CompactionLogEntryProto.parseFrom(value));
-        compactionDag.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
-            compactionLogEntry.getOutputFileInfoList(), compactionLogEntry.getDbSequenceNumber());
+        FlushLogEntry flushLogEntry =
+            FlushLogEntry.getFromProtobuf(HddsProtos.FlushLogEntryProto.parseFrom(value));
+        FlushFileInfo fileInfo = flushLogEntry.getFileInfo();
+
+        flushLinkedList.addFlush(
+            fileInfo.getFileName(),
+            flushLogEntry.getDbSequenceNumber(),
+            flushLogEntry.getFlushTime(),
+            fileInfo.getStartKey(),
+            fileInfo.getEndKey(),
+            fileInfo.getColumnFamily());
+
         managedRocksIterator.get().next();
       }
     } catch (InvalidProtocolBufferException e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed to parse flush log entry", e);
     }
-  }
-
-  public void pngPrintMutableGraph(CompactionDag helper, String filePath)
-      throws IOException {
-    Objects.requireNonNull(filePath, "Image file path is required.");
-    PrintableGraph graph;
-    graph = new PrintableGraph(helper.getBackwardCompactionDAG(), PrintableGraph.GraphType.FILE_NAME);
-    graph.generateImage(filePath);
   }
 }

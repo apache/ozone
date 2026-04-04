@@ -24,7 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -80,9 +80,8 @@ import picocli.CommandLine;
 /**
  * Tests Freon, with MiniOzoneCluster.
  */
-public class TestOMSnapshotDAG {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestOMSnapshotDAG.class);
+public class TestOMSnapshotFlush {
+  private static final Logger LOG = LoggerFactory.getLogger(TestOMSnapshotFlush.class);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -92,14 +91,12 @@ public class TestOMSnapshotDAG {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    DatanodeRatisServerConfig ratisServerConfig =
-        conf.getObject(DatanodeRatisServerConfig.class);
+    DatanodeRatisServerConfig ratisServerConfig = conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
     ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
     conf.setFromObject(ratisServerConfig);
 
-    RatisClientConfig.RaftConfig raftClientConfig =
-        conf.getObject(RatisClientConfig.RaftConfig.class);
+    RatisClientConfig.RaftConfig raftClientConfig = conf.getObject(RatisClientConfig.RaftConfig.class);
     raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
@@ -146,42 +143,39 @@ public class TestOMSnapshotDAG {
       String volumeName, String bucketName, String snapshotName) throws IOException {
 
     final String dbKey = getSnapshotDBKey(volumeName, bucketName, snapshotName);
-    final SnapshotInfo snapshotInfo =
-        omMetadataManager.getSnapshotInfoTable().get(dbKey);
+    final SnapshotInfo snapshotInfo = omMetadataManager.getSnapshotInfoTable().get(dbKey);
     String checkpointPath = getDBCheckpointAbsolutePath(snapshotInfo);
 
     // Use RocksDB transaction sequence number in SnapshotInfo, which is
     // persisted at the time of snapshot creation, as the snapshot generation
-    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider snapshotLocalData =
-             localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
+    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider snapshotLocalData = localDataManager
+        .getOmSnapshotLocalData(snapshotInfo)) {
       NavigableMap<Integer, List<SstFileInfo>> versionSstFiles = snapshotLocalData.getSnapshotLocalData()
           .getVersionSstFileInfos().entrySet().stream()
           .collect(toMap(Map.Entry::getKey, entry -> entry.getValue().getSstFiles(),
               (u, v) -> {
-              throw new IllegalStateException(String.format("Duplicate key %s", u));
-            }, TreeMap::new));
+                throw new IllegalStateException(String.format("Duplicate key %s", u));
+              }, TreeMap::new));
       DifferSnapshotInfo dsi = new DifferSnapshotInfo((version) -> Paths.get(checkpointPath),
           snapshotInfo.getSnapshotId(), snapshotLocalData.getSnapshotLocalData().getDbTxSequenceNumber(),
           versionSstFiles);
-      return new DifferSnapshotVersion(dsi, 0, COLUMN_FAMILIES_TO_TRACK_IN_DAG);
+      return new DifferSnapshotVersion(dsi, 0, COLUMN_FAMILIES_TO_TRACK);
     }
   }
 
   @Test
-  public void testDAGReconstruction() throws IOException {
+  public void testFlushReconstruction() throws IOException {
     // Generate keys
-    RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator(cluster.getConf());
+    RandomKeyGenerator randomKeyGenerator = new RandomKeyGenerator(cluster.getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
     cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
         "--num-of-keys", "500",
         "--num-of-threads", "1",
-        "--key-size", "0",  // zero-byte keys since we don't test DNs here
+        "--key-size", "0", // zero-byte keys since we don't test DNs here
         "--factor", "THREE",
         "--type", "RATIS",
-        "--validate-writes"
-    );
+        "--validate-writes");
 
     assertEquals(500L, randomKeyGenerator.getNumberOfKeysAdded());
     assertEquals(500L, randomKeyGenerator.getSuccessfulValidationCount());
@@ -189,11 +183,11 @@ public class TestOMSnapshotDAG {
     List<OmVolumeArgs> volList = cluster.getOzoneManager()
         .listAllVolumes("", "", 2);
     LOG.debug("List of all volumes: {}", volList);
-    final String volumeName = volList.stream().filter(e ->
-        !e.getVolume().equals(OZONE_S3_VOLUME_NAME_DEFAULT))  // Ignore s3v vol
+    // Ignore the s3v volume
+    final String volumeName = volList.stream()
+        .filter(e -> !e.getVolume().equals(OZONE_S3_VOLUME_NAME_DEFAULT))
         .collect(Collectors.toList()).get(0).getVolume();
-    List<OmBucketInfo> bucketList =
-        cluster.getOzoneManager().listBuckets(volumeName, "", "", 10, false);
+    List<OmBucketInfo> bucketList = cluster.getOzoneManager().listBuckets(volumeName, "", "", 10, false);
     LOG.debug("List of all buckets under the first volume: {}", bucketList);
     final String bucketName = bucketList.get(0).getBucketName();
 
@@ -228,9 +222,9 @@ public class TestOMSnapshotDAG {
     DifferSnapshotVersion snap2 = getDifferSnapshotInfo(omMetadataManager, localDataManager,
         volumeName, bucketName, "snap2");
 
-      // RocksDB does checkpointing in a separate thread, wait for it
+    // RocksDB does checkpointing in a separate thread, wait for it
     List<SstFileInfo> sstDiffList21 = differ.getSSTDiffList(snap2, snap1, bucketPrefix,
-            COLUMN_FAMILIES_TO_TRACK_IN_DAG, true).orElse(Collections.emptyList());
+        COLUMN_FAMILIES_TO_TRACK).orElse(Collections.emptyList());
     LOG.debug("Got diff list: {}", sstDiffList21);
 
     // Delete 1000 keys, take a 3rd snapshot, and do another diff
@@ -246,15 +240,15 @@ public class TestOMSnapshotDAG {
         "snap3");
 
     List<SstFileInfo> sstDiffList32 = differ.getSSTDiffList(snap3, snap2, bucketPrefix,
-            COLUMN_FAMILIES_TO_TRACK_IN_DAG, true).orElse(Collections.emptyList());
+        COLUMN_FAMILIES_TO_TRACK).orElse(Collections.emptyList());
 
     // snap3-snap1 diff result is a combination of snap3-snap2 and snap2-snap1
     List<SstFileInfo> sstDiffList31 = differ.getSSTDiffList(snap3, snap1, bucketPrefix,
-            COLUMN_FAMILIES_TO_TRACK_IN_DAG, true).orElse(Collections.emptyList());
+        COLUMN_FAMILIES_TO_TRACK).orElse(Collections.emptyList());
 
     // Same snapshot. Result should be empty list
     List<SstFileInfo> sstDiffList22 = differ.getSSTDiffList(snap2, snap2, bucketPrefix,
-            COLUMN_FAMILIES_TO_TRACK_IN_DAG, true).orElse(Collections.emptyList());
+        COLUMN_FAMILIES_TO_TRACK).orElse(Collections.emptyList());
     assertThat(sstDiffList22).isEmpty();
     snapDB1.close();
     snapDB2.close();
@@ -277,15 +271,15 @@ public class TestOMSnapshotDAG {
     snap3 = getDifferSnapshotInfo(omMetadataManager, localDataManager,
         volumeName, bucketName, "snap3");
     List<SstFileInfo> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1, bucketPrefix,
-            COLUMN_FAMILIES_TO_TRACK_IN_DAG, true).orElse(Collections.emptyList());
+        COLUMN_FAMILIES_TO_TRACK).orElse(Collections.emptyList());
     assertEquals(sstDiffList21, sstDiffList21Run2);
 
     List<SstFileInfo> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2, bucketPrefix,
-            COLUMN_FAMILIES_TO_TRACK_IN_DAG, true).orElse(Collections.emptyList());
+        COLUMN_FAMILIES_TO_TRACK).orElse(Collections.emptyList());
     assertEquals(sstDiffList32, sstDiffList32Run2);
 
     List<SstFileInfo> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1, bucketPrefix,
-            COLUMN_FAMILIES_TO_TRACK_IN_DAG, true).orElse(Collections.emptyList());
+        COLUMN_FAMILIES_TO_TRACK).orElse(Collections.emptyList());
     assertEquals(sstDiffList31, sstDiffList31Run2);
     snapDB1.close();
     snapDB2.close();
@@ -298,25 +292,22 @@ public class TestOMSnapshotDAG {
     // when there is no snapshot in SnapshotInfoTable.
 
     // Generate keys
-    RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator(cluster.getConf());
+    RandomKeyGenerator randomKeyGenerator = new RandomKeyGenerator(cluster.getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
     // 1000 keys are enough to trigger compaction with 256KB DB CF write buffer
     cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
         "--num-of-keys", "1000",
         "--num-of-threads", "1",
-        "--key-size", "0",  // zero-byte keys since we don't test DNs here
+        "--key-size", "0", // zero-byte keys since we don't test DNs here
         "--factor", "THREE",
         "--type", "RATIS",
-        "--validate-writes"
-    );
+        "--validate-writes");
 
     assertEquals(1000L, randomKeyGenerator.getNumberOfKeysAdded());
     assertEquals(1000L, randomKeyGenerator.getSuccessfulValidationCount());
 
-    String omMetadataDir =
-        cluster.getOzoneManager().getConfiguration().get(OMConfigKeys.OZONE_OM_DB_DIRS);
+    String omMetadataDir = cluster.getOzoneManager().getConfiguration().get(OMConfigKeys.OZONE_OM_DB_DIRS);
     // Verify that no compaction log entry has been written
     Path logPath = Paths.get(omMetadataDir, OM_SNAPSHOT_DIFF_DIR,
         DB_COMPACTION_LOG_DIR);
