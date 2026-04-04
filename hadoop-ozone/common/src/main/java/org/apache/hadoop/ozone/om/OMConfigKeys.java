@@ -667,7 +667,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
-      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
+      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
 
   /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
