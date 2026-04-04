@@ -147,7 +147,7 @@ public class ScmConfig extends ReconfigurableConfig {
               "Pending container allocations are tracked in a two-window tumbling bucket " +
               "pattern. Each window has this duration. " +
               "After 2x this interval, allocations that haven't been confirmed via " +
-              "container reports will automatically age out. Default is 10 minutes."
+              "container reports will automatically age out. Default is 5 minutes."
   )
   private Duration pendingContainerAllocationRollInterval = Duration.ofMinutes(5);
 

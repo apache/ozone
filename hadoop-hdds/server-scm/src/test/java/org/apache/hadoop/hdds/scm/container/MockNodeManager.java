@@ -114,6 +114,7 @@ public class MockNodeManager implements NodeManager {
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
   private int numPipelinePerDatanode;
+  private PendingContainerTracker pendingContainerTracker;
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -948,8 +949,6 @@ public class MockNodeManager implements NodeManager {
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
   }
-
-  private PendingContainerTracker pendingContainerTracker;
 
   @Override
   public PendingContainerTracker getPendingContainerTracker() {
