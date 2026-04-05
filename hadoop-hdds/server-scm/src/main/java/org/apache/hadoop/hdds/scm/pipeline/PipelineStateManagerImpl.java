@@ -327,6 +327,11 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
     return new Builder();
   }
 
+  @Override
+  public RequestType getType() {
+    return RequestType.PIPELINE;
+  }
+
   /**
    * Builder for PipelineStateManagerImpl.
    */
@@ -364,8 +369,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
           pipelineStore, nodeManager, transactionBuffer);
       pipelineStateManager.initialize();
 
-      return scmRatisServer.getProxyHandler(RequestType.PIPELINE,
-          PipelineStateManager.class, pipelineStateManager);
+      return scmRatisServer.getProxyHandler(PipelineStateManager.class, pipelineStateManager);
     }
   }
 }

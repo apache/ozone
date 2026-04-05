@@ -47,6 +47,11 @@ public final class StatefulServiceStateManagerImpl
     this.transactionBuffer = scmDBTransactionBuffer;
   }
 
+  @Override
+  public RequestType getType() {
+    return RequestType.STATEFUL_SERVICE_CONFIG;
+  }
+
   /**
    * {@inheritDoc}
    */
@@ -134,8 +139,7 @@ public final class StatefulServiceStateManagerImpl
           new StatefulServiceStateManagerImpl(statefulServiceConfig,
               transactionBuffer);
 
-      return scmRatisServer.getProxyHandler(RequestType.STATEFUL_SERVICE_CONFIG,
-          StatefulServiceStateManager.class, stateManager);
+      return scmRatisServer.getProxyHandler(StatefulServiceStateManager.class, stateManager);
     }
   }
 }

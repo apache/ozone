@@ -29,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,5 +134,10 @@ public final class SecretKeyStateImpl implements SecretKeyState {
   @Override
   public void reinitialize(List<ManagedSecretKey> secretKeys) {
     updateKeysInternal(secretKeys);
+  }
+
+  @Override
+  public RequestType getType() {
+    return RequestType.SECRET_KEY;
   }
 }

@@ -267,6 +267,11 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
+  public RequestType getType() {
+    return RequestType.CONTAINER;
+  }
+
+  @Override
   public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
     try (AutoCloseableLock ignored = readLock()) {
       return containers.getContainerIDs(state, start, count);
@@ -636,8 +641,7 @@ public final class ContainerStateManagerImpl
           conf, pipelineMgr, table, transactionBuffer,
           containerReplicaPendingOps);
 
-      return scmRatisServer.getProxyHandler(RequestType.CONTAINER,
-          ContainerStateManager.class, csm);
+      return scmRatisServer.getProxyHandler(ContainerStateManager.class, csm);
     }
 
   }

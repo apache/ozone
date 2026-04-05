@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 
 /**
@@ -66,5 +67,10 @@ public class MockCAStore implements CertificateStore {
 
   @Override
   public void reinitialize(SCMMetadataStore metadataStore) {
+  }
+
+  @Override
+  public RequestType getType() {
+    return RequestType.CERT_STORE;
   }
 }

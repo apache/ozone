@@ -66,7 +66,7 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
 
   @Override
   public RequestType getType() {
-    return RequestType.BLOCK;
+    return impl.getType();
   }
 
   @Override
@@ -82,6 +82,11 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
   @Override
   public DeletedBlockLogStateManager getProxy() {
     return new DeletedBlockLogStateManager() {
+      @Override
+      public RequestType getType() {
+        return impl.getType();
+      }
+
       @Override
       public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
           throws IOException {

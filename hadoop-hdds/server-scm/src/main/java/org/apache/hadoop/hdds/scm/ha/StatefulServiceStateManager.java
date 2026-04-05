@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
  * This interface defines an API for saving and reading configurations of a
  * {@link StatefulService}.
  */
-public interface StatefulServiceStateManager {
+public interface StatefulServiceStateManager extends SCMHandler {
 
   /**
    * Persists the specified configurations bytes to RocksDB and replicates
