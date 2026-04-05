@@ -17,10 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.ha.invoker;
 
-import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -28,29 +26,24 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.utils.db.Table;
 
-/**
- * Invoker for DeletedBlockLogStateManager local (non-@Replicate) methods.
- */
+/** Code generated for DeletedBlockLogStateManager.  Do not modify. */
 public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockLogStateManager> {
-  private final DeletedBlockLogStateManager impl;
-
   enum ReplicateMethod implements NameAndParameterTypes {
-    addTransactionsToDB(new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}),
-    removeTransactionsFromDB(new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}),;
+    addTransactionsToDB(new Class<?>[][] {
+        null,
+        new Class<?>[] {ArrayList.class},
+        new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}
+    }),
+    removeTransactionsFromDB(new Class<?>[][] {
+        null,
+        new Class<?>[] {ArrayList.class},
+        new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}
+    });
 
     private final Class<?>[][] parameterTypes;
 
-    ReplicateMethod(Class<?>[] parameterTypes) {
-      final Class<?>[][] types = new Class<?>[parameterTypes.length + 1][];
-      for (int i = 0; i <= parameterTypes.length; ++i) {
-        types[i] = Arrays.copyOf(parameterTypes, i);
-      }
-      this.parameterTypes = types;
-    }
-
-    @Override
-    public String getName() {
-      return name();
+    ReplicateMethod(Class<?>[][] parameterTypes) {
+      this.parameterTypes = parameterTypes;
     }
 
     @Override
@@ -59,9 +52,8 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
     }
   }
 
-  public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl, SCMRatisServer scmRatisServer) {
-    super(scmRatisServer);
-    this.impl = impl;
+  public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl, SCMRatisServer ratis) {
+    super(impl, DeletedBlockLogStateManagerInvoker::newProxy, ratis);
   }
 
   @Override
@@ -74,98 +66,81 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
     return DeletedBlockLogStateManager.class;
   }
 
-  @Override
-  public DeletedBlockLogStateManager getImpl() {
-    return impl;
-  }
-
-  @Override
-  public DeletedBlockLogStateManager getProxy() {
+  static DeletedBlockLogStateManager newProxy(ScmInvoker<DeletedBlockLogStateManager> invoker) {
     return new DeletedBlockLogStateManager() {
+
       @Override
-      public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
-          throws IOException {
-        final Object[] args = {txs};
-        invokeRatisServer(ReplicateMethod.addTransactionsToDB, args);
+      public void addTransactionsToDB(ArrayList arg0, DeletedBlocksTransactionSummary arg1) throws IOException {
+        final Object[] args = {arg0, arg1};
+        invoker.invokeReplicateDirect(ReplicateMethod.addTransactionsToDB, args);
       }
 
       @Override
-      public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
-          DeletedBlocksTransactionSummary summary) throws IOException {
-        final Object[] args = {txs, summary};
-        invokeRatisServer(ReplicateMethod.addTransactionsToDB, args);
-      }
-
-      @Override
-      public void removeTransactionsFromDB(ArrayList<Long> txIDs)
-          throws IOException {
-        final Object[] args = {txIDs};
-        invokeRatisServer(ReplicateMethod.removeTransactionsFromDB, args);
-      }
-
-      @Override
-      public void removeTransactionsFromDB(ArrayList<Long> txIDs,
-          DeletedBlocksTransactionSummary summary) throws IOException {
-        final Object[] args = {txIDs, summary};
-        invokeRatisServer(ReplicateMethod.removeTransactionsFromDB, args);
+      public void addTransactionsToDB(ArrayList arg0) throws IOException {
+        final Object[] args = {arg0};
+        invoker.invokeReplicateDirect(ReplicateMethod.addTransactionsToDB, args);
       }
 
       @Override
       public Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator() throws IOException {
-        return impl.getReadOnlyIterator();
+        return invoker.getImpl().getReadOnlyIterator();
       }
 
       @Override
       public void onFlush() {
-        impl.onFlush();
+        invoker.getImpl().onFlush();
       }
 
       @Override
-      public void reinitialize(
-          Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
-          Table<String, ByteString> statefulConfigTable) {
-        impl.reinitialize(deletedBlocksTXTable, statefulConfigTable);
+      public void reinitialize(Table arg0, Table arg1) {
+        invoker.getImpl().reinitialize(arg0, arg1);
+      }
+
+      @Override
+      public void removeTransactionsFromDB(ArrayList arg0) throws IOException {
+        final Object[] args = {arg0};
+        invoker.invokeReplicateDirect(ReplicateMethod.removeTransactionsFromDB, args);
+      }
+
+      @Override
+      public void removeTransactionsFromDB(ArrayList arg0, DeletedBlocksTransactionSummary arg1) throws IOException {
+        final Object[] args = {arg0, arg1};
+        invoker.invokeReplicateDirect(ReplicateMethod.removeTransactionsFromDB, args);
       }
     };
   }
 
-  // Code generated for DeletedBlockLogStateManager.  Do not modify.
   @SuppressWarnings("unchecked")
   @Override
-  public Object invokeLocal(String methodName, Object[] params) throws Exception {
+  public Object invokeLocal(String methodName, Object[] p) throws Exception {
     switch (methodName) {
-    case "onFlush":
-      impl.onFlush();
-      return null;
-
     case "addTransactionsToDB":
-      final ArrayList arg0 =
-          params.length > 0 ? (ArrayList) params[0] : null;
-      final DeletedBlocksTransactionSummary arg1 =
-          params.length > 1 ? (DeletedBlocksTransactionSummary) params[1] : null;
-      impl.addTransactionsToDB(arg0, arg1);
-      return null;
-
-    case "removeTransactionsFromDB":
-      final ArrayList arg2 =
-          params.length > 0 ? (ArrayList) params[0] : null;
-      final DeletedBlocksTransactionSummary arg3 =
-          params.length > 1 ? (DeletedBlocksTransactionSummary) params[1] : null;
-      impl.removeTransactionsFromDB(arg2, arg3);
+      final ArrayList arg0 = p.length > 0 ? (ArrayList) p[0] : null;
+      final DeletedBlocksTransactionSummary arg1 = p.length > 1 ? (DeletedBlocksTransactionSummary) p[1] : null;
+      getImpl().addTransactionsToDB(arg0, arg1);
       return null;
 
     case "getReadOnlyIterator":
-      return impl.getReadOnlyIterator();
+      return getImpl().getReadOnlyIterator();
+
+    case "onFlush":
+      getImpl().onFlush();
+      return null;
 
     case "reinitialize":
-      final Table arg4 = params.length > 0 ? (Table) params[0] : null;
-      final Table arg5 = params.length > 1 ? (Table) params[1] : null;
-      impl.reinitialize(arg4, arg5);
+      final Table arg2 = p.length > 0 ? (Table) p[0] : null;
+      final Table arg3 = p.length > 1 ? (Table) p[1] : null;
+      getImpl().reinitialize(arg2, arg3);
+      return null;
+
+    case "removeTransactionsFromDB":
+      final ArrayList arg4 = p.length > 0 ? (ArrayList) p[0] : null;
+      final DeletedBlocksTransactionSummary arg5 = p.length > 1 ? (DeletedBlocksTransactionSummary) p[1] : null;
+      getImpl().removeTransactionsFromDB(arg4, arg5);
       return null;
 
     default:
-      throw new IllegalArgumentException("Method not found: " + methodName);
+      throw new IllegalArgumentException("Method not found: " + methodName + " in DeletedBlockLogStateManager");
     }
   }
-
 }
