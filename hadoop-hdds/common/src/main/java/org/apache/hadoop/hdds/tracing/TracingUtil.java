@@ -290,8 +290,42 @@ public final class TracingUtil {
     };
   }
 
+  /**
+   * Create an active span whose parent is decoded from an encoded W3C
+   * traceparent string (produced by {@link #exportCurrentSpan()}).
+   * If {@code encodedParent} is null or empty, a root span is created.
+   * Scope and span are both closed when the returned TraceCloseable is closed.
+   */
+  public static TraceCloseable createActivatedSpanWithParent(
+      String spanName, String encodedParent) {
+    Span span = importAndCreateSpan(spanName, encodedParent);
+    Scope scope = span.makeCurrent();
+    return () -> {
+      scope.close();
+      span.end();
+    };
+  }
+
   public static Span getActiveSpan() {
     return Span.current();
+  }
+
+  /**
+   * Helper to build the tracing carrier string from W3C headers.
+   * @param traceparent raw traceparent header
+   * @param tracestate raw tracestate header
+   * @return formatted carrier string for TextExtractor
+   */
+  public static String buildTraceContextCarrier(String traceparent, String tracestate) {
+    if (traceparent == null || traceparent.isEmpty()) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder("traceparent=")
+        .append(traceparent.trim());
+    if (tracestate != null && !tracestate.isEmpty()) {
+      sb.append(";tracestate=").append(tracestate.trim());
+    }
+    return sb.toString();
   }
 
   /**

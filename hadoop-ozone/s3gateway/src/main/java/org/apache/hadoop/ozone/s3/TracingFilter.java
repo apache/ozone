@@ -46,10 +46,17 @@ public class TracingFilter implements ContainerRequestFilter,
   public void filter(ContainerRequestContext requestContext) {
     finishAndCloseActiveSpan();
 
-    TracingUtil.TraceCloseable activatedSpan =
-        TracingUtil.createActivatedSpan(resourceInfo.getResourceClass().getSimpleName() + "." +
-            resourceInfo.getResourceMethod().getName());
-    requestContext.setProperty(TRACING_SPAN_CLOSABLE, activatedSpan);
+    String traceparent = requestContext.getHeaderString("traceparent");
+    String tracestate  = requestContext.getHeaderString("tracestate");
+    String encodedParent = TracingUtil.buildTraceContextCarrier(traceparent, tracestate);
+
+    String spanName = resourceInfo.getResourceClass().getSimpleName() + "." +
+        resourceInfo.getResourceMethod().getName();
+
+    TracingUtil.TraceCloseable traceCloseable =
+        TracingUtil.createActivatedSpanWithParent(spanName, encodedParent);
+
+    requestContext.setProperty(TRACING_SPAN_CLOSABLE, traceCloseable);
   }
 
   @Override
@@ -57,21 +64,37 @@ public class TracingFilter implements ContainerRequestFilter,
       ContainerResponseContext responseContext) {
     final TracingUtil.TraceCloseable spanClosable
         = (TracingUtil.TraceCloseable) requestContext.getProperty(TRACING_SPAN_CLOSABLE);
+    if (spanClosable == null) {
+      return;
+    }
     // HDDS-7064: Operation performed while writing StreamingOutput response
     // should only be closed once the StreamingOutput callback has completely
     // written the data to the destination
-    OutputStream out = responseContext.getEntityStream();
-    if (out != null) {
-      responseContext.setEntityStream(new WrappedOutputStream(out) {
-        @Override
-        public void close() throws IOException {
-          super.close();
-          finishAndClose(spanClosable);
-        }
-      });
+    if (isStreamingGetObject(requestContext)) {
+      OutputStream out = responseContext.getEntityStream();
+      if (out != null) {
+        responseContext.setEntityStream(new WrappedOutputStream(out) {
+          @Override
+          public void close() throws IOException {
+            super.close();
+            finishAndClose(spanClosable);
+          }
+        });
+      } else {
+        finishAndClose(spanClosable);
+      }
     } else {
       finishAndClose(spanClosable);
     }
+  }
+
+  private boolean isStreamingGetObject(ContainerRequestContext req) {
+    if (!"GET".equalsIgnoreCase(req.getMethod())) {
+      return false;
+    }
+    String cls = resourceInfo.getResourceClass().getSimpleName();
+    String method = resourceInfo.getResourceMethod().getName();
+    return "ObjectEndpoint".equals(cls) && "get".equals(method);
   }
 
   private static void finishAndClose(TracingUtil.TraceCloseable spanClosable) {
