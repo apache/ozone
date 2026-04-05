@@ -65,8 +65,8 @@ def parse_xml_file(xml_content, properties):
     tag = prop.findtext('tag', '')
 
     properties[name] = Property(
-      name=name,
-      value=prop.findtext('value', ''),
+      name=name.strip(),
+      value=prop.findtext('value', '').strip(),
       tag=tag,
       description=' '.join(description.split()).strip()
     )
@@ -116,7 +116,6 @@ This page provides a comprehensive overview of the configuration keys available 
 
     value = prop.value
     if value:
-      value = value.strip()
       value = value.replace('|', '\\|')
       value = placeholder_pattern.sub(r'`\1{\2}`', value)
       value = value.replace('\n', ' ')
