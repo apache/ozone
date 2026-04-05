@@ -26,12 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringJoiner;
@@ -48,8 +44,15 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
+import org.apache.ratis.thirdparty.io.grpc.Server;
+import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
+import org.apache.ratis.thirdparty.io.grpc.stub.ServerCalls;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +65,17 @@ import org.slf4j.LoggerFactory;
 public class TestGrpcOmTransportConcurrentFailover {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGrpcOmTransportConcurrentFailover.class);
+
+  private static final String SERVICE_NAME = "hadoop.ozone.OzoneManagerService";
+
+  private static final MethodDescriptor<OMRequest, OMResponse>
+      SUBMIT_REQUEST_METHOD = MethodDescriptor.<OMRequest, OMResponse>newBuilder()
+      .setType(MethodDescriptor.MethodType.UNARY)
+      .setFullMethodName(MethodDescriptor.generateFullMethodName(
+          SERVICE_NAME, "submitRequest"))
+      .setRequestMarshaller(new Proto2Marshaller<>(OMRequest::parseFrom))
+      .setResponseMarshaller(new Proto2Marshaller<>(OMResponse::parseFrom))
+      .build();
 
   private static final String OM_SERVICE_ID = "om-service-test";
   private static final String NODE_ID_BASE = "om";
@@ -237,11 +251,12 @@ public class TestGrpcOmTransportConcurrentFailover {
     private final AtomicInteger successCount = new AtomicInteger(0);
     private final AtomicInteger failureCount = new AtomicInteger(0);
     private final AtomicBoolean isLeader = new AtomicBoolean(false);
-    private final OzoneManagerServiceGrpc.OzoneManagerServiceImplBase serviceImpl =
-        mock(OzoneManagerServiceGrpc.OzoneManagerServiceImplBase.class,
-            delegatesTo(new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
+    private final ServerCalls.UnaryMethod<OMRequest, OMResponse> submitRequestImpl =
+        mock(ServerCalls.UnaryMethod.class,
+            delegatesTo(new ServerCalls.UnaryMethod<OMRequest, OMResponse>() {
               @Override
-              public void submitRequest(OMRequest request, StreamObserver<OMResponse> responseObserver) {
+              public void invoke(OMRequest request,
+                                 StreamObserver<OMResponse> responseObserver) {
                 requestCount.incrementAndGet();
 
                 if (!isLeader.get()) {
@@ -272,8 +287,14 @@ public class TestGrpcOmTransportConcurrentFailover {
     }
 
     public void start() throws Exception {
-      server = ServerBuilder.forPort(port)
-          .addService(serviceImpl)
+      ServerServiceDefinition service = ServerServiceDefinition.builder(SERVICE_NAME)
+          .addMethod(SUBMIT_REQUEST_METHOD,
+              ServerCalls.asyncUnaryCall(submitRequestImpl))
+          .build();
+
+      server = NettyServerBuilder.forPort(port)
+          .directExecutor()
+          .addService(service)
           .build()
           .start();
     }
@@ -299,6 +320,39 @@ public class TestGrpcOmTransportConcurrentFailover {
 
     public int getFailureCount() {
       return failureCount.get();
+    }
+  }
+
+  private static final class Proto2Marshaller<T> implements MethodDescriptor.Marshaller<T> {
+    private final Parser<T> parser;
+
+    private Proto2Marshaller(Parser<T> parser) {
+      this.parser = parser;
+    }
+
+    @Override
+    public InputStream stream(T value) {
+      if (value instanceof com.google.protobuf.Message) {
+        return ((com.google.protobuf.Message) value).toByteString().newInput();
+      }
+      if (value instanceof com.google.protobuf.MessageLite) {
+        return ((com.google.protobuf.MessageLite) value).toByteString().newInput();
+      }
+      throw new IllegalArgumentException("Unsupported protobuf type: " + value.getClass());
+    }
+
+    @Override
+    public T parse(InputStream stream) {
+      try {
+        return parser.parse(stream);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    @FunctionalInterface
+    private interface Parser<T> {
+      T parse(InputStream stream) throws IOException;
     }
   }
 }

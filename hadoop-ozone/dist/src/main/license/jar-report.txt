@@ -44,13 +44,9 @@ share/ozone/lib/error_prone_annotations.jar
 share/ozone/lib/failureaccess.jar
 share/ozone/lib/gethostname4j.jar
 share/ozone/lib/grpc-api.jar
-share/ozone/lib/grpc-context.jar
-share/ozone/lib/grpc-core.jar
-share/ozone/lib/grpc-netty.jar
 share/ozone/lib/grpc-protobuf.jar
 share/ozone/lib/grpc-protobuf-lite.jar
 share/ozone/lib/grpc-stub.jar
-share/ozone/lib/grpc-util.jar
 share/ozone/lib/gson.jar
 share/ozone/lib/guava-jre.jar
 share/ozone/lib/guice-assistedinject.jar
@@ -69,6 +65,7 @@ share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
 share/ozone/lib/hdds-container-service.jar
+share/ozone/lib/hdds-datanode-grpc-client.jar
 share/ozone/lib/hdds-docs.jar
 share/ozone/lib/hdds-erasurecode.jar
 share/ozone/lib/hdds-interface-admin.jar
@@ -76,6 +73,7 @@ share/ozone/lib/hdds-interface-client.jar
 share/ozone/lib/hdds-interface-server.jar
 share/ozone/lib/hdds-rocks-native.jar
 share/ozone/lib/hdds-managed-rocksdb.jar
+share/ozone/lib/hdds-scm-grpc-client.jar
 share/ozone/lib/hdds-server-framework.jar
 share/ozone/lib/hdds-server-scm.jar
 share/ozone/lib/hk2-api.jar
@@ -189,7 +187,6 @@ share/ozone/lib/netty-tcnative-boringssl-static.Final.jar
 share/ozone/lib/netty-tcnative-classes.Final.jar
 share/ozone/lib/netty-transport.Final.jar
 share/ozone/lib/netty-transport-classes-epoll.Final.jar
-share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
 share/ozone/lib/netty-transport-native-epoll.Final.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
@@ -234,7 +231,6 @@ share/ozone/lib/ozone-s3-secret-store.jar
 share/ozone/lib/ozone-s3gateway.jar
 share/ozone/lib/ozone-tools.jar
 share/ozone/lib/ozone-vapor.jar
-share/ozone/lib/perfmark-api.jar
 share/ozone/lib/picocli.jar
 share/ozone/lib/picocli-shell-jline3.jar
 share/ozone/lib/protobuf-java.jar

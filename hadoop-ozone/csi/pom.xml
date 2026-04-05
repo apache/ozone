@@ -34,65 +34,12 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-      <version>${protobuf.version}</version>
-    </dependency>
-    <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
     </dependency>
     <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-api</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-netty</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-protobuf</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-stub</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-classes-epoll</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-unix-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -147,6 +94,10 @@
       <artifactId>ozone-common</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-thirdparty-misc</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
@@ -157,46 +108,10 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java-util</artifactId>
-      <version>${protobuf.version}</version>
-      <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.j2objc</groupId>
-          <artifactId>j2objc-annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <!-- for generated sources, Java 11+ -->
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
       <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-codec-http2</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-handler-proxy</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-transport-native-epoll</artifactId>
-      <classifier>linux-x86_64</classifier>
-      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -226,6 +141,21 @@
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
           </annotationProcessors>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>analyze</id>
+            <configuration>
+              <ignoredUnusedDeclaredDependencies combine.children="append">
+                <ignoredUnusedDeclaredDependency>org.apache.ozone:hdds-server-framework</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.apache.ratis:ratis-thirdparty-misc</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
@@ -268,6 +198,29 @@
                   </bannedImports>
                 </restrictImports>
               </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>shade-proto-for-ratis</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>process-sources</phase>
+            <configuration>
+              <target>
+                <!-- use grpc and protobuf from ratis-thirdparty -->
+                <replace dir="${project.build.directory}/generated-sources/protobuf/java" includes="**/*.java" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
+                <replace dir="${project.build.directory}/generated-sources/protobuf/java" includes="**/*.java" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
+                <replace dir="${project.build.directory}/generated-sources/protobuf/grpc-java" includes="**/*.java" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
+                <replace dir="${project.build.directory}/generated-sources/protobuf/grpc-java" includes="**/*.java" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
+                <replace dir="${project.build.directory}/generated-sources/protobuf/grpc-java" includes="**/*.java" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
+              </target>
             </configuration>
           </execution>
         </executions>

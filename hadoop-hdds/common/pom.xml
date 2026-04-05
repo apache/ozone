@@ -248,6 +248,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
+          <useIncrementalCompilation>false</useIncrementalCompilation>
           <annotationProcessorPaths>
             <path>
               <groupId>org.apache.ozone</groupId>
@@ -262,6 +263,26 @@
             <arg>-AartifactId=${project.artifactId}</arg>
           </compilerArgs>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>analyze</id>
+            <configuration>
+              <ignoredUnusedDeclaredDependencies combine.children="append">
+                <!--
+                  hdds-config is used only as an annotationProcessorPath (ConfigFileGenerator).
+                  Its annotation types are @Retention(SOURCE) so they don't appear in compiled
+                  bytecode; the dependency analyzer therefore flags it as unused.
+                -->
+                <ignoredUnusedDeclaredDependency>org.apache.ozone:hdds-config</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.apache.ratis:ratis-thirdparty-misc</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
