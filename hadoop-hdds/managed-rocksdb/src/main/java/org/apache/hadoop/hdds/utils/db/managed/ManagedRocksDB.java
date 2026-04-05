@@ -75,6 +75,14 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     );
   }
 
+  public static ManagedRocksDB openAsSecondary(
+      final ManagedOptions options,
+      final String dbPath,
+      final String secondaryDbLogFilePath)
+      throws RocksDBException {
+    return new ManagedRocksDB(RocksDB.openAsSecondary(options, dbPath, secondaryDbLogFilePath));
+  }
+
   public static ManagedRocksDB open(
       final DBOptions options, final String path,
       final List<ColumnFamilyDescriptor> columnFamilyDescriptors,
