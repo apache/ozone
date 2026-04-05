@@ -725,11 +725,16 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     for (OmLCRule r: omLifecycleConfiguration.getRules()) {
       OzoneLifecycleConfiguration.OzoneLCExpiration e = null;
+      OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload a = null;
       OzoneLifecycleConfiguration.OzoneLCFilter f = null;
 
       if (r.getExpiration() != null) {
         e = new OzoneLifecycleConfiguration.OzoneLCExpiration(
             r.getExpiration().getDays(), r.getExpiration().getDate());
+      }
+      if (r.getAbortIncompleteMultipartUpload() != null) {
+        a = new OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload(
+            r.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
       }
       if (r.getFilter() != null) {
         OzoneLifecycleConfiguration.LifecycleAndOperator andOperator = null;
@@ -742,7 +747,7 @@ public final class OzoneBucketStub extends OzoneBucket {
       }
 
       rules.add(new OzoneLifecycleConfiguration.OzoneLCRule(r.getId(),
-          r.getEffectivePrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, f));
+          r.getEffectivePrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, a, f));
     }
 
     return new OzoneLifecycleConfiguration(

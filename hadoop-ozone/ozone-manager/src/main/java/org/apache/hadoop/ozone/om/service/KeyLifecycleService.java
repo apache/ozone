@@ -37,6 +37,7 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,6 +80,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -366,6 +369,10 @@ public class KeyLifecycleService extends BackgroundService {
           handleAndClearFullList(bucket, expiredKeyList, false);
           handleAndClearFullList(bucket, expiredDirList, true);
         }
+
+        // Process AbortIncompleteMultipartUpload actions
+        processMultipartUploads(bucket, ruleList);
+
         onSuccess(bucketKey);
       }
 
@@ -740,6 +747,156 @@ public class KeyLifecycleService extends BackgroundService {
       } catch (IOException e) {
         // log failure and continue the process to delete/move files already identified in this run
         LOG.warn("Failed to iterate through bucket {}/{}", volumeName, bucketName, e);
+      }
+    }
+
+    /**
+     * Process AbortIncompleteMultipartUpload actions for incomplete multipart uploads.
+     * Iterates through the multipartInfoTable and aborts uploads that match the rule criteria
+     * and have exceeded the configured days after initiation.
+     *
+     * @param bucketInfo the bucket information
+     * @param ruleList list of lifecycle rules to evaluate
+     */
+    private void processMultipartUploads(OmBucketInfo bucketInfo, List<OmLCRule> ruleList) {
+      // Filter rules that have AbortIncompleteMultipartUpload actions
+      List<OmLCRule> mpuRules = ruleList.stream()
+          .filter(r -> r.getAbortIncompleteMultipartUpload() != null)
+          .collect(Collectors.toList());
+
+      if (mpuRules.isEmpty()) {
+        return;
+      }
+
+      String volumeName = bucketInfo.getVolumeName();
+      String bucketName = bucketInfo.getBucketName();
+      String bucketPrefix = omMetadataManager.getMultipartKey(volumeName, bucketName, "", "");
+
+      LOG.debug("Processing AbortIncompleteMultipartUpload actions for bucket {}/{}", volumeName, bucketName);
+
+      List<OmMultipartUpload> expiredUploads = new ArrayList<>();
+
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
+               omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
+        while (mpuIterator.hasNext()) {
+          if (!shouldRun()) {
+            LOG.info("KeyLifecycleService is suspended or disabled. " +
+                "Stopping multipart upload processing for bucket {}.", bucketName);
+            return;
+          }
+
+          Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
+          OmMultipartKeyInfo mpuKeyInfo = entry.getValue();
+
+          // Extract multipart upload information from the key
+          OmMultipartUpload upload = OmMultipartUpload.from(entry.getKey());
+          upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
+          String keyName = upload.getKeyName();
+
+          // Check each rule to see if this upload should be aborted
+          for (OmLCRule rule : mpuRules) {
+            if (shouldAbortUpload(upload, keyName, rule)) {
+              expiredUploads.add(upload);
+              LOG.debug("Multipart upload {}/{}/{} with uploadId {} will be aborted",
+                  volumeName, bucketName, keyName, upload.getUploadId());
+              break;  // One rule match is enough
+            }
+          }
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to iterate multipartInfoTable for bucket {}/{}", volumeName, bucketName, e);
+        return;
+      }
+
+      if (!expiredUploads.isEmpty()) {
+        LOG.info("{} expired multipart uploads found for bucket {}/{}",
+            expiredUploads.size(), volumeName, bucketName);
+        abortExpiredMultipartUploads(bucketInfo, expiredUploads);
+      }
+    }
+
+    /**
+     * Check if a multipart upload should be aborted based on the lifecycle rule.
+     *
+     * @param upload the multipart upload information
+     * @param keyName the key name of the upload
+     * @param rule the lifecycle rule to evaluate against
+     * @return true if the upload should be aborted, false otherwise
+     */
+    private boolean shouldAbortUpload(OmMultipartUpload upload, String keyName, OmLCRule rule) {
+      // Check if upload age exceeds the threshold
+      if (!rule.getAbortIncompleteMultipartUpload().shouldAbort(
+          upload.getCreationTime().toEpochMilli())) {
+        return false;
+      }
+
+      // Check prefix matching
+      String effectivePrefix = rule.getEffectivePrefix();
+      if (effectivePrefix != null && !keyName.startsWith(effectivePrefix)) {
+        return false;
+      }
+
+      // TODO: Add tag filtering support when multipart uploads support tags
+
+      return true;
+    }
+
+    /**
+     * Abort expired multipart uploads by sending an abort request.
+     *
+     * @param bucketInfo the bucket information
+     * @param expiredUploads list of expired multipart uploads to abort
+     */
+    private void abortExpiredMultipartUploads(OmBucketInfo bucketInfo, List<OmMultipartUpload> expiredUploads) {
+      String volumeName = bucketInfo.getVolumeName();
+      String bucketName = bucketInfo.getBucketName();
+
+      List<OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo> expiredMPUInfoList = expiredUploads.stream()
+          .map(upload -> OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo.newBuilder()
+              .setName(upload.getDbKey())
+              .build())
+          .collect(Collectors.toList());
+
+      OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket expiredMPUBucket =
+          OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket.newBuilder()
+              .setVolumeName(volumeName)
+              .setBucketName(bucketName)
+              .addAllMultipartUploads(expiredMPUInfoList)
+              .build();
+
+      OzoneManagerProtocolProtos.MultipartUploadsExpiredAbortRequest abortRequest =
+          OzoneManagerProtocolProtos.MultipartUploadsExpiredAbortRequest.newBuilder()
+              .addExpiredMultipartUploadsPerBucket(expiredMPUBucket)
+              .build();
+
+      OMRequest omRequest = OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.AbortExpiredMultiPartUploads)
+          .setMultipartUploadsExpiredAbortRequest(abortRequest)
+          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setClientId(clientId.toString())
+          .build();
+
+      try {
+        long startTime = System.nanoTime();
+        OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
+            getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+        long endTime = System.nanoTime();
+
+        if (response != null) {
+          if (response.getSuccess()) {
+            LOG.info("Successfully aborted {} multipart uploads for bucket {}/{} in {} ns",
+                expiredUploads.size(), volumeName, bucketName, endTime - startTime);
+          } else {
+            LOG.error("Failed to abort multipart uploads for bucket {}/{}: {}",
+                volumeName, bucketName, response.getMessage());
+          }
+        } else {
+          LOG.error("Received null response when aborting multipart uploads for bucket {}/{}",
+              volumeName, bucketName);
+        }
+      } catch (ServiceException e) {
+        LOG.error("Failed to submit abort multipart uploads request for bucket {}/{}",
+            volumeName, bucketName, e);
       }
     }
 

@@ -318,4 +318,113 @@ class TestOmLCRule {
     assertEquals(30, ruleFromProto3.getExpiration().getDays());
     assertNull(ruleFromProto3.getFilter());
   }
+
+  @Test
+  public void testRuleWithAbortIncompleteMultipartUpload() throws OMException {
+    long currentTime = System.currentTimeMillis();
+
+    // Test rule with only AbortIncompleteMultipartUpload action
+    OmLCAbortIncompleteMultipartUpload abortAction =
+        new OmLCAbortIncompleteMultipartUpload.Builder()
+            .setDaysAfterInitiation(7)
+            .build();
+
+    OmLCRule.Builder rule1 = new OmLCRule.Builder()
+        .setId("abort-incomplete-uploads")
+        .setEnabled(true)
+        .setPrefix("uploads/")
+        .setAction(abortAction);
+
+    OmLCRule builtRule = rule1.build();
+    assertDoesNotThrow(() -> builtRule.valid(BucketLayout.DEFAULT, currentTime));
+    assertNotNull(builtRule.getAbortIncompleteMultipartUpload());
+    assertEquals(7, builtRule.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+  }
+
+  @Test
+  public void testRuleWithBothExpirationAndAbortActions() throws OMException {
+    long currentTime = System.currentTimeMillis();
+    
+    OmLCExpiration expiration = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+
+    OmLCAbortIncompleteMultipartUpload abortAction =
+        new OmLCAbortIncompleteMultipartUpload.Builder()
+            .setDaysAfterInitiation(7)
+            .build();
+
+    OmLCRule.Builder rule = new OmLCRule.Builder()
+        .setId("combined-rule")
+        .setEnabled(true)
+        .setPrefix("temp/")
+        .addAction(expiration)
+        .addAction(abortAction);
+
+    OmLCRule builtRule = rule.build();
+    assertDoesNotThrow(() -> builtRule.valid(BucketLayout.DEFAULT, currentTime));
+    assertNotNull(builtRule.getExpiration());
+    assertNotNull(builtRule.getAbortIncompleteMultipartUpload());
+    assertEquals(30, builtRule.getExpiration().getDays());
+    assertEquals(7, builtRule.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+  }
+
+  @Test
+  public void testProtobufConversionWithAbortAction() throws OMException {
+    long currentTime = System.currentTimeMillis();
+
+    OmLCAbortIncompleteMultipartUpload abortAction =
+        new OmLCAbortIncompleteMultipartUpload.Builder()
+            .setDaysAfterInitiation(14)
+            .build();
+
+    OmLCRule originalRule = new OmLCRule.Builder()
+        .setId("test-abort-rule")
+        .setEnabled(true)
+        .setPrefix("multipart/")
+        .setAction(abortAction)
+        .build();
+
+    LifecycleRule proto = originalRule.getProtobuf();
+
+    OmLCRule ruleFromProto = OmLCRule.getFromProtobuf(proto, BucketLayout.DEFAULT);
+    assertEquals("test-abort-rule", ruleFromProto.getId());
+    assertTrue(ruleFromProto.isEnabled());
+    assertEquals("multipart/", ruleFromProto.getPrefix());
+    assertNotNull(ruleFromProto.getAbortIncompleteMultipartUpload());
+    assertEquals(14, ruleFromProto.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+  }
+
+  @Test
+  public void testProtobufConversionWithBothActions() throws OMException {
+    long currentTime = System.currentTimeMillis();
+
+    OmLCExpiration expiration = new OmLCExpiration.Builder()
+        .setDays(60)
+        .build();
+
+    OmLCAbortIncompleteMultipartUpload abortAction =
+        new OmLCAbortIncompleteMultipartUpload.Builder()
+            .setDaysAfterInitiation(5)
+            .build();
+
+    OmLCRule originalRule = new OmLCRule.Builder()
+        .setId("combined-actions")
+        .setEnabled(true)
+        .setPrefix("data/")
+        .addAction(expiration)
+        .addAction(abortAction)
+        .build();
+
+    LifecycleRule proto = originalRule.getProtobuf();
+
+    OmLCRule ruleFromProto = OmLCRule.getFromProtobuf(proto, BucketLayout.DEFAULT);
+    assertEquals("combined-actions", ruleFromProto.getId());
+    assertTrue(ruleFromProto.isEnabled());
+    assertEquals("data/", ruleFromProto.getPrefix());
+    assertNotNull(ruleFromProto.getExpiration());
+    assertNotNull(ruleFromProto.getAbortIncompleteMultipartUpload());
+    assertEquals(60, ruleFromProto.getExpiration().getDays());
+    assertEquals(5, ruleFromProto.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+  }
 }
