@@ -63,6 +63,9 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preExecute(ozoneManager);
+    if (getModificationTime() < -1) {
+      throw new OMException(OMException.ResultCodes.INVALID_REQUEST);
+    }
     SetTimesRequest setTimesRequest = request.getSetTimesRequest();
     String keyPath = setTimesRequest.getKeyArgs().getKeyName();
     String normalizedKeyPath =
@@ -202,19 +205,13 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
-    String volume = null;
-    String bucket = null;
-    String key;
+
+    String volume = getVolumeName();
+    String bucket = getBucketName();
+    String key = getKeyName();
     boolean operationResult = false;
     Result result;
     try {
-      if (getModificationTime() < -1) {
-        throw new OMException(OMException.ResultCodes.INVALID_REQUEST);
-      }
-      volume = getVolumeName();
-      bucket = getBucketName();
-      key = getKeyName();
-
       mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
               bucket));

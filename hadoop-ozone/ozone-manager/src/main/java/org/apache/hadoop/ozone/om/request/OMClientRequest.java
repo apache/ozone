@@ -575,4 +575,8 @@ public abstract class OMClientRequest implements RequestAuditor {
   public void mergeOmLockDetails(OMLockDetails details) {
     omLockDetails.merge(details);
   }
+
+  protected void setOmRequest(OMRequest omRequest) {
+    this.omRequest = omRequest;
+  }
 }
