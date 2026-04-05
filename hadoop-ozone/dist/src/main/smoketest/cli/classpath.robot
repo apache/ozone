@@ -14,11 +14,20 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test ozone classpath command
+Documentation       Test ozone classpath command and --validate classpath checks (HDDS-7373)
 Library             BuiltIn
 Resource            ../lib/os.robot
 Resource            ../ozone-lib/shell.robot
 Test Timeout        5 minutes
+
+*** Variables ***
+${TEMP_DIR}    /tmp
+
+*** Keywords ***
+Append missing jar path to classpath descriptor
+    [arguments]    ${ozone_home}    ${artifact}    ${bogus_jar}
+    ${cp_file} =    Set Variable    ${ozone_home}/share/ozone/classpath/${artifact}.classpath
+    Execute    sed -i 's_$_:${bogus_jar}_' '${cp_file}'
 
 *** Test Cases ***
 Ignores HADOOP_CLASSPATH if OZONE_CLASSPATH is set
@@ -47,4 +56,36 @@ Adds optional dir entries
     ${output} =         Execute          ${OZONE_COPY}/bin/ozone classpath ozone-insight
                         Should Contain   ${output}   ${jars_dir}/ozone-insight/optional.jar
 
+    [teardown]    Remove Directory    ${OZONE_COPY}    recursive=True
+
+Validate classpath succeeds when all jars are present
+    ${output} =         Execute          ozone --validate classpath ozone-insight
+                        Should Contain   ${output}   Validating classpath file:
+                        Should Contain   ${output}   Validation SUCCESSFUL
+
+Validate classpath fails when classpath descriptor is missing
+    ${output} =         Execute and checkrc    ozone --validate classpath hdds-nonexistent-artifact-7373    1
+                        Should Contain   ${output}   ERROR: Classpath file descriptor
+
+Validate classpath fails when a listed jar is missing
+    ${OZONE_COPY} =     Set Variable     ${TEMP_DIR}/ozone-validate-missing-jar
+    ${bogus_jar} =     Set Variable     ${TEMP_DIR}/ozone-robot-missing-7373.jar
+    Copy Directory      ${OZONE_DIR}     ${OZONE_COPY}
+    Append missing jar path to classpath descriptor    ${OZONE_COPY}    ozone-insight    ${bogus_jar}
+    ${output} =         Execute and checkrc    ${OZONE_COPY}/bin/ozone --validate classpath ozone-insight    1
+                        Should Contain   ${output}   ERROR: Jar file ${bogus_jar} is missing
+                        Should Contain   ${output}   Validation FAILED due to missing jar files!
+    [teardown]    Remove Directory    ${OZONE_COPY}    recursive=True
+
+Validate with wrong subcommand prints usage
+    ${output} =         Execute and checkrc    ozone --validate version    1
+                        Should Contain   ${output}   Usage I: ozone --validate classpath
+
+Validate continue allows daemon command after failed classpath check
+    ${OZONE_COPY} =     Set Variable     ${TEMP_DIR}/ozone-validate-continue
+    ${bogus_jar} =     Set Variable     ${TEMP_DIR}/ozone-robot-missing-scm-7373.jar
+    Copy Directory      ${OZONE_DIR}     ${OZONE_COPY}
+    Append missing jar path to classpath descriptor    ${OZONE_COPY}    hdds-server-scm    ${bogus_jar}
+    ${output} =         Execute And Ignore Error    ${OZONE_COPY}/bin/ozone --validate continue --daemon status scm
+                        Should Contain   ${output}   Validation FAILED due to missing jar files! Continuing command execution
     [teardown]    Remove Directory    ${OZONE_COPY}    recursive=True
