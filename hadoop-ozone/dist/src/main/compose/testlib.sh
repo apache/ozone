@@ -179,7 +179,7 @@ start_docker_env(){
 
   docker-compose --ansi never down --remove-orphans
 
-  retry docker-compose --ansi never --progress quiet pull
+  retry docker-compose --ansi never pull
 
   opts=""
   if has_scalable_datanode; then
