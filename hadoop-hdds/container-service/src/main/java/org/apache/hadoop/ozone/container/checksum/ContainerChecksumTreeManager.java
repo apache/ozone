@@ -202,7 +202,7 @@ public class ContainerChecksumTreeManager {
         // Our block deleting service will eventually catch up.
         // Our container scanner will not update this deleted block in the merkle tree further even if it is still on
         // disk so that we remain in sync with the peer.
-        // TODO HDDS-11765 Add support for deleting blocks from our replica when a peer has already deleted the block.
+        // Actual block data and chunk file deletion is handled in KeyValueHandler.reconcileContainerInternal.
         report.addDivergedDeletedBlock(peerBlockMerkleTree);
       } else {
         // Neither our nor peer's block is deleted. Walk the chunk list to find differences.
