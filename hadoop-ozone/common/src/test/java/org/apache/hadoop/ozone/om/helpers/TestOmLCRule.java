@@ -371,8 +371,6 @@ class TestOmLCRule {
 
   @Test
   public void testProtobufConversionWithAbortAction() throws OMException {
-    long currentTime = System.currentTimeMillis();
-
     OmLCAbortIncompleteMultipartUpload abortAction =
         new OmLCAbortIncompleteMultipartUpload.Builder()
             .setDaysAfterInitiation(14)
@@ -397,8 +395,6 @@ class TestOmLCRule {
 
   @Test
   public void testProtobufConversionWithBothActions() throws OMException {
-    long currentTime = System.currentTimeMillis();
-
     OmLCExpiration expiration = new OmLCExpiration.Builder()
         .setDays(60)
         .build();
