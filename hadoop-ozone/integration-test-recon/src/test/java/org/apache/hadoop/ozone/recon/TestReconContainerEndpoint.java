@@ -222,8 +222,7 @@ public class TestReconContainerEndpoint {
             null, // ContainerHealthSchemaManager - not needed for this test
             recon.getReconServer().getReconNamespaceSummaryManager(),
             recon.getReconServer().getReconContainerMetadataManager(),
-            omMetadataManagerInstance,
-            new OzoneConfiguration());
+            omMetadataManagerInstance);
     return containerEndpoint.getKeysForContainer(containerId, 10, "");
   }
 
