@@ -44,7 +44,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -61,16 +60,14 @@ public final class ScmInvokerCodeGenerator {
 
   private final Class<?> api;
   private final String apiName;
-  private final String requestTypeName;
   private final String invokerClassName;
 
   private final StringWriter out = new StringWriter();
   private String indentation = "";
 
-  private ScmInvokerCodeGenerator(Class<?> api, RequestType type) {
+  private ScmInvokerCodeGenerator(Class<?> api) {
     this.api = api;
     this.apiName = api.getSimpleName();
-    this.requestTypeName = type.name();
     this.invokerClassName = apiName + "Invoker";
 
   }
@@ -209,7 +206,7 @@ public final class ScmInvokerCodeGenerator {
   List<Method> getMethods(Predicate<Method> filter) {
     return Arrays.stream(api.getMethods())
         .filter(filter)
-        .sorted(Comparator.comparing(Method::getName))
+        .sorted(Comparator.comparing(Method::getName).thenComparing(Method::getParameterCount))
         .collect(Collectors.toList());
   }
 
@@ -217,12 +214,14 @@ public final class ScmInvokerCodeGenerator {
     printf("enum ReplicateMethod implements NameAndParameterTypes");
     try (UncheckedAutoCloseable ignore = printScope()) {
       final List<Method> apiMethods = getMethods(null, null);
-      for (int i = 0; i < apiMethods.size(); i++) {
-        final Method m = apiMethods.get(i);
+      boolean first = true;
+      for (Method m : apiMethods) {
         if (m.isDefault() || m.getAnnotation(Replicate.class) == null) {
           continue;
         }
-        if (i > 0) {
+        if (first) {
+          first = false;
+        } else {
           println(false, ",");
         }
 
@@ -300,13 +299,6 @@ public final class ScmInvokerCodeGenerator {
 
     println();
     println("@Override");
-    printf("public RequestType getType()");
-    try (UncheckedAutoCloseable ignore = printScope()) {
-      println("return RequestType.%s;", requestTypeName);
-    }
-
-    println();
-    println("@Override");
     printf("public Class<%s> getApi()", apiName);
     try (UncheckedAutoCloseable ignore = printScope()) {
       println("return %s.class;", apiName);
@@ -367,6 +359,12 @@ public final class ScmInvokerCodeGenerator {
   }
 
   void printProxyClassMethod(Method method) {
+    final Replicate r = method.getAnnotation(Replicate.class);
+    if (r == null && method.isDefault()) {
+      // Do not print non-Replicate default methods, just use default implementation.
+      return;
+    }
+
     println();
     println("@Override");
     printf("public %s %s(%s)%s",
@@ -376,7 +374,6 @@ public final class ScmInvokerCodeGenerator {
         getThrowsString(method.getExceptionTypes()));
 
     try (UncheckedAutoCloseable ignored = printScope()) {
-      final Replicate r = method.getAnnotation(Replicate.class);
       final String args = IntStream.range(0, method.getParameterCount())
           .mapToObj(i -> "arg" + i)
           .reduce("", (a, b) -> a.isEmpty() ? b : a + ", " + b);
@@ -454,8 +451,8 @@ public final class ScmInvokerCodeGenerator {
     return java;
   }
 
-  public static void generate(Class<?> api, RequestType type, boolean updateFile) {
-    final ScmInvokerCodeGenerator generator = new ScmInvokerCodeGenerator(api, type);
+  public static void generate(Class<?> api, boolean updateFile) {
+    final ScmInvokerCodeGenerator generator = new ScmInvokerCodeGenerator(api);
     final String classString = generator.generateClass();
     if (!updateFile) {
       System.out.println(classString);

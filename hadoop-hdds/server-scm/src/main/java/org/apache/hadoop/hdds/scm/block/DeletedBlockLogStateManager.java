@@ -77,6 +77,6 @@ public interface DeletedBlockLogStateManager extends SCMHandler {
       Table<String, ByteString> statefulConfigTable);
 
   static void main(String[] args) {
-    ScmInvokerCodeGenerator.generate(DeletedBlockLogStateManager.class, RequestType.BLOCK, true);
+    ScmInvokerCodeGenerator.generate(DeletedBlockLogStateManager.class, true);
   }
 }

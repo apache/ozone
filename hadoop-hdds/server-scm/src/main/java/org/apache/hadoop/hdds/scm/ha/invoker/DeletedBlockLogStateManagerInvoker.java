@@ -64,14 +64,14 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
     return new DeletedBlockLogStateManager() {
 
       @Override
-      public void addTransactionsToDB(ArrayList arg0, DeletedBlocksTransactionSummary arg1) throws IOException {
-        final Object[] args = {arg0, arg1};
+      public void addTransactionsToDB(ArrayList arg0) throws IOException {
+        final Object[] args = {arg0};
         invoker.invokeReplicateDirect(ReplicateMethod.addTransactionsToDB, args);
       }
 
       @Override
-      public void addTransactionsToDB(ArrayList arg0) throws IOException {
-        final Object[] args = {arg0};
+      public void addTransactionsToDB(ArrayList arg0, DeletedBlocksTransactionSummary arg1) throws IOException {
+        final Object[] args = {arg0, arg1};
         invoker.invokeReplicateDirect(ReplicateMethod.addTransactionsToDB, args);
       }
 
