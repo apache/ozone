@@ -309,7 +309,7 @@ const Containers: React.FC<{}> = () => {
                   { value: 10000, label: '10K Records' },
                   { value: 100000, label: '100K Records' },
                   { value: 1000000, label: '1M Records' },
-                  { value: 5000000, label: '5M Records' }
+                  { value: 0, label: 'Complete' }
                 ]}
               />
               <Tooltip title={`Export ${tabToLabel[selectedTab]} containers as CSV`}>

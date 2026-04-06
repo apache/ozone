@@ -115,7 +115,6 @@ public class ContainerEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
   private BucketLayout layout = BucketLayout.DEFAULT;
-  private final int maxCsvExportRecords;
 
   /**
    * Enumeration representing different data filters.
@@ -154,8 +153,7 @@ public class ContainerEndpoint {
                            ContainerHealthSchemaManager containerHealthSchemaManager,
                            ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                            ReconContainerMetadataManager reconContainerMetadataManager,
-                           ReconOMMetadataManager omMetadataManager,
-                           OzoneConfiguration ozoneConfiguration) {
+                           ReconOMMetadataManager omMetadataManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
@@ -164,9 +162,6 @@ public class ContainerEndpoint {
     this.reconSCM = reconSCM;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.omMetadataManager = omMetadataManager;
-    this.maxCsvExportRecords = ozoneConfiguration.getInt(
-        ReconServerConfigKeys.OZONE_RECON_CSV_EXPORT_MAX_RECORDS_KEY,
-        ReconServerConfigKeys.OZONE_RECON_CSV_EXPORT_MAX_RECORDS_DEFAULT);
   }
 
   /**
@@ -489,12 +484,10 @@ public class ContainerEndpoint {
 
     // Must be effectively final for use in the lambda
     final ContainerSchemaDefinition.UnHealthyContainerStates filterState = internalState;
-    final int finalLimit = (limit <= 0 || limit > maxCsvExportRecords)
-        ? maxCsvExportRecords : limit;
 
     StreamingOutput stream = outputStream -> {
       try (Cursor<UnhealthyContainersRecord> cursor =
-               containerHealthSchemaManager.getUnhealthyContainersCursor(filterState, finalLimit)) {
+               containerHealthSchemaManager.getUnhealthyContainersCursor(filterState, limit)) {
         
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
         
