@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.QuasiClosedContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -110,6 +111,7 @@ public class ReconControllerModule extends AbstractModule {
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
 
     bind(ContainerHealthSchemaManager.class).in(Singleton.class);
+    bind(QuasiClosedContainerSchemaManager.class).in(Singleton.class);
     bind(ReconContainerMetadataManager.class)
         .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
     bind(ReconFileMetadataManager.class)

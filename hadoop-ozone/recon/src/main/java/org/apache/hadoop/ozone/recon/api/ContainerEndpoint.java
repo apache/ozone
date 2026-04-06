@@ -72,10 +72,14 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadat
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.QuasiClosedContainerSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.QuasiClosedContainerSchemaManager.QuasiClosedContainerRecord;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -102,6 +106,7 @@ public class ContainerEndpoint {
   private final ReconContainerManager containerManager;
   private final PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
+  private final QuasiClosedContainerSchemaManager quasiClosedSchemaManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
   private static final Logger LOG =
@@ -143,6 +148,7 @@ public class ContainerEndpoint {
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
                            ContainerHealthSchemaManager containerHealthSchemaManager,
+                           QuasiClosedContainerSchemaManager quasiClosedSchemaManager,
                            ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                            ReconContainerMetadataManager reconContainerMetadataManager,
                            ReconOMMetadataManager omMetadataManager) {
@@ -150,6 +156,7 @@ public class ContainerEndpoint {
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
     this.containerHealthSchemaManager = containerHealthSchemaManager;
+    this.quasiClosedSchemaManager = quasiClosedSchemaManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconSCM = reconSCM;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
@@ -810,6 +817,95 @@ public class ContainerEndpoint {
       response.put("lastKey", null);
     }
     response.put("containerDiscrepancyInfo", containerDiscrepancyInfoList);
+    return Response.ok(response).build();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // QUASI-CLOSED CONTAINER ENDPOINTS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns all containers currently in QUASI_CLOSED lifecycle state with
+   * cursor-based forward pagination.
+   *
+   * <p>QUASI_CLOSED containers are those locally closed by a datanode
+   * (e.g. due to a pipeline failure) but not yet force-closed to CLOSED by SCM.
+   * Long-running QUASI_CLOSED containers may indicate stalled pipeline finalization.
+   *
+   * @param limit          maximum containers to return (default: 1000)
+   * @param minContainerId cursor — return containers with ID &gt; minContainerId
+   * @return paginated list of quasi-closed containers with replica history
+   */
+  @GET
+  @Path("/quasiClosed")
+  public Response getQuasiClosedContainers(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_PREVKEY) long minContainerId) {
+    return buildQuasiClosedResponse(
+        quasiClosedSchemaManager.getQuasiClosedContainers(minContainerId, limit));
+  }
+
+  /**
+   * Returns QUASI_CLOSED containers belonging to a specific pipeline.
+   * Useful for diagnosing which pipelines have the most stuck containers.
+   *
+   * @param pipelineId     pipeline UUID to filter by
+   * @param limit          maximum containers to return
+   * @param minContainerId forward-pagination cursor
+   * @return paginated list of quasi-closed containers for the given pipeline
+   */
+  @GET
+  @Path("/quasiClosed/pipeline/{pipelineId}")
+  public Response getQuasiClosedContainersByPipeline(
+      @PathParam("pipelineId") String pipelineId,
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_PREVKEY) long minContainerId) {
+    if (pipelineId == null || pipelineId.isEmpty()) {
+      throw new WebApplicationException("pipelineId must not be empty",
+          Response.Status.BAD_REQUEST);
+    }
+    return buildQuasiClosedResponse(
+        quasiClosedSchemaManager.getByPipeline(pipelineId, minContainerId, limit));
+  }
+
+  /**
+   * Returns summary count of QUASI_CLOSED containers.
+   */
+  @GET
+  @Path("/quasiClosed/summary")
+  public Response getQuasiClosedSummary() {
+    long count = quasiClosedSchemaManager.getCount();
+    Map<String, Long> summary = new HashMap<>();
+    summary.put("quasiClosedCount", count);
+    return Response.ok(summary).build();
+  }
+
+  private Response buildQuasiClosedResponse(List<QuasiClosedContainerRecord> records) {
+    List<QuasiClosedContainerMetadata> metaList = new ArrayList<>();
+    long lastKey = 0L;
+    for (QuasiClosedContainerRecord rec : records) {
+      long containerId = rec.getContainerId();
+      List<ContainerHistory> replicas =
+          containerManager.getAllContainerHistory(containerId);
+      metaList.add(new QuasiClosedContainerMetadata(
+          containerId,
+          rec.getPipelineId(),
+          rec.getDatanodeCount(),
+          rec.getKeyCount(),
+          rec.getDataSize(),
+          rec.getReplicationType(),
+          rec.getReplicationFactor(),
+          rec.getStateEnterTime(),
+          rec.getFirstSeenTime(),
+          rec.getLastScanTime(),
+          replicas));
+      lastKey = Math.max(lastKey, containerId);
+    }
+    long totalCount = quasiClosedSchemaManager.getCount();
+    QuasiClosedContainersResponse response =
+        new QuasiClosedContainersResponse(totalCount, metaList, lastKey);
     return Response.ok(response).build();
   }
 }

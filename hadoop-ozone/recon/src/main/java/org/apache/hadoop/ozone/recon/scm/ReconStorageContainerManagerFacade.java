@@ -112,9 +112,11 @@ import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
+import org.apache.hadoop.ozone.recon.fsck.QuasiClosedContainerTask;
 import org.apache.hadoop.ozone.recon.fsck.ReconReplicationManager;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.QuasiClosedContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
@@ -164,6 +166,7 @@ public class ReconStorageContainerManagerFacade
   private ContainerSizeCountTask containerSizeCountTask;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private ReconReplicationManager reconReplicationManager;
+  private QuasiClosedContainerTask quasiClosedContainerTask;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
@@ -182,7 +185,8 @@ public class ReconStorageContainerManagerFacade
                                             ReconContext reconContext,
                                             DataSource dataSource,
                                             ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
-                                            ContainerHealthSchemaManager containerHealthSchemaManager)
+                                            ContainerHealthSchemaManager containerHealthSchemaManager,
+                                            QuasiClosedContainerSchemaManager quasiClosedSchemaManager)
       throws IOException {
     reconNodeDetails = reconUtils.getReconNodeDetails(conf);
     this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
@@ -377,6 +381,15 @@ public class ReconStorageContainerManagerFacade
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
     reconScmTasks.add(containerSizeCountTask);
+
+    // Create QuasiClosedContainerTask
+    LOG.info("Creating QuasiClosedContainerTask");
+    this.quasiClosedContainerTask = new QuasiClosedContainerTask(
+        containerManager,
+        quasiClosedSchemaManager,
+        reconTaskConfig,
+        taskStatusUpdaterManager);
+    reconScmTasks.add(quasiClosedContainerTask);
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
         reconTaskConfig, ozoneConfiguration);
