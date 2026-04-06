@@ -14,31 +14,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-<h1>Usage Statistics</h1>
-<table class="table table-bordered table-striped">
-    <thead>
-    <tr>
-        <th>Metric</th>
-        <th>Value</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-        <td>Number of Active Snapshots</td>
-        <td>{{$ctrl.snapshotUsageMetrics.NumSnapshotActive}}</td>
-    </tr>
-    <tr>
-        <td>Number of Deleted Snapshots</td>
-        <td>{{$ctrl.snapshotUsageMetrics.NumSnapshotDeleted}}</td>
-    </tr>
-    <tr>
-        <td>Snapshot Cache Size</td>
-        <td>{{$ctrl.snapshotUsageMetrics.NumSnapshotCacheSize}}</td>
-    </tr>
-    </tbody>
-</table>
 
-<div style="margin-bottom: 20px;"></div>
 
 <h1>Snapshot Diff Jobs</h1>
 
@@ -145,21 +121,4 @@
     </div>
 </div>
 
-<div style="margin-bottom: 20px;"></div>
 
-<h1>Snapshot Internal Metrics</h1>
-
-<table class="table table-bordered table-striped">
-    <thead>
-    <tr>
-        <th>Metric Name</th>
-        <th>Value</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr ng-repeat="metric in $ctrl.snapshotMetrics">
-        <td>{{metric.key}}</td>
-        <td>{{metric.value}}</td>
-    </tr>
-    </tbody>
-</table>
