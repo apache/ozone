@@ -56,8 +56,8 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
   @Override
   public RewriteTablePath rewriteLocationPrefix(String sPrefix, String tPrefix) {
-    checkNonNullNonEmpty(sPrefix, "Source prefix('%s') cannot be empty.");
-    checkNonNullNonEmpty(tPrefix, "Target prefix('%s') cannot be empty.");
+    checkNonNullNonEmpty(sPrefix, "Source prefix");
+    checkNonNullNonEmpty(tPrefix, "Target prefix");
     this.sourcePrefix = sPrefix;
     this.targetPrefix = tPrefix;
     return this;
@@ -65,21 +65,21 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
   @Override
   public RewriteTablePath startVersion(String sVersion) {
-    checkNonNullNonEmpty(sVersion, "Start version('%s') cannot be empty.");
+    checkNonNullNonEmpty(sVersion, "Start version");
     this.startVersionName = sVersion;
     return this;
   }
 
   @Override
   public RewriteTablePath endVersion(String eVersion) {
-    checkNonNullNonEmpty(eVersion, "End version('%s') cannot be empty.");
+    checkNonNullNonEmpty(eVersion, "End version");
     this.endVersionName = eVersion;
     return this;
   }
 
   @Override
   public RewriteTablePath stagingLocation(String stagingLocation) {
-    checkNonNullNonEmpty(stagingLocation, "Staging location('%s') cannot be empty.");
+    checkNonNullNonEmpty(stagingLocation, "Staging location");
     this.stagingDir = stagingLocation;
     return this;
   }
@@ -200,11 +200,10 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     return metadataDir;
   }
 
-  private static void checkNonNullNonEmpty(String value, String messageFormat) {
-    String message = String.format(messageFormat, value);
-    Objects.requireNonNull(value, message);
+  private static void checkNonNullNonEmpty(String value, String name) {
+    Objects.requireNonNull(value, () -> name + " is null");
     if (value.trim().isEmpty()) {
-      throw new IllegalArgumentException(message);
+      throw new IllegalArgumentException(name + " is empty");
     }
   }
 }
