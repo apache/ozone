@@ -144,7 +144,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
   private ReconfigurationHandler reconfigurationHandler;
-  private TracingConfig tracingConfig;
   private String tracingServiceName;
   private String scmServiceId;
 
@@ -257,7 +256,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       tracingServiceName = "HddsDatanodeService." + datanodeDetails.getID();
-      tracingConfig = conf.getObject(TracingConfig.class);
+      TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
       TracingUtil.initTracing(tracingServiceName, conf);
       LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled

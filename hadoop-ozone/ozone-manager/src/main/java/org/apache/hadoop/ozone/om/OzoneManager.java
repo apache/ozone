@@ -391,7 +391,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private OmConfig config;
-  private TracingConfig tracingConfig;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
@@ -513,6 +512,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Objects.requireNonNull(conf, "conf == null");
     setConfiguration(conf);
+    TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
     // Load HA related configurations
     OMHANodeDetails omhaNodeDetails =
         OMHANodeDetails.loadOMHAConfig(configuration);
@@ -540,7 +540,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
     reconfigurationHandler.registerCompleteCallback((changedKeys, newConf) -> {
       if (changedKeys.keySet().stream()
-          .anyMatch(k -> k.startsWith("ozone.tracing."))){
+          .anyMatch(k -> k.startsWith("ozone.tracing."))) {
         TracingUtil.reconfigureTracing("OzoneManager", (OzoneConfiguration) newConf);
       }
     });
@@ -4476,7 +4476,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void setConfiguration(OzoneConfiguration conf) {
     this.configuration = conf;
     config = conf.getObject(OmConfig.class);
-    tracingConfig = conf.getObject(TracingConfig.class);
   }
 
   public OzoneConfiguration reloadConfiguration() {

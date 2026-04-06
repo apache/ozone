@@ -138,6 +138,7 @@ public final class TracingUtil {
       throw e;
     }
   }
+
   /**
    * Export the active tracing span as a string.
    *
