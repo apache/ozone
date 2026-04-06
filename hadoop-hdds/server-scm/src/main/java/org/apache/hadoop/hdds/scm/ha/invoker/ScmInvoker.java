@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler.translateExce
 import java.util.function.Function;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -29,7 +30,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 /**
  * Invokes methods without using reflection.
  */
-public abstract class ScmInvoker<T> {
+public abstract class ScmInvoker<T extends SCMHandler> {
   private final T impl;
   private final T proxy;
   private final SCMRatisServer ratisHandler;
@@ -40,7 +41,9 @@ public abstract class ScmInvoker<T> {
     this.ratisHandler = ratisHandler;
   }
 
-  public abstract RequestType getType();
+  public final RequestType getType() {
+    return getImpl().getType();
+  }
 
   public abstract Class<T> getApi();
 

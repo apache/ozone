@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -31,7 +32,13 @@ import org.apache.hadoop.hdds.utils.db.Table;
  * DeletedBlockLogStateManager interface to
  * manage deleted blocks and record them in the underlying persist store.
  */
-public interface DeletedBlockLogStateManager {
+public interface DeletedBlockLogStateManager extends SCMHandler {
+
+  @Override
+  default RequestType getType() {
+    return RequestType.BLOCK;
+  }
+
   @Replicate
   void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException;

@@ -72,14 +72,14 @@ public interface SCMRatisServer {
 
   RaftPeerId getLeaderId();
 
-  default <T> T getProxyHandler(ScmInvoker<T> invoker) {
+  default <T extends SCMHandler> T getProxyHandler(ScmInvoker<T> invoker) {
     registerStateMachineHandler(invoker.getType(), invoker.getImpl());
     return invoker.getProxy();
   }
 
-  default <T> T getProxyHandler(RequestType type, Class<T> intf, T impl) {
+  default <T extends SCMHandler> T getProxyHandler(Class<T> intf, T impl) {
     final SCMHAInvocationHandler invocationHandler =
-        new SCMHAInvocationHandler(type, impl, this);
+        new SCMHAInvocationHandler(impl.getType(), impl, this);
     return intf.cast(Proxy.newProxyInstance(getClass().getClassLoader(),
         new Class<?>[] {intf}, invocationHandler));
   }

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha.invoker;
 import java.io.IOException;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -54,11 +53,6 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
 
   public DeletedBlockLogStateManagerInvoker(DeletedBlockLogStateManager impl, SCMRatisServer ratis) {
     super(impl, DeletedBlockLogStateManagerInvoker::newProxy, ratis);
-  }
-
-  @Override
-  public RequestType getType() {
-    return RequestType.BLOCK;
   }
 
   @Override
