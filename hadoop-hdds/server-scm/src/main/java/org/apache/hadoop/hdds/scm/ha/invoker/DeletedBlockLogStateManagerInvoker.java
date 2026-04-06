@@ -65,11 +65,6 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
   }
 
   @Override
-  public RequestType getType() {
-    return impl.getType();
-  }
-
-  @Override
   public Class<DeletedBlockLogStateManager> getApi() {
     return DeletedBlockLogStateManager.class;
   }

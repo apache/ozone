@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -220,4 +221,9 @@ public interface ContainerStateManager extends SCMHandler {
    */
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
+
+  @Override
+  default RequestType getType() {
+    return RequestType.CONTAINER;
+  }
 }

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import java.util.List;
 import java.util.UUID;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
@@ -56,4 +57,9 @@ public interface SecretKeyState extends SCMHandler {
    * Update SecretKeys from a snapshot from SCM leader.
    */
   void reinitialize(List<ManagedSecretKey> secretKeys);
+
+  @Override
+  default RequestType getType() {
+    return RequestType.SECRET_KEY;
+  }
 }

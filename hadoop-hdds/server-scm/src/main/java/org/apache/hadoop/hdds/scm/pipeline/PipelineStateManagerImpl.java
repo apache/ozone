@@ -27,7 +27,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
@@ -325,11 +324,6 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
   // legacy interfaces end
   public static Builder newBuilder() {
     return new Builder();
-  }
-
-  @Override
-  public RequestType getType() {
-    return RequestType.PIPELINE;
   }
 
   /**

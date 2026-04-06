@@ -28,7 +28,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -196,11 +195,6 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
   public void setSubCACertId(String subCACertId) {
     newSubCACertId.set(subCACertId);
     LOG.info("Scm sub CA new certificate is {}", subCACertId);
-  }
-
-  @Override
-  public RequestType getType() {
-    return RequestType.CERT_ROTATE;
   }
 
   /**

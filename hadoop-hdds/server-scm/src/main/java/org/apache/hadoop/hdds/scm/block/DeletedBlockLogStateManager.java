@@ -33,6 +33,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
  * manage deleted blocks and record them in the underlying persist store.
  */
 public interface DeletedBlockLogStateManager extends SCMHandler {
+
+  @Override
+  default RequestType getType() {
+    return RequestType.BLOCK;
+  }
+
   @Replicate
   void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException;

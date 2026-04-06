@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.slf4j.Logger;
@@ -45,11 +44,6 @@ public final class StatefulServiceStateManagerImpl
       DBTransactionBuffer scmDBTransactionBuffer) {
     this.statefulServiceConfig = statefulServiceConfig;
     this.transactionBuffer = scmDBTransactionBuffer;
-  }
-
-  @Override
-  public RequestType getType() {
-    return RequestType.STATEFUL_SERVICE_CONFIG;
   }
 
   /**

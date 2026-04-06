@@ -213,6 +213,11 @@ public class SequenceIdGenerator {
      * during SCM reload.
      */
     void reinitialize(Table<String, Long> sequenceIdTable) throws IOException;
+
+    @Override
+    default RequestType getType() {
+      return RequestType.SEQUENCE_ID;
+    }
   }
 
   /**
@@ -289,11 +294,6 @@ public class SequenceIdGenerator {
           sequenceIdToLastIdMap.put(sequenceIdName, lastId);
         }
       }
-    }
-
-    @Override
-    public RequestType getType() {
-      return RequestType.SEQUENCE_ID;
     }
 
     /**

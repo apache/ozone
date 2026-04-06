@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
@@ -287,11 +286,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
         throw new IOException(msg, ex);
       }
     }
-  }
-
-  @Override
-  public RequestType getType() {
-    return RequestType.FINALIZE;
   }
 
   /**

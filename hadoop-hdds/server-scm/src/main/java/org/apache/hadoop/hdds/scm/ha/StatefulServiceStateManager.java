@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
 
@@ -65,4 +66,9 @@ public interface StatefulServiceStateManager extends SCMHandler {
    * {@link org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore}
    */
   void reinitialize(Table<String, ByteString> statefulServiceConfig);
+
+  @Override
+  default RequestType getType() {
+    return RequestType.STATEFUL_SERVICE_CONFIG;
+  }
 }

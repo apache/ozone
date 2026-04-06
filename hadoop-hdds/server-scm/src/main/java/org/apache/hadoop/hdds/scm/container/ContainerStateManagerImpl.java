@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
@@ -264,11 +263,6 @@ public final class ContainerStateManagerImpl
     actions.put(FINALIZE, info -> pipelineManager
         .removeContainerFromPipeline(info.getPipelineID(), info.containerID()));
     return actions;
-  }
-
-  @Override
-  public RequestType getType() {
-    return RequestType.CONTAINER;
   }
 
   @Override

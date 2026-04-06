@@ -30,7 +30,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -193,11 +192,6 @@ public final class SCMCertStore implements CertificateStore {
   @Override
   public void reinitialize(SCMMetadataStore metadataStore) {
     this.scmMetadataStore = metadataStore;
-  }
-
-  @Override
-  public RequestType getType() {
-    return RequestType.CERT_STORE;
   }
 
   /**

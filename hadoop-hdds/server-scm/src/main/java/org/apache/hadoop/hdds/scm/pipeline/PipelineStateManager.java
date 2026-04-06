@@ -24,6 +24,7 @@ import java.util.NavigableSet;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
@@ -108,4 +109,9 @@ public interface PipelineStateManager extends SCMHandler {
 
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException;
+
+  @Override
+  default RequestType getType() {
+    return RequestType.PIPELINE;
+  }
 }

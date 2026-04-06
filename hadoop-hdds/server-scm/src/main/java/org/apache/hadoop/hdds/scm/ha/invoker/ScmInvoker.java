@@ -36,7 +36,9 @@ public abstract class ScmInvoker<T extends SCMHandler> {
     this.ratisHandler = ratisHandler;
   }
 
-  public abstract RequestType getType();
+  public final RequestType getType() {
+    return getImpl().getType();
+  }
 
   public abstract Class<T> getApi();
 
