@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -77,11 +76,6 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
   @Override
   public DeletedBlockLogStateManager getProxy() {
     return new DeletedBlockLogStateManager() {
-      @Override
-      public RequestType getType() {
-        return impl.getType();
-      }
-
       @Override
       public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
           throws IOException {
