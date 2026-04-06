@@ -49,9 +49,23 @@ import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
- * A tool to (manually) generate code for copy-paste.
+ * Generate code for {@link ScmInvoker} implementations.
+ * Step 1. Create the target java file in {@link #DIR}.  It will be used as an input for license header and imports.
+ * Step 2. Add main method to the API interface.
+ * Step 3. Manually fix imports.
+ * <p>
+ * Below is an example for generating the API interface FinalizationStateManager:
+ * Step 1. Copy FinalizationStateManager.java to DIR/FinalizationStateManagerInvoker.java
+ * Step 2. //FinalizationStateManager
+ *         static void main(String[] args) {
+ *           ScmInvokerCodeGenerator.generate(FinalizationStateManager.class, true);
+ *         }
+ * Step 3. Manually fix imports.
  */
 public final class ScmInvokerCodeGenerator {
+  static final String DIR = "hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/ha/invoker/";
+  static final int LINE_LENGTH = 120;
+
   static final DeclaredMethod INVOKE_LOCAL = new DeclaredMethod("invokeLocal",
       new Class[]{String.class, Object[].class},
       new String[]{"methodName", "p"},
@@ -62,6 +76,7 @@ public final class ScmInvokerCodeGenerator {
   private final String apiName;
   private final String invokerClassName;
 
+  private final StringBuilder lineBuffer = new StringBuilder();
   private final StringWriter out = new StringWriter();
   private String indentation = "";
 
@@ -78,9 +93,9 @@ public final class ScmInvokerCodeGenerator {
 
   void printf(boolean indent, String format, Object... args) {
     if (indent) {
-      out.append(indentation);
+      lineBuffer.append(indentation);
     }
-    out.append(String.format(format, args));
+    lineBuffer.append(String.format(format, args));
   }
 
   void println() {
@@ -93,7 +108,28 @@ public final class ScmInvokerCodeGenerator {
 
   void println(boolean indent, String format, Object... args) {
     printf(indent, format, args);
-    out.append(System.lineSeparator());
+
+    String s = lineBuffer.toString();
+    lineBuffer.setLength(0);
+
+    if (s.length() <= LINE_LENGTH) {
+      out.append(s).append(System.lineSeparator());
+      return;
+    }
+
+    // break long lines
+    int nonSpace = 0;
+    while (s.charAt(nonSpace) == ' ') {
+      nonSpace++;
+    }
+
+    final int i = s.lastIndexOf(" ", LINE_LENGTH);
+    out.append(s.substring(0, i))
+        .append(System.lineSeparator());
+    out.append(s.substring(0, nonSpace)) // original indentation
+        .append("    ")
+        .append(s.substring(i + 1))
+        .append(System.lineSeparator());
   }
 
   UncheckedAutoCloseable printScope() {
@@ -407,8 +443,7 @@ public final class ScmInvokerCodeGenerator {
   }
 
   public String generateClass() {
-    out.getBuffer().setLength(0);
-    println("/** Code generated for %s.  Do not modify. */", apiName);
+    println("/** Code generated for {@link %s}.  Do not modify. */", apiName);
     printf("public class %s extends ScmInvoker<%s>", invokerClassName, apiName);
     try (UncheckedAutoCloseable ignored = printScope()) {
       printEnum();
@@ -420,12 +455,11 @@ public final class ScmInvokerCodeGenerator {
   }
 
   File updateFile(String classString) throws IOException {
-    final String dir = "hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/ha/invoker/";
-    final File java = new File(dir, invokerClassName + ".java");
+    final File java = new File(DIR, invokerClassName + ".java");
     if (!java.isFile()) {
       throw new FileNotFoundException("Not found: " + java.getAbsolutePath());
     }
-    final File tmp = new File(dir, invokerClassName + "_tmp.java");
+    final File tmp = new File(DIR, invokerClassName + "_tmp.java");
     if (tmp.exists()) {
       throw new IOException("Already exist: " + java.getAbsolutePath());
     }
