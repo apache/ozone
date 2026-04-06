@@ -51,6 +51,7 @@ public final class TracingUtil {
 
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
+  private static SdkTracerProvider sdkTracerProvider;
 
   private TracingUtil() {
   }
@@ -58,7 +59,7 @@ public final class TracingUtil {
   /**
    * Initialize the tracing with the given service name.
    */
-  public static void initTracing(
+  public static synchronized void initTracing(
       String serviceName, ConfigurationSource conf) {
     if (!isTracingEnabled(conf) || isInit) {
       return;
@@ -71,6 +72,25 @@ public final class TracingUtil {
     } catch (Exception e) {
       LOG.error("Failed to initialize tracing", e);
     }
+  }
+
+  /**
+   * Shuts down and re-initializes tracing.
+   * Called after tracing-related keys are reconfigured on OM/SCM/DN.
+   */
+  public static synchronized void reconfigureTracing(
+      String serviceName, ConfigurationSource conf) {
+    shutdownTracing();
+    initTracing(serviceName, conf);
+  }
+
+  private static void shutdownTracing() {
+    if (sdkTracerProvider != null) {
+      sdkTracerProvider.shutdown();
+      sdkTracerProvider = null;
+    }
+    tracer = OpenTelemetry.noop().getTracer("noop");
+    isInit = false;
   }
 
   private static void initialize(String serviceName, ConfigurationSource conf) {
@@ -106,12 +126,18 @@ public final class TracingUtil {
         .setResource(resource)
         .setSampler(sampler)
         .build();
-    OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
-        .setTracerProvider(tracerProvider)
-        .build();
-    tracer = openTelemetry.getTracer(serviceName);
-  }
 
+    try {
+      OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
+          .setTracerProvider(tracerProvider)
+          .build();
+      tracer = openTelemetry.getTracer(serviceName);
+      sdkTracerProvider = tracerProvider;
+    } catch (RuntimeException e) {
+      tracerProvider.shutdown();
+      throw e;
+    }
+  }
   /**
    * Export the active tracing span as a string.
    *

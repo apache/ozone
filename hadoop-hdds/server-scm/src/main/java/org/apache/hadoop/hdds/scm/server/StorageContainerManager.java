@@ -168,6 +168,8 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -285,6 +287,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ContainerTokenSecretManager containerTokenMgr;
 
   private OzoneConfiguration configuration;
+  private final TracingConfig tracingConfig;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
@@ -357,6 +360,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
+    tracingConfig = conf.getObject(TracingConfig.class);
     initMetrics();
     initPerfMetrics();
 
@@ -422,9 +426,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
             .register(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
-                this::reconfigureSafeModeLogInterval);
+                this::reconfigureSafeModeLogInterval)
+            .register(tracingConfig);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+    reconfigurationHandler.registerCompleteCallback((changedKeys, newConf) -> {
+      if (changedKeys.keySet().stream()
+          .anyMatch(k -> k.startsWith("ozone.tracing."))) {
+        TracingUtil.reconfigureTracing("StorageContainerManager",
+            (OzoneConfiguration) newConf);
+      }
+    });
 
     initializeSystemManagers(conf, configurator);
 
