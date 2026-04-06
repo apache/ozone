@@ -482,7 +482,6 @@ public class ContainerEndpoint {
       }
     }
 
-    // Must be effectively final for use in the lambda
     final ContainerSchemaDefinition.UnHealthyContainerStates filterState = internalState;
 
     StreamingOutput stream = outputStream -> {
