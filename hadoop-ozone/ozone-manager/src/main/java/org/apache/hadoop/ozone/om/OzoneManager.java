@@ -1863,6 +1863,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metricsTimer = new Timer();
     metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
 
+    LOG.info("Starting OmSnapshotDirectoryMetrics");
+
+    metrics.startSnapshotDirectoryMetrics(configuration, getMetadataManager());
+
     try {
       scmTopologyClient.start(configuration);
     } catch (IOException ex) {
@@ -1944,6 +1948,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ScheduleOMMetricsWriteTask scheduleOMMetricsWriteTask = new ScheduleOMMetricsWriteTask();
     metricsTimer = new Timer();
     metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
+
+    // Restart snapshot directory metrics updates
+    metrics.stopSnapshotDirectoryMetrics();
+    metrics.startSnapshotDirectoryMetrics(configuration, getMetadataManager());
 
     initializeRatisServer(false);
     if (omRatisServer != null) {
