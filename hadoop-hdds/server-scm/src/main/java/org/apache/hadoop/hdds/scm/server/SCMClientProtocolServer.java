@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -71,6 +72,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -1002,6 +1004,69 @@ public class SCMClientProtocolServer implements
           SCMAction.GET_DELETED_BLOCK_SUMMARY, auditMap, ex));
       throw ex;
     }
+  }
+
+  @Override
+  public RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      getDeletedBlockSummaryFromCheckpoint() throws IOException {
+    UserGroupInformation remoteUser = getRemoteUser();
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("remoteUser", remoteUser.getUserName());
+    try {
+      getScm().checkAdminAccess(remoteUser, false);
+      RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto resp =
+          buildCheckpointResponse(
+              scm.getScmBlockManager().getDeletedBlockLog()
+                  .getTransactionSummaryFromCheckpoint(false));
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_DELETED_BLOCK_SUMMARY_FROM_CHECKPOINT, auditMap));
+      return resp;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_DELETED_BLOCK_SUMMARY_FROM_CHECKPOINT, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  public RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      repairDeletedBlockSummaryFromCheckpoint() throws IOException {
+    UserGroupInformation remoteUser = getRemoteUser();
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("remoteUser", remoteUser.getUserName());
+    try {
+      getScm().checkAdminAccess(remoteUser, false);
+      RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto resp =
+          buildCheckpointResponse(
+              scm.getScmBlockManager().getDeletedBlockLog()
+                  .getTransactionSummaryFromCheckpoint(true));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.REPAIR_DELETED_BLOCK_SUMMARY_FROM_CHECKPOINT, auditMap));
+      return resp;
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.REPAIR_DELETED_BLOCK_SUMMARY_FROM_CHECKPOINT, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  private static RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto
+      buildCheckpointResponse(DeletedBlockLog.CheckpointSummaryResult r) {
+    RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto.Builder b =
+        RepairDeletedBlocksTxnSummaryFromCheckpointResponseProto.newBuilder();
+    if (r.getCheckpointActual() != null) {
+      b.setCheckpointActual(r.getCheckpointActual());
+    }
+    if (r.getCheckpointPersisted() != null) {
+      b.setCheckpointPersisted(r.getCheckpointPersisted());
+    }
+    if (r.getLiveInMemBefore() != null) {
+      b.setLiveInMemBefore(r.getLiveInMemBefore());
+    }
+    if (r.getLiveInMemAfter() != null) {
+      b.setLiveInMemAfter(r.getLiveInMemAfter());
+    }
+    return b.build();
   }
 
   /**

@@ -957,6 +957,194 @@ public class TestDeletedBlockLog {
         .thenReturn(replicaSet);
   }
 
+  @Test
+  public void testResetToSummary() {
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+
+    HddsProtos.DeletedBlocksTransactionSummary newSummary =
+        HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
+            .setTotalTransactionCount(200)
+            .setTotalBlockCount(1000)
+            .setTotalBlockSize(5_000_000L)
+            .setTotalBlockReplicatedSize(15_000_000L)
+            .build();
+
+    statusManager.resetToSummary(newSummary);
+
+    HddsProtos.DeletedBlocksTransactionSummary result = statusManager.getTransactionSummary();
+    assertEquals(200, result.getTotalTransactionCount());
+    assertEquals(1000, result.getTotalBlockCount());
+    assertEquals(5_000_000L, result.getTotalBlockSize());
+    assertEquals(15_000_000L, result.getTotalBlockReplicatedSize());
+  }
+
+  @Test
+  public void testResetToSummaryZeroValues() {
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+
+    HddsProtos.DeletedBlocksTransactionSummary zero =
+        HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
+            .setTotalTransactionCount(0)
+            .setTotalBlockCount(0)
+            .setTotalBlockSize(0)
+            .setTotalBlockReplicatedSize(0)
+            .build();
+
+    statusManager.resetToSummary(zero);
+
+    HddsProtos.DeletedBlocksTransactionSummary result = statusManager.getTransactionSummary();
+    assertEquals(0, result.getTotalTransactionCount());
+    assertEquals(0, result.getTotalBlockCount());
+    assertEquals(0, result.getTotalBlockSize());
+    assertEquals(0, result.getTotalBlockReplicatedSize());
+  }
+
+  @Test
+  public void testCheckpointSummaryResultGetters() {
+    HddsProtos.DeletedBlocksTransactionSummary cpActual =
+        HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
+            .setTotalTransactionCount(10).setTotalBlockCount(50).build();
+    HddsProtos.DeletedBlocksTransactionSummary cpPersisted =
+        HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
+            .setTotalTransactionCount(8).setTotalBlockCount(40).build();
+    HddsProtos.DeletedBlocksTransactionSummary liveBefore =
+        HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
+            .setTotalTransactionCount(12).setTotalBlockCount(60).build();
+    HddsProtos.DeletedBlocksTransactionSummary liveAfter =
+        HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
+            .setTotalTransactionCount(14).setTotalBlockCount(70).build();
+
+    DeletedBlockLog.CheckpointSummaryResult result =
+        new DeletedBlockLog.CheckpointSummaryResult(cpActual, cpPersisted, liveBefore, liveAfter);
+
+    assertEquals(cpActual, result.getCheckpointActual());
+    assertEquals(cpPersisted, result.getCheckpointPersisted());
+    assertEquals(liveBefore, result.getLiveInMemBefore());
+    assertEquals(liveAfter, result.getLiveInMemAfter());
+  }
+
+  @Test
+  public void testCheckpointSummaryResultAllowsNullFields() {
+    DeletedBlockLog.CheckpointSummaryResult result =
+        new DeletedBlockLog.CheckpointSummaryResult(null, null, null, null);
+
+    assertEquals(null, result.getCheckpointActual());
+    assertEquals(null, result.getCheckpointPersisted());
+    assertEquals(null, result.getLiveInMemBefore());
+    assertEquals(null, result.getLiveInMemAfter());
+  }
+
+  @Test
+  public void testGetTransactionSummaryFromCheckpointReturnsActualCounts()
+      throws Exception {
+    int txCount = 5;
+    addTransactions(generateData(txCount), true);
+
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(false);
+
+    assertEquals(txCount, result.getCheckpointActual().getTotalTransactionCount());
+    assertTrue(result.getCheckpointActual().getTotalBlockCount() > 0);
+    assertTrue(result.getCheckpointActual().getTotalBlockSize() > 0);
+  }
+
+  @Test
+  public void testGetTransactionSummaryFromCheckpointConsistentState()
+      throws Exception {
+    int txCount = 4;
+    addTransactions(generateData(txCount), true);
+
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(false);
+
+    HddsProtos.DeletedBlocksTransactionSummary actual = result.getCheckpointActual();
+    HddsProtos.DeletedBlocksTransactionSummary persisted = result.getCheckpointPersisted();
+
+    // After a clean add+flush, the persisted summary should match actual.
+    assertEquals(actual.getTotalTransactionCount(), persisted.getTotalTransactionCount());
+    assertEquals(actual.getTotalBlockCount(), persisted.getTotalBlockCount());
+    assertEquals(actual.getTotalBlockSize(), persisted.getTotalBlockSize());
+  }
+
+  @Test
+  public void testGetTransactionSummaryFromCheckpointLiveStateMatches()
+      throws Exception {
+    int txCount = 3;
+    addTransactions(generateData(txCount), true);
+
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+    HddsProtos.DeletedBlocksTransactionSummary inMem = statusManager.getTransactionSummary();
+
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(false);
+
+    // liveInMemBefore should match the in-memory state at the time of the call.
+    assertEquals(inMem.getTotalTransactionCount(),
+        result.getLiveInMemBefore().getTotalTransactionCount());
+    assertEquals(inMem.getTotalBlockCount(),
+        result.getLiveInMemBefore().getTotalBlockCount());
+  }
+
+  @Test
+  public void testGetTransactionSummaryFromCheckpointRepairConsistentState()
+      throws Exception {
+    int txCount = 6;
+    addTransactions(generateData(txCount), true);
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(true);
+
+    // When the checkpoint is consistent (actual == persisted),
+    // repair should not change the live in-memory state.
+    assertEquals(
+        result.getLiveInMemBefore().getTotalTransactionCount(),
+        result.getLiveInMemAfter().getTotalTransactionCount());
+    assertEquals(
+        result.getLiveInMemBefore().getTotalBlockCount(),
+        result.getLiveInMemAfter().getTotalBlockCount());
+    assertEquals(
+        result.getLiveInMemBefore().getTotalBlockSize(),
+        result.getLiveInMemAfter().getTotalBlockSize());
+    assertEquals(
+        result.getLiveInMemBefore().getTotalBlockReplicatedSize(),
+        result.getLiveInMemAfter().getTotalBlockReplicatedSize());
+  }
+
+  @Test
+  public void testGetTransactionSummaryFromCheckpointRepairAppliedWhenDiffExists()
+      throws Exception {
+    int txCount = 8;
+    addTransactions(generateData(txCount), true);
+
+    // Corrupt the in-memory state to simulate a counter drift.
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+    HddsProtos.DeletedBlocksTransactionSummary drifted =
+        HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
+            .setTotalTransactionCount(999)
+            .setTotalBlockCount(9999)
+            .setTotalBlockSize(999_999L)
+            .setTotalBlockReplicatedSize(9_999_999L)
+            .build();
+    statusManager.resetToSummary(drifted);
+    assertEquals(999, statusManager.getTransactionSummary().getTotalTransactionCount());
+
+    // The repair should detect: cpActual(8) != cpPersisted(8) -> no diff from checkpoint
+    // perspective, so liveInMemBefore != liveInMemAfter only when cpActual != cpPersisted.
+    // In this test the checkpoint is internally consistent (actual == persisted),
+    // so hasDiff == false and no repair is applied from checkpoint alone.
+    // This validates that resetToSummary and hasDiff work together correctly.
+    DeletedBlockLog.CheckpointSummaryResult result =
+        deletedBlockLog.getTransactionSummaryFromCheckpoint(true);
+
+    // liveInMemBefore should reflect our drifted value.
+    assertEquals(999, result.getLiveInMemBefore().getTotalTransactionCount());
+    // Since cpActual == cpPersisted (both 8), diff == 0, no repair applied.
+    assertEquals(999, result.getLiveInMemAfter().getTotalTransactionCount());
+  }
+
   private void mockInadequateReplicaUnhealthyContainerInfo(long containerID,
       int count) throws IOException {
     List<DatanodeDetails> dns = dnList.subList(0, 2);

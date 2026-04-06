@@ -64,6 +64,13 @@ public interface DeletedBlockLogStateManager {
   Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
       throws IOException;
 
+  /**
+   * Persists a corrected summary into the stateful-config table via the Raft
+   * write batch. Called under the deletion lock during a repair operation.
+   */
+  @Replicate
+  void updateSummaryInDb(DeletedBlocksTransactionSummary summary) throws IOException;
+
   void onFlush();
 
   void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
