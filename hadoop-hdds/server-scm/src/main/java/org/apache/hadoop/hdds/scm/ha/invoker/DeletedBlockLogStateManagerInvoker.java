@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.utils.db.Table;
 
-/** Code generated for DeletedBlockLogStateManager.  Do not modify. */
+/** Code generated for {@link DeletedBlockLogStateManager}.  Do not modify. */
 public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockLogStateManager> {
   enum ReplicateMethod implements NameAndParameterTypes {
     addTransactionsToDB(new Class<?>[][] {
