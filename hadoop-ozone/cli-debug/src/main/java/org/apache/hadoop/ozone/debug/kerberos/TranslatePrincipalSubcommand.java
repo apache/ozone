@@ -20,9 +20,7 @@ package org.apache.hadoop.ozone.debug.kerberos;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
@@ -36,9 +34,8 @@ import picocli.CommandLine;
     name = "translate-principal",
     description = "Translate Kerberos principal(s) using auth_to_local rules."
 )
-@MetaInfServices(DebugSubcommand.class)
 public class TranslatePrincipalSubcommand extends AbstractSubcommand
-    implements Callable<Void>, DebugSubcommand {
+    implements Callable<Void> {
 
   @CommandLine.Parameters(arity = "1..*",
       description = "Kerberos principal(s) to translate"

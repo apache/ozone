@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import picocli.CommandLine;
 
@@ -36,9 +35,10 @@ import picocli.CommandLine;
  * and prints diagnostic summary.
  * Example: ozone debug kerberos diagnose
  */
-@CommandLine.Command(name = "diagnose", description = "Diagnose Kerberos configuration issues.")
+@CommandLine.Command(name = "diagnose",
+    description = "Diagnose Kerberos configuration issues.")
 public class DiagnoseSubcommand extends AbstractSubcommand
-    implements Callable<Integer>, DebugSubcommand {
+    implements Callable<Integer> {
   @Override
   public Integer call() throws Exception {
     out().println("\n== Ozone Kerberos Diagnostics ==\n");
