@@ -17,8 +17,11 @@
 
 package org.apache.hadoop.ozone.debug.kerberos;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -61,7 +64,11 @@ public class DiagnoseSubcommand extends AbstractSubcommand
       out().println("-- " + probe.name() + " --");
 
       ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-      PrintStream ps = new PrintStream(buffer);
+      BufferedWriter writer = new BufferedWriter(
+          new OutputStreamWriter(buffer, StandardCharsets.UTF_8));
+
+      PrintStream ps = new PrintStream(
+          buffer, true, java.nio.charset.StandardCharsets.UTF_8.name());
       PrintStream oldOut = System.out;
       PrintStream oldErr = System.err;
 
@@ -78,9 +85,11 @@ public class DiagnoseSubcommand extends AbstractSubcommand
       } finally {
         System.setOut(oldOut);
         System.setErr(oldErr);
+        ps.close();
+        writer.close();
       }
 
-      output = buffer.toString();
+      output = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
       out().print(output);
 
       if (output.contains("ERROR:")) {

@@ -18,7 +18,8 @@
 package org.apache.hadoop.ozone.debug.kerberos;
 
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.InputStream;
+import java.nio.file.Files;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
@@ -56,20 +57,38 @@ public abstract class ConfigProbe implements DiagnosticProbe {
   }
 
   /**
-   *
-   * @param file
-   * @param description
-   * @return
+   * Validate that a file exists, is readable, and not empty.
    */
   protected boolean canReadFile(File file, String description) {
-    try (FileInputStream fis = new FileInputStream(file)) {
-      if (fis.read() == -1) {
+    if (file == null) {
+      error(description + " is null");
+      return false;
+    }
+
+    if (!file.exists()) {
+      error(description + " does not exist: " + file);
+      return false;
+    }
+
+    if (!file.isFile()) {
+      error(description + " is not a file: " + file);
+      return false;
+    }
+
+    if (!file.canRead()) {
+      error(description + " is not readable: " + file);
+      return false;
+    }
+
+    try (InputStream fileInputStream = Files.newInputStream(file.toPath())) {
+      if (fileInputStream.read() == -1) {
         error(description + " is empty or invalid: " + file);
         return false;
       }
       return true;
     } catch (Exception e) {
-      error(description + " is not readable: " + file + " (" + e.getMessage() + ")");
+      error(description + " is not readable: " + file +
+          " (" + e.getMessage() + ")");
       return false;
     }
   }
