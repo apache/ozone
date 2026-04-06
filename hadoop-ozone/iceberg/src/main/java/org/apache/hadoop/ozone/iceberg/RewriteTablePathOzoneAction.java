@@ -18,10 +18,10 @@
  */
 package org.apache.hadoop.ozone.iceberg;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import com.google.common.base.Preconditions;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.Table;
@@ -39,13 +39,14 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   private String startVersionName;
   private String endVersionName;
   private String stagingDir;
-  private int parallelism = Runtime.getRuntime().availableProcessors();
+  private int parallelism;
 
   private final Table table;
   private ExecutorService executorService;
 
   public RewriteTablePathOzoneAction(Table table) {
     this.table = table;
+    this.parallelism = Runtime.getRuntime().availableProcessors();
   }
 
   public RewriteTablePathOzoneAction(Table table, int parallelism) {
@@ -55,8 +56,8 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
   @Override
   public RewriteTablePath rewriteLocationPrefix(String sPrefix, String tPrefix) {
-    Preconditions.checkArgument(
-        sPrefix != null && !sPrefix.isEmpty(), "Source prefix('%s') cannot be empty.", sPrefix);
+    checkNonNullNonEmpty(sPrefix, "Source prefix('%s') cannot be empty.");
+    checkNonNullNonEmpty(tPrefix, "Target prefix('%s') cannot be empty.");
     this.sourcePrefix = sPrefix;
     this.targetPrefix = tPrefix;
     return this;
@@ -64,30 +65,21 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
   @Override
   public RewriteTablePath startVersion(String sVersion) {
-    Preconditions.checkArgument(
-        sVersion != null && !sVersion.trim().isEmpty(),
-        "Start version('%s') cannot be empty.",
-        sVersion);
+    checkNonNullNonEmpty(sVersion, "Start version('%s') cannot be empty.");
     this.startVersionName = sVersion;
     return this;
   }
 
   @Override
   public RewriteTablePath endVersion(String eVersion) {
-    Preconditions.checkArgument(
-        eVersion != null && !eVersion.trim().isEmpty(),
-        "End version('%s') cannot be empty.",
-        eVersion);
+    checkNonNullNonEmpty(eVersion, "End version('%s') cannot be empty.");
     this.endVersionName = eVersion;
     return this;
   }
 
   @Override
   public RewriteTablePath stagingLocation(String stagingLocation) {
-    Preconditions.checkArgument(
-        stagingLocation != null && !stagingLocation.isEmpty(),
-        "Staging location('%s') cannot be empty.",
-        stagingLocation);
+    checkNonNullNonEmpty(stagingLocation, "Staging location('%s') cannot be empty.");
     this.stagingDir = stagingLocation;
     return this;
   }
@@ -113,18 +105,11 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   }
 
   private void validateInputs() {
-    Preconditions.checkArgument(
-        sourcePrefix != null && !sourcePrefix.isEmpty(),
-        "Source prefix('%s') cannot be empty.",
-        sourcePrefix);
-    Preconditions.checkArgument(
-        targetPrefix != null && !targetPrefix.isEmpty(),
-        "Target prefix('%s') cannot be empty.",
-        targetPrefix);
-    Preconditions.checkArgument(
-        !sourcePrefix.equals(targetPrefix),
-        "Source prefix cannot be the same as target prefix (%s)",
-        sourcePrefix);
+    if (sourcePrefix.equals(targetPrefix)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Source prefix cannot be the same as target prefix (%s)", sourcePrefix));
+    }
 
     validateAndSetEndVersion();
     validateAndSetStartVersion();
@@ -144,7 +129,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     TableMetadata tableMetadata = ((HasTableOperations) table).operations().current();
 
     if (endVersionName == null) {
-      Preconditions.checkNotNull(
+      Objects.requireNonNull(
           tableMetadata.metadataFileLocation(), "Metadata file location should not be null");
       this.endVersionName = tableMetadata.metadataFileLocation();
     } else {
@@ -172,12 +157,15 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
       }
     }
 
-    Preconditions.checkArgument(
-        versionFile != null,
-        "Cannot find provided version file %s in metadata log.",
-        versionFileName);
-    Preconditions.checkArgument(
-        fileExist(versionFile), "Version file %s does not exist.", versionFile);
+    if (versionFile == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot find provided version file %s in metadata log.", versionFileName));
+    }
+    if (!fileExist(versionFile)) {
+      throw new IllegalArgumentException(
+          String.format("Version file %s does not exist.", versionFile));
+    }
     return versionFile;
   }
 
@@ -206,8 +194,17 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
       metadataDir = currentMetadataPath.substring(0, lastIndex + 1);
     }
 
-    Preconditions.checkArgument(
-        !metadataDir.isEmpty(), "Failed to get the metadata file root directory");
+    if (metadataDir.isEmpty()) {
+      throw new IllegalArgumentException("Failed to get the metadata file root directory");
+    }
     return metadataDir;
+  }
+
+  private static void checkNonNullNonEmpty(String value, String messageFormat) {
+    String message = String.format(messageFormat, value);
+    Objects.requireNonNull(value, message);
+    if (value.trim().isEmpty()) {
+      throw new IllegalArgumentException(message);
+    }
   }
 }

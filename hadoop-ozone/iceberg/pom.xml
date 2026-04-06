@@ -27,27 +27,46 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
+    <!-- Iceberg 1.10+ API is Java 11 bytecode, override parent Java 8 default. -->
     <maven.compiler.release>11</maven.compiler.release>
   </properties>
 
   <dependencies>
 
-    <!-- Common utilities -->
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-
     <!-- Iceberg dependencies -->
     <dependency>
       <groupId>org.apache.iceberg</groupId>
       <artifactId>iceberg-api</artifactId>
-      <version>${iceberg.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.iceberg</groupId>
       <artifactId>iceberg-core</artifactId>
-      <version>${iceberg.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.httpcomponents.client5</groupId>
+          <artifactId>httpclient5</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents.core5</groupId>
+          <artifactId>httpcore5</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents.core5</groupId>
+          <artifactId>httpcore5-h2</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.iceberg</groupId>
+          <artifactId>iceberg-bundled-guava</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.checkerframework</groupId>
+          <artifactId>checker-qual</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.roaringbitmap</groupId>
+          <artifactId>RoaringBitmap</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 
@@ -57,8 +76,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <!-- Iceberg 1.10+ API is Java 11 bytecode, override parent Java 8 default. -->
-          <release>11</release>
+          <proc>none</proc>
         </configuration>
       </plugin>
       <plugin>
