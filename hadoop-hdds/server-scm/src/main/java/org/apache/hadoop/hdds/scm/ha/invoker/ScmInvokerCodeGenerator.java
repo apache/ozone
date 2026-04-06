@@ -76,7 +76,7 @@ public final class ScmInvokerCodeGenerator {
   private final String apiName;
   private final String invokerClassName;
 
-  private final StringBuilder lineBuffer = new StringBuilder();
+  private final StringWriter lineBuffer = new StringWriter();
   private final StringWriter out = new StringWriter();
   private String indentation = "";
 
@@ -110,7 +110,7 @@ public final class ScmInvokerCodeGenerator {
     printf(indent, format, args);
 
     String s = lineBuffer.toString();
-    lineBuffer.setLength(0);
+    lineBuffer.getBuffer().setLength(0);
 
     if (s.length() <= LINE_LENGTH) {
       out.append(s).append(System.lineSeparator());
@@ -123,7 +123,7 @@ public final class ScmInvokerCodeGenerator {
       nonSpace++;
     }
 
-    final int i = s.lastIndexOf(" ", LINE_LENGTH);
+    final int i = s.lastIndexOf(' ', LINE_LENGTH);
     out.append(s.substring(0, i))
         .append(System.lineSeparator());
     out.append(s.substring(0, nonSpace)) // original indentation
