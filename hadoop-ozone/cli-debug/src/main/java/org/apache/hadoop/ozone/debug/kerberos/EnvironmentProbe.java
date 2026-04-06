@@ -15,12 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.kdiag;
+package org.apache.hadoop.ozone.debug.kerberos;
+
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
  * Prints environment variables relevant to Kerberos and Ozone.
  */
-public class EnvironmentProbe implements DiagnosticProbe {
+public class EnvironmentProbe extends ConfigProbe {
 
   @Override
   public String name() {
@@ -28,19 +30,14 @@ public class EnvironmentProbe implements DiagnosticProbe {
   }
 
   @Override
-  public boolean run() {
-    System.out.println("-- Environment Variables --");
-    print("KRB5_CONFIG");
-    print("KRB5CCNAME");
-    print("OZONE_CONF_DIR");
-    print("HADOOP_CONF_DIR");
-    print("JAVA_SECURITY_KRB5_CONF");
-    return true;
-  }
+  public boolean test(OzoneConfiguration conf) {
 
-  private void print(String key) {
-    String value = System.getenv(key);
-    System.out.println(key + " = "
-        + (value == null ? "(unset)" : value));
+    printValue("KRB5_CONFIG", System.getenv("KRB5_CONFIG"));
+    printValue("KRB5CCNAME", System.getenv("KRB5CCNAME"));
+    printValue("OZONE_CONF_DIR", System.getenv("OZONE_CONF_DIR"));
+    printValue("HADOOP_CONF_DIR", System.getenv("HADOOP_CONF_DIR"));
+    printValue("JAVA_SECURITY_KRB5_CONF", System.getenv("JAVA_SECURITY_KRB5_CONF"));
+
+    return true;
   }
 }

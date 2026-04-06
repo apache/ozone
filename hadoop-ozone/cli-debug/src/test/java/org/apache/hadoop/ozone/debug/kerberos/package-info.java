@@ -15,29 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.kdiag;
-
-import java.net.InetAddress;
-
 /**
- * Prints host and JVM information.
+ * Tests for ozone debug kerberos subcommand.
  */
-public class HostProbe implements DiagnosticProbe {
-
-  @Override
-  public String name() {
-    return "Host Information";
-  }
-
-  @Override
-  public boolean run() throws Exception {
-    System.out.println("-- Host Information --");
-    System.out.println("Hostname = "
-        + InetAddress.getLocalHost().getCanonicalHostName());
-    System.out.println("User = "
-        + System.getProperty("user.name"));
-    System.out.println("Java version = "
-        + System.getProperty("java.version"));
-    return true;
-  }
-}
+package org.apache.hadoop.ozone.debug.kerberos;

@@ -15,7 +15,22 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.debug.kerberos;
+
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
+
 /**
- * Tests for auth to local(kerbname).
+ * Subcommand for ozone debug kerberos related operation.
  */
-package org.apache.hadoop.ozone.debug.authtolocal;
+@CommandLine.Command(
+    name = "kerberos",
+    description = "Debug commands for kerberos related issues.",
+    subcommands = {
+        DiagnoseSubcommand.class,
+        TranslatePrincipalSubcommand.class
+    })
+@MetaInfServices(DebugSubcommand.class)
+public class KerberosSubcommand implements DebugSubcommand {
+}

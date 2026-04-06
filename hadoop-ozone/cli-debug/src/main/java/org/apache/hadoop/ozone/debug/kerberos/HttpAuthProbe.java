@@ -15,20 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.kdiag;
+package org.apache.hadoop.ozone.debug.kerberos;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 
 /**
  * Prints HTTP Kerberos authentication configuration for Ozone services.
- *
  * This probe checks whether the HTTP endpoints (WebUI / REST services)
  * of Ozone components are configured to use Kerberos authentication.
- *
  * It only prints configuration values for diagnostics and does not
- * enforce validation. Validation can be added in future improvements.
+ * enforce validation.
  */
-public class HttpAuthProbe implements DiagnosticProbe {
+public class HttpAuthProbe extends ConfigProbe {
 
   @Override
   public String name() {
@@ -36,28 +37,15 @@ public class HttpAuthProbe implements DiagnosticProbe {
   }
 
   @Override
-  public boolean run() {
+  public boolean test(OzoneConfiguration conf) {
 
-    System.out.println("-- HTTP Kerberos Authentication --");
-
-    OzoneConfiguration conf = new OzoneConfiguration();
-
-    print(conf, "ozone.om.http.auth.type");
-    print(conf, "hdds.scm.http.auth.type");
-    print(conf, "hdds.datanode.http.auth.type");
+    print(conf, OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE);
+    print(conf, HddsConfigKeys.HDDS_SCM_HTTP_AUTH_TYPE);
+    print(conf, HddsConfigKeys.HDDS_DATANODE_HTTP_AUTH_TYPE);
+    print(conf, ReconServerConfigKeys.OZONE_RECON_HTTP_AUTH_TYPE);
+    //Used key directly to avoid cyclic dependency
     print(conf, "ozone.s3g.http.auth.type");
-    print(conf, "ozone.recon.http.auth.type");
 
     return true;
-  }
-
-  /**
-   * Helper method to print configuration value.
-   */
-  private void print(OzoneConfiguration conf, String key) {
-
-    String value = conf.get(key);
-    System.out.println(key + " = " +
-        (value == null ? "(unset)" : value));
   }
 }

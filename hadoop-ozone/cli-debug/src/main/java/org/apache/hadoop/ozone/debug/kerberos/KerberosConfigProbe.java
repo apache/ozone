@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.kdiag;
+package org.apache.hadoop.ozone.debug.kerberos;
 
 import java.io.File;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.util.KerberosUtil;
 
 /**
@@ -28,7 +29,7 @@ import org.apache.hadoop.security.authentication.util.KerberosUtil;
  * - Default Kerberos realm
  * - JVM Kerberos system properties used by Java security
  */
-public class KerberosConfigProbe implements DiagnosticProbe {
+public class KerberosConfigProbe extends ConfigProbe {
 
   @Override
   public String name() {
@@ -36,8 +37,7 @@ public class KerberosConfigProbe implements DiagnosticProbe {
   }
 
   @Override
-  public boolean run() {
-    System.out.println("-- Kerberos Configuration --");
+  public boolean test(OzoneConfiguration conf) {
     // Determine krb5.conf location
     String path = System.getenv("KRB5_CONFIG");
     if (path == null) {
@@ -45,13 +45,22 @@ public class KerberosConfigProbe implements DiagnosticProbe {
     }
     File file = new File(path);
     System.out.println("krb5.conf = " + file);
-    try {
-      String realm = KerberosUtil.getDefaultRealm();
-      System.out.println("Default realm = " + realm);
-    } catch (Exception e) {
-      System.out.println("WARNING: Unable to determine default realm");
+    if (!file.exists()) {
+      error("krb5.conf not found");
       return false;
     }
-    return file.exists();
+    // Avoid scenario where file does exist but not accessible.
+    // Validate actual readability (not just permissions)
+    if (!canReadFile(file, "krb5.conf")) {
+      return false;
+    }
+    try {
+      System.out.println("Default realm = "
+          + KerberosUtil.getDefaultRealm());
+      return true;
+    } catch (Exception e) {
+      error("Cannot determine Kerberos realm: " + e.getMessage());
+      return false;
+    }
   }
 }

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.kdiag;
+package org.apache.hadoop.ozone.debug.kerberos;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -27,10 +27,15 @@ import org.apache.hadoop.security.UserGroupInformation;
  * what authentication method Hadoop is currently using, and whether a valid
  * Kerberos ticket is present in the process ticket cache.
  *
- * The probe does NOT attempt to perform a login (kinit). Instead it reports
+ * The probe does NOT attempt to perform a login (kinit), Instead it reports
  * the current state so operators can diagnose security issues.
+ * Checks the current Kerberos authentication state of the process.
+ * Provides clear diagnostics about:
+ * - Whether Kerberos is configured.
+ * - Whether the process is using Kerberos.
+ * - Whether a valid ticket is present.
  */
-public class KerberosTicketProbe implements DiagnosticProbe {
+public class KerberosTicketProbe extends ConfigProbe {
 
   @Override
   public String name() {
@@ -38,44 +43,56 @@ public class KerberosTicketProbe implements DiagnosticProbe {
   }
 
   @Override
-  public boolean run() {
-    System.out.println("-- Kerberos Ticket --");
+  public boolean test(OzoneConfiguration conf) {
+
     try {
-      OzoneConfiguration conf = new OzoneConfiguration();
-      // Initialize Hadoop security configuration
       UserGroupInformation.setConfiguration(conf);
-      String authType = conf.get("hadoop.security.authentication");
-      boolean securityEnabled =
+      String authType = conf.getTrimmed("hadoop.security.authentication");
+      boolean kerberosEnabled =
           "kerberos".equalsIgnoreCase(authType);
-      System.out.println("Security enabled = " + securityEnabled);
+      System.out.println("kerberos configured = " + kerberosEnabled);
+
       UserGroupInformation ugi =
-          UserGroupInformation.getCurrentUser();
+          UserGroupInformation.getLoginUser();
       System.out.println("Login user = " + ugi.getUserName());
+
+      boolean usingKerberos =
+          ugi.getAuthenticationMethod()
+              == UserGroupInformation.AuthenticationMethod.KERBEROS;
+
       System.out.println("Authentication method = "
           + ugi.getAuthenticationMethod());
+
       boolean hasTicket = ugi.hasKerberosCredentials();
       System.out.println("Kerberos ticket present = " + hasTicket);
+
       String ticketCache = System.getenv("KRB5CCNAME");
+
       System.out.println("Ticket cache = "
           + (ticketCache == null ? "(default cache)" : ticketCache));
 
-      if (!securityEnabled) {
-        System.out.println(
-            "Kerberos security is not enabled in configuration");
-        return true;
+      if (!kerberosEnabled) {
+        warn("Kerberos is not enabled in configurations (current=" + authType + ")");
+        return true; //not a failure, just informational
+      }
+
+      if (!usingKerberos) {
+        warn("Kerberos is configured but not active.\n"
+            + "  Authentication method = " + ugi.getAuthenticationMethod() + "\n"
+            + "  No Kerberos login detected.\n"
+            + "  Fix: Run 'kinit' or login via keytab.");
+        return false;
       }
 
       if (!hasTicket) {
-        System.out.println(
-            "WARNING: Kerberos security is enabled but no ticket is loaded");
-        System.out.println(
-            "Run 'kinit' to obtain Kerberos credentials");
+        warn("Kerberos authentication is enabled but no valid ticket is found.\n"
+            + "  Fix: Run 'kinit' to obtain Kerberos credentials.");
         return false;
       }
+      System.out.println("Kerberos authentication is active and ticket is valid");
       return true;
     } catch (Exception e) {
-      System.out.println(
-          "ERROR checking kerberos credentials: " + e.getMessage());
+      error("Kerberos check failure: " + e.getMessage());
       return false;
     }
   }

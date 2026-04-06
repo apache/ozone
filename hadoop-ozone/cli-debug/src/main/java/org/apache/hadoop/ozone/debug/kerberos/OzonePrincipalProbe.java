@@ -15,35 +15,34 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.kdiag;
+package org.apache.hadoop.ozone.debug.kerberos;
+
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfig;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 /**
- * Prints JVM Kerberos related system properties.
+ * Prints configured service principals.
  */
-public class JvmKerberosProbe implements DiagnosticProbe {
+public class OzonePrincipalProbe extends ConfigProbe {
 
   @Override
   public String name() {
-    return "JVM Kerberos Properties";
+    return "Ozone Service Principals";
   }
 
   @Override
-  public boolean run() {
+  public boolean test(OzoneConfiguration conf) {
 
-    System.out.println("-- JVM Kerberos Properties --");
-    // Print JVM Kerberos related system properties
-    print("java.security.krb5.conf");
-    print("java.security.krb5.realm");
-    print("java.security.krb5.kdc");
-    print("sun.security.krb5.debug");
-
+    print(conf, OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+    print(conf, ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY);
+    print(conf, HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY);
+    print(conf, ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY);
+    //Used key directly to avoid cyclic dependency.
+    print(conf, "ozone.s3g.kerberos.principal");
     return true;
   }
 
-  private void print(String key) {
-
-    String value = System.getProperty(key);
-    System.out.println(key + " = "
-        + (value == null ? "(unset)" : value));
-  }
 }

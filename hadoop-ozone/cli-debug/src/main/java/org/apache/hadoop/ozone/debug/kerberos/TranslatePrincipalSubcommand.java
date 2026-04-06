@@ -15,29 +15,30 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.authtolocal;
+package org.apache.hadoop.ozone.debug.kerberos;
 
 import java.util.List;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
- * Debug command to translate Kerberos principals into local user names
+ * Debug command to translate one or more Kerberos principals into local user names
  * using the configured auth_to_local rules.
  *
  * Example:
- *   ozone debug kerbname testuser/om@EXAMPLE.COM
+ *   ozone debug kerberos translate-principal testuser/om@EXAMPLE.COM
  */
 @CommandLine.Command(
-    name = "kerbname",
+    name = "translate-principal",
     description = "Translate Kerberos principal(s) using auth_to_local rules."
 )
 @MetaInfServices(DebugSubcommand.class)
-public class KerbNameDebug implements Callable<Void>, DebugSubcommand {
+public class TranslatePrincipalSubcommand extends AbstractSubcommand
+    implements Callable<Void>, DebugSubcommand {
 
   @CommandLine.Parameters(arity = "1..*",
       description = "Kerberos principal(s) to translate"
@@ -46,12 +47,14 @@ public class KerbNameDebug implements Callable<Void>, DebugSubcommand {
 
   @Override
   public Void call() throws Exception {
-    System.out.println("-- Kerberos Principal Translation --");
-    OzoneConfiguration conf = new OzoneConfiguration();
-    // Initialize auth_to_local rules
-    String rules = conf.get("hadoop.security.auth_to_local", "DEFAULT");
-    KerberosName.setRules(rules);
+
+    System.out.println("\n== Kerberos Principal Translation  ==\n");
+
+    String rules = getOzoneConf()
+        .getTrimmed("hadoop.security.auth_to_local", "DEFAULT");
     System.out.println("auth_to_local rules = " + rules);
+
+    KerberosName.setRules(rules);
     for (String principal : principals) {
       try {
         KerberosName kerbName = new KerberosName(principal);
@@ -59,7 +62,8 @@ public class KerbNameDebug implements Callable<Void>, DebugSubcommand {
         System.out.println(String.format(
             "Principal = %s to Local user = %s", principal, shortName));
       } catch (Exception e) {
-        System.out.println("Failed to translate principal: " + e.getMessage());
+        System.err.println("ERROR: Failed to translate principal "
+            + principal + " : " + e.getMessage());
       }
     }
     return null;

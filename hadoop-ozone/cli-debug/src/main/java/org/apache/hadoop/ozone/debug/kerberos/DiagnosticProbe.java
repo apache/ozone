@@ -15,7 +15,22 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.debug.kerberos;
+
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+
 /**
- * Kerberos diagnostic debug related commands.
+ * Interface for a diagnostic probe executed by ozone debug kerberos subcommands.
  */
-package org.apache.hadoop.ozone.debug.kdiag;
+public interface DiagnosticProbe {
+
+  /**
+   * Name of the probe (used in output headers).
+   */
+  String name();
+
+  /**
+   * Execute the diagnostic check.
+   */
+  boolean test(OzoneConfiguration conf) throws Exception;
+}

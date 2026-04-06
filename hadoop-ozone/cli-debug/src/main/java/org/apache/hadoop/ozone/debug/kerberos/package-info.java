@@ -16,6 +16,6 @@
  */
 
 /**
- * Auth to local debug related commands.
+ * ozone debug kerberos related sub commands and required probe.
  */
-package org.apache.hadoop.ozone.debug.authtolocal;
+package org.apache.hadoop.ozone.debug.kerberos;

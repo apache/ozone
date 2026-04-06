@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.kdiag;
+package org.apache.hadoop.ozone.debug.kerberos;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -24,7 +24,7 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 /**
  * Validates auth_to_local principal mapping.
  */
-public class PrincipalMappingProbe implements DiagnosticProbe {
+public class PrincipalMappingProbe extends ConfigProbe {
 
   @Override
   public String name() {
@@ -32,21 +32,32 @@ public class PrincipalMappingProbe implements DiagnosticProbe {
   }
 
   @Override
-  public boolean run() throws Exception {
-    System.out.println("-- Principal Mapping --");
-    OzoneConfiguration conf = new OzoneConfiguration();
-    String rules = conf.get("hadoop.security.auth_to_local");
-    if (rules == null) {
-      System.out.println("auth_to_local rules not configured");
+  public boolean test(OzoneConfiguration conf) {
+
+    // Read auth_to_local rules
+    String rules = conf.getTrimmed("hadoop.security.auth_to_local");
+
+    if (rules == null || rules.isEmpty()) {
+      warn("auth_to_local rules not configured");
       return false;
     }
-    KerberosName.setRules(rules);
-    String principal =
-        UserGroupInformation.getLoginUser().getUserName();
-    KerberosName name =
-        new KerberosName(principal);
-    System.out.println("Principal = " + principal);
-    System.out.println("Local user = " + name.getShortName());
-    return true;
+    System.out.println("auth_to_local rules = " + rules);
+
+    try {
+      // Apply rules
+      KerberosName.setRules(rules);
+      // Get current user principal
+      String principal =
+          UserGroupInformation.getLoginUser().getUserName();
+      System.out.println("Principal = " + principal);
+      KerberosName name = new KerberosName(principal);
+      String shortName = name.getShortName();
+      System.out.println("Local user = " + shortName);
+      return true;
+    } catch (Exception e) {
+      error("Failed to map principal using auth_to_local rules: "
+          + e.getMessage());
+      return false;
+    }
   }
 }
