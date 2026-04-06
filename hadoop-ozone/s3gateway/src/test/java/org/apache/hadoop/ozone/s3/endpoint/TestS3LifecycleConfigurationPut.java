@@ -179,6 +179,29 @@ public class TestS3LifecycleConfigurationPut {
     }
   }
 
+  @Test
+  public void testPutLifecycleWithAbortIncompleteMultipartUpload() throws Exception {
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", withAbortIncompleteMultipartUpload()).getStatus());
+  }
+
+  @Test
+  public void testPutLifecycleWithBothExpirationAndAbort() throws Exception {
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", withBothExpirationAndAbort()).getStatus());
+  }
+
+  @Test
+  public void testPutInvalidAbortIncompleteMultipartUploadConfig() throws Exception {
+    // Test with zero days - should fail
+    testInvalidLifecycleConfiguration(
+        TestS3LifecycleConfigurationPut::withAbortZeroDays,
+        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+
+    // Test with negative days - should fail
+    testInvalidLifecycleConfiguration(
+        TestS3LifecycleConfigurationPut::withAbortNegativeDays,
+        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+  }
+
   private static InputStream onePrefix() {
     String xml = ("<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
         ".com/doc/2006-03-01/\">" +
@@ -511,6 +534,69 @@ public class TestS3LifecycleConfigurationPut {
             "         <Status>Enabled</Status>" +
             "     </Rule>" +
             "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withAbortIncompleteMultipartUpload() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>abort-incomplete-uploads</ID>" +
+        "<Prefix>uploads/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<AbortIncompleteMultipartUpload>" +
+        "<DaysAfterInitiation>7</DaysAfterInitiation>" +
+        "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withBothExpirationAndAbort() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>cleanup-rule</ID>" +
+        "<Prefix>temp/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration>" +
+        "<Days>30</Days>" +
+        "</Expiration>" +
+        "<AbortIncompleteMultipartUpload>" +
+        "<DaysAfterInitiation>7</DaysAfterInitiation>" +
+        "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withAbortZeroDays() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>invalid-abort</ID>" +
+        "<Prefix>uploads/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<AbortIncompleteMultipartUpload>" +
+        "<DaysAfterInitiation>0</DaysAfterInitiation>" +
+        "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withAbortNegativeDays() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>invalid-abort</ID>" +
+        "<Prefix>uploads/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<AbortIncompleteMultipartUpload>" +
+        "<DaysAfterInitiation>-1</DaysAfterInitiation>" +
+        "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
 
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
