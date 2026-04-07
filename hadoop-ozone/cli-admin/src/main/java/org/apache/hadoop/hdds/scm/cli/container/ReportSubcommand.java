@@ -72,6 +72,12 @@ public class ReportSubcommand extends ScmSubcommand {
       return;
     }
 
+    if (containerList != null && containerList.size() > 0) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "Container IDs are only valid with --suppress or --unsuppress. " +
+          "To print the summary report, do not pass any container ID.");
+    }
+
     printReport(scmClient);
   }
 

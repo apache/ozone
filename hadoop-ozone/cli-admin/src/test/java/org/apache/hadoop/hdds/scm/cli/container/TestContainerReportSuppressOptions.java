@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm.cli.container;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -214,6 +216,20 @@ public class TestContainerReportSuppressOptions {
     assertFalse(output.contains("\"suppressed\" : true"));
   }
   
+  /**
+   * Test container report throws exception when container IDs are passed without --suppress/--unsuppress optionss.
+   */
+  @Test
+  @Order(6)
+  public void testContainerIDWithoutSuppressOptions() {
+    ReportSubcommand reportCmd = new ReportSubcommand();
+    CommandLine c = new CommandLine(reportCmd);
+    c.parseArgs("1", "2");
+    CommandLine.ParameterException ex =
+        assertThrows(CommandLine.ParameterException.class, () -> reportCmd.execute(scmClient));
+    assertThat(ex.getMessage()).contains("Container IDs are only valid with --suppress or --unsuppress");
+  }
+
   /**
    * Create mock RM report based on current container states.
    */
