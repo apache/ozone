@@ -533,13 +533,6 @@ public class MockNodeManager implements NodeManager {
   @Override
   public void addPipeline(Pipeline pipeline) {
     node2PipelineMap.addPipeline(pipeline);
-    // Pipeline creation uses DNs that may not be the pre-registered fake nodes; ensure each
-    // pipeline member has metrics so {@link #getDatanodeInfo} and space checks work.
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (nodeMetricMap.get(dn) == null) {
-        populateNodeMetric(dn, 0);
-      }
-    }
   }
 
   /**

@@ -254,6 +254,13 @@ public class SCMClientProtocolServer implements
       getScm().checkAdminAccess(getRemoteUser(), false);
       final ContainerInfo container = scm.getContainerManager()
           .allocateContainer(replicationConfig, owner);
+      if (container == null) {
+        throw new SCMException(
+            "Could not allocate container for replication " + replicationConfig
+                + ", owner=" + owner
+                + ": no suitable open pipeline with enough space",
+            ResultCodes.FAILED_TO_ALLOCATE_CONTAINER);
+      }
       final Pipeline pipeline = scm.getPipelineManager()
           .getPipeline(container.getPipelineID());
       ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);
