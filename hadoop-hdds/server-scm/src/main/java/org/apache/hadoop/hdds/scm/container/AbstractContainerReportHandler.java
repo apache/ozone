@@ -252,7 +252,7 @@ abstract class AbstractContainerReportHandler {
       // If the state of a container is OPEN and a replica is in different state, finalize the container.
       if (replica.getState() != State.OPEN) {
         getLogger().info("FINALIZE (i.e. CLOSING) {}", detailsForLogging);
-        containerManager.updateContainerState(containerId, LifeCycleEvent.FINALIZE);
+        updateContainerState(containerId, LifeCycleEvent.FINALIZE);
       }
       return false;
     case CLOSING:
@@ -263,7 +263,7 @@ abstract class AbstractContainerReportHandler {
       // If the replica is in QUASI_CLOSED state, move the container to QUASI_CLOSED state.
       if (replica.getState() == State.QUASI_CLOSED) {
         getLogger().info("QUASI_CLOSE {}", detailsForLogging);
-        containerManager.updateContainerState(containerId, LifeCycleEvent.QUASI_CLOSE);
+        updateContainerState(containerId, LifeCycleEvent.QUASI_CLOSE);
         return false;
       }
 
@@ -288,7 +288,7 @@ abstract class AbstractContainerReportHandler {
           return true;
         }
         getLogger().info("CLOSE {}", detailsForLogging);
-        containerManager.updateContainerState(containerId, LifeCycleEvent.CLOSE);
+        updateContainerState(containerId, LifeCycleEvent.CLOSE);
       }
       return false;
     case QUASI_CLOSED:
@@ -301,7 +301,7 @@ abstract class AbstractContainerReportHandler {
           return true;
         }
         getLogger().info("FORCE_CLOSE for {}", detailsForLogging);
-        containerManager.updateContainerState(containerId, LifeCycleEvent.FORCE_CLOSE);
+        updateContainerState(containerId, LifeCycleEvent.FORCE_CLOSE);
       }
       return false;
     case CLOSED:
@@ -355,6 +355,15 @@ abstract class AbstractContainerReportHandler {
       getLogger().error("Replica not processed due to container state {}: {}",
           container.getState(), detailsForLogging);
       return false;
+    }
+  }
+
+  private void updateContainerState(ContainerID containerID, LifeCycleEvent event)
+      throws InvalidStateTransitionException, IOException {
+    if (scmContext.isLeader()) {
+      containerManager.updateContainerState(containerID, event);
+    } else {
+      getLogger().debug("The Current scm is not leader");
     }
   }
 

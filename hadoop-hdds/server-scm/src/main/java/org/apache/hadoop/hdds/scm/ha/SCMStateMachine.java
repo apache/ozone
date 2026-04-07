@@ -35,7 +35,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
@@ -52,6 +51,7 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.DivisionInfo;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -86,7 +86,6 @@ public class SCMStateMachine extends BaseStateMachine {
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 
-  private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
   private AtomicBoolean isStateMachineReady = new AtomicBoolean();
 
   public SCMStateMachine(final StorageContainerManager scm,
@@ -284,15 +283,12 @@ public class SCMStateMachine extends BaseStateMachine {
       return;
     }
 
-    currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
-        .getInfo().getCurrentTerm());
-
-    if (isStateMachineReady.compareAndSet(false, true)) {
-      // refresh and validate safe mode rules if it can exit safe mode
-      // if being leader, all previous term transactions have been applied
-      // if other states, just refresh safe mode rules, and transaction keeps flushing from leader
-      // and does not depend on pending transactions.
-      scm.getScmSafeModeManager().refreshAndValidate();
+    if (!isStateMachineReady.get()) {
+      if (groupMemberId.getPeerId().equals(newLeaderId)) {
+        tryStartDNServerAndRefreshSafeMode();
+      } else {
+        scheduleDNServerStartCheck();
+      }
     }
 
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
@@ -300,10 +296,11 @@ public class SCMStateMachine extends BaseStateMachine {
       return;
     }
 
-    LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
+    long currentTerm = scm.getScmHAManager().getRatisServer().getDivision()
+        .getInfo().getCurrentTerm();
+    LOG.info("current SCM becomes leader of term {}.", currentTerm);
 
-    scm.getScmContext().updateLeaderAndTerm(true,
-        currentLeaderTerm.get());
+    scm.getScmContext().updateLeaderAndTerm(true, currentTerm);
     scm.getSequenceIdGen().invalidateBatch();
 
     try {
@@ -369,19 +366,100 @@ public class SCMStateMachine extends BaseStateMachine {
     if (transactionBuffer != null) {
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
     }
-
-    if (currentLeaderTerm.get() == term) {
-      // This means after a restart, all pending transactions have been applied.
-      if (isStateMachineReady.compareAndSet(false, true)) {
-        // Refresh Safemode rules state if not already done.
-        scm.getScmSafeModeManager().refreshAndValidate();
-      }
-      currentLeaderTerm.set(-1L);
-    }
   }
 
   public boolean getIsStateMachineReady() {
     return isStateMachineReady.get();
+  }
+
+  /**
+   * Start the DN protocol server and trigger safe mode re-evaluation.
+   *
+   * <p>In HA mode the DN server is deliberately not started during
+   * {@link org.apache.hadoop.hdds.scm.server.StorageContainerManager#start()}.
+   * Instead it is deferred until the SCM state machine has caught up with
+   * the leader's committed log entries, so that DN heartbeats are processed
+   * against the latest container/pipeline state rather than a stale snapshot.
+   *
+   * <p>The method is guarded by {@code isStateMachineReady} (CAS) to ensure
+   * the non-idempotent {@code DatanodeProtocolServer.start()} is invoked
+   * exactly once.
+   */
+  private void tryStartDNServerAndRefreshSafeMode() {
+    if (isStateMachineReady.get()) {
+      return;
+    }
+    if (scm.getScmContext().isLeader() || isFollowerCaughtUp()) {
+      if (isStateMachineReady.compareAndSet(false, true)) {
+        scm.getDatanodeProtocolServer().start();
+        scm.getScmSafeModeManager().refreshAndValidate();
+      }
+    }
+  }
+
+  /**
+   * Check whether this follower's state machine has caught up with the
+   * leader's committed log entries.
+   * @return true if {@code lastAppliedIndex >= leaderCommitIndex}
+   */
+  private boolean isFollowerCaughtUp() {
+    try {
+      RaftServer.Division division = scm.getScmHAManager()
+          .getRatisServer().getDivision();
+      DivisionInfo divisionInfo = division.getInfo();
+      long lastAppliedIndex = divisionInfo.getLastAppliedIndex();
+
+      RaftPeerId leaderId = divisionInfo.getLeaderId();
+      if (leaderId != null) {
+        for (RaftProtos.CommitInfoProto info : division.getCommitInfos()) {
+          if (info.getServer().getId().equals(leaderId.toByteString())) {
+            long leaderCommit = info.getCommitIndex();
+            boolean caughtUp = lastAppliedIndex >= leaderCommit;
+            if (caughtUp) {
+              LOG.info("Followers caught up with the leader: lastAppliedIndex={}, leaderCommit={}",
+                  lastAppliedIndex, leaderCommit);
+            } else {
+              LOG.debug("Followers did not catch up with the leader: lastAppliedIndex={}, leaderCommit={}",
+                  lastAppliedIndex, leaderCommit);
+            }
+            return caughtUp;
+          }
+        }
+      }
+
+      LOG.warn("Leader commit index not available yet, leaderId={}", leaderId);
+      return false;
+    } catch (Exception e) {
+      LOG.warn("Failed to check follower catch-up status", e);
+      return false;
+    }
+  }
+
+  /**
+   * Schedule deferred checks for starting the DN protocol server.
+   */
+  private void scheduleDNServerStartCheck() {
+    CompletableFuture.runAsync(() -> {
+      long delayMs = 1000;
+      final long maxTotalMs = 5 * 60 * 1000;
+      long elapsed = 0;
+      while (!isStateMachineReady.get() && elapsed < maxTotalMs) {
+        try {
+          Thread.sleep(delayMs);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return;
+        }
+        elapsed += delayMs;
+        tryStartDNServerAndRefreshSafeMode();
+        delayMs = Math.min(delayMs * 2, 10_000);
+      }
+      if (isStateMachineReady.get()) {
+        LOG.info("DN server started via deferred check after {}ms", elapsed);
+      } else {
+        LOG.warn("DN server start check expired after {}ms", elapsed);
+      }
+    });
   }
 
   @Override
