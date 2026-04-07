@@ -29,6 +29,14 @@ Append missing jar path to classpath descriptor
     ${cp_file} =    Set Variable    ${ozone_home}/share/ozone/classpath/${artifact}.classpath
     Execute    sed -i 's_$_:${bogus_jar}_' '${cp_file}'
 
+Copy Ozone install and inject missing jar classpath entry
+    [arguments]    ${copy_subdir}    ${bogus_jar_basename}    ${artifact}
+    ${OZONE_COPY} =    Set Variable    ${TEMP_DIR}/${copy_subdir}
+    ${bogus_jar} =    Set Variable    ${TEMP_DIR}/${bogus_jar_basename}
+    Copy Directory    ${OZONE_DIR}    ${OZONE_COPY}
+    Append missing jar path to classpath descriptor    ${OZONE_COPY}    ${artifact}    ${bogus_jar}
+    [return]    ${OZONE_COPY}    ${bogus_jar}
+
 *** Test Cases ***
 Ignores HADOOP_CLASSPATH if OZONE_CLASSPATH is set
     [setup]    Create File         ${TEMP_DIR}/hadoop-classpath.jar
@@ -68,10 +76,8 @@ Validate classpath fails when classpath descriptor is missing
                         Should Contain   ${output}   ERROR: Classpath file descriptor
 
 Validate classpath fails when a listed jar is missing
-    ${OZONE_COPY} =     Set Variable     ${TEMP_DIR}/ozone-validate-missing-jar
-    ${bogus_jar} =     Set Variable     ${TEMP_DIR}/ozone-robot-missing-7373.jar
-    Copy Directory      ${OZONE_DIR}     ${OZONE_COPY}
-    Append missing jar path to classpath descriptor    ${OZONE_COPY}    ozone-insight    ${bogus_jar}
+    ${OZONE_COPY}    ${bogus_jar} =    Copy Ozone install and inject missing jar classpath entry
+    ...    ozone-validate-missing-jar    ozone-robot-missing-7373.jar    ozone-insight
     ${output} =         Execute and checkrc    ${OZONE_COPY}/bin/ozone --validate classpath ozone-insight    1
                         Should Contain   ${output}   ERROR: Jar file ${bogus_jar} is missing
                         Should Contain   ${output}   Validation FAILED due to missing jar files!
@@ -82,10 +88,8 @@ Validate with wrong subcommand prints usage
                         Should Contain   ${output}   Usage I: ozone --validate classpath
 
 Validate continue allows daemon command after failed classpath check
-    ${OZONE_COPY} =     Set Variable     ${TEMP_DIR}/ozone-validate-continue
-    ${bogus_jar} =     Set Variable     ${TEMP_DIR}/ozone-robot-missing-scm-7373.jar
-    Copy Directory      ${OZONE_DIR}     ${OZONE_COPY}
-    Append missing jar path to classpath descriptor    ${OZONE_COPY}    hdds-server-scm    ${bogus_jar}
+    ${OZONE_COPY}    ${bogus_jar} =    Copy Ozone install and inject missing jar classpath entry
+    ...    ozone-validate-continue    ozone-robot-missing-scm-7373.jar    hdds-server-scm
     ${output} =         Execute And Ignore Error    ${OZONE_COPY}/bin/ozone --validate continue --daemon status scm
                         Should Contain   ${output}   Validation FAILED due to missing jar files! Continuing command execution
     [teardown]    Remove Directory    ${OZONE_COPY}    recursive=True
