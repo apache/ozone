@@ -37,6 +37,7 @@ import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -64,6 +65,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_THREAD_NUMBER_DIR_DELETION)
         .add(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL)
         .addAll(new OmConfig().reconfigurableProperties())
+        .addAll(new TracingConfig().reconfigurableProperties())
         .build();
 
     assertProperties(getSubject(), expected);
