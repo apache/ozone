@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
  * where the disk is mounted.
  */
 public final class DiskCheckUtil {
+  public static final String LINUX_DISK_FULL_MESSAGE = "No space left on device";
   // For testing purposes, an alternate check implementation can be provided
   // to inject failures.
   private static DiskChecks impl = new DiskChecksImpl();
@@ -149,10 +150,15 @@ public final class DiskCheckUtil {
             "volume check.", testFile.getAbsolutePath()), notFoundEx);
         return false;
       } catch (SyncFailedException syncEx) {
-        logError(storageDir, String.format("Could sync file %s to disk.",
+        logError(storageDir, String.format("Could not sync file %s to disk.",
             testFile.getAbsolutePath()), syncEx);
         return false;
       } catch (IOException ioEx) {
+        String msg = ioEx.getMessage();
+        if (msg != null && msg.contains(LINUX_DISK_FULL_MESSAGE)) {
+          LOG.warn("Could not write file {} for volume check", testFile.getAbsolutePath(), ioEx);
+          return true;
+        }
         logError(storageDir, String.format("Could not write file %s " +
             "for volume check.", testFile.getAbsolutePath()), ioEx);
         return false;
