@@ -37,7 +37,7 @@ jobs:
       fail-fast: false
     steps:
       - name: "Checkout project" # required for `gh` CLI
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
           sparse-checkout: |

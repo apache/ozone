@@ -82,6 +82,8 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
         .setBytesToMove(info.getBytesToMove())
         .setBytesMoved(info.getBalancedBytes())
         .setRunningStatus(info.getOperationalState())
+        .setIdealUsage(info.getIdealUsage())
+        .addAllVolumeInfo(info.getVolumeInfo())
         .build();
   }
 

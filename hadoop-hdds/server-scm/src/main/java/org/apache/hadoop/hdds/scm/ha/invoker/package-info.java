@@ -15,25 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.container.replication;
-
 /**
- * A class which extents ReplicationQueue and does nothing. This is used when
- * checking containers in a read-only mode, where we don't want to queue them
- * for replication.
+ * Invoker implementations for SCM HA to dispatch local method calls
+ * without using reflection.
  */
-public class NullReplicationQueue extends ReplicationQueue {
-
-  @Override
-  public void enqueue(ContainerHealthResult.UnderReplicatedHealthResult
-                          underReplicatedHealthResult) {
-    // Do nothing
-  }
-
-  @Override
-  public void enqueue(ContainerHealthResult.OverReplicatedHealthResult
-                          overReplicatedHealthResult) {
-    // Do nothing
-  }
-
-}
+package org.apache.hadoop.hdds.scm.ha.invoker;

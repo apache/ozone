@@ -33,10 +33,10 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.lang.reflect.Proxy;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
@@ -48,10 +48,6 @@ import org.slf4j.LoggerFactory;
 public final class TracingUtil {
   private static final Logger LOG = LoggerFactory.getLogger(TracingUtil.class);
   private static final String NULL_SPAN_AS_STRING = "";
-  private static final String OTEL_EXPORTER_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT";
-  private static final String OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT = "http://localhost:4317";
-  private static final String OTEL_TRACES_SAMPLER_ARG = "OTEL_TRACES_SAMPLER_ARG";
-  private static final double OTEL_TRACES_SAMPLER_RATIO_DEFAULT = 1.0;
 
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
@@ -69,7 +65,7 @@ public final class TracingUtil {
     }
 
     try {
-      initialize(serviceName);
+      initialize(serviceName, conf);
       isInit = true;
       LOG.info("Initialized tracing service: {}", serviceName);
     } catch (Exception e) {
@@ -77,21 +73,16 @@ public final class TracingUtil {
     }
   }
 
-  private static void initialize(String serviceName) {
-    String otelEndPoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
-    if (otelEndPoint == null || otelEndPoint.isEmpty()) {
-      otelEndPoint = OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT;
-    }
+  private static void initialize(String serviceName, ConfigurationSource conf) {
+    //Fetch and log the right tracing parameters based on config, environment variable and default value priority.
+    TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
+    String otelEndPoint = tracingConfig.getTracingEndpoint();
+    double samplerRatio = tracingConfig.getTraceSamplerRatio();
+    LOG.info("Sampling Trace Config = '{}'", samplerRatio);
+    String spanSamplingConfig = tracingConfig.getSpanSampling();
+    LOG.info("Sampling Span Config = '{}'", spanSamplingConfig);
 
-    double samplerRatio = OTEL_TRACES_SAMPLER_RATIO_DEFAULT;
-    try {
-      String sampleStrRatio = System.getenv(OTEL_TRACES_SAMPLER_ARG);
-      if (sampleStrRatio != null && !sampleStrRatio.isEmpty()) {
-        samplerRatio = Double.parseDouble(System.getenv(OTEL_TRACES_SAMPLER_ARG));
-      }
-    } catch (NumberFormatException ex) {
-      // ignore and use the default value.
-    }
+    Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);
 
     Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), serviceName));
     OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
@@ -99,10 +90,21 @@ public final class TracingUtil {
         .build();
 
     SimpleSpanProcessor spanProcessor = SimpleSpanProcessor.builder(spanExporter).build();
+
+    // Choose sampler based on span sampling config. If it is empty use trace based sampling only.
+    // else use custom SpanSampler.
+    Sampler sampler;
+    if (spanMap.isEmpty()) {
+      sampler = Sampler.traceIdRatioBased(samplerRatio);
+    } else {
+      Sampler rootSampler = Sampler.traceIdRatioBased(samplerRatio);
+      sampler = new SpanSampler(rootSampler, spanMap);
+    }
+
     SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
         .addSpanProcessor(spanProcessor)
         .setResource(resource)
-        .setSampler(Sampler.traceIdRatioBased(samplerRatio))
+        .setSampler(sampler)
         .build();
     OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
         .setTracerProvider(tracerProvider)
@@ -133,7 +135,6 @@ public final class TracingUtil {
    *
    * @param name          name of the newly created scope
    * @param encodedParent Encoded parent span (could be null or empty)
-   *
    * @return Tracing scope.
    */
   public static Span importAndCreateSpan(String name, String encodedParent) {
@@ -170,19 +171,55 @@ public final class TracingUtil {
         new TraceAllMethod<>(delegate, itf.getSimpleName())));
   }
 
-  public static boolean isTracingEnabled(
-      ConfigurationSource conf) {
-    return conf.getBoolean(
-        ScmConfigKeys.HDDS_TRACING_ENABLED,
-        ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
+  public static boolean isTracingEnabled(ConfigurationSource conf) {
+    return conf.getObject(TracingConfig.class).isTracingEnabled();
+  }
+
+  /**
+   * Function to parse span sampling config. The input is in the form <span_name>:<sample_rate>.
+   * The sample rate must be a number between 0 and 1. Any value other than that will LOG an error.
+   */
+  static Map<String, LoopSampler> parseSpanSamplingConfig(String configStr) {
+    Map<String, LoopSampler> result = new HashMap<>();
+    if (configStr == null || configStr.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    for (String entry : configStr.split(",")) {
+      String trimmed = entry.trim();
+      int colon = trimmed.indexOf(':');
+
+      if (colon <= 0 || colon >= trimmed.length() - 1) {
+        continue;
+      }
+
+      String name = trimmed.substring(0, colon).trim();
+      String val = trimmed.substring(colon + 1).trim();
+
+      try {
+        double rate = Double.parseDouble(val);
+        //if the rate  is less than or equal to zero , no sampling config is taken for that key value pair.
+        if (rate > 0) {
+          // cap it at 1.0 when a number greater than 1 is entered
+          double effectiveRate = Math.min(rate, 1.0);
+          result.put(name, new LoopSampler(effectiveRate));
+        } else {
+          LOG.warn("rate for span '{}' is 0 or less, ignoring sample configuration", name);
+        }
+      } catch (NumberFormatException e) {
+        LOG.error("Invalid rate '{}' for span '{}', ignoring sample configuration", val, name);
+      }
+    }
+    return result;
   }
 
   /**
    * Execute {@code runnable} inside an activated new span.
+   * If a parent span exists in the current context, this becomes a child span.
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
       CheckedRunnable<E> runnable) throws E {
-    Span span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    Span span = buildSpan(spanName);
     executeInSpan(span, runnable);
   }
 
@@ -191,12 +228,13 @@ public final class TracingUtil {
    */
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
       CheckedSupplier<R, E> supplier) throws E {
-    Span span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    Span span = buildSpan(spanName);
     return executeInSpan(span, supplier);
   }
 
   /**
    * Execute {@code supplier} in the given {@code span}.
+   *
    * @return the value returned by {@code supplier}
    */
   private static <R, E extends Exception> R executeInSpan(Span span,
@@ -244,7 +282,7 @@ public final class TracingUtil {
    * in case of Exceptions.
    */
   public static TraceCloseable createActivatedSpan(String spanName) {
-    Span span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    Span span = buildSpan(spanName);
     Scope scope = span.makeCurrent();
     return () -> {
       scope.close();
@@ -297,6 +335,21 @@ public final class TracingUtil {
           map.put(kv[0].trim(), kv[1].trim());
         }
       }
+    }
+  }
+
+  /**
+   * Creates a new span, using the current context as a parent if valid;
+   * otherwise, creates a root span.
+   */
+  private static Span buildSpan(String spanName) {
+    Context currentContext = Context.current();
+    Span parentSpan = Span.fromContext(currentContext);
+
+    if (parentSpan.getSpanContext().isValid()) {
+      return tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
+    } else {
+      return tracer.spanBuilder(spanName).setNoParent().startSpan();
     }
   }
 }

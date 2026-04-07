@@ -90,6 +90,7 @@ const Insights: React.FC<{}> = () => {
           (map: Map<string, Set<string>>, current: FileCountResponse) => {
             const volume = current.volume;
             const bucket = current.bucket;
+            if (!volume || !bucket) return map;
             if (map.has(volume)) {
               const buckets = Array.from(map.get(volume)!);
               map.set(volume, new Set<string>([...buckets, bucket]));

@@ -604,9 +604,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public String getOzoneKey(String volume, String bucket, String key) {
     StringBuilder builder = new StringBuilder()
-        .append(OM_KEY_PREFIX).append(volume);
-    // TODO : Throw if the Bucket is null?
-    builder.append(OM_KEY_PREFIX).append(bucket);
+        .append(OM_KEY_PREFIX).append(volume)
+        .append(OM_KEY_PREFIX).append(bucket); // TODO : Throw if the Bucket is null?
     if (StringUtils.isNotBlank(key)) {
       builder.append(OM_KEY_PREFIX);
       if (!key.equals(OM_KEY_PREFIX)) {
@@ -1769,11 +1768,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                 long parentID, String fileName,
                                 String clientId) {
     StringBuilder openKey = new StringBuilder();
-    openKey.append(OM_KEY_PREFIX).append(volumeId);
-    openKey.append(OM_KEY_PREFIX).append(bucketId);
-    openKey.append(OM_KEY_PREFIX).append(parentID);
-    openKey.append(OM_KEY_PREFIX).append(fileName);
-    openKey.append(OM_KEY_PREFIX).append(clientId);
+    openKey.append(OM_KEY_PREFIX).append(volumeId)
+        .append(OM_KEY_PREFIX).append(bucketId)
+        .append(OM_KEY_PREFIX).append(parentID)
+        .append(OM_KEY_PREFIX).append(fileName)
+        .append(OM_KEY_PREFIX).append(clientId);
     return openKey.toString();
   }
 
@@ -1781,9 +1780,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public String getRenameKey(String volumeName, String bucketName,
                              long objectID) {
     StringBuilder renameKey = new StringBuilder();
-    renameKey.append(OM_KEY_PREFIX).append(volumeName);
-    renameKey.append(OM_KEY_PREFIX).append(bucketName);
-    renameKey.append(OM_KEY_PREFIX).append(objectID);
+    renameKey.append(OM_KEY_PREFIX).append(volumeName)
+        .append(OM_KEY_PREFIX).append(bucketName)
+        .append(OM_KEY_PREFIX).append(objectID);
     return renameKey.toString();
   }
 
@@ -1798,11 +1797,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                 long parentID, String fileName,
                                 String uploadId) {
     StringBuilder openKey = new StringBuilder();
-    openKey.append(OM_KEY_PREFIX).append(volumeId);
-    openKey.append(OM_KEY_PREFIX).append(bucketId);
-    openKey.append(OM_KEY_PREFIX).append(parentID);
-    openKey.append(OM_KEY_PREFIX).append(fileName);
-    openKey.append(OM_KEY_PREFIX).append(uploadId);
+    openKey.append(OM_KEY_PREFIX).append(volumeId)
+        .append(OM_KEY_PREFIX).append(bucketId)
+        .append(OM_KEY_PREFIX).append(parentID)
+        .append(OM_KEY_PREFIX).append(fileName)
+        .append(OM_KEY_PREFIX).append(uploadId);
     return openKey.toString();
   }
 

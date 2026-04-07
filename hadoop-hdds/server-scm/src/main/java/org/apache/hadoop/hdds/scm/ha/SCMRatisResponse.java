@@ -29,6 +29,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
  * Represents the response from RatisServer.
  */
 public final class SCMRatisResponse {
+  static final ScmCodecFactory FACTORY =  ScmCodecFactory.getInstance();
 
   private final boolean success;
   private final Object result;
@@ -65,17 +66,18 @@ public final class SCMRatisResponse {
     return exception;
   }
 
-  public static Message encode(final Object result)
+  public static Message encode(Object result, Class<?> type)
       throws InvalidProtocolBufferException {
 
     if (result == null) {
       return Message.EMPTY;
     }
 
-    final Class<?> type = result.getClass();
+    final Class<?> resolved = FACTORY.resolve(type);
+
     final SCMRatisResponseProto response = SCMRatisResponseProto.newBuilder()
         .setType(type.getName())
-        .setValue(ScmCodecFactory.getCodec(type).serialize(result))
+        .setValue(FACTORY.getCodec(resolved).serialize(result))
         .build();
     return Message.valueOf(UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer()));
   }
@@ -102,14 +104,8 @@ public final class SCMRatisResponse {
       throw new InvalidProtocolBufferException("Missing response value");
     }
 
-    try {
-      final Class<?> type = ReflectionUtil.getClass(responseProto.getType());
-      return new SCMRatisResponse(ScmCodecFactory.getCodec(type)
-          .deserialize(type, responseProto.getValue()));
-    } catch (ClassNotFoundException e) {
-      throw new InvalidProtocolBufferException(responseProto.getType() +
-          " cannot be decoded!" + e.getMessage());
-    }
+    final Class<?> type = FACTORY.resolve(responseProto.getType());
+    return new SCMRatisResponse(FACTORY.getCodec(type).deserialize(responseProto.getValue()));
   }
 
 }

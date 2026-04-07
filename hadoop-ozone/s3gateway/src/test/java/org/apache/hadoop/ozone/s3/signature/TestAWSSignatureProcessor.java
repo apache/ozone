@@ -15,18 +15,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
+package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.ext.Provider;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+import org.junit.jupiter.api.Test;
 
 /**
- * Custom unmarshaller to read PutBucketAclRequest wo namespace.
+ * Tests for {@link AWSSignatureProcessor}.
  */
-@Provider
-public class PutBucketAclRequestUnmarshaller extends MessageUnmarshaller<S3BucketAcl> {
+public class TestAWSSignatureProcessor {
 
-  public PutBucketAclRequestUnmarshaller() {
-    super(S3BucketAcl.class);
+  @Test
+  public void testLowerCaseHeaderMapRemovesKeysCaseInsensitively() {
+    AWSSignatureProcessor.LowerCaseKeyStringMap headers =
+        new AWSSignatureProcessor.LowerCaseKeyStringMap();
+    headers.put("Authorization", "AWS4-HMAC-SHA256 value");
+
+    assertEquals("AWS4-HMAC-SHA256 value",
+        headers.remove("AUTHORIZATION"));
+    assertFalse(headers.containsKey("authorization"));
   }
-
 }
