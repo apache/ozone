@@ -166,6 +166,14 @@ public final class SCMNodeMetrics implements MetricsSource {
           Integer.parseInt(nonWritableNodes));
     }
 
+    String volumeFailures = nodeStatistics.get("VolumeFailures");
+    if (volumeFailures != null) {
+      metrics.addGauge(
+          Interns.info("VolumeFailures",
+              "Number of datanodes with at least one failed volume"),
+          Integer.parseInt(volumeFailures));
+    }
+
     for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {
       metrics.addGauge(
           Interns.info(e.getKey(), diskMetricDescription(e.getKey())),

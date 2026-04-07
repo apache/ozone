@@ -357,6 +357,50 @@ public class TestListInfoSubcommand {
     assertTrue(output.contains("Healthy volume count:"), "Should display healthy volume count");
   }
 
+  @Test
+  public void testFailedVolumesFilter() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.Node> baseNodes = getNodeDetails();
+
+    List<HddsProtos.Node> nodes = new ArrayList<>();
+    // node 0: 1 failed volume
+    nodes.add(HddsProtos.Node.newBuilder(baseNodes.get(0))
+        .setTotalVolumeCount(4).setHealthyVolumeCount(3)
+        .addFailedVolumes("/data/disk2").build());
+    // node 1: healthy, no failed volumes
+    nodes.add(HddsProtos.Node.newBuilder(baseNodes.get(1))
+        .setTotalVolumeCount(4).setHealthyVolumeCount(4).build());
+    // node 2: 2 failed volumes
+    nodes.add(HddsProtos.Node.newBuilder(baseNodes.get(2))
+        .setTotalVolumeCount(6).setHealthyVolumeCount(4)
+        .addFailedVolumes("/data/disk1")
+        .addFailedVolumes("/data/disk5").build());
+    // node 3: healthy, no failed volumes
+    nodes.add(HddsProtos.Node.newBuilder(baseNodes.get(3))
+        .setTotalVolumeCount(4).setHealthyVolumeCount(4).build());
+
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodes);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--failed-volumes");
+    cmd.execute(scmClient);
+    String output = outContent.toString(DEFAULT_ENCODING);
+
+    // Only 2 datanodes (those with failed volumes) should appear
+    Matcher m = Pattern.compile("^Datanode:", Pattern.MULTILINE)
+        .matcher(output);
+    int count = 0;
+    while (m.find()) {
+      count++;
+    }
+    assertEquals(2, count, "Only datanodes with failed volumes should be listed");
+    assertTrue(output.contains("Failed volume"));
+    assertTrue(output.contains("/data/disk2"));
+    assertTrue(output.contains("/data/disk1"));
+    assertTrue(output.contains("/data/disk5"));
+  }
+
   private void validateOrdering(JsonNode root, String orderDirection) {
     for (int i = 0; i < root.size() - 1; i++) {
       long usedCurrent = root.get(i).get("used").asLong();

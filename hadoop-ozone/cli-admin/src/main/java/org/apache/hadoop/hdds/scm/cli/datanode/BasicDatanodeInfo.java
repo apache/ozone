@@ -41,6 +41,8 @@ public final class BasicDatanodeInfo {
   private Integer totalVolumeCount = null;
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private Integer healthyVolumeCount = null;
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  private List<String> failedVolumes = null;
   
   private BasicDatanodeInfo(Builder builder) {
     this.dn = builder.dn;
@@ -51,6 +53,7 @@ public final class BasicDatanodeInfo {
     this.percentUsed = builder.percentUsed;
     this.totalVolumeCount = builder.totalVolumeCount;
     this.healthyVolumeCount = builder.healthyVolumeCount;
+    this.failedVolumes = builder.failedVolumes;
   }
 
   /**
@@ -65,6 +68,7 @@ public final class BasicDatanodeInfo {
     private Double percentUsed;
     private Integer totalVolumeCount;
     private Integer healthyVolumeCount;
+    private List<String> failedVolumes;
 
     public Builder(DatanodeDetails dn, HddsProtos.NodeOperationalState opState,
                    HddsProtos.NodeState healthState) {
@@ -83,6 +87,11 @@ public final class BasicDatanodeInfo {
     public Builder withVolumeCounts(Integer total, Integer healthy) {
       this.totalVolumeCount = total;
       this.healthyVolumeCount = healthy;
+      return this;
+    }
+
+    public Builder withFailedVolumes(List<String> volumes) {
+      this.failedVolumes = volumes;
       return this;
     }
 
@@ -204,6 +213,11 @@ public final class BasicDatanodeInfo {
   @JsonProperty(index = 111)
   public Integer getHealthyVolumeCount() {
     return healthyVolumeCount;
+  }
+
+  @JsonProperty(index = 112)
+  public List<String> getFailedVolumes() {
+    return failedVolumes;
   }
 
   @JsonIgnore
