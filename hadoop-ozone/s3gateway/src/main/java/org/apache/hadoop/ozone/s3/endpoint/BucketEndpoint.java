@@ -258,6 +258,9 @@ public class BucketEndpoint extends EndpointBase {
         auditReadFailure(s3GAction, ex);
         if (ex.getCause() instanceof OMException) {
           final OMException omException = (OMException) ex.getCause();
+          if (omException.getResult() == ResultCodes.FILE_NOT_FOUND) {
+            throw ex; 
+          }
           handleOMException(omException, bucketName, prefix);
         } else {
           throw ex;
