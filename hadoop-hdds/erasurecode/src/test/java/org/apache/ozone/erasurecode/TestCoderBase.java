@@ -480,19 +480,16 @@ public abstract class TestCoderBase {
   protected void dumpSetting() {
     if (allowDump) {
       StringBuilder sb = new StringBuilder("Erasure coder test settings:\n");
-      sb.append(" numDataUnits=").append(numDataUnits);
-      sb.append(" numParityUnits=").append(numParityUnits);
-      sb.append(" chunkSize=").append(chunkSize).append('\n');
+      sb.append(" numDataUnits=").append(numDataUnits)
+          .append(" numParityUnits=").append(numParityUnits)
+          .append(" chunkSize=").append(chunkSize).append('\n')
+          .append(" erasedDataIndexes=").append(Arrays.toString(erasedDataIndexes))
+          .append(" erasedParityIndexes=").append(Arrays.toString(erasedParityIndexes))
+          .append(" usingDirectBuffer=").append(usingDirectBuffer)
+          .append(" allowVerboseDump=").append(allowDump)
+          .append('\n');
 
-      sb.append(" erasedDataIndexes=").
-          append(Arrays.toString(erasedDataIndexes));
-      sb.append(" erasedParityIndexes=").
-          append(Arrays.toString(erasedParityIndexes));
-      sb.append(" usingDirectBuffer=").append(usingDirectBuffer);
-      sb.append(" allowVerboseDump=").append(allowDump);
-      sb.append('\n');
-
-      System.out.println(sb.toString());
+      System.out.println(sb);
     }
   }
 

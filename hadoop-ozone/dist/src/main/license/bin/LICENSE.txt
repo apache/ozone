@@ -246,6 +246,8 @@ EPL 2.0
 CDDL 1.1 + GPLv2 with classpath exception
 =====================
 
+   com.sun.xml.bind:jaxb-core
+   com.sun.xml.bind:jaxb-impl
    com.sun.istack:istack-commons-runtime
    com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
@@ -303,11 +305,9 @@ Apache License 2.0
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
-   commons-daemon:commons-daemon
    commons-digester:commons-digester
    commons-httpclient:commons-httpclient
    commons-io:commons-io
-   commons-lang:commons-lang
    commons-net:commons-net
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload
@@ -402,10 +402,12 @@ Apache License 2.0
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
    org.apache.ranger:ranger-audit-core
+   org.apache.ranger:ranger-authz-api
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
    org.apache.ranger:ranger-plugin-common
    org.apache.ranger:ranger-plugin-cred
+   org.apache.ranger:ugsync-util
    org.apache.ratis:ratis-client
    org.apache.ratis:ratis-common
    org.apache.ratis:ratis-grpc

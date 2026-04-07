@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -35,17 +36,22 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,9 +79,9 @@ public class TestDiskBalancerSubCommands {
     
     // Create shared list of in-service datanodes
     inServiceDatanodes = new ArrayList<>();
-    inServiceDatanodes.add("host-1:19864");
-    inServiceDatanodes.add("host-2:19864");
-    inServiceDatanodes.add("host-3:19864");
+    inServiceDatanodes.add("host-1:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
+    inServiceDatanodes.add("host-2:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
+    inServiceDatanodes.add("host-3:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
     
     // Create shared mock protocol
     mockProtocol = mock(DiskBalancerProtocol.class);
@@ -130,13 +136,49 @@ public class TestDiskBalancerSubCommands {
     
     MockedStatic<DiskBalancerSubCommandUtil> mockedUtil = 
         mockStatic(DiskBalancerSubCommandUtil.class);
+    Map<String, String> addressToDisplay = new LinkedHashMap<>();
+    for (String addr : inServiceDatanodes) {
+      addressToDisplay.put(addr, addr);
+    }
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getAllOperableNodesClientRpcAddress(any()))
-        .thenReturn(inServiceDatanodes);
+        .thenReturn(addressToDisplay);
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(anyString()))
         .thenReturn(mockProtocol);
-    
+    // Mock getDatanodeHostAndIp(HddsProtos.DatanodeDetailsProto) to format the output
+    mockedUtil.when(() -> DiskBalancerSubCommandUtil
+        .getDatanodeHostAndIp(any(HddsProtos.DatanodeDetailsProto.class)))
+        .thenAnswer(invocation -> {
+          HddsProtos.DatanodeDetailsProto proto = invocation.getArgument(0);
+          return proto.getHostName() + " (" + proto.getIpAddress() + ":" +
+              HDDS_DATANODE_CLIENT_PORT_DEFAULT + ")";
+        });
+    // Mock getDatanodeHostAndIp(String, String, int) to format the output
+    // Return value is used by Mockito internally for mock setup
+    mockedUtil.when(() -> {
+      @SuppressWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
+      String ignored = DiskBalancerSubCommandUtil
+          .getDatanodeHostAndIp(any(DatanodeDetailsProto.class));
+      // Use the value to avoid "ignored return value" static analysis warnings.
+      System.out.println(ignored);
+    }).thenAnswer(invocation -> {
+      DatanodeDetailsProto proto = invocation.getArgument(0);
+      String hostname = proto.getHostName();
+      String ipAddress = proto.getIpAddress();
+      int port = proto.getPortsList().stream()
+          .filter(p -> p.getName().equals(
+              DatanodeDetails.Port.Name.CLIENT_RPC.name()))
+          .mapToInt(HddsProtos.Port::getValue)
+          .findFirst()
+          .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT);
+      String addressPort = ipAddress + ":" + port;
+      if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
+        return hostname + " (" + addressPort + ")";
+      }
+      return addressPort;
+    });
+
     return new DiskBalancerMocks(mockedConf, mockedClient, mockedUtil);
   }
 
@@ -198,6 +240,25 @@ public class TestDiskBalancerSubCommands {
 
       Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2, host-3\\]");
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithDuplicateHostnames() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-1", "host-2");
+      cmd.call();
+
+      // output should show each host only once
+      String output = outContent.toString(DEFAULT_ENCODING);
+      Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2\\]");
+      Matcher m = p.matcher(output);
       assertTrue(m.find());
     }
   }
@@ -555,6 +616,16 @@ public class TestDiskBalancerSubCommands {
       String output = outContent.toString(DEFAULT_ENCODING);
       assertTrue(output.contains("\"datanode\""));
       assertTrue(output.contains("\"volumeDensity\""));
+      assertTrue(output.contains("\"idealUsage\""));
+      assertTrue(output.contains("\"volumes\""));
+      assertTrue(output.contains("\"storageId\""));
+      assertTrue(output.contains("\"storagePath\""));
+      assertTrue(output.contains("\"totalCapacity\""));
+      assertTrue(output.contains("\"usedSpace\""));
+      assertTrue(output.contains("\"effectiveUsedSpace\""));
+      assertTrue(output.contains("\"utilization\""));
+      assertTrue(output.contains("\"volumeDensity\""));
+      assertTrue(output.contains("\"containerPreAllocatedSpace\""));
     }
   }
 
@@ -633,14 +704,14 @@ public class TestDiskBalancerSubCommands {
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
         .build();
 
-    DiskBalancerConfigurationProto configProto = DiskBalancerConfigurationProto.newBuilder()
-        .setThreshold(threshold)
-        .setDiskBandwidthInMB(bandwidthInMB)
-        .setParallelThread(parallelThread)
-        .setStopAfterDiskEven(true)
-        .build();
+    DiskBalancerConfigurationProto configProto = createConfigProto(threshold, bandwidthInMB, parallelThread, true);
+
 
     return DatanodeDiskBalancerInfoProto.newBuilder()
         .setNode(nodeProto)
@@ -677,18 +748,71 @@ public class TestDiskBalancerSubCommands {
   /**
    * Generates a random report proto for a given hostname.
    * @param hostname the hostname
-   * @return DatanodeDiskBalancerInfoProto with random volume density
+   * @return DatanodeDiskBalancerInfoProto with random volume density and volume info
    */
   private DatanodeDiskBalancerInfoProto generateRandomReportProto(String hostname) {
     double volumeDensity = random.nextDouble() * 0.1;
+    double idealUsage = 0.1 + random.nextDouble() * 0.3;
+    double threshold = 5.0 + random.nextDouble() * 10.0;
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    DiskBalancerConfigurationProto configProto = createConfigProto(threshold, 100L, 5, true);
+
+    long committed1 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
+    long committed2 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
+    long capacity1 = 500L * 1024 * 1024 * 1024 + random.nextInt(1024 * 1024);
+    long capacity2 = 600L * 1024 * 1024 * 1024 + random.nextInt(1024 * 1024);
+    double util1 = idealUsage + random.nextDouble() * 0.1;
+    double util2 = idealUsage - random.nextDouble() * 0.1;
+    long used1 = (long) (capacity1 * util1);
+    long used2 = (long) (capacity2 * util2);
+    long effective1 = used1 + committed1;
+    long effective2 = used2 + committed2;
+    String path1 = "/data/hdds-" + hostname + "-1";
+    String path2 = "/data/hdds-" + hostname + "-2";
+    VolumeReportProto vol1 = VolumeReportProto.newBuilder()
+        .setStorageId("DISK-" + hostname + "-vol1")
+        .setStoragePath(path1)
+        .setUtilization(util1)
+        .setCommittedBytes(committed1)
+        .setTotalCapacity(capacity1)
+        .setUsedSpace(used1)
+        .setEffectiveUsedSpace(effective1)
+        .build();
+    VolumeReportProto vol2 = VolumeReportProto.newBuilder()
+        .setStorageId("DISK-" + hostname + "-vol2")
+        .setStoragePath(path2)
+        .setUtilization(util2)
+        .setCommittedBytes(committed2)
+        .setTotalCapacity(capacity2)
+        .setUsedSpace(used2)
+        .setEffectiveUsedSpace(effective2)
         .build();
 
     return DatanodeDiskBalancerInfoProto.newBuilder()
         .setNode(nodeProto)
         .setCurrentVolumeDensitySum(volumeDensity)
+        .setIdealUsage(idealUsage)
+        .setDiskBalancerConf(configProto)
+        .addVolumeInfo(vol1)
+        .addVolumeInfo(vol2)
+        .build();
+  }
+
+  private DiskBalancerConfigurationProto createConfigProto(double threshold, long bandwidthInMB, int parallelThread,
+      boolean stopAfterDiskEven) {
+    return DiskBalancerConfigurationProto.newBuilder()
+        .setThreshold(threshold)
+        .setDiskBandwidthInMB(bandwidthInMB)
+        .setParallelThread(parallelThread)
+        .setStopAfterDiskEven(stopAfterDiskEven)
         .build();
   }
 }

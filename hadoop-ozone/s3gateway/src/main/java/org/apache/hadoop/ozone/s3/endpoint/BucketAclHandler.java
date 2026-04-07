@@ -30,6 +30,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -46,6 +47,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.http.HttpStatus;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +61,9 @@ import org.slf4j.LoggerFactory;
 public class BucketAclHandler extends BucketOperationHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(BucketAclHandler.class);
+
+  private static final Supplier<MessageUnmarshaller<S3BucketAcl>> UNMARSHALLER =
+      MemoizedSupplier.valueOf(() -> new MessageUnmarshaller<>(S3BucketAcl.class));
 
   /**
    * Determine if this handler should handle the current request.
@@ -157,8 +162,7 @@ public class BucketAclHandler extends BucketOperationHandler {
       if (grantReads == null && grantWrites == null && grantReadACP == null
           && grantWriteACP == null && grantFull == null) {
         // Handle grants in body
-        S3BucketAcl putBucketAclRequest =
-            new PutBucketAclRequestUnmarshaller().readFrom(body);
+        S3BucketAcl putBucketAclRequest = UNMARSHALLER.get().readFrom(body);
         ozoneAclListOnBucket.addAll(
             S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));
         ozoneAclListOnVolume.addAll(

@@ -413,6 +413,8 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
             HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY),
         new DeprecationDelta("hdds.recon.heartbeat.interval",
             HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL),
+        new DeprecationDelta("hdds.tracing.enabled",
+            "ozone.tracing.enabled"),
         new DeprecationDelta("hdds.datanode.disk.check.io.test.count",
             HddsConfigKeys.HDDS_DATANODE_DISK_CHECK_IO_TEST_ENABLED_KEY)
     });

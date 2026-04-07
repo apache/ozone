@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -49,7 +51,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
  * 4. The declaration should throw RaftException
  *
  */
-public interface ContainerStateManager {
+public interface ContainerStateManager extends SCMHandler {
 
   /* **********************************************************************
    * Container Life Cycle                                                 *
@@ -102,6 +104,15 @@ public interface ContainerStateManager {
    *
    */
   boolean contains(ContainerID containerID);
+
+  /**
+   * Get {@link ContainerID}s for the given state.
+   *
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerID};
+   */
+  List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count);
 
   /**
    * Get {@link ContainerInfo}s.
@@ -172,15 +183,15 @@ public interface ContainerStateManager {
 
 
   /**
-   * Bypasses the container state machine to change a container's state from DELETING or DELETED to CLOSED. This API was
-   * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
    *
-   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
    * @param id id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
    * @throws IOException
    */
   @Replicate
-  void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
+  void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
+      throws IOException;
 
   /**
    *
@@ -210,4 +221,9 @@ public interface ContainerStateManager {
    */
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
+
+  @Override
+  default RequestType getType() {
+    return RequestType.CONTAINER;
+  }
 }
