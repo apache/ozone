@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -375,6 +376,117 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+  }
+
+  @Test
+  public void testPutObjectIfNoneMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is, new ObjectMetadata()).ifNoneMatch("*");
+
+    PutObjectResult putObjectResult = s3Client.putObject(request);
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+  }
+
+  @Test
+  public void testPutObjectIfNoneMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    InputStream is2 = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is2, new ObjectMetadata()).ifNoneMatch("*");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(request));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+  }
+
+  @Test
+  public void testPutObjectIfMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    String etag = putObjectResult.getETag();
+
+    InputStream is2 = new ByteArrayInputStream("bar2".getBytes(StandardCharsets.UTF_8));
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is2, new ObjectMetadata()).ifMatch(etag);
+
+    PutObjectResult putObjectResult2 = s3Client.putObject(request);
+    assertNotNull(putObjectResult2.getETag());
+    assertNotEquals(etag, putObjectResult2.getETag());
+
+    ObjectMetadata updatedObjectMetadata = s3Client.getObjectMetadata(bucketName, keyName);
+    assertEquals(putObjectResult2.getETag(), updatedObjectMetadata.getETag());
+  }
+
+  @Test
+  public void testPutObjectIfMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult initialResult =
+        s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    InputStream is2 = new ByteArrayInputStream("bar2".getBytes(StandardCharsets.UTF_8));
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is2, new ObjectMetadata()).ifMatch("wrong-etag");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(request));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+
+    ObjectMetadata existingObjectMetadata = s3Client.getObjectMetadata(bucketName, keyName);
+    assertEquals(initialResult.getETag(), existingObjectMetadata.getETag());
+  }
+
+  @Test
+  public void testPutObjectIfMatchMissingKeyFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream("bar2".getBytes(
+        StandardCharsets.UTF_8));
+    PutObjectRequest request = new PutObjectRequest(
+        bucketName, keyName, is, new ObjectMetadata()).ifMatch("some-etag");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(request));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+
+    AmazonServiceException missingKey = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(bucketName, keyName));
+    assertEquals(ErrorType.Client, missingKey.getErrorType());
+    assertEquals(404, missingKey.getStatusCode());
+    assertEquals("NoSuchKey", missingKey.getErrorCode());
   }
 
   @Test
@@ -1422,10 +1534,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       StringBuilder completionXml = new StringBuilder();
       completionXml.append("<CompleteMultipartUpload>\n");
       for (PartETag part : completedParts) {
-        completionXml.append("  <Part>\n");
-        completionXml.append("    <PartNumber>").append(part.getPartNumber()).append("</PartNumber>\n");
-        completionXml.append("    <ETag>").append(stripQuotes(part.getETag())).append("</ETag>\n");
-        completionXml.append("  </Part>\n");
+        completionXml.append("  <Part>\n")
+            .append("    <PartNumber>").append(part.getPartNumber()).append("</PartNumber>\n")
+            .append("    <ETag>").append(stripQuotes(part.getETag())).append("</ETag>\n")
+            .append("  </Part>\n");
       }
       completionXml.append("</CompleteMultipartUpload>");
 

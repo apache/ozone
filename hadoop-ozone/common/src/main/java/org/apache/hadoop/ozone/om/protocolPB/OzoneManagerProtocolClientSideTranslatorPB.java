@@ -744,6 +744,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getExpectedDataGeneration() != null) {
       keyArgs.setExpectedDataGeneration(args.getExpectedDataGeneration());
     }
+    if (args.getExpectedETag() != null) {
+      keyArgs.setExpectedETag(args.getExpectedETag());
+    }
 
     req.setKeyArgs(keyArgs.build());
 
@@ -1255,7 +1258,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (!StringUtils.isBlank(snapshotName)) {
       requestBuilder.setSnapshotName(snapshotName);
     }
-      
+
     final OMRequest omRequest = createOMRequest(Type.CreateSnapshot)
         .setCreateSnapshotRequest(requestBuilder)
         .build();

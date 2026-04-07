@@ -22,7 +22,7 @@ type GlobalStorage = {
   totalOzoneCapacity: number;
   totalOzoneUsedSpace: number;
   totalOzoneFreeSpace: number;
-  totalOzonePreAllocatedContainerSpace: number;
+  totalOzoneCommittedSpace: number;
   totalMinimumFreeSpace: number;
 };
 
@@ -33,7 +33,7 @@ type GlobalNamespace = {
 
 type UsedSpaceBreakdown = {
   openKeyBytes: OpenKeyBytesInfo;
-  committedKeyBytes: number;
+  finalizedKeyBytes: number;
 };
 
 type OpenKeyBytesInfo = {

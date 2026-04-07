@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -234,6 +235,107 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     assertEquals(content, objectBytes.asUtf8String());
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutObjectIfNoneMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse putObjectResponse = s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .ifNoneMatch("*"),
+        RequestBody.fromString(content));
+
+    assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", putObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutObjectIfNoneMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .ifNoneMatch("*"),
+        RequestBody.fromString(content)));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testPutObjectIfMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    PutObjectResponse putObjectResponse = s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .ifMatch(initialResponse.eTag()),
+        RequestBody.fromString("bar2"));
+
+    assertNotNull(putObjectResponse.eTag());
+    assertNotEquals(initialResponse.eTag(), putObjectResponse.eTag());
+
+    HeadObjectResponse headObjectResponse = s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName));
+    assertEquals(putObjectResponse.eTag(), headObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutObjectIfMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .ifMatch("wrong-etag"),
+        RequestBody.fromString("bar2")));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+
+    HeadObjectResponse headObjectResponse = s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName));
+    assertEquals(initialResponse.eTag(), headObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutObjectIfMatchMissingKeyFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .ifMatch("some-etag"),
+        RequestBody.fromString("bar2")));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName)));
   }
 
   @Test
@@ -1178,10 +1280,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       StringBuilder xml = new StringBuilder();
       xml.append("<CompleteMultipartUpload>\n");
       for (CompletedPart part : parts) {
-        xml.append("  <Part>\n");
-        xml.append("    <PartNumber>").append(part.partNumber()).append("</PartNumber>\n");
-        xml.append("    <ETag>").append(stripQuotes(part.eTag())).append("</ETag>\n");
-        xml.append("  </Part>\n");
+        xml.append("  <Part>\n")
+            .append("    <PartNumber>").append(part.partNumber()).append("</PartNumber>\n")
+            .append("    <ETag>").append(stripQuotes(part.eTag())).append("</ETag>\n")
+            .append("  </Part>\n");
       }
       xml.append("</CompleteMultipartUpload>");
       return xml.toString();

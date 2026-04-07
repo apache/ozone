@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -144,6 +145,211 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         () -> preExecuteTest(false, 0, invalidReplication));
 
     assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateKeyExpectedGenCreateIfNotExistsKeyMissing(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
+        false, 0, 100L, replicationConfig,
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    checkResponse(modifiedOmRequest, response, id, false, getBucketLayout());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateKeyExpectedGenCreateIfNotExistsKeyAlreadyExists(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
+        false, 0, 100L, replicationConfig,
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OmKeyInfo existingKeyInfo = createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig).setUpdateID(1L).build();
+    omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(), existingKeyInfo);
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    String openKey = getOpenKey(id);
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(KEY_ALREADY_EXISTS, response.getOMResponse().getStatus());
+
+    // As we got error, no entry should be created in openKeyTable.
+    OmKeyInfo openKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    assertNull(openKeyInfo);
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateKeyExpectedGenMismatchReturnsKeyGenerationMismatch(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    long expectedGen = 1L;
+    OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
+        false, 0, 100L, replicationConfig, expectedGen));
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OmKeyInfo existingKeyInfo = createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig).setUpdateID(2L).build();
+    omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(), existingKeyInfo);
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    String openKey = getOpenKey(id);
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
+
+    // As we got error, no entry should be created in openKeyTable.
+    OmKeyInfo openKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    assertNull(openKeyInfo);
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateWithExpectedETagKeyNotFound(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    OMRequest modifiedOmRequest = doPreExecute(
+        createKeyRequestWithExpectedETag("some-etag"));
+    OMKeyCreateRequest omKeyCreateRequest =
+        getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        getBucketLayout());
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateWithExpectedETagNoETagOnKey(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    OMRequest modifiedOmRequest = doPreExecute(
+        createKeyRequestWithExpectedETag("some-etag"));
+    OMKeyCreateRequest omKeyCreateRequest =
+        getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        getBucketLayout());
+
+    // Create existing key without ETag metadata
+    OmKeyInfo existingKeyInfo = createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig)
+        .setUpdateID(1L).build();
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(getOzoneKey(), existingKeyInfo);
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(
+        OzoneManagerProtocolProtos.Status.ETAG_NOT_AVAILABLE,
+        response.getOMResponse().getStatus());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateWithExpectedETagMismatch(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    OMRequest modifiedOmRequest = doPreExecute(
+        createKeyRequestWithExpectedETag("expected-etag"));
+    OMKeyCreateRequest omKeyCreateRequest =
+        getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        getBucketLayout());
+
+    // Create existing key with a different ETag
+    OmKeyInfo existingKeyInfo = createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig)
+        .setUpdateID(1L)
+        .addMetadata(OzoneConsts.ETAG, "different-etag")
+        .build();
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(getOzoneKey(), existingKeyInfo);
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(
+        OzoneManagerProtocolProtos.Status.ETAG_MISMATCH,
+        response.getOMResponse().getStatus());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateWithExpectedETagSuccess(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    String expectedETag = "matching-etag";
+    OMRequest modifiedOmRequest = doPreExecute(
+        createKeyRequestWithExpectedETag(expectedETag));
+    OMKeyCreateRequest omKeyCreateRequest =
+        getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        getBucketLayout());
+
+    // Create existing key with matching ETag
+    OmKeyInfo existingKeyInfo = createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig)
+        .setUpdateID(1L)
+        .addMetadata(OzoneConsts.ETAG, expectedETag)
+        .build();
+    omMetadataManager.getKeyTable(getBucketLayout())
+        .put(getOzoneKey(), existingKeyInfo);
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OK, response.getOMResponse().getStatus());
+
+    // Verify open key was normalized onto the atomic rewrite generation.
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(id));
+    assertNotNull(openKeyInfo);
+    assertEquals(existingKeyInfo.getUpdateID(),
+        openKeyInfo.getExpectedDataGeneration());
+    assertNull(openKeyInfo.getExpectedETag());
+    // Creation time should remain the same on rewrite
+    assertEquals(existingKeyInfo.getCreationTime(),
+        openKeyInfo.getCreationTime());
   }
 
   @ParameterizedTest
@@ -814,6 +1020,30 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
           .setKey(key)
           .setValue(value)
           .build()));
+    }
+
+    CreateKeyRequest createKeyRequest =
+        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+    return OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest).build();
+  }
+
+  private OMRequest createKeyRequestWithExpectedETag(String expectedETag) {
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(keyName).setIsMultipartKey(false)
+        .setFactor(
+            ((RatisReplicationConfig) replicationConfig)
+                .getReplicationFactor())
+        .setType(replicationConfig.getReplicationType())
+        .setLatestVersionLocation(true)
+        .setDataSize(100L);
+
+    if (expectedETag != null) {
+      keyArgs.setExpectedETag(expectedETag);
     }
 
     CreateKeyRequest createKeyRequest =

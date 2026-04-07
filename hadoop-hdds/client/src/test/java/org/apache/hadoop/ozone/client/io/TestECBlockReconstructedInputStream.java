@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
@@ -363,13 +364,8 @@ public class TestECBlockReconstructedInputStream {
   }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {
-    List<ByteBuffer> dataStreams = new ArrayList<>();
-    for (ByteBuffer b : data) {
-      dataStreams.add(b);
-    }
-    for (ByteBuffer b : parity) {
-      dataStreams.add(b);
-    }
+    List<ByteBuffer> dataStreams = new ArrayList<>(Arrays.asList(data));
+    dataStreams.addAll(Arrays.asList(parity));
     streamFactory.setBlockStreamData(dataStreams);
   }
 }

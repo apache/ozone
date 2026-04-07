@@ -580,6 +580,16 @@ enum DiskBalancerRunningStatus {
     PAUSED = 3;
 }
 
+message VolumeReportProto {
+    optional string storageId = 1;
+    optional string storagePath = 2;
+    optional uint64 totalCapacity = 3;
+    optional uint64 usedSpace = 4;
+    optional uint64 committedBytes = 5;
+    optional uint64 effectiveUsedSpace = 6;
+    optional double utilization = 7;
+}
+
 message DatanodeDiskBalancerInfoProto {
     required DatanodeDetailsProto node = 1;
     required double currentVolumeDensitySum = 2;
@@ -589,4 +599,6 @@ message DatanodeDiskBalancerInfoProto {
     optional uint64 failureMoveCount = 6;
     optional uint64 bytesToMove = 7;
     optional uint64 bytesMoved = 8;
+    optional double idealUsage = 9;
+    repeated VolumeReportProto volumeInfo = 10;
 }
