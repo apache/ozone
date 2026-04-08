@@ -1530,25 +1530,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               .addMultipartUploads(builder.setName(dbMultipartInfoKey)
                   .build());
           numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
-          // TODO: Uncomment this when the complete flow for MPU split table is done
-          // if (omMultipartKeyInfo.getSchemaVersion() == 0) {
-          //   numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
-          // } else {
-          //   OmMultipartPartKey prefix =
-          //       OmMultipartPartKey.prefix(expiredMultipartUpload.getUploadId());
-          //   try (TableIterator<OmMultipartPartKey, ? extends KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
-          //            partIterator = getMultipartPartsTable().iterator(prefix)) {
-          //     while (partIterator.hasNext()) {
-          //       KeyValue<OmMultipartPartKey, OmMultipartPartInfo> partEntry =
-          //           partIterator.next();
-          //       if (!expiredMultipartUpload.getUploadId().equals(
-          //           partEntry.getKey().getUploadId())) {
-          //         break;
-          //       }
-          //       numParts++;
-          //     }
-          //   }
-          // }
+          // TODO: Add the expired part handling from the new table when the complete flow is done
         }
 
       }

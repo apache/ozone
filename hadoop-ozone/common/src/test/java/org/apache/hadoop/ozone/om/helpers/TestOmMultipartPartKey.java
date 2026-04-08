@@ -167,4 +167,27 @@ public class TestOmMultipartPartKey {
     assertThrows(NullPointerException.class,
         () -> codec.fromPersistedFormat(null));
   }
+
+  @Test
+  public void testSortOrderIsNumericalNotLexicographic() throws Exception {
+    // "9" sorts after "10" lexicographically, but 9 < 10 numerically.
+    // Big-endian int32 encoding must produce the numerical order.
+    byte[] raw9  = codec.toPersistedFormat(OmMultipartPartKey.of("uid", 9));
+    byte[] raw10 = codec.toPersistedFormat(OmMultipartPartKey.of("uid", 10));
+
+    // Arrays.compare is unsigned byte-by-byte — same as RocksDB's default comparator.
+    assertTrue(Arrays.compare(raw9, raw10) < 0,
+        "part 9 must sort before part 10 in byte order (big-endian encoding)");
+  }
+
+  @Test
+  public void testUploadIdContainingSlashRoundTrips() throws Exception {
+    // uploadId itself contains '/' — the codec separator character.
+    // A naive "find first slash" parser would split at the wrong position.
+    OmMultipartPartKey key = OmMultipartPartKey.of("upload/with/slashes", 5);
+    byte[] raw = codec.toPersistedFormat(key);
+    OmMultipartPartKey decoded = codec.fromPersistedFormat(raw);
+    assertEquals("upload/with/slashes", decoded.getUploadId());
+    assertEquals(5, decoded.getPartNumber().intValue());
+  }
 }
