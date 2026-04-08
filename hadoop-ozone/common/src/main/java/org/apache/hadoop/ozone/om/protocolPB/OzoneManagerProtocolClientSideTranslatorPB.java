@@ -744,6 +744,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getExpectedDataGeneration() != null) {
       keyArgs.setExpectedDataGeneration(args.getExpectedDataGeneration());
     }
+    if (args.getExpectedETag() != null) {
+      keyArgs.setExpectedETag(args.getExpectedETag());
+    }
 
     req.setKeyArgs(keyArgs.build());
 

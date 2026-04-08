@@ -303,6 +303,21 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
+  public void updateContainerInfo(final ContainerID cid, ContainerInfoProto containerInfo)
+      throws IOException {
+    lock.lock();
+    try {
+      if (containerExist(cid)) {
+        containerStateManager.updateContainerInfo(containerInfo);
+      } else {
+        throw new ContainerNotFoundException(cid);
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public void transitionDeletingOrDeletedToTargetState(ContainerID containerID, LifeCycleState targetState)
           throws IOException {
     HddsProtos.ContainerID proto = containerID.getProtobuf();

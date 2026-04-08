@@ -20,14 +20,13 @@ package org.apache.hadoop.hdds.scm.ha;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 
 /**
- * Invokes methods without using reflection.
+ * Base interface for SCM handlers participating in Ratis-based HA.
+ * Each handler is associated with a fixed {@link RequestType}.
  */
-public interface ScmInvoker<T> {
+public interface SCMHandler {
+
+  /**
+   * Returns the {@link RequestType} of this handler.
+   */
   RequestType getType();
-
-  Class<T> getApi();
-
-  T getImpl();
-
-  Object invokeLocal(String methodName, Object[] args) throws Exception;
 }
