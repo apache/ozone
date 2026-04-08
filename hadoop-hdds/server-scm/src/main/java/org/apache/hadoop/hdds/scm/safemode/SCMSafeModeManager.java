@@ -88,8 +88,10 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final SafeModeMetrics safeModeMetrics;
 
   private long safeModeLogIntervalMs;
-  private ScheduledExecutorService safeModeLogExecutor;
+  /** Shared by periodic safe-mode log and optional rule refresh. */
+  private ScheduledExecutorService safeModeScheduledExecutor;
   private ScheduledFuture<?> safeModeLogTask;
+  private ScheduledFuture<?> safeModeRefreshTask;
   private final long refreshIntervalMs;
 
   public SCMSafeModeManager(final ConfigurationSource conf,
@@ -135,16 +137,28 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (!enabled) {
       return;
     }
-    final ScheduledExecutorService refreshExecutor = Executors.newSingleThreadScheduledExecutor(
-        new ThreadFactoryBuilder()
-            .setDaemon(true)
-            .setNameFormat(getClass().getSimpleName() + "-refresh-%d")
-            .build());
-    refreshExecutor.scheduleAtFixedRate(
-        () -> refreshAndValidate(refreshExecutor),
-        refreshIntervalMillis,
-        refreshIntervalMillis,
-        TimeUnit.MILLISECONDS);
+    synchronized (this) {
+      ScheduledExecutorService executor = getOrCreateSafeModeScheduledExecutor();
+      if (safeModeRefreshTask != null && !safeModeRefreshTask.isDone()) {
+        safeModeRefreshTask.cancel(false);
+      }
+      safeModeRefreshTask = executor.scheduleAtFixedRate(
+          this::runRefreshAndValidate,
+          refreshIntervalMillis,
+          refreshIntervalMillis,
+          TimeUnit.MILLISECONDS);
+    }
+  }
+
+  private synchronized ScheduledExecutorService getOrCreateSafeModeScheduledExecutor() {
+    if (safeModeScheduledExecutor == null) {
+      safeModeScheduledExecutor = Executors.newScheduledThreadPool(1,
+          new ThreadFactoryBuilder()
+              .setNameFormat(scmContext.threadNamePrefix() + "SCM-SafeMode-%d")
+              .setDaemon(true)
+              .build());
+    }
+    return safeModeScheduledExecutor;
   }
 
   public void start() {
@@ -153,12 +167,16 @@ public class SCMSafeModeManager implements SafeModeManager {
   }
 
   public void stop() {
-    stopSafeModePeriodicLogger();
+    shutdownSafeModeScheduledExecutorNow();
     safeModeMetrics.unRegister();
   }
 
   public SafeModeMetrics getSafeModeMetrics() {
     return safeModeMetrics;
+  }
+
+  public boolean isPeriodicRefreshEnabled() {
+    return refreshIntervalMs > 0;
   }
 
   private void emitSafeModeStatus() {
@@ -169,7 +187,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     // notify SCMServiceManager
     if (!safeModeStatus.isInSafeMode()) {
-      stopSafeModePeriodicLogger();
+      stopSafeModePeriodicTasks();
       // If safemode is off, then notify the delayed listeners with a delay.
       serviceManager.notifyStatusChanged();
     } else if (safeModeStatus.isPreCheckComplete()) {
@@ -242,10 +260,10 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (refreshIntervalMs > 0) {
       return; // use executor to refresh
     }
-    refreshAndValidate(null);
+    runRefreshAndValidate();
   }
 
-  private void refreshAndValidate(ScheduledExecutorService refreshExecutor) {
+  private void runRefreshAndValidate() {
     if (getInSafeMode()) {
       exitRules.values().forEach(rule -> {
         rule.refresh(false);
@@ -254,8 +272,6 @@ public class SCMSafeModeManager implements SafeModeManager {
           rule.cleanup();
         }
       });
-    } else if (refreshExecutor != null) {
-      refreshExecutor.shutdownNow(); // Not in safemode
     }
   }
 
@@ -297,18 +313,12 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (!getInSafeMode()) {
       return;
     }
-    if (safeModeLogExecutor == null) {
-      safeModeLogExecutor = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder()
-              .setNameFormat(scmContext.threadNamePrefix() + "SCM-SafeMode-Log-%d")
-              .setDaemon(true)
-              .build());
-    }
+    ScheduledExecutorService executor = getOrCreateSafeModeScheduledExecutor();
 
     if (safeModeLogTask != null && !safeModeLogTask.isDone()) {
       safeModeLogTask.cancel(false);
     }
-    safeModeLogTask = safeModeLogExecutor.scheduleAtFixedRate(() -> {
+    safeModeLogTask = executor.scheduleAtFixedRate(() -> {
       try {
         logSafeModeStatus();
       } catch (Throwable t) {
@@ -348,19 +358,40 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     LOG.info(statusLog.toString());
     if (!getInSafeMode()) {
-      stopSafeModePeriodicLogger();
+      stopSafeModePeriodicTasks();
     }
   }
 
-  /**
-   * Stops the periodic safe mode logger.
-   * Called when safe mode exits.
-   */
-  private synchronized void stopSafeModePeriodicLogger() {
-    if (safeModeLogExecutor != null) {
-      safeModeLogExecutor.shutdownNow();
-      safeModeLogExecutor = null;
-      LOG.info("Stopped periodic Safe Mode logging");
+  /** Stops periodic log and refresh when SCM leaves safe mode. */
+  private synchronized void stopSafeModePeriodicTasks() {
+    if (safeModeLogTask != null) {
+      safeModeLogTask.cancel(false);
+      safeModeLogTask = null;
+    }
+    if (safeModeRefreshTask != null) {
+      safeModeRefreshTask.cancel(false);
+      safeModeRefreshTask = null;
+    }
+    if (safeModeScheduledExecutor != null) {
+      safeModeScheduledExecutor.shutdown();
+      safeModeScheduledExecutor = null;
+      LOG.info("Stopped periodic Safe Mode tasks (log and refresh)");
+    }
+  }
+
+  private synchronized void shutdownSafeModeScheduledExecutorNow() {
+    if (safeModeLogTask != null) {
+      safeModeLogTask.cancel(false);
+      safeModeLogTask = null;
+    }
+    if (safeModeRefreshTask != null) {
+      safeModeRefreshTask.cancel(false);
+      safeModeRefreshTask = null;
+    }
+    if (safeModeScheduledExecutor != null) {
+      safeModeScheduledExecutor.shutdownNow();
+      safeModeScheduledExecutor = null;
+      LOG.info("Shut down Safe Mode scheduled executor");
     }
   }
 
