@@ -121,14 +121,16 @@ public class TestPendingContainerTracker {
         new PendingContainerTracker(MAX_CONTAINER_SIZE, rollMs, null);
 
     shortRollTracker.recordPendingAllocationForDatanode(dn1, container1);
-    assertEquals(1, shortRollTracker.getPendingContainers(dn1).size());
-    assertThat(shortRollTracker.getPendingContainers(dn1)).contains(container1);
+    Set<ContainerID> pendingDn1 = shortRollTracker.getPendingContainers(dn1);
+    assertEquals(1, pendingDn1.size());
+    assertThat(pendingDn1).containsExactly(container1);
 
     // First roll: C1 moves from currentWindow to previousWindow; union still includes C1
     Thread.sleep(rollMs + 80);
     shortRollTracker.rollWindowsIfNeeded(dn1);
-    assertEquals(1, shortRollTracker.getPendingContainers(dn1).size());
-    assertThat(shortRollTracker.getPendingContainers(dn1)).contains(container1);
+    pendingDn1 = shortRollTracker.getPendingContainers(dn1);
+    assertEquals(1, pendingDn1.size());
+    assertThat(pendingDn1).containsExactly(container1);
 
     // Second roll: prior previousWindow (holding C1) is dropped; C1 is no longer pending
     Thread.sleep(rollMs + 80);
@@ -190,8 +192,8 @@ public class TestPendingContainerTracker {
     Set<ContainerID> pending = tracker.getPendingContainers(dn1);
 
     assertEquals(2, pending.size());
-    assertThat(pending.contains(container1));
-    assertThat(pending.contains(container2));
+    assertThat(pending).contains(container1);
+    assertThat(pending).contains(container2);
 
     // Returned set should be a copy - modifying it shouldn't affect tracker
     pending.add(container3);
@@ -204,7 +206,7 @@ public class TestPendingContainerTracker {
 
     Set<ContainerID> pending = tracker.getPendingContainers(unknownDN);
 
-    assertThat(pending.isEmpty());
+    assertThat(pending).isEmpty();
   }
 
   @Test
@@ -261,8 +263,8 @@ public class TestPendingContainerTracker {
     }
 
     // Verify no exceptions occurred and counts are reasonable
-    assertThat(tracker.getTotalPendingCount() >= 0);
-    assertThat(tracker.getDataNodeCount() <= 3);
+    assertThat(tracker.getTotalPendingCount()).isGreaterThanOrEqualTo(0);
+    assertThat(tracker.getDataNodeCount()).isLessThanOrEqualTo(3);
   }
 
   @Test
@@ -335,7 +337,7 @@ public class TestPendingContainerTracker {
 
     Set<ContainerID> pending = tracker.getPendingContainers(dn1);
     assertFalse(pending.contains(container1));
-    assertThat(pending.contains(container2));
+    assertThat(pending).contains(container2);
   }
 
   @Test
@@ -348,15 +350,15 @@ public class TestPendingContainerTracker {
 
     assertEquals(1, tracker.getPendingContainers(dn1).size());
     Set<ContainerID> pending1 = tracker.getPendingContainers(dn1);
-    assertThat(pending1.contains(container1));
+    assertThat(pending1).contains(container1);
 
     // Add container2 - should be in same window initially
     tracker.recordPendingAllocation(pipeline, container2);
 
     assertEquals(2, tracker.getPendingContainers(dn1).size());
     Set<ContainerID> pending2 = tracker.getPendingContainers(dn1);
-    assertThat(pending2.contains(container1));
-    assertThat(pending2.contains(container2));
+    assertThat(pending2).contains(container1);
+    assertThat(pending2).contains(container2);
 
     // Both containers should be in the union
     assertEquals(2, pending2.size());
@@ -401,6 +403,6 @@ public class TestPendingContainerTracker {
 
     Set<ContainerID> pending = tracker.getPendingContainers(dn1);
     assertEquals(1, pending.size());
-    assertThat(pending.contains(container3));
+    assertThat(pending).contains(container3);
   }
 }

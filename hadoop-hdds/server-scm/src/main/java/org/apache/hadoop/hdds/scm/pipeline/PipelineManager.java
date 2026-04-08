@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -228,11 +227,4 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * Get the pipeline metrics.
    */
   SCMPipelineMetrics getMetrics();
-  
-  /**
-   * Get DatanodeInfo for a specific DataNode which includes per-volume storage reports.
-   * @param datanodeDetails The datanode to get info for
-   * @return DatanodeInfo containing detailed node information including per-disk stats, or null if not available
-   */
-  DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails);
 }
