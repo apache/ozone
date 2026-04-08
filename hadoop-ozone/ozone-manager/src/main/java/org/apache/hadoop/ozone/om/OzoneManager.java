@@ -3665,7 +3665,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // request.
 
     try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
-             iterator = tenantStateTable.iterator()) {
+        iterator = tenantStateTable.iterator()) {
 
       final List<TenantState> tenantStateList = new ArrayList<>();
 
