@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -169,7 +170,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -422,21 +422,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     serviceManager = new SCMServiceManager();
     reconfigurationHandler =
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
+            .register(tracingConfig)
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
             .register(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
-                this::reconfigureSafeModeLogInterval)
-            .register(tracingConfig);
+                this::reconfigureSafeModeLogInterval);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
-    reconfigurationHandler.registerCompleteCallback((changedKeys, newConf) -> {
-      if (changedKeys.keySet().stream()
-          .anyMatch(k -> k.startsWith("ozone.tracing."))) {
-        TracingUtil.reconfigureTracing("StorageContainerManager",
-            (OzoneConfiguration) newConf);
-      }
-    });
+    reconfigurationHandler.registerCompleteCallback(
+        TracingReconfigurationCallback.forReconfiguration("StorageContainerManager", tracingConfig));
 
     initializeSystemManagers(conf, configurator);
 

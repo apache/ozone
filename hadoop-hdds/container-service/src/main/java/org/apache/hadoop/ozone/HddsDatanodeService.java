@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
@@ -79,7 +80,6 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -144,7 +144,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
   private ReconfigurationHandler reconfigurationHandler;
-  private String tracingServiceName;
   private String scmServiceId;
 
   //Constructor for DataNode PluginService
@@ -255,9 +254,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       datanodeDetails.setSetupTime(Time.now());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
-      tracingServiceName = "HddsDatanodeService." + datanodeDetails.getID();
+      String tracingServiceName = "HddsDatanodeService." + datanodeDetails.getID();
       TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
-      TracingUtil.initTracing(tracingServiceName, conf);
+      TracingReconfigurationCallback tracingReconfigurationCallback =
+          TracingReconfigurationCallback.init(tracingServiceName, tracingConfig);
       LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -307,6 +307,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
       reconfigurationHandler =
           new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
+              .register(tracingConfig)
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
@@ -316,8 +317,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
               .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
                   this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
-                  this::reconfigReplicationStreamsLimit)
-              .register(tracingConfig);
+                  this::reconfigReplicationStreamsLimit);
 
       scmServiceId = HddsUtils.getScmServiceId(conf);
 
@@ -328,13 +328,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       }
 
       reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
-      reconfigurationHandler.registerCompleteCallback((changedKeys, newConf) -> {
-        if (changedKeys.keySet().stream()
-            .anyMatch(k -> k.startsWith("ozone.tracing."))) {
-          TracingUtil.reconfigureTracing(tracingServiceName,
-              (OzoneConfiguration) newConf);
-        }
-      });
+      reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
       datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode,

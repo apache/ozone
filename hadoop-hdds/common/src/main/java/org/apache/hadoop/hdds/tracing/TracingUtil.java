@@ -60,13 +60,13 @@ public final class TracingUtil {
    * Initialize the tracing with the given service name.
    */
   public static synchronized void initTracing(
-      String serviceName, ConfigurationSource conf) {
-    if (!isTracingEnabled(conf) || isInit) {
+      String serviceName, TracingConfig tracingConfig) {
+    if (!tracingConfig.isTracingEnabled() || isInit) {
       return;
     }
 
     try {
-      initialize(serviceName, conf);
+      initialize(serviceName, tracingConfig);
       isInit = true;
       LOG.info("Initialized tracing service: {}", serviceName);
     } catch (Exception e) {
@@ -79,9 +79,9 @@ public final class TracingUtil {
    * Called after tracing-related keys are reconfigured on OM/SCM/DN.
    */
   public static synchronized void reconfigureTracing(
-      String serviceName, ConfigurationSource conf) {
+      String serviceName, TracingConfig tracingConfig) {
     shutdownTracing();
-    initTracing(serviceName, conf);
+    initTracing(serviceName, tracingConfig);
   }
 
   private static void shutdownTracing() {
@@ -93,9 +93,8 @@ public final class TracingUtil {
     isInit = false;
   }
 
-  private static void initialize(String serviceName, ConfigurationSource conf) {
+  private static void initialize(String serviceName, TracingConfig tracingConfig) {
     //Fetch and log the right tracing parameters based on config, environment variable and default value priority.
-    TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
     String otelEndPoint = tracingConfig.getTracingEndpoint();
     double samplerRatio = tracingConfig.getTraceSamplerRatio();
     LOG.info("Sampling Trace Config = '{}'", samplerRatio);

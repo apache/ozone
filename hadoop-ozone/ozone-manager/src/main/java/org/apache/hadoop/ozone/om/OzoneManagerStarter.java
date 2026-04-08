@@ -24,6 +24,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
@@ -167,7 +168,7 @@ public class OzoneManagerStarter extends GenericCli implements Callable<Void> {
    */
   private void commonInit() {
     conf = getOzoneConf();
-    TracingUtil.initTracing("OzoneManager", conf);
+    TracingUtil.initTracing("OzoneManager", conf.getObject(TracingConfig.class));
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);

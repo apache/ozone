@@ -174,6 +174,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
@@ -200,7 +201,6 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -538,12 +538,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
-    reconfigurationHandler.registerCompleteCallback((changedKeys, newConf) -> {
-      if (changedKeys.keySet().stream()
-          .anyMatch(k -> k.startsWith("ozone.tracing."))) {
-        TracingUtil.reconfigureTracing("OzoneManager", (OzoneConfiguration) newConf);
-      }
-    });
+    reconfigurationHandler.registerCompleteCallback(
+        TracingReconfigurationCallback.forReconfiguration("OzoneManager", tracingConfig));
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
@@ -1022,7 +1018,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (layoutVersionInDB != null &&
           versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
         LOG.info("New OM snapshot received with higher layout version {}. " +
-            "Attempting to finalize current OM to that version.",
+                "Attempting to finalize current OM to that version.",
             layoutVersionInDB);
         upgradeFinalizer.finalizeAndWaitForCompletion(
             "om-ratis-snapshot", this,
@@ -3669,7 +3665,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // request.
 
     try (TableIterator<String, ? extends KeyValue<String, OmDBTenantState>>
-        iterator = tenantStateTable.iterator()) {
+             iterator = tenantStateTable.iterator()) {
 
       final List<TenantState> tenantStateList = new ArrayList<>();
 

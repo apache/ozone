@@ -24,6 +24,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -147,7 +148,7 @@ public class StorageContainerManagerStarter extends GenericCli implements Callab
    */
   private void commonInit() {
     conf = getOzoneConf();
-    TracingUtil.initTracing("StorageContainerManager", conf);
+    TracingUtil.initTracing("StorageContainerManager", conf.getObject(TracingConfig.class));
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);

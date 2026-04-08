@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -77,7 +78,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = getOzoneConf();
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
-    TracingUtil.initTracing("S3gateway", OzoneConfigurationHolder.configuration());
+    TracingUtil.initTracing("S3gateway", OzoneConfigurationHolder.configuration().getObject(TracingConfig.class));
     UserGroupInformation.setConfiguration(OzoneConfigurationHolder.configuration());
     loginS3GUser(OzoneConfigurationHolder.configuration());
     setHttpBaseDir(OzoneConfigurationHolder.configuration());
