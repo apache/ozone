@@ -1018,7 +1018,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (layoutVersionInDB != null &&
           versionManager.getMetadataLayoutVersion() < layoutVersionInDB) {
         LOG.info("New OM snapshot received with higher layout version {}. " +
-                "Attempting to finalize current OM to that version.",
+            "Attempting to finalize current OM to that version.",
             layoutVersionInDB);
         upgradeFinalizer.finalizeAndWaitForCompletion(
             "om-ratis-snapshot", this,
