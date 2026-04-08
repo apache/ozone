@@ -141,15 +141,15 @@ public class TestPendingContainerTrackerIntegration {
         LOG.info("DataNode {} has {} bytes pending", dn.getUuidString(), pendingSize);
 
         Set<ContainerID> pendingContainers = pendingTracker.getPendingContainers(dn);
-        assertThat(pendingContainers.contains(container.containerID()));
+        assertThat(pendingContainers).contains(container.containerID());
       }
     }
 
-    assertThat(!nodesWithPending.isEmpty());
+    assertThat(nodesWithPending).isNotEmpty();
 
     // Verify metrics increased
     long afterAdded = metrics.getNumPendingContainersAdded();
-    assertThat(afterAdded > initialAdded);
+    assertThat(afterAdded).isGreaterThan(initialAdded);
 
     LOG.info("Pending tracked successfully. Waiting for ICR to remove pending...");
 
@@ -182,12 +182,12 @@ public class TestPendingContainerTrackerIntegration {
     // Verify all pending containers removed
     for (DatanodeDetails dn : nodesWithPending) {
       Set<ContainerID> pendingContainers = pendingTracker.getPendingContainers(dn);
-      assertThat(!pendingContainers.contains(container.containerID()));
+      assertThat(pendingContainers).doesNotContain(container.containerID());
     }
 
     // Verify remove metrics increased
     long afterRemoved = metrics.getNumPendingContainersRemoved();
-    assertThat(afterRemoved > initialRemoved);
+    assertThat(afterRemoved).isGreaterThan(initialRemoved);
 
     LOG.info("After added = " + afterAdded);
 
