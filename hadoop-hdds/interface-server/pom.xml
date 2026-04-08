@@ -81,6 +81,10 @@
     </pluginManagement>
     <plugins>
       <plugin>
+        <groupId>com.salesforce.servicelibs</groupId>
+        <artifactId>proto-backwards-compatibility</artifactId>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>

@@ -22,6 +22,9 @@ CONTRIBUTING.md
 README.md
 SECURITY.md
 
+# hadoop-hdds/interface-client
+src/main/resources/proto.lock
+
 # tools/fault-injection-service
 tools/fault-injection-service/README.md
 
