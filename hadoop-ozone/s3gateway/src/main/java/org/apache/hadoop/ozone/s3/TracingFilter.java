@@ -38,6 +38,9 @@ public class TracingFilter implements ContainerRequestFilter,
     ContainerResponseFilter {
 
   public static final String TRACING_SPAN_CLOSABLE = "TRACING_SPAN_CLOSABLE";
+  private static final String HTTP_GET_METHOD = "GET";
+  private static final String OBJECT_ENDPOINT_CLASS_NAME = "ObjectEndpoint";
+  private static final String OBJECT_GET_METHOD_NAME = "get";
 
   @Context
   private ResourceInfo resourceInfo;
@@ -89,12 +92,12 @@ public class TracingFilter implements ContainerRequestFilter,
   }
 
   private boolean isStreamingGetObject(ContainerRequestContext req) {
-    if (!"GET".equalsIgnoreCase(req.getMethod())) {
+    if (!HTTP_GET_METHOD.equalsIgnoreCase(req.getMethod())) {
       return false;
     }
     String cls = resourceInfo.getResourceClass().getSimpleName();
     String method = resourceInfo.getResourceMethod().getName();
-    return "ObjectEndpoint".equals(cls) && "get".equals(method);
+    return OBJECT_ENDPOINT_CLASS_NAME.equals(cls) && OBJECT_GET_METHOD_NAME.equals(method);
   }
 
   private static void finishAndClose(TracingUtil.TraceCloseable spanClosable) {
