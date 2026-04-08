@@ -181,7 +181,6 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <prometheus.version>0.16.0</prometheus.version>
     <properties.maven.plugin.version>1.3.0</properties.maven.plugin.version>
-    <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
     <protobuf.version>3.25.8</protobuf.version>
     <ranger.version>2.8.0</ranger.version>
@@ -1770,21 +1769,6 @@
           <groupId>com.google.code.maven-replacer-plugin</groupId>
           <artifactId>replacer</artifactId>
           <version>${maven-replacer-plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>com.salesforce.servicelibs</groupId>
-          <artifactId>proto-backwards-compatibility</artifactId>
-          <version>${proto-backwards-compatibility.version}</version>
-          <configuration>
-            <protoSourceRoot>${basedir}/target/classes</protoSourceRoot>
-          </configuration>
-          <executions>
-            <execution>
-              <goals>
-                <goal>backwards-compatibility-check</goal>
-              </goals>
-            </execution>
-          </executions>
         </plugin>
         <plugin>
           <groupId>com.github.eirslett</groupId>
