@@ -1165,13 +1165,16 @@ public class ContainerStateMachine extends BaseStateMachine {
                   + "{} Container Result: {}", getGroupId(), r.getCmdType(), index,
               r.getMessage(), r.getResult());
           metrics.incNumApplyTransactionsFails();
+          // Mark the container unhealthy BEFORE completing the future so that
+          // any subsequent applyTransaction sees the unhealthy state immediately
+          // when it calls checkContainerHealthy (race-free).
+          stateMachineHealthy.compareAndSet(true, false);
+          unhealthyContainers.add(requestProto.getContainerID());
           // Since the applyTransaction now is completed exceptionally,
           // before any further snapshot is taken , the exception will be
           // caught in stateMachineUpdater in Ratis and ratis server will
           // shutdown.
           applyTransactionFuture.completeExceptionally(sce);
-          stateMachineHealthy.compareAndSet(true, false);
-          unhealthyContainers.add(requestProto.getContainerID());
           ratisServer.handleApplyTransactionFailure(getGroupId(), trx.getServerRole());
         } else {
           if (LOG.isDebugEnabled()) {
