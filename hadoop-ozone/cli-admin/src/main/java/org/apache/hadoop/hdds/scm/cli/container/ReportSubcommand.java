@@ -44,13 +44,70 @@ public class ReportSubcommand extends ScmSubcommand {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
+  @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
+  private SuppressOptions suppressOptions;
+
+  @CommandLine.Mixin
+  private ContainerIDParameters containerList;
+
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
       description = "Format output as JSON")
   private boolean json;
 
+  static class SuppressOptions {
+    @CommandLine.Option(names = {"--suppress"},
+        description = "Suppress container(s) from future reports")
+    private boolean suppress;
+
+    @CommandLine.Option(names = {"--unsuppress"},
+        description = "Unsuppress container(s) to include in future reports")
+    private boolean unsuppress;
+  }
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (suppressOptions != null) {
+      handleSuppressUnsuppress(scmClient);
+      return;
+    }
+
+    if (containerList != null && containerList.size() > 0) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "Container IDs are only valid with --suppress or --unsuppress. " +
+          "To print the summary report, do not pass any container ID.");
+    }
+
+    printReport(scmClient);
+  }
+
+  private void handleSuppressUnsuppress(ScmClient scmClient) throws IOException {
+    boolean suppress = suppressOptions.suppress;
+    List<Long> containerIDs = containerList.getValidatedIDs();
+    List<Long> failedContainerIDs = scmClient.suppressContainers(containerIDs, suppress);
+
+    int failures = 0;
+    for (long id : containerIDs) {
+      if (failedContainerIDs.contains(id)) {
+        err().println("Failed to " + (suppress ? "suppress" : "unsuppress") + " container " + id + ".");
+        failures++;
+      } else {
+        out().println((suppress ? "Suppressed" : "Unsuppressed") + " container: " + id);
+      }
+    }
+
+    int numOfSuccess = containerIDs.size() - failures;
+    if (numOfSuccess > 0) {
+      out().println("\n" + (suppress ? "Suppressed " : "Unsuppressed ") + numOfSuccess + " container(s) successfully.");
+      out().println("Container report will be updated after the next Replication Manager cycle.");
+    }
+
+    if (failures > 0) {
+      throw new IOException("Failed to " + (suppress ? "suppress " : "unsuppress ") + failures + " container(s).");
+    }
+  }
+
+  private void printReport(ScmClient scmClient) throws IOException {
     ReplicationManagerReport report = scmClient.getReplicationManagerReport();
     if (report.getReportTimeStamp() == 0) {
       System.err.println("The Container Report is not available until Replication Manager completes" +

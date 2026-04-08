@@ -451,7 +451,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerListResult listContainer(long startContainerID,
       int count) throws IOException {
-    return listContainer(startContainerID, count, null, null, null);
+    return listContainer(startContainerID, count, null, null, null, null);
   }
 
   /**
@@ -468,7 +468,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state) throws IOException {
-    return listContainer(startContainerID, count, state, null, null);
+    return listContainer(startContainerID, count, state, null, null, null);
   }
 
   /**
@@ -487,20 +487,28 @@ public class SCMClientProtocolServer implements
   public ContainerListResult listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException {
-    return listContainerInternal(startContainerID, count, state, factor, null, null);
+    return listContainerInternal(startContainerID, count, state, factor, null, null, null);
   }
 
   private ContainerListResult listContainerInternal(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig) throws IOException {
+      ReplicationConfig repConfig,
+      Boolean suppressed) throws IOException {
     boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, replicationType, repConfig);
+    Map<String, String> auditMap = buildAuditMap(startContainerID, count, state, factor, 
+        replicationType, repConfig, suppressed);
 
     try {
       Stream<ContainerInfo> containerStream =
           buildContainerStream(factor, replicationType, repConfig, getBaseContainerStream(state));
+      
+      // Filter by suppressed flag only if explicitly specified
+      if (suppressed != null) {
+        containerStream = containerStream.filter(info -> info.isSuppressed() == suppressed);
+      }
+      
       List<ContainerInfo> containerInfos =
           containerStream.filter(info -> info.containerID().getId() >= startContainerID)
               .sorted().collect(Collectors.toList());
@@ -552,7 +560,8 @@ public class SCMClientProtocolServer implements
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType replicationType,
-      ReplicationConfig repConfig) {
+      ReplicationConfig repConfig,
+      Boolean suppressed) {
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
     auditMap.put("count", String.valueOf(count));
@@ -567,6 +576,9 @@ public class SCMClientProtocolServer implements
     }
     if (repConfig != null) {
       auditMap.put("replicationConfig", repConfig.toString());
+    }
+    if (suppressed != null) {
+      auditMap.put("suppressed", suppressed.toString());
     }
 
     return auditMap;
@@ -588,7 +600,28 @@ public class SCMClientProtocolServer implements
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig repConfig) throws IOException {
-    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig);
+    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig, null);
+  }
+
+  /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container with this state will be returned.
+   * @param repConfig Replication Config for the container.
+   * @param suppressed container to be suppressed/unsuppressed from report
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
+  @Override
+  public ContainerListResult listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig repConfig,
+      Boolean suppressed) throws IOException {
+    return listContainerInternal(startContainerID, count, state, null, replicationType, repConfig, suppressed);
   }
 
   @Override
@@ -1692,6 +1725,38 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.RECONCILE_CONTAINER, auditMap));
     } catch (SCMException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.RECONCILE_CONTAINER, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
+    SCMAction action = suppress ? SCMAction.SUPPRESS_CONTAINER : SCMAction.UNSUPPRESS_CONTAINER;
+    List<Long> failedContainerIDs = new ArrayList<>();
+    for (long containerId : containerIds) {
+      try {
+        persistContainerSuppression(containerId, suppress, action);
+      } catch (IOException ex) {
+        failedContainerIDs.add(containerId);
+      }
+    }
+    return failedContainerIDs;
+  }
+
+  private void persistContainerSuppression(long longContainerID, boolean suppress, SCMAction action)
+      throws IOException {
+    ContainerID containerID = ContainerID.valueOf(longContainerID);
+    final Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("containerID", containerID.toString());
+    auditMap.put("suppress", String.valueOf(suppress));
+    try {
+      ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
+      containerInfo.setSuppressed(suppress);
+      scm.getContainerManager().updateContainerInfo(containerID, containerInfo.getProtobuf());
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(action, auditMap));
+    } catch (IOException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(action, auditMap, ex));
       throw ex;
     }
   }

@@ -226,4 +226,14 @@ public interface ContainerStateManager extends SCMHandler {
   default RequestType getType() {
     return RequestType.CONTAINER;
   }
+
+  /**
+   * Update container info.
+   *
+   * @param containerInfo Updated container info proto
+   * @throws IOException
+   */
+  @Replicate
+  void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
+      throws IOException;
 }
