@@ -125,7 +125,6 @@ public class SCMSafeModeManager implements SafeModeManager {
         HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
         HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    startRefresh();
   }
 
   private void startRefresh() {
@@ -153,6 +152,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void start() {
     emitSafeModeStatus();
     startSafeModePeriodicLogger();
+    startRefresh();
   }
 
   public void stop() {
