@@ -22,6 +22,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.Table;
@@ -92,6 +94,14 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
       return doExecute();
     } finally {
       executorService.shutdown();
+      try {
+        if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        executorService.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
