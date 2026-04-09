@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.google.common.base.Strings;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -66,10 +65,10 @@ public class ListInfoSubcommand extends ScmSubcommand {
        defaultValue = "false")
   private boolean json;
 
-  @CommandLine.Option(names = {"--failed-volumes"},
+  @CommandLine.Option(names = {"--nodes-with-failed-volumes"},
       description = "Only show datanodes that have at least one failed volume.",
       defaultValue = "false")
-  private boolean failedVolumesOnly;
+  private boolean nodeWithFailedVolumes;
 
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
   private ExclusiveNodeOptions exclusiveNodeOptions;
@@ -94,12 +93,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     pipelines = scmClient.listPipelines();
     if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
       HddsProtos.Node node = scmClient.queryNode(UUID.fromString(exclusiveNodeOptions.getNodeId()));
-      Integer totalVolumeCount = node.hasTotalVolumeCount() ? node.getTotalVolumeCount() : null;
-      Integer healthyVolumeCount = node.hasHealthyVolumeCount() ? node.getHealthyVolumeCount() : null;
-      BasicDatanodeInfo singleNodeInfo = new BasicDatanodeInfo.Builder(
-          DatanodeDetails.getFromProtoBuf(node.getNodeID()), node.getNodeOperationalStates(0),
-          node.getNodeStates(0)).withVolumeCounts(totalVolumeCount, healthyVolumeCount)
-          .withFailedVolumes(getFailedVolumes(node)).build();
+      BasicDatanodeInfo singleNodeInfo = new BasicDatanodeInfo.Builder(node).build();
       if (json) {
         List<BasicDatanodeInfo> dtoList = Collections.singletonList(singleNodeInfo);
         System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dtoList));
@@ -125,7 +119,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
       allNodes = allNodes.filter(p -> p.getHealthState().toString()
           .compareToIgnoreCase(nodeState) == 0);
     }
-    if (failedVolumesOnly) {
+    if (nodeWithFailedVolumes) {
       allNodes = allNodes.filter(p ->
           p.getFailedVolumes() != null && !p.getFailedVolumes().isEmpty());
     }
@@ -165,14 +159,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
               long capacity = p.getCapacity();
               long used = capacity - p.getRemaining();
               double percentUsed = (capacity > 0) ? (used * 100.0) / capacity : 0.0;
-              Integer totalVolumeCount = node.hasTotalVolumeCount() ? node.getTotalVolumeCount() : null;
-              Integer healthyVolumeCount = node.hasHealthyVolumeCount() ? node.getHealthyVolumeCount() : null;
-              return new BasicDatanodeInfo.Builder(
-                  DatanodeDetails.getFromProtoBuf(node.getNodeID()),
-                  node.getNodeOperationalStates(0), node.getNodeStates(0))
+              return new BasicDatanodeInfo.Builder(node)
                   .withUsageInfo(used, capacity, percentUsed)
-                  .withVolumeCounts(totalVolumeCount, healthyVolumeCount)
-                  .withFailedVolumes(getFailedVolumes(node)).build();
+                  .build();
             } catch (Exception e) {
               String reason = "Could not process info for an unknown datanode";
               if (p != null && p.getNode() != null && !Strings.isNullOrEmpty(p.getNode().getUuid())) {
@@ -189,27 +178,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
         null, HddsProtos.QueryScope.CLUSTER, "");
 
-    return nodes.stream().map(p -> {
-      Integer totalVolumeCount = p.hasTotalVolumeCount() ? p.getTotalVolumeCount() : null;
-      Integer healthyVolumeCount = p.hasHealthyVolumeCount() ? p.getHealthyVolumeCount() : null;
-      return new BasicDatanodeInfo.Builder(
-          DatanodeDetails.getFromProtoBuf(p.getNodeID()), p.getNodeOperationalStates(0), p.getNodeStates(0))
-          .withVolumeCounts(totalVolumeCount, healthyVolumeCount)
-          .withFailedVolumes(getFailedVolumes(p)).build(); })
+    return nodes.stream().map(p -> new BasicDatanodeInfo.Builder(p).build())
         .sorted(Comparator.comparing(BasicDatanodeInfo::getHealthState))
         .collect(Collectors.toList());
-  }
-
-  private static List<String> getFailedVolumes(HddsProtos.Node node) {
-    int count = node.getFailedVolumesCount();
-    if (count == 0) {
-      return Collections.emptyList();
-    }
-    List<String> result = new ArrayList<>(count);
-    for (int i = 0; i < count; i++) {
-      result.add(node.getFailedVolumes(i));
-    }
-    return result;
   }
 
   private void printDatanodeInfo(BasicDatanodeInfo dn) {
@@ -231,12 +202,12 @@ public class ListInfoSubcommand extends ScmSubcommand {
                 .append('/').append(p.getPipelineState().toString()).append('/')
                 .append(datanode.getID().equals(p.getLeaderId()) ?
                     "Leader" : "Follower")
-                .append(System.getProperty("line.separator")));
+                .append("\n"));
       }
     } else {
       pipelineListInfo
           .append("No pipelines in cluster.")
-          .append(System.getProperty("line.separator"));
+          .append("\n");
     }
     System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()

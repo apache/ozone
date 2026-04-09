@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -383,7 +384,7 @@ public class TestListInfoSubcommand {
     when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
 
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--failed-volumes");
+    c.parseArgs("--nodes-with-failed-volumes");
     cmd.execute(scmClient);
     String output = outContent.toString(DEFAULT_ENCODING);
 
@@ -395,10 +396,10 @@ public class TestListInfoSubcommand {
       count++;
     }
     assertEquals(2, count, "Only datanodes with failed volumes should be listed");
-    assertTrue(output.contains("Failed volume"));
-    assertTrue(output.contains("/data/disk2"));
-    assertTrue(output.contains("/data/disk1"));
-    assertTrue(output.contains("/data/disk5"));
+    assertThat(output).contains("Failed volume");
+    assertThat(output).contains("/data/disk2");
+    assertThat(output).contains("/data/disk1");
+    assertThat(output).contains("/data/disk5");
   }
 
   private void validateOrdering(JsonNode root, String orderDirection) {
