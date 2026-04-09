@@ -1325,8 +1325,9 @@ public interface ClientProtocol {
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param disableNativeDiff request to force diff to perform diffs without native lib
    * @return the difference report between two snapshots
-   * @deprecated Use {@link #snapshotDiff(String, String, String, String, String, int, boolean, boolean, boolean)}
+   * @deprecated Use {@link #snapshotDiff(String, String, String, String, String, int)}
    * instead to submit a new snapshot diff job or just return the existing job result.
    * @throws IOException in case of any exception while generating snapshot diff
    */

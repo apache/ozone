@@ -868,6 +868,8 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                       final String token,
                                                       int pageSize)
       throws IOException {
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+
     // Check if fromSnapshot and toSnapshot are equal.
     if (Objects.equals(fromSnapshot, toSnapshot)) {
       SnapshotDiffReportOzone diffReport = new SnapshotDiffReportOzone(

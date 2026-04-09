@@ -27,7 +27,7 @@ public class SubmitSnapshotDiffResponse {
 
   public SubmitSnapshotDiffResponse(long waitTimeInMs, SnapshotDiffResponse.JobStatus prevStatus, String prevReason) {
     StringBuilder msgBuilder = new StringBuilder();
-    if (prevStatus != null) {
+    if (prevStatus != null && prevStatus != SnapshotDiffResponse.JobStatus.QUEUED) {
       msgBuilder.append("Previous snapshot diff attempt found. Status: ")
           .append(prevStatus);
       if (StringUtils.isNotEmpty(prevReason)) {

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.CREATE;
@@ -646,7 +647,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
         forceFullDiff, disableNativeDiff);
 
     JobStatus prevStatus = snapDiffJob.getStatus();
-    String prevReason = snapDiffJob.getReason();
+    String prevReason = isEmpty(snapDiffJob.getReason()) ? null : snapDiffJob.getReason();
+    String jobId = prevStatus == QUEUED ? snapDiffJob.getJobId() : UUID.randomUUID().toString();
 
     switch (prevStatus) {
     case QUEUED:
@@ -658,14 +660,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           volumeName, bucketName, fromSnapshotName, toSnapshotName);
       try {
         updateJobStatus(snapDiffJobKey, prevStatus, IN_PROGRESS);
-        snapDiffExecutor.execute(() -> generateSnapshotDiffReport(snapDiffJobKey, snapDiffJob.getJobId(),
+        snapDiffExecutor.execute(() -> generateSnapshotDiffReport(snapDiffJobKey, jobId,
             volumeName, bucketName, fromSnapshotName, toSnapshotName,
             forceFullDiff, disableNativeDiff));
-        if (prevStatus == QUEUED) {
-          return new SubmitSnapshotDiffResponse(defaultWaitTime, null, null);
-        } else {
-          return new SubmitSnapshotDiffResponse(defaultWaitTime, prevStatus, prevReason);
-        }
+        return new SubmitSnapshotDiffResponse(defaultWaitTime, prevStatus, prevReason);
       } catch (RejectedExecutionException exception) {
         updateJobStatus(snapDiffJobKey, IN_PROGRESS, REJECTED);
         LOG.warn("Exceeded the snapDiff parallel requests processing " +
@@ -679,7 +677,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       }
     case IN_PROGRESS:
     case DONE:
-      return new SubmitSnapshotDiffResponse(defaultWaitTime, prevStatus, null);
+      return new SubmitSnapshotDiffResponse(defaultWaitTime, prevStatus, prevReason);
     default:
       throw new IllegalStateException("Unknown snapshot job status: " + snapDiffJob.getStatus());
     }

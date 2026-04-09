@@ -83,7 +83,7 @@ public class SnapshotDiffHandler extends Handler {
   private boolean cancel;
 
   @CommandLine.Option(names = {"-r", "--get-report"},
-      description = "Get the snapshot diff report is available; " +
+      description = "Get the snapshot diff report if available; " +
           "does not submit a diff job if there is no job in progress.",
       defaultValue = "false")
   private boolean getReport;
