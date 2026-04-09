@@ -130,6 +130,42 @@ public class TestS3MultipartUploadCommitPartRequest
   }
 
   @Test
+  public void testValidateAndUpdateCacheRejectsSchemaVersionOneBeforeFinalization()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    createParentPath(volumeName, bucketName);
+
+    String multipartUploadID =
+        initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
+            keyName, (byte) 1);
+
+    long clientID = Time.now();
+    OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
+        bucketName, keyName, clientID, multipartUploadID, 1);
+
+    S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
+        getS3MultipartUploadCommitReq(commitMultipartRequest);
+
+    addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID);
+
+    // Regular part metadata is present; the upgrade gate should still reject
+    // this schema version before commit proceeds.
+    OMClientResponse omClientResponse =
+        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
+            2L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status
+        .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
   public void testValidateAndUpdateCacheMultipartNotFound() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
