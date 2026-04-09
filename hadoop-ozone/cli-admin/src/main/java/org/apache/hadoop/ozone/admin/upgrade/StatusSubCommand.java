@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.admin.upgrade;
 
 import java.io.IOException;
-import java.util.UUID;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -38,8 +37,7 @@ public class StatusSubCommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient client) throws IOException {
-    String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID();
-    HddsProtos.UpgradeStatus status = client.queryUpgradeStatus(upgradeClientID, true);
+    HddsProtos.UpgradeStatus status = client.queryUpgradeStatus();
 
     // Temporary output to validate the command is working.
     out().println("Update status:");

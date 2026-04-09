@@ -1097,7 +1097,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto getQueryUpgradeStatus(
       StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto request) throws IOException {
 
-    HddsProtos.UpgradeStatus response = impl.queryUpgradeStatus(request.getUpgradeClientId(), request.getReadonly());
+    HddsProtos.UpgradeStatus response = impl.queryUpgradeStatus();
     return StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto
         .newBuilder()
         .setStatus(response)

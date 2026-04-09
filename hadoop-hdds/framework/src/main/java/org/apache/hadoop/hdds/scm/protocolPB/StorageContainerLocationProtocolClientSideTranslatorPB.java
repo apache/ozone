@@ -1152,12 +1152,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public HddsProtos.UpgradeStatus queryUpgradeStatus(String upgradeClientID, boolean readonly) throws IOException {
+  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
     StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto req =
         StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto
             .newBuilder()
-            .setReadonly(readonly)
-            .setUpgradeClientId(upgradeClientID)
             .build();
 
     StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto response =

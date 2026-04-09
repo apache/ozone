@@ -574,8 +574,6 @@ message QueryUpgradeFinalizationProgressResponseProto {
 }
 
 message QueryUpgradeStatusRequestProto {
-  required string upgradeClientId = 1;
-  optional bool readonly = 2;
 }
 
 message QueryUpgradeStatusResponseProto {
