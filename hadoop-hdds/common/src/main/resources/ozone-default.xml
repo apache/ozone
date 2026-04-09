@@ -1904,6 +1904,46 @@
   </property>
 
   <property>
+    <name>ozone.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone blacklisted users delimited by the comma.
+      If set, This is the list of users that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone blacklisted groups delimited by the comma.
+      If set, This is the list of groups that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone read blacklist users delimited by the comma.
+      If set, This is the list of users are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone read blacklist groups delimited by the comma.
+      If set, This is the list of groups are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.volume.name</name>
     <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
