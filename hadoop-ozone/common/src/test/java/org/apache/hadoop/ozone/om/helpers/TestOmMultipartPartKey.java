@@ -48,6 +48,18 @@ public class TestOmMultipartPartKey {
         .filter(partNumber -> (partNumber & 0xFF) == 0x2F);
   }
 
+  private static int compareUnsignedBytes(byte[] left, byte[] right) {
+    int length = Math.min(left.length, right.length);
+    for (int i = 0; i < length; i++) {
+      int a = left[i] & 0xFF;
+      int b = right[i] & 0xFF;
+      if (a != b) {
+        return Integer.compare(a, b);
+      }
+    }
+    return Integer.compare(left.length, right.length);
+  }
+
   @Test
   public void testRoundTripFullKey() throws Exception {
     OmMultipartPartKey key = OmMultipartPartKey.of("upload-123", 9);
@@ -175,8 +187,7 @@ public class TestOmMultipartPartKey {
     byte[] raw9  = codec.toPersistedFormat(OmMultipartPartKey.of("uid", 9));
     byte[] raw10 = codec.toPersistedFormat(OmMultipartPartKey.of("uid", 10));
 
-    // Arrays.compare is unsigned byte-by-byte — same as RocksDB's default comparator.
-    assertTrue(Arrays.compare(raw9, raw10) < 0,
+    assertTrue(compareUnsignedBytes(raw9, raw10) < 0,
         "part 9 must sort before part 10 in byte order (big-endian encoding)");
   }
 
