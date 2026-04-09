@@ -202,12 +202,12 @@ public class ListInfoSubcommand extends ScmSubcommand {
                 .append('/').append(p.getPipelineState().toString()).append('/')
                 .append(datanode.getID().equals(p.getLeaderId()) ?
                     "Leader" : "Follower")
-                .append("\n"));
+                .append('\n'));
       }
     } else {
       pipelineListInfo
           .append("No pipelines in cluster.")
-          .append("\n");
+          .append('\n');
     }
     System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
