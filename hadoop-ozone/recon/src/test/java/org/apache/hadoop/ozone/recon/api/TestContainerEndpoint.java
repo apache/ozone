@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
@@ -114,7 +115,6 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -124,7 +124,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for container endpoint.
  */
-@Flaky("HDDS-14178")
 public class TestContainerEndpoint {
 
   @TempDir
@@ -237,6 +236,12 @@ public class TestContainerEndpoint {
     }
 
     omConfiguration = new OzoneConfiguration();
+    // HDDS-14178: default parallel OM table reprocess is flaky in this test; pin to
+    // single iterator/worker for deterministic ContainerKeyMapper reprocess.
+    omConfiguration.setInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS, 1);
+    omConfiguration.setInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS, 1);
 
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     BlockID blockID1 = new BlockID(1, 101);
