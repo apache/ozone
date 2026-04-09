@@ -75,6 +75,15 @@ public final class TracingUtil {
   }
 
   /**
+   * Receives serviceName and configurationSource.
+   * Delegates tracing initiation to {@link #initTracing(String, TracingConfig)}.
+   */
+  public static synchronized void initTracing(
+      String serviceName, ConfigurationSource conf) {
+    initTracing(serviceName, conf.getObject(TracingConfig.class));
+  }
+
+  /**
    * Shuts down and re-initializes tracing.
    * Called after tracing-related keys are reconfigured on OM/SCM/DN.
    */

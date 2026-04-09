@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.shell.CommandFactory;
 import org.apache.hadoop.fs.shell.FsCommand;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -79,7 +78,7 @@ public class OzoneFsShell extends FsShell {
   public static void main(String[] argv) throws Exception {
     OzoneFsShell shell = newShellInstance();
     OzoneConfiguration conf = new OzoneConfiguration();
-    TracingUtil.initTracing("FsShell", conf.getObject(TracingConfig.class));
+    TracingUtil.initTracing("FsShell", conf);
     conf.setQuietMode(false);
     shell.setConf(conf);
     String spanName = "ozone fs " + String.join(" ", argv);

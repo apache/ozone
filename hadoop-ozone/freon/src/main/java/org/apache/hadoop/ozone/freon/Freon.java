@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.cli.ExtensibleParentCommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.slf4j.Logger;
@@ -58,7 +57,7 @@ public class Freon extends GenericCli implements ExtensibleParentCommand {
   public int execute(String[] argv) {
     conf = getOzoneConf();
     HddsServerUtil.initializeMetrics(conf, "ozone-freon");
-    TracingUtil.initTracing("freon", conf.getObject(TracingConfig.class));
+    TracingUtil.initTracing("freon", conf);
     String spanName = "ozone freon " + String.join(" ", argv);
     return TracingUtil.executeInNewSpan(spanName, () -> super.execute(argv));
   }
