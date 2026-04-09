@@ -49,7 +49,6 @@ public final class TracingReconfigurationCallback implements ReconfigurationChan
     return new TracingReconfigurationCallback(serviceName, tracingConfig);
   }
 
-
   @Override
   public void onPropertiesChanged(Map<String, Boolean> changedKeys, Configuration newConf) {
     if (changedKeys.keySet().stream().anyMatch(k -> k.startsWith(TRACING_KEY_PREFIX))) {
