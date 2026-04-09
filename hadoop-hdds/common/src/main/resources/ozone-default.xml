@@ -1904,6 +1904,46 @@
   </property>
 
   <property>
+    <name>ozone.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone blacklisted users delimited by the comma.
+      If set, This is the list of users that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone blacklisted groups delimited by the comma.
+      If set, This is the list of groups that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone read blacklist users delimited by the comma.
+      If set, This is the list of users are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone read blacklist groups delimited by the comma.
+      If set, This is the list of groups are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.volume.name</name>
     <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
@@ -2084,6 +2124,15 @@
     <description>Time interval used to store the omMetrics in to a
       file. Background thread periodically stores the OM metrics in to a
       file. Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.directory.metrics.update.interval</name>
+    <value>5m</value>
+    <tag>OZONE, OM</tag>
+    <description>Time interval used to update the space consumption stats of the
+      Ozone Manager snapshot directories. Background thread periodically calculates
+      and updates these stats. Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>

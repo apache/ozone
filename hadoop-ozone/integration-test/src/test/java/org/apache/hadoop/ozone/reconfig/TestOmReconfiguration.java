@@ -19,7 +19,11 @@ package org.apache.hadoop.ozone.reconfig;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLACKLIST_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLACKLIST_USERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_USERS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
@@ -66,6 +70,10 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL)
         .addAll(new OmConfig().reconfigurableProperties())
         .addAll(new TracingConfig().reconfigurableProperties())
+        .add(OZONE_BLACKLIST_USERS)
+        .add(OZONE_BLACKLIST_GROUPS)
+        .add(OZONE_READ_BLACKLIST_USERS)
+        .add(OZONE_READ_BLACKLIST_GROUPS)
         .build();
 
     assertProperties(getSubject(), expected);
@@ -92,6 +100,70 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     assertEquals(
         ImmutableSet.of(newValue),
         cluster().getOzoneManager().getOmReadOnlyAdminUsernames());
+  }
+
+  @Test
+  void blacklistUsers() throws ReconfigurationException {
+    final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
+
+    getSubject().reconfigureProperty(OZONE_BLACKLIST_USERS, newValue);
+
+    assertEquals(
+        ImmutableSet.of(newValue),
+        cluster().getOzoneManager().getOmBlacklistUsernames());
+  }
+
+  @Test
+  void blacklistGroups() throws ReconfigurationException {
+    String groupA = "groupA";
+    String groupB = "groupB";
+    getSubject().reconfigureProperty(OZONE_BLACKLIST_GROUPS, groupA);
+    assertTrue(
+        cluster().getOzoneManager().getOmBlacklistGroups().contains(groupA),
+        groupA + " should be a blacklist group");
+
+    getSubject().reconfigureProperty(OZONE_BLACKLIST_GROUPS, groupB);
+    assertFalse(
+        cluster().getOzoneManager().getOmBlacklistGroups().contains(groupA),
+        groupA + " should NOT be a blacklist group");
+    assertTrue(
+        cluster().getOzoneManager().getOmBlacklistGroups().contains(groupB),
+        groupB + " should be a blacklist group");
+  }
+
+  @Test
+  void readBlacklistUsers() throws ReconfigurationException {
+    final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
+
+    getSubject().reconfigureProperty(OZONE_READ_BLACKLIST_USERS,
+        newValue);
+
+    assertEquals(
+        ImmutableSet.of(newValue),
+        cluster().getOzoneManager().getOmReadOnlyBlacklistUsernames());
+  }
+
+  @Test
+  void readBlacklistGroups() throws ReconfigurationException {
+    String groupA = "readonlyBlacklistGroupA";
+    String groupB = "readonlyBlacklistGroupB";
+    getSubject().reconfigureProperty(OZONE_READ_BLACKLIST_GROUPS,
+        groupA);
+    assertTrue(
+        cluster().getOzoneManager().getOmReadonlyBlacklistGroups()
+            .contains(groupA),
+        groupA + " should be a readOnly blacklist group");
+
+    getSubject().reconfigureProperty(OZONE_READ_BLACKLIST_GROUPS,
+        groupB);
+    assertFalse(
+        cluster().getOzoneManager().getOmReadonlyBlacklistGroups()
+            .contains(groupA),
+        groupA + " should NOT be a readOnly blacklist group");
+    assertTrue(
+        cluster().getOzoneManager().getOmReadonlyBlacklistGroups()
+            .contains(groupB),
+        groupB + " should be a readOnly blacklist group");
   }
 
   @Test

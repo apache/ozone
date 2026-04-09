@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -111,21 +110,9 @@ public class BucketAclHandler extends BucketOperationHandler {
           new S3BucketAcl.AccessControlList(grantList));
 
       getMetrics().updateGetAclSuccessStats(context.getStartNanos());
-      auditReadSuccess(context.getAction());
       return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
-    } catch (OMException ex) {
+    } catch (OMException | RuntimeException ex) {
       getMetrics().updateGetAclFailureStats(context.getStartNanos());
-      auditReadFailure(context.getAction(), ex);
-      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else {
-        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      }
-    } catch (OS3Exception ex) {
-      getMetrics().updateGetAclFailureStats(context.getStartNanos());
-      auditReadFailure(context.getAction(), ex);
       throw ex;
     }
   }
@@ -228,22 +215,11 @@ public class BucketAclHandler extends BucketOperationHandler {
       }
 
       getMetrics().updatePutAclSuccessStats(context.getStartNanos());
-      auditWriteSuccess(context.getAction());
       return Response.status(HttpStatus.SC_OK).build();
 
-    } catch (OMException exception) {
+    } catch (OMException | RuntimeException exception) {
       getMetrics().updatePutAclFailureStats(context.getStartNanos());
-      auditWriteFailure(context.getAction(), exception);
-      if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
-      } else if (isAccessDenied(exception)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, exception);
-      }
       throw exception;
-    } catch (OS3Exception ex) {
-      getMetrics().updatePutAclFailureStats(context.getStartNanos());
-      auditWriteFailure(context.getAction(), ex);
-      throw ex;
     }
   }
 
