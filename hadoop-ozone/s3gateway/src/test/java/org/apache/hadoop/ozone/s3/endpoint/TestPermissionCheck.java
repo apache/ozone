@@ -154,12 +154,12 @@ public class TestPermissionCheck {
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listMultipartUploads(anyString(), anyString(), anyString(), anyInt());
+    doThrow(exception).when(bucket).listMultipartUploads(any(), any(), any(), anyInt());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
-    OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.listMultipartUploads("bucketName", "prefix", "", "", 10));
+    bucketEndpoint.queryParamsForTest().set(QueryParams.UPLOADS, "");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 

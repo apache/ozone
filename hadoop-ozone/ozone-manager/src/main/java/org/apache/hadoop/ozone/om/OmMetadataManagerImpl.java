@@ -108,6 +108,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -160,6 +162,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Table<String, OmKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
+  private Table<OmMultipartPartKey, OmMultipartPartInfo> multipartPartsTable;
   private Table<String, RepeatedOmKeyInfo> deletedTable;
 
   private Table<String, OmDirectoryInfo> dirTable;
@@ -386,6 +389,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return multipartInfoTable;
   }
 
+  @Override
+  public Table<OmMultipartPartKey, OmMultipartPartInfo> getMultipartPartsTable() {
+    return multipartPartsTable;
+  }
+
   /**
    * Start metadata manager.
    */
@@ -464,6 +472,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE_DEF);
     multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE_DEF);
+    multipartPartsTable = initializer.get(OMDBDefinition.MULTIPART_PARTS_TABLE_DEF);
     deletedTable = initializer.get(OMDBDefinition.DELETED_TABLE_DEF);
 
     dirTable = initializer.get(OMDBDefinition.DIRECTORY_TABLE_DEF);
@@ -1520,6 +1529,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               .addMultipartUploads(builder.setName(dbMultipartInfoKey)
                   .build());
           numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
+          // TODO: Add the expired part handling from the new table when the complete flow is done
         }
 
       }

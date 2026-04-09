@@ -88,6 +88,7 @@ message ScmContainerLocationRequest {
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
   optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
   optional SCMListContainerIDsRequestProto scmListContainerIDsRequest = 51;
+  optional SuppressContainerRequestProto suppressContainerRequest = 52;
 }
 
 message ScmContainerLocationResponse {
@@ -147,6 +148,7 @@ message ScmContainerLocationResponse {
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
   optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
   optional SCMListContainerIDsResponseProto scmListContainerIDsResponse = 51;
+  optional SuppressContainerResponseProto suppressContainerResponse = 52;
 
   enum Status {
     OK = 1;
@@ -205,6 +207,7 @@ enum Type {
   ReconcileContainer = 45;
   GetDeletedBlocksTransactionSummary = 46;
   ListContainerIDs = 47;
+  SuppressContainer = 48;
 }
 
 /**
@@ -313,6 +316,7 @@ message SCMListContainerRequestProto {
   optional ReplicationFactor factor = 5;
   optional ReplicationType type = 6;
   optional ECReplicationConfig ecReplicationConfig = 7;
+  optional bool suppressed = 8;
 }
 
 message SCMListContainerResponseProto {
@@ -709,6 +713,16 @@ message ReconcileContainerRequestProto {
 }
 
 message ReconcileContainerResponseProto {
+}
+
+message SuppressContainerRequestProto {
+  repeated int64 containerIDs = 1;
+  optional bool suppress = 2;
+}
+
+message SuppressContainerResponseProto {
+  // Container IDs that failed to suppress or unsuppress. Empty if all succeeded.
+  repeated int64 failedContainerIDs = 1;
 }
 
 /**

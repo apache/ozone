@@ -32,11 +32,15 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLACKLIST_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLACKLIST_USERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_GROUPS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_USERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
@@ -174,6 +178,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
@@ -197,8 +202,10 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -412,6 +419,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OzoneAdmins omAdmins;
   private final OzoneAdmins readOnlyAdmins;
   private final OzoneAdmins s3OzoneAdmins;
+  private final OzoneBlacklist omBlacklist;
+  private final OzoneBlacklist readBlacklist;
 
   private final OMMetrics metrics;
   private final OmSnapshotInternalMetrics omSnapshotIntMetrics;
@@ -510,6 +519,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Objects.requireNonNull(conf, "conf == null");
     setConfiguration(conf);
+    TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
+    TracingReconfigurationCallback tracingReconfigurationCallback =
+        TracingReconfigurationCallback.init("OzoneManager", tracingConfig);
     // Load HA related configurations
     OMHANodeDetails omhaNodeDetails =
         OMHANodeDetails.loadOMHAConfig(configuration);
@@ -523,6 +535,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     reconfigurationHandler =
         new ReconfigurationHandler("OM", conf, this::checkAdminUserPrivilege)
             .register(config)
+            .register(tracingConfig)
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
@@ -531,9 +544,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask)
             .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
-            .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion);
+            .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion)
+            .register(OZONE_BLACKLIST_USERS, this::reconfOzoneBlacklistUsers)
+            .register(OZONE_BLACKLIST_GROUPS, this::reconfOzoneBlacklistGroups)
+            .register(OZONE_READ_BLACKLIST_USERS, this::reconfOzoneReadBlacklistUsers)
+            .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+    reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
@@ -683,9 +701,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     omAdmins = OzoneAdmins.getOzoneAdmins(omStarterUser, conf);
     LOG.info("OM start with adminUsers: {}", omAdmins.getAdminUsernames());
+    omBlacklist = OzoneBlacklist.getOzoneBlacklist(conf);
+    LOG.info("OM start with blacklist users: {}",
+        omBlacklist.getBlacklistUsernames());
 
     // Get read only admin list
     readOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
+    readBlacklist = OzoneBlacklist.getReadonlyBlacklist(conf);
 
     s3OzoneAdmins = OzoneAdmins.getS3Admins(conf);
     instantiateServices(false);
@@ -4619,6 +4641,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omAdmins.getAdminGroups();
   }
 
+  public Collection<String> getOmBlacklistUsernames() {
+    return omBlacklist.getBlacklistUsernames();
+  }
+
+  public Collection<String> getOmReadOnlyBlacklistUsernames() {
+    return readBlacklist.getBlacklistUsernames();
+  }
+
+  public Collection<String> getOmBlacklistGroups() {
+    return omBlacklist.getBlacklistGroups();
+  }
+
+  public Collection<String> getOmReadonlyBlacklistGroups() {
+    return readBlacklist.getBlacklistGroups();
+  }
+
+  public OzoneBlacklist getOmBlacklist() {
+    return omBlacklist;
+  }
+
   /**
    * @param callerUgi Caller UserGroupInformation
    * @return return true if the {@code ugi} is a read-only OM admin
@@ -4633,6 +4675,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isAdmin(UserGroupInformation callerUgi) {
     return callerUgi != null && omAdmins.isAdmin(callerUgi);
+  }
+
+  /**
+   * @param callerUgi Caller UserGroupInformation
+   * @return returns true if the {@code ugi} is under the blacklist.
+   */
+  public boolean isBlacklisted(UserGroupInformation callerUgi) {
+    return callerUgi != null && omBlacklist.isBlacklisted(callerUgi);
+  }
+
+  /**
+   * @param callerUgi Caller UserGroupInformation
+   * @return returns true if the {@code ugi} is under the read blacklist.
+   */
+  public boolean isReadBlacklisted(UserGroupInformation callerUgi) {
+    return callerUgi != null && readBlacklist.isBlacklisted(callerUgi);
   }
 
   /**
@@ -5353,6 +5411,42 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     readOnlyAdmins.setAdminUsernames(pReadOnlyAdmins);
     LOG.info("Load conf {} : {}, and now readOnly admins are: {}",
         OZONE_READONLY_ADMINISTRATORS, newVal, pReadOnlyAdmins);
+    return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneBlacklistUsers(String newVal) {
+    Collection<String> blacklistUsers =
+        OzoneBlacklist.getOzoneBlacklistUsersFromConfigValue(newVal);
+    omBlacklist.setBlacklistUsernames(blacklistUsers);
+    LOG.info("Load conf {} : {}, and now blacklist users are: {}",
+        OZONE_BLACKLIST_USERS, newVal, blacklistUsers);
+    return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneBlacklistGroups(String newVal) {
+    Collection<String> blacklistGroups =
+        OzoneBlacklist.getOzoneBlacklistGroupsFromConfigValue(newVal);
+    omBlacklist.setBlacklistGroups(blacklistGroups);
+    LOG.info("Load conf {} : {}, and now blacklist groups are: {}",
+        OZONE_BLACKLIST_GROUPS, newVal, blacklistGroups);
+    return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneReadBlacklistUsers(String newVal) {
+    Collection<String> readBlacklistUsers =
+        OzoneBlacklist.getOzoneReadBlacklistUsersFromConfigValue(newVal);
+    readBlacklist.setBlacklistUsernames(readBlacklistUsers);
+    LOG.info("Load conf {} : {}, and now read blacklist users are: {}",
+        OZONE_READ_BLACKLIST_USERS, newVal, readBlacklistUsers);
+    return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneReadBlacklistGroups(String newVal) {
+    Collection<String> readBlacklistGroups =
+        OzoneBlacklist.getOzoneReadBlacklistGroupsFromConfigValue(newVal);
+    readBlacklist.setBlacklistGroups(readBlacklistGroups);
+    LOG.info("Load conf {} : {}, and now read blacklist groups are: {}",
+        OZONE_READ_BLACKLIST_GROUPS, newVal, readBlacklistGroups);
     return String.valueOf(newVal);
   }
 
