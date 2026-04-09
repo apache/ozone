@@ -420,8 +420,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       isFile(keyPath, keyDetails);
 
-      Response conditionalResponse = createConditionalReadResponse(
-          keyPath, keyDetails);
+      Response conditionalResponse = S3ConditionalRequest
+          .evaluateReadPreconditions(getHeaders(), keyPath, keyDetails);
       if (conditionalResponse != null) {
         long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(
             startNanos);
@@ -579,8 +579,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
-      Response conditionalResponse = createConditionalReadResponse(
-          keyPath, key);
+      Response conditionalResponse = S3ConditionalRequest
+          .evaluateReadPreconditions(getHeaders(), keyPath, key);
       if (conditionalResponse != null) {
         getMetrics().updateHeadKeySuccessStats(startNanos);
         auditReadSuccess(s3GAction);
@@ -1181,20 +1181,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           volumeName, bucketName, keyPath, length, replicationConfig,
           customMetadata, tags);
     }
-  }
-
-  /**
-   * Parses an ETag from a conditional header value, removing surrounding
-   * quotes if present.
-   */
-  static String parseETag(String headerValue) {
-    return S3ConditionalRequest.parseETag(headerValue);
-  }
-
-  private Response createConditionalReadResponse(String keyPath, OzoneKey key)
-      throws OS3Exception {
-    return S3ConditionalRequest.evaluateReadPreconditions(getHeaders(),
-        keyPath, key);
   }
 
   /** Request context shared among {@code ObjectOperationHandler}s. */

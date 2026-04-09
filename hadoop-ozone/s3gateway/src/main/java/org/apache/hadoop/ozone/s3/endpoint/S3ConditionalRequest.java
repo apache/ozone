@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.parseETag;
 
 import java.text.ParseException;
 import java.time.Instant;
@@ -127,7 +127,7 @@ final class S3ConditionalRequest {
     }
 
     if (trimmedIfNoneMatch != null
-        && !"*".equals(stripQuotes(trimmedIfNoneMatch))) {
+        && !"*".equals(parseETag(trimmedIfNoneMatch))) {
       OS3Exception ex = newError(INVALID_REQUEST, keyPath);
       ex.setErrorMessage(
           "Only If-None-Match: * is supported for conditional put.");
@@ -135,13 +135,6 @@ final class S3ConditionalRequest {
     }
 
     return new WriteConditions(trimmedIfNoneMatch, trimmedIfMatch);
-  }
-
-  static String parseETag(String headerValue) {
-    if (headerValue == null) {
-      return null;
-    }
-    return stripQuotes(headerValue.trim());
   }
 
   private static Response buildNotModifiedResponse(OzoneKey key) {
@@ -156,12 +149,12 @@ final class S3ConditionalRequest {
       return false;
     }
     for (String candidate : headerValue.split(",")) {
-      String trimmedCandidate = candidate.trim();
-      if ("*".equals(trimmedCandidate)) {
+      String parsedCandidate = parseETag(candidate);
+      if ("*".equals(parsedCandidate)) {
         return true;
       }
       if (currentETag != null
-          && currentETag.equals(parseETag(trimmedCandidate))) {
+          && currentETag.equals(parsedCandidate)) {
         return true;
       }
     }

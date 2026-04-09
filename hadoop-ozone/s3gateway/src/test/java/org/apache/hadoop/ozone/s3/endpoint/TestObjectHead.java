@@ -141,6 +141,24 @@ public class TestObjectHead {
   }
 
   @Test
+  public void testHeadIgnoresIfUnmodifiedSinceAfterMatchingIfMatch()
+      throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, "etag-key", "head-content"));
+
+    Response response = keyEndpoint.head(bucketName, "etag-key");
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn(eTag);
+    when(headers.getHeaderString(IF_UNMODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey("etag-key")
+            .getModificationTime().minusSeconds(60)));
+
+    response = keyEndpoint.head(bucketName, "etag-key");
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+  }
+
+  @Test
   public void testHeadWhenKeyIsAFileAndKeyPathDoesNotEndWithASlash()
       throws IOException, OS3Exception {
     // GIVEN
