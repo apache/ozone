@@ -79,3 +79,53 @@ HSync Can Be Used To Create Keys
     Freon DFSG      sync=HSYNC    n=1    path=${o3fspath}
     ${pfspath} =    Format FS URL         ofs      $vol1    bucket1
     Freon DFSG      sync=HSYNC    n=1    path=${pfspath}
+
+Snapshot Diff RPC Is Compatible
+    # Snapshot diff requires snapshot support + FSO buckets in these tests.
+    Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
+    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
+
+    ${status}    ${help} =    Run Keyword And Ignore Error    Execute    ozone sh snapshot --help
+    Run Keyword If    '${status}' == 'FAIL'    Pass Execution    Snapshot CLI not supported by this client
+
+    ${bucket} =      Set Variable    snapdiff-${CLIENT_VERSION}
+    ${fromSnap} =    Set Variable    snapdiff-from-${CLIENT_VERSION}
+    ${toSnap} =      Set Variable    snapdiff-to-${CLIENT_VERSION}
+    ${key1} =        Set Variable    snapdiff-key1-${CLIENT_VERSION}
+    ${key2} =        Set Variable    snapdiff-key2-${CLIENT_VERSION}
+
+    Execute          ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/${bucket}
+    Execute          ozone sh key put /vol1/${bucket}/base ${TESTFILE}
+    Execute          ozone sh snapshot create /vol1/${bucket} ${fromSnap}
+    Execute          ozone sh key put /vol1/${bucket}/${key1} ${TESTFILE}
+    Execute          ozone sh key put /vol1/${bucket}/${key2} ${TESTFILE}
+    Execute          ozone sh snapshot create /vol1/${bucket} ${toSnap}
+
+    # Wait until report generation is complete and validate output includes the created keys.
+    Wait Until Keyword Succeeds    2min    5sec    Snapshot Diff Report Should Contain Created Keys
+    ...    /vol1/${bucket}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
+
+*** Keywords ***
+Snapshot Diff Report Should Contain Created Keys
+    [Arguments]    ${bucketPath}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
+
+    # New clients support --get-report. Old clients don't; fall back to the legacy call.
+    ${status}    ${output} =    Run Keyword And Ignore Error
+    ...    Execute    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
+
+    IF    '${status}' == 'PASS'
+        # On newer servers, --get-report does not submit jobs. If the job is not
+        # found, submit it first (this keeps new-client/new-server behavior).
+        ${notFound} =    Run Keyword And Return Status
+        ...    Should Contain    ${output}    No snapshot diff job found
+        IF    ${notFound}
+            Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+        END
+        ${output} =    Execute    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
+    ELSE
+        ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+    END
+
+    Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
+    Should Contain    ${output}    ${key1}
+    Should Contain    ${output}    ${key2}

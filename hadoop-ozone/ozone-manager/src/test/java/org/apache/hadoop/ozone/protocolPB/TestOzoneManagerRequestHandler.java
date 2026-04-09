@@ -43,7 +43,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Assertions;
@@ -310,5 +312,90 @@ public class TestOzoneManagerRequestHandler {
         "Audit message should contain Transaction 10, got: " + formatted);
     Assertions.assertTrue(formatted.contains("Command") && formatted.contains("CreateVolume"),
         "Audit message should contain Command CreateVolume, got: " + formatted);
+  }
+
+  @Test
+  public void testSnapshotDiffRoutingUsesCorrectServerMethodBasedOnOptionalFlags()
+      throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    OMLayoutVersionManager lvm = Mockito.mock(OMLayoutVersionManager.class);
+    Mockito.when(lvm.isAllowed(Mockito.anyString())).thenReturn(true);
+    Mockito.when(ozoneManager.getVersionManager()).thenReturn(lvm);
+
+    Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyInt(), Mockito.anyBoolean(), Mockito.anyBoolean()))
+        .thenReturn(new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.IN_PROGRESS, 123L));
+
+    Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+            Mockito.anyInt()))
+        .thenReturn(new SnapshotDiffResponse(null, SnapshotDiffResponse.JobStatus.NOT_FOUND, 0L));
+
+    OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder commonReqBuilder =
+        OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+            .setVolumeName("vol")
+            .setBucketName("buck")
+            .setFromSnapshot("s1")
+            .setToSnapshot("s2")
+            .setToken("t")
+            .setPageSize(10);
+
+    // Legacy request: presence of these fields is the backwards-compat signal.
+    OzoneManagerProtocolProtos.SnapshotDiffRequest legacySnapshotDiffRequest =
+        commonReqBuilder.clone()
+            .setForceFullDiff(false)
+            .setDisableNativeDiff(false)
+            .build();
+
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotDiff)
+            .setClientId("client")
+            .setSnapshotDiffRequest(legacySnapshotDiffRequest)
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse response =
+        handler.handleReadRequest(request);
+
+    Mockito.verify(ozoneManager).snapshotDiff("vol", "buck", "s1", "s2", "t",
+        10, false, false);
+    Mockito.verify(ozoneManager, Mockito.never()).snapshotDiff(Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyInt());
+
+    Assertions.assertTrue(response.hasSnapshotDiffResponse());
+    Assertions.assertEquals(
+        OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto.IN_PROGRESS,
+        response.getSnapshotDiffResponse().getJobStatus());
+    Assertions.assertEquals(123L, response.getSnapshotDiffResponse().getWaitTimeInMs());
+
+    Mockito.clearInvocations(ozoneManager);
+
+    // Report-only request: do NOT set forceFullDiff/disableNativeDiff.
+    OzoneManagerProtocolProtos.SnapshotDiffRequest reportOnlySnapshotDiffRequest =
+        commonReqBuilder.clone().build();
+    OzoneManagerProtocolProtos.OMRequest reportOnlyRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotDiff)
+            .setClientId("client")
+            .setSnapshotDiffRequest(reportOnlySnapshotDiffRequest)
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse reportOnlyResponse =
+        handler.handleReadRequest(reportOnlyRequest);
+
+    Mockito.verify(ozoneManager).snapshotDiff("vol", "buck", "s1", "s2", "t", 10);
+    Mockito.verify(ozoneManager, Mockito.never()).snapshotDiff(Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyString(), Mockito.anyString(),
+        Mockito.anyString(), Mockito.anyInt(), Mockito.anyBoolean(), Mockito.anyBoolean());
+
+    Assertions.assertTrue(reportOnlyResponse.hasSnapshotDiffResponse());
+    Assertions.assertEquals(
+        OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto.NOT_FOUND,
+        reportOnlyResponse.getSnapshotDiffResponse().getJobStatus());
+    Assertions.assertEquals(0L, reportOnlyResponse.getSnapshotDiffResponse().getWaitTimeInMs());
   }
 }
