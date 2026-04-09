@@ -84,7 +84,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
   @CommandLine.Option(
       names = {"-s", "--start"},
-      description = "The item to start the listing from.\n" +
+      description = "The item to start the listing from.%n" +
           "i.e. continuation token. " +
           "This will be excluded from the result.",
       defaultValue = ""
