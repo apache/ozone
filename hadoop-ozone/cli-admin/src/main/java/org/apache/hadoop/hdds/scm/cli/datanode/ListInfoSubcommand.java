@@ -234,8 +234,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
                 .append(System.getProperty("line.separator")));
       }
     } else {
-      pipelineListInfo.append("No pipelines in cluster.");
-      pipelineListInfo.append(System.getProperty("line.separator"));
+      pipelineListInfo
+          .append("No pipelines in cluster.")
+          .append(System.getProperty("line.separator"));
     }
     System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
