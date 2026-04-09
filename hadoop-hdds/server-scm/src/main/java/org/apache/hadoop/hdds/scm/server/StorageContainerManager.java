@@ -354,10 +354,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Objects.requireNonNull(configurator, "configurator cannot be null");
     configuration = Objects.requireNonNull(conf, "configuration cannot be null");
-    // It is assumed the scm --init command creates the SCM Storage Config.
     TracingConfig tracingConfig = configuration.getObject(TracingConfig.class);
     TracingReconfigurationCallback tracingReconfigurationCallback =
         TracingReconfigurationCallback.init("StorageContainerManager", tracingConfig);
+    // It is assumed the scm --init command creates the SCM Storage Config.
     scmStorageConfig = new SCMStorageConfig(conf);
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
