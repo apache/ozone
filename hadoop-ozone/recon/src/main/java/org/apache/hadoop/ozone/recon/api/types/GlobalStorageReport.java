@@ -64,7 +64,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *   <li><b>totalOzoneFreeSpace</b>:
  *       Remaining allocatable space within Ozone capacity.</li>
  *
- *   <li><b>totalOzonePreAllocatedContainerSpace</b>:
+ *   <li><b>totalOzoneCommittedSpace</b>:
  *       Space pre-allocated for containers but not yet fully utilized.</li>
  *
  *   <li><b>totalMinimumFreeSpace</b>:
@@ -92,8 +92,8 @@ public class GlobalStorageReport {
   @JsonProperty("totalOzoneFreeSpace")
   private long totalOzoneFreeSpace;
 
-  @JsonProperty("totalOzonePreAllocatedContainerSpace")
-  private long totalOzonePreAllocatedContainerSpace;
+  @JsonProperty("totalOzoneCommittedSpace")
+  private long totalOzoneCommittedSpace;
 
   @JsonProperty("totalMinimumFreeSpace")
   private long totalMinimumFreeSpace;
@@ -118,8 +118,8 @@ public class GlobalStorageReport {
     return totalOzoneFreeSpace;
   }
 
-  public long getTotalOzonePreAllocatedContainerSpace() {
-    return totalOzonePreAllocatedContainerSpace;
+  public long getTotalOzoneCommittedSpace() {
+    return totalOzoneCommittedSpace;
   }
 
   public long getTotalMinimumFreeSpace() {
@@ -135,7 +135,7 @@ public class GlobalStorageReport {
     this.totalOzoneCapacity = builder.totalOzoneCapacity;
     this.totalOzoneUsedSpace = builder.totalOzoneUsedSpace;
     this.totalOzoneFreeSpace = builder.totalOzoneFreeSpace;
-    this.totalOzonePreAllocatedContainerSpace = builder.totalOzonePreAllocatedContainerSpace;
+    this.totalOzoneCommittedSpace = builder.totalOzoneCommittedSpace;
     this.totalMinimumFreeSpace = builder.totalMinimumFreeSpace;
   }
 
@@ -152,7 +152,7 @@ public class GlobalStorageReport {
     private long totalOzoneCapacity;
     private long totalOzoneUsedSpace;
     private long totalOzoneFreeSpace;
-    private long totalOzonePreAllocatedContainerSpace;
+    private long totalOzoneCommittedSpace;
     private long totalMinimumFreeSpace;
 
     public Builder() {
@@ -160,7 +160,7 @@ public class GlobalStorageReport {
       totalOzoneCapacity = 0;
       totalOzoneUsedSpace = 0;
       totalOzoneFreeSpace = 0;
-      totalOzonePreAllocatedContainerSpace = 0;
+      totalOzoneCommittedSpace = 0;
       totalMinimumFreeSpace = 0;
     }
 
@@ -184,8 +184,8 @@ public class GlobalStorageReport {
       return this;
     }
 
-    public Builder setTotalOzonePreAllocatedContainerSpace(long totalOzonePreAllocatedContainerSpace) {
-      this.totalOzonePreAllocatedContainerSpace = totalOzonePreAllocatedContainerSpace;
+    public Builder setTotalOzoneCommittedSpace(long totalOzoneCommittedSpace) {
+      this.totalOzoneCommittedSpace = totalOzoneCommittedSpace;
       return this;
     }
 

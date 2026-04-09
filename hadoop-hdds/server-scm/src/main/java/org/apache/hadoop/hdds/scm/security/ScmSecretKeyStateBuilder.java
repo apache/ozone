@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.security;
 
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyState;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyStateImpl;
@@ -45,7 +44,6 @@ public class ScmSecretKeyStateBuilder {
 
   public SecretKeyState build() {
     final SecretKeyState impl = new SecretKeyStateImpl(secretKeyStore);
-    return scmRatisServer.getProxyHandler(SCMRatisProtocol.RequestType.SECRET_KEY,
-       SecretKeyState.class, impl);
+    return scmRatisServer.getProxyHandler(SecretKeyState.class, impl);
   }
 }

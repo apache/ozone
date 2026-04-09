@@ -1328,54 +1328,33 @@
     ]
   },
   "fileSizeCounts": [
-    {
-      "volume": "vol1",
-      "bucket": "bucket1",
-      "fileSize": 1024,
-      "count": 56
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket2",
-      "fileSize": 4096,
-      "count": 25
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket3",
-      "fileSize": 32768,
-      "count": 312
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket4",
-      "fileSize": 131072,
-      "count": 78
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket5",
-      "fileSize": 1024,
-      "count": 123
-    },
-    {
-      "volume": "vol1",
-      "bucket": "bucket6",
-      "fileSize": 131072,
-      "count": 187
-    },
-    {
-      "volume": "vol2",
-      "bucket": "bucket7",
-      "fileSize": 1024,
-      "count": 54
-    },
-    {
-      "volume": "vol3",
-      "bucket": "bucket8",
-      "fileSize": 131072,
-      "count": 217
-    }
+    { "volume": "voltpb", "bucket": "buck1pb", "fileSize": 137438953472, "count": 2857 },
+    { "volume": "voltpb", "bucket": "buck2pb", "fileSize": 137438953472, "count": 143  },
+
+    { "volume": "vol-reverse", "bucket": "bucket-r7", "fileSize": 549755813888, "count": 2    },
+    { "volume": "vol-reverse", "bucket": "bucket-r6", "fileSize": 274877906944, "count": 5    },
+    { "volume": "vol-reverse", "bucket": "bucket-r5", "fileSize": 8589934592,   "count": 30   },
+    { "volume": "vol-reverse", "bucket": "bucket-r4", "fileSize": 1048576,      "count": 180  },
+    { "volume": "vol-reverse", "bucket": "bucket-r3", "fileSize": 65536,        "count": 450  },
+    { "volume": "vol-reverse", "bucket": "bucket-r2", "fileSize": 4096,         "count": 1200 },
+    { "volume": "vol-reverse", "bucket": "bucket-r1", "fileSize": 1024,         "count": 3800 },
+
+    { "volume": "vol-single", "bucket": "bucket-s1", "fileSize": 67108864, "count": 620 },
+    { "volume": "vol-single", "bucket": "bucket-s2", "fileSize": 67108864, "count": 180 },
+
+    { "volume": "vol-edge", "bucket": "bucket-e1", "fileSize": 1099511627776, "count": 1     },
+    { "volume": "vol-edge", "bucket": "bucket-e2", "fileSize": 1024,          "count": 50000 },
+
+    { "volume": "vol1", "bucket": "bucket1",  "fileSize": 1024,      "count": 56  },
+    { "volume": "vol1", "bucket": "bucket2",  "fileSize": 4096,      "count": 25  },
+    { "volume": "vol1", "bucket": "bucket3",  "fileSize": 32768,     "count": 312 },
+    { "volume": "vol1", "bucket": "bucket4",  "fileSize": 131072,    "count": 78  },
+    { "volume": "vol1", "bucket": "bucket5",  "fileSize": 1024,      "count": 123 },
+    { "volume": "vol1", "bucket": "bucket6",  "fileSize": 131072,    "count": 187 },
+    { "volume": "vol2", "bucket": "bucket7",  "fileSize": 1048576,   "count": 410 },
+    { "volume": "vol2", "bucket": "bucket8",  "fileSize": 16777216,  "count": 94  },
+    { "volume": "vol3", "bucket": "bucket9",  "fileSize": 134217728, "count": 38  },
+    { "volume": "vol3", "bucket": "bucket10", "fileSize": 1024,      "count": 217 }
   ],
   "containerCount": [
     {
@@ -6874,7 +6853,7 @@
       "totalOzoneCapacity": 879519597390,
       "totalOzoneFreeSpace": 539776978944,
       "totalOzoneUsedSpace": 30679040,
-      "totalOzonePreAllocatedContainerSpace":1022024
+      "totalOzoneCommittedSpace":1022024
     },
     "globalNamespace": {
         "totalUsedSpace": 12349932,
@@ -6886,7 +6865,7 @@
           "openKeyAndFileBytes": 19255266,
           "multipartOpenKeyBytes": 0
         },
-        "committedKeyBytes": 1249923
+        "finalizedKeyBytes": 1249923
     },
     "dataNodeUsage": [
         {

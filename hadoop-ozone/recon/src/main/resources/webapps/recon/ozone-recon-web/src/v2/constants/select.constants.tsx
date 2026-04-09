@@ -48,8 +48,7 @@ export const selectStyles: StylesConfig<Option, true> = {
     padding: 0
   }),
   menu: (baseStyles) => ({
-    ...baseStyles,
-    height: 100
+    ...baseStyles
   }),
   placeholder: (baseStyles) => ({
     ...baseStyles,
@@ -58,5 +57,9 @@ export const selectStyles: StylesConfig<Option, true> = {
   }),
   indicatorSeparator: () => ({
     display: 'none'
+  }),
+  menuPortal: (baseStyles) => ({
+    ...baseStyles,
+    zIndex: 9999
   })
 }
