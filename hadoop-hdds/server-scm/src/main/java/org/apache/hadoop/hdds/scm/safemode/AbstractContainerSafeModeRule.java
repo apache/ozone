@@ -137,15 +137,14 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   @Override
   public synchronized void refresh(boolean forceRefresh) {
-    if (!forceRefresh) {
-      return;
-    }
-    final long startNanos = Time.monotonicNowNanos();
-    try {
-      initializeRule();
-    } finally {
-      long durationMs = TimeUnit.NANOSECONDS.toMillis(Time.monotonicNowNanos() - startNanos);
-      getSafeModeMetrics().setLastContainerSafeModeRuleRefreshDurationMs(getContainerType(), durationMs);
+    if (forceRefresh || !validate()) {
+      final long startNanos = Time.monotonicNowNanos();
+      try {
+        initializeRule();
+      } finally {
+        long durationMs = TimeUnit.NANOSECONDS.toMillis(Time.monotonicNowNanos() - startNanos);
+        getSafeModeMetrics().setLastContainerSafeModeRuleRefreshDurationMs(getContainerType(), durationMs);
+      }
     }
   }
 
