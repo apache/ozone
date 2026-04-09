@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
@@ -145,8 +146,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
 
   @Option(
       names = "--clients",
-      description = "The number of Ozone clients used. If zero or less, " +
-          "will fallback to 1",
+      description = "The number of Ozone clients used.",
       defaultValue = "1")
   private int clientsNo;
 
@@ -208,18 +208,14 @@ public class OmMetadataGenerator extends BaseFreonGenerator
           String followerNodeId = followerOMNodeIds.get(currentFollowerAffinityIndex);
           changeInitialProxyForFollowerRead(ozoneClient, followerNodeId);
           currentFollowerAffinityIndex = (currentFollowerAffinityIndex + 1) % followerOMNodeIds.size();
-          LOG.debug("Connected OzoneClient-{} to OM follower {}", i + 1, followerNodeId);
+          LOG.info("Connected OzoneClient-{} to OM follower {}", i + 1, followerNodeId);
         }
         ozoneClients[i] = ozoneClient;
       }
       runTests(this::applyOperation);
     } finally {
       if (ozoneClients != null) {
-        for (OzoneClient ozoneClient : ozoneClients) {
-          if (ozoneClient != null) {
-            ozoneClient.close();
-          }
-        }
+        IOUtils.closeQuietly(ozoneClients);
       }
       omKeyArgsBuilder.remove();
     }
@@ -557,8 +553,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     OmTransport transport = ozoneManagerClient.getTransport();
 
     if (transport instanceof Hadoop3OmTransport) {
-      Hadoop3OmTransport hadoop3OmTransport =
-          (Hadoop3OmTransport) ozoneManagerClient.getTransport();
+      Hadoop3OmTransport hadoop3OmTransport = (Hadoop3OmTransport) transport;
       HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
           hadoop3OmTransport.getOmFollowerReadFailoverProxyProvider();
 
