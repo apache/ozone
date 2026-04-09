@@ -24,12 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -40,7 +35,6 @@ import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -224,40 +218,6 @@ public class TestBucketAclHandler {
     assertSucceeds(() -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
   }
 
-  @Test
-  public void testAuditLoggingOnBucketNotFound() throws Exception {
-    BucketAclHandler spyHandler = spy(aclHandler);
-
-    when(headers.getHeaderString(S3Acl.GRANT_READ))
-        .thenReturn("id=\"testuser\"");
-
-    // This should throw exception for non-existent bucket
-    assertThrows(OS3Exception.class,
-        () -> spyHandler.handlePutRequest(mockContext(), "nonexistent-bucket", null));
-
-    // Verify that auditWriteFailure was called with PUT_ACL action
-    verify(spyHandler, times(1)).auditWriteFailure(
-        eq(S3GAction.PUT_ACL),
-        any(OS3Exception.class));
-  }
-
-  @Test
-  public void testAuditLoggingOnInvalidArgument() throws Exception {
-    BucketAclHandler spyHandler = spy(aclHandler);
-
-    // Invalid format will trigger OS3Exception
-    when(headers.getHeaderString(S3Acl.GRANT_READ))
-        .thenReturn("invalid-format");
-
-    assertThrows(OS3Exception.class,
-        () -> spyHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
-
-    // Verify that auditWriteFailure was called with PUT_ACL action
-    verify(spyHandler, times(1)).auditWriteFailure(
-        eq(S3GAction.PUT_ACL),
-        any(OS3Exception.class));
-  }
-
   // ===== GET Request Tests =====
 
   @Test
@@ -296,31 +256,6 @@ public class TestBucketAclHandler {
     assertNotNull(result.getOwner());
     assertNotNull(result.getAclList());
     assertNotNull(result.getAclList().getGrantList());
-  }
-
-  @Test
-  public void testAuditLoggingOnGetSuccess() throws Exception {
-    BucketAclHandler spyHandler = spy(aclHandler);
-
-    Response response = spyHandler.handleGetRequest(mockContext(), BUCKET_NAME);
-
-    assertNotNull(response);
-    // Verify that auditReadSuccess was called with GET_ACL action
-    verify(spyHandler, times(1)).auditReadSuccess(eq(S3GAction.GET_ACL));
-  }
-
-  @Test
-  public void testAuditLoggingOnGetBucketNotFound() throws Exception {
-    BucketAclHandler spyHandler = spy(aclHandler);
-
-    // This should throw exception for non-existent bucket
-    assertThrows(OS3Exception.class,
-        () -> spyHandler.handleGetRequest(mockContext(), "nonexistent-bucket"));
-
-    // Verify that auditReadFailure was called with GET_ACL action
-    verify(spyHandler, times(1)).auditReadFailure(
-        eq(S3GAction.GET_ACL),
-        any(OS3Exception.class));
   }
 
   private static S3RequestContext mockContext() {

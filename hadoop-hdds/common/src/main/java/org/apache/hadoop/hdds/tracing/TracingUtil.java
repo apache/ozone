@@ -37,7 +37,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
@@ -49,12 +48,6 @@ import org.slf4j.LoggerFactory;
 public final class TracingUtil {
   private static final Logger LOG = LoggerFactory.getLogger(TracingUtil.class);
   private static final String NULL_SPAN_AS_STRING = "";
-  private static final String OTEL_EXPORTER_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT";
-  private static final String OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT = "http://localhost:4317";
-  private static final String OTEL_TRACES_SAMPLER_ARG = "OTEL_TRACES_SAMPLER_ARG";
-  private static final double OTEL_TRACES_SAMPLER_RATIO_DEFAULT = 1.0;
-  private static final String OTEL_SPAN_SAMPLING_ARG = "OTEL_SPAN_SAMPLING_ARG";
-  private static final String OTEL_TRACES_SAMPLER_CONFIG_DEFAULT = "";
 
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
@@ -72,7 +65,7 @@ public final class TracingUtil {
     }
 
     try {
-      initialize(serviceName);
+      initialize(serviceName, conf);
       isInit = true;
       LOG.info("Initialized tracing service: {}", serviceName);
     } catch (Exception e) {
@@ -80,38 +73,15 @@ public final class TracingUtil {
     }
   }
 
-  private static void initialize(String serviceName) {
-    String otelEndPoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
-    if (otelEndPoint == null || otelEndPoint.isEmpty()) {
-      otelEndPoint = OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT;
-    }
+  private static void initialize(String serviceName, ConfigurationSource conf) {
+    //Fetch and log the right tracing parameters based on config, environment variable and default value priority.
+    TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
+    String otelEndPoint = tracingConfig.getTracingEndpoint();
+    double samplerRatio = tracingConfig.getTraceSamplerRatio();
+    LOG.info("Sampling Trace Config = '{}'", samplerRatio);
+    String spanSamplingConfig = tracingConfig.getSpanSampling();
+    LOG.info("Sampling Span Config = '{}'", spanSamplingConfig);
 
-    double samplerRatio = OTEL_TRACES_SAMPLER_RATIO_DEFAULT;
-    try {
-      String sampleStrRatio = System.getenv(OTEL_TRACES_SAMPLER_ARG);
-      if (sampleStrRatio != null && !sampleStrRatio.isEmpty()) {
-        samplerRatio = Double.parseDouble(System.getenv(OTEL_TRACES_SAMPLER_ARG));
-        LOG.info("Sampling Trace Config = '{}'", samplerRatio);
-      }
-    } catch (NumberFormatException ex) {
-      // log and use the default value.
-      LOG.warn("Invalid value for {}: '{}'. Falling back to default: {}",
-          OTEL_TRACES_SAMPLER_ARG, System.getenv(OTEL_TRACES_SAMPLER_ARG), OTEL_TRACES_SAMPLER_RATIO_DEFAULT, ex);
-    }
-
-    String spanSamplingConfig = OTEL_TRACES_SAMPLER_CONFIG_DEFAULT;
-    try {
-      String spanStrConfig = System.getenv(OTEL_SPAN_SAMPLING_ARG);
-      if (spanStrConfig != null && !spanStrConfig.isEmpty()) {
-        spanSamplingConfig = spanStrConfig;
-      }
-      LOG.info("Sampling Span Config = '{}'", spanSamplingConfig);
-    } catch (Exception ex) {
-      // Log and use the default value.
-      LOG.warn("Failed to process {}. Falling back to default configuration: {}",
-          OTEL_SPAN_SAMPLING_ARG, OTEL_TRACES_SAMPLER_CONFIG_DEFAULT, ex);
-    }
-    // Pass the config to parseSpanSamplingConfig to get spans to be sampled.
     Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);
 
     Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), serviceName));
@@ -201,11 +171,8 @@ public final class TracingUtil {
         new TraceAllMethod<>(delegate, itf.getSimpleName())));
   }
 
-  public static boolean isTracingEnabled(
-      ConfigurationSource conf) {
-    return conf.getBoolean(
-        ScmConfigKeys.HDDS_TRACING_ENABLED,
-        ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
+  public static boolean isTracingEnabled(ConfigurationSource conf) {
+    return conf.getObject(TracingConfig.class).isTracingEnabled();
   }
 
   /**

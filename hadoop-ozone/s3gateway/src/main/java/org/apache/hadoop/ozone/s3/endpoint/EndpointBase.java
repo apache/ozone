@@ -671,7 +671,7 @@ public abstract class EndpointBase {
     AUDIT.logReadFailure(auditMessageForFailure(action, ex).build());
   }
 
-  protected boolean isAccessDenied(OMException ex) {
+  protected static boolean isAccessDenied(OMException ex) {
     ResultCodes result = ex.getResult();
     return result == ResultCodes.PERMISSION_DENIED
         || result == ResultCodes.INVALID_TOKEN;
