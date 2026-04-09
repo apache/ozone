@@ -342,7 +342,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OMClientResponse omClientResponse = new OMKeyRenameResponseWithFSO(
         omResponse.setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
         dbFromKey, dbToKey, fromKeyParent, toKeyParent, fromKeyValue,
-        omBucketInfo, isRenameDirectory, getBucketLayout());
+        omBucketInfo, isRenameDirectory, getBucketLayout(),
+        fromKeyName, toKeyName);
     return omClientResponse;
   }
 

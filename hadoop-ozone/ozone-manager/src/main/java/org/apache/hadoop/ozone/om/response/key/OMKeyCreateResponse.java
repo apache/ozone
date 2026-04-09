@@ -28,9 +28,11 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,6 +103,11 @@ public class OMKeyCreateResponse extends OmKeyResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .putWithBatch(batchOperation, openKey, omKeyInfo);
+
+    // Add to completed requests table.
+    omMetadataManager.getCompletedRequestInfoTable()
+        .putWithBatch(batchOperation, omKeyInfo.getUpdateID(),
+            getCompletedRequestInfo(omKeyInfo.getUpdateID()));
   }
 
   protected long getOpenKeySessionID() {
@@ -113,6 +120,26 @@ public class OMKeyCreateResponse extends OmKeyResponse {
 
   protected OmBucketInfo getOmBucketInfo() {
     return omBucketInfo;
+  }
+
+  protected Type getOperationType() {
+    return Type.CreateKey;
+  }
+
+  protected OmCompletedRequestInfo.OperationArgs getCompletedRequestInfoArgs() {
+    return new OmCompletedRequestInfo.OperationArgs.NoArgs();
+  }
+
+  protected OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(getOperationType())
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(omKeyInfo.getVolumeName())
+        .setBucketName(omKeyInfo.getBucketName())
+        .setKeyName(omKeyInfo.getKeyName())
+        .setOpArgs(getCompletedRequestInfoArgs())
+        .build();
   }
 }
 

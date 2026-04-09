@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -157,6 +159,34 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     // keyTable.
     assertTrue(omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
 
+  }
+
+  @Test
+  public void testGetCompletedRequestInfo() throws Exception {
+    long txIndex = 100L;
+
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager
+            .getKeyTable(getBucketLayout()).get(ozoneKey);
+
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
+            OzoneManagerProtocolProtos.DeleteKeyResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
+            .build();
+
+    OMKeyDeleteResponse omKeyDeleteResponse = getOmKeyDeleteResponse(omKeyInfo,
+            omResponse);
+
+    OmCompletedRequestInfo info = omKeyDeleteResponse.getCompletedRequestInfo(txIndex);
+
+    assertEquals(txIndex, info.getTrxLogIndex());
+    assertEquals(OzoneManagerProtocolProtos.Type.DeleteKey, info.getCmdType());
+    assertEquals(omKeyInfo.getVolumeName(), info.getVolumeName());
+    assertEquals(omKeyInfo.getBucketName(), info.getBucketName());
+    assertEquals(OmCompletedRequestInfo.OperationArgs.NoArgs.class,
+             info.getOpArgs().getClass());
   }
 
   protected String addKeyToTable() throws Exception {
