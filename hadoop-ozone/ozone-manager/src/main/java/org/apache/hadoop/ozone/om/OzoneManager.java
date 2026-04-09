@@ -178,6 +178,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
@@ -204,6 +205,7 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -517,6 +519,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Objects.requireNonNull(conf, "conf == null");
     setConfiguration(conf);
+    TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
+    TracingReconfigurationCallback tracingReconfigurationCallback =
+        TracingReconfigurationCallback.init("OzoneManager", tracingConfig);
     // Load HA related configurations
     OMHANodeDetails omhaNodeDetails =
         OMHANodeDetails.loadOMHAConfig(configuration);
@@ -530,6 +535,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     reconfigurationHandler =
         new ReconfigurationHandler("OM", conf, this::checkAdminUserPrivilege)
             .register(config)
+            .register(tracingConfig)
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
@@ -545,6 +551,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+    reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
