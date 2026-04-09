@@ -47,7 +47,7 @@ public class TestTracingUtil {
 
   @Test
   public void testInitTracing() {
-    TracingUtil.initTracing("testInitTracing", tracingConfigEnabled());
+    TracingUtil.initTracing("testInitTracing", tracingEnabled());
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("initTracing")) {
       exportCurrentSpan();
     } catch (Exception e) {
@@ -61,17 +61,13 @@ public class TestTracingUtil {
     return config;
   }
 
-  private static TracingConfig tracingConfigEnabled() {
-    return tracingEnabled().getObject(TracingConfig.class);
-  }
-
   /**
    * Test for checking if span was not created when a regular method
    * in Service implementation has @SkipTracing.
    */
   @Test
   public void testSkipTracingNoSpan() {
-    TracingUtil.initTracing("TestService", tracingConfigEnabled());
+    TracingUtil.initTracing("TestService", tracingEnabled());
     ServiceImpl impl = new ServiceImpl();
     Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
 
@@ -85,7 +81,7 @@ public class TestTracingUtil {
    */
   @Test
   public void testSkipTracingExceptionUnwrapped() {
-    TracingUtil.initTracing("TestService", tracingConfigEnabled());
+    TracingUtil.initTracing("TestService", tracingEnabled());
     ServiceImpl impl = new ServiceImpl();
     Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
 
@@ -101,7 +97,7 @@ public class TestTracingUtil {
    */
   @Test
   public void testProxyNormalVsSkipped() {
-    TracingUtil.initTracing("TestService", tracingConfigEnabled());
+    TracingUtil.initTracing("TestService", tracingEnabled());
     ServiceImpl impl = new ServiceImpl();
     Service serviceProxy = createProxy(impl, Service.class, tracingEnabled());
 

@@ -201,7 +201,6 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -514,7 +513,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Objects.requireNonNull(conf, "conf == null");
     setConfiguration(conf);
     TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
-    TracingUtil.initTracing("OzoneManager", tracingConfig);
+    TracingReconfigurationCallback tracingReconfigurationCallback =
+        TracingReconfigurationCallback.init("OzoneManager", tracingConfig);
     // Load HA related configurations
     OMHANodeDetails omhaNodeDetails =
         OMHANodeDetails.loadOMHAConfig(configuration);
@@ -540,8 +540,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
-    reconfigurationHandler.registerCompleteCallback(
-        TracingReconfigurationCallback.forReconfiguration("OzoneManager", tracingConfig));
+    reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
     versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);

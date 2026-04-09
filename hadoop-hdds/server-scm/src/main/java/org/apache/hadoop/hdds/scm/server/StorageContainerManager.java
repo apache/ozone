@@ -170,7 +170,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -288,7 +287,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ContainerTokenSecretManager containerTokenMgr;
 
   private OzoneConfiguration configuration;
-  private final TracingConfig tracingConfig;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
@@ -355,14 +353,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     super(HddsVersionInfo.HDDS_VERSION_INFO);
 
     Objects.requireNonNull(configurator, "configurator cannot be null");
-    Objects.requireNonNull(conf, "configuration cannot be null");
+    configuration = Objects.requireNonNull(conf, "configuration cannot be null");
     // It is assumed the scm --init command creates the SCM Storage Config.
+    TracingConfig tracingConfig = configuration.getObject(TracingConfig.class);
+    TracingReconfigurationCallback tracingReconfigurationCallback =
+        TracingReconfigurationCallback.init("StorageContainerManager", tracingConfig);
     scmStorageConfig = new SCMStorageConfig(conf);
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    configuration = conf;
-    tracingConfig = conf.getObject(TracingConfig.class);
-    TracingUtil.initTracing("StorageContainerManager", tracingConfig);
+
     initMetrics();
     initPerfMetrics();
 
@@ -432,8 +431,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
                 this::reconfigureSafeModeLogInterval);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
-    reconfigurationHandler.registerCompleteCallback(
-        TracingReconfigurationCallback.forReconfiguration("StorageContainerManager", tracingConfig));
+    reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
     initializeSystemManagers(conf, configurator);
 

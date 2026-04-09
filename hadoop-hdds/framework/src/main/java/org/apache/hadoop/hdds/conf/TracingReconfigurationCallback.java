@@ -23,10 +23,9 @@ import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
- * Holds the service name and {@link TracingConfig} for tracing reconfiguration.
- * Use {@link #init} when this service is the only place that calls
- * {@link TracingUtil#initTracing}; use {@link #forReconfiguration} when tracing
- * was already initialized earlier (e.g. CLI starter).
+ * Reconfiguration hook for ozone.tracing settings.
+ * init runs TracingUtil.initTracing once and returns this callback for registerCompleteCallback.
+ * onPropertiesChanged calls TracingUtil.reconfigureTracing when any changed key starts with ozone.tracing.
  */
 
 public final class TracingReconfigurationCallback implements ReconfigurationChangeCallback {
@@ -50,13 +49,6 @@ public final class TracingReconfigurationCallback implements ReconfigurationChan
     return new TracingReconfigurationCallback(serviceName, tracingConfig);
   }
 
-  /**
-   * Callback only; tracing must already have been initialized (e.g. in a starter).
-   */
-  public static TracingReconfigurationCallback forReconfiguration(
-      String serviceName, TracingConfig tracingConfig) {
-    return new TracingReconfigurationCallback(serviceName, tracingConfig);
-  }
 
   @Override
   public void onPropertiesChanged(Map<String, Boolean> changedKeys, Configuration newConf) {
