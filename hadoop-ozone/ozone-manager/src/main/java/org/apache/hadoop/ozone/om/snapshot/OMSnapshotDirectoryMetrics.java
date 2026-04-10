@@ -146,11 +146,12 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
   }
 
   /**
-   * Calculates & updates directory size metrics accounting for hardlinks.
-   * (only counts each inode once).
+     * Calculates & updates directory size metrics accounting for snapshot and
+   * backup SST Directory. (only counts each inode once).
    * Uses Files.getAttribute to get the inode number and tracks visited inodes.
    *
-   * @param directory the directory containing all checkpointDirs.
+   * @param snapshotsDir the directory containing all checkpointDirs.
+   * @param sstBackupDir the backup SST directory
    */
   private void calculateAndUpdateMetrics(File snapshotsDir,
       File sstBackupDir) throws IOException {

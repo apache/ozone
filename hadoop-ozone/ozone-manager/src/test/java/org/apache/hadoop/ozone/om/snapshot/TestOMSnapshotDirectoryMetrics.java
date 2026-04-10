@@ -111,10 +111,6 @@ public class TestOMSnapshotDirectoryMetrics {
     metrics.updateMetrics();
 
     assertEquals(2, metrics.getNumSnapshots());
-    // Total SST count should still be 1 if hardlink is counted once, 
-    // but the implementation uses visitedInodes per snapshot directory? 
-    // Wait, let's check the implementation again.
-    // calculateAndUpdateMetrics: visitedSnapshotsInodes is used for ALL snapshots.
     assertEquals(1, metrics.getTotalSstFilesCount());
     assertEquals(size1, metrics.getDbSnapshotsDirSize());
 
