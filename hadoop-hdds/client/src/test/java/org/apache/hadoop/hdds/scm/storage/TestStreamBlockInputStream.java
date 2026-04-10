@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -50,6 +52,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -97,7 +100,8 @@ public class TestStreamBlockInputStream {
     byte[] data = new byte[] {1, 2, 3, 4};
     long length = data.length;
     Pipeline pipeline = mockStandalonePipeline();
-    XceiverClientGrpc xceiverClient = mockStreamingReadClient(data);
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    XceiverClientGrpc xceiverClient = mockStreamingReadClient(data, requestObserver);
     XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
     when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
         .thenReturn(xceiverClient);
@@ -115,12 +119,72 @@ public class TestStreamBlockInputStream {
       assertEquals(data[(int) length - 1] & 0xFF, last);
       assertEquals(length, sbis.getPos());
       verify(xceiverClient, times(1)).completeStreamRead();
+      verify(requestObserver, times(1)).onCompleted();
 
       // Subsequent reads should return EOF and must not trigger duplicate permit release.
       assertEquals(-1, sbis.read());
       assertEquals(-1, sbis.read());
     }
 
+    verify(xceiverClient, times(1)).completeStreamRead();
+    verify(requestObserver, times(1)).onCompleted();
+    verify(requestObserver, never()).cancel(any(), any());
+  }
+
+  @Test
+  public void testCancelsRequestStreamWhenOnCompletedThrows() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    BlockID blockID = new BlockID(1L, 3L);
+    byte[] data = new byte[] {1, 2, 3, 4};
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    RuntimeException closeFailure = new RuntimeException("close failed");
+    doThrow(closeFailure).when(requestObserver).onCompleted();
+
+    XceiverClientGrpc xceiverClient = mockStreamingReadClient(data, requestObserver);
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer all = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, sbis.read(all));
+      assertEquals(data.length, sbis.getPos());
+      assertEquals(-1, sbis.read());
+    }
+
+    verify(requestObserver, times(1)).onCompleted();
+    verify(requestObserver, times(1)).cancel(eq("StreamBlockInputStream closed"), eq(closeFailure));
+    verify(xceiverClient, times(1)).completeStreamRead();
+  }
+
+  @Test
+  public void testCloseDoesNotFailWhenOnCompletedAndCancelThrow() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    BlockID blockID = new BlockID(1L, 4L);
+    byte[] data = new byte[] {1, 2, 3, 4};
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    RuntimeException closeFailure = new RuntimeException("close failed");
+    RuntimeException cancelFailure = new RuntimeException("cancel failed");
+    doThrow(closeFailure).when(requestObserver).onCompleted();
+    doThrow(cancelFailure).when(requestObserver)
+        .cancel(eq("StreamBlockInputStream closed"), eq(closeFailure));
+
+    XceiverClientGrpc xceiverClient = mockStreamingReadClient(data, requestObserver);
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer all = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, sbis.read(all));
+      assertEquals(data.length, sbis.getPos());
+      assertEquals(-1, sbis.read());
+    }
+
+    verify(requestObserver, times(1)).onCompleted();
+    verify(requestObserver, times(1)).cancel(eq("StreamBlockInputStream closed"), eq(closeFailure));
     verify(xceiverClient, times(1)).completeStreamRead();
   }
 
@@ -149,10 +213,12 @@ public class TestStreamBlockInputStream {
     return pipeline;
   }
 
-  private XceiverClientGrpc mockStreamingReadClient(byte[] data) throws Exception {
+  private XceiverClientGrpc mockStreamingReadClient(byte[] data,
+      ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver) throws Exception {
     XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
     StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
     ReadBlockResponseProto readBlock = buildReadBlockResponse(data);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
 
     doNothing().when(xceiverClient)
         .streamRead(any(ContainerCommandRequestProto.class),
