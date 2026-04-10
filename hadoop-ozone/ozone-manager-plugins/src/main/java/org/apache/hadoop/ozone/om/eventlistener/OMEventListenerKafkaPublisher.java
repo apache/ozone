@@ -88,7 +88,7 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
   }
 
   @Override
-  public void shutdown() {
+  public void stop() {
     try {
       kafkaClient.shutdown();
     } catch (IOException ex) {

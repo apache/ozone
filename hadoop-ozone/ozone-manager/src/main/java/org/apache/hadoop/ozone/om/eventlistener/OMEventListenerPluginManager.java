@@ -46,7 +46,7 @@ public class OMEventListenerPluginManager {
     return plugins;
   }
 
-  public void startAll() {
+  public void start(OzoneConfiguration conf) {
     for (OMEventListener plugin : plugins) {
       try {
         plugin.start();
@@ -57,10 +57,10 @@ public class OMEventListenerPluginManager {
     }
   }
 
-  public void shutdownAll() {
+  public void stop() {
     for (OMEventListener plugin : plugins) {
       try {
-        plugin.shutdown();
+        plugin.stop();
       } catch (Exception ex) {
         LOG.error("Failed to shut down event listener plugin {}",
             plugin.getClass().getName(), ex);

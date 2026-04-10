@@ -50,51 +50,20 @@ public class TestOMEventListenerPluginManager {
     return loadedClasses;
   }
 
-  private static class BrokenFooPlugin {
+  private static class BrokenPlugin {
 
   }
 
   /**
-   * A dummy plugin implementation for testing.
+   * Dummy plugin implementation for testing.
    */
-  public static class FooPlugin implements OMEventListener {
-
-    private boolean initialized = false;
-    private boolean started = false;
-    private boolean shutdown = false;
-
-    @Override
-    public void initialize(OzoneConfiguration conf, OMEventListenerPluginContext pluginContext) {
-      initialized = true;
-    }
-
-    @Override
-    public void start() {
-      started = true;
-    }
-
-    @Override
-    public void shutdown() {
-      shutdown = true;
-    }
-
-    public boolean isInitialized() {
-      return initialized;
-    }
-
-    public boolean isStarted() {
-      return started;
-    }
-
-    public boolean isShutdown() {
-      return shutdown;
-    }
+  public static class FooPlugin extends NoOpOMEventListener {
   }
 
   /**
    * Another dummy plugin implementation for testing.
    */
-  public static class BarPlugin extends FooPlugin {
+  public static class BarPlugin extends NoOpOMEventListener {
   }
 
   @Test
@@ -154,12 +123,33 @@ public class TestOMEventListenerPluginManager {
   public void testPluginClassDoesNotImplementInterface() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.om.plugin.destination.foo", "enabled");
-    conf.set("ozone.om.plugin.destination.foo.classname", BrokenFooPlugin.class.getName());
+    conf.set("ozone.om.plugin.destination.foo.classname", BrokenPlugin.class.getName());
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
     Assertions.assertEquals(
         Arrays.asList(),
         getLoadedPlugins(pluginManager));
+  }
+
+  @Test
+  public void testLifecycle() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set("ozone.om.plugin.destination.foo", "enabled");
+    conf.set("ozone.om.plugin.destination.foo.classname", FooPlugin.class.getName());
+
+    OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
+    FooPlugin plugin = (FooPlugin) pluginManager.getLoaded().get(0);
+
+    Assertions.assertTrue(plugin.isInitialized());
+    Assertions.assertFalse(plugin.isStarted());
+    Assertions.assertFalse(plugin.isStopped());
+
+    pluginManager.start(conf);
+    Assertions.assertTrue(plugin.isStarted());
+    Assertions.assertFalse(plugin.isStopped());
+
+    pluginManager.stop();
+    Assertions.assertTrue(plugin.isStopped());
   }
 }

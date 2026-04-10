@@ -231,6 +231,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.om.eventlistener.OMEventListenerPluginManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -398,6 +399,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private KeyManager keyManager;
+  private OMEventListenerPluginManager eventListenerPluginManager;
   private PrefixManagerImpl prefixManager;
   private final UpgradeFinalizer<OzoneManager> upgradeFinalizer;
   private ExecutorService edekCacheLoader = null;
@@ -969,6 +971,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     prefixManager = new PrefixManagerImpl(this, metadataManager, true);
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
+    eventListenerPluginManager = new OMEventListenerPluginManager(this,
+        configuration);
     // If authorizer is not initialized or the authorizer is Native
     // re-initialize the authorizer, else for non-native authorizer
     // like ranger we can reuse previous value if it is initialized
@@ -1688,6 +1692,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return keyManager;
   }
 
+  public OMEventListenerPluginManager getEventListenerPluginManager() {
+    return eventListenerPluginManager;
+  }
+
   @VisibleForTesting
   public OMStorage getOmStorage() {
     return omStorage;
@@ -1865,6 +1873,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     keyManager.start(configuration);
+    eventListenerPluginManager.start(configuration);
 
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
@@ -1913,6 +1922,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metadataManager.start(configuration);
     keyManager.start(configuration);
+    eventListenerPluginManager.start(configuration);
     startSecretManagerIfNecessary();
 
     // Set metrics and start metrics back ground thread
@@ -2399,6 +2409,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         isOmGrpcServerRunning = false;
       }
       keyManager.stop();
+      if (eventListenerPluginManager != null) {
+        eventListenerPluginManager.stop();
+      }
       stopSecretManager();
 
       if (scmTopologyClient != null) {
@@ -4065,6 +4078,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
   }
 
+  @SuppressWarnings("methodlength")
   TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
       TransactionInfo checkpointTrxnInfo) throws Exception {
     long startTime = Time.monotonicNow();
@@ -4073,6 +4087,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       // Stop Background services
       keyManager.stop();
+      if (eventListenerPluginManager != null) {
+        eventListenerPluginManager.stop();
+      }
       stopSecretManager();
       stopTrashEmptier();
       omSnapshotManager.invalidateCache();
@@ -4085,6 +4102,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           "installing the new checkpoint.");
       // Stop the checkpoint install process and restart the services.
       keyManager.start(configuration);
+      eventListenerPluginManager.start(configuration);
       startSecretManagerIfNecessary();
       startTrashEmptier(configuration);
       throw e;
@@ -4163,6 +4181,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       } else {
         // OM DB is not stopped. Start the services.
         keyManager.start(configuration);
+        eventListenerPluginManager.start(configuration);
         startSecretManagerIfNecessary();
         startTrashEmptier(configuration);
         omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
@@ -4388,6 +4407,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart required services
     metadataManager.start(configuration);
     keyManager.start(configuration);
+    eventListenerPluginManager.start(configuration);
     startSecretManagerIfNecessary();
     startTrashEmptier(configuration);
 

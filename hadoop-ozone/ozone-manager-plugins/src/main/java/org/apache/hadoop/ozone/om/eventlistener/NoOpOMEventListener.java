@@ -20,13 +20,38 @@ package org.apache.hadoop.ozone.om.eventlistener;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
- * Interface for event listener plugin implementations.
+ * A no-op implementation of {@link OMEventListener} for testing and as a template.
  */
-public interface OMEventListener {
+public class NoOpOMEventListener implements OMEventListener {
 
-  void initialize(OzoneConfiguration conf, OMEventListenerPluginContext pluginContext);
+  private boolean initialized = false;
+  private boolean started = false;
+  private boolean stopped = false;
 
-  void start();
+  @Override
+  public void initialize(OzoneConfiguration conf, OMEventListenerPluginContext pluginContext) {
+    initialized = true;
+  }
 
-  void stop();
+  @Override
+  public void start() {
+    started = true;
+  }
+
+  @Override
+  public void stop() {
+    stopped = true;
+  }
+
+  public boolean isInitialized() {
+    return initialized;
+  }
+
+  public boolean isStarted() {
+    return started;
+  }
+
+  public boolean isStopped() {
+    return stopped;
+  }
 }
