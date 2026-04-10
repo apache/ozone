@@ -11,6 +11,7 @@ share/ozone/lib/asm.jar
 share/ozone/lib/asm-tree.jar
 share/ozone/lib/asm-util.jar
 share/ozone/lib/aspectjrt.jar
+share/ozone/lib/avro.jar
 share/ozone/lib/aws-java-sdk-core.jar
 share/ozone/lib/aws-java-sdk-kms.jar
 share/ozone/lib/aws-java-sdk-s3.jar
@@ -18,6 +19,7 @@ share/ozone/lib/bcpkix-jdk18on.jar
 share/ozone/lib/bcprov-jdk18on.jar
 share/ozone/lib/bcutil-jdk18on.jar
 share/ozone/lib/bonecp.RELEASE.jar
+share/ozone/lib/caffeine.jar
 share/ozone/lib/cdi-api.SP1.jar
 share/ozone/lib/commons-beanutils.jar
 share/ozone/lib/commons-cli.jar
@@ -84,6 +86,9 @@ share/ozone/lib/hk2-utils.jar
 share/ozone/lib/hppc.jar
 share/ozone/lib/httpclient.jar
 share/ozone/lib/httpcore.jar
+share/ozone/lib/iceberg-api.jar
+share/ozone/lib/iceberg-common.jar
+share/ozone/lib/iceberg-core.jar
 share/ozone/lib/istack-commons-runtime.jar
 share/ozone/lib/j2objc-annotations.jar
 share/ozone/lib/jackson-annotations.jar
@@ -223,6 +228,7 @@ share/ozone/lib/ozone-filesystem-hadoop3.jar
 share/ozone/lib/ozone-filesystem.jar
 share/ozone/lib/ozone-freon.jar
 share/ozone/lib/ozone-httpfsgateway.jar
+share/ozone/lib/ozone-iceberg.jar
 share/ozone/lib/ozone-insight.jar
 share/ozone/lib/ozone-interface-client.jar
 share/ozone/lib/ozone-interface-storage.jar
