@@ -387,6 +387,7 @@ Apache License 2.0
    org.apache.hadoop:hadoop-shaded-protobuf_3_25
    org.apache.httpcomponents:httpcore
    org.apache.iceberg:iceberg-api
+   org.apache.iceberg:iceberg-bundled-guava
    org.apache.iceberg:iceberg-common
    org.apache.iceberg:iceberg-core
    org.apache.kerby:kerb-admin

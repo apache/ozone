@@ -37,12 +37,6 @@
     <dependency>
       <groupId>org.apache.iceberg</groupId>
       <artifactId>iceberg-api</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.iceberg</groupId>
-          <artifactId>iceberg-bundled-guava</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.iceberg</groupId>
@@ -61,16 +55,24 @@
           <artifactId>httpcore5-h2</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.apache.iceberg</groupId>
-          <artifactId>iceberg-bundled-guava</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.checkerframework</groupId>
           <artifactId>checker-qual</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.roaringbitmap</groupId>
           <artifactId>RoaringBitmap</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.avro</groupId>
+          <artifactId>avro</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
