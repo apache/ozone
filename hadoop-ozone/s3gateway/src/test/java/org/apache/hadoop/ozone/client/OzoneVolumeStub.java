@@ -106,7 +106,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
   }
 
   @Override
-  public void createBucket(String bucketName) {
+  public void createBucket(String bucketName) throws OMException {
     createBucket(bucketName, new BucketArgs.Builder()
         .setStorageType(StorageType.DEFAULT)
         .setVersioning(false)
@@ -114,7 +114,11 @@ public final class OzoneVolumeStub extends OzoneVolume {
   }
 
   @Override
-  public void createBucket(String bucketName, BucketArgs bucketArgs) {
+  public void createBucket(String bucketName, BucketArgs bucketArgs) throws OMException {
+    if (buckets.containsKey(bucketName)) {
+      throw new OMException("", OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
+    }
+
     buckets.put(bucketName, OzoneBucketStub.newBuilder()
         .setVolumeName(getName())
         .setName(bucketName)
@@ -166,10 +170,14 @@ public final class OzoneVolumeStub extends OzoneVolume {
 
   @Override
   public void deleteBucket(String bucketName) throws IOException {
-    if (buckets.containsKey(bucketName)) {
+    if (!buckets.containsKey(bucketName)) {
+      throw new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND);
+    }
+    OzoneBucketStub bucket = (OzoneBucketStub) buckets.get(bucketName);
+    if (bucket.isEmpty()) {
       buckets.remove(bucketName);
     } else {
-      throw new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND);
+      throw new OMException("", OMException.ResultCodes.BUCKET_NOT_EMPTY);
     }
   }
 

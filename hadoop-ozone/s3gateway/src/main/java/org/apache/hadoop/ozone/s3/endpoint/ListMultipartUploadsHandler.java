@@ -56,7 +56,7 @@ class ListMultipartUploadsHandler extends BucketOperationHandler {
 
     long startNanos = context.getStartNanos();
 
-    OzoneBucket bucket = getBucket(bucketName);
+    OzoneBucket bucket = context.getVolume().getBucket(bucketName);
 
     try {
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());

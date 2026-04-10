@@ -37,6 +37,8 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -151,7 +153,7 @@ public class TestBucketAclHandler {
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"testuser\"");
 
-    assertThrows(OS3Exception.class,
+    assertThrows(OMException.class,
         () -> aclHandler.handlePutRequest(mockContext(), "nonexistent-bucket", null),
         "Should throw OS3Exception for non-existent bucket");
   }
@@ -236,7 +238,7 @@ public class TestBucketAclHandler {
 
   @Test
   public void testHandleGetRequestBucketNotFound() {
-    assertThrows(OS3Exception.class,
+    assertThrows(OMException.class,
         () -> aclHandler.handleGetRequest(mockContext(), "nonexistent-bucket"),
         "Should throw OS3Exception for non-existent bucket");
   }
@@ -258,7 +260,14 @@ public class TestBucketAclHandler {
     assertNotNull(result.getAclList().getGrantList());
   }
 
-  private static S3RequestContext mockContext() {
-    return new S3RequestContext(mock(BucketEndpoint.class), null);
+  private S3RequestContext mockContext() throws IOException {
+    BucketEndpoint endpoint = mock(BucketEndpoint.class);
+    OzoneVolume volume = mock(OzoneVolume.class);
+    when(endpoint.getVolume()).thenReturn(volume);
+    when(volume.getBucket(BUCKET_NAME))
+        .thenAnswer(any -> client.getObjectStore().getS3Bucket(BUCKET_NAME));
+    when(volume.getBucket("nonexistent-bucket"))
+        .thenThrow(new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND));
+    return new S3RequestContext(endpoint, null);
   }
 }
