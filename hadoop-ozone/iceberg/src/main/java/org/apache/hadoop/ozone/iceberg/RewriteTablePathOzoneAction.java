@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.HasTableOperations;
+import org.apache.iceberg.PartitionStatisticsFile;
 import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.RewriteTablePathUtil.RewriteResult;
 import org.apache.iceberg.Snapshot;
@@ -144,8 +145,9 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
               "Source prefix cannot be the same as target prefix (%s)", sourcePrefix));
     }
 
-    validateAndSetEndVersion();
-    validateAndSetStartVersion();
+    TableMetadata tableMetadata = ((HasTableOperations) table).operations().current();
+    validateAndSetEndVersion(tableMetadata);
+    validateAndSetStartVersion(tableMetadata);
 
     if (stagingDir == null) {
       stagingDir =
@@ -158,9 +160,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     }
   }
 
-  private void validateAndSetEndVersion() {
-    TableMetadata tableMetadata = ((HasTableOperations) table).operations().current();
-
+  private void validateAndSetEndVersion(TableMetadata tableMetadata) {
     if (endVersionName == null) {
       Objects.requireNonNull(
           tableMetadata.metadataFileLocation(), "Metadata file location should not be null");
@@ -170,9 +170,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     }
   }
 
-  private void validateAndSetStartVersion() {
-    TableMetadata tableMetadata = ((HasTableOperations) table).operations().current();
-
+  private void validateAndSetStartVersion(TableMetadata tableMetadata) {
     if (startVersionName != null) {
       this.startVersionName = validateVersion(tableMetadata, startVersionName);
     }
@@ -182,11 +180,12 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     String versionFile = null;
     if (versionInFilePath(tableMetadata.metadataFileLocation(), versionFileName)) {
       versionFile = tableMetadata.metadataFileLocation();
-    }
-
-    for (MetadataLogEntry log : tableMetadata.previousFiles()) {
-      if (versionInFilePath(log.file(), versionFileName)) {
-        versionFile = log.file();
+    } else {
+      for (MetadataLogEntry log : tableMetadata.previousFiles()) {
+        if (versionInFilePath(log.file(), versionFileName)) {
+          versionFile = log.file();
+          break;
+        }
       }
     }
 
@@ -209,15 +208,15 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   private String rebuildMetadata() {
     //TODO need to implement rewrite of manifest list , manifest files and position delete files.
     TableMetadata startMetadata = startVersionName != null
-            ? ((HasTableOperations) newStaticTable(startVersionName, table.io()))
-            .operations()
-            .current()
-            : null;
+        ? ((HasTableOperations) newStaticTable(startVersionName, table.io()))
+        .operations()
+        .current()
+        : null;
     TableMetadata endMetadata =
-            ((HasTableOperations) newStaticTable(endVersionName, table.io())).operations().current();
+        ((HasTableOperations) newStaticTable(endVersionName, table.io())).operations().current();
 
-    if (endMetadata.partitionStatisticsFiles() != null
-            && !endMetadata.partitionStatisticsFiles().isEmpty()) {
+    List<PartitionStatisticsFile> partitionStats = endMetadata.partitionStatisticsFiles();
+    if (partitionStats != null && !partitionStats.isEmpty()) {
       throw new IllegalArgumentException("Partition statistics files are not supported yet.");
     }
 
@@ -238,7 +237,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
   private void writeAsCsv(Set<Pair<String, String>> rows, OutputFile outputFile) {
     try (BufferedWriter writer = new BufferedWriter(
-            new OutputStreamWriter(outputFile.createOrOverwrite(), StandardCharsets.UTF_8))) {
+        new OutputStreamWriter(outputFile.createOrOverwrite(), StandardCharsets.UTF_8))) {
       for (Pair<String, String> pair : rows) {
         writer.write(String.join(",", pair.first(), pair.second()));
         writer.newLine();
@@ -275,11 +274,12 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
   private Set<Pair<String, String>> rewriteVersionFile(TableMetadata metadata, String versionFilePath) {
     Set<Pair<String, String>> result = new HashSet<>();
-    String stagingPath =
-            RewriteTablePathUtil.stagingPath(versionFilePath, sourcePrefix, stagingDir);
+    String stagingPath = RewriteTablePathUtil.stagingPath(versionFilePath, sourcePrefix, stagingDir);
+    
     System.out.println("Processing version file " + versionFilePath);
     TableMetadata newTableMetadata = RewriteTablePathUtil.replacePaths(metadata, sourcePrefix, targetPrefix);
     TableMetadataParser.overwrite(newTableMetadata, table.io().newOutputFile(stagingPath));
+    
     result.add(Pair.of(stagingPath, RewriteTablePathUtil.newPath(versionFilePath, sourcePrefix, targetPrefix)));
     result.addAll(statsFileCopyPlan(metadata.statisticsFiles(), newTableMetadata.statisticsFiles()));
 
@@ -301,7 +301,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
       StatisticsFile before = beforeStats.get(i);
       StatisticsFile after = afterStats.get(i);
       if (before.fileSizeInBytes() != after.fileSizeInBytes()) {
-        throw new IllegalArgumentException("Before and after path rewrite, statistic files count should be same");
+        throw new IllegalArgumentException("Before and after path rewrite, statistic files size should be same");
       }
       result.add(Pair.of(before.path(), after.path()));
     }

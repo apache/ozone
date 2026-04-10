@@ -62,12 +62,9 @@ class TestRewriteTablePathOzoneAction {
       Types.NestedField.required(2, "c2", Types.StringType.get()),
       Types.NestedField.optional(3, "c3", Types.StringType.get()));
 
-  private String tableLocation = null;
   private String sourcePrefix = null;
   private String targetPrefix = null;
   private Table table = null;
-
-  private final HadoopTables tables = new HadoopTables(new Configuration());
 
   @TempDir
   private java.nio.file.Path tableDir;
@@ -78,7 +75,7 @@ class TestRewriteTablePathOzoneAction {
 
   @BeforeEach
   public void setupTableLocation() {
-    this.tableLocation = tableDir.toUri().toString().replaceFirst("^file:///", "file:/") + TABLE_NAME;
+      String tableLocation = tableDir.toUri().toString().replaceFirst("^file:///", "file:/") + TABLE_NAME;
     this.table = createTable(tableLocation + "/");
     this.sourcePrefix = tableLocation;
     this.targetPrefix = targetDir.toUri().toString().replaceFirst("^file:///", "file:/") + TABLE_NAME;
@@ -261,6 +258,7 @@ class TestRewriteTablePathOzoneAction {
   }
 
   private Table createTable(String location) {
+    HadoopTables tables = new HadoopTables(new Configuration());
     Table tbl = tables.create(SCHEMA, PartitionSpec.unpartitioned(), new HashMap<>(), location);
     for (int i = 0; i < COMMITS; i++) {
       String dataPath = location + "/data/batch-" + i + ".parquet";
