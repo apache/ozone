@@ -27,6 +27,7 @@ set -u
 : "${OZONE_UPGRADE_TO}"
 : "${TEST_DIR}"
 : "${SCM}"
+: "${CLIENT}"
 : "${OZONE_CURRENT_VERSION}"
 set +u
 
@@ -42,17 +43,6 @@ rolling_restart_service() {
 
   # Stop service
   stop_containers "${SERVICE}"
-
-  # Check if this SCM container is running, as during a rolling upgrade it does stop-start one-by-one and
-  # we want to run write/read tests while one service is unavailable. Choose SCM (the container where the generate and
-  # validate robot tests are running) considering availability.
-  if [[ "$(docker inspect -f '{{.State.Running}}' "ha-${SCM}-1" 2>/dev/null)" != "true" ]]; then
-    local fallback_scm
-    fallback_scm="$(docker-compose --project-directory="$TEST_DIR/compose/ha" config --services | grep scm | grep -v "^${SCM}$" | head -n1)"
-    if [[ -n "$fallback_scm" ]]; then
-      export SCM="$fallback_scm"
-    fi
-  fi
 
   # The data generation/validation is doing S3 API tests, so skip it in case the S3 gateway is updated
   # TODO find a better solution
@@ -129,4 +119,4 @@ OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-finalized"
 # TODO Add validation for pre-finalized state
 
 # Sends commands to finalize OM and SCM.
-execute_robot_test "$SCM" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot
+execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot
