@@ -554,7 +554,7 @@ public final class IamSessionPolicyResolver {
         // is s3:ListBucket or s3:* (which includes s3:ListBucket)
         if (condition != null && condition.prefixes != null && !condition.prefixes.isEmpty()) {
           for (String prefix : condition.prefixes) {
-            // If operator is StringEquals, we should ignore any prefix containing wildcards
+            // If operator is StringEquals, we should ignore any prefix containing wildcards - this is AWS behavior
             if (STRING_EQUALS.equals(condition.operator) && hasWildcard(prefix)) {
               continue;
             }
