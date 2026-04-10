@@ -45,15 +45,13 @@ public class TestOMSnapshotDirectoryMetrics {
   private Path tempDir;
 
   private OMMetadataManager metadataManager;
-  private RDBStore store;
-  private RocksDBCheckpointDiffer differ;
   private OMSnapshotDirectoryMetrics metrics;
 
   @BeforeEach
   public void setup() throws IOException {
     metadataManager = Mockito.mock(OMMetadataManager.class);
-    store = Mockito.mock(RDBStore.class);
-    differ = Mockito.mock(RocksDBCheckpointDiffer.class);
+    RDBStore store = Mockito.mock(RDBStore.class);
+    RocksDBCheckpointDiffer differ = Mockito.mock(RocksDBCheckpointDiffer.class);
 
     when(metadataManager.getStore()).thenReturn(store);
     when(store.getRocksDBCheckpointDiffer()).thenReturn(differ);
