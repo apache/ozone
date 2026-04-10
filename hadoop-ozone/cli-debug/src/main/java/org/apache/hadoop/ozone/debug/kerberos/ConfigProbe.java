@@ -33,7 +33,7 @@ public abstract class ConfigProbe implements DiagnosticProbe {
   protected void printValue(String key, String value) {
     if (value != null && value.startsWith("to Local user")) {
       System.out.println(key + " " + value);
-    }else {
+    } else {
       System.out.println(key + " = " +
           (value == null ? "(unset)" : value));
     }
