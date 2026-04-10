@@ -748,6 +748,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
             .build();
+      case QueryUpgradeStatus:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setQueryUpgradeStatusResponse(getQueryUpgradeStatus(request.getQueryUpgradeStatusRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1084,6 +1090,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .build();
 
     return QueryUpgradeFinalizationProgressResponseProto.newBuilder()
+        .setStatus(response)
+        .build();
+  }
+
+  public StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto getQueryUpgradeStatus(
+      StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto request) throws IOException {
+
+    HddsProtos.UpgradeStatus response = impl.queryUpgradeStatus();
+    return StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto
+        .newBuilder()
         .setStatus(response)
         .build();
   }
