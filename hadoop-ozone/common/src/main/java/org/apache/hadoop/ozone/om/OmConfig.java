@@ -161,15 +161,16 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private boolean followerReadLocalLeaseEnabled;
 
-  @Config(key = "ozone.om.follower.read.local.lease.lag.limit",
+  @Config(key = "ozone.om.follower.read.local.lease.log.limit",
       defaultValue = "10000",
       reconfigurable = true,
       type = ConfigType.LONG,
       tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
-      description = "If the lag between leader OM and follower OM is larger " +
-          "than this number, the follower OM is not up-to-date."
+      description = "If the log lag between leader OM and follower OM is larger " +
+          "than this number, the follower OM is not up-to-date. " +
+          "Setting this to -1 to allow infinite lag."
   )
-  private long followerReadLocalLeaseLagLimit;
+  private long followerReadLocalLeaseLogLimit;
 
   @Config(key = "ozone.om.follower.read.local.lease.time.ms",
       defaultValue = "5000",
@@ -178,7 +179,8 @@ public class OmConfig extends ReconfigurableConfig {
       tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
       description = " If the lag time Ms between leader OM and follower OM is larger " +
           "than this number, the follower OM is not up-to-date. " +
-          "By default, it's set to Ratis RPC timeout value."
+          "By default, it's set to Ratis RPC timeout value. " +
+          "Setting this to -1 to allow infinite lag."
   )
   private long followerReadLocalLeaseTimeMs;
 
@@ -230,12 +232,12 @@ public class OmConfig extends ReconfigurableConfig {
     this.followerReadLocalLeaseEnabled = newValue;
   }
 
-  public long getFollowerReadLocalLeaseLagLimit() {
-    return followerReadLocalLeaseLagLimit;
+  public long getFollowerReadLocalLeaseLogLimit() {
+    return followerReadLocalLeaseLogLimit;
   }
 
-  public void setFollowerReadLocalLeaseLagLimit(long newValue) {
-    this.followerReadLocalLeaseLagLimit = newValue;
+  public void setFollowerReadLocalLeaseLogLimit(long newValue) {
+    this.followerReadLocalLeaseLogLimit = newValue;
   }
 
   public long getFollowerReadLocalLeaseTimeMs() {

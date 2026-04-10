@@ -388,8 +388,8 @@ public class SCMClientProtocolServer implements
       try {
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
-        strContainerIDs.append(ContainerID.valueOf(containerID).toString());
-        strContainerIDs.append(',');
+        strContainerIDs.append(ContainerID.valueOf(containerID).toString())
+            .append(',');
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
@@ -1161,7 +1161,8 @@ public class SCMClientProtocolServer implements
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes,
-      Optional<String> excludeContainers) throws IOException {
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
@@ -1275,6 +1276,12 @@ public class SCMClientProtocolServer implements
         String ec = excludeContainers.get();
         auditMap.put("excludeContainers", (ec));
         cbc.setExcludeContainers(ec);
+      }
+
+      if (includeContainers.isPresent()) {
+        String ic = includeContainers.get();
+        auditMap.put("includeContainers", (ic));
+        cbc.setIncludeContainers(ic);
       }
 
       ContainerBalancer containerBalancer = scm.getContainerBalancer();
@@ -1495,7 +1502,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("state", String.valueOf(state));
 
     try {
-      long count = scm.getContainerManager().getContainers(state).size();
+      long count = scm.getContainerManager().getContainerStateCount(state);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_COUNT, auditMap));
       return count;
@@ -1507,8 +1514,8 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers(
-      long startContainerID, int count, HddsProtos.LifeCycleState state)
+  public List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
 
     final Map<String, String> auditMap = Maps.newHashMap();
@@ -1516,14 +1523,14 @@ public class SCMClientProtocolServer implements
     auditMap.put("count", String.valueOf(count));
     auditMap.put("state", String.valueOf(state));
     try {
-      List<ContainerInfo> results = scm.getContainerManager().getContainers(
-          ContainerID.valueOf(startContainerID), count, state);
+      List<ContainerID> results = scm.getContainerManager().getContainerIDs(
+          startContainerID, count, state);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-          SCMAction.LIST_CONTAINER, auditMap));
+          SCMAction.LIST_CONTAINER_IDS, auditMap));
       return results;
     } catch (Exception ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.LIST_CONTAINER, auditMap, ex));
+          SCMAction.LIST_CONTAINER_IDS, auditMap, ex));
       throw ex;
     }
   }

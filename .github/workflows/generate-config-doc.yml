@@ -22,21 +22,21 @@ on:
         required: true
 
 jobs:
-  generate:
-    runs-on: ubuntu-24.04
+  generate-config-doc:
+    runs-on: ubuntu-slim
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.sha }}
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
       
       - name: Download ozone-bin artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ozone-bin
           path: ozone-bin
@@ -51,7 +51,7 @@ jobs:
           python3 dev-support/ci/xml_to_md.py ozone-bin/extracted Configurations.md
       
       - name: Upload generated documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: config-documentation
           path: Configurations.md

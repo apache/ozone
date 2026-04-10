@@ -947,7 +947,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         // become an orphan. Otherwise if the version is updated it
         // could mean that there could be some orphan version present within the
         // same snapshot.
-        if (isPurgeTransactionSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion()) {
+        // Do not increment for snapshotId when the YAML was just deleted (empty versions).
+        if (!currentVersionMeta.getSnapshotVersions().isEmpty() &&
+                (isPurgeTransactionSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion())) {
           incrementOrphanCheckCount(snapshotId);
         }
       }
