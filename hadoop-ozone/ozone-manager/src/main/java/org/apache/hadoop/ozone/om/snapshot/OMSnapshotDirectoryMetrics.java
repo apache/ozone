@@ -68,6 +68,8 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
   private @Metric MutableGaugeLong dbSnapshotsDirSize;
   private @Metric MutableGaugeLong totalSstFilesCount;
   private @Metric MutableGaugeLong numSnapshots;
+  private @Metric MutableGaugeLong sstBackupDirSize;
+  private @Metric MutableGaugeLong sstBackupSstFilesCount;
 
   private final OMMetadataManager metadataManager;
   private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
@@ -79,6 +81,21 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
         OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS));
     this.metadataManager = metadataManager;
+    this.dbSnapshotsDirSize = registry.newGauge(
+        SnapshotMetricsInfo.DbSnapshotsDirSize.name(),
+        SnapshotMetricsInfo.DbSnapshotsDirSize.description(), 0L);
+    this.totalSstFilesCount = registry.newGauge(
+        SnapshotMetricsInfo.TotalSstFilesCount.name(),
+        SnapshotMetricsInfo.TotalSstFilesCount.description(), 0L);
+    this.numSnapshots = registry.newGauge(
+        SnapshotMetricsInfo.NumSnapshots.name(),
+        SnapshotMetricsInfo.NumSnapshots.description(), 0L);
+    this.sstBackupDirSize = registry.newGauge(
+        SnapshotMetricsInfo.SstBackupDirSize.name(),
+        SnapshotMetricsInfo.SstBackupDirSize.description(), 0L);
+    this.sstBackupSstFilesCount = registry.newGauge(
+        SnapshotMetricsInfo.SstBackupSstFilesCount.name(),
+        SnapshotMetricsInfo.SstBackupSstFilesCount.description(), 0L);
   }
 
   public static OMSnapshotDirectoryMetrics create(ConfigurationSource conf,
@@ -116,7 +133,10 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
 
     try {
       // Calculate aggregate metrics
-      calculateAndUpdateMetrics(snapshotsDir);
+      String sstBackupDir = store.getRocksDBCheckpointDiffer() != null
+          ? store.getRocksDBCheckpointDiffer().getSSTBackupDir() : null;
+      calculateAndUpdateMetrics(snapshotsDir,
+          sstBackupDir != null ? new File(sstBackupDir) : null);
     } catch (Exception e) {
       LOG.warn("Error calculating snapshot directory metrics", e);
       resetMetrics();
@@ -132,54 +152,93 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
    *
    * @param directory the directory containing all checkpointDirs.
    */
-  private void calculateAndUpdateMetrics(File directory) throws IOException {
-    Set<Object> visitedInodes = new HashSet<>();
-    long totalSize = 0;
-    long sstFileCount = 0;
+  private void calculateAndUpdateMetrics(File snapshotsDir,
+      File sstBackupDir) throws IOException {
+    Set<Object> visitedSnapshotsInodes = new HashSet<>();
+    long snapshotsTotalSize = 0;
+    long snapshotsSstFileCount = 0;
     int snapshotCount = 0;
-    try (Stream<Path> checkpointDirs = Files.list(directory.toPath())) {
-      for (Path checkpointDir : checkpointDirs.collect(Collectors.toList())) {
-        if (Files.isDirectory(checkpointDir)) {
-          snapshotCount++;
-          try (Stream<Path> files = Files.list(checkpointDir)) {
-            for (Path path : files.collect(Collectors.toList())) {
-              if (Files.isRegularFile(path)) {
-                try {
-                  // Get inode number
-                  Object fileKey = IOUtils.getINode(path);
-                  if (fileKey == null) {
-                    // Fallback: use file path + size as unique identifier
-                    fileKey = path.toAbsolutePath() + ":" + Files.size(path);
-                  }
-                  // Only count this file if we haven't seen this inode before
-                  if (visitedInodes.add(fileKey)) {
-                    if (path.toFile().getName().endsWith(ROCKSDB_SST_SUFFIX)) {
-                      sstFileCount++;
-                    }
-                    totalSize += Files.size(path);
-                  }
-                } catch (UnsupportedOperationException | IOException e) {
-                  // Fallback: if we can't get inode, just count the file size.
-                  LOG.warn("Could not get inode for {}, using file size directly: {}",
-                      path, e.getMessage());
-                  totalSize += Files.size(path);
-                  if (path.toFile().getName().endsWith(ROCKSDB_SST_SUFFIX)) {
-                    sstFileCount++;
-                  }
-                }
+
+    if (snapshotsDir != null && snapshotsDir.exists() && snapshotsDir.isDirectory()) {
+      try (Stream<Path> checkpointDirs = Files.list(snapshotsDir.toPath())) {
+        for (Path checkpointDir : checkpointDirs.collect(Collectors.toList())) {
+          if (Files.isDirectory(checkpointDir)) {
+            snapshotCount++;
+            SizeAndCount sizeAndCount =
+                calculateDirSize(checkpointDir, visitedSnapshotsInodes);
+            snapshotsTotalSize += sizeAndCount.size;
+            snapshotsSstFileCount += sizeAndCount.count;
+          }
+        }
+      }
+    }
+
+    long backupDirSize = 0;
+    long backupSstFileCount = 0;
+    if (sstBackupDir != null && sstBackupDir.exists() &&
+        sstBackupDir.isDirectory()) {
+      SizeAndCount sizeAndCount =
+          calculateDirSize(sstBackupDir.toPath(), new HashSet<>());
+      backupDirSize = sizeAndCount.size;
+      backupSstFileCount = sizeAndCount.count;
+    }
+
+    numSnapshots.set(snapshotCount);
+    totalSstFilesCount.set(snapshotsSstFileCount);
+    dbSnapshotsDirSize.set(snapshotsTotalSize);
+    sstBackupDirSize.set(backupDirSize);
+    sstBackupSstFilesCount.set(backupSstFileCount);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Updated snapshot directory metrics: size={}, sstFiles={}, " +
+              "snapshots={}, backupSize={}, backupSstFiles={}",
+          snapshotsTotalSize, snapshotsSstFileCount, snapshotCount,
+          backupDirSize, backupSstFileCount);
+    }
+  }
+
+  private SizeAndCount calculateDirSize(Path directory, Set<Object> visitedInodes) throws IOException {
+    long size = 0;
+    long count = 0;
+    try (Stream<Path> files = Files.list(directory)) {
+      for (Path path : files.collect(Collectors.toList())) {
+        if (Files.isRegularFile(path)) {
+          try {
+            // Get inode number
+            Object fileKey = IOUtils.getINode(path);
+            if (fileKey == null) {
+              // Fallback: use file path + size as unique identifier
+              fileKey = path.toAbsolutePath() + ":" + Files.size(path);
+            }
+            // Only count this file if we haven't seen this inode before
+            if (visitedInodes.add(fileKey)) {
+              if (path.toFile().getName().endsWith(ROCKSDB_SST_SUFFIX)) {
+                count++;
               }
+              size += Files.size(path);
+            }
+          } catch (UnsupportedOperationException | IOException e) {
+            // Fallback: if we can't get inode, just count the file size.
+            LOG.warn("Could not get inode for {}, using file size directly: {}",
+                path, e.getMessage());
+            size += Files.size(path);
+            if (path.toFile().getName().endsWith(ROCKSDB_SST_SUFFIX)) {
+              count++;
             }
           }
         }
       }
     }
-    numSnapshots.set(snapshotCount);
-    totalSstFilesCount.set(sstFileCount);
-    dbSnapshotsDirSize.set(totalSize);
+    return new SizeAndCount(size, count);
+  }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Updated snapshot directory metrics: size={}, sstFiles={}, snapshots={}",
-          totalSize, sstFileCount, snapshotCount);
+  private static final class SizeAndCount {
+    private final long size;
+    private final long count;
+
+    private SizeAndCount(long size, long count) {
+      this.size = size;
+      this.count = count;
     }
   }
 
@@ -190,6 +249,8 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
     dbSnapshotsDirSize.set(0);
     totalSstFilesCount.set(0);
     numSnapshots.set(0);
+    sstBackupDirSize.set(0);
+    sstBackupSstFilesCount.set(0);
   }
 
   /**
@@ -204,6 +265,8 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
         .addGauge(SnapshotMetricsInfo.DbSnapshotsDirSize, dbSnapshotsDirSize.value())
         .addGauge(SnapshotMetricsInfo.TotalSstFilesCount, totalSstFilesCount.value())
         .addGauge(SnapshotMetricsInfo.NumSnapshots, numSnapshots.value())
+        .addGauge(SnapshotMetricsInfo.SstBackupDirSize, sstBackupDirSize.value())
+        .addGauge(SnapshotMetricsInfo.SstBackupSstFilesCount, sstBackupSstFilesCount.value())
         .addGauge(SnapshotMetricsInfo.LastUpdateTime, getLastUpdateTime());
   }
 
@@ -222,6 +285,16 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
     return numSnapshots.value();
   }
 
+  @VisibleForTesting
+  public long getSstBackupDirSize() {
+    return sstBackupDirSize.value();
+  }
+
+  @VisibleForTesting
+  public long getSstBackupSstFilesCount() {
+    return sstBackupSstFilesCount.value();
+  }
+
   public void unRegister() {
     stop();
     MetricsSystem ms = DefaultMetricsSystem.instance();
@@ -236,6 +309,8 @@ public final class OMSnapshotDirectoryMetrics extends OMPeriodicMetrics implemen
     DbSnapshotsDirSize("Total size of db.snapshots directory in bytes"),
     TotalSstFilesCount("Total number of SST files across all snapshots"),
     NumSnapshots("Total number of snapshot checkpoint directories"),
+    SstBackupDirSize("Total size of backup SST directory in bytes"),
+    SstBackupSstFilesCount("Total number of SST files in backup SST directory"),
     LastUpdateTime("Time stamp when the snapshot directory metrics were last updated");
 
     private final String desc;
