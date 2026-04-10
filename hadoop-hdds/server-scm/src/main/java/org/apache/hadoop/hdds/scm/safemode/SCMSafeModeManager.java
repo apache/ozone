@@ -136,13 +136,13 @@ public class SCMSafeModeManager implements SafeModeManager {
     }
     final String name = "safemode-refreshing(" + refreshIntervalMs + "ms)-thread";
     final Thread t = new Thread(() -> {
-      while (getInSafeMode()) {
-        try {
+      try {
+        while (getInSafeMode()) {
           Thread.sleep(refreshIntervalMs);
-        } catch (InterruptedException e) {
-          LOG.info("Interrupted {}", name, e);
+          runRefreshAndValidate();
         }
-        runRefreshAndValidate();
+      } catch (InterruptedException e) {
+        LOG.info("Interrupted {}", name, e);
       }
     }, name);
     t.setDaemon(true);
@@ -162,10 +162,6 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   public SafeModeMetrics getSafeModeMetrics() {
     return safeModeMetrics;
-  }
-
-  public boolean isPeriodicRefreshEnabled() {
-    return refreshIntervalMs > 0;
   }
 
   private void emitSafeModeStatus() {
@@ -218,13 +214,6 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void forceExitSafeMode() {
     LOG.info("SCM force-exiting safe mode.");
     status.set(SafeModeStatus.OUT_OF_SAFE_MODE);
-    exitRules.values().forEach(rule -> {
-      try {
-        rule.cleanup();
-      } catch (Exception e) {
-        LOG.warn("Safe mode exit rule cleanup failed for {}", rule.getRuleName(), e);
-      }
-    });
     emitSafeModeStatus();
   }
 
