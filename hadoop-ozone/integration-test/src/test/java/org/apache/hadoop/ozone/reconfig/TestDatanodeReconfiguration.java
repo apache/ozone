@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
@@ -54,6 +55,7 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
         .add(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT)
         .add(REPLICATION_STREAMS_LIMIT_KEY)
         .addAll(new DatanodeConfiguration().reconfigurableProperties())
+        .addAll(new TracingConfig().reconfigurableProperties())
         .build();
 
     assertProperties(getSubject(), expected);

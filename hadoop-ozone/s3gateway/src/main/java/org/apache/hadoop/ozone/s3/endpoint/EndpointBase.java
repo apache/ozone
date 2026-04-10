@@ -105,7 +105,6 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
-import org.apache.hadoop.util.Time;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.slf4j.Logger;
@@ -183,27 +182,6 @@ public abstract class EndpointBase {
     return queryParams;
   }
 
-  protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
-      throws OS3Exception, IOException {
-    OzoneBucket bucket;
-    try {
-      bucket = volume.getBucket(bucketName);
-    } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            s3Auth.getAccessID(), ex);
-      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
-          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
-        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      } else {
-        throw ex;
-      }
-    }
-    return bucket;
-  }
-
   /**
    * Initializes the object post construction. Calls init() from any
    * child classes to work around the issue of only one method can be annotated.
@@ -269,62 +247,6 @@ public abstract class EndpointBase {
 
   protected OzoneVolume getVolume() throws IOException {
     return client.getObjectStore().getS3Volume();
-  }
-
-  /**
-   * Create an S3Bucket, and also it creates mapping needed to access via
-   * ozone and S3.
-   * @param bucketName
-   * @return location of the S3Bucket.
-   * @throws IOException
-   */
-  protected String createS3Bucket(String bucketName) throws
-      IOException, OS3Exception {
-    long startNanos = Time.monotonicNowNanos();
-    try {
-      client.getObjectStore().createS3Bucket(bucketName);
-    } catch (OMException ex) {
-      getMetrics().updateCreateBucketFailureStats(startNanos);
-      if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            s3Auth.getAccessID(), ex);
-      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
-          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
-        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_ALREADY_EXISTS) {
-        throw newError(S3ErrorTable.BUCKET_ALREADY_EXISTS, bucketName, ex);
-      } else {
-        throw ex;
-      }
-    }
-    return "/" + bucketName;
-  }
-
-  /**
-   * Deletes an s3 bucket and removes mapping of Ozone volume/bucket.
-   * @param s3BucketName - S3 Bucket Name.
-   * @throws  IOException in case the bucket cannot be deleted.
-   */
-  protected void deleteS3Bucket(String s3BucketName)
-      throws IOException, OS3Exception {
-    try {
-      client.getObjectStore().deleteS3Bucket(s3BucketName);
-    } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            s3BucketName, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            s3Auth.getAccessID(), ex);
-      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
-          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
-        throw newError(S3ErrorTable.INTERNAL_ERROR, s3BucketName, ex);
-      } else {
-        throw ex;
-      }
-    }
   }
 
   /**
@@ -546,7 +468,7 @@ public abstract class EndpointBase {
     Map<String, String> auditMap = getAuditParameters();
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
-    
+
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
         .withParams(auditMap);
