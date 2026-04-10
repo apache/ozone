@@ -31,16 +31,16 @@ public class HostProbe extends ConfigProbe {
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) throws Exception {
+  public ProbeResult test(OzoneConfiguration conf) throws Exception {
 
-    boolean valid = true;
+    ProbeResult result = ProbeResult.PASS;
     // Hostname resolution checks
     try {
       String hostname = InetAddress.getLocalHost().getCanonicalHostName();
-      System.out.println("Hostname = " + hostname);
+      printValue("Hostname", hostname);
     } catch (Exception e) {
       error("Failed to resolve hostname: " + e.getMessage());
-      valid = false;
+      result = ProbeResult.FAIL;
     }
 
     // User checks
@@ -48,23 +48,25 @@ public class HostProbe extends ConfigProbe {
       String user = System.getProperty("user.name");
       if (user == null || user.isEmpty()) {
         error("User name is not available");
-        valid = false;
+        result = ProbeResult.FAIL;
       } else {
-        System.out.println("User = " + user);
+        printValue("User", user);
       }
     } catch (Exception e) {
       error("Failed to determine user: " + e.getMessage());
-      valid = false;
+      result = ProbeResult.FAIL;
     }
 
     // Java version
     try {
-      System.out.println("Java version = "
-          + System.getProperty("java.version"));
+      printValue("Java version",
+          System.getProperty("java.version"));
     } catch (Exception e) {
       error("Failed to get Java version: " + e.getMessage());
-      valid = false;
+      if (result == ProbeResult.PASS) {
+        result = ProbeResult.WARN;
+      }
     }
-    return valid;
+    return result;
   }
 }

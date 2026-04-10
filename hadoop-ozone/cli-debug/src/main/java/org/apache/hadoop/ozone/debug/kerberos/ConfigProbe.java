@@ -31,8 +31,12 @@ public abstract class ConfigProbe implements DiagnosticProbe {
    * Generic key-value printer (used everywhere).
    */
   protected void printValue(String key, String value) {
-    System.out.println(key + " = " +
-        (value == null ? "(unset)" : value));
+    if (value != null && value.startsWith("to Local user")) {
+      System.out.println(key + " " + value);
+    }else {
+      System.out.println(key + " = " +
+          (value == null ? "(unset)" : value));
+    }
   }
 
   /**
@@ -91,5 +95,22 @@ public abstract class ConfigProbe implements DiagnosticProbe {
           " (" + e.getMessage() + ")");
       return false;
     }
+  }
+
+  protected File getKrb5ConfigFile() {
+    // 1. Check System Property (Highest priority)
+    String path = System.getProperty("java.security.krb5.conf");
+
+    // 2. Check Environment Variable
+    if (path == null || path.isEmpty()) {
+      path = System.getenv("KRB5_CONFIG");
+    }
+
+    // 3. Fallback to default
+    if (path == null || path.isEmpty()) {
+      path = "/etc/krb5.conf";
+    }
+
+    return new File(path);
   }
 }

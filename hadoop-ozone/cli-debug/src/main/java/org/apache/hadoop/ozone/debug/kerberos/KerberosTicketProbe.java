@@ -17,23 +17,15 @@
 
 package org.apache.hadoop.ozone.debug.kerberos;
 
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Checks the current Kerberos authentication state of the process.
- *
  * This probe verifies whether Kerberos security is enabled in configuration,
  * what authentication method Hadoop is currently using, and whether a valid
  * Kerberos ticket is present in the process ticket cache.
- *
- * The probe does NOT attempt to perform a login (kinit), Instead it reports
- * the current state so operators can diagnose security issues.
- * Checks the current Kerberos authentication state of the process.
- * Provides clear diagnostics about:
- * - Whether Kerberos is configured.
- * - Whether the process is using Kerberos.
- * - Whether a valid ticket is present.
  */
 public class KerberosTicketProbe extends ConfigProbe {
 
@@ -43,57 +35,61 @@ public class KerberosTicketProbe extends ConfigProbe {
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) {
+  public ProbeResult test(OzoneConfiguration conf) {
 
     try {
       UserGroupInformation.setConfiguration(conf);
-      String authType = conf.getTrimmed("hadoop.security.authentication");
+      String authType = conf.getTrimmed(
+          CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
+          "simple");
       boolean kerberosEnabled =
           "kerberos".equalsIgnoreCase(authType);
-      System.out.println("kerberos configured = " + kerberosEnabled);
+      printValue("kerberos configured", String.valueOf(kerberosEnabled));
+
+      // If Kerberos is not enabled, do not proceed with UGI calls.
+      if (!kerberosEnabled) {
+        warn("Kerberos is not enabled in configurations (current=" + authType + ")");
+        return ProbeResult.WARN;
+      }
 
       UserGroupInformation ugi =
           UserGroupInformation.getLoginUser();
-      System.out.println("Login user = " + ugi.getUserName());
+      printValue("Login user", ugi.getUserName());
+
+      printValue("Authentication method",
+          String.valueOf(ugi.getAuthenticationMethod()));
 
       boolean usingKerberos =
           ugi.getAuthenticationMethod()
               == UserGroupInformation.AuthenticationMethod.KERBEROS;
 
-      System.out.println("Authentication method = "
-          + ugi.getAuthenticationMethod());
-
       boolean hasTicket = ugi.hasKerberosCredentials();
-      System.out.println("Kerberos ticket present = " + hasTicket);
+      printValue("Kerberos ticket present", String.valueOf(hasTicket));
 
       String ticketCache = System.getenv("KRB5CCNAME");
 
-      System.out.println("Ticket cache = "
-          + (ticketCache == null ? "(default cache)" : ticketCache));
-
-      if (!kerberosEnabled) {
-        warn("Kerberos is not enabled in configurations (current=" + authType + ")");
-        return true; //not a failure, just informational
-      }
+      printValue("Ticket cache",
+          ticketCache == null ? "(default cache)" : ticketCache);
 
       if (!usingKerberos) {
         warn("Kerberos is configured but not active.\n"
             + "  Authentication method = " + ugi.getAuthenticationMethod() + "\n"
             + "  No Kerberos login detected.\n"
             + "  Fix: Run 'kinit' or login via keytab.");
-        return false;
+        return ProbeResult.WARN;
       }
 
       if (!hasTicket) {
         warn("Kerberos authentication is enabled but no valid ticket is found.\n"
             + "  Fix: Run 'kinit' to obtain Kerberos credentials.");
-        return false;
+        return ProbeResult.WARN;
       }
-      System.out.println("Kerberos authentication is active and ticket is valid");
-      return true;
+      printValue("Kerberos status",
+          "Authentication is active and ticket is valid");
+      return ProbeResult.PASS;
     } catch (Exception e) {
       error("Kerberos check failure: " + e.getMessage());
-      return false;
+      return ProbeResult.FAIL;
     }
   }
 }

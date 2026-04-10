@@ -17,8 +17,15 @@
 
 package org.apache.hadoop.ozone.debug.kerberos;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.hdds.recon.ReconConfig;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 
 /**
@@ -28,36 +35,78 @@ public class PrincipalMappingProbe extends ConfigProbe {
 
   @Override
   public String name() {
-    return "auth_to_local mapping";
+    return "Auth-to-Local Mapping";
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) {
+  public ProbeResult test(OzoneConfiguration conf) {
 
-    // Read auth_to_local rules
-    String rules = conf.getTrimmed("hadoop.security.auth_to_local");
-
-    if (rules == null || rules.isEmpty()) {
-      warn("auth_to_local rules not configured");
-      return false;
+    // Check if krb5.conf is empty or missing ?
+    // as it causes KerberosName to fail
+    File krbConfig = getKrb5ConfigFile();
+    if (!canReadFile(krbConfig, "krb5.conf")) {
+      error("Kerberos configuration file (" + krbConfig.getAbsolutePath() +
+          ") is missing or empty. Mapping validation cannot proceed.");
+      return ProbeResult.FAIL;
     }
-    System.out.println("auth_to_local rules = " + rules);
+
+    // Read rule
+    String rules = conf.getTrimmed(
+        "hadoop.security.auth_to_local", "DEFAULT");
+    printValue("auth_to_local rules", rules);
 
     try {
-      // Apply rules
+      // Initialise rule
       KerberosName.setRules(rules);
-      // Get current user principal
-      String principal =
-          UserGroupInformation.getLoginUser().getUserName();
-      System.out.println("Principal = " + principal);
-      KerberosName name = new KerberosName(principal);
-      String shortName = name.getShortName();
-      System.out.println("Local user = " + shortName);
-      return true;
+      // Fetch all configured principals
+      List<String> principals = getConfiguredPrincipals(conf);
+      if (principals.isEmpty()) {
+        warn("No Kerberos principals found in configuration to test mapping");
+        return ProbeResult.WARN;
+      }
+
+      ProbeResult result = ProbeResult.PASS;
+      // Validate each principal
+      for (String principal : principals) {
+        try {
+          KerberosName name = new KerberosName(principal);
+          String shortName = name.getShortName();
+          printValue("Principal = " + principal,
+              "to Local user = " + shortName);
+        } catch (Exception e) {
+          warn("Mapping failed for principal " + principal
+              + " : " + e.getMessage());
+          // continue checking others
+          result = ProbeResult.WARN;
+        }
+      }
+      return result;
     } catch (Exception e) {
-      error("Failed to map principal using auth_to_local rules: "
-          + e.getMessage());
-      return false;
+      error("auth_to_local mapping check failed: " + e.getMessage());
+      return ProbeResult.WARN;
     }
+  }
+
+  /**
+   * Fetch all configured Kerberos principals from Ozone config.
+   */
+  private List<String> getConfiguredPrincipals(OzoneConfiguration conf) {
+
+    List<String> principals = new ArrayList<>();
+
+    List<String> principalsFromConfig = Arrays.asList(
+        OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY,
+        ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
+        HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY,
+        ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
+        "ozone.s3g.kerberos.principal");
+
+    for (String principal : principalsFromConfig) {
+      String value = conf.getTrimmed(principal);
+      if (value != null && !value.isEmpty()) {
+        principals.add(value);
+      }
+    }
+    return principals;
   }
 }

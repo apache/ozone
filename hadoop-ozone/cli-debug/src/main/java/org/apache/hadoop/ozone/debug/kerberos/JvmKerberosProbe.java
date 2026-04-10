@@ -21,7 +21,11 @@ import java.io.File;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
- * Prints JVM Kerberos related system properties.
+ * Validates JVM-level Kerberos related system properties.
+ *  Verifies that the configured krb5.conf file exists.
+ *  Detects partial configuration (realm without KDC or vice versa).
+ *  Warns about conflicting configurations (both krb5.conf and explicit realm/KDC).
+ *  Indicates if Kerberos debug logging is enabled.
  */
 public class JvmKerberosProbe extends ConfigProbe {
 
@@ -31,48 +35,64 @@ public class JvmKerberosProbe extends ConfigProbe {
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) {
+  public ProbeResult test(OzoneConfiguration conf) {
 
-    boolean valid = true;
+    ProbeResult result = ProbeResult.PASS;
     String krb5Conf = System.getProperty("java.security.krb5.conf");
     String realm = System.getProperty("java.security.krb5.realm");
     String kdc = System.getProperty("java.security.krb5.kdc");
     String debug = System.getProperty("sun.security.krb5.debug");
+
     // Print JVM Kerberos related system properties.
     printValue("java.security.krb5.conf", krb5Conf);
     printValue("java.security.krb5.realm", realm);
     printValue("java.security.krb5.kdc", kdc);
     printValue("sun.security.krb5.debug", debug);
 
-    // Validate krb5.conf path
-    if (krb5Conf != null) {
-      File file = new File(krb5Conf);
-      if (!file.exists()) {
-        error("Configured krb5.conf does not exist: " + krb5Conf);
-        valid = false;
-      }
+    // If krb5.conf is not set at JVM level,
+    // fallback to default system path.
+    if (krb5Conf == null || krb5Conf.isEmpty()) {
+      krb5Conf = "/etc/krb5.conf";
+      printValue("Effective krb5.conf (default)", krb5Conf);
+    }
+
+    File file = new File(krb5Conf);
+    if (!canReadFile(file, "krb5.conf")) {
+      result = ProbeResult.FAIL;
     }
 
     // Partial config
     if (realm != null && kdc == null) {
       warn("java.security.krb5.realm is set but " +
           "java.security.krb5.kdc is not set");
+      if (result == ProbeResult.PASS) {
+        result = ProbeResult.WARN;
+      }
     }
 
     if (kdc != null && realm == null) {
       warn("java.security.krb5.kdc is set but " +
           "java.security.krb5.realm is not set");
+      if (result == ProbeResult.PASS) {
+        result = ProbeResult.WARN;
+      }
     }
 
     // Conflicting config
-    if (krb5Conf != null && (realm != null || kdc != null)) {
-      warn("Both krb5.conf and explicit realm/kdc are set; may cause conflicts");
+    if (realm != null || kdc != null) {
+      // Conflict only matters if both styles are used together
+      if (System.getProperty("java.security.krb5.conf") != null) {
+        warn("Both krb5.conf and explicit realm/kdc are set, may cause conflicts");
+        if (result == ProbeResult.PASS) {
+          result = ProbeResult.WARN;
+        }
+      }
     }
 
     // Debug info
     if ("true".equalsIgnoreCase(debug)) {
-      System.out.println("Kerberos debug logging is ENABLED");
+      printValue("Kerberos debug", "ENABLED");
     }
-    return valid;
+    return result;
   }
 }

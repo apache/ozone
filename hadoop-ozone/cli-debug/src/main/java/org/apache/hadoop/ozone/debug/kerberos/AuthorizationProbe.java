@@ -37,13 +37,14 @@ public class AuthorizationProbe extends ConfigProbe {
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) {
-
-    boolean valid = true;
+  public ProbeResult test(OzoneConfiguration conf) {
 
     // Print relevant configs
+    print(conf, OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY);
+    print(conf, OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED);
     print(conf, OzoneConfigKeys.OZONE_ACL_ENABLED);
     print(conf, OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS);
+
     print(conf, CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION);
     print(conf, OMConfigKeys.OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL);
 
@@ -52,24 +53,49 @@ public class AuthorizationProbe extends ConfigProbe {
     print(conf, HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_BLOCK_PROTOCOL_ACL);
     print(conf, HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_CERTIFICATE_PROTOCOL_ACL);
 
+    ProbeResult result = ProbeResult.PASS;
+
+    // Validate Ozone security if enabled
+    boolean ozoneSecurityEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY,
+        OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT);
+
+    // If security disabled, no need to check further.
+    if (!ozoneSecurityEnabled) {
+      warn("Ozone security is disabled (ozone.security.enabled=false). "
+          + "Authorization checks are not enforced in non-secure mode.");
+      return ProbeResult.WARN; // not a failure
+    }
+
+    // Validate Ozone authorization(master switch)
+    boolean ozoneAuthEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED, true);
+
+    if (!ozoneAuthEnabled) {
+      warn("Ozone authorization is disabled (ozone.authorization.enabled=false). "
+          + "No admin or ACL checks will be enforced.");
+      result = ProbeResult.WARN;
+    }
+
     // Validate Hadoop authorization
-    boolean hadoopAuth = Boolean.parseBoolean(
-        conf.getTrimmed(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION));
+    boolean hadoopAuthEnabled = conf.getBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false);
 
-    if (!hadoopAuth) {
+    if (!hadoopAuthEnabled) {
       warn("Hadoop authorization is disabled");
-      valid = false;
+      result = ProbeResult.WARN;
     }
 
-    // Validate Ozone ACLs
-    boolean ozoneAcl = Boolean.parseBoolean(
-        conf.getTrimmed(OzoneConfigKeys.OZONE_ACL_ENABLED));
+    // Validate Ozone ACLs enforcement
+    boolean ozoneAclEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_ACL_ENABLED, false);
 
-    if (!ozoneAcl) {
-      warn("Ozone ACLs are disabled");
-      valid = false;
+    if (!ozoneAclEnabled) {
+      warn("Ozone ACLs are disabled while authorization is enabled. "
+          + "Only admin privilege checks will be enforced.");
+      result = ProbeResult.WARN;
     }
 
-    return valid;
+    return result;
   }
 }

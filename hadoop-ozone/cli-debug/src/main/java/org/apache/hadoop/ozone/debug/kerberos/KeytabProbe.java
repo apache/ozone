@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 /**
- * Validates existence and readability of Ozone service keytabs.
+ * Validates existence and readability of Ozone service keytab.
  * Reports warnings if keytab are missing or not readable.
  * This probe checks the configured keytab files for major Ozone
  * services such as OM, SCM, recon, s3g and DataNode.
@@ -41,17 +41,17 @@ public class KeytabProbe extends ConfigProbe {
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) {
+  public ProbeResult test(OzoneConfiguration conf) {
 
-    boolean valid = true;
     // Check if security is enabled
     boolean securityEnabled = Boolean.parseBoolean(
         conf.getTrimmed(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY));
 
     if (!securityEnabled) {
-      System.out.println("Security not enabled, skipping keytab validation");
-      return true;
+      warn("Ozone security is disabled, skipping keytab validation.");
+      return ProbeResult.WARN;
     }
+    ProbeResult result = ProbeResult.PASS;
     List<String> keys = Arrays.asList(
         OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
         ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
@@ -63,10 +63,10 @@ public class KeytabProbe extends ConfigProbe {
     for (String key : keys) {
       String path = conf.getTrimmed(key);
       if (!checkKeytab(path)) {
-        valid = false;
+        result = ProbeResult.FAIL;
       }
     }
-    return valid;
+    return result;
   }
 
   /**
@@ -87,7 +87,7 @@ public class KeytabProbe extends ConfigProbe {
     if (!canReadFile(file, "keytab")) {
       return false;
     }
-    System.out.println("Keytab OK: " + path);
+    printValue("Keytab OK", path);
     return true;
   }
 }

@@ -24,18 +24,16 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import picocli.CommandLine;
 
 /**
- * Debug command to translate one or more Kerberos principals into local user names
+ * Debug command to translate one or more Kerberos principals into local user name.
  * using the configured auth_to_local rules.
- *
- * Example:
- *   ozone debug kerberos translate-principal testuser/om@EXAMPLE.COM
+ * Example: ozone debug kerberos translate-principal <principal>
  */
 @CommandLine.Command(
     name = "translate-principal",
     description = "Translate Kerberos principal(s) using auth_to_local rules."
 )
 public class TranslatePrincipalSubcommand extends AbstractSubcommand
-    implements Callable<Void> {
+    implements Callable<Integer> {
 
   @CommandLine.Parameters(arity = "1..*",
       description = "Kerberos principal(s) to translate"
@@ -43,26 +41,38 @@ public class TranslatePrincipalSubcommand extends AbstractSubcommand
   private List<String> principals;
 
   @Override
-  public Void call() throws Exception {
+  public Integer call() throws Exception {
 
-    System.out.println("\n== Kerberos Principal Translation  ==\n");
+    out().println("\n== Kerberos Principal Translation  ==\n");
 
-    String rules = getOzoneConf()
-        .getTrimmed("hadoop.security.auth_to_local", "DEFAULT");
-    System.out.println("auth_to_local rules = " + rules);
+    String rules = getOzoneConf().getTrimmed(
+        "hadoop.security.auth_to_local", "DEFAULT");
+    out().println("auth_to_local rules = " + rules);
 
     KerberosName.setRules(rules);
+    int pass = 0;
+    int fail = 0;
     for (String principal : principals) {
+      out().println("-- " + principal + " --");
       try {
         KerberosName kerbName = new KerberosName(principal);
         String shortName = kerbName.getShortName();
-        System.out.println(String.format(
-            "Principal = %s to Local user = %s", principal, shortName));
+        out().println(String.format("Principal = %s to " +
+            "Local user = %s", principal, shortName));
+        pass++;
+        out().println("[PASS] " + principal);
       } catch (Exception e) {
-        System.err.println("ERROR: Failed to translate principal "
+        err().println("ERROR: Failed to translate principal "
             + principal + " : " + e.getMessage());
+        fail++;
+        out().println("[FAIL] " + principal);
       }
+      out().println();
     }
-    return null;
+    out().println("== Translation Summary ==");
+    out().println("PASS : " + pass);
+    out().println("FAIL : " + fail);
+
+    return fail > 0 ? 1 : 0;
   }
 }

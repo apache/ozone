@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.ozone.debug.kerberos;
 
-import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -52,7 +50,6 @@ public class DiagnoseSubcommand extends AbstractSubcommand
         new KeytabProbe(),
         new KerberosTicketProbe(),
         new PrincipalMappingProbe(),
-        new OzonePrincipalProbe(),
         new SecurityConfigProbe(),
         new AuthorizationProbe(),
         new HttpAuthProbe());
@@ -64,47 +61,48 @@ public class DiagnoseSubcommand extends AbstractSubcommand
       out().println("-- " + probe.name() + " --");
 
       ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-      BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(buffer, StandardCharsets.UTF_8));
-
       PrintStream ps = new PrintStream(
-          buffer, true, java.nio.charset.StandardCharsets.UTF_8.name());
+          buffer, true, StandardCharsets.UTF_8.name());
       PrintStream oldOut = System.out;
       PrintStream oldErr = System.err;
 
       System.setOut(ps);
       System.setErr(ps);
 
-      boolean valid = false;
-      String output;
+      ProbeResult result;
       try {
-        valid = probe.test(conf);
+        result = probe.test(conf);
       } catch (Throwable t) {
         t.printStackTrace(System.err);
-        System.err.println("ERROR: Probe execution failed: " + t.getMessage());
+        err().println("ERROR: Probe execution failed: " + t.getMessage());
+        result = ProbeResult.FAIL;
       } finally {
         System.setOut(oldOut);
         System.setErr(oldErr);
         ps.close();
-        writer.close();
       }
 
-      output = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+      String output = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
       out().print(output);
 
-      if (output.contains("ERROR:")) {
+      switch (result) {
+      case FAIL:
         fail++;
         out().println("[FAIL] " + probe.name());
-      } else if (!valid) {
+        break;
+      case WARN:
         warn++;
         out().println("[WARN] " + probe.name());
-      } else {
+        break;
+      case PASS:
         pass++;
         out().println("[PASS] " + probe.name());
+        break;
+      default:
+        throw new IllegalStateException("Unknown result: " + result);
       }
       out().println();
     }
-
     out().println("== Diagnostic Summary ==");
     out().println("PASS : " + pass);
     out().println("WARN : " + warn);

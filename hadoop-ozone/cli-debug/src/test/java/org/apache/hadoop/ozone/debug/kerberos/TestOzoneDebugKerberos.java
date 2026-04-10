@@ -48,7 +48,7 @@ class TestOzoneDebugKerberos {
   }
 
   /**
-   * Test ozone debug kerberos diagnose.
+   * Test ozone debug kerberos diagnose, success scenario.
    */
   @Test
   void testDiagnoseSubcommandSuccess() {
@@ -65,8 +65,7 @@ class TestOzoneDebugKerberos {
         .contains("-- Kerberos kinit Command --")
         .contains("-- Keytab Validation --")
         .contains("-- Kerberos Ticket --")
-        .contains("-- auth_to_local mapping --")
-        .contains("-- Ozone Service Principals --")
+        .contains("-- Auth-to-Local Mapping --")
         .contains("-- Security Configuration --")
         .contains("-- Authorization Configuration --")
         .contains("-- HTTP Kerberos Authentication --")
@@ -74,17 +73,18 @@ class TestOzoneDebugKerberos {
         .contains("PASS :")
         .contains("WARN :")
         .contains("FAIL :");
-
+    // assert integer return code
     assertThat(rc).isGreaterThanOrEqualTo(0);
   }
 
   /**
-   * Test ozone debug kerberos diagnose.
+   * Test ozone debug kerberos diagnose, failure scenario.
    */
   @Test
   void testDiagnoseSubcommandFailure() {
 
-    // Force Kerberos failure
+    // Setting java.security.krb5.conf to invalid path for
+    // JVM Kerberos probe to fail.
     System.setProperty("java.security.krb5.conf", "/invalid/path");
     int rc = executeDiagnose();
 
@@ -93,12 +93,12 @@ class TestOzoneDebugKerberos {
     String combined = stdOut + stdErr;
 
     assertThat(combined)
-        .contains("Kerberos Configuration")
+        .contains("-- JVM Kerberos Properties --")
         .contains("ERROR");
 
     assertThat(combined)
         .contains("FAIL :");
-
+    // assert integer return code
     assertThat(rc).isEqualTo(1);
   }
 
@@ -114,18 +114,28 @@ class TestOzoneDebugKerberos {
     String stdErr = normalize(err.get());
     String combined = stdOut + stdErr;
 
+    // Basic header checks
     assertThat(stdOut)
         .contains("Kerberos Principal Translation")
-        .contains("auth_to_local rules");
+        .contains("auth_to_local rules")
+        .contains("-- testuser/host@EXAMPLE.COM --");
 
-    // Either success OR failure
+    // Either PASS or FAIL must be present
     assertThat(combined)
-        .containsAnyOf(
-            "Principal =",
-            "ERROR: Failed to translate principal"
-        );
+        .containsAnyOf("[PASS]", "[FAIL]");
 
-    assertThat(rc).isEqualTo(0);
+    // summary must be present
+    assertThat(stdOut)
+        .contains("== Translation Summary ==")
+        .contains("PASS :")
+        .contains("FAIL :");
+
+     // assert integer return code
+    if (combined.contains("[FAIL]")) {
+      assertThat(rc).isEqualTo(1);
+    } else {
+      assertThat(rc).isEqualTo(0);
+    }
   }
 
   private static int executeDiagnose() {

@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 /**
  * Validates Hadoop and Ozone security configuration.
- *
  * This probe verifies that Kerberos authentication is enabled
  * and prints related security configuration values used by
  * Ozone services.
@@ -37,7 +36,7 @@ public class SecurityConfigProbe extends ConfigProbe {
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) {
+  public ProbeResult test(OzoneConfiguration conf) {
 
     // Print all relevant configs
     print(conf, CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION);
@@ -52,21 +51,22 @@ public class SecurityConfigProbe extends ConfigProbe {
     print(conf, HddsConfigKeys.HDDS_GRPC_TLS_ENABLED);
 
     String auth = conf.getTrimmed(
-        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION);
-    String ozoneSecurity = conf.getTrimmed(
-        OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY);
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION, "simple");
+    boolean ozoneSecurity = conf.getBoolean(
+        OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, false);
 
-    boolean valid = true;
+    ProbeResult result = ProbeResult.PASS;
+    // Hadoop authentication check
     if (!"kerberos".equalsIgnoreCase(auth)) {
       warn("Kerberos is not enabled (current: " + auth + ")");
-      valid = false;
+      result = ProbeResult.WARN;
     }
 
-    if (!Boolean.parseBoolean(ozoneSecurity)) {
-      warn("Ozone security is not enabled (current: " + ozoneSecurity + ")");
-      valid = false;
+    if (!ozoneSecurity) {
+      warn("Ozone security is not enabled (current: " + false + ")");
+      result = ProbeResult.WARN;
     }
 
-    return valid;
+    return result;
   }
 }

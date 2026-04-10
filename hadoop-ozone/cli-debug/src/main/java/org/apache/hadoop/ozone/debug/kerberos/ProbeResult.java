@@ -17,27 +17,11 @@
 
 package org.apache.hadoop.ozone.debug.kerberos;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
 /**
- * Prints environment variables relevant to Kerberos and Ozone.
+ * Enum to represent probe result.
  */
-public class EnvironmentProbe extends ConfigProbe {
-
-  @Override
-  public String name() {
-    return "Environment Variables";
-  }
-
-  @Override
-  public ProbeResult test(OzoneConfiguration conf) {
-
-    printValue("KRB5_CONFIG", System.getenv("KRB5_CONFIG"));
-    printValue("KRB5CCNAME", System.getenv("KRB5CCNAME"));
-    printValue("OZONE_CONF_DIR", System.getenv("OZONE_CONF_DIR"));
-    printValue("HADOOP_CONF_DIR", System.getenv("HADOOP_CONF_DIR"));
-    printValue("JAVA_SECURITY_KRB5_CONF", System.getenv("JAVA_SECURITY_KRB5_CONF"));
-
-    return ProbeResult.PASS;
-  }
+public enum ProbeResult {
+  PASS,
+  WARN,
+  FAIL
 }

@@ -31,31 +31,31 @@ public class KinitProbe extends ConfigProbe {
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) {
+  public ProbeResult test(OzoneConfiguration conf) {
 
     String path = System.getenv("PATH");
 
     if (path == null) {
-      System.out.println("PATH = (unset)");
-      error("kinit cannot be resolved because PATH is not set");
-      return false;
+      printValue("PATH", "(unset)");
+      error("kinit cannot be resolved because PATH is not set.");
+      return ProbeResult.FAIL;
     }
 
-    System.out.println("PATH = " + path);
+    printValue("PATH", path);
     for (String dir : path.split(":")) {
       File file = new File(dir, "kinit");
       if (file.exists()) {
         if (!file.canExecute()) {
           error("kinit found but not executable: " +
               file.getAbsolutePath());
-          return false;
+          return ProbeResult.FAIL;
         }
-        System.out.println("kinit found at " +
+        printValue("kinit found at ",
             file.getAbsolutePath());
-        return true;
+        return ProbeResult.PASS;
       }
     }
     error("kinit not found on PATH");
-    return false;
+    return ProbeResult.FAIL;
   }
 }

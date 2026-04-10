@@ -37,7 +37,7 @@ public class HttpAuthProbe extends ConfigProbe {
   }
 
   @Override
-  public boolean test(OzoneConfiguration conf) {
+  public ProbeResult test(OzoneConfiguration conf) {
 
     print(conf, OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE);
     print(conf, HddsConfigKeys.HDDS_SCM_HTTP_AUTH_TYPE);
@@ -46,6 +46,6 @@ public class HttpAuthProbe extends ConfigProbe {
     //Used key directly to avoid cyclic dependency
     print(conf, "ozone.s3g.http.auth.type");
 
-    return true;
+    return ProbeResult.PASS;
   }
 }

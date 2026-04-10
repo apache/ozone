@@ -30,7 +30,7 @@ public interface DiagnosticProbe {
   String name();
 
   /**
-   * Execute the diagnostic check.
+   * Execute the diagnostic check and return probe result as enum.
    */
-  boolean test(OzoneConfiguration conf) throws Exception;
+  ProbeResult test(OzoneConfiguration conf) throws Exception;
 }
