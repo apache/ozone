@@ -27,7 +27,7 @@
 
   <properties>
     <!-- move to root POM when needed in any other module -->
-    <aws-java-sdk2.version>2.42.23</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.42.28</aws-java-sdk2.version>
   </properties>
 
   <dependencyManagement>
