@@ -90,6 +90,12 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (nodeWithFailedVolumes && exclusiveNodeOptions != null
+        && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
+      throw new IOException(
+          "--nodes-with-failed-volumes cannot be used with --id/--node-id. "
+          + "Use them separately.");
+    }
     pipelines = scmClient.listPipelines();
     if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
       HddsProtos.Node node = scmClient.queryNode(UUID.fromString(exclusiveNodeOptions.getNodeId()));

@@ -402,6 +402,18 @@ public class TestListInfoSubcommand {
     assertThat(output).contains("/data/disk5");
   }
 
+  @Test
+  public void testFailedVolumesFilterRejectsNodeId() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--nodes-with-failed-volumes",
+        "--id", nodes.get(0).getNodeID().getUuid());
+    assertThrows(IOException.class, () -> cmd.execute(scmClient));
+  }
+
   private void validateOrdering(JsonNode root, String orderDirection) {
     for (int i = 0; i < root.size() - 1; i++) {
       long usedCurrent = root.get(i).get("used").asLong();
