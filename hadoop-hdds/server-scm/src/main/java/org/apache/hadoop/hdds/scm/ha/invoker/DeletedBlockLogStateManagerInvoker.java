@@ -149,7 +149,8 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       if (java.util.Arrays.equals(parameterTypes,
           new Class<?>[]{
               java.util.ArrayList.class,
-              org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary.class
+              org.apache.hadoop.hdds.protocol.proto.HddsProtos
+                  .DeletedBlocksTransactionSummary.class
           })) {
         return void.class;
       }
@@ -185,10 +186,14 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       if (java.util.Arrays.equals(parameterTypes,
           new Class<?>[]{
               java.util.ArrayList.class,
-              org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary.class
+              org.apache.hadoop.hdds.protocol.proto.HddsProtos
+                  .DeletedBlocksTransactionSummary.class
           })) {
         return void.class;
       }
+      break;
+
+    default:
       break;
     }
 
