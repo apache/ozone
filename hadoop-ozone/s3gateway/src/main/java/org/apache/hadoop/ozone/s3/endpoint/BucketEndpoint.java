@@ -99,8 +99,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       return handler.handleGetRequest(context, bucketName);
     } catch (OMException ex) {
-      OS3Exception code = translateException(ex);
-      throw newError(code, bucketName, ex);
+      throw newError(translateException(ex), bucketName, ex);
     }
   }
 
@@ -271,8 +270,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       return handler.handlePutRequest(context, bucketName, body);
     } catch (OMException ex) {
-      OS3Exception code = translateException(ex);
-      throw newError(code, bucketName, ex);
+      throw newError(translateException(ex), bucketName, ex);
     }
   }
 
@@ -320,8 +318,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       return handler.handleDeleteRequest(context, bucketName);
     } catch (OMException ex) {
-      OS3Exception code = translateException(ex);
-      throw newError(code, bucketName, ex);
+      throw newError(translateException(ex), bucketName, ex);
     }
   }
 
@@ -431,7 +428,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     handler = new AuditingBucketOperationHandler(chain);
   }
 
-  private static OS3Exception translateException(OMException ex) {
+  private static S3ErrorTable translateException(OMException ex) {
     switch (ex.getResult()) {
     case ACCESS_DENIED:
     case INVALID_TOKEN:

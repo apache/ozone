@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.signature;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
@@ -114,7 +115,7 @@ public final class StringToSignProducer {
     strToSign.append(signatureInfo.getAlgorithm()).append(NEWLINE);
     if (signatureInfo.getDateTime() == null) {
       LOG.error("DateTime Header not found.");
-      throw S3_AUTHINFO_CREATION_ERROR;
+      throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
     }
     strToSign.append(signatureInfo.getDateTime()).append(NEWLINE)
         .append(credentialScope).append(NEWLINE);
@@ -187,13 +188,13 @@ public final class StringToSignProducer {
           validateSignedHeader(schema, header, headerValue);
         } catch (DateTimeParseException ex) {
           LOG.error("DateTime format invalid.", ex);
-          throw S3_AUTHINFO_CREATION_ERROR;
+          throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
         }
 
       } else {
         LOG.error("Header " + header + " not present in "
             + "request but requested to be signed.");
-        throw S3_AUTHINFO_CREATION_ERROR;
+        throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
       }
     }
 
@@ -225,7 +226,7 @@ public final class StringToSignProducer {
     if (contentSignatureHeaderValue == null) {
       LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
           + " header for signed payload");
-      throw S3_AUTHINFO_CREATION_ERROR;
+      throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
     }
     // Simply return the header value of x-amz-content-sha256 as the payload hash
     // These are the possible cases:
@@ -332,7 +333,7 @@ public final class StringToSignProducer {
         LOG.error("AWS date not in valid range. Request timestamp:{} should "
             + "not be older than {} seconds.",
             headerValue, PRESIGN_URL_MAX_EXPIRATION_SECONDS);
-        throw S3_AUTHINFO_CREATION_ERROR;
+        throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
       }
       break;
     case X_AMZ_CONTENT_SHA256:
@@ -361,7 +362,7 @@ public final class StringToSignProducer {
   ) throws OS3Exception {
     if (!canonicalHeaders.contains(HOST + ":")) {
       LOG.error("The SignedHeaders list must include HTTP Host header");
-      throw S3_AUTHINFO_CREATION_ERROR;
+      throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
     }
     for (String header : headers.keySet().stream()
         .filter(s -> s.startsWith("x-amz-"))
@@ -375,7 +376,7 @@ public final class StringToSignProducer {
         }
         LOG.error("The SignedHeaders list must include all "
             + "x-amz-* headers in the request");
-        throw S3_AUTHINFO_CREATION_ERROR;
+        throw newError(S3_AUTHINFO_CREATION_ERROR, null, null);
       }
     }
   }
