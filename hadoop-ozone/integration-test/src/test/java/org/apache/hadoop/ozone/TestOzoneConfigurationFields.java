@@ -128,6 +128,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_THREAD_NUMBER_KEY_DELETION,
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         ScmConfigKeys.OZONE_SCM_HA_PREFIX,
+        ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPEND_ENTRIES_COMPOSE_ENABLED,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPEND_ENTRIES_COMPOSE_ENABLED,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
         DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
         OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT,

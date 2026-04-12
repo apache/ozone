@@ -575,6 +575,11 @@ public final class ScmConfigKeys {
           "ozone.scm.ha.ratis.log.purge.gap";
   public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT = 1000000;
 
+  public static final String OZONE_SCM_HA_RAFT_LOG_APPEND_ENTRIES_COMPOSE_ENABLED =
+          "ozone.scm.ha.ratis.raft.server.log.append-entries.compose.enabled";
+  public static final boolean
+      OZONE_SCM_HA_RAFT_LOG_APPEND_ENTRIES_COMPOSE_ENABLED_DEFAULT = false;
+
   /**
    * the config will transfer value to ratis config
    * raft.server.snapshot.auto.trigger.threshold.

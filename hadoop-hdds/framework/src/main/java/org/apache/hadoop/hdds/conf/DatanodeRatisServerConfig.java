@@ -132,6 +132,15 @@ public class DatanodeRatisServerConfig {
   )
   private long logAppenderWaitTimeMin;
 
+  @Config(key = "hdds.ratis.raft.server.log.append-entries.compose.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
+      description = "Enable/disable composing appendEntries requests on the " +
+          "Ratis server log appender path."
+  )
+  private boolean appendEntriesComposeEnabled;
+
   public long getRequestTimeOut() {
     return requestTimeOut;
   }
@@ -210,5 +219,14 @@ public class DatanodeRatisServerConfig {
 
   public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
     this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
+  }
+
+  public boolean isAppendEntriesComposeEnabled() {
+    return appendEntriesComposeEnabled;
+  }
+
+  public void setAppendEntriesComposeEnabled(
+      boolean appendEntriesComposeEnabled) {
+    this.appendEntriesComposeEnabled = appendEntriesComposeEnabled;
   }
 }

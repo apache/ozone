@@ -352,6 +352,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT);
     RaftServerConfigKeys.Log.setPurgeGap(properties, purgeGap);
 
+    properties.setBoolean(
+        "raft.server.log.append-entries.compose.enabled",
+        ratisServerConfig.isAppendEntriesComposeEnabled());
+
     //Set the number of Snapshots Retained.
     RatisServerConfiguration ratisServerConfiguration =
         conf.getObject(RatisServerConfiguration.class);

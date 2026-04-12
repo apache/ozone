@@ -817,6 +817,12 @@ public final class OzoneManagerRatisServer {
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP,
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT));
 
+    properties.setBoolean(
+        "raft.server.log.append-entries.compose.enabled",
+        conf.getBoolean(
+            OMConfigKeys.OZONE_OM_RATIS_LOG_APPEND_ENTRIES_COMPOSE_ENABLED,
+            OMConfigKeys.OZONE_OM_RATIS_LOG_APPEND_ENTRIES_COMPOSE_ENABLED_DEFAULT));
+
     // This avoids writing commit metadata to Raft Log, which can be used to recover the
     // commit index even if a majority of servers are dead. We don't need this for OzoneManager,
     // disabling this will avoid the additional disk IO.
