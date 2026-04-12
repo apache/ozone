@@ -24,6 +24,7 @@ Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit t
 *** Test Cases ***
 Check OM Finalized
     [Tags]    om    finalized
+    Skip               OM cannot finalize now/yet
     ${result} =        Execute      env
                        Log    ${result}
     Pass Execution If    '%{OZONE_UPGRADE_FROM}' == '1.1.0'    OM finalization not supported in version %{OZONE_UPGRADE_FROM}

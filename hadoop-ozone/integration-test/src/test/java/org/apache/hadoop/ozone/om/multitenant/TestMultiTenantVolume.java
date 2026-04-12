@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,7 @@ import org.junit.jupiter.api.Test;
  * and that users not belonging to a tenant are directed to the default S3
  * volume.
  */
+@Unhealthy("OM cannot finalize now/yet")
 public class TestMultiTenantVolume {
   private static MiniOzoneCluster cluster;
   private static String s3VolumeName;

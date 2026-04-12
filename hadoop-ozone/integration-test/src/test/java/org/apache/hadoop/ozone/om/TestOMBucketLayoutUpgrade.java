@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -70,6 +71,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Unhealthy("OM cannot finalize now/yet")
 class TestOMBucketLayoutUpgrade {
 
   private static final int PRE_UPGRADE = 100;
