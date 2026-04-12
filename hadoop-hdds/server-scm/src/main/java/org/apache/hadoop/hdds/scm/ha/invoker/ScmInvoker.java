@@ -55,6 +55,10 @@ public abstract class ScmInvoker<T extends SCMHandler> {
     return proxy;
   }
 
+  public final Object invoke(String methodName, Object[] args) throws Exception {
+    return invokeLocal(methodName, args);
+  }
+
   /** For non-@Replicate methods. */
   abstract Object invokeLocal(String methodName, Object[] args) throws Exception;
 
