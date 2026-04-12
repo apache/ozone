@@ -137,4 +137,23 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       throw new IllegalArgumentException("Method not found: " + methodName + " in DeletedBlockLogStateManager");
     }
   }
+
+  @Override
+  public Class<?> getReturnType(String methodName, int numArgs) {
+    switch (methodName) {
+    case "addTransactionsToDB":
+      return void.class;
+    case "getReadOnlyIterator":
+      return Table.KeyValueIterator.class;
+    case "onFlush":
+      return void.class;
+    case "reinitialize":
+      return void.class;
+    case "removeTransactionsFromDB":
+      return void.class;
+    default:
+      throw new IllegalArgumentException(
+          "Method not found: " + methodName + " in DeletedBlockLogStateManager");
+    }
+  }
 }

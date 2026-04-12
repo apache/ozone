@@ -224,9 +224,8 @@ public class SCMStateMachine extends BaseStateMachine {
         request.getOperation(),
         request.getArguments());
 
-    final Class<?> returnType = invoker.getApi()
-        .getMethod(request.getOperation(), request.getParameterTypes())
-        .getReturnType();
+    final Class<?> returnType =
+        invoker.getReturnType(request.getOperation(), request.getArguments().length);
 
     return SCMRatisResponse.encode(result, returnType);
   }
