@@ -139,21 +139,61 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
   }
 
   @Override
-  public Class<?> getReturnType(String methodName, int numArgs) {
+  public Class<?> getReturnType(String methodName, Class<?>[] parameterTypes) {
     switch (methodName) {
     case "addTransactionsToDB":
-      return void.class;
+      if (java.util.Arrays.equals(parameterTypes,
+          new Class<?>[]{java.util.ArrayList.class})) {
+        return void.class;
+      }
+      if (java.util.Arrays.equals(parameterTypes,
+          new Class<?>[]{
+              java.util.ArrayList.class,
+              org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary.class
+          })) {
+        return void.class;
+      }
+      break;
+
     case "getReadOnlyIterator":
-      return Table.KeyValueIterator.class;
+      if (parameterTypes == null || parameterTypes.length == 0) {
+        return org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.class;
+      }
+      break;
+
     case "onFlush":
-      return void.class;
+      if (parameterTypes == null || parameterTypes.length == 0) {
+        return void.class;
+      }
+      break;
+
     case "reinitialize":
-      return void.class;
+      if (java.util.Arrays.equals(parameterTypes,
+          new Class<?>[]{
+              org.apache.hadoop.hdds.utils.db.Table.class,
+              org.apache.hadoop.hdds.utils.db.Table.class
+          })) {
+        return void.class;
+      }
+      break;
+
     case "removeTransactionsFromDB":
-      return void.class;
-    default:
-      throw new IllegalArgumentException(
-          "Method not found: " + methodName + " in DeletedBlockLogStateManager");
+      if (java.util.Arrays.equals(parameterTypes,
+          new Class<?>[]{java.util.ArrayList.class})) {
+        return void.class;
+      }
+      if (java.util.Arrays.equals(parameterTypes,
+          new Class<?>[]{
+              java.util.ArrayList.class,
+              org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary.class
+          })) {
+        return void.class;
+      }
+      break;
     }
+
+    throw new IllegalArgumentException(
+        "Method not found: " + methodName
+            + " with parameterTypes in DeletedBlockLogStateManager");
   }
 }

@@ -59,7 +59,7 @@ public abstract class ScmInvoker<T extends SCMHandler> {
     return invokeLocal(methodName, args);
   }
 
-  public abstract Class<?> getReturnType(String methodName, int numArgs);
+  public abstract Class<?> getReturnType(String methodName, Class<?>[] parameterTypes);
 
   /** For non-@Replicate methods. */
   abstract Object invokeLocal(String methodName, Object[] args) throws Exception;
