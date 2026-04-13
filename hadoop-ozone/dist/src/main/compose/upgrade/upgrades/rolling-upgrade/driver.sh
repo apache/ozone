@@ -74,6 +74,9 @@ rolling_restart_service() {
     dn*)
       wait_for_port "${SERVICE}" 9882 120
       ;;
+    s3g*)
+      wait_for_port "${SERVICE}" 9878 120
+      ;;
   esac
 }
 

@@ -274,7 +274,7 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
-  s3g:
+  s3g-haproxy:
     image: haproxy:lts-alpine
     hostname: s3g
     networks:
