@@ -1145,27 +1145,24 @@ public class TestReconSCMContainerSyncIntegration
       int perGroup = 10_000;  // 10k containers per scenario = 90k total
 
       // Pre-seed Recon
-      long base = 1;
+      long base = 1L;
       seedRecon(base,           perGroup, OPEN);          // group A: stuck OPEN
       seedReconAsClosing(base + perGroup, perGroup);      // group B: stuck CLOSING
       // group C (base+2*perGroup): absent, SCM has them CLOSED
       // group D (base+3*perGroup): absent, SCM has them OPEN
       // group E (base+4*perGroup): absent, SCM has them QUASI_CLOSED
-      seedRecon(base + 5 * perGroup, perGroup, CLOSED);  // group F: to retire → DELETING
-      seedRecon(base + 6 * perGroup, perGroup, CLOSED);  // group G: to retire → DELETED
-      seedRecon(base + 7 * perGroup, perGroup, QUASI_CLOSED); // group H: to retire → DELETED
-      seedRecon(base + 8 * perGroup, perGroup, CLOSED);  // group I: SCM ContainerNotFound
+      seedRecon(base + 5L * perGroup, perGroup, CLOSED);  // group F: to retire → DELETING
+      seedRecon(base + 6L * perGroup, perGroup, CLOSED);  // group G: to retire → DELETED
+      seedRecon(base + 7L * perGroup, perGroup, QUASI_CLOSED); // group H: to retire → DELETED
+      seedRecon(base + 8L * perGroup, perGroup, CLOSED);  // group I: SCM ContainerNotFound
 
       // Ranges
-      long aEnd = base + perGroup;
       long bEnd = base + 2L * perGroup;
       long cEnd = base + 3L * perGroup;
       long dEnd = base + 4L * perGroup;
       long eEnd = base + 5L * perGroup;
       long fEnd = base + 6L * perGroup;
-      long gEnd = base + 7L * perGroup;
       long hEnd = base + 8L * perGroup;
-      long iEnd = base + 9L * perGroup;
 
       // Build CLOSED list for Pass 1: groups A + B + C
       List<ContainerID> closedIds = idRange(base, cEnd);

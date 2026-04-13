@@ -545,7 +545,7 @@ class ReconStorageContainerSyncHelper {
       LOG.info("Pass 3 (QUASI_CLOSED): sync complete, checked {}, added {}, corrected {}.",
           retrieved, addedCount, correctedCount);
       return true;
-    } catch (Exception e) {
+    } catch (IOException e) {
       LOG.error("Pass 3 (QUASI_CLOSED): unexpected error during sync.", e);
       return false;
     }
