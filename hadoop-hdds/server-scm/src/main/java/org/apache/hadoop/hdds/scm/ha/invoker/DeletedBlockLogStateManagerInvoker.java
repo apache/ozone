@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha.invoker;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
@@ -142,23 +143,18 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
   public Class<?> getReturnType(String methodName, Class<?>[] parameterTypes) {
     switch (methodName) {
     case "addTransactionsToDB":
-      if (java.util.Arrays.equals(parameterTypes,
-          new Class<?>[]{java.util.ArrayList.class})) {
+      if (Arrays.equals(parameterTypes, new Class<?>[]{ArrayList.class})) {
         return void.class;
       }
-      if (java.util.Arrays.equals(parameterTypes,
-          new Class<?>[]{
-              java.util.ArrayList.class,
-              org.apache.hadoop.hdds.protocol.proto.HddsProtos
-                  .DeletedBlocksTransactionSummary.class
-          })) {
+      if (Arrays.equals(parameterTypes,
+          new Class<?>[]{ArrayList.class, DeletedBlocksTransactionSummary.class})) {
         return void.class;
       }
       break;
 
     case "getReadOnlyIterator":
       if (parameterTypes == null || parameterTypes.length == 0) {
-        return org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.class;
+        return Table.KeyValueIterator.class;
       }
       break;
 
@@ -169,26 +165,19 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       break;
 
     case "reinitialize":
-      if (java.util.Arrays.equals(parameterTypes,
-          new Class<?>[]{
-              org.apache.hadoop.hdds.utils.db.Table.class,
-              org.apache.hadoop.hdds.utils.db.Table.class
-          })) {
+      if (Arrays.equals(parameterTypes,
+          new Class<?>[]{Table.class, Table.class})) {
         return void.class;
       }
       break;
 
     case "removeTransactionsFromDB":
-      if (java.util.Arrays.equals(parameterTypes,
-          new Class<?>[]{java.util.ArrayList.class})) {
+      if (Arrays.equals(parameterTypes,
+          new Class<?>[]{ArrayList.class})) {
         return void.class;
       }
-      if (java.util.Arrays.equals(parameterTypes,
-          new Class<?>[]{
-              java.util.ArrayList.class,
-              org.apache.hadoop.hdds.protocol.proto.HddsProtos
-                  .DeletedBlocksTransactionSummary.class
-          })) {
+      if (Arrays.equals(parameterTypes,
+          new Class<?>[]{ArrayList.class, DeletedBlocksTransactionSummary.class})) {
         return void.class;
       }
       break;
