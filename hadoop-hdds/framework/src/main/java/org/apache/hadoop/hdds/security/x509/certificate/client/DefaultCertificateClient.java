@@ -279,9 +279,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   private synchronized void updateCachedSubCAId(String s) {
-    BigInteger candidateNewId = new BigInteger(s);
     if (caCertId == null
-        || new BigInteger(caCertId).compareTo(candidateNewId) < 0) {
+        || new BigInteger(caCertId).compareTo(new BigInteger(s)) < 0) {
       caCertId = s;
     }
   }
