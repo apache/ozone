@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.debug.kerberos;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -40,8 +43,8 @@ public class AuthorizationProbe extends ConfigProbe {
   public ProbeResult test(OzoneConfiguration conf) {
 
     // Print relevant configs
-    print(conf, OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY);
-    print(conf, OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED);
+    print(conf, OZONE_SECURITY_ENABLED_KEY);
+    print(conf, OZONE_AUTHORIZATION_ENABLED);
     print(conf, OzoneConfigKeys.OZONE_ACL_ENABLED);
     print(conf, OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS);
 
@@ -56,23 +59,24 @@ public class AuthorizationProbe extends ConfigProbe {
     ProbeResult result = ProbeResult.PASS;
 
     // Validate Ozone security if enabled
-    boolean ozoneSecurityEnabled = conf.getBoolean(
-        OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY,
+    boolean ozoneSecurityEnabled = conf.getBoolean(OZONE_SECURITY_ENABLED_KEY,
         OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT);
 
     // If security disabled, no need to check further.
     if (!ozoneSecurityEnabled) {
-      warn("Ozone security is disabled (ozone.security.enabled=false). "
+      warn("Ozone security is disabled ("
+          + OZONE_SECURITY_ENABLED_KEY + "=" +  ozoneSecurityEnabled + ". "
           + "Authorization checks are not enforced in non-secure mode.");
       return ProbeResult.WARN; // not a failure
     }
 
     // Validate Ozone authorization(master switch)
-    boolean ozoneAuthEnabled = conf.getBoolean(
-        OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED, true);
+    boolean ozoneAuthEnabled = conf.getBoolean(OZONE_AUTHORIZATION_ENABLED,
+        OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED_DEFAULT);
 
     if (!ozoneAuthEnabled) {
-      warn("Ozone authorization is disabled (ozone.authorization.enabled=false). "
+      warn("Ozone authorization is disabled ("
+          + OZONE_AUTHORIZATION_ENABLED + "=" + ozoneAuthEnabled + ". "
           + "No admin or ACL checks will be enforced.");
       result = ProbeResult.WARN;
     }
