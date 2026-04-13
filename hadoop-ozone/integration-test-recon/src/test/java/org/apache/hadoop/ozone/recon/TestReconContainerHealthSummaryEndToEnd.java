@@ -597,8 +597,8 @@ public class TestReconContainerHealthSummaryEndToEnd {
 
       LambdaTestUtils.await(REPLICA_SYNC_TIMEOUT_MS, POLL_INTERVAL_MS, () -> {
         try {
-          return scmCm.getContainerReplicas(containerID).size() >= 1
-              && reconCm.getContainerReplicas(containerID).size() >= 1;
+          return !scmCm.getContainerReplicas(containerID).isEmpty()
+              && !reconCm.getContainerReplicas(containerID).isEmpty();
         } catch (Exception e) {
           return false;
         }
@@ -691,8 +691,8 @@ public class TestReconContainerHealthSummaryEndToEnd {
 
       LambdaTestUtils.await(REPLICA_SYNC_TIMEOUT_MS, POLL_INTERVAL_MS, () -> {
         try {
-          return scmCm.getContainerReplicas(containerID).size() >= 1
-              && reconCm.getContainerReplicas(containerID).size() >= 1;
+          return !scmCm.getContainerReplicas(containerID).isEmpty()
+              && !reconCm.getContainerReplicas(containerID).isEmpty();
         } catch (Exception e) {
           return false;
         }

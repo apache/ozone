@@ -155,25 +155,6 @@ public class TestReconSCMContainerSyncIntegration
         .collect(Collectors.toList());
   }
 
-  /**
-   * Configures the mocked SCM service provider to serve a single-batch
-   * container ID list for the given {@code state}.
-   * Also wires {@code getExistContainerWithPipelinesInBatch(anyList())} to return a
-   * container in that state for each requested ID.
-   */
-  private void mockScmSingleBatch(List<ContainerID> ids, LifeCycleState state)
-      throws IOException {
-    long total = ids.size();
-    when(mockScm.getContainerCount(state)).thenReturn(total);
-    when(mockScm.getListOfContainerIDs(
-        eq(ContainerID.valueOf(1L)), eq((int) total), eq(state)))
-        .thenReturn(ids);
-    when(mockScm.getExistContainerWithPipelinesInBatch(anyList())).thenAnswer(inv -> {
-      List<Long> idList = inv.getArgument(0);
-      return idList.stream().map(id -> containerCwp(id, state)).collect(Collectors.toList());
-    });
-  }
-
   // ===========================================================================
   // decideSyncAction() tests
   // ===========================================================================

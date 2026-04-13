@@ -731,21 +731,6 @@ class ReconStorageContainerSyncHelper {
         startContainerId, (int) batchSize, state);
   }
 
-  private long countStateContainersByPaging(HddsProtos.LifeCycleState state)
-      throws IOException {
-    long count = 0;
-    ContainerID startContainerId = ContainerID.valueOf(1);
-    while (true) {
-      List<ContainerID> batch = getContainerIDsByState(startContainerId, state);
-      if (batch == null || batch.isEmpty()) {
-        return count;
-      }
-      count += batch.size();
-      long lastID = batch.get(batch.size() - 1).getId();
-      startContainerId = ContainerID.valueOf(lastID + 1);
-    }
-  }
-
   private long getStatePaginationBatchSize() {
     return getContainerCountPerCall(Long.MAX_VALUE);
   }
