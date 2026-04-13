@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -303,15 +304,15 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   )
   public static OMRequest blockRenameKeysWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (req.getRenameKeysRequest().hasRenameKeysArgs()) {
-      RenameKeysArgs keyArgs = req.getRenameKeysRequest().getRenameKeysArgs();
+    final RenameKeysArgs keyArgs = req.getRenameKeysRequest().getRenameKeysArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
-        BucketLayout bucketLayout = ctx.getBucketLayout(
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
-        bucketLayout.validateSupportedOperation();
-      }
-    }
+    OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
+    OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
+
+    final BucketLayout bucketLayout =
+        ctx.getBucketLayout(keyArgs.getVolumeName(), keyArgs.getBucketName());
+    bucketLayout.validateSupportedOperation();
+
     return req;
   }
 }
