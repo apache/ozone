@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 public class TestOmSnapshotDiffJobCodec {
   private final OldSnapshotDiffJobCodecForTesting oldCodec
       = new OldSnapshotDiffJobCodecForTesting();
-  private final Codec<SnapshotDiffJob> newCodec = SnapshotDiffJob.getCodec();
+  private final Codec<SnapshotDiffJob> newCodec = SnapshotDiffJob.codec();
 
   @Test
   public void testOldJsonSerializedDataCanBeReadByNewCodec() throws Exception {
