@@ -117,6 +117,11 @@ public final class S3ErrorTable {
   public static final OS3Exception PRECOND_FAILED = new OS3Exception(
       "PreconditionFailed", "At least one of the pre-conditions you " +
       "specified did not hold", HTTP_PRECON_FAILED);
+
+  public static final OS3Exception CONDITIONAL_REQUEST_CONFLICT =
+      new OS3Exception("ConditionalRequestConflict",
+          "A conflicting conditional operation occurred. Retry the request.",
+          HTTP_CONFLICT);
   
   public static final OS3Exception NOT_IMPLEMENTED = new OS3Exception(
       "NotImplemented", "This part of feature is not implemented yet.",

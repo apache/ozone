@@ -30,9 +30,9 @@ import picocli.CommandLine.ParentCommand;
  */
 @Command(name = "load",
     aliases = "l",
-    description = "Load ozone audit log files.\n\n" +
-        "To load an audit log to database:\n" +
-        "ozone debug auditparser <path to db file> load <logs>\n",
+    description = "Load ozone audit log files.%n%n" +
+        "To load an audit log to database:%n" +
+        "ozone debug auditparser <path to db file> load <logs>%n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class LoadCommandHandler implements Callable<Void> {

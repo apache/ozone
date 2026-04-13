@@ -49,10 +49,10 @@ public class DeletedBlock {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(64);
-    sb.append(" localID: ").append(blockID.getContainerBlockID().getLocalID());
-    sb.append(" containerID: ").append(blockID.getContainerBlockID().getContainerID());
-    sb.append(" size: ").append(size);
-    sb.append(" replicatedSize: ").append(replicatedSize);
+    sb.append(" localID: ").append(blockID.getContainerBlockID().getLocalID())
+        .append(" containerID: ").append(blockID.getContainerBlockID().getContainerID())
+        .append(" size: ").append(size)
+        .append(" replicatedSize: ").append(replicatedSize);
     return sb.toString();
   }
 }

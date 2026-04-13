@@ -47,14 +47,14 @@ import picocli.CommandLine;
         "-hostname=<decommission-om-node-address> [options]",
     description = "Decommission an OzoneManager. Ensure that the node being " +
         "decommissioned is shutdown first." +
-        "\nNote - Add the node to be decommissioned to " +
+        "%nNote - Add the node to be decommissioned to " +
         OZONE_OM_DECOMMISSIONED_NODES_KEY + "config in ozone-site.xml of all " +
         "OzoneManagers before proceeding with decommission." +
-        "\nNote - DECOMMISSIONING AN OM MIGHT RENDER THE CLUSTER TO LOSE " +
+        "%nNote - DECOMMISSIONING AN OM MIGHT RENDER THE CLUSTER TO LOSE " +
         "HIGH AVAILABILITY." +
-        "\nNote - When there are only two OzoneManagers, do not stop the " +
+        "%nNote - When there are only two OzoneManagers, do not stop the " +
         "OzoneManager before decommissioning as both OzoneManagers are " +
-        "required to reach quorum." + "\n" +
+        "required to reach quorum." + "%n" +
         "It is recommended to add another OzoneManager(s) before " +
         "decommissioning one to maintain HA.",
     mixinStandardHelpOptions = true,

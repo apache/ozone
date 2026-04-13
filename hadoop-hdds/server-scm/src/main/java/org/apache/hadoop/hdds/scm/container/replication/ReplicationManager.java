@@ -867,6 +867,12 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReplicationQueue repQueue, ReplicationManagerReport report,
       boolean readOnly) throws ContainerNotFoundException {
     synchronized (containerInfo) {
+      // Filter out suppressed containers early
+      if (containerInfo.isSuppressed()) {
+        LOG.debug("Skipping suppressed container: {}", containerInfo.getContainerID());
+        return false;
+      }
+      
       // Reset health state to HEALTHY before processing this container
       report.resetContainerHealthState();
       final boolean isEC = isEC(containerInfo.getReplicationConfig());

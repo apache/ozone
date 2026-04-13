@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
@@ -573,6 +572,24 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Override
+  public void updateContainerInfo(HddsProtos.ContainerInfoProto updatedInfoProto)
+      throws IOException {
+    ContainerInfo updatedInfo = ContainerInfo.fromProtobuf(updatedInfoProto);
+    ContainerID containerID = updatedInfo.containerID();
+    
+    try (AutoCloseableLock ignored = writeLock(containerID)) {
+      final ContainerInfo currentInfo = containers.getContainerInfo(containerID);
+      if (currentInfo == null) {
+        throw new ContainerNotFoundException(containerID);
+      }
+      // Update suppressed flag
+      currentInfo.setSuppressed(updatedInfo.isSuppressed());
+      transactionBuffer.addToBuffer(containerStore, containerID, currentInfo);
+      LOG.debug("Updated container info for container: {}, suppressed={}", containerID, currentInfo.isSuppressed());
+    }
+  }
+
   private AutoCloseableLock readLock() {
     return AutoCloseableLock.acquire(lock.readLock());
   }
@@ -645,8 +662,7 @@ public final class ContainerStateManagerImpl
           conf, pipelineMgr, table, transactionBuffer,
           containerReplicaPendingOps);
 
-      return scmRatisServer.getProxyHandler(RequestType.CONTAINER,
-          ContainerStateManager.class, csm);
+      return scmRatisServer.getProxyHandler(ContainerStateManager.class, csm);
     }
 
   }
