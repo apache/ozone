@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -109,6 +110,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -124,6 +127,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -442,6 +447,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
       throws IOException {
+    return listContainer(startContainerID, count, state, replicationType, replicationConfig, null);
+  }
+
+  @Override
+  public ContainerListResult listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed)
+      throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
     Preconditions.checkState(count > 0,
@@ -451,6 +466,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     builder.setStartContainerID(startContainerID);
     builder.setCount(count);
     builder.setTraceID(TracingUtil.exportCurrentSpan());
+    if (suppressed != null) {
+      builder.setSuppressed(suppressed);
+    }
     if (state != null) {
       builder.setState(state);
     }
@@ -1250,10 +1268,30 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers(
-      long startContainerID, int count, HddsProtos.LifeCycleState state)
+  public List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
-    return listContainer(startContainerID, count, state).getContainerInfoList();
+    Preconditions.checkState(startContainerID.getId() >= 0,
+        "Container ID cannot be negative.");
+    Preconditions.checkState(count > 0,
+        "Container count must be greater than 0.");
+    SCMListContainerIDsRequestProto.Builder builder = SCMListContainerIDsRequestProto
+        .newBuilder();
+    builder.setStartContainerID(startContainerID.getProtobuf());
+    builder.setCount(count);
+    builder.setTraceID(TracingUtil.exportCurrentSpan());
+    builder.setState(state);
+
+    SCMListContainerIDsRequestProto request = builder.build();
+
+    SCMListContainerIDsResponseProto response =
+        submitRequest(Type.ListContainerIDs,
+            builder1 -> builder1.setScmListContainerIDsRequest(request))
+            .getScmListContainerIDsResponse();
+    return response.getContainerIDsList()
+        .stream()
+        .map(ContainerID::getFromProtobuf)
+        .collect(Collectors.toList());
   }
 
   @Override
@@ -1287,6 +1325,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .build();
     // TODO check error handling.
     submitRequest(Type.ReconcileContainer, builder -> builder.setReconcileContainerRequest(request));
+  }
+
+  @Override
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress)
+      throws IOException {
+    SuppressContainerRequestProto request = SuppressContainerRequestProto.newBuilder()
+        .addAllContainerIDs(containerIds)
+        .setSuppress(suppress)
+        .build();
+    SuppressContainerResponseProto response =
+        submitRequest(Type.SuppressContainer, builder -> builder.setSuppressContainerRequest(request))
+            .getSuppressContainerResponse();
+    return response.getFailedContainerIDsList();
   }
 
   /**

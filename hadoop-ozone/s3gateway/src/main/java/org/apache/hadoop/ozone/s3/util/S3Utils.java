@@ -216,6 +216,20 @@ public final class S3Utils {
   }
 
   /**
+   * Normalizes an ETag header value by trimming whitespace and removing
+   * surrounding double quotes.
+   *
+   * @param value the raw header value
+   * @return the normalized ETag, or {@code null} if the input is null
+   */
+  public static String parseETag(String value) {
+    if (value == null) {
+      return null;
+    }
+    return stripQuotes(value.trim());
+  }
+
+  /**
    * Wraps the given string in double quotes.
    *
    * @param value the input string

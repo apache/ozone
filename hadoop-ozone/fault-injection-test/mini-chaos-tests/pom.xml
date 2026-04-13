@@ -133,11 +133,6 @@
       <artifactId>slf4j-api</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>software.amazon.awssdk</groupId>
-      <artifactId>s3</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 
   <build>

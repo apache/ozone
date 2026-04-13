@@ -128,7 +128,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
 
     initialize(om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
+        om.isAdminAuthorizationEnabled(),
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());

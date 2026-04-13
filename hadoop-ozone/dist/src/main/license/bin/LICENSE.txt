@@ -246,6 +246,8 @@ EPL 2.0
 CDDL 1.1 + GPLv2 with classpath exception
 =====================
 
+   com.sun.xml.bind:jaxb-core
+   com.sun.xml.bind:jaxb-impl
    com.sun.istack:istack-commons-runtime
    com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
@@ -278,6 +280,7 @@ Apache License 2.0
    com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
+   com.github.ben-manes.caffeine:caffeine
    com.github.jnr:jnr-a64asm
    com.github.jnr:jnr-constants
    com.github.jnr:jnr-ffi
@@ -303,11 +306,9 @@ Apache License 2.0
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
-   commons-daemon:commons-daemon
    commons-digester:commons-digester
    commons-httpclient:commons-httpclient
    commons-io:commons-io
-   commons-lang:commons-lang
    commons-net:commons-net
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload
@@ -366,6 +367,7 @@ Apache License 2.0
    log4j:apache-log4j-extras
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
+   org.apache.avro:avro
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
    org.apache.commons:commons-collections4
@@ -384,6 +386,9 @@ Apache License 2.0
    org.apache.hadoop:hadoop-shaded-guava
    org.apache.hadoop:hadoop-shaded-protobuf_3_25
    org.apache.httpcomponents:httpcore
+   org.apache.iceberg:iceberg-api
+   org.apache.iceberg:iceberg-common
+   org.apache.iceberg:iceberg-core
    org.apache.kerby:kerb-admin
    org.apache.kerby:kerb-client
    org.apache.kerby:kerb-common
@@ -402,10 +407,12 @@ Apache License 2.0
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
    org.apache.ranger:ranger-audit-core
+   org.apache.ranger:ranger-authz-api
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
    org.apache.ranger:ranger-plugin-common
    org.apache.ranger:ranger-plugin-cred
+   org.apache.ranger:ugsync-util
    org.apache.ratis:ratis-client
    org.apache.ratis:ratis-common
    org.apache.ratis:ratis-grpc

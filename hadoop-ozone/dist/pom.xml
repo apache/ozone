@@ -143,6 +143,11 @@
       <artifactId>ozone-tools</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-vapor</artifactId>
+      <scope>runtime</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -250,6 +255,19 @@
     </plugins>
   </build>
   <profiles>
+    <profile>
+      <id>jdk11-with-iceberg</id>
+      <activation>
+        <jdk>[11,)</jdk>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>org.apache.ozone</groupId>
+          <artifactId>ozone-iceberg</artifactId>
+          <scope>runtime</scope>
+        </dependency>
+      </dependencies>
+    </profile>
     <profile>
       <id>build-with-ozonefs</id>
       <activation>

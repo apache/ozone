@@ -226,6 +226,10 @@ class RDBTable implements Table<byte[], byte[]> {
         this, prefix, type);
   }
 
+  boolean isClosed() {
+    return db.isClosed();
+  }
+
   @Override
   public String getName() {
     return family.getName();
