@@ -339,6 +339,118 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testGetObjectIfMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()));
+
+    assertEquals(content, response.asUtf8String());
+  }
+
+  @Test
+  public void testGetObjectIfMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(
+            b -> b.bucket(bucketName).key(keyName).ifMatch("wrong-etag")));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testGetObjectIfNoneMatchReturnsNotModified() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(
+            b -> b.bucket(bucketName).key(keyName)
+                .ifNoneMatch(initialResponse.eTag())));
+
+    assertEquals(304, exception.statusCode());
+  }
+
+  @Test
+  public void testGetObjectIfModifiedSinceReturnsNotModified() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    HeadObjectResponse headObjectResponse = s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(
+            b -> b.bucket(bucketName).key(keyName)
+                .ifModifiedSince(headObjectResponse.lastModified()
+                    .plusSeconds(60))));
+
+    assertEquals(304, exception.statusCode());
+  }
+
+  @Test
+  public void testHeadObjectIfMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    HeadObjectResponse response = s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()));
+
+    assertEquals(Long.valueOf(content.length()), response.contentLength());
+  }
+
+  @Test
+  public void testHeadObjectIfUnmodifiedSinceFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    HeadObjectResponse headObjectResponse = s3Client.headObject(
+        b -> b.bucket(bucketName).key(keyName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.headObject(
+            b -> b.bucket(bucketName).key(keyName)
+                .ifUnmodifiedSince(headObjectResponse.lastModified()
+                    .minusSeconds(60))));
+
+    assertEquals(412, exception.statusCode());
+  }
+
+  @Test
   public void testPutObjectEmpty() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -1280,10 +1392,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       StringBuilder xml = new StringBuilder();
       xml.append("<CompleteMultipartUpload>\n");
       for (CompletedPart part : parts) {
-        xml.append("  <Part>\n");
-        xml.append("    <PartNumber>").append(part.partNumber()).append("</PartNumber>\n");
-        xml.append("    <ETag>").append(stripQuotes(part.eTag())).append("</ETag>\n");
-        xml.append("  </Part>\n");
+        xml.append("  <Part>\n")
+            .append("    <PartNumber>").append(part.partNumber()).append("</PartNumber>\n")
+            .append("    <ETag>").append(stripQuotes(part.eTag())).append("</ETag>\n")
+            .append("  </Part>\n");
       }
       xml.append("</CompleteMultipartUpload>");
       return xml.toString();

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ATOMIC_WRITE_CONFLICT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -252,7 +252,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // However there is no closed key entry, so the commit should fail.
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
+    assertEquals(ATOMIC_WRITE_CONFLICT, omClientResponse.getOMResponse().getStatus());
 
     // Now add the key to the key table, and try again, but with different generation
     omKeyInfoBuilder.setExpectedDataGeneration(null);
@@ -261,7 +261,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     closedKeyTable.put(getOzonePathKey(), invalidKeyInfo);
     // This should fail as the updateID ia zero and the open key has rewrite generation of 1.
     omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
+    assertEquals(ATOMIC_WRITE_CONFLICT, omClientResponse.getOMResponse().getStatus());
 
     omKeyInfoBuilder.setUpdateID(1L);
     OmKeyInfo closedKeyInfo = omKeyInfoBuilder.build();
@@ -347,144 +347,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse =
         omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(KEY_ALREADY_EXISTS, omClientResponse.getOMResponse().getStatus());
-  }
-
-  @Test
-  public void testCommitWithExpectedETagSuccess() throws Exception {
-    Table<String, OmKeyInfo> openKeyTable =
-        omMetadataManager.getOpenKeyTable(getBucketLayout());
-    Table<String, OmKeyInfo> closedKeyTable =
-        omMetadataManager.getKeyTable(getBucketLayout());
-
-    OMRequest modifiedOmRequest =
-        doPreExecute(createCommitKeyRequest());
-    OMKeyCommitRequest omKeyCommitRequest =
-        getOmKeyCommitRequest(modifiedOmRequest);
-    KeyArgs keyArgs =
-        modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
-
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, omKeyCommitRequest.getBucketLayout());
-
-    List<OmKeyLocationInfo> allocatedLocationList =
-        keyArgs.getKeyLocationsList().stream()
-            .map(OmKeyLocationInfo::getFromProtobuf)
-            .collect(Collectors.toList());
-
-    String expectedETag = "matching-etag";
-    OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName, replicationConfig,
-        new OmKeyLocationInfoGroup(version, new ArrayList<>()));
-    omKeyInfoBuilder.setExpectedETag(expectedETag);
-
-    String openKey = addKeyToOpenKeyTable(allocatedLocationList,
-        omKeyInfoBuilder);
-    assertNotNull(openKeyTable.get(openKey));
-
-    // Add closed key with matching ETag
-    OmKeyInfo closedKeyInfo = OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName, replicationConfig,
-        new OmKeyLocationInfoGroup(version, new ArrayList<>()))
-        .addMetadata(OzoneConsts.ETAG, expectedETag).build();
-    closedKeyTable.put(getOzonePathKey(), closedKeyInfo);
-
-    OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(OK, omClientResponse.getOMResponse().getStatus());
-
-    OmKeyInfo committedKey = closedKeyTable.get(getOzonePathKey());
-    assertNotNull(committedKey);
-    assertNull(committedKey.getExpectedETag());
-  }
-
-  @Test
-  public void testCommitWithExpectedETagMismatch() throws Exception {
-    Table<String, OmKeyInfo> openKeyTable =
-        omMetadataManager.getOpenKeyTable(getBucketLayout());
-    Table<String, OmKeyInfo> closedKeyTable =
-        omMetadataManager.getKeyTable(getBucketLayout());
-
-    OMRequest modifiedOmRequest =
-        doPreExecute(createCommitKeyRequest());
-    OMKeyCommitRequest omKeyCommitRequest =
-        getOmKeyCommitRequest(modifiedOmRequest);
-    KeyArgs keyArgs =
-        modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
-
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, omKeyCommitRequest.getBucketLayout());
-
-    List<OmKeyLocationInfo> allocatedLocationList =
-        keyArgs.getKeyLocationsList().stream()
-            .map(OmKeyLocationInfo::getFromProtobuf)
-            .collect(Collectors.toList());
-
-    OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName, replicationConfig,
-        new OmKeyLocationInfoGroup(version, new ArrayList<>()));
-    omKeyInfoBuilder.setExpectedETag("expected-etag");
-
-    String openKey = addKeyToOpenKeyTable(allocatedLocationList,
-        omKeyInfoBuilder);
-    assertNotNull(openKeyTable.get(openKey));
-
-    // Add closed key with different ETag
-    OmKeyInfo closedKeyInfo = OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName, replicationConfig,
-        new OmKeyLocationInfoGroup(version, new ArrayList<>()))
-        .addMetadata(OzoneConsts.ETAG, "different-etag").build();
-    closedKeyTable.put(getOzonePathKey(), closedKeyInfo);
-
-    OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(
-        OzoneManagerProtocolProtos.Status.ETAG_MISMATCH,
-        omClientResponse.getOMResponse().getStatus());
-  }
-
-  @Test
-  public void testCommitWithExpectedETagNoETagOnKey() throws Exception {
-    Table<String, OmKeyInfo> openKeyTable =
-        omMetadataManager.getOpenKeyTable(getBucketLayout());
-    Table<String, OmKeyInfo> closedKeyTable =
-        omMetadataManager.getKeyTable(getBucketLayout());
-
-    OMRequest modifiedOmRequest =
-        doPreExecute(createCommitKeyRequest());
-    OMKeyCommitRequest omKeyCommitRequest =
-        getOmKeyCommitRequest(modifiedOmRequest);
-    KeyArgs keyArgs =
-        modifiedOmRequest.getCommitKeyRequest().getKeyArgs();
-
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, omKeyCommitRequest.getBucketLayout());
-
-    List<OmKeyLocationInfo> allocatedLocationList =
-        keyArgs.getKeyLocationsList().stream()
-            .map(OmKeyLocationInfo::getFromProtobuf)
-            .collect(Collectors.toList());
-
-    OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName, replicationConfig,
-        new OmKeyLocationInfoGroup(version, new ArrayList<>()));
-    omKeyInfoBuilder.setExpectedETag("expected-etag");
-
-    String openKey = addKeyToOpenKeyTable(allocatedLocationList,
-        omKeyInfoBuilder);
-    assertNotNull(openKeyTable.get(openKey));
-
-    // Add closed key WITHOUT ETag
-    OmKeyInfo closedKeyInfo = OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName, replicationConfig,
-        new OmKeyLocationInfoGroup(version, new ArrayList<>())).build();
-    closedKeyTable.put(getOzonePathKey(), closedKeyInfo);
-
-    OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(
-        OzoneManagerProtocolProtos.Status.ETAG_NOT_AVAILABLE,
-        omClientResponse.getOMResponse().getStatus());
+    assertEquals(ATOMIC_WRITE_CONFLICT, omClientResponse.getOMResponse().getStatus());
   }
 
   @Test

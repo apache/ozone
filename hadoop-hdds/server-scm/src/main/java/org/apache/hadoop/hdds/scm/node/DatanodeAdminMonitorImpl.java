@@ -497,11 +497,11 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private String replicaDetails(Collection<ContainerReplica> replicas) {
     StringBuilder sb = new StringBuilder();
-    sb.append("Replicas{");
-    sb.append(replicas.stream()
-        .map(Object::toString)
-        .collect(Collectors.joining(",")));
-    sb.append('}');
+    sb.append("Replicas{")
+        .append(replicas.stream()
+            .map(Object::toString)
+            .collect(Collectors.joining(",")))
+        .append('}');
     return sb.toString();
   }
 

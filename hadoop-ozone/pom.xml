@@ -107,6 +107,15 @@
 
   <profiles>
     <profile>
+      <id>jdk11-with-iceberg</id>
+      <activation>
+        <jdk>[11,)</jdk>
+      </activation>
+      <modules>
+        <module>iceberg</module>
+      </modules>
+    </profile>
+    <profile>
       <id>build-with-ozonefs</id>
       <activation>
         <property>

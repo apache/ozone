@@ -146,6 +146,12 @@ public final class ContainerBalancerConfiguration {
           "data node is very high")
   private boolean triggerDuEnable = false;
 
+  @Config(key = "hdds.container.balancer.include.non.standard.containers", type = ConfigType.BOOLEAN,
+      defaultValue = "false", tags = {ConfigTag.BALANCER},
+      description = "Whether to include containers in non-standard states, such as " +
+          "OVER_REPLICATED CLOSED/QUASI_CLOSED and HEALTHY QUASI_CLOSED containers.")
+  private boolean includeNonStandardContainers = false;
+
   /**
    * Gets the threshold value for Container Balancer.
    *
@@ -432,6 +438,24 @@ public final class ContainerBalancerConfiguration {
     this.excludeNodes = excludeNodes;
   }
 
+  /**
+   * Get the includeNonStandardContainers value for Container Balancer.
+   *
+   * @return the boolean value of includeNonStandardContainers
+   */
+  public Boolean getIncludeNonStandardContainers() {
+    return includeNonStandardContainers;
+  }
+
+  /**
+   * Set the includeNonStandardContainers value for Container Balancer.
+   *
+   * @param enable the boolean value to be set to includeNonStandardContainers
+   */
+  public void setIncludeNonStandardContainers(boolean enable) {
+    includeNonStandardContainers = enable;
+  }
+
   @Override
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
@@ -478,7 +502,9 @@ public final class ContainerBalancerConfiguration {
         "Datanodes Specified to be Balanced",
         includeNodes.equals("") ? "None" : includeNodes,
         "Datanodes Excluded from Balancing",
-        excludeNodes.equals("") ? "None" : excludeNodes);
+        excludeNodes.equals("") ? "None" : excludeNodes,
+        "Whether to include non-standard containers for balancing",
+        includeNonStandardContainers);
   }
 
   public ContainerBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -500,7 +526,8 @@ public final class ContainerBalancerConfiguration {
         .setExcludeDatanodes(excludeNodes)
         .setMoveNetworkTopologyEnable(networkTopologyEnable)
         .setTriggerDuBeforeMoveEnable(triggerDuEnable)
-        .setMoveReplicationTimeout(moveReplicationTimeout);
+        .setMoveReplicationTimeout(moveReplicationTimeout)
+        .setIncludeNonStandardContainers(includeNonStandardContainers);
     return builder;
   }
 
@@ -554,6 +581,9 @@ public final class ContainerBalancerConfiguration {
     }
     if (proto.hasMoveReplicationTimeout()) {
       config.setMoveReplicationTimeout(proto.getMoveReplicationTimeout());
+    }
+    if (proto.hasIncludeNonStandardContainers()) {
+      config.setIncludeNonStandardContainers(proto.getIncludeNonStandardContainers());
     }
     return config;
   }
