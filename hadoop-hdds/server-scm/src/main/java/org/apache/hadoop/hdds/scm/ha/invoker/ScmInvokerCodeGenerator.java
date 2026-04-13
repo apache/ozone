@@ -72,6 +72,12 @@ public final class ScmInvokerCodeGenerator {
       Object.class,
       new Class<?>[]{Exception.class});
 
+  static final DeclaredMethod GET_RETURN_TYPE = new DeclaredMethod("getReturnType",
+      new Class[]{String.class, Class[].class},
+      new String[]{"methodName", "parameterTypes"},
+      Class.class,
+      new Class<?>[]{});
+
   private final Class<?> api;
   private final String apiName;
   private final String invokerClassName;
@@ -442,6 +448,85 @@ public final class ScmInvokerCodeGenerator {
     }
   }
 
+  void printReturnTypeMethod() {
+    println();
+    println("@Override");
+    printf("public Class<?> getReturnType(String methodName, Class<?>[] parameterTypes)");
+    try (UncheckedAutoCloseable ignored = printScope()) {
+      printReturnTypeSwitch();
+    }
+  }
+
+  void printReturnTypeSwitch() {
+    printf("switch (methodName)");
+    try (UncheckedAutoCloseable ignored = printScope(true, 0)) {
+      final List<Method> apiMethods = getReturnTypeMethods();
+
+      final List<String> methodNames = apiMethods.stream()
+          .map(Method::getName)
+          .distinct()
+          .sorted()
+          .collect(Collectors.toList());
+
+      for (String methodName : methodNames) {
+        final List<Method> overrides = apiMethods.stream()
+            .filter(m -> m.getName().equals(methodName))
+            .sorted(Comparator.comparing(Method::getParameterCount))
+            .collect(Collectors.toList());
+
+        printf("case \"%s\":", methodName);
+        try (UncheckedAutoCloseable ignore = printScope(false, 1)) {
+          for (Method m : overrides) {
+            printReturnTypeIf(m);
+          }
+          println("break;");
+        }
+        println();
+      }
+
+      printf("default:");
+      try (UncheckedAutoCloseable ignore = printScope(false, 1)) {
+        println("break;");
+      }
+    }
+
+    println();
+    println("throw new IllegalArgumentException(");
+    println("    \"Method not found: \" + methodName");
+    println("        + \" with parameterTypes in %s\");", apiName);
+  }
+
+  void printReturnTypeIf(Method method) {
+    final Class<?>[] paramTypes = method.getParameterTypes();
+    final String params = classesToString(paramTypes, ".class");
+
+    if (paramTypes.length == 0) {
+      printf("if (parameterTypes == null || parameterTypes.length == 0)");
+      try (UncheckedAutoCloseable ignore = printScope()) {
+        println("return %s.class;", getClassname(method.getReturnType()));
+      }
+      return;
+    }
+
+    final String condition =
+        String.format("Arrays.equals(parameterTypes, new Class<?>[]{%s})", params);
+
+    if ((indentation + "if (" + condition + ")").length() <= LINE_LENGTH) {
+      printf("if (%s)", condition);
+      try (UncheckedAutoCloseable ignore = printScope()) {
+        println("return %s.class;", getClassname(method.getReturnType()));
+      }
+    } else {
+      println("if (Arrays.equals(parameterTypes,");
+      try (UncheckedAutoCloseable ignore = printScope(false, 1)) {
+        println("new Class<?>[]{%s}))", params);
+      }
+      try (UncheckedAutoCloseable ignore = printScope()) {
+        println("return %s.class;", getClassname(method.getReturnType()));
+      }
+    }
+  }
+
   public String generateClass() {
     println("/** Code generated for {@link %s}.  Do not modify. */", apiName);
     printf("public class %s extends ScmInvoker<%s>", invokerClassName, apiName);
@@ -450,8 +535,19 @@ public final class ScmInvokerCodeGenerator {
       printHeaderMethods();
       printProxyMethod();
       printInvokeMethod(INVOKE_LOCAL);
+      printReturnTypeMethod();
     }
     return out.toString();
+  }
+
+  List<Method> getReturnTypeMethods() {
+    return Arrays.stream(api.getMethods())
+        .filter(m -> !Modifier.isStatic(m.getModifiers()))
+        .filter(m -> m.getAnnotation(Deprecated.class) == null)
+        .filter(m -> !m.isDefault() || m.getAnnotation(Replicate.class) != null)
+        .sorted(Comparator.comparing(Method::getName)
+            .thenComparing(Method::getParameterCount))
+        .collect(Collectors.toList());
   }
 
   File updateFile(String classString) throws IOException {
