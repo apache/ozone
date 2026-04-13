@@ -117,7 +117,7 @@ public final class SelfSignedCertificate {
 
     BigInteger serial;
     if (caCertSerialId == null) {
-      serial = new BigInteger(Long.toString(Time.monotonicNow()));
+      serial = BigInteger.valueOf(Time.monotonicNow());
     } else {
       serial = caCertSerialId;
     }
