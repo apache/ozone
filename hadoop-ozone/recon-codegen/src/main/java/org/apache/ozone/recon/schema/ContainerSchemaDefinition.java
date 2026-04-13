@@ -78,7 +78,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
             .primaryKey(CONTAINER_ID, CONTAINER_STATE))
         .constraint(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
             .check(field(name(CONTAINER_STATE))
-                .in(UnHealthyContainerStates.values())))
+                .in((Object[]) UnHealthyContainerStates.values())))
         .execute();
     // Composite index (container_state, container_id) serves two query patterns:
     //

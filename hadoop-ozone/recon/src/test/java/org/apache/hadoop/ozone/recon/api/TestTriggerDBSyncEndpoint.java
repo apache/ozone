@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyString;
@@ -98,6 +99,7 @@ public class TestTriggerDBSyncEndpoint {
 
 
     ReconUtils reconUtilsMock = mock(ReconUtils.class);
+    when(reconUtilsMock.getReconDbDir(any(), anyString())).thenCallRealMethod();
 
     ReconTaskStatusDao reconTaskStatusDaoMock = mock(ReconTaskStatusDao.class);
     ReconTaskStatusUpdaterManager taskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
@@ -150,5 +152,25 @@ public class TestTriggerDBSyncEndpoint {
     Response response = triggerDBSyncEndpoint.triggerOMDBSync();
     assertEquals(200, response.getStatus());
     assertEquals(true, response.getEntity());
+  }
+
+  /**
+   * Verifies that {@code POST /api/v1/triggerdbsync/scm} can be invoked and
+   * returns HTTP 200 with a boolean result.
+   *
+   * <p>In the test environment the Recon SCM facade is wired up against a
+   * mini in-memory cluster, so the four-pass targeted sync may return
+   * {@code false} (e.g., empty SCM state).  The test only asserts that the
+   * endpoint is reachable and that the response entity is a boolean, which
+   * is sufficient to verify wiring and the HTTP contract.
+   */
+  @Test
+  public void testTriggerSCMContainerSync() {
+    TriggerDBSyncEndpoint triggerDBSyncEndpoint
+        = reconTestInjector.getInstance(TriggerDBSyncEndpoint.class);
+    Response response = triggerDBSyncEndpoint.triggerSCMContainerSync();
+    assertEquals(200, response.getStatus());
+    assertNotNull(response.getEntity());
+    assertEquals(Boolean.class, response.getEntity().getClass());
   }
 }

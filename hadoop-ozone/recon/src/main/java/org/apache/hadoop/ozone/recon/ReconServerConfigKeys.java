@@ -132,9 +132,27 @@ public final class  ReconServerConfigKeys {
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "60s";
 
+  /**
+   * Total container count drift threshold above which the periodic incremental
+   * sync escalates to a full SCM DB snapshot.
+   *
+   * <p>When {@code |SCM_total_containers - Recon_total_containers|} exceeds
+   * this value the targeted 4-pass sync becomes expensive (many batched RPC
+   * rounds) and a full checkpoint replacement is cheaper and more reliable.
+   * For drift at or below this value the incremental sync corrects the gap
+   * without replacing the entire database.
+   *
+   * <p>Note: a full snapshot is also scheduled unconditionally every 24h
+   * (configurable via {@code ozone.recon.scm.snapshot.task.interval.delay})
+   * as a structural safety net, independent of this threshold.
+   *
+   * <p>Default: 10,000. In large clusters (millions of containers) operators
+   * may raise this further since the targeted sync handles per-state
+   * corrections efficiently even at higher drift levels.
+   */
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
-  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 100;
+  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 10_000;
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_ENABLED =
       "ozone.recon.scm.snapshot.enabled";
@@ -196,6 +214,36 @@ public final class  ReconServerConfigKeys {
   public static final String
       OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
 
+  /**
+   * How often the incremental (targeted) SCM container sync runs.
+   *
+   * <p>Each cycle calls {@code decideSyncAction()} — two lightweight count
+   * RPCs to SCM — and then either runs the 4-pass incremental sync or takes
+   * no action. A full snapshot is still gated by
+   * {@code ozone.recon.scm.snapshot.task.interval.delay} (default 24h).
+   *
+   * <p>Default: 1h. Set to a shorter value in environments where container
+   * state discrepancies need to be detected and corrected faster.
+   */
+  public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY =
+      "ozone.recon.scm.container.sync.task.interval.delay";
+
+  public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT
+      = "1h";
+
+  /**
+   * Initial delay before the first incremental SCM container sync run.
+   *
+   * <p>Default: 2m (slightly later than the snapshot initial delay of 1m,
+   * so the snapshot has time to initialize the SCM DB before the first
+   * incremental sync attempts to read it).
+   */
+  public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY =
+      "ozone.recon.scm.container.sync.task.initial.delay";
+
+  public static final String
+      OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT = "2m";
+
   public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY =
       "ozone.recon.scmclient.rpc.timeout";
 
@@ -252,6 +300,47 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE =
       "ozone.recon.scm.container.id.batch.size";
   public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
+
+  /**
+   * Maximum number of CLOSED/QUASI_CLOSED containers to check against SCM per
+   * Pass 4 (DELETED retirement) sync cycle. Limiting the batch size prevents
+   * excessive SCM RPC load during a single sync run; containers not checked in
+   * one cycle are deferred to the next.
+   *
+   * <p>Default: 500 containers per sync cycle.
+   */
+  public static final String OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE =
+      "ozone.recon.scm.deleted.container.check.batch.size";
+  public static final int OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT = 500;
+
+  /**
+   * Per-state drift threshold used by the tiered sync decision when the total
+   * container count in SCM and Recon is equal.
+   *
+   * <p>Equal totals can still hide lifecycle state drift: a container that
+   * advanced from OPEN → QUASI_CLOSED → CLOSED in SCM is counted in both SCM
+   * and Recon's total, but Recon may still record it in the old state.
+   * The following per-state comparisons are evaluated:
+   *
+   * <ul>
+   *   <li><b>OPEN</b>: catches containers stuck OPEN in Recon after SCM has
+   *       already moved them to CLOSING, QUASI_CLOSED, or CLOSED.</li>
+   *   <li><b>QUASI_CLOSED</b>: catches containers stuck QUASI_CLOSED in Recon
+   *       after SCM has already moved them to CLOSED or beyond.  This case is
+   *       invisible to the OPEN check alone.</li>
+   * </ul>
+   *
+   * <p>If the drift in <em>any</em> of the checked states exceeds this
+   * threshold a targeted sync is triggered.  A full snapshot is deliberately
+   * NOT triggered for per-state drift because the targeted sync's per-state
+   * passes already correct these conditions efficiently without replacing the
+   * entire database.
+   *
+   * <p>Default: 5.
+   */
+  public static final String OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD =
+      "ozone.recon.scm.per.state.drift.threshold";
+  public static final int OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT = 5;
 
   /**
    * Private constructor for utility class.

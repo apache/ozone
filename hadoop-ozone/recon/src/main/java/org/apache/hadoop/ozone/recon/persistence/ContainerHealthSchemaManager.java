@@ -64,7 +64,7 @@ public class ContainerHealthSchemaManager {
    * twice the limit.  1,000 IDs stays well under ~30 KB, providing a safe
    * 2× margin.</p>
    */
-  static final int MAX_DELETE_CHUNK_SIZE = 1_000;
+  static final int MAX_IN_CLAUSE_CHUNK_SIZE = 1_000;
 
   private final ContainerSchemaDefinition containerSchemaDefinition;
 
@@ -153,7 +153,8 @@ public class ContainerHealthSchemaManager {
    * limit.  A single {@code IN} predicate with more than ~2,000 values (when
    * combined with the 7-state container_state filter) overflows this limit
    * and causes {@code ERROR XBCM4}.  This method automatically partitions
-   * {@code containerIds} into chunks of at most {@value #MAX_DELETE_CHUNK_SIZE}
+   * {@code containerIds} into chunks of at most
+   * {@value #MAX_IN_CLAUSE_CHUNK_SIZE}
    * IDs so callers never need to worry about the limit, regardless of how
    * many containers a scan cycle processes.
    *
@@ -198,8 +199,8 @@ public class ContainerHealthSchemaManager {
       List<Long> containerIds) {
     int totalDeleted = 0;
 
-    for (int from = 0; from < containerIds.size(); from += MAX_DELETE_CHUNK_SIZE) {
-      int to = Math.min(from + MAX_DELETE_CHUNK_SIZE, containerIds.size());
+    for (int from = 0; from < containerIds.size(); from += MAX_IN_CLAUSE_CHUNK_SIZE) {
+      int to = Math.min(from + MAX_IN_CLAUSE_CHUNK_SIZE, containerIds.size());
       List<Long> chunk = containerIds.subList(from, to);
 
       int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
@@ -221,6 +222,12 @@ public class ContainerHealthSchemaManager {
   /**
    * Returns previous in-state-since timestamps for tracked unhealthy states.
    * The key is a stable containerId + state tuple.
+   *
+   * <p>This method also chunks the container-id predicate internally to stay
+   * within Derby's statement compilation limits. Large scan cycles in Recon can
+   * easily touch tens of thousands of containers, and expanding all IDs into a
+   * single {@code IN (...)} predicate causes Derby to generate bytecode that
+   * exceeds the JVM constant-pool / method-size limits.</p>
    */
   public Map<ContainerStateKey, Long> getExistingInStateSinceByContainerIds(
       List<Long> containerIds) {
@@ -231,24 +238,29 @@ public class ContainerHealthSchemaManager {
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
     Map<ContainerStateKey, Long> existing = new HashMap<>();
     try {
-      dslContext.select(
-              UNHEALTHY_CONTAINERS.CONTAINER_ID,
-              UNHEALTHY_CONTAINERS.CONTAINER_STATE,
-              UNHEALTHY_CONTAINERS.IN_STATE_SINCE)
-          .from(UNHEALTHY_CONTAINERS)
-          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(containerIds))
-          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
-              UnHealthyContainerStates.MISSING.toString(),
-              UnHealthyContainerStates.EMPTY_MISSING.toString(),
-              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
-              UnHealthyContainerStates.OVER_REPLICATED.toString(),
-              UnHealthyContainerStates.MIS_REPLICATED.toString(),
-              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
-          .forEach(record -> existing.put(
-              new ContainerStateKey(record.get(UNHEALTHY_CONTAINERS.CONTAINER_ID),
-                  record.get(UNHEALTHY_CONTAINERS.CONTAINER_STATE)),
-              record.get(UNHEALTHY_CONTAINERS.IN_STATE_SINCE)));
+      for (int from = 0; from < containerIds.size(); from += MAX_IN_CLAUSE_CHUNK_SIZE) {
+        int to = Math.min(from + MAX_IN_CLAUSE_CHUNK_SIZE, containerIds.size());
+        List<Long> chunk = containerIds.subList(from, to);
+
+        dslContext.select(
+                UNHEALTHY_CONTAINERS.CONTAINER_ID,
+                UNHEALTHY_CONTAINERS.CONTAINER_STATE,
+                UNHEALTHY_CONTAINERS.IN_STATE_SINCE)
+            .from(UNHEALTHY_CONTAINERS)
+            .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(chunk))
+            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
+                UnHealthyContainerStates.MISSING.toString(),
+                UnHealthyContainerStates.EMPTY_MISSING.toString(),
+                UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+                UnHealthyContainerStates.OVER_REPLICATED.toString(),
+                UnHealthyContainerStates.MIS_REPLICATED.toString(),
+                UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+                UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+            .forEach(record -> existing.put(
+                new ContainerStateKey(record.get(UNHEALTHY_CONTAINERS.CONTAINER_ID),
+                    record.get(UNHEALTHY_CONTAINERS.CONTAINER_STATE)),
+                record.get(UNHEALTHY_CONTAINERS.IN_STATE_SINCE)));
+      }
     } catch (Exception e) {
       LOG.warn("Failed to load existing inStateSince records. Falling back to current scan time.", e);
     }
