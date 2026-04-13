@@ -146,8 +146,7 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       if (Arrays.equals(parameterTypes, new Class<?>[]{ArrayList.class})) {
         return void.class;
       }
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{ArrayList.class, DeletedBlocksTransactionSummary.class})) {
+      if (Arrays.equals(parameterTypes, new Class<?>[]{ArrayList.class, DeletedBlocksTransactionSummary.class})) {
         return void.class;
       }
       break;
@@ -165,19 +164,16 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       break;
 
     case "reinitialize":
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{Table.class, Table.class})) {
+      if (Arrays.equals(parameterTypes, new Class<?>[]{Table.class, Table.class})) {
         return void.class;
       }
       break;
 
     case "removeTransactionsFromDB":
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{ArrayList.class})) {
+      if (Arrays.equals(parameterTypes, new Class<?>[]{ArrayList.class})) {
         return void.class;
       }
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{ArrayList.class, DeletedBlocksTransactionSummary.class})) {
+      if (Arrays.equals(parameterTypes, new Class<?>[]{ArrayList.class, DeletedBlocksTransactionSummary.class})) {
         return void.class;
       }
       break;
