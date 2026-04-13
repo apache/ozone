@@ -52,8 +52,8 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
+import org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
@@ -410,8 +410,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket
   )
@@ -433,8 +433,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     return req;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+  @OMLayoutVersionValidator(
+      applyBefore = OMLayoutFeature.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket
   )
@@ -474,8 +474,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
    * write to them, instead of using the server default which may be in a layout
    * they do not understand.
    */
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket
   )
