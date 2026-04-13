@@ -50,6 +50,10 @@ public final class SCMNodeMetrics implements MetricsSource {
   private @Metric MutableCounterLong numNodeCommandQueueReportProcessed;
   private @Metric MutableCounterLong numNodeCommandQueueReportProcessingFailed;
   private @Metric String textMetric;
+  // Pending container allocations at SCM (per-DN tracker), not yet on datanodes.
+  private @Metric MutableCounterLong numPendingContainersAdded;
+  private @Metric MutableCounterLong numPendingContainersRemoved;
+  private @Metric MutableCounterLong numSkippedFullNodeContainerAllocation;
 
   private final MetricsRegistry registry;
   private final NodeManagerMXBean managerMXBean;
@@ -122,6 +126,18 @@ public final class SCMNodeMetrics implements MetricsSource {
    */
   void incNumNodeCommandQueueReportProcessingFailed() {
     numNodeCommandQueueReportProcessingFailed.incr();
+  }
+
+  void incNumPendingContainersAdded() {
+    numPendingContainersAdded.incr();
+  }
+
+  void incNumPendingContainersRemoved() {
+    numPendingContainersRemoved.incr();
+  }
+
+  void incNumSkippedFullNodeContainerAllocation() {
+    numSkippedFullNodeContainerAllocation.incr();
   }
 
   /**
