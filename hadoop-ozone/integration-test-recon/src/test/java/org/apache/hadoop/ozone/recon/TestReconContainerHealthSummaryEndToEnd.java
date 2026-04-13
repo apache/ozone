@@ -47,8 +47,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -1207,11 +1207,13 @@ public class TestReconContainerHealthSummaryEndToEnd {
       }
 
       ContainerInfo scmInfo = scmCm.getContainer(containerID);
-      ContainerInfo reconInfo = ContainerInfo.fromProtobuf(scmInfo.getProtobuf());
+      ContainerInfo reconInfo =
+          ContainerInfo.fromProtobuf(scmInfo.getProtobuf());
       Pipeline pipeline = null;
       if (scmInfo.getPipelineID() != null) {
         try {
-          pipeline = scm.getPipelineManager().getPipeline(scmInfo.getPipelineID());
+          pipeline = scm.getPipelineManager()
+              .getPipeline(scmInfo.getPipelineID());
         } catch (PipelineNotFoundException ignored) {
           pipeline = null;
         }
