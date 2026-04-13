@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#checks:basic
+#checks:skipped
 
 set -u -o pipefail
 

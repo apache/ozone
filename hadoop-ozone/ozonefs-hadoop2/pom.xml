@@ -23,6 +23,9 @@
   <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone FS Hadoop 2.x compatibility</name>
+  <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
