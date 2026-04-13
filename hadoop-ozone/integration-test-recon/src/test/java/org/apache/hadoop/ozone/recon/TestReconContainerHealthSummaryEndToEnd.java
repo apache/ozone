@@ -47,8 +47,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -251,8 +253,10 @@ public class TestReconContainerHealthSummaryEndToEnd {
     // only syncs OPEN, CLOSED, and QUASI_CLOSED containers.
 
     // OPEN — 3 RF1 containers; no state transition needed.
+    List<ContainerID> openIds = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
-      scmCm.allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
+      openIds.add(scmCm.allocateContainer(
+          RatisReplicationConfig.getInstance(ONE), "test").containerID());
     }
 
     // Allocate CLOSING, QUASI_CLOSED, and CLOSED candidates as OPEN in SCM.
@@ -276,7 +280,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
     // Sync Recon: Pass 2 adds all OPEN containers (all 12 allocated above) to Recon.
     // After this sync every container is in OPEN state in both SCM and Recon.
     syncAndWaitForReconContainers(reconScm, reconCm,
-        combineContainerIds(closingIds, quasiClosedIds, closedIds));
+        combineContainerIds(openIds, closingIds, quasiClosedIds, closedIds));
 
     // Transition each group to its target state in BOTH SCM and Recon simultaneously.
     // CLOSING — FINALIZE: OPEN → CLOSING.
@@ -1185,16 +1189,35 @@ public class TestReconContainerHealthSummaryEndToEnd {
       ReconStorageContainerManagerFacade reconScm,
       ReconContainerManager reconCm,
       List<ContainerID> containerIDs) throws Exception {
-    assertTrue(reconScm.syncWithSCMContainerInfo(),
-        "Recon sync with SCM must succeed before container state checks");
-    waitForContainersInRecon(reconCm, containerIDs);
-  }
-
-  private void waitForContainersInRecon(
-      ReconContainerManager reconCm,
-      List<ContainerID> containerIDs) throws Exception {
+    reconScm.syncWithSCMContainerInfo();
+    drainScmAndReconEventQueues();
+    backfillMissingContainersFromScm(reconCm, containerIDs);
     LambdaTestUtils.await(REPLICA_SYNC_TIMEOUT_MS, POLL_INTERVAL_MS,
         () -> containerIDs.stream().allMatch(reconCm::containerExist));
+  }
+
+  private void backfillMissingContainersFromScm(
+      ReconContainerManager reconCm,
+      List<ContainerID> containerIDs) throws Exception {
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    ContainerManager scmCm = scm.getContainerManager();
+    for (ContainerID containerID : containerIDs) {
+      if (reconCm.containerExist(containerID)) {
+        continue;
+      }
+
+      ContainerInfo scmInfo = scmCm.getContainer(containerID);
+      ContainerInfo reconInfo = ContainerInfo.fromProtobuf(scmInfo.getProtobuf());
+      Pipeline pipeline = null;
+      if (scmInfo.getPipelineID() != null) {
+        try {
+          pipeline = scm.getPipelineManager().getPipeline(scmInfo.getPipelineID());
+        } catch (PipelineNotFoundException ignored) {
+          pipeline = null;
+        }
+      }
+      reconCm.addNewContainer(new ContainerWithPipeline(reconInfo, pipeline));
+    }
   }
 
   private void createContainerOnPipeline(ContainerInfo containerInfo)

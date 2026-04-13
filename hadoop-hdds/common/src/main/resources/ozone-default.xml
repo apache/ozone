@@ -3615,6 +3615,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.scm.per.state.drift.threshold</name>
+    <value>5</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Per-state lifecycle drift threshold used when SCM and Recon total container
+      counts are equal. If OPEN, QUASI_CLOSED, or derived CLOSED counts differ by
+      more than this value, Recon triggers a targeted SCM container sync.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.scm.snapshot.enabled</name>
     <value>true</value>
     <tag>OZONE, RECON, SCM</tag>
@@ -4598,6 +4608,35 @@
     <tag>OZONE, MANAGEMENT, RECON</tag>
     <description>
       Interval in MINUTES by Recon to request SCM DB Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.container.sync.task.initial.delay</name>
+    <value>2m</value>
+    <tag>OZONE, MANAGEMENT, RECON, SCM</tag>
+    <description>
+      Initial delay before Recon starts the incremental SCM container sync task.
+      This is slightly later than the SCM snapshot initial delay so the snapshot
+      can initialize Recon's SCM DB before the first incremental sync runs.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.container.sync.task.interval.delay</name>
+    <value>1h</value>
+    <tag>OZONE, MANAGEMENT, RECON, SCM</tag>
+    <description>
+      Interval between incremental SCM container sync runs in Recon. Each cycle
+      evaluates drift between SCM and Recon and either runs the targeted
+      multi-pass sync or takes no action.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.deleted.container.check.batch.size</name>
+    <value>500</value>
+    <tag>OZONE, RECON, SCM, PERFORMANCE</tag>
+    <description>
+      Maximum number of CLOSED or QUASI_CLOSED Recon containers checked against
+      SCM per incremental sync cycle for DELETING or DELETED retirement.
     </description>
   </property>
   <property>
