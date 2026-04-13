@@ -508,22 +508,10 @@ public final class ScmInvokerCodeGenerator {
       return;
     }
 
-    final String condition =
-        String.format("Arrays.equals(parameterTypes, new Class<?>[]{%s})", params);
-
-    if ((indentation + "if (" + condition + ")").length() <= LINE_LENGTH) {
-      printf("if (%s)", condition);
-      try (UncheckedAutoCloseable ignore = printScope()) {
-        println("return %s.class;", getClassname(method.getReturnType()));
-      }
-    } else {
-      println("if (Arrays.equals(parameterTypes,");
-      try (UncheckedAutoCloseable ignore = printScope(false, 1)) {
-        println("new Class<?>[]{%s}))", params);
-      }
-      try (UncheckedAutoCloseable ignore = printScope()) {
-        println("return %s.class;", getClassname(method.getReturnType()));
-      }
+    println("if (Arrays.equals(parameterTypes,");
+    printf(true, "    new Class<?>[]{%s}))", params);
+    try (UncheckedAutoCloseable ignore = printScope()) {
+      println("return %s.class;", getClassname(method.getReturnType()));
     }
   }
 
