@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MAX_CONTA
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MIN_CONTAINER_ID;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -485,21 +486,27 @@ public class ContainerEndpoint {
     final ContainerSchemaDefinition.UnHealthyContainerStates filterState = internalState;
 
     StreamingOutput stream = outputStream -> {
-      try (Cursor<UnhealthyContainersRecord> cursor =
+      try (BufferedOutputStream bos = new BufferedOutputStream(outputStream, 256 * 1024);
+           Cursor<UnhealthyContainersRecord> cursor =
                containerHealthSchemaManager.getUnhealthyContainersCursor(filterState, limit)) {
         
-        PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
+        PrintWriter writer = new PrintWriter(new OutputStreamWriter(bos, StandardCharsets.UTF_8));
         
         // Write CSV header
         writer.println("container_id,container_state,in_state_since," +
             "expected_replica_count,actual_replica_count,replica_delta");
         
+        StringBuilder sb = new StringBuilder(128);
         while (cursor.hasNext()) {
           UnhealthyContainersRecord rec = cursor.fetchNext();
-          writer.printf("%d,%s,%d,%d,%d,%d%n",
-              rec.getContainerId(), rec.getContainerState(),
-              rec.getInStateSince(), rec.getExpectedReplicaCount(),
-              rec.getActualReplicaCount(), rec.getReplicaDelta());
+          sb.setLength(0);
+          sb.append(rec.getContainerId()).append(',')
+              .append(rec.getContainerState()).append(',')
+              .append(rec.getInStateSince()).append(',')
+              .append(rec.getExpectedReplicaCount()).append(',')
+              .append(rec.getActualReplicaCount()).append(',')
+              .append(rec.getReplicaDelta());
+          writer.println(sb);
         }
         writer.flush();
       } catch (Exception e) {

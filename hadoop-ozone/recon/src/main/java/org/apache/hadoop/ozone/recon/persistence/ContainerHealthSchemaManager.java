@@ -397,12 +397,19 @@ public class ContainerHealthSchemaManager {
 
     if (state != null) {
       query.addConditions(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(state.toString()));
+      // Single-state filter: ordering by container_state is redundant (every
+      // row has the same value).  ORDER BY container_id alone lets Derby walk
+      // the composite index idx_state_container_id in order and return rows
+      // immediately — no sort step, eliminating "time to first byte" delay.
+      query.addOrderBy(UNHEALTHY_CONTAINERS.CONTAINER_ID.asc());
+    } else {
+      // All-states query: order by state first, then container_id.  This
+      // matches the composite index order so Derby can still avoid a sort.
+      query.addOrderBy(
+          UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc(),
+          UNHEALTHY_CONTAINERS.CONTAINER_ID.asc()
+      );
     }
-
-    query.addOrderBy(
-        UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc(),
-        UNHEALTHY_CONTAINERS.CONTAINER_ID.asc()
-    );
 
     if (limit > 0) {
       query.addLimit(limit);
