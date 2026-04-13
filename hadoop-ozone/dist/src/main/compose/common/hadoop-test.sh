@@ -21,7 +21,9 @@ if [[ ${SECURITY_ENABLED} == "true" ]]; then
 fi
 export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_compose_file}
 
-: ${HADOOP_IMAGE:="${docker.hadoop.image}"}
+DEFAULT_HADOOP_IMAGE="${docker.hadoop.image}"
+
+: ${HADOOP_IMAGE:="${DEFAULT_HADOOP_IMAGE}"}
 : ${HADOOP_TEST_IMAGES:=""}
 
 if [[ -z "${HADOOP_TEST_IMAGES}" ]]; then
@@ -57,6 +59,7 @@ for HADOOP_TEST_IMAGE in $HADOOP_TEST_IMAGES; do
   hadoop_version=$(docker run --rm "${HADOOP_TEST_IMAGE}" bash -c "hadoop version | grep -m1 '^Hadoop' | cut -f2 -d' '")
   export HADOOP_MAJOR_VERSION=${hadoop_version%%.*}
 
+  retry docker-compose --ansi never --profile hadoop pull nm rm
   docker-compose --ansi never --profile hadoop up -d nm rm
 
   execute_command_in_container rm hadoop version

@@ -144,6 +144,8 @@ public class ContainerBalancerTask implements Runnable {
     this.moveManager.setMoveTimeout(config.getMoveTimeout().toMillis());
     this.moveManager.setReplicationTimeout(
         config.getMoveReplicationTimeout().toMillis());
+    this.moveManager.setIncludeNonStandardContainers(
+        config.getIncludeNonStandardContainers());
     this.delayStart = delayStart;
     this.ozoneConfiguration = scm.getConfiguration();
     this.containerBalancer = containerBalancer;
@@ -996,7 +998,8 @@ public class ContainerBalancerTask implements Runnable {
             result == MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
-            result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION) {
+            result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION ||
+            result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE) {
           // add source back to queue as a different container can be selected in next run.
           // the container which caused failure of move is not excluded
           // as it is an intermittent failure or a replica related failure

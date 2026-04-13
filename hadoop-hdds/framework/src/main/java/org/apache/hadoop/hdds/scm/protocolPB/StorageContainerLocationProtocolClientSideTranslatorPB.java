@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -109,6 +110,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -124,6 +127,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SuppressContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -145,6 +150,8 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -162,6 +169,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private final StorageContainerLocationProtocolPB rpcProxy;
   private final SCMContainerLocationFailoverProxyProvider fpp;
+  private final ScmNodeTarget targetScmNode;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(StorageContainerLocationProtocolClientSideTranslatorPB.class);
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -170,8 +180,20 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   public StorageContainerLocationProtocolClientSideTranslatorPB(
       SCMContainerLocationFailoverProxyProvider proxyProvider) {
+    this(proxyProvider, null);
+  }
+
+  /**
+   * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB with a ScmNodeTarget.
+   *
+   * @param proxyProvider {@link SCMContainerLocationFailoverProxyProvider}
+   * @param targetScmNode {@link ScmNodeTarget} to route requests to specific SCM nodes
+   */
+  public StorageContainerLocationProtocolClientSideTranslatorPB(
+      SCMContainerLocationFailoverProxyProvider proxyProvider, ScmNodeTarget targetScmNode) {
     Objects.requireNonNull(proxyProvider, "proxyProvider == null");
     this.fpp = proxyProvider;
+    this.targetScmNode = targetScmNode;
     this.rpcProxy = (StorageContainerLocationProtocolPB) RetryProxy.create(
         StorageContainerLocationProtocolPB.class,
         fpp,
@@ -202,6 +224,17 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private ScmContainerLocationResponse submitRpcRequest(
       ScmContainerLocationRequest wrapper) throws ServiceException {
+    // If targetScmNode has a specific node ID, route follower-readable requests to that node
+    if (targetScmNode != null && targetScmNode.hasNodeId() && 
+        FOLLOWER_READABLE_COMMAND_TYPES.contains(wrapper.getCmdType())) {
+      try {
+        StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(targetScmNode.getNodeId());
+        return proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+      } catch (IOException e) {
+        throw new ServiceException("Failed to get proxy for node: " + targetScmNode.getNodeId(), e);
+      }
+    }
+
     if (!ADMIN_COMMAND_TYPE.contains(wrapper.getCmdType())) {
       return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
     }
@@ -414,6 +447,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
       throws IOException {
+    return listContainer(startContainerID, count, state, replicationType, replicationConfig, null);
+  }
+
+  @Override
+  public ContainerListResult listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed)
+      throws IOException {
     Preconditions.checkState(startContainerID >= 0,
         "Container ID cannot be negative.");
     Preconditions.checkState(count > 0,
@@ -423,6 +466,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     builder.setStartContainerID(startContainerID);
     builder.setCount(count);
     builder.setTraceID(TracingUtil.exportCurrentSpan());
+    if (suppressed != null) {
+      builder.setSuppressed(suppressed);
+    }
     if (state != null) {
       builder.setState(state);
     }
@@ -843,13 +889,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.GetSafeModeRuleStatuses,
             builder -> builder.setGetSafeModeRuleStatusesRequest(request))
             .getGetSafeModeRuleStatusesResponse();
-    Map<String, Pair<Boolean, String>> map = new HashMap();
-    for (SafeModeRuleStatusProto statusProto :
-        response.getSafeModeRuleStatusesProtoList()) {
-      map.put(statusProto.getRuleName(),
+    return buildSafeModeRuleStatusesMap(response);
+  }
+
+  /**
+   * Helper method to build a map from GetSafeModeRuleStatusesResponseProto.
+   * Extracts rule names and their status information.
+   */
+  private Map<String, Pair<Boolean, String>> buildSafeModeRuleStatusesMap(
+      GetSafeModeRuleStatusesResponseProto response) {
+    Map<String, Pair<Boolean, String>> ruleStatuses = new HashMap<>();
+    for (SafeModeRuleStatusProto statusProto : response.getSafeModeRuleStatusesProtoList()) {
+      ruleStatuses.put(statusProto.getRuleName(),
           Pair.of(statusProto.getValidate(), statusProto.getStatusText()));
     }
-    return map;
+    return ruleStatuses;
   }
 
   /**
@@ -930,7 +984,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes,
-      Optional<String> excludeContainers) throws IOException {
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException {
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -1019,6 +1074,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (excludeContainers.isPresent()) {
       String ec = excludeContainers.get();
       builder.setExcludeContainers(ec);
+    }
+
+    if (includeContainers.isPresent()) {
+      String ic = includeContainers.get();
+      builder.setIncludeContainers(ic);
     }
 
     StartContainerBalancerRequestProto request = builder.build();
@@ -1208,10 +1268,30 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers(
-      long startContainerID, int count, HddsProtos.LifeCycleState state)
+  public List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
-    return listContainer(startContainerID, count, state).getContainerInfoList();
+    Preconditions.checkState(startContainerID.getId() >= 0,
+        "Container ID cannot be negative.");
+    Preconditions.checkState(count > 0,
+        "Container count must be greater than 0.");
+    SCMListContainerIDsRequestProto.Builder builder = SCMListContainerIDsRequestProto
+        .newBuilder();
+    builder.setStartContainerID(startContainerID.getProtobuf());
+    builder.setCount(count);
+    builder.setTraceID(TracingUtil.exportCurrentSpan());
+    builder.setState(state);
+
+    SCMListContainerIDsRequestProto request = builder.build();
+
+    SCMListContainerIDsResponseProto response =
+        submitRequest(Type.ListContainerIDs,
+            builder1 -> builder1.setScmListContainerIDsRequest(request))
+            .getScmListContainerIDsResponse();
+    return response.getContainerIDsList()
+        .stream()
+        .map(ContainerID::getFromProtobuf)
+        .collect(Collectors.toList());
   }
 
   @Override
@@ -1245,5 +1325,38 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .build();
     // TODO check error handling.
     submitRequest(Type.ReconcileContainer, builder -> builder.setReconcileContainerRequest(request));
+  }
+
+  @Override
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress)
+      throws IOException {
+    SuppressContainerRequestProto request = SuppressContainerRequestProto.newBuilder()
+        .addAllContainerIDs(containerIds)
+        .setSuppress(suppress)
+        .build();
+    SuppressContainerResponseProto response =
+        submitRequest(Type.SuppressContainer, builder -> builder.setSuppressContainerRequest(request))
+            .getSuppressContainerResponse();
+    return response.getFailedContainerIDsList();
+  }
+
+  /**
+   * Holder class to store the target SCM node ID for routing requests.
+   * This allows requests to be directed to specific SCM nodes in an HA cluster.
+   */
+  public static class ScmNodeTarget {
+    private String nodeId;
+
+    public String getNodeId() {
+      return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+      this.nodeId = nodeId;
+    }
+
+    public boolean hasNodeId() {
+      return nodeId != null && !nodeId.isEmpty();
+    }
   }
 }

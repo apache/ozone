@@ -144,7 +144,7 @@ public final class NSSummaryCLIUtils {
     if (!path.startsWith("ofs://")) {
       return path;
     }
-    int idx = path.indexOf("/", OFS_PREFIX.length());
+    int idx = path.indexOf('/', OFS_PREFIX.length());
     if (idx == -1) {
       return path.substring(OFS_PREFIX.length());
     }

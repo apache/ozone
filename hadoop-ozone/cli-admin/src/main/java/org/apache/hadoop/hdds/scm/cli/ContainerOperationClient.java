@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -94,8 +95,16 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
+    this(conf, null);
+  }
+
+  public ContainerOperationClient(OzoneConfiguration conf, ScmNodeTarget targetScmNode) throws IOException {
     this.configuration = conf;
-    storageContainerLocationClient = newContainerRpcClient(conf);
+    if (targetScmNode != null) {
+      storageContainerLocationClient = newContainerRpcClientForNode(conf, targetScmNode);
+    } else {
+      storageContainerLocationClient = newContainerRpcClient(conf);
+    }
     secretKeyClient = newSecretKeyClient(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -133,6 +142,11 @@ public class ContainerOperationClient implements ScmClient {
   public static StorageContainerLocationProtocol newContainerRpcClient(
       ConfigurationSource configSource) {
     return HAUtils.getScmContainerClient(configSource);
+  }
+
+  public static StorageContainerLocationProtocol newContainerRpcClientForNode(
+      ConfigurationSource configSource, ScmNodeTarget targetScmNode) {
+    return HAUtils.getScmContainerClientForNode(configSource, targetScmNode);
   }
 
   public static SecretKeyProtocolScm newSecretKeyClient(
@@ -376,6 +390,22 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public ContainerListResult listContainer(long startContainerID,
+       int count, HddsProtos.LifeCycleState state,
+       HddsProtos.ReplicationType repType,
+       ReplicationConfig replicationConfig,
+       Boolean suppressed) throws IOException {
+    if (count > maxCountOfContainerList) {
+      LOG.warn("Attempting to list {} containers. However, this exceeds" +
+          " the cluster's current limit of {}. The results will be capped at the" +
+          " maximum allowed count.", count, maxCountOfContainerList);
+      count = maxCountOfContainerList;
+    }
+    return storageContainerLocationClient.listContainer(
+        startContainerID, count, state, repType, replicationConfig, suppressed);
+  }
+
+  @Override
   public ContainerDataProto readContainer(long containerID,
       Pipeline pipeline) throws IOException {
     XceiverClientManager clientManager = getXceiverClientManager();
@@ -511,13 +541,14 @@ public class ContainerOperationClient implements ScmClient {
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes,
-      Optional<String> excludeContainers) throws IOException {
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException {
     return storageContainerLocationClient.startContainerBalancer(threshold,
         iterations, maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes, excludeContainers);
+        excludeNodes, excludeContainers, includeContainers);
   }
 
   @Override
@@ -598,5 +629,10 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public void reconcileContainer(long id) throws IOException {
     storageContainerLocationClient.reconcileContainer(id);
+  }
+
+  @Override
+  public List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException {
+    return storageContainerLocationClient.suppressContainers(containerIds, suppress);
   }
 }

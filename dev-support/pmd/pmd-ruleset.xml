@@ -39,9 +39,13 @@
   <rule ref="category/java/performance.xml/AddEmptyString"/>
   <rule ref="category/java/performance.xml/AppendCharacterWithChar" />
   <rule ref="category/java/performance.xml/AvoidFileStream"/>
+  <rule ref="category/java/performance.xml/ConsecutiveAppendsShouldReuse"/>
   <rule ref="category/java/performance.xml/InefficientEmptyStringCheck"/>
   <rule ref="category/java/performance.xml/InefficientStringBuffering"/>
   <rule ref="category/java/performance.xml/StringInstantiation"/>
+  <rule ref="category/java/performance.xml/StringToString"/>
+  <rule ref="category/java/performance.xml/UseArraysAsList"/>
+  <rule ref="category/java/performance.xml/UseIndexOfChar"/>
   <rule ref="category/java/performance.xml/UseStringBufferLength"/>
 
   <rule ref="category/java/codestyle.xml/FieldDeclarationsShouldBeAtStartOfClass">

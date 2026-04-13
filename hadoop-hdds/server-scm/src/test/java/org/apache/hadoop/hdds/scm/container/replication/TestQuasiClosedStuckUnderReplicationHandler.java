@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,7 +41,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -115,10 +116,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testReturnsZeroIfNotUnderReplicated() throws IOException {
     final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
+        QUASI_CLOSED, Pair.of(origin, IN_SERVICE), Pair.of(origin, IN_SERVICE), Pair.of(origin, IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1);
     assertEquals(0, count);
@@ -128,9 +126,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testNoCommandsScheduledIfPendingOps() throws IOException {
     final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
+        QUASI_CLOSED, Pair.of(origin, IN_SERVICE), Pair.of(origin, IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
@@ -143,8 +139,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testCommandScheduledForUnderReplicatedContainer() throws IOException {
     final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
+        QUASI_CLOSED, Pair.of(origin, IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1);
     assertEquals(2, count);
@@ -155,10 +150,13 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testOverloadedExceptionContinuesAndThrows() throws NotLeaderException, CommandTargetOverloadedException {
     final DatanodeID origin1 = DatanodeID.randomID();
     final DatanodeID origin2 = DatanodeID.randomID();
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin2, IN_SERVICE, QUASI_CLOSED, 5));
 
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(replicationManager, commandsSent, new AtomicBoolean(true));
 
@@ -172,9 +170,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     final DatanodeID origin1 = DatanodeID.randomID();
     final DatanodeID origin2 = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
+        QUASI_CLOSED, Pair.of(origin1, IN_SERVICE), Pair.of(origin2, IN_SERVICE));
 
     PlacementPolicy policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager, conf);
     handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);
@@ -188,8 +184,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   public void testPartialReplicationExceptionThrown() {
     final DatanodeID origin1 = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE));
+        QUASI_CLOSED, Pair.of(origin1, IN_SERVICE));
 
     PlacementPolicy policy = ReplicationTestUtil.getInsufficientNodesTestPlacementPolicy(nodeManager, conf, 2);
     handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);
@@ -197,6 +192,34 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     assertThrows(InsufficientDatanodesException.class, () ->
         handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1));
     assertEquals(1, commandsSent.size());
+  }
+
+  @Test
+  public void testOriginCopies() throws IOException {
+    final DatanodeID origin1 = DatanodeID.randomID();
+    final DatanodeID origin2 = DatanodeID.randomID();
+
+    // Configure default copy counts: best origin gets 3 copies, other origins get 2 copies.
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        new OzoneConfiguration().getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    rmConf.setQuasiClosedStuckBestOriginCopies(3);
+    rmConf.setQuasiClosedStuckOtherOriginCopies(2);
+    when(replicationManager.getConfig()).thenReturn(rmConf);
+
+    // origin1 is the best origin (BCSID=10, target=3): has 2 copies, needs 1 more.
+    // origin2 is an other origin (BCSID=5, target=2): has 2 copies, already at target.
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(
+        container.containerID(), origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(
+        container.containerID(), origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(
+        container.containerID(), origin2, IN_SERVICE, QUASI_CLOSED, 5));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(
+        container.containerID(), origin2, IN_SERVICE, QUASI_CLOSED, 5));
+
+    int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1);
+    assertEquals(1, count);
   }
 
   private ContainerHealthResult.UnderReplicatedHealthResult getUnderReplicatedHealthResult() {

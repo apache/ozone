@@ -22,7 +22,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 /**
  * {@link ScmCodec} for {@code Boolean} objects.
  */
-public class ScmBooleanCodec implements ScmCodec<Boolean> {
+class ScmBooleanCodec implements ScmCodec<Boolean> {
   static final ByteString TRUE = ByteString.copyFromUtf8(Boolean.TRUE.toString());
   static final ByteString FALSE = ByteString.copyFromUtf8(Boolean.FALSE.toString());
 
@@ -32,7 +32,7 @@ public class ScmBooleanCodec implements ScmCodec<Boolean> {
   }
 
   @Override
-  public Boolean deserialize(Class<?> type, ByteString value) {
+  public Boolean deserialize(ByteString value) {
     return value.equals(TRUE) ? Boolean.TRUE : Boolean.FALSE;
   }
 }

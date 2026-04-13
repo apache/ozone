@@ -179,6 +179,8 @@ start_docker_env(){
 
   docker-compose --ansi never down --remove-orphans
 
+  retry docker-compose --ansi never pull
+
   opts=""
   if has_scalable_datanode; then
     opts="--scale datanode=${datanode_count}"
@@ -251,7 +253,7 @@ execute_robot_test(){
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SCM:"${SCM}" \
-      ${ARGUMENTS[@]} --log NONE --report NONE --output "$OUTPUT_PATH" \
+      ${ARGUMENTS[@]-} --log NONE --report NONE --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
@@ -357,6 +359,30 @@ save_container_logs() {
   done
 }
 
+retry() {
+  local -i n=0
+  local -i attempts=${RETRY_ATTEMPTS:-3}
+  local -i rc=0
+
+  set +e
+  while [[ $n -lt $attempts ]]; do
+    if "$@"; then
+      rc=0
+      break
+    fi
+    let n++
+
+    if [[ $n -eq $attempts ]]; then
+      echo "ERROR: $n attempts failed to: $@"
+      rc=1
+    else
+      sleep ${RETRY_SLEEP:-3}
+    fi
+  done
+  set -e
+
+  return ${rc}
+}
 
 ## @description wait until the port is available on the given host
 ## @param The host to check for the port
