@@ -126,4 +126,15 @@ public class TestEndpointBase {
     assertFalse(endpointBase.isAccessDenied(new OMException(ResultCodes.BUCKET_NOT_FOUND)));
   }
 
+  @Test
+  public void testExpiredTokenResultCode() {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+    };
+
+    assertTrue(endpointBase.isExpiredToken(new OMException(ResultCodes.TOKEN_EXPIRED)));
+    assertFalse(endpointBase.isExpiredToken(new OMException(ResultCodes.INVALID_TOKEN)));
+  }
+
 }
