@@ -79,6 +79,22 @@ public class TracingConfig extends ReconfigurableConfig {
   )
   private String spanSampling;
 
+  @Config(
+      key = "ozone.tracing.client.application-aware",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      reconfigurable = true,
+      tags = { ConfigTag.OZONE, ConfigTag.HDDS },
+      description = "When true and Ozone's own tracing is disabled, the client may still "
+          + "emit child spans using the application's OpenTelemetry (GlobalOpenTelemetry) "
+          + "when an active span exists in Context."
+  )
+  private boolean clientApplicationAware;
+
+  public boolean isClientApplicationAware() {
+    return clientApplicationAware;
+  }
+
   public boolean isTracingEnabled() {
     return tracingEnabled;
   }
