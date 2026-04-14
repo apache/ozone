@@ -172,10 +172,11 @@ class ReconStorageContainerSyncHelper {
     int perStateDriftThreshold = ozoneConfiguration.getInt(
         OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD,
         OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT);
+    List<ContainerInfo> reconContainers = containerManager.getContainers();
 
     // --- Check 1: total container count drift ---
     long scmTotal = scmServiceProvider.getContainerCount();
-    long reconTotal = containerManager.getContainers().size();
+    long reconTotal = reconContainers.size();
     long totalDrift = Math.abs(scmTotal - reconTotal);
 
     if (totalDrift > largeThreshold) {
@@ -198,10 +199,10 @@ class ReconStorageContainerSyncHelper {
     long scmOpen = scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.OPEN);
     long scmQuasiClosed =
         scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
-    long reconOpen = containerManager.getContainers().stream()
+    long reconOpen = reconContainers.stream()
         .filter(c -> c.getState() == HddsProtos.LifeCycleState.OPEN)
         .count();
-    long reconQuasiClosed = containerManager.getContainers().stream()
+    long reconQuasiClosed = reconContainers.stream()
         .filter(c -> c.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED)
         .count();
     long scmClosed = Math.max(0, scmTotal - scmOpen - scmQuasiClosed);

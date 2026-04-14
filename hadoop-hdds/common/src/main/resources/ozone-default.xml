@@ -3607,11 +3607,11 @@
   </property>
   <property>
     <name>ozone.recon.scm.container.threshold</name>
-    <value>100</value>
+    <value>10000</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
-      Threshold value for the difference in number of containers
-      in SCM and RECON.
+      Total container count drift threshold above which Recon escalates from
+      incremental SCM container sync to a full SCM DB snapshot sync.
     </description>
   </property>
   <property>
