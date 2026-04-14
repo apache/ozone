@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -123,17 +124,23 @@ public class PendingContainerTracker {
     /**
      * Add container to current window.
      */
-    synchronized boolean add(ContainerID containerID) {
-      return currentWindow.add(containerID);
+    synchronized boolean add(ContainerID containerID, DatanodeID dnID) {
+      boolean added = currentWindow.add(containerID);
+      LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
+          containerID, dnID, added, getCount());
+      return added;
     }
 
     /**
      * Remove container from both windows.
      */
-    synchronized boolean remove(ContainerID containerID) {
+    synchronized boolean remove(ContainerID containerID, DatanodeID dnID) {
       boolean removedFromCurrent = currentWindow.remove(containerID);
       boolean removedFromPrevious = previousWindow.remove(containerID);
-      return removedFromCurrent || removedFromPrevious;
+      boolean removed = removedFromCurrent || removedFromPrevious;
+      LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
+          containerID, dnID, removed, getCount());
+      return removed;
     }
 
     /**
@@ -162,15 +169,9 @@ public class PendingContainerTracker {
     }
 
     TwoWindowBucket get(DatanodeDetails dn) {
-      if (dn == null) {
-        return null;
-      }
+      Objects.requireNonNull(dn, "dn == null");
       return get(dn.getID());
     }
-  }
-
-  public PendingContainerTracker(long maxContainerSize) {
-    this(maxContainerSize, 5 * 60 * 1000, null); // Default 5 minutes
   }
 
   public PendingContainerTracker(long maxContainerSize, long rollIntervalMs,
@@ -188,9 +189,7 @@ public class PendingContainerTracker {
    * allocations or container reports touching this tracker.
    */
   public void rollWindowsIfNeeded(DatanodeDetails node) {
-    if (node == null) {
-      return;
-    }
+    Objects.requireNonNull(node, "node == null");
     datanodeBuckets.get(node.getID());
   }
 
@@ -205,7 +204,9 @@ public class PendingContainerTracker {
    */
   public boolean hasEffectiveAllocatableSpaceForNewContainer(
       DatanodeDetails node, DatanodeInfo datanodeInfo, long containerSize) {
-    if (node == null || datanodeInfo == null || containerSize <= 0) {
+    Objects.requireNonNull(node, "node == null");
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
+    if (containerSize <= 0) {
       return false;
     }
     long pendingBytes = getPendingAllocationSize(node);
@@ -238,10 +239,8 @@ public class PendingContainerTracker {
    * @param containerID The container being allocated
    */
   public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
-    if (pipeline == null || containerID == null) {
-      LOG.warn("Ignoring null pipeline or containerID");
-      return;
-    }
+    Objects.requireNonNull(pipeline, "pipeline == null");
+    Objects.requireNonNull(containerID, "containerID == null");
 
     for (DatanodeDetails node : pipeline.getNodes()) {
       recordPendingAllocationForDatanode(node, containerID);
@@ -256,10 +255,8 @@ public class PendingContainerTracker {
    * @param containerID The container being allocated/replicated
    */
   public void recordPendingAllocationForDatanode(DatanodeDetails node, ContainerID containerID) {
-    if (node == null || containerID == null) {
-      LOG.warn("Ignoring null node or containerID");
-      return;
-    }
+    Objects.requireNonNull(node, "node == null");
+    Objects.requireNonNull(containerID, "containerID == null");
 
     DatanodeID dnID = node.getID();
     boolean added = addContainerToBucket(containerID, dnID);
@@ -270,13 +267,7 @@ public class PendingContainerTracker {
   }
 
   private boolean addContainerToBucket(ContainerID containerID, DatanodeID dnID) {
-    TwoWindowBucket bucket = datanodeBuckets.get(dnID);
-    synchronized (bucket) {
-      boolean added = bucket.add(containerID);
-      LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
-          containerID, dnID, added, bucket.getCount());
-      return added;
-    }
+    return datanodeBuckets.get(dnID).add(containerID, dnID);
   }
 
   /**
@@ -288,9 +279,8 @@ public class PendingContainerTracker {
    * @param containerID The container to remove from pending
    */
   public void removePendingAllocation(DatanodeDetails node, ContainerID containerID) {
-    if (node == null || containerID == null) {
-      return;
-    }
+    Objects.requireNonNull(node, "node == null");
+    Objects.requireNonNull(containerID, "containerID == null");
 
     DatanodeID dnID = node.getID();
     boolean removed = removeContainerFromBucket(containerID, dnID);
@@ -301,13 +291,7 @@ public class PendingContainerTracker {
   }
 
   private boolean removeContainerFromBucket(ContainerID containerID, DatanodeID dnID) {
-    TwoWindowBucket bucket = datanodeBuckets.get(dnID);
-    synchronized (bucket) {
-      boolean removed = bucket.remove(containerID);
-      LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
-          containerID, dnID, removed, bucket.getCount());
-      return removed;
-    }
+    return datanodeBuckets.get(dnID).remove(containerID, dnID);
   }
 
   /**
@@ -320,9 +304,7 @@ public class PendingContainerTracker {
    * @return Total bytes of pending container allocations
    */
   public long getPendingAllocationSize(DatanodeDetails node) {
-    if (node == null) {
-      return 0;
-    }
+    Objects.requireNonNull(node, "node == null");
     return getPendingContainerCount(node) * maxContainerSize;
   }
 
@@ -334,13 +316,8 @@ public class PendingContainerTracker {
    * @return Pending container count
    */
   public long getPendingContainerCount(DatanodeDetails node) {
-    if (node == null) {
-      return 0;
-    }
-    TwoWindowBucket bucket = datanodeBuckets.get(node);
-    synchronized (bucket) {
-      return bucket.getCount();
-    }
+    Objects.requireNonNull(node, "node == null");
+    return datanodeBuckets.get(node).getCount();
   }
 
   /**
@@ -348,13 +325,9 @@ public class PendingContainerTracker {
    */
   @VisibleForTesting
   public boolean containsPendingContainer(DatanodeDetails node, ContainerID containerID) {
-    if (node == null || containerID == null) {
-      return false;
-    }
-    TwoWindowBucket bucket = datanodeBuckets.get(node);
-    synchronized (bucket) {
-      return bucket.contains(containerID);
-    }
+    Objects.requireNonNull(node, "node == null");
+    Objects.requireNonNull(containerID, "containerID == null");
+    return datanodeBuckets.get(node).contains(containerID);
   }
 
   @VisibleForTesting

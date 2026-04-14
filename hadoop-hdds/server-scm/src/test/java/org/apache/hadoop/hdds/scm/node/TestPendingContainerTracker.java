@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Timeout;
 public class TestPendingContainerTracker {
 
   private static final long MAX_CONTAINER_SIZE = 5L * 1024 * 1024 * 1024; // 5GB
-
+  private static final long DEFAULT_ROLL_INTERVAL_MS = 5 * 60 * 1000;
   private static final int NUM_DATANODES = 1000;
   private static final int NUM_PIPELINES = 1000;
   private static final int NUM_CONTAINERS = 10_000;
@@ -59,7 +59,7 @@ public class TestPendingContainerTracker {
 
   @BeforeEach
   public void setUp() throws IOException {
-    tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE);
+    tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, DEFAULT_ROLL_INTERVAL_MS, null);
 
     datanodes = new ArrayList<>(NUM_DATANODES);
     for (int i = 0; i < NUM_DATANODES; i++) {
