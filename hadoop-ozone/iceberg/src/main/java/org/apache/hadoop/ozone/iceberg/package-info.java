@@ -16,6 +16,6 @@
  */
 
 /**
- * Iceberg integration classes for Ozone.
+ * Filesystem-related utilities.
  */
-package org.apache.hadoop.ozone.iceberg;
+package org.apache.hadoop.hdds.fs;
