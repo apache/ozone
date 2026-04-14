@@ -164,7 +164,10 @@ public enum S3ErrorTable {
 
   BAD_DIGEST(
       "BadDigest", "The Content-MD5 or checksum value that you specified did not match what the server received.",
-      HTTP_BAD_REQUEST);
+      HTTP_BAD_REQUEST),
+
+  INVALID_DIGEST(
+      "InvalidDigest", "The Content-MD5 you specified is not valid.", HTTP_BAD_REQUEST);
 
   private static final Logger LOG = LoggerFactory.getLogger(S3ErrorTable.class);
 
