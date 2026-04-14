@@ -216,7 +216,8 @@ public class PendingContainerTracker {
   private boolean hasAllocatableSpaceAfterPending(
       DatanodeInfo datanodeInfo, long containerSize, long pendingAllocationBytes) {
     List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
-    if (storageReports == null || storageReports.isEmpty()) {
+    Objects.requireNonNull(storageReports, "storageReports == null");
+    if (storageReports.isEmpty()) {
       return false;
     }
     for (StorageReportProto report : storageReports) {
