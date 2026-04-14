@@ -1259,6 +1259,30 @@ public class TestIamSessionPolicyResolver {
   }
 
   @Test
+  public void testAllActionsForKeyWithPrefixCondition() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket/*\",\n" +
+        "    \"Condition\": {\n" +
+        "      \"StringLike\": {\n" +
+        "        \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
+        "      }\n" +
+        "    }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected - only ListBucket supports s3:prefix and that is a bucket action,
+    // not object action
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
+  }
+
+  @Test
   public void testAllActionsForBucket() throws OMException {
     final String json = "{\n" +
         "  \"Statement\": [{\n" +
@@ -1284,6 +1308,46 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
     expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("my-bucket", "*")), acls(READ)));
     expectedResolvedRanger.add(new OzoneGrant(bucketSet, allBucketAcls));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllActionsForBucketWithPrefixCondition() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"arn:aws:s3:::my-bucket\",\n" +
+        "    \"Condition\": {\n" +
+        "      \"StringLike\": {\n" +
+        "        \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
+        "      }\n" +
+        "    }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
+    // Expected for native: READ, LIST ACLs for bucket (only ListBucket supports s3:prefix); volume READ;
+    // prefix "team/folder", "team/folder/" READ
+    final Set<IOzoneObj> bucketSet = objSet(bucket("my-bucket"));
+    final Set<ACLType> bucketAcls = acls(READ, LIST);
+    expectedResolvedNative.add(
+        new OzoneGrant(objSet(volume(), prefix("my-bucket", "team/folder"), prefix("my-bucket", "team/folder/")),
+            acls(READ)));
+    expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
+    assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
+
+    // Expected for Ranger: READ, LIST ACLs for bucket (only ListBucket supports s3:prefix); volume READ,
+    // key "team/folder", "team/folder/*" READ
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume(), key("my-bucket", "team/folder"), key("my-bucket", "team/folder/*")),
+            acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1517,11 +1581,11 @@ public class TestIamSessionPolicyResolver {
         "      \"Effect\": \"Allow\",\n" +
         "      \"Action\": [\n" +
         "        \"s3:GetAccelerateConfiguration\",\n" +    // unsupported action
-        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:GetBucketAcl\",\n" +                  // ignored because it doesn't support s3:prefix condition
         "        \"s3:GetObject\",\n" +                     // object-level action not applied for bucket
         "        \"s3:GetObjectAcl\",\n" +                  // unsupported action
         "        \"s3:ListBucket\",\n" +
-        "        \"s3:ListBucketMultipartUploads\"\n" +
+        "        \"s3:ListBucketMultipartUploads\"\n" +     // ignored because it doesn't support s3:prefix condition
         "      ],\n" +
         "      \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
         "      \"Condition\": {\n" +
@@ -1539,16 +1603,16 @@ public class TestIamSessionPolicyResolver {
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
 
-    // Expected for native: READ, LIST, READ_ACL bucket acls; volume and prefixes "team/folder", "team/folder/" READ
+    // Expected for native: READ, LIST bucket acls; volume and prefixes "team/folder", "team/folder/" READ
     final Set<IOzoneObj> bucketSet = objSet(bucket("bucket1"));
-    final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL);
+    final Set<ACLType> bucketAcls = acls(READ, LIST);
     expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
     expectedResolvedNative.add(new OzoneGrant(
         objSet(volume(), prefix("bucket1", "team/folder"), prefix("bucket1", "team/folder/")), acls(READ)));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: READ, LIST, READ_ACL bucket acls; volume and keys "team/folder" and "team/folder/*" READ
+    // Expected for Ranger: READ, LIST bucket acls; volume and keys "team/folder" and "team/folder/*" READ
     expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
     expectedResolvedRanger.add(new OzoneGrant(
         objSet(volume(), key("bucket1", "team/folder"), key("bucket1", "team/folder/*")), acls(READ)));
@@ -1569,17 +1633,37 @@ public class TestIamSessionPolicyResolver {
     final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
     final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
 
-    // Ensure what we got is what we expected
+    // s3:prefix conditions do not apply to object actions like s3:GetObject.
+    assertThat(resolvedFromNativeAuthorizer).isEmpty();
+    assertThat(resolvedFromRangerAuthorizer).isEmpty();
+  }
+
+  @Test
+  public void testListAndGetWithPrefixConditionSkipsObjectAction() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": [\"s3:ListBucket\", \"s3:GetObject\"],\n" +
+        "    \"Resource\": [\"arn:aws:s3:::logs\", \"arn:aws:s3:::logs/*\"],\n" +
+        "    \"Condition\": { \"StringLike\": { \"s3:prefix\": \"team/*\" } }\n" +
+        "  }]\n" +
+        "}";
+
+    final Set<OzoneGrant> resolvedFromNativeAuthorizer = resolve(json, VOLUME, NATIVE);
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+
+    // Expected for native (GetObject is ignored because s3:prefix is present): READ, LIST bucket acls; volume READ;
+    // prefix "log/team" READ
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
-    // Expected for native: READ acl on prefix "" (condition prefixes are ignored); bucket READ; volume READ;
-    final Set<IOzoneObj> readObjectsNative = objSet(prefix("logs", ""), bucket("logs"), volume());
-    expectedResolvedNative.add(new OzoneGrant(readObjectsNative, acls(READ)));
+    expectedResolvedNative.add(new OzoneGrant(objSet(bucket("logs")), acls(READ, LIST)));
+    expectedResolvedNative.add(new OzoneGrant(objSet(volume(), prefix("logs", "team/")), acls(READ)));
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
+    // Expected for Ranger (GetObject is ignored because s3:prefix is present): READ, LIST bucket acls; volume READ;
+    // key "log/team/*" READ
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: READ acl on key "*" (condition prefixes are ignored)
-    final Set<IOzoneObj> keySet = objSet(key("logs", "*"), bucket("logs"), volume());
-    expectedResolvedRanger.add(new OzoneGrant(keySet, acls(READ)));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("logs")), acls(READ, LIST)));
+    expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), key("logs", "team/*")), acls(READ)));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
@@ -1698,6 +1782,35 @@ public class TestIamSessionPolicyResolver {
     final Set<ACLType> keyAcls = acls(CREATE, WRITE);
     expectedResolvedRanger.add(new OzoneGrant(keySet, keyAcls));
     expectedResolvedRanger.add(new OzoneGrant(objSet(volume(), bucket("*")), acls(READ)));
+    assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
+  }
+
+  @Test
+  public void testAllActionsOnAllResourcesWithPrefixCondition() throws OMException {
+    final String json = "{\n" +
+        "  \"Statement\": [{\n" +
+        "    \"Effect\": \"Allow\",\n" +
+        "    \"Action\": \"s3:*\",\n" +
+        "    \"Resource\": \"*\",\n" +
+        "    \"Condition\": {\n" +
+        "      \"StringLike\": {\n" +
+        "        \"s3:prefix\": [ \"team/folder\", \"team/folder/*\" ]\n" +
+        "      }\n" +
+        "    }\n" +
+        "  }]\n" +
+        "}";
+
+    // Wildcards on bucket are not supported for Native authorizer
+    expectBucketWildcardUnsupportedExceptionForNativeAuthorizer(json);
+
+    final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
+    // Ensure what we got is what we expected
+    final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
+    // Expected for Ranger: (only ListBucket supports s3:prefix) READ volume; READ, LIST acl on bucket;
+    // READ on key "team/folder", "team/folder/*"
+    expectedResolvedRanger.add(new OzoneGrant(objSet(bucket("*")), acls(READ, LIST)));
+    expectedResolvedRanger.add(
+        new OzoneGrant(objSet(volume(), key("*", "team/folder"), key("*", "team/folder/*")), acls(READ)));
     assertThat(resolvedFromRangerAuthorizer).isEqualTo(expectedResolvedRanger);
   }
 
