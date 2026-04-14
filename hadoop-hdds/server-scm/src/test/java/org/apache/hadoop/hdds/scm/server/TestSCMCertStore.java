@@ -37,7 +37,6 @@ import java.util.List;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
@@ -72,7 +71,7 @@ public class TestSCMCertStore {
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
 
     final SCMRatisServer ratisServer = mock(SCMRatisServer.class);
-    when(ratisServer.getProxyHandler(eq(SCMRatisProtocol.RequestType.CERT_STORE),
+    when(ratisServer.getProxyHandler(
         eq(CertificateStore.class), any(CertificateStore.class)))
         .then(returnsLastArg());
     scmMetadataStore = new SCMMetadataStoreImpl(config);

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
+import java.util.function.Supplier;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -30,9 +31,13 @@ import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint.ObjectRequestContext;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.ratis.util.MemoizedSupplier;
 
 /** Handle requests for object tagging. */
 class ObjectTaggingHandler extends ObjectOperationHandler {
+
+  private static final Supplier<MessageUnmarshaller<S3Tagging>> UNMARSHALLER =
+      MemoizedSupplier.valueOf(() -> new MessageUnmarshaller<>(S3Tagging.class));
 
   @Override
   Response handlePutRequest(ObjectRequestContext context, String keyName, InputStream body) throws IOException {
@@ -43,7 +48,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     try {
       S3Tagging tagging;
       try {
-        tagging = new PutTaggingUnmarshaller().readFrom(body);
+        tagging = UNMARSHALLER.get().readFrom(body);
         tagging.validate();
       } catch (Exception ex) {
         OS3Exception exception = S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, keyName);

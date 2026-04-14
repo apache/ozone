@@ -306,8 +306,10 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           BlockDataStreamOutput blockDataStreamOutput =
               (BlockDataStreamOutput) currentStreamEntry
                   .getByteBufStreamOutput();
-          blockDataStreamOutput.executePutBlock(false, false);
-          blockDataStreamOutput.watchForCommit(false);
+          if (blockDataStreamOutput != null) {
+            blockDataStreamOutput.executePutBlock(false, false);
+            blockDataStreamOutput.watchForCommit(false);
+          }
         } catch (IOException e) {
           LOG.error(
               "Failed to execute putBlock/watchForCommit. " +

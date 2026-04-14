@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
+import static org.apache.hadoop.ozone.container.common.volume.HddsVolume.HDDS_VOLUME_DIR;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -26,12 +27,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedList;
+import java.time.Clock;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -40,6 +39,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
@@ -107,20 +109,9 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   If more than ioFailureTolerance IO checks fail out of the last ioTestCount
   tests run, then the volume is considered failed.
    */
-  private final int ioTestCount;
-  private final int ioFailureTolerance;
-  private AtomicInteger currentIOFailureCount;
-  private Queue<Boolean> ioTestSlidingWindow;
+  private final boolean isDiskCheckEnabled;
+  private SlidingWindow ioTestSlidingWindow;
   private int healthCheckFileSize;
-
-  /*
-  Counter for consecutive latch or per-check timeouts. Incremented by
-  recordTimeoutAsIOFailure() which must NOT be synchronized (check() may be
-  holding the lock — that is exactly why the timeout fired). AtomicInteger
-  provides the necessary thread safety without locking. Reset to 0 by
-  resetTimeoutCount() whenever a check completes successfully.
-   */
-  private final AtomicInteger consecutiveTimeoutCount;
 
   /**
    * Type for StorageVolume.
@@ -168,23 +159,19 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
       this.conf = b.conf;
       this.dnConf = conf.getObject(DatanodeConfiguration.class);
-      this.ioTestCount = dnConf.getVolumeIOTestCount();
-      this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
-      this.ioTestSlidingWindow = new LinkedList<>();
-      this.currentIOFailureCount = new AtomicInteger(0);
+      this.isDiskCheckEnabled = dnConf.isDiskCheckEnabled();
+      this.ioTestSlidingWindow = new SlidingWindow(dnConf.getVolumeIOFailureTolerance(),
+          dnConf.getDiskCheckSlidingWindowTimeout(), b.getClock());
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
-      this.consecutiveTimeoutCount = new AtomicInteger(0);
     } else {
       storageDir = new File(b.volumeRootStr);
       volumeUsage = null;
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
-      this.ioTestCount = 0;
-      this.ioFailureTolerance = 0;
+      this.isDiskCheckEnabled = false;
       this.conf = null;
       this.dnConf = null;
-      this.consecutiveTimeoutCount = new AtomicInteger(0);
     }
     this.storageDirStr = storageDir.getAbsolutePath();
   }
@@ -237,16 +224,22 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       if (!getStorageDir().mkdirs()) {
         throw new IOException("Cannot create directory " + getStorageDir());
       }
+      // Set permissions on storage directory (e.g., hdds subdirectory)
+      setStorageDirPermissions();
       setState(VolumeState.NOT_FORMATTED);
       createVersionFile();
       break;
     case NOT_FORMATTED:
       // Version File does not exist. Create it.
+      // Ensure permissions are correct even if directory already existed
+      setStorageDirPermissions();
       createVersionFile();
       break;
     case NOT_INITIALIZED:
       // Version File exists.
       // Verify its correctness and update property fields.
+      // Ensure permissions are correct even if directory already existed
+      setStorageDirPermissions();
       readVersionFile();
       setState(VolumeState.NORMAL);
       break;
@@ -413,6 +406,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     private boolean failedVolume = false;
     private String datanodeUuid;
     private String clusterID;
+    private Clock clock = new SlidingWindow.MonotonicClock();
 
     public Builder(String volumeRootStr, String storageDirStr) {
       this.volumeRootStr = volumeRootStr;
@@ -459,6 +453,11 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       return this.getThis();
     }
 
+    public T clock(Clock c) {
+      this.clock = c;
+      return this.getThis();
+    }
+
     public abstract StorageVolume build() throws IOException;
 
     public String getVolumeRootStr() {
@@ -471,6 +470,14 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
     public StorageType getStorageType() {
       return this.storageType;
+    }
+
+    public String getStorageDirStr() {
+      return this.storageDirStr;
+    }
+
+    public Clock getClock() {
+      return this.clock;
     }
   }
 
@@ -552,6 +559,14 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     return this.volumeSet;
   }
 
+  public boolean getDiskCheckEnabled() {
+    return isDiskCheckEnabled;
+  }
+
+  public SlidingWindow getIoTestSlidingWindow() {
+    return ioTestSlidingWindow;
+  }
+
   public StorageType getStorageType() {
     return storageType;
   }
@@ -603,6 +618,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   public void failVolume() {
+    LOG.warn("Volume {} failed", this);
     setState(VolumeState.FAILED);
     if (volumeUsage != null) {
       volumeUsage.shutdown();
@@ -659,7 +675,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
    * check consists of a directory check and an IO check.
    *
    * If the directory check fails, the volume check fails immediately.
-   * The IO check is allows to fail up to {@code ioFailureTolerance} times
+   * The IO check is allowed to fail up to {@code ioFailureTolerance} times
    * out of the last {@code ioTestCount} IO checks before this volume check is
    * failed. Each call to this method runs one IO check.
    *
@@ -683,11 +699,11 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
         throw new InterruptedException("Directory check of volume " + this +
             " interrupted.");
       }
+      LOG.error("Directory check of volume {} failed", this);
       return VolumeCheckResult.FAILED;
     }
 
-    // If IO test count is set to 0, IO tests for disk health are disabled.
-    if (ioTestCount == 0) {
+    if (!isDiskCheckEnabled) {
       return VolumeCheckResult.HEALTHY;
     }
 
@@ -696,7 +712,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     // to avoid volume failure we can ignore checking disk read/write
     int minimumDiskSpace = healthCheckFileSize * 2;
     if (getCurrentUsage().getAvailable() < minimumDiskSpace) {
-      ioTestSlidingWindow.add(true);
       return VolumeCheckResult.HEALTHY;
     }
 
@@ -715,114 +730,26 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     // We can check again if disk is full. If it is full,
     // in this case keep volume as healthy so that READ can still be served
     if (!diskChecksPassed && getCurrentUsage().getAvailable() < minimumDiskSpace) {
-      ioTestSlidingWindow.add(true);
       return VolumeCheckResult.HEALTHY;
     }
 
-    // Move the sliding window of IO test results forward 1 and check threshold.
-    if (advanceIOWindow(diskChecksPassed)) {
-      // If the failure threshold has been crossed, fail the volume without
-      // further scans. Once the volume is failed, it will not be checked
-      // anymore. The failure counts can be left as is.
-      LOG.error("Failed IO test for volume {}: the last {} runs " +
-              "encountered {} out of {} tolerated failures.", this,
-          ioTestSlidingWindow.size(), currentIOFailureCount,
-          ioFailureTolerance);
-      return VolumeCheckResult.FAILED;
-    } else if (LOG.isDebugEnabled()) {
-      LOG.debug("IO test results for volume {}: the last {} runs encountered " +
-              "{} out of {} tolerated failures", this,
-          ioTestSlidingWindow.size(),
-          currentIOFailureCount, ioFailureTolerance);
+    if (!diskChecksPassed) {
+      ioTestSlidingWindow.add();
     }
+
+    // If the failure threshold has been crossed, fail the volume without further scans.
+    // Once the volume is failed, it will not be checked anymore.
+    // The failure counts can be left as is.
+    if (ioTestSlidingWindow.isExceeded()) {
+      LOG.error("Failed IO test for volume {}: encountered more than the {} tolerated failures within the past {} ms.",
+          this, ioTestSlidingWindow.getWindowSize(), ioTestSlidingWindow.getExpiryDurationMillis());
+      return VolumeCheckResult.FAILED;
+    }
+
+    LOG.debug("IO test results for volume {}: encountered {} out of {} tolerated failures",
+        this, ioTestSlidingWindow.getNumEventsInWindow(), ioTestSlidingWindow.getWindowSize());
 
     return VolumeCheckResult.HEALTHY;
-  }
-
-  /**
-   * Called by {@link StorageVolumeChecker} when a volume check times out —
-   * either because the global {@code checkAllVolumes()} latch expired before
-   * this volume's async check completed, or because the per-check timeout
-   * inside {@link ThrottledAsyncChecker} fired.
-   *
-   * <p><b>Must not be {@code synchronized}.</b> When a timeout fires,
-   * {@link #check} may still be executing and holding the object lock — that
-   * is precisely why the timeout occurred. Acquiring the same lock here would
-   * deadlock or stall {@link StorageVolumeChecker#checkAllVolumes} until the
-   * hung check finally returns.
-   *
-   * <p>Instead, a dedicated {@link AtomicInteger} ({@code
-   * consecutiveTimeoutCount}) tracks consecutive timeouts without any locking.
-   * The threshold reuses the existing {@code ioFailureTolerance} so no
-   * additional configuration key is required.
-   *
-   * <p>Recovery: call {@link #resetTimeoutCount()} when a check completes
-   * successfully to break the timeout streak.
-   *
-   * @return {@code true} if {@code consecutiveTimeoutCount > ioFailureTolerance},
-   *         meaning the volume should now be marked FAILED; {@code false} if
-   *         the timeout is still within tolerance this round.
-   */
-  public boolean recordTimeoutAsIOFailure() {
-    int count = consecutiveTimeoutCount.incrementAndGet();
-    if (count > ioFailureTolerance) {
-      LOG.error("Volume {} check timed out {} consecutive time(s),"
-              + " exceeding tolerance of {}. Marking FAILED.",
-          this, count, ioFailureTolerance);
-      return true;
-    }
-    LOG.warn("Volume {} check timed out ({}/{} consecutive timeouts tolerated)."
-            + " Common transient causes: kernel I/O scheduler saturation"
-            + " or JVM GC pressure. Volume will be failed if the next check"
-            + " also times out.",
-        this, count, ioFailureTolerance);
-    return false;
-  }
-
-  /**
-   * Resets the consecutive-timeout counter to 0.
-   *
-   * <p>Called by {@link StorageVolumeChecker} when this volume's check
-   * completes successfully, indicating that the transient stall has resolved
-   * and any accumulated timeout count should not carry over to the next cycle.
-   *
-   * <p>No synchronization needed — operates on an {@link AtomicInteger}.
-   */
-  public void resetTimeoutCount() {
-    int prev = consecutiveTimeoutCount.getAndSet(0);
-    if (prev > 0 && LOG.isDebugEnabled()) {
-      LOG.debug("Volume {} completed a healthy check. Consecutive timeout"
-          + " count reset from {} to 0.", this, prev);
-    }
-  }
-
-  @VisibleForTesting
-  public int getConsecutiveTimeoutCount() {
-    return consecutiveTimeoutCount.get();
-  }
-
-  /**
-   * Advances the IO-test sliding window by one entry and updates the rolling
-   * failure counter.
-   *
-   * <p>Called by both {@link #check} (genuine IO test result) and
-   * {@link #recordTimeoutAsIOFailure} (synthetic failure for a check timeout),
-   * keeping the window-update logic in a single place.
-   *
-   * @param passed {@code true} if the IO test passed; {@code false} otherwise.
-   * @return {@code true} if {@code currentIOFailureCount} now exceeds
-   *         {@code ioFailureTolerance}; {@code false} if still within bounds.
-   */
-  private boolean advanceIOWindow(boolean passed) {
-    ioTestSlidingWindow.add(passed);
-    if (!passed) {
-      currentIOFailureCount.incrementAndGet();
-    }
-    if (ioTestSlidingWindow.size() > ioTestCount &&
-        Objects.equals(ioTestSlidingWindow.poll(), Boolean.FALSE)) {
-      currentIOFailureCount.decrementAndGet();
-    }
-    return currentIOFailureCount.get() > ioFailureTolerance;
   }
 
   @Override
@@ -853,11 +780,31 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       throw new IOException("Unable to create the volume root dir at " + root);
     }
 
+    // Set permissions on volume root directory immediately after creation/check
+    // (for data volumes, we want to ensure the root has secure permissions,
+    // even if the directory already existed from a previous run)
+    // This follows the same pattern as metadata directories in getDirectoryFromConfig()
+    if (b.conf != null && root.exists() && HDDS_VOLUME_DIR.equals(b.getStorageDirStr())) {
+      ServerUtils.setDataDirectoryPermissions(root, b.conf,
+          ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+    }
+
     SpaceUsageCheckFactory usageCheckFactory = b.usageCheckFactory;
     if (usageCheckFactory == null) {
       usageCheckFactory = SpaceUsageCheckFactory.create(b.conf);
     }
 
     return usageCheckFactory.paramsFor(root, exclusionProvider);
+  }
+
+  /**
+   * Sets permissions on the storage directory (e.g., hdds subdirectory).
+   */
+  private void setStorageDirPermissions() {
+    if (conf != null && getStorageDir().exists()
+        && HDDS_VOLUME_DIR.equals(getStorageDir().getName())) {
+      ServerUtils.setDataDirectoryPermissions(getStorageDir(), conf,
+          ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+    }
   }
 }

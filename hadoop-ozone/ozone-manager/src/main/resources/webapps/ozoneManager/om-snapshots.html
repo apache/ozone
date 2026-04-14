@@ -1,0 +1,124 @@
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+
+
+<h1>Snapshot Diff Jobs</h1>
+
+<div class="row">
+    <div class="col-md-6 text-left">
+        <label>Show: </label>
+        <select class="form-select" ng-model="RecordsToDisplay" ng-change="UpdateRecordsToShow()">
+            <option value="10" ng-selected="{true}">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="All">All</option>
+        </select>
+    </div>
+    <div class="col-md-6 text-right">
+        <label>Search: </label> <input type="text" ng-model="search">
+    </div>
+</div>
+
+<table class="table table-bordered table-striped">
+    <thead>
+    <tr>
+        <th ng-click="columnSort('jobId')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'jobId'), 'sortasc' : (columnName == 'jobId' && !reverse), 'sortdesc':(columnName == 'jobId' && reverse)}">Job ID</span>
+        </th>
+        <th ng-click="columnSort('status')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'status'), 'sortasc' : (columnName == 'status' && !reverse), 'sortdesc':(columnName == 'status' && reverse)}">Status</span>
+        </th>
+        <th ng-click="columnSort('volume')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'volume'), 'sortasc' : (columnName == 'volume' && !reverse), 'sortdesc':(columnName == 'volume' && reverse)}">Volume</span>
+        </th>
+        <th ng-click="columnSort('bucket')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'bucket'), 'sortasc' : (columnName == 'bucket' && !reverse), 'sortdesc':(columnName == 'bucket' && reverse)}">Bucket</span>
+        </th>
+        <th ng-click="columnSort('fromSnapshot')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'fromSnapshot'), 'sortasc' : (columnName == 'fromSnapshot' && !reverse), 'sortdesc':(columnName == 'fromSnapshot' && reverse)}">From Snapshot</span>
+        </th>
+        <th ng-click="columnSort('toSnapshot')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'toSnapshot'), 'sortasc' : (columnName == 'toSnapshot' && !reverse), 'sortdesc':(columnName == 'toSnapshot' && reverse)}">To Snapshot</span>
+        </th>
+        <th ng-click="columnSort('keysProcessedPct')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'keysProcessedPct'), 'sortasc' : (columnName == 'keysProcessedPct' && !reverse), 'sortdesc':(columnName == 'keysProcessedPct' && reverse)}">Progress</span>
+        </th>
+        <th ng-click="columnSort('totalDiffEntries')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'totalDiffEntries'), 'sortasc' : (columnName == 'totalDiffEntries' && !reverse), 'sortdesc':(columnName == 'totalDiffEntries' && reverse)}">Total Diff Entries</span>
+        </th>
+        <th ng-click="columnSort('creationTime')" class="nodeStatusInfo">
+            <span ng-class="{'sorting' : (columnName != 'creationTime'), 'sortasc' : (columnName == 'creationTime' && !reverse), 'sortdesc':(columnName == 'creationTime' && reverse)}">Creation Time</span>
+        </th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr ng-repeat="job in $ctrl.snapshotDiffJobs|filter:search|orderBy:columnName:reverse">
+        <td>{{job.jobId}}</td>
+        <td>
+            {{job.status}}
+            <div ng-if="job.status === 'FAILED' && job.reason">
+                <span class="label label-danger">Reason: {{job.reason}}</span>
+            </div>
+            <div ng-if="job.status === 'IN_PROGRESS' && job.subStatus">
+                <span class="label label-info">Sub-status: {{job.subStatus}}</span>
+            </div>
+        </td>
+        <td>{{job.volume}}</td>
+        <td>{{job.bucket}}</td>
+        <td>{{job.fromSnapshot}}</td>
+        <td>{{job.toSnapshot}}</td>
+        <td>
+            <span ng-if="job.status === 'DONE'">Completed</span>
+            <span ng-if="job.status !== 'DONE'">{{job.keysProcessedPct | number:2}}%</span>
+        </td>
+        <td>{{job.totalDiffEntries}}</td>
+        <td>{{job.creationTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="row">
+    <div class="col-md-6 text-left">
+        <label>Page:</label>
+        <select class="form-select" ng-model="currentPage" ng-change="handlePagination(currentPage, false)">
+            <option ng-repeat="page in getPagesArray()" ng-value="page">{{page}}</option>
+        </select>
+        <span>of {{lastIndex}}. </span>
+        <span ng-if="$ctrl.snapshotDiffJobs && $ctrl.snapshotDiffJobs.length > 0">
+            Showing {{getCurrentPageFirstItemIndex()}} to {{getCurrentPageLastItemIndex()}} of the total {{totalItems}} entries.
+        </span>
+    </div>
+    <div class="col-md-6 text-right">
+        <nav aria-label="..." ng-show="RecordsToDisplay !== 'All'">
+            <ul class="pagination" style="margin: 0; padding: 0">
+                <li class="page-item" ng-class="{disabled:currentPage==1}"
+                    ng-click="handlePagination(currentPage-1,(currentPage==1))">
+                    <span class="page-link" tabindex="-1">Previous</span>
+                </li>
+                <li class="page-item active">
+                    <span class="page-link">{{currentPage}} </span>
+                </li>
+                <li class="page-item" ng-class="{disabled:lastIndex==currentPage}"
+                    ng-click="handlePagination(currentPage+1, (lastIndex==currentPage))">
+                    <span class="page-link" tabindex="-1">Next</span>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</div>
+
+

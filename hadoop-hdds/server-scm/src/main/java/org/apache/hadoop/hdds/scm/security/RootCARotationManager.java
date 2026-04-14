@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Root CA Rotation Service is a service in SCM to control the CA rotation.
  */
-public class RootCARotationManager extends StatefulService {
+public class RootCARotationManager extends StatefulService<CertInfoProto> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RootCARotationManager.class);
@@ -137,7 +137,7 @@ public class RootCARotationManager extends StatefulService {
    *   (4) Rotation Committed
    */
   public RootCARotationManager(StorageContainerManager scm) {
-    super(scm.getStatefulServiceStateManager());
+    super(scm.getStatefulServiceStateManager(), CertInfoProto.getDefaultInstance().getParserForType());
     this.scm = scm;
     this.ozoneConf = scm.getConfiguration();
     this.secConf = new SecurityConfig(ozoneConf);
@@ -218,14 +218,6 @@ public class RootCARotationManager extends StatefulService {
   @Override
   public boolean shouldRun() {
     return true;
-  }
-
-  /**
-   * @return Name of this service.
-   */
-  @Override
-  public String getServiceName() {
-    return RootCARotationManager.class.getSimpleName();
   }
 
   /**
@@ -386,8 +378,7 @@ public class RootCARotationManager extends StatefulService {
           CertificateServer newRootCAServer = null;
           BigInteger newId = BigInteger.ONE;
           try {
-            newId = new BigInteger(String.valueOf(
-                sequenceIdGen.getNextId(CERTIFICATE_ID)));
+            newId = BigInteger.valueOf(sequenceIdGen.getNextId(CERTIFICATE_ID));
             newRootCAServer =
                 HASecurityUtils.initializeRootCertificateServer(secConf,
                     scm.getCertificateStore(), scmStorageConfig, newId,
@@ -778,7 +769,7 @@ public class RootCARotationManager extends StatefulService {
 
   private void checkAndHandlePostProcessing() throws IOException,
       CertificateException {
-    CertInfoProto proto = readConfiguration(CertInfoProto.class);
+    final CertInfoProto proto = readConfiguration();
     if (proto == null) {
       LOG.info("No {} configuration found in stateful storage",
           getServiceName());

@@ -163,6 +163,10 @@ public final class OMConfigKeys {
   public static final boolean
       OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL =
+      "ozone.om.snapshot.directory.metrics.update.interval";
+  public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT = "5m";
+
   /**
    * OM Ratis related configurations.
    */
@@ -225,6 +229,10 @@ public final class OMConfigKeys {
       = "ozone.om.ratis.snapshot.max.total.sst.size";
   public static final long
       OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT = 10737418240L;
+
+  public static final String OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY
+      = "ozone.om.db.checkpoint.use.inode.based.transfer";
+  public static final boolean OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT = true;
 
   // OM Ratis server configurations
   public static final String OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_KEY
@@ -663,7 +671,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
-      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
+      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
 
   /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
