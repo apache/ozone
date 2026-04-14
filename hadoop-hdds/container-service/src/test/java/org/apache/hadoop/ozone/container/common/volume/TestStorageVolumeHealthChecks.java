@@ -25,6 +25,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -91,6 +92,7 @@ public class TestStorageVolumeHealthChecks {
     // needs to be cleared before each test.
     FileUtils.deleteDirectory(volumePath.toFile());
     DiskCheckUtil.clearTestImpl();
+    TEST_CLOCK.set(Instant.now());
   }
 
   @ParameterizedTest
@@ -328,77 +330,65 @@ public class TestStorageVolumeHealthChecks {
 
   /**
    * With the default settings (ioFailureTolerance=1), the first simulated
-   * check timeout must be tolerated: {@code consecutiveTimeoutCount} becomes 1
-   * which is NOT {@code > 1}, so {@code recordTimeoutAsIOFailure()} returns
-   * {@code false}.
+   * timeout within the timeout window must be tolerated.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
-  public void testFirstTimeoutIsTolerated(StorageVolume.Builder<?> builder)
+  public void testFirstTimeoutWithinWindowIsTolerated(
+      StorageVolume.Builder<?> builder)
       throws Exception {
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
 
-    assertEquals(0, volume.getConsecutiveTimeoutCount());
-    assertFalse(volume.recordTimeoutAsIOFailure(),
-        "First timeout should be tolerated (count 1 is not > tolerance 1)");
-    assertEquals(1, volume.getConsecutiveTimeoutCount());
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "First timeout within the window should be tolerated");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
   }
 
   /**
-   * With the default settings (ioFailureTolerance=1), the second consecutive
-   * timeout must cause {@code recordTimeoutAsIOFailure()} to return
-   * {@code true}: count becomes 2 which IS {@code > 1}.
+   * With the default settings (ioFailureTolerance=1), the second timeout
+   * within the timeout window must fail the volume.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
-  public void testSecondConsecutiveTimeoutFails(StorageVolume.Builder<?> builder)
+  public void testSecondTimeoutWithinWindowFails(
+      StorageVolume.Builder<?> builder)
       throws Exception {
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
 
-    assertFalse(volume.recordTimeoutAsIOFailure(), "First timeout should be tolerated");
-    assertEquals(1, volume.getConsecutiveTimeoutCount());
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "First timeout should be tolerated");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
 
-    assertTrue(volume.recordTimeoutAsIOFailure(),
-        "Second consecutive timeout should exceed tolerance and return true");
-    assertEquals(2, volume.getConsecutiveTimeoutCount());
+    assertTrue(volume.recordTimeoutAndCheckFailure(),
+        "Second timeout in the window should exceed tolerance and return true");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getWindowSize());
   }
 
   /**
-   * {@code resetTimeoutCount()} resets the consecutive-timeout counter to 0,
-   * so a subsequent single timeout is tolerated again — the streak does not
-   * carry over past a successful check cycle.
-   *
-   * <p>{@code resetTimeoutCount()} is called by {@link StorageVolumeChecker}
-   * whenever a volume completes a healthy check (either via
-   * {@code checkAllVolumes()} or via {@code checkVolume()}).
+   * Timeout events automatically expire from the timeout window, so an old
+   * timeout does not need an explicit reset before a later timeout is
+   * tolerated again.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
-  public void testResetTimeoutCountResetsConsecutiveCounter(
+  public void testExpiredTimeoutDoesNotCountTowardLaterFailure(
       StorageVolume.Builder<?> builder) throws Exception {
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
 
-    // Simulate one tolerated timeout.
-    assertFalse(volume.recordTimeoutAsIOFailure(),
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
         "First timeout should be tolerated");
-    assertEquals(1, volume.getConsecutiveTimeoutCount());
+    TEST_CLOCK.fastForward(
+        volume.getTimeoutFailureSlidingWindow().getExpiryDurationMillis() + 1);
 
-    // StorageVolumeChecker calls resetTimeoutCount() when the volume's check
-    // eventually completes successfully. Simulate that here.
-    volume.resetTimeoutCount();
-    assertEquals(0, volume.getConsecutiveTimeoutCount(),
-        "Counter must be reset to 0 after a successful check");
-
-    // A new single timeout after reset is tolerated again.
-    assertFalse(volume.recordTimeoutAsIOFailure(),
-        "Timeout after reset should be tolerated again");
-    assertEquals(1, volume.getConsecutiveTimeoutCount());
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Timeout after the window expires should be tolerated again");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
   }
 
   /**

@@ -375,8 +375,8 @@ public class TestStorageVolumeChecker {
   /**
    * Verifies that when the per-check timeout inside {@link ThrottledAsyncChecker}
    * fires on {@link StorageVolumeChecker#checkVolume}, the first timeout is
-   * tolerated (callback not invoked, volume not failed) and the second
-   * consecutive timeout causes the volume to be failed.
+   * tolerated (callback not invoked, volume not failed) and the second timeout
+   * within the timeout window causes the volume to be failed.
    *
    * <p>This test uses the real {@link ThrottledAsyncChecker} (not
    * {@link DummyChecker}) so that the actual {@code TimeoutException}
@@ -400,7 +400,7 @@ public class TestStorageVolumeChecker {
       return VolumeCheckResult.HEALTHY;
     });
     // First timeout returns false (within tolerance), second returns true.
-    when(volume.recordTimeoutAsIOFailure()).thenReturn(false).thenReturn(true);
+    when(volume.recordTimeoutAndCheckFailure()).thenReturn(false).thenReturn(true);
 
     AtomicLong callbackCount = new AtomicLong(0);
     StorageVolumeChecker checker =
@@ -413,7 +413,7 @@ public class TestStorageVolumeChecker {
     Thread.sleep(600);
     assertEquals(0, callbackCount.get(),
         "Callback must NOT fire for a tolerated timeout");
-    verify(volume, times(1)).recordTimeoutAsIOFailure();
+    verify(volume, times(1)).recordTimeoutAndCheckFailure();
 
     // Second checkVolume — should time out and exceed tolerance (callback fired).
     checker.checkVolume(volume, (healthy, failed) -> callbackCount.incrementAndGet());
@@ -428,10 +428,10 @@ public class TestStorageVolumeChecker {
 
   /**
    * Verifies that when the {@code checkAllVolumes()} latch times out and
-   * pending volumes have not yet reported a result, their consecutive-timeout
-   * counter is incremented and the first timeout is tolerated.
+   * pending volumes have not yet reported a result, the timeout is recorded in
+   * the timeout window and the first timeout is tolerated.
    *
-   * <p>This test confirms that {@code recordTimeoutAsIOFailure()} is called on
+   * <p>This test confirms that {@code recordTimeoutAndCheckFailure()} is called on
    * pending volumes, and that the volume is NOT in the returned failed set on
    * the first timeout.
    */
@@ -451,7 +451,7 @@ public class TestStorageVolumeChecker {
       return VolumeCheckResult.HEALTHY;
     });
     // Simulate: first timeout is within tolerance.
-    when(volume.recordTimeoutAsIOFailure()).thenReturn(false);
+    when(volume.recordTimeoutAndCheckFailure()).thenReturn(false);
     when(volume.getVolumeInfoStats()).thenReturn(
         new VolumeInfoMetrics("test-vol", volume));
 
@@ -463,7 +463,7 @@ public class TestStorageVolumeChecker {
 
     assertFalse(failed.contains(volume),
         "Volume must NOT be in failed set on first tolerated timeout");
-    verify(volume, times(1)).recordTimeoutAsIOFailure();
+    verify(volume, times(1)).recordTimeoutAndCheckFailure();
 
     blockLatch.countDown();
     checker.shutdownAndWait(5, TimeUnit.SECONDS);

@@ -226,7 +226,7 @@ public class StorageVolumeChecker {
     final CountDownLatch latch = new CountDownLatch(1);
 
     // Shared set used to guarantee exactly-one call to
-    // recordTimeoutAsIOFailure() per volume, regardless of whether the
+    // recordTimeoutAndCheckFailure() per volume, regardless of whether the
     // per-check timeout (ResultHandler.onFailure) or the global latch timeout
     // (pending-volumes loop below) fires first.  The first path to CAS-add the
     // volume owns the tolerance decision; the other path skips it.
@@ -270,13 +270,6 @@ public class StorageVolumeChecker {
       // already applied its own tolerance.
       final Set<StorageVolume> result = new HashSet<>(failedVolumes);
 
-      // Volumes that completed healthy: reset their consecutive-timeout
-      // counter so a single transient timeout is not combined with an
-      // unrelated future one after a healthy gap.
-      for (StorageVolume v : healthyVolumes) {
-        v.resetTimeoutCount();
-      }
-
       // Volumes still pending (neither healthy nor explicitly failed) at
       // latch-timeout time.  onFailure() may have already handled some of
       // these via timeoutHandledSet; skip those to avoid double-counting.
@@ -292,7 +285,7 @@ public class StorageVolumeChecker {
           continue;
         }
         // Latch fired first — this is the first (and only) handler.
-        if (v.recordTimeoutAsIOFailure()) {
+        if (v.recordTimeoutAndCheckFailure()) {
           // Tolerance exceeded — mark as failed.
           result.add(v);
         }
@@ -363,7 +356,7 @@ public class StorageVolumeChecker {
 
     /**
      * Shared set used to guarantee exactly-one call to
-     * {@link StorageVolume#recordTimeoutAsIOFailure()} per volume when both
+     * {@link StorageVolume#recordTimeoutAndCheckFailure()} per volume when both
      * the per-check timeout ({@link #onFailure}) and the global latch timeout
      * (pending-volumes loop in {@code checkAllVolumes}) can race for the same
      * volume.
@@ -448,7 +441,7 @@ public class StorageVolumeChecker {
         boolean firstToHandle =
             (timeoutHandledSet == null) || timeoutHandledSet.add(volume);
         if (firstToHandle) {
-          if (!volume.recordTimeoutAsIOFailure()) {
+          if (!volume.recordTimeoutAndCheckFailure()) {
             // Within tolerance: do NOT trigger the failure callback.
             // The volume is not marked failed; the next check cycle will
             // re-evaluate its health. cleanup() is intentionally not called
@@ -466,9 +459,6 @@ public class StorageVolumeChecker {
 
     private void markHealthy() {
       healthyVolumes.add(volume);
-      // A successful completion resets any accumulated timeout count so that
-      // an earlier transient timeout does not carry over to future cycles.
-      volume.resetTimeoutCount();
     }
 
     private void markFailed() {
