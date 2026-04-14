@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -36,8 +38,8 @@ public class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
 
-  private final List<String> ratisEvents = new ArrayList<>();
-  private static final int MAX_RATIS_EVENTS = 100;
+  private final LinkedList<String> ratisEvents = new LinkedList<>();
+  private final int maxRatisEvents;
 
   /**
    * Container stat metrics, the meaning of following metrics
@@ -65,14 +67,23 @@ public class SCMMetrics {
     return dbCheckpointMetrics;
   }
 
-  public SCMMetrics() {
+  public SCMMetrics(int maxRatisEvents) {
     dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics");
+    this.maxRatisEvents = maxRatisEvents;
   }
 
   public static SCMMetrics create() {
+    return create(null);
+  }
+
+  public static SCMMetrics create(ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
+    int maxRatisEvents = conf == null
+        ? ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
+        : conf.getInt(ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT,
+        ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
     return ms.register(SOURCE_NAME, "Storage Container Manager Metrics",
-        new SCMMetrics());
+        new SCMMetrics(maxRatisEvents));
   }
 
   public void setLastContainerReportSize(long size) {
@@ -163,8 +174,8 @@ public class SCMMetrics {
 
   public void addRatisEvent(String event) {
     synchronized (ratisEvents) {
-      if (ratisEvents.size() >= MAX_RATIS_EVENTS) {
-        ratisEvents.remove(0);
+      if (ratisEvents.size() >= maxRatisEvents) {
+        ratisEvents.removeFirst();
       }
       ratisEvents.add(Time.formatTime(Time.now()) + "|" + event);
     }

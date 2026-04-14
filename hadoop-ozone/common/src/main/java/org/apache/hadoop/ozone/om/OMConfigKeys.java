@@ -691,6 +691,10 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.local.data.manager.service.interval";
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
 
+  public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
+      "ozone.om.ratis.events.max.limit";
+  public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
+
   /**
    * Never constructed.
    */

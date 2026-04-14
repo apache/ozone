@@ -1427,15 +1427,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Initialize SCM metrics.
    */
-  public static void initMetrics() {
-    metrics = SCMMetrics.create();
+  public void initMetrics() {
+    metrics = SCMMetrics.create(configuration);
   }
 
   /**
    * Return SCM metrics instance.
    */
   public static SCMMetrics getMetrics() {
-    return metrics == null ? SCMMetrics.create() : metrics;
+    return metrics;
   }
 
   /**
