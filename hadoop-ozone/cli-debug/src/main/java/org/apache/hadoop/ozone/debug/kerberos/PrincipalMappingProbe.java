@@ -21,6 +21,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
@@ -52,7 +54,7 @@ public class PrincipalMappingProbe extends ConfigProbe {
 
     // Read rule
     String rules = conf.getTrimmed(
-        "hadoop.security.auth_to_local", "DEFAULT");
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT");
     printValue("auth_to_local rules", rules);
 
     try {

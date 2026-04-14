@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.debug.kerberos;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
@@ -92,7 +93,7 @@ public class AuthorizationProbe extends ConfigProbe {
 
     // Validate Ozone ACLs enforcement
     boolean ozoneAclEnabled = conf.getBoolean(
-        OzoneConfigKeys.OZONE_ACL_ENABLED, false);
+        OzoneConfigKeys.OZONE_ACL_ENABLED, OZONE_ACL_ENABLED_DEFAULT);
 
     if (!ozoneAclEnabled) {
       warn("Ozone ACLs are disabled while authorization is enabled. "

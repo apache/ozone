@@ -116,8 +116,6 @@ public final class HddsConfigKeys {
       "hdds.scm.safemode.log.interval";
   public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT = "1m";
 
-  public static final String HDDS_SCM_HTTP_AUTH_TYPE = "hdds.scm.http.auth.type";
-
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.

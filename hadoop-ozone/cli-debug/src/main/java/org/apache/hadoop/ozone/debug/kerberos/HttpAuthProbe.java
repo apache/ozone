@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.debug.kerberos;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 
@@ -40,7 +41,7 @@ public class HttpAuthProbe extends ConfigProbe {
   public ProbeResult test(OzoneConfiguration conf) {
 
     print(conf, OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE);
-    print(conf, HddsConfigKeys.HDDS_SCM_HTTP_AUTH_TYPE);
+    print(conf, SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE);
     print(conf, HddsConfigKeys.HDDS_DATANODE_HTTP_AUTH_TYPE);
     print(conf, ReconServerConfigKeys.OZONE_RECON_HTTP_AUTH_TYPE);
     //Used key directly to avoid cyclic dependency
