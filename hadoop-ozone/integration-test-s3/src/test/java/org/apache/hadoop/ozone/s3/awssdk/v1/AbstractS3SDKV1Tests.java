@@ -88,6 +88,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -101,6 +102,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -121,6 +123,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.NonHATests;
@@ -133,6 +136,8 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -513,17 +518,24 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", object.getObjectMetadata().getETag());
   }
 
-  @Test
-  public void testPutObjectWithWrongMD5Header() throws Exception {
+  static Stream<Arguments> wrongContentMD5Provider() throws Exception {
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    return Stream.of(
+        Arguments.of(wrongMd5Base64, S3ErrorTable.BAD_DIGEST.getCode()),
+        Arguments.of("invalid-base64", S3ErrorTable.INVALID_DIGEST.getCode())
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testPutObjectWithWrongMD5Header(String wrongMd5Base64, String expectedErrorCode) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     final String content = "bar";
     s3Client.createBucket(bucketName);
-
-    // Use wrong content to calculate MD5
-    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
-    byte[] wrongMd5Bytes = calculateDigest(new ByteArrayInputStream(wrongContentBytes), 0, wrongContentBytes.length);
-    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
 
     byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
     InputStream is = new ByteArrayInputStream(contentBytes);
@@ -536,7 +548,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(400, ase.getStatusCode());
-    assertEquals("BadDigest", ase.getErrorCode());
+    assertEquals(expectedErrorCode, ase.getErrorCode());
 
     // Verify the object was not uploaded
     assertFalse(s3Client.doesObjectExist(bucketName, keyName));
@@ -597,8 +609,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     }
   }
 
-  @Test
-  public void testMultipartUploadPartWithWrongMD5Header() throws Exception {
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testMultipartUploadPartWithWrongMD5Header(String wrongMd5Base64, String expectedErrorCode) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(bucketName);
@@ -612,11 +625,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     String partContent = "partdata";
     byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
 
-    byte[] wrongMd5Bytes = calculateDigest(
-        new ByteArrayInputStream("wrongdata".getBytes(StandardCharsets.UTF_8)), 0, 9);
-    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
-
-    // Upload part with wrong MD5 should fail
+    // Upload part with wrong/invalid MD5 should fail
     InputStream partInputStream = new ByteArrayInputStream(partBytes);
     ObjectMetadata metadata = new ObjectMetadata();
     metadata.setContentMD5(wrongMd5Base64);
@@ -636,7 +645,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(400, ase.getStatusCode());
-    assertEquals("BadDigest", ase.getErrorCode());
+    assertEquals(expectedErrorCode, ase.getErrorCode());
 
     // Abort the multipart upload
     AbortMultipartUploadRequest abortRequest = new AbortMultipartUploadRequest(bucketName, keyName, uploadId);

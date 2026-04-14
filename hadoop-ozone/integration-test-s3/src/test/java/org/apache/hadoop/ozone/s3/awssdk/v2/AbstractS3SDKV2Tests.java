@@ -43,6 +43,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,6 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -71,6 +73,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.NonHATests;
@@ -84,6 +87,9 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -516,26 +522,33 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
   }
 
-  @Test
-  public void testPutObjectWithWrongMD5Header() throws Exception {
+  static Stream<Arguments> wrongContentMD5Provider() throws Exception {
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    return Stream.of(
+        Arguments.of(wrongMd5Base64, S3ErrorTable.BAD_DIGEST.getCode()),
+        Arguments.of("invalid-base64", S3ErrorTable.INVALID_DIGEST.getCode())
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testPutObjectWithWrongMD5Header(String contentMD5, String expectedErrorCode) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     final String content = "bar";
     s3Client.createBucket(b -> b.bucket(bucketName));
 
-    // Use wrong content to calculate MD5
-    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
-    byte[] wrongMd5Bytes = calculateDigest(new ByteArrayInputStream(wrongContentBytes), 0, wrongContentBytes.length);
-    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
-
     S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
             .bucket(bucketName)
             .key(keyName)
-            .contentMD5(wrongMd5Base64),
+            .contentMD5(contentMD5),
         RequestBody.fromString(content)));
 
     assertEquals(400, exception.statusCode());
-    assertEquals("BadDigest", exception.awsErrorDetails().errorCode());
+    assertEquals(expectedErrorCode, exception.awsErrorDetails().errorCode());
 
     // Verify the object was not uploaded
     assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
@@ -591,8 +604,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(part1Content, objectBytes.asUtf8String());
   }
 
-  @Test
-  public void testMultipartUploadPartWithWrongMD5Header() throws Exception {
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testMultipartUploadPartWithWrongMD5Header(String wrongMd5Base64, String expectedErrorCode) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -607,10 +621,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     String partContent = "partdata";
     byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
 
-    byte[] wrongMd5Bytes = calculateDigest(
-        new ByteArrayInputStream("wrongdata".getBytes(StandardCharsets.UTF_8)), 0, 9);
-    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
-
     // Upload part with wrong MD5 should fail
     S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.uploadPart(b -> b
             .bucket(bucketName)
@@ -621,7 +631,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         RequestBody.fromBytes(partBytes)));
 
     assertEquals(400, exception.statusCode());
-    assertEquals("BadDigest", exception.awsErrorDetails().errorCode());
+    assertEquals(expectedErrorCode, exception.awsErrorDetails().errorCode());
 
     // Abort the multipart upload
     s3Client.abortMultipartUpload(b -> b
