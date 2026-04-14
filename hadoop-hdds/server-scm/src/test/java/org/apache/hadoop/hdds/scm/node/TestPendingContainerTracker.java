@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -39,73 +41,88 @@ public class TestPendingContainerTracker {
 
   private static final long MAX_CONTAINER_SIZE = 5L * 1024 * 1024 * 1024; // 5GB
 
+  private static final int NUM_DATANODES = 1000;
+  private static final int NUM_PIPELINES = 1000;
+  private static final int NUM_CONTAINERS = 10_000;
+  private List<DatanodeDetails> datanodes;
+  private List<Pipeline> pipelines;
+  private List<ContainerID> containers;
+
   private PendingContainerTracker tracker;
   private Pipeline pipeline;
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
-  private DatanodeDetails dn3;
+
+  /** First three container IDs. */
   private ContainerID container1;
   private ContainerID container2;
-  private ContainerID container3;
 
   @BeforeEach
   public void setUp() throws IOException {
     tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE);
 
-    // Create a 3-node Ratis pipeline
-    pipeline = MockPipeline.createPipeline(3);
-    dn1 = pipeline.getNodes().get(0);
-    dn2 = pipeline.getNodes().get(1);
-    dn3 = pipeline.getNodes().get(2);
+    datanodes = new ArrayList<>(NUM_DATANODES);
+    for (int i = 0; i < NUM_DATANODES; i++) {
+      datanodes.add(MockDatanodeDetails.randomLocalDatanodeDetails());
+    }
 
-    container1 = ContainerID.valueOf(1L);
-    container2 = ContainerID.valueOf(2L);
-    container3 = ContainerID.valueOf(3L);
+    pipelines = new ArrayList<>(NUM_PIPELINES);
+    for (int i = 0; i < NUM_PIPELINES; i++) {
+      pipelines.add(MockPipeline.createPipeline(Collections.singletonList(datanodes.get(i))));
+    }
+
+    containers = new ArrayList<>(NUM_CONTAINERS);
+    for (long id = 1; id <= NUM_CONTAINERS; id++) {
+      containers.add(ContainerID.valueOf(id));
+    }
+
+    pipeline = MockPipeline.createPipeline(datanodes.subList(0, 3));
+    dn1 = datanodes.get(0);
+    dn2 = datanodes.get(1);
+
+    container1 = containers.get(0);
+    container2 = containers.get(1);
   }
 
   @Test
   public void testRecordPendingAllocation() {
-    // Initially no pending containers
-    assertEquals(0, tracker.getPendingContainers(dn1).size());
-    assertEquals(0, tracker.getPendingAllocationSize(dn1));
+    // Allocate first 100 containers across first 100 pipelines (1 DN each)
+    for (int i = 0; i < 100; i++) {
+      tracker.recordPendingAllocation(pipelines.get(i), containers.get(i));
+    }
 
-    // Record a pending allocation
-    tracker.recordPendingAllocation(pipeline, container1);
+    // Each of the first 100 DNs should have 1 pending container
+    for (int i = 0; i < 100; i++) {
+      assertEquals(1, tracker.getPendingContainerCount(datanodes.get(i)));
+      assertEquals(MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(datanodes.get(i)));
+    }
 
-    // All 3 DNs should have the container pending
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
-    assertEquals(1, tracker.getPendingContainers(dn2).size());
-    assertEquals(1, tracker.getPendingContainers(dn3).size());
-
-    // Size should be MAX_CONTAINER_SIZE for each DN
-    assertEquals(MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn1));
-    assertEquals(MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn2));
-    assertEquals(MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn3));
+    // DNs beyond index 100 should have 0 pending
+    assertEquals(0, tracker.getPendingContainerCount(datanodes.get(500)));
+    assertEquals(0, tracker.getPendingContainerCount(datanodes.get(999)));
   }
 
   @Test
-  public void testRecordMultiplePendingAllocations() {
-    tracker.recordPendingAllocation(pipeline, container1);
-    tracker.recordPendingAllocation(pipeline, container2);
-    tracker.recordPendingAllocation(pipeline, container3);
+  public void testRemovePendingAllocation() {
+    // Allocate containers 0-99 to first 100 pipelines
+    for (int i = 0; i < 100; i++) {
+      tracker.recordPendingAllocation(pipelines.get(i), containers.get(i));
+    }
 
-    // Each DN should have 3 pending containers
-    assertEquals(3, tracker.getPendingContainers(dn1).size());
-    assertEquals(3, tracker.getPendingContainers(dn2).size());
-    assertEquals(3, tracker.getPendingContainers(dn3).size());
+    // Remove from first 50 DNs
+    for (int i = 0; i < 50; i++) {
+      tracker.removePendingAllocation(datanodes.get(i), containers.get(i));
+    }
 
-    // Size should be 3 × MAX_CONTAINER_SIZE
-    assertEquals(3 * MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn1));
-  }
+    // First 50 DNs should have 0 pending
+    for (int i = 0; i < 50; i++) {
+      assertEquals(0, tracker.getPendingContainerCount(datanodes.get(i)));
+    }
 
-  @Test
-  public void testIdempotentRecording() {
-    tracker.recordPendingAllocation(pipeline, container1);
-    tracker.recordPendingAllocation(pipeline, container1); // Duplicate
-
-    // Should still be 1 container (Set deduplication)
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
-    assertEquals(MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn1));
+    // DNs 50-99 should still have 1 pending
+    for (int i = 50; i < 100; i++) {
+      assertEquals(1, tracker.getPendingContainerCount(datanodes.get(i)));
+    }
   }
 
   /**
@@ -121,56 +138,20 @@ public class TestPendingContainerTracker {
         new PendingContainerTracker(MAX_CONTAINER_SIZE, rollMs, null);
 
     shortRollTracker.recordPendingAllocationForDatanode(dn1, container1);
-    Set<ContainerID> pendingDn1 = shortRollTracker.getPendingContainers(dn1);
-    assertEquals(1, pendingDn1.size());
-    assertThat(pendingDn1).containsExactly(container1);
+    assertEquals(1, shortRollTracker.getPendingContainerCount(dn1));
+    assertTrue(shortRollTracker.containsPendingContainer(dn1, container1));
 
     // First roll: C1 moves from currentWindow to previousWindow; union still includes C1
     Thread.sleep(rollMs + 80);
     shortRollTracker.rollWindowsIfNeeded(dn1);
-    pendingDn1 = shortRollTracker.getPendingContainers(dn1);
-    assertEquals(1, pendingDn1.size());
-    assertThat(pendingDn1).containsExactly(container1);
+    assertEquals(1, shortRollTracker.getPendingContainerCount(dn1));
+    assertTrue(shortRollTracker.containsPendingContainer(dn1, container1));
 
     // Second roll: prior previousWindow (holding C1) is dropped; C1 is no longer pending
     Thread.sleep(rollMs + 80);
     shortRollTracker.rollWindowsIfNeeded(dn1);
-    assertEquals(0, shortRollTracker.getPendingContainers(dn1).size());
+    assertEquals(0, shortRollTracker.getPendingContainerCount(dn1));
     assertEquals(0L, shortRollTracker.getPendingAllocationSize(dn1));
-  }
-
-  @Test
-  public void testRemovePendingAllocation() {
-    tracker.recordPendingAllocation(pipeline, container1);
-    tracker.recordPendingAllocation(pipeline, container2);
-
-    assertEquals(2, tracker.getPendingContainers(dn1).size());
-
-    // Remove one container from DN1
-    tracker.removePendingAllocation(dn1, container1);
-
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
-    assertEquals(MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn1));
-
-    // DN2 and DN3 should still have both containers
-    assertEquals(2, tracker.getPendingContainers(dn2).size());
-    assertEquals(2, tracker.getPendingContainers(dn3).size());
-  }
-
-  @Test
-  public void testRemovePendingAllocationFromPipeline() {
-    tracker.recordPendingAllocation(pipeline, container1);
-    tracker.recordPendingAllocation(pipeline, container2);
-
-    // Remove container1 from all nodes in pipeline
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      tracker.removePendingAllocation(dn, container1);
-    }
-
-    // All DNs should have only container2 remaining
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
-    assertEquals(1, tracker.getPendingContainers(dn2).size());
-    assertEquals(1, tracker.getPendingContainers(dn3).size());
   }
 
   @Test
@@ -181,53 +162,13 @@ public class TestPendingContainerTracker {
     tracker.removePendingAllocation(dn1, container2);
 
     // DN1 should still have container1
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
+    assertEquals(1, tracker.getPendingContainerCount(dn1));
   }
 
   @Test
-  public void testGetPendingContainers() {
-    tracker.recordPendingAllocation(pipeline, container1);
-    tracker.recordPendingAllocation(pipeline, container2);
-
-    Set<ContainerID> pending = tracker.getPendingContainers(dn1);
-
-    assertEquals(2, pending.size());
-    assertThat(pending).contains(container1);
-    assertThat(pending).contains(container2);
-
-    // Returned set should be a copy - modifying it shouldn't affect tracker
-    pending.add(container3);
-    assertEquals(2, tracker.getPendingContainers(dn1).size()); // Should still be 2
-  }
-
-  @Test
-  public void testGetPendingContainersForNonExistentDN() {
+  public void testUnknownDatanodeHasZeroPendingCount() {
     DatanodeDetails unknownDN = MockDatanodeDetails.randomDatanodeDetails();
-
-    Set<ContainerID> pending = tracker.getPendingContainers(unknownDN);
-
-    assertThat(pending).isEmpty();
-  }
-
-  @Test
-  public void testGetTotalPendingCount() {
-    assertEquals(0, tracker.getTotalPendingCount());
-
-    tracker.recordPendingAllocation(pipeline, container1);
-
-    // 1 container × 3 DNs = 3 total pending
-    assertEquals(3, tracker.getTotalPendingCount());
-
-    tracker.recordPendingAllocation(pipeline, container2);
-
-    // 2 containers × 3 DNs = 6 total pending
-    assertEquals(6, tracker.getTotalPendingCount());
-
-    // Remove from one DN
-    tracker.removePendingAllocation(dn1, container1);
-
-    // (2 containers × 2 DNs) + (1 container × 1 DN) = 5 total
-    assertEquals(5, tracker.getTotalPendingCount());
+    assertEquals(0, tracker.getPendingContainerCount(unknownDN));
   }
 
   @Test
@@ -261,62 +202,23 @@ public class TestPendingContainerTracker {
     for (Thread thread : threads) {
       thread.join();
     }
-
-    // Verify no exceptions occurred and counts are reasonable
-    assertThat(tracker.getTotalPendingCount()).isGreaterThanOrEqualTo(0);
-    assertThat(tracker.getDataNodeCount()).isLessThanOrEqualTo(3);
   }
 
   @Test
-  public void testMemoryCleanupOnEmptySet() {
+  public void testBucketsRetainedWhenEmpty() {
     tracker.recordPendingAllocation(pipeline, container1);
 
-    assertEquals(3, tracker.getDataNodeCount());
+    assertEquals(1, tracker.getPendingContainerCount(dn1));
 
     // Remove the only pending container from DN1
     tracker.removePendingAllocation(dn1, container1);
 
-    // DN1 should be removed from the map (memory cleanup)
-    assertEquals(2, tracker.getDataNodeCount());
-  }
+    assertEquals(0, tracker.getPendingContainerCount(dn1));
+    assertEquals(1, tracker.getPendingContainerCount(dn2));
 
-  @Test
-  public void testPendingContainer() {
-    // Simulate allocation and confirmation flow
-
-    // Allocate 3 containers
-    tracker.recordPendingAllocation(pipeline, container1);
-    tracker.recordPendingAllocation(pipeline, container2);
-    tracker.recordPendingAllocation(pipeline, container3);
-
-    // Each DN should have 3 pending, 15GB total
-    assertEquals(3, tracker.getPendingContainers(dn1).size());
-    assertEquals(3 * MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn1));
-
-    // DN1 confirms container1 via container report
-    tracker.removePendingAllocation(dn1, container1);
-
-    // DN1 now has 2 pending, 10GB
-    assertEquals(2, tracker.getPendingContainers(dn1).size());
-    assertEquals(2 * MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn1));
-
-    // DN2 and DN3 still have 3 pending
-    assertEquals(3, tracker.getPendingContainers(dn2).size());
-    assertEquals(3, tracker.getPendingContainers(dn3).size());
-
-    // All DNs eventually confirm all containers
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      tracker.removePendingAllocation(dn, container1);
-      tracker.removePendingAllocation(dn, container2);
-      tracker.removePendingAllocation(dn, container3);
-    }
-
-    // All DNs should have 0 pending
-    assertEquals(0, tracker.getPendingContainers(dn1).size());
-    assertEquals(0, tracker.getPendingContainers(dn2).size());
-    assertEquals(0, tracker.getPendingContainers(dn3).size());
-    assertEquals(0, tracker.getTotalPendingCount());
-    assertEquals(0, tracker.getDataNodeCount());
+    // Empty bucket for DN1 is still usable for new allocations
+    tracker.recordPendingAllocationForDatanode(dn1, container2);
+    assertEquals(1, tracker.getPendingContainerCount(dn1));
   }
 
   @Test
@@ -328,81 +230,92 @@ public class TestPendingContainerTracker {
     tracker.recordPendingAllocation(pipeline, container1);
     tracker.recordPendingAllocation(pipeline, container2);
 
-    assertEquals(2, tracker.getPendingContainers(dn1).size());
+    assertEquals(2, tracker.getPendingContainerCount(dn1));
 
     // Remove container1 - should work regardless of which window it's in
     tracker.removePendingAllocation(dn1, container1);
 
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
+    assertEquals(1, tracker.getPendingContainerCount(dn1));
 
-    Set<ContainerID> pending = tracker.getPendingContainers(dn1);
-    assertFalse(pending.contains(container1));
-    assertThat(pending).contains(container2);
+    assertFalse(tracker.containsPendingContainer(dn1, container1));
+    assertTrue(tracker.containsPendingContainer(dn1, container2));
   }
 
   @Test
-  public void testUnionOfBothWindows() {
-    // This test verifies the two-window concept:
-    // getPendingContainers should return union of current + previous windows
+  public void testManyContainersOnSingleDatanode() {
+    // Allocate first 1000 containers to the first datanode
+    DatanodeDetails dn = datanodes.get(0);
+    for (int i = 0; i < 1000; i++) {
+      tracker.recordPendingAllocationForDatanode(dn, containers.get(i));
+    }
 
-    // Add container1
-    tracker.recordPendingAllocation(pipeline, container1);
+    assertEquals(1000, tracker.getPendingContainerCount(dn));
+    assertEquals(1000 * MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(dn));
 
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
-    Set<ContainerID> pending1 = tracker.getPendingContainers(dn1);
-    assertThat(pending1).contains(container1);
+    // Verify specific containers are present
+    assertTrue(tracker.containsPendingContainer(dn, containers.get(0)));
+    assertTrue(tracker.containsPendingContainer(dn, containers.get(500)));
+    assertTrue(tracker.containsPendingContainer(dn, containers.get(999)));
 
-    // Add container2 - should be in same window initially
-    tracker.recordPendingAllocation(pipeline, container2);
+    // Remove half of them
+    for (int i = 0; i < 500; i++) {
+      tracker.removePendingAllocation(dn, containers.get(i));
+    }
 
-    assertEquals(2, tracker.getPendingContainers(dn1).size());
-    Set<ContainerID> pending2 = tracker.getPendingContainers(dn1);
-    assertThat(pending2).contains(container1);
-    assertThat(pending2).contains(container2);
-
-    // Both containers should be in the union
-    assertEquals(2, pending2.size());
+    assertEquals(500, tracker.getPendingContainerCount(dn));
+    assertFalse(tracker.containsPendingContainer(dn, containers.get(0)));
+    assertTrue(tracker.containsPendingContainer(dn, containers.get(999)));
   }
 
   @Test
-  public void testIdempotencyAcrossWindows() {
-    // Recording same container multiple times should only count it once
-    // This should work even if it spans windows
+  public void testAllDatanodesWithMultipleContainers() {
+    // Allocate 10 containers to each of the 1000 datanodes
+    for (int dnIdx = 0; dnIdx < NUM_DATANODES; dnIdx++) {
+      DatanodeDetails dn = datanodes.get(dnIdx);
+      for (int cIdx = 0; cIdx < 10; cIdx++) {
+        int containerIdx = dnIdx * 10 + cIdx;
+        tracker.recordPendingAllocationForDatanode(dn, containers.get(containerIdx));
+      }
+    }
 
-    tracker.recordPendingAllocation(pipeline, container1);
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
+    // Each DN should have 10 pending containers
+    for (int i = 0; i < NUM_DATANODES; i++) {
+      assertEquals(10, tracker.getPendingContainerCount(datanodes.get(i)));
+      assertEquals(10 * MAX_CONTAINER_SIZE, tracker.getPendingAllocationSize(datanodes.get(i)));
+    }
 
-    // Record again - should still be 1 (idempotency via Set)
-    tracker.recordPendingAllocation(pipeline, container1);
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
+    // Remove all containers from every 10th DN
+    for (int dnIdx = 0; dnIdx < NUM_DATANODES; dnIdx += 10) {
+      DatanodeDetails dn = datanodes.get(dnIdx);
+      for (int cIdx = 0; cIdx < 10; cIdx++) {
+        int containerIdx = dnIdx * 10 + cIdx;
+        tracker.removePendingAllocation(dn, containers.get(containerIdx));
+      }
+    }
 
-    // Add different container
-    tracker.recordPendingAllocation(pipeline, container2);
-    assertEquals(2, tracker.getPendingContainers(dn1).size());
+    // Every 10th DN should have 0 pending
+    for (int i = 0; i < NUM_DATANODES; i += 10) {
+      assertEquals(0, tracker.getPendingContainerCount(datanodes.get(i)));
+    }
 
-    // Record container1 again
-    tracker.recordPendingAllocation(pipeline, container1);
-    assertEquals(2, tracker.getPendingContainers(dn1).size());
+    // Other DNs should still have 10 pending
+    assertEquals(10, tracker.getPendingContainerCount(datanodes.get(1)));
+    assertEquals(10, tracker.getPendingContainerCount(datanodes.get(15)));
+    assertEquals(10, tracker.getPendingContainerCount(datanodes.get(999)));
   }
 
   @Test
-  public void testExplicitRemoval() {
+  public void testIdempotentRecording() {
+    // Allocate same 100 containers multiple times to first 100 DNs
+    DatanodeDetails dn = datanodes.get(0);
 
-    tracker.recordPendingAllocation(pipeline, container1);
-    tracker.recordPendingAllocation(pipeline, container2);
-    tracker.recordPendingAllocation(pipeline, container3);
+    for (int round = 0; round < 5; round++) {
+      for (int i = 0; i < 100; i++) {
+        tracker.recordPendingAllocationForDatanode(dn, containers.get(i));
+      }
+    }
 
-    assertEquals(3, tracker.getPendingContainers(dn1).size());
-
-    // Simulate container report confirms container1 and container2
-    tracker.removePendingAllocation(dn1, container1);
-    tracker.removePendingAllocation(dn1, container2);
-
-    // Immediately reflects the removal (doesn't wait for aging)
-    assertEquals(1, tracker.getPendingContainers(dn1).size());
-
-    Set<ContainerID> pending = tracker.getPendingContainers(dn1);
-    assertEquals(1, pending.size());
-    assertThat(pending).contains(container3);
+    // Should still only have 100 containers
+    assertEquals(100, tracker.getPendingContainerCount(dn));
   }
 }

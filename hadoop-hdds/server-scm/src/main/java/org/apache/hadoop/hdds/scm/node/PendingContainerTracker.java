@@ -18,12 +18,10 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -71,18 +69,7 @@ public class PendingContainerTracker {
 
   private static final Logger LOG = LoggerFactory.getLogger(PendingContainerTracker.class);
 
-  /**
-   * Roll interval in milliseconds.
-   * Configurable via hdds.scm.container.pending.allocation.roll.interval.
-   * Default: 5 minutes.
-   * Containers automatically age out after 2 × rollIntervalMs.
-   */
-  private final long rollIntervalMs;
-
-  /**
-   * Map of DataNode ID to TwoWindowBucket.
-   */
-  private final ConcurrentHashMap<DatanodeID, TwoWindowBucket> datanodeBuckets;
+  private final DatanodeBuckets datanodeBuckets;
 
   /**
    * Maximum container size in bytes.
@@ -120,21 +107,17 @@ public class PendingContainerTracker {
         currentWindow.clear();
         lastRollTime = now;
       } else if (elapsed >= rollIntervalMs) {
+        previousWindow.clear();
+        final Set<ContainerID> tmp = previousWindow;
         previousWindow = currentWindow;
-        currentWindow = new HashSet<>();
+        currentWindow = tmp;
         lastRollTime = now;
         LOG.debug("Rolled window. Previous window size: {}, Current window reset to empty", previousWindow.size());
       }
     }
 
-    /**
-     * Get union of both windows (all pending containers).
-     */
-    synchronized Set<ContainerID> getAllPending() {
-      Set<ContainerID> all = new HashSet<>();
-      all.addAll(currentWindow);
-      all.addAll(previousWindow);
-      return all;
+    synchronized boolean contains(ContainerID containerID) {
+      return currentWindow.contains(containerID) || previousWindow.contains(containerID);
     }
 
     /**
@@ -154,13 +137,6 @@ public class PendingContainerTracker {
     }
 
     /**
-     * Check if either window is non-empty.
-     */
-    synchronized boolean isEmpty() {
-      return currentWindow.isEmpty() && previousWindow.isEmpty();
-    }
-
-    /**
      * Count of pending containers in both windows.
      */
     synchronized int getCount() {
@@ -168,15 +144,39 @@ public class PendingContainerTracker {
     }
   }
 
+  /**
+   * Per-datanode two-window buckets.
+   */
+  private static class DatanodeBuckets {
+    private final ConcurrentHashMap<DatanodeID, TwoWindowBucket> map = new ConcurrentHashMap<>();
+    private final long rollIntervalMs;
+
+    DatanodeBuckets(long rollIntervalMs) {
+      this.rollIntervalMs = rollIntervalMs;
+    }
+
+    TwoWindowBucket get(DatanodeID id) {
+      final TwoWindowBucket bucket = map.compute(id, (k, b) -> b != null ? b : new TwoWindowBucket(rollIntervalMs));
+      bucket.rollIfNeeded();
+      return bucket;
+    }
+
+    TwoWindowBucket get(DatanodeDetails dn) {
+      if (dn == null) {
+        return null;
+      }
+      return get(dn.getID());
+    }
+  }
+
   public PendingContainerTracker(long maxContainerSize) {
-    this(maxContainerSize, 10 * 60 * 1000, null); // Default 10 minutes
+    this(maxContainerSize, 5 * 60 * 1000, null); // Default 5 minutes
   }
 
   public PendingContainerTracker(long maxContainerSize, long rollIntervalMs,
       SCMNodeMetrics metrics) {
-    this.datanodeBuckets = new ConcurrentHashMap<>();
+    this.datanodeBuckets = new DatanodeBuckets(rollIntervalMs);
     this.maxContainerSize = maxContainerSize;
-    this.rollIntervalMs = rollIntervalMs;
     this.metrics = metrics;
     LOG.info("PendingContainerTracker initialized with maxContainerSize={}B, rollInterval={}ms",
         maxContainerSize, rollIntervalMs);
@@ -184,21 +184,14 @@ public class PendingContainerTracker {
 
   /**
    * Advances the two-window tumbling bucket for this datanode when the roll interval has elapsed.
-   * Call on periodic paths (e.g. node report) so windows age even when there are no new
+   * Call on periodic paths (node report) so windows age even when there are no new
    * allocations or container reports touching this tracker.
    */
   public void rollWindowsIfNeeded(DatanodeDetails node) {
     if (node == null) {
       return;
     }
-    DatanodeID dnID = node.getID();
-    datanodeBuckets.computeIfPresent(dnID, (k, bucket) -> {
-      synchronized (bucket) {
-        bucket.rollIfNeeded();
-        // Remove bucket if empty after roll
-        return bucket.isEmpty() ? null : bucket;
-      }
-    });
+    datanodeBuckets.get(node.getID());
   }
 
   /**
@@ -225,12 +218,9 @@ public class PendingContainerTracker {
     if (storageReports == null || storageReports.isEmpty()) {
       return false;
     }
-    long effectiveAllocatableSpace = 0L;
     for (StorageReportProto report : storageReports) {
       long usableSpace = VolumeUsage.getUsableSpace(report);
-      long containersOnThisDisk = usableSpace / containerSize;
-      effectiveAllocatableSpace += containersOnThisDisk * containerSize;
-      if (effectiveAllocatableSpace - pendingAllocationBytes >= containerSize) {
+      if (usableSpace - pendingAllocationBytes >= containerSize) {
         return true;
       }
     }
@@ -238,18 +228,6 @@ public class PendingContainerTracker {
       metrics.incNumSkippedFullNodeContainerAllocation();
     }
     return false;
-  }
-
-  /**
-   * Drops all pending allocation state for a datanode (e.g. stale/dead cleanup).
-   */
-  public void clearPendingForDatanode(DatanodeDetails node) {
-    if (node == null) {
-      return;
-    }
-    DatanodeID dnID = node.getID();
-    datanodeBuckets.remove(dnID);
-    LOG.debug("Cleared pending container allocations for datanode {}", dnID);
   }
 
   /**
@@ -284,27 +262,21 @@ public class PendingContainerTracker {
     }
 
     DatanodeID dnID = node.getID();
-    AtomicBoolean added = addContainerToBucket(containerID, dnID);
+    boolean added = addContainerToBucket(containerID, dnID);
 
-    if (added.get() && metrics != null) {
+    if (added && metrics != null) {
       metrics.incNumPendingContainersAdded();
     }
   }
 
-  private AtomicBoolean addContainerToBucket(ContainerID containerID, DatanodeID dnID) {
-    AtomicBoolean added = new AtomicBoolean(false);
-
-    datanodeBuckets.compute(dnID, (k, existing) -> {
-      TwoWindowBucket bucket = (existing != null) ? existing : new TwoWindowBucket(rollIntervalMs);
-      synchronized (bucket) {
-        bucket.rollIfNeeded();
-        added.set(bucket.add(containerID));
-        LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
-            containerID, dnID, added.get(), bucket.getCount());
-        return bucket;
-      }
-    });
-    return added;
+  private boolean addContainerToBucket(ContainerID containerID, DatanodeID dnID) {
+    TwoWindowBucket bucket = datanodeBuckets.get(dnID);
+    synchronized (bucket) {
+      boolean added = bucket.add(containerID);
+      LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
+          containerID, dnID, added, bucket.getCount());
+      return added;
+    }
   }
 
   /**
@@ -321,32 +293,26 @@ public class PendingContainerTracker {
     }
 
     DatanodeID dnID = node.getID();
-    AtomicBoolean removed = removeContainerFromBucket(containerID, dnID);
+    boolean removed = removeContainerFromBucket(containerID, dnID);
 
-    if (removed.get() && metrics != null) {
+    if (removed && metrics != null) {
       metrics.incNumPendingContainersRemoved();
     }
   }
 
-  private AtomicBoolean removeContainerFromBucket(ContainerID containerID, DatanodeID dnID) {
-    AtomicBoolean removed = new AtomicBoolean(false);
-
-    datanodeBuckets.computeIfPresent(dnID, (k, bucket) -> {
-      synchronized (bucket) {
-        bucket.rollIfNeeded();
-        removed.set(bucket.remove(containerID));
-        LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
-            containerID, dnID, removed.get(), bucket.getCount());
-        return bucket.isEmpty() ? null : bucket;
-      }
-    });
-    return removed;
+  private boolean removeContainerFromBucket(ContainerID containerID, DatanodeID dnID) {
+    TwoWindowBucket bucket = datanodeBuckets.get(dnID);
+    synchronized (bucket) {
+      boolean removed = bucket.remove(containerID);
+      LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
+          containerID, dnID, removed, bucket.getCount());
+      return removed;
+    }
   }
 
   /**
    * Bytes of SCM-side pending container allocations for this datanode (count × configured max
-   * container size). For whether a new container can be placed, prefer
-   * {@link #hasEffectiveAllocatableSpaceForNewContainer}.
+   * container size).
    * <p>Note: this call may advance the internal tumbling window if the roll interval has elapsed,
    * ensuring the returned value reflects the most up-to-date pending state.</p>
    *
@@ -357,64 +323,38 @@ public class PendingContainerTracker {
     if (node == null) {
       return 0;
     }
-
-    TwoWindowBucket bucket = datanodeBuckets.get(node.getID());
-    if (bucket == null) {
-      return 0;
-    }
-
-    synchronized (bucket) {
-      bucket.rollIfNeeded();
-      return (long) bucket.getCount() * maxContainerSize;
-    }
+    return getPendingContainerCount(node) * maxContainerSize;
   }
 
   /**
-   * Get the set of pending container IDs for a DataNode.
-   * Returns union of current and previous windows.
-   * Useful for debugging and monitoring.
-   * <p>Note: this call may advance the internal tumbling window if the roll interval has elapsed,
-   * ensuring the returned set reflects the most up-to-date pending state.</p>
+   * Number of pending container allocations for this datanode (union of current and previous
+   * windows). This call may advance the internal tumbling window if the roll interval has elapsed.
    *
    * @param node The DataNode
-   * @return Set of pending container IDs
+   * @return Pending container count
    */
-  public Set<ContainerID> getPendingContainers(DatanodeDetails node) {
+  public long getPendingContainerCount(DatanodeDetails node) {
     if (node == null) {
-      return Collections.emptySet();
+      return 0;
     }
-
-    TwoWindowBucket bucket = datanodeBuckets.get(node.getID());
-    if (bucket == null) {
-      return Collections.emptySet();
-    }
-
+    TwoWindowBucket bucket = datanodeBuckets.get(node);
     synchronized (bucket) {
-      bucket.rollIfNeeded();
-      return bucket.getAllPending();
+      return bucket.getCount();
     }
   }
 
   /**
-   * Get total number of DataNodes with pending allocations.
-   *
-   * @return Count of DataNodes
+   * Whether container is in the current or previous window for this datanode.
    */
-  public int getDataNodeCount() {
-    return datanodeBuckets.size();
-  }
-
-  /**
-   * Get total number of pending containers across all DataNodes.
-   * Note: Same container on multiple DataNodes is counted once per DataNode.
-   * The count may include containers from the previous window (up to 10 minutes old).
-   *
-   * @return Total pending container count
-   */
-  public long getTotalPendingCount() {
-    return datanodeBuckets.values().stream()
-        .mapToLong(TwoWindowBucket::getCount)
-        .sum();
+  @VisibleForTesting
+  public boolean containsPendingContainer(DatanodeDetails node, ContainerID containerID) {
+    if (node == null || containerID == null) {
+      return false;
+    }
+    TwoWindowBucket bucket = datanodeBuckets.get(node);
+    synchronized (bucket) {
+      return bucket.contains(containerID);
+    }
   }
 
   @VisibleForTesting
