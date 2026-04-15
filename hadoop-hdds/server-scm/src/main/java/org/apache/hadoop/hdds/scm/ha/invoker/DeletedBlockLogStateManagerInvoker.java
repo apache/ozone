@@ -116,7 +116,7 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       final ArrayList arg0 = p.length > 0 ? (ArrayList) p[0] : null;
       final DeletedBlocksTransactionSummary arg1 = p.length > 1 ? (DeletedBlocksTransactionSummary) p[1] : null;
       getImpl().addTransactionsToDB(arg0, arg1);
-      return null;
+      return Message.EMPTY;
 
     case "getReadOnlyIterator":
       returnType = Table.KeyValueIterator.class;
@@ -125,19 +125,19 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
 
     case "onFlush":
       getImpl().onFlush();
-      return null;
+      return Message.EMPTY;
 
     case "reinitialize":
       final Table arg2 = p.length > 0 ? (Table) p[0] : null;
       final Table arg3 = p.length > 1 ? (Table) p[1] : null;
       getImpl().reinitialize(arg2, arg3);
-      return null;
+      return Message.EMPTY;
 
     case "removeTransactionsFromDB":
       final ArrayList arg4 = p.length > 0 ? (ArrayList) p[0] : null;
       final DeletedBlocksTransactionSummary arg5 = p.length > 1 ? (DeletedBlocksTransactionSummary) p[1] : null;
       getImpl().removeTransactionsFromDB(arg4, arg5);
-      return null;
+      return Message.EMPTY;
 
     default:
       throw new IllegalArgumentException("Method not found: " + methodName + " in DeletedBlockLogStateManager");
