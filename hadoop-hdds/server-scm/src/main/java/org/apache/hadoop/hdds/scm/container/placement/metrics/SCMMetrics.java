@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
 import java.util.LinkedList;
-import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;

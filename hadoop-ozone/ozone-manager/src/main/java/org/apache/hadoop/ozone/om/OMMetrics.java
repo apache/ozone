@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.LinkedList;
-import java.util.List;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
