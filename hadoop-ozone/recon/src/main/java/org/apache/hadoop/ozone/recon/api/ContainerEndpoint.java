@@ -26,8 +26,12 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MAX_CONTA
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MIN_CONTAINER_ID;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -48,7 +52,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -61,6 +67,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
@@ -84,6 +91,8 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.util.SeekableIterator;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.recon.schema.generated.tables.records.UnhealthyContainersRecord;
+import org.jooq.Cursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -448,6 +457,71 @@ public class ContainerEndpoint {
       response.setSummaryCount(s.getContainerState(), s.getCount());
     }
     return Response.ok(response).build();
+  }
+
+  /**
+   * Export all unhealthy containers into a CSV file by streaming the results directly
+   * from the database without holding them in the JVM heap.
+   *
+   * @param state The container state to filter by, or null for all.
+   * @param limit The maximum number of records to return, 0 for unlimited.
+   * @return {@link Response} containing the CSV StreamingOutput.
+   */
+  @GET
+  @Path("/unhealthy/export")
+  @Produces("text/csv")
+  public Response exportUnhealthyContainers(
+      @QueryParam("state") String state,
+      @DefaultValue("0") @QueryParam(RECON_QUERY_LIMIT) int limit) {
+
+    ContainerSchemaDefinition.UnHealthyContainerStates internalState = null;
+    if (StringUtils.isNotEmpty(state)) {
+      try {
+        internalState = ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
+      } catch (IllegalArgumentException e) {
+        throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+      }
+    }
+
+    final ContainerSchemaDefinition.UnHealthyContainerStates filterState = internalState;
+
+    StreamingOutput stream = outputStream -> {
+      try (BufferedOutputStream bos = new BufferedOutputStream(outputStream, 256 * 1024);
+           Cursor<UnhealthyContainersRecord> cursor =
+               containerHealthSchemaManager.getUnhealthyContainersCursor(filterState, limit)) {
+        
+        PrintWriter writer = new PrintWriter(new OutputStreamWriter(bos, StandardCharsets.UTF_8));
+        
+        // Write CSV header
+        writer.println("container_id,container_state,in_state_since," +
+            "expected_replica_count,actual_replica_count,replica_delta");
+        
+        StringBuilder sb = new StringBuilder(128);
+        while (cursor.hasNext()) {
+          UnhealthyContainersRecord rec = cursor.fetchNext();
+          sb.setLength(0);
+          sb.append(rec.getContainerId()).append(',')
+              .append(rec.getContainerState()).append(',')
+              .append(rec.getInStateSince()).append(',')
+              .append(rec.getExpectedReplicaCount()).append(',')
+              .append(rec.getActualReplicaCount()).append(',')
+              .append(rec.getReplicaDelta());
+          writer.println(sb);
+        }
+        writer.flush();
+      } catch (Exception e) {
+        LOG.error("Error streaming unhealthy containers CSV", e);
+        throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    };
+
+    String filename = String.format("unhealthy_containers_%s_%d.csv",
+        state != null ? state.toLowerCase() : "all",
+        System.currentTimeMillis());
+
+    return Response.ok(stream)
+        .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+        .build();
   }
 
   private UnhealthyContainerMetadata toUnhealthyMetadata(
