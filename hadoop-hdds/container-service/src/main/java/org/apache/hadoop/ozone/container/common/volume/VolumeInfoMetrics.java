@@ -76,6 +76,18 @@ public class VolumeInfoMetrics implements MetricsSource {
   @Metric("Number of scans skipped for the volume")
   private MutableCounterLong numScansSkipped;
 
+  @Metric("Write requests allowed while usable space is between the reported (soft) and hard min-free-space thresholds")
+  private MutableCounterLong numWriteRequestsInSoftBandMinFreeSpace;
+
+  @Metric("Write requests rejected because the hard min-free-space limit would be violated")
+  private MutableCounterLong numWriteRequestsRejectedHardMinFreeSpace;
+  @Metric("Container create allowed while usable space is between the reported (soft) " +
+      "and hard min-free-space thresholds")
+  private MutableCounterLong numContainerCreateRequestsInSoftBandMinFreeSpace;
+
+  @Metric("Container create requests rejected because the hard min-free-space limit would be violated")
+  private MutableCounterLong numContainerCreateRequestsRejectedHardMinFreeSpace;
+
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
    */
@@ -183,6 +195,38 @@ public class VolumeInfoMetrics implements MetricsSource {
 
   public void incNumScansSkipped() {
     numScansSkipped.incr();
+  }
+
+  public long getNumWriteRequestsInSoftBandMinFreeSpace() {
+    return numWriteRequestsInSoftBandMinFreeSpace.value();
+  }
+
+  public void incNumWriteRequestsInSoftBandMinFreeSpace() {
+    numWriteRequestsInSoftBandMinFreeSpace.incr();
+  }
+
+  public long getNumWriteRequestsRejectedHardMinFreeSpace() {
+    return numWriteRequestsRejectedHardMinFreeSpace.value();
+  }
+
+  public void incNumWriteRequestsRejectedHardMinFreeSpace() {
+    numWriteRequestsRejectedHardMinFreeSpace.incr();
+  }
+
+  public long getNumContainerCreateRequestsInSoftBandMinFreeSpace() {
+    return numContainerCreateRequestsInSoftBandMinFreeSpace.value();
+  }
+
+  public void incNumContainerCreateRequestsInSoftBandMinFreeSpace() {
+    numContainerCreateRequestsInSoftBandMinFreeSpace.incr();
+  }
+
+  public long getNumContainerCreateRequestsRejectedHardMinFreeSpace() {
+    return numContainerCreateRequestsRejectedHardMinFreeSpace.value();
+  }
+
+  public void incNumContainerCreateRequestsRejectedHardMinFreeSpace() {
+    numContainerCreateRequestsRejectedHardMinFreeSpace.incr();
   }
 
   @Override

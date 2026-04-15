@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.STORAGE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Duration;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -769,19 +770,21 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
     }
     if (minFreeSpaceHardLimitRatio > 1 || minFreeSpaceHardLimitRatio < 0) {
-      LOG.warn("{} = {} is invalid, should be between 0 and 1",
+      LOG.warn("{} = {} is invalid, should be between 0 and 1; resetting to default {}",
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
-          minFreeSpaceHardLimitRatio);
+          minFreeSpaceHardLimitRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT);
       minFreeSpaceHardLimitRatio =
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
     }
     if (minFreeSpaceHardLimitRatio > minFreeSpaceRatio) {
-      LOG.warn("{} = {} is greater than {} = {}. SCM-reported spare will match the "
-              + "hard limit only (see getMinFreeSpace(long)).",
+      LOG.warn("{} = {} must not exceed {} = {}, setting hard limit to soft limit. "
+              + "Set hard.limit.percent <= min.free.space.percent to enable the soft band.",
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
           minFreeSpaceHardLimitRatio,
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
           minFreeSpaceRatio);
+      minFreeSpaceHardLimitRatio = minFreeSpaceRatio;
     }
 
     if (minFreeSpace < 0) {
@@ -851,14 +854,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   /**
    * Minimum free space reported to SCM (freeSpaceToSpare in storage reports).
-   * <p>If {@code min.free.space.hard.limit.percent &gt; min.free.space.percent} (invalid combo),
-   * this returns the same value as {@link #getHardLimitMinFreeSpace(long)} so SCM uses the
-   * hard-limit threshold only; there is no soft band until ratios are fixed.</p>
    */
   public long getMinFreeSpace(long capacity) {
-    if (minFreeSpaceHardLimitRatio > minFreeSpaceRatio) {
-      return getHardLimitMinFreeSpace(capacity);
-    }
     return Math.max((long) (capacity * minFreeSpaceRatio), minFreeSpace);
   }
 
@@ -875,6 +872,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * 2% reported (40GB) and 1.5% hard (30GB), this is 10GB — the gap where the DN may send
    * close-container actions while writes still succeed.
    */
+  @VisibleForTesting
   public long getSoftBandMinFreeSpaceWidth(long capacity) {
     long reported = getMinFreeSpace(capacity);
     long hard = getHardLimitMinFreeSpace(capacity);
@@ -889,6 +887,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return minFreeSpaceRatio;
   }
 
+  @VisibleForTesting
   public float getMinFreeSpaceHardLimitRatio() {
     return minFreeSpaceHardLimitRatio;
   }
