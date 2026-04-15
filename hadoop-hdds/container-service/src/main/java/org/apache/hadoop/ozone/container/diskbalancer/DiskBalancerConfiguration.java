@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -299,7 +300,7 @@ public final class DiskBalancerConfiguration {
    */
   public Set<State> getMovableContainerStates() {
     String raw = containerStates;
-    if (raw == null || raw.trim().isEmpty()) {
+    if (StringUtils.isBlank(raw)) {
       throw new IllegalArgumentException(
           "hdds.datanode.disk.balancer.container.states must not be empty.");
     }
