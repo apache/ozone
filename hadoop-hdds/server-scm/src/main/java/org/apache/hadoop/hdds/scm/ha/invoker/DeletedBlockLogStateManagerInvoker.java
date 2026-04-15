@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.ha.invoker;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
@@ -145,58 +144,5 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
     }
 
     return SCMRatisResponse.encode(returnValue, returnType);
-  }
-
-  @Override
-  public Class<?> getReturnType(String methodName, Class<?>[] parameterTypes) {
-    switch (methodName) {
-    case "addTransactionsToDB":
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{ArrayList.class})) {
-        return void.class;
-      }
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{ArrayList.class, DeletedBlocksTransactionSummary.class})) {
-        return void.class;
-      }
-      break;
-
-    case "getReadOnlyIterator":
-      if (parameterTypes == null || parameterTypes.length == 0) {
-        return Table.KeyValueIterator.class;
-      }
-      break;
-
-    case "onFlush":
-      if (parameterTypes == null || parameterTypes.length == 0) {
-        return void.class;
-      }
-      break;
-
-    case "reinitialize":
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{Table.class, Table.class})) {
-        return void.class;
-      }
-      break;
-
-    case "removeTransactionsFromDB":
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{ArrayList.class})) {
-        return void.class;
-      }
-      if (Arrays.equals(parameterTypes,
-          new Class<?>[]{ArrayList.class, DeletedBlocksTransactionSummary.class})) {
-        return void.class;
-      }
-      break;
-
-    default:
-      break;
-    }
-
-    throw new IllegalArgumentException(
-        "Method not found: " + methodName
-            + " with parameterTypes in DeletedBlockLogStateManager");
   }
 }
