@@ -423,7 +423,7 @@ public class SCMStateMachine extends BaseStateMachine {
   public void notifyConfigurationChanged(long term, long index,
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
     addRatisEvent("Configuration changed at term index (" + term + ", " + index +
-        ") to " + TextFormat.shortDebugString(newRaftConfiguration));
+        ") to " + newRaftConfiguration.toString());
   }
 
   @Override
