@@ -693,7 +693,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isS3MultiTenancyEnabled =
         OMMultiTenantManager.checkAndEnableMultiTenancy(this, conf);
 
-    metrics = OMMetrics.create();
+    metrics = OMMetrics.create(conf);
     omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
     perfMetrics = OMPerformanceMetrics.register();
     omDeletionMetrics = DeletingServiceMetrics.create();
