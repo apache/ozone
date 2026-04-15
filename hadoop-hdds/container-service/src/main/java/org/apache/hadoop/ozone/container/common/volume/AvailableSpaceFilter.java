@@ -42,11 +42,24 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
   @Override
   public boolean test(HddsVolume vol) {
     StorageLocationReport report = vol.getReport();
-    long spareAtHardLimit = vol.getFreeSpaceToSpare(report.getCapacity());
+    long capacity = report.getCapacity();
+    long spareAtHardLimit = vol.getFreeSpaceToSpare(capacity);
+    long spareReported = vol.getReportedFreeSpaceToSpare(capacity);
     long available =
         report.getRemaining() - report.getCommitted() - spareAtHardLimit;
+    long availableAtReportedSpare =
+        report.getRemaining() - report.getCommitted() - spareReported;
 
     boolean hasEnoughSpace = available > requiredSpace;
+
+    VolumeInfoMetrics stats = vol.getVolumeInfoStats();
+    if (stats != null) {
+      if (!hasEnoughSpace) {
+        stats.incNumContainerCreateRequestsRejectedHardMinFreeSpace();
+      } else if (availableAtReportedSpare <= requiredSpace) {
+        stats.incNumContainerCreateRequestsInSoftBandMinFreeSpace();
+      }
+    }
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 
