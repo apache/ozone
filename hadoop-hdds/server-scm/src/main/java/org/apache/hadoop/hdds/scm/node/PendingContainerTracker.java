@@ -107,13 +107,16 @@ public class PendingContainerTracker {
         previousWindow.clear();
         currentWindow.clear();
         lastRollTime = now;
+        LOG.debug("Double roll interval elapsed: ({}ms) dropped: {} pending containers from both windows",
+            elapsed, getCount());
       } else if (elapsed >= rollIntervalMs) {
         previousWindow.clear();
         final Set<ContainerID> tmp = previousWindow;
         previousWindow = currentWindow;
         currentWindow = tmp;
         lastRollTime = now;
-        LOG.debug("Rolled window. Previous window size: {}, Current window reset to empty", previousWindow.size());
+        LOG.debug("Rolled window. Previous window size: {} elapsed: ({}ms), Current window reset to empty",
+            previousWindow.size(), elapsed);
       }
     }
 
