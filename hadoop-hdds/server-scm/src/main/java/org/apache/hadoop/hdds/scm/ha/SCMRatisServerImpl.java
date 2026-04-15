@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -223,6 +224,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public void registerStateMachineHandler(final RequestType handlerType,
                                           final Object handler) {
+    if (handler instanceof ScmInvoker) {
+      stateMachine.registerInvoker(handlerType, (ScmInvoker) handler);
+    }
     stateMachine.registerHandler(handlerType, handler);
   }
 

@@ -120,7 +120,7 @@ public class SCMStateMachine extends BaseStateMachine {
     handlers.put(type, handler);
   }
 
-  public void registerStateMachineInvoker(RequestType type,
+  public void registerInvoker(RequestType type,
       ScmInvoker<?> invoker) {
     invokers.put(type, invoker);
   }
@@ -189,7 +189,7 @@ public class SCMStateMachine extends BaseStateMachine {
   private Message process(final SCMRatisRequest request) throws Exception {
     final ScmInvoker<?> invoker = invokers.get(request.getType());
     if (invoker != null) {
-      return process(request, invoker);
+      return invoker.invokeLocal(request.getOperation(), request.getArguments());
     }
     return process(request, handlers.get(request.getType()));
   }
@@ -210,24 +210,6 @@ public class SCMStateMachine extends BaseStateMachine {
       final Exception targetEx = (Exception) e.getTargetException();
       throw targetEx != null ? targetEx : e;
     }
-  }
-
-  public static Message process(final SCMRatisRequest request,
-      final ScmInvoker<?> invoker) throws Exception {
-
-    if (invoker == null) {
-      throw new IOException("No invoker found for request type "
-          + request.getType());
-    }
-
-    final Object result = invoker.invoke(
-        request.getOperation(),
-        request.getArguments());
-
-    final Class<?> returnType =
-        invoker.getReturnType(request.getOperation(), request.getParameterTypes());
-
-    return SCMRatisResponse.encode(result, returnType);
   }
 
   @Override

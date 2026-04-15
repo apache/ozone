@@ -23,8 +23,10 @@ import java.util.Arrays;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.ratis.protocol.Message;
 
 /** Code generated for {@link DeletedBlockLogStateManager}.  Do not modify. */
 public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockLogStateManager> {
@@ -107,7 +109,9 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
 
   @SuppressWarnings("unchecked")
   @Override
-  public Object invokeLocal(String methodName, Object[] p) throws Exception {
+  public Message invokeLocal(String methodName, Object[] p) throws Exception {
+    final Class<?> returnType;
+    final Object returnValue;
     switch (methodName) {
     case "addTransactionsToDB":
       final ArrayList arg0 = p.length > 0 ? (ArrayList) p[0] : null;
@@ -116,7 +120,9 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       return null;
 
     case "getReadOnlyIterator":
-      return getImpl().getReadOnlyIterator();
+      returnType = Table.KeyValueIterator.class;
+      returnValue = getImpl().getReadOnlyIterator();
+      break;
 
     case "onFlush":
       getImpl().onFlush();
@@ -137,6 +143,8 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
     default:
       throw new IllegalArgumentException("Method not found: " + methodName + " in DeletedBlockLogStateManager");
     }
+
+    return SCMRatisResponse.encode(returnValue, returnType);
   }
 
   @Override
