@@ -275,5 +275,11 @@ public class OMException extends IOException {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
 
     TOO_MANY_SNAPSHOTS,
+
+    ETAG_MISMATCH,
+
+    ETAG_NOT_AVAILABLE,
+
+    ATOMIC_WRITE_CONFLICT,
   }
 }

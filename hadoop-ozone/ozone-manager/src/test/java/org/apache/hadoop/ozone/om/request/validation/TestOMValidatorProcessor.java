@@ -504,9 +504,9 @@ public class TestOMValidatorProcessor {
       Class<?> annotationClass,
       V applyBeforeVersion) {
     StringBuilder annotation = new StringBuilder();
-    annotation.append('@').append(annotationClass.getName()).append('(');
-    annotation.append("processingPhase = ").append(phase);
-    annotation.append(", requestType = ").append(reqType.name());
+    annotation.append('@').append(annotationClass.getName()).append('(')
+        .append("processingPhase = ").append(phase)
+        .append(", requestType = ").append(reqType.name());
     if (applyBeforeVersion != null) {
       annotation.append(", applyBefore = ").append(applyBeforeVersion.name());
     }
@@ -548,11 +548,11 @@ public class TestOMValidatorProcessor {
     for (String modifier : modifiers) {
       signature.append(modifier).append(' ');
     }
-    signature.append(returnType).append(' ');
-    signature.append("validatorMethod(");
-    signature.append(createParameterList(paramspecs));
-    signature.append(") ");
-    signature.append(createThrowsClause(exceptions));
+    signature.append(returnType).append(' ')
+        .append("validatorMethod(")
+        .append(createParameterList(paramspecs))
+        .append(") ")
+        .append(createThrowsClause(exceptions));
     return signature.append(" {");
   }
 

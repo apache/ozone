@@ -1,0 +1,204 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om.helpers;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.stream.IntStream;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+
+/**
+ * Unit tests for {@link OmMultipartPartKey}.
+ */
+public class TestOmMultipartPartKey {
+
+  private final Codec<OmMultipartPartKey> codec = OmMultipartPartKey.getCodec();
+
+  /**
+   * Generate a stream of part numbers with low byte separator as 2F,
+   * in the supported MPU range [1, 10000], values with low byte 0x2f.
+   * AND operation with 0xFF gives the low byte of the part number.
+   * @return IntStream of part numbers with low byte separator as 2F.
+   */
+  private static IntStream partNumbersWithLowByteSeparator() {
+    return IntStream.rangeClosed(1, 10000)
+        .filter(partNumber -> (partNumber & 0xFF) == 0x2F);
+  }
+
+  private static int compareUnsignedBytes(byte[] left, byte[] right) {
+    int length = Math.min(left.length, right.length);
+    for (int i = 0; i < length; i++) {
+      int a = left[i] & 0xFF;
+      int b = right[i] & 0xFF;
+      if (a != b) {
+        return Integer.compare(a, b);
+      }
+    }
+    return Integer.compare(left.length, right.length);
+  }
+
+  @Test
+  public void testRoundTripFullKey() throws Exception {
+    OmMultipartPartKey key = OmMultipartPartKey.of("upload-123", 9);
+
+    byte[] raw = codec.toPersistedFormat(key);
+    OmMultipartPartKey decoded = codec.fromPersistedFormat(raw);
+
+    assertEquals(key, decoded);
+    assertTrue(decoded.hasPartNumber());
+    assertEquals("upload-123/9", decoded.toString());
+  }
+
+  @Test
+  public void testRoundTripPrefixKey() throws Exception {
+    OmMultipartPartKey key = OmMultipartPartKey.prefix("upload-abc");
+
+    byte[] raw = codec.toPersistedFormat(key);
+    OmMultipartPartKey decoded = codec.fromPersistedFormat(raw);
+
+    assertEquals(key, decoded);
+    assertFalse(decoded.hasPartNumber());
+    assertEquals("upload-abc", decoded.toString());
+  }
+
+  @Test
+  public void testCodecBufferRoundTripFullKey() throws Exception {
+    OmMultipartPartKey key = OmMultipartPartKey.of("upload-buffer", 1024);
+
+    assertTrue(codec.supportCodecBuffer());
+    try (CodecBuffer buffer = codec.toHeapCodecBuffer(key)) {
+      OmMultipartPartKey decoded = codec.fromCodecBuffer(buffer);
+      assertEquals(key, decoded);
+      assertTrue(decoded.hasPartNumber());
+      assertEquals(1024, decoded.getPartNumber().intValue());
+    }
+  }
+
+  @Test
+  public void testCodecBufferRoundTripPrefixKey() throws Exception {
+    OmMultipartPartKey key = OmMultipartPartKey.prefix("upload-prefix-buffer");
+
+    assertTrue(codec.supportCodecBuffer());
+    try (CodecBuffer buffer = codec.toHeapCodecBuffer(key)) {
+      OmMultipartPartKey decoded = codec.fromCodecBuffer(buffer);
+      assertEquals(key, decoded);
+      assertFalse(decoded.hasPartNumber());
+    }
+  }
+
+  // Test to validate that the full key is decoded correctly
+  // when the part number has a low byte same as the separator byte i.e. 2F.
+  @ParameterizedTest
+  @MethodSource("partNumbersWithLowByteSeparator")
+  public void testDecodeFullKeyWhenPartLowByteIsSeparator(int partNumber)
+      throws Exception {
+    OmMultipartPartKey key = OmMultipartPartKey.of("upload-sep", partNumber);
+
+    byte[] raw = codec.toPersistedFormat(key);
+    OmMultipartPartKey decoded = codec.fromPersistedFormat(raw);
+
+    assertTrue(decoded.hasPartNumber());
+    assertEquals(partNumber, decoded.getPartNumber().intValue());
+    assertEquals("upload-sep", decoded.getUploadId());
+  }
+
+  @Test
+  public void testDecodeRejectsInvalidKeyWithoutSeparator() {
+    assertThrows(IllegalArgumentException.class,
+        () -> codec.fromPersistedFormat("invalid".getBytes(UTF_8)));
+  }
+
+  @Test
+  public void testDecodeRejectsEmptyKey() {
+    assertThrows(IllegalArgumentException.class,
+        () -> codec.fromPersistedFormat(new byte[0]));
+  }
+
+  @Test
+  public void testCodecBufferDecodeRejectsInvalidKeyWithoutSeparator() {
+    try (CodecBuffer buffer = CodecBuffer.wrap("invalid".getBytes(UTF_8))) {
+      assertThrows(IllegalArgumentException.class,
+          () -> codec.fromCodecBuffer(buffer));
+    }
+  }
+
+  @Test
+  public void testCodecBufferDecodeRejectsEmptyKey() {
+    try (CodecBuffer buffer = CodecBuffer.wrap(new byte[0])) {
+      assertThrows(IllegalArgumentException.class,
+          () -> codec.fromCodecBuffer(buffer));
+    }
+  }
+
+  @Test
+  public void testDecodeRejectsMalformedKeyWithMiddleSeparatorOnly() {
+    byte[] malformed = "up/xx".getBytes(UTF_8);
+    assertThrows(IllegalArgumentException.class,
+        () -> codec.fromPersistedFormat(malformed));
+  }
+
+  @Test
+  public void testFactoryRejectsNullPartNumber() {
+    assertThrows(NullPointerException.class,
+        () -> OmMultipartPartKey.of("upload-id", null));
+  }
+
+  @Test
+  public void testFactoryRejectsNullUploadId() {
+    assertThrows(NullPointerException.class,
+        () -> OmMultipartPartKey.of(null, 1));
+    assertThrows(NullPointerException.class,
+        () -> OmMultipartPartKey.prefix(null));
+  }
+
+  @Test
+  public void testDecodeRejectsNullRawData() {
+    assertThrows(NullPointerException.class,
+        () -> codec.fromPersistedFormat(null));
+  }
+
+  @Test
+  public void testSortOrderIsNumericalNotLexicographic() throws Exception {
+    // "9" sorts after "10" lexicographically, but 9 < 10 numerically.
+    // Big-endian int32 encoding must produce the numerical order.
+    byte[] raw9  = codec.toPersistedFormat(OmMultipartPartKey.of("uid", 9));
+    byte[] raw10 = codec.toPersistedFormat(OmMultipartPartKey.of("uid", 10));
+
+    assertTrue(compareUnsignedBytes(raw9, raw10) < 0,
+        "part 9 must sort before part 10 in byte order (big-endian encoding)");
+  }
+
+  @Test
+  public void testUploadIdContainingSlashRoundTrips() throws Exception {
+    // uploadId itself contains '/' — the codec separator character.
+    // A naive "find first slash" parser would split at the wrong position.
+    OmMultipartPartKey key = OmMultipartPartKey.of("upload/with/slashes", 5);
+    byte[] raw = codec.toPersistedFormat(key);
+    OmMultipartPartKey decoded = codec.fromPersistedFormat(raw);
+    assertEquals("upload/with/slashes", decoded.getUploadId());
+    assertEquals(5, decoded.getPartNumber().intValue());
+  }
+}

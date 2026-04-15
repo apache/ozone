@@ -280,6 +280,7 @@ Apache License 2.0
    com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
+   com.github.ben-manes.caffeine:caffeine
    com.github.jnr:jnr-a64asm
    com.github.jnr:jnr-constants
    com.github.jnr:jnr-ffi
@@ -366,6 +367,7 @@ Apache License 2.0
    log4j:apache-log4j-extras
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
+   org.apache.avro:avro
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
    org.apache.commons:commons-collections4
@@ -384,6 +386,9 @@ Apache License 2.0
    org.apache.hadoop:hadoop-shaded-guava
    org.apache.hadoop:hadoop-shaded-protobuf_3_25
    org.apache.httpcomponents:httpcore
+   org.apache.iceberg:iceberg-api
+   org.apache.iceberg:iceberg-common
+   org.apache.iceberg:iceberg-core
    org.apache.kerby:kerb-admin
    org.apache.kerby:kerb-client
    org.apache.kerby:kerb-common

@@ -221,14 +221,14 @@ public class TestPartUpload {
     byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
     String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
     return Stream.of(
-        Arguments.arguments(wrongMd5Base64),
-        Arguments.arguments("invalid-base64")
+        Arguments.arguments(wrongMd5Base64, S3ErrorTable.BAD_DIGEST),
+        Arguments.arguments("invalid-base64", S3ErrorTable.INVALID_DIGEST)
     );
   }
 
   @ParameterizedTest
   @MethodSource("wrongContentMD5Provider")
-  public void testPartUploadWithWrongContentMD5(String wrongContentMD5) throws Exception {
+  public void testPartUploadWithWrongContentMD5(String wrongContentMD5, S3ErrorTable s3Error) throws Exception {
     String content = "Multipart Upload Part";
 
     HttpHeaders headersWithWrongMD5 = mock(HttpHeaders.class);
@@ -243,7 +243,7 @@ public class TestPartUpload {
 
     String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
 
-    assertErrorResponse(S3ErrorTable.BAD_DIGEST,
+    assertErrorResponse(s3Error,
         () -> put(endpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
   }
 

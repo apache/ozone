@@ -15,19 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha;
+package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import java.util.List;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 
 /**
- * Invokes methods without using reflection.
+ * JMX interface for SnapshotDiffManager.
  */
-public interface ScmInvoker<T> {
-  RequestType getType();
-
-  Class<T> getApi();
-
-  T getImpl();
-
-  Object invokeLocal(String methodName, Object[] args) throws Exception;
+@InterfaceAudience.Private
+public interface SnapshotDiffManagerMXBean {
+  /**
+   * Returns all snapshot diff jobs.
+   * @return list of snapshot diff jobs
+   */
+  List<SnapshotDiffJob> getSnapshotDiffJobs();
 }
