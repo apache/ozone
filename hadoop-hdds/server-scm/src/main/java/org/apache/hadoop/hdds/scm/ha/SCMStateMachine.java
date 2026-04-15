@@ -78,7 +78,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   private StorageContainerManager scm;
   private Map<RequestType, Object> handlers;
-  private Map<RequestType,  ScmInvoker<?>> invokers;
+  private Map<RequestType, ScmInvoker<?>> invokers;
   private SCMHADBTransactionBuffer transactionBuffer;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
