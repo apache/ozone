@@ -35,11 +35,13 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
@@ -286,6 +288,41 @@ public class TestContainerBalancer {
         Double.parseDouble(status.getConfiguration().getUtilizationThreshold()));
     assertEquals(balancerConfiguration.getIterations(), status.getConfiguration().getIterations());
     assertEquals(balancerConfiguration.getTriggerDuEnable(), status.getConfiguration().getTriggerDuBeforeMoveEnable());
+
+    stopBalancer();
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+  }
+
+  @Test
+  public void testStartBalancerWithInvalidNodes() throws Exception {
+    NodeManager nm = scm.getScmNodeManager();
+    String validHost = "1.2.3.4";
+    String invalidHost = "invalid-host-name";
+
+    when(nm.getNodesByAddress(invalidHost)).thenReturn(Collections.emptyList());
+    when(nm.getNodesByAddress(validHost)).thenReturn(Collections.singletonList(mock(DatanodeDetails.class)));
+
+    // Test invalid includeNodes
+    balancerConfiguration.setIncludeNodes(invalidHost);
+    InvalidContainerBalancerConfigurationException ex =
+        assertThrows(InvalidContainerBalancerConfigurationException.class,
+            () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains(invalidHost);
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    // Test invalid excludeNodes
+    balancerConfiguration.setIncludeNodes("");
+    balancerConfiguration.setExcludeNodes(invalidHost);
+    ex = assertThrows(InvalidContainerBalancerConfigurationException.class,
+        () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains(invalidHost);
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    // Test a valid case
+    balancerConfiguration.setExcludeNodes("");
+    balancerConfiguration.setIncludeNodes(validHost);
+    assertDoesNotThrow(() -> startBalancer(balancerConfiguration));
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
 
     stopBalancer();
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());

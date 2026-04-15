@@ -142,6 +142,22 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String dbVolumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
 
+    // ACL check during preExecute (align with other create requests)
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            volumeName, null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.CREATE_TENANT,
+                buildVolumeAuditMap(volumeName), ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
+
     // Backwards compatibility with older Ozone clients that don't have this
     // field. Defaults to false.
     boolean forceCreationWhenVolumeExists =
@@ -244,13 +260,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     Exception exception = null;
 
     try {
-      // Check ACL: requires volume CREATE permission.
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-            tenantId, null, null);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();

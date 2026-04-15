@@ -24,14 +24,13 @@ import java.lang.annotation.Target;
 
 /**
  * The {@code UpgradeActionRecon} annotation is used to specify
- * upgrade actions that should be executed during particular phases
+ * upgrade actions that should be executed during finalization
  * of the Recon service layout upgrade process.
  *
  * <p>This annotation can be used to associate an upgrade action
- * class with a specific layout feature and upgrade phase. The
- * framework will dynamically discover these annotated upgrade
- * actions and execute them based on the feature's version and
- * the defined action type (e.g., {@link ReconUpgradeAction.UpgradeActionType#FINALIZE}).
+ * class with a specific layout feature. The framework will
+ * dynamically discover these annotated upgrade actions and execute
+ * them based on the feature's version during finalization.
  *
  * <p>The annotation is retained at runtime, allowing the reflection-based
  * mechanism to scan for annotated classes, register the associated actions,
@@ -40,11 +39,11 @@ import java.lang.annotation.Target;
  * Example usage:
  *
  * <pre>
- * &#64;UpgradeActionRecon(feature = FEATURE_NAME, type = FINALIZE)
+ * &#64;UpgradeActionRecon(feature = FEATURE_NAME)
  * public class FeatureNameUpgradeAction implements ReconUpgradeAction {
  *   &#64;Override
- *   public void execute() throws Exception {
- *     // Custom upgrade logic for FEATURE_1
+ *   public void execute(DataSource source) throws Exception {
+ *     // Custom upgrade logic for FEATURE_NAME
  *   }
  * }
  * </pre>
@@ -57,9 +56,4 @@ public @interface UpgradeActionRecon {
    * Defines the layout feature this upgrade action is associated with.
    */
   ReconLayoutFeature feature();
-
-  /**
-   * Defines the type of upgrade phase during which the action should be executed.
-   */
-  ReconUpgradeAction.UpgradeActionType type();
 }

@@ -41,6 +41,7 @@ import jakarta.annotation.Nullable;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
@@ -614,6 +615,9 @@ public final class HddsUtils {
     }
     if (t instanceof RemoteException) {
       t = ((RemoteException) t).unwrapRemoteException();
+    }
+    if (t instanceof UndeclaredThrowableException) {
+      t = ((UndeclaredThrowableException) t).getUndeclaredThrowable();
     }
     while (t != null) {
       if (t instanceof RpcException ||

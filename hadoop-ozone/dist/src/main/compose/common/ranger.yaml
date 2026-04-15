@@ -26,7 +26,8 @@ services:
     environment:
       POSTGRES_PASSWORD: "rangerR0cks!"
     volumes:
-      - ${RANGER_SOURCE_DIR}/dev-support/ranger-docker/config/init_postgres.sh:/docker-entrypoint-initdb.d/init_postgres.sh
+      # The location of the init_postgres.sh file changed in Ranger 2.8
+      - ${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/rdbms/init_postgres.sh:/docker-entrypoint-initdb.d/init_postgres.sh
     healthcheck:
       test: 'su -c "pg_isready -q" postgres'
       interval: 10s
@@ -35,7 +36,7 @@ services:
 
   ranger:
     image: ${RANGER_IMAGE}:${RANGER_IMAGE_VERSION}
-    hostname: ranger
+    hostname: ranger-admin.rangernw
     dns_search: .
     ports:
       - 6080:6080
@@ -43,8 +44,27 @@ services:
       ranger-db:
         condition: service_healthy
     environment:
+      POSTGRES_PASSWORD: "rangerR0cks!"
+      RANGER_DB_USER: "rangeradmin"
+      RANGER_DB_PASSWORD: "rangerR0cks!"
       RANGER_DB_TYPE: postgres
-      RANGER_VERSION:
+      RANGER_DB_FLAVOR: POSTGRES
+      RANGER_DB_ROOT_USER: "postgres"
+      RANGER_ADMIN_DB_ROOT_PASSWORD: "rangerR0cks!"
+      RANGER_AUDIT_DB_ROOT_PASSWORD: "rangerR0cks!"
+      RANGER_ADMIN_DB_HOST: "ranger-db"
+      RANGER_ADMIN_DB_PORT: "5432"
+      RANGER_ADMIN_DB_DBNAME: "ranger"
+      RANGER_ADMIN_DB_USERNAME: "rangeradmin"
+      RANGER_ADMIN_DB_PASSWORD: "rangerR0cks!"
+      RANGER_AUDIT_DB_HOST: "ranger-db"
+      RANGER_AUDIT_DB_PORT: "5432"
+      RANGER_AUDIT_DB_DBNAME: "ranger"
+      RANGER_AUDIT_DB_USERNAME: "rangeradmin"
+      RANGER_AUDIT_DB_PASSWORD: "rangerR0cks!"
+      RANGER_VERSION: ${RANGER_VERSION}
+    volumes:
+      - ${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/admin/ranger-admin-install-postgres.properties:/opt/ranger/admin/install.properties
     healthcheck:
       test: 'grep "Successfully retrieved .*dev_ozone" /var/log/ranger/ranger-admin*log'
       interval: 2s

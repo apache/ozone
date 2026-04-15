@@ -492,15 +492,9 @@ public class NodeStateManager implements Runnable, Closeable {
     return getEnteringMaintenanceNodes().size();
   }
 
-  /**
-   * Returns all the nodes with the specified status.
-   *
-   * @param status NodeStatus
-   *
-   * @return list of nodes
-   */
-  public List<DatanodeInfo> getNodes(NodeStatus status) {
-    return nodeStateMap.getDatanodeInfos(status);
+  /** @return a list of datanodes for the matching nodes matching the given status. */
+  public List<DatanodeDetails> getNodes(NodeStatus status) {
+    return nodeStateMap.getDatanodeDetails(status);
   }
 
   /**

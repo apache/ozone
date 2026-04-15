@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.protocolPB;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -54,11 +53,11 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
 
   private final StorageContainerDatanodeProtocol impl;
   private final OzoneProtocolMessageDispatcher<SCMDatanodeRequest,
-      SCMDatanodeResponse, ProtocolMessageEnum> dispatcher;
+      SCMDatanodeResponse, Type> dispatcher;
 
   public StorageContainerDatanodeProtocolServerSideTranslatorPB(
       StorageContainerDatanodeProtocol impl,
-      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics) {
+      ProtocolMessageMetrics<Type> protocolMessageMetrics) {
     this.impl = impl;
     dispatcher =
         new OzoneProtocolMessageDispatcher<>("SCMDatanodeProtocol",

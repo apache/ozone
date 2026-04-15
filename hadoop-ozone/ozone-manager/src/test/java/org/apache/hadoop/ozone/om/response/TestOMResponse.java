@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -77,7 +76,7 @@ public class TestOMResponse {
     OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
     when(ratisServer.checkRetryCache()).thenReturn(null);
 
-    ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics =
+    ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type> protocolMessageMetrics =
         mock(ProtocolMessageMetrics.class);
 
     translator = new OzoneManagerProtocolServerSideTranslatorPB(

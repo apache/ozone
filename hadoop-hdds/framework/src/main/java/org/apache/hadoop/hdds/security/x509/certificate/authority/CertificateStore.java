@@ -22,6 +22,8 @@ import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 
@@ -34,7 +36,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
  * With this interface, DefaultCA server read and write DB or persistence
  * layer and we can write to SCM's Metadata DB.
  */
-public interface CertificateStore {
+public interface CertificateStore extends SCMHandler {
 
   /**
    * Writes a new certificate that was issued to the persistent store.
@@ -96,4 +98,8 @@ public interface CertificateStore {
    */
   void reinitialize(SCMMetadataStore metadataStore);
 
+  @Override
+  default RequestType getType() {
+    return RequestType.CERT_STORE;
+  }
 }

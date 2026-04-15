@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -314,8 +315,8 @@ public class TestReplicationManagerScenarios {
   private void assertExpectations(Scenario scenario,
       ReplicationManagerReport report) {
     Expectation expectation = scenario.getExpectation();
-    for (ReplicationManagerReport.HealthState state :
-        ReplicationManagerReport.HealthState.values()) {
+    for (ContainerHealthState state :
+        ContainerHealthState.values()) {
       assertEquals(expectation.getExpected(state), report.getStat(state),
           "Test: " + scenario + ": Unexpected count for " + state);
     }
@@ -493,44 +494,68 @@ public class TestReplicationManagerScenarios {
   public static class Expectation {
 
     // The expected counts for each health state, as would be seen in the ReplicationManagerReport.
-    private Map<ReplicationManagerReport.HealthState, Integer> stateCounts = new HashMap<>();
+    private Map<ContainerHealthState, Integer> stateCounts = new HashMap<>();
     // The expected count for each queue after running the RM check phase.
     private int underReplicatedQueue = 0;
     private int overReplicatedQueue = 0;
 
     public void setUnderReplicated(int underReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.UNDER_REPLICATED, underReplicated);
+      stateCounts.put(ContainerHealthState.UNDER_REPLICATED, underReplicated);
     }
 
     public void setOverReplicated(int overReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.OVER_REPLICATED, overReplicated);
+      stateCounts.put(ContainerHealthState.OVER_REPLICATED, overReplicated);
     }
 
     public void setMisReplicated(int misReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.MIS_REPLICATED, misReplicated);
+      stateCounts.put(ContainerHealthState.MIS_REPLICATED, misReplicated);
     }
 
     public void setUnhealthy(int unhealthy) {
-      stateCounts.put(ReplicationManagerReport.HealthState.UNHEALTHY, unhealthy);
+      stateCounts.put(ContainerHealthState.UNHEALTHY, unhealthy);
     }
 
     public void setMissing(int missing) {
-      stateCounts.put(ReplicationManagerReport.HealthState.MISSING, missing);
+      stateCounts.put(ContainerHealthState.MISSING, missing);
     }
 
     public void setEmpty(int empty) {
-      stateCounts.put(ReplicationManagerReport.HealthState.EMPTY,  empty);
+      stateCounts.put(ContainerHealthState.EMPTY,  empty);
     }
 
     public void setQuasiClosedStuck(int quasiClosedStuck) {
-      stateCounts.put(ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
     }
 
     public void setOpenUnhealthy(int openUnhealthy) {
-      stateCounts.put(ReplicationManagerReport.HealthState.OPEN_UNHEALTHY, openUnhealthy);
+      stateCounts.put(ContainerHealthState.OPEN_UNHEALTHY, openUnhealthy);
     }
 
-    public int getExpected(ReplicationManagerReport.HealthState state) {
+    public void setQuasiClosedStuckUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED, count);
+    }
+
+    public void setQuasiClosedStuckOverReplicated(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED, count);
+    }
+
+    public void setQuasiClosedStuckMissing(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_MISSING, count);
+    }
+
+    public void setUnhealthyUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED, count);
+    }
+
+    public void setUnhealthyOverReplicated(int count) {
+      stateCounts.put(ContainerHealthState.UNHEALTHY_OVER_REPLICATED, count);
+    }
+
+    public void setMissingUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.MISSING_UNDER_REPLICATED, count);
+    }
+
+    public int getExpected(ContainerHealthState state) {
       return stateCounts.getOrDefault(state, 0);
     }
 

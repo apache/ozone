@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -51,12 +52,15 @@ import org.mockito.Mockito;
 public class TestS3LifecycleConfigurationPut {
 
   private BucketEndpoint bucketEndpoint;
+  private HttpHeaders headers;
 
   @BeforeEach
   public void setup() throws Exception {
     OzoneClient clientStub = new OzoneClientStub();
+    headers = Mockito.mock(HttpHeaders.class);
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
+        .setHeaders(headers)
         .build();
     ObjectStore objectStore = clientStub.getObjectStore();
     BucketArgs bucketArgs = BucketArgs.newBuilder().setOwner("owner").build();
@@ -165,13 +169,11 @@ public class TestS3LifecycleConfigurationPut {
   @Test
   public void testPutLifecycleConfigurationFailsWithNonBucketOwner()
       throws Exception {
-    HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
-    when(httpHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER))
-        .thenReturn("anotheruser");
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("anotheruser");
 
     try {
-      bucketEndpoint.setHeaders(httpHeaders);
       bucketEndpoint.put("bucket1", onePrefix());
+      verify(headers).getHeaderString(EXPECTED_BUCKET_OWNER_HEADER);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_FORBIDDEN, ex.getHttpCode());

@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  */
 @XmlRootElement(name = "Error")
 @XmlAccessorType(XmlAccessType.NONE)
-public class OS3Exception extends Exception {
+public class OS3Exception extends RuntimeException {
   private static final Logger LOG =
       LoggerFactory.getLogger(OS3Exception.class);
   private static ObjectMapper mapper;
@@ -158,8 +158,8 @@ public class OS3Exception extends Exception {
         this.getRequestId());
   }
 
-  /** Create a copy with specific message. */
   public OS3Exception withMessage(String message) {
-    return new OS3Exception(code, message, httpCode);
+    setErrorMessage(message);
+    return this;
   }
 }

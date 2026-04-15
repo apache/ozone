@@ -88,11 +88,13 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
                                                      IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isOwner(ugi, bucketOwner)) {
-      throw new OMException(
-          "Only bucket owners and Ozone admins can rename snapshots",
-          OMException.ResultCodes.PERMISSION_DENIED);
+    if (ozoneManager.isAdminAuthorizationEnabled()) {
+      if (!ozoneManager.isAdmin(ugi) &&
+          !ozoneManager.isOwner(ugi, bucketOwner)) {
+        throw new OMException(
+            "Only bucket owners and Ozone admins can rename snapshots",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
     }
 
     // Set rename time here so OM leader and follower would have the

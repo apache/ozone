@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -118,6 +121,80 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR,
         omClientResponse.getOMResponse().getStatus());
 
+  }
+
+  /**
+   * Test abort MPU when omKeyInfo is null in openKeyTable.
+   * This simulates the case where OpenKeyCleanupService has deleted the key
+   * from openKeyTable leaving behind orphan parts in multipartInfoTable.
+   */
+  @Test
+  public void testValidateAndUpdateCacheWithOrphanMultipartInfo() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    createParentPath(volumeName, bucketName);
+
+    // Step 1: Initiate multipart upload
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
+        bucketName, keyName);
+
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
+
+    OMClientResponse omClientResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);
+
+    String multipartUploadID = omClientResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
+    String multipartOpenKey = getMultipartOpenKey(volumeName, bucketName,
+        keyName, multipartUploadID);
+
+    // Step 2: Verify initial state - both tables have entries
+    assertNotNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
+    assertNotNull(omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartOpenKey));
+
+    // Step 3: Simulate OpenKeyCleanupService deleting the entry from openKeyTable
+    // while keeping the multipartInfoTable entry (orphan scenario)
+    // Mark the entry as deleted in the cache
+    omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .addCacheEntry(new CacheKey<>(multipartOpenKey),
+            CacheValue.get(100L));
+
+    // Verify orphan state: multipartInfoTable has entry, openKeyTable doesn't
+    assertNotNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
+    assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartOpenKey));
+
+    // Step 4: Now abort the multipart upload with orphaned metadata
+    OMRequest abortMPURequest =
+        doPreExecuteAbortMPU(volumeName, bucketName, keyName,
+            multipartUploadID);
+
+    S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
+        getS3MultipartUploadAbortReq(abortMPURequest);
+
+    // This should succeed despite omKeyInfo being null (orphan cleanup case)
+    omClientResponse =
+        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
+
+    // Check response - abort should succeed
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    // Verify cleanup: multipartInfoTable entry should be removed
+    assertNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
+
+    // Verify openKeyTable entry remains null
+    assertNull(omMetadataManager
+        .getOpenKeyTable(s3MultipartUploadAbortRequest.getBucketLayout())
+        .get(multipartOpenKey));
   }
 
   @Test

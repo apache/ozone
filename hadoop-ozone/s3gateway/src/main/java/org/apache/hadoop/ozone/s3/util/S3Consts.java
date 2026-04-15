@@ -96,6 +96,15 @@ public final class S3Consts {
   public static final String EXPECTED_BUCKET_OWNER_HEADER = "x-amz-expected-bucket-owner";
   public static final String EXPECTED_SOURCE_BUCKET_OWNER_HEADER = "x-amz-source-expected-bucket-owner";
 
+  public static final String CHECKSUM_HEADER = "Content-MD5";
+
+  // Conditional request headers
+  public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+  public static final String IF_MATCH_HEADER = "If-Match";
+  public static final String IF_MODIFIED_SINCE_HEADER = "If-Modified-Since";
+  public static final String IF_UNMODIFIED_SINCE_HEADER =
+      "If-Unmodified-Since";
+
   //Never Constructed
   private S3Consts() {
 

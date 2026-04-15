@@ -817,13 +817,8 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {
-    List<ByteBuffer> dataStreams = new ArrayList<>();
-    for (ByteBuffer b : data) {
-      dataStreams.add(b);
-    }
-    for (ByteBuffer b : parity) {
-      dataStreams.add(b);
-    }
+    List<ByteBuffer> dataStreams = new ArrayList<>(Arrays.asList(data));
+    dataStreams.addAll(Arrays.asList(parity));
     streamFactory.setBlockStreamData(dataStreams);
   }
 

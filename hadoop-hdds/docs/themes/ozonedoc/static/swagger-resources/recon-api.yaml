@@ -1764,9 +1764,15 @@ components:
             - 0
             - 100
             - 40
-    StorageReport:
+    DataNodeStorageReport:
       type: object
       properties:
+        datanodeUuid:
+          type: string
+          example: 841be80f-0454-47df-b676
+        hostName:
+          type: string
+          example: ozone-datanode-1
         capacity:
           type: number
           example: 270429917184
@@ -1779,6 +1785,51 @@ components:
         committed:
           type: number
           example: 27007111
+        minimumFreeSpace:
+          type: number
+          example: 20480
+        reserved:
+          type: number
+          example: 31457280
+        filesystemCapacity:
+          type: number
+          example: 270461374464
+        filesystemUsed:
+          type: number
+          example: 390262784
+        filesystemAvailable:
+          type: number
+          example: 270071111680
+      ClusterStorageReport:
+        type: object
+        properties:
+          capacity:
+            type: number
+            example: 270429917184
+          used:
+            type: number
+            example: 358805504
+          remaining:
+            type: number
+            example: 270071111680
+          committed:
+            type: number
+            example: 27007111
+          minimumFreeSpace:
+            type: number
+            example: 20480
+          reserved:
+            type: number
+            example: 31457280
+          filesystemCapacity:
+            type: number
+            example: 270461374464
+          filesystemUsed:
+            type: number
+            example: 390262784
+          filesystemAvailable:
+            type: number
+            example: 270071111680
     ClusterState:
       type: object
       properties:
@@ -1806,7 +1857,7 @@ components:
           type: integer
           example: 4
         storageReport:
-          $ref: "#/components/schemas/StorageReport"
+          $ref: "#/components/schemas/ClusterStorageReport"
         containers:
           type: integer
           example: 26
@@ -1857,7 +1908,7 @@ components:
                 type: number
                 example: 1605738400544
               storageReport:
-                $ref: "#/components/schemas/StorageReport"
+                $ref: "#/components/schemas/DataNodeStorageReport"
               pipelines:
                 type: array
                 items:

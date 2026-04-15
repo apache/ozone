@@ -65,19 +65,19 @@ jobs:
       thirdparty-version: ${{ steps.versions.outputs.thirdparty }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.ref }}
       - name: Cache for maven dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.m2/repository
             !~/.m2/repository/org/apache/ratis
           key: ratis-dependencies-${{ hashFiles('**/pom.xml') }}
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 8
@@ -95,7 +95,7 @@ jobs:
           mvn -B --no-transfer-progress -Dscan=false versions:set -DnewVersion=${{ steps.versions.outputs.ratis }}
           dev-support/checks/build.sh
       - name: Store Maven repo for tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ratis-jars
           path: |
@@ -112,7 +112,7 @@ jobs:
       protobuf-version: ${{ steps.versions.outputs.protobuf }}
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: apache/ratis-thirdparty
           ref: ${{ needs.ratis.outputs.thirdparty-version }}
@@ -123,7 +123,7 @@ jobs:
           echo "netty=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
           echo "protobuf=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
   debug:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     needs:
       - ratis
       - ratis-thirdparty

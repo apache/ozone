@@ -81,9 +81,4 @@ public class RootEndpoint extends EndpointBase {
       }
     }
   }
-
-  @Override
-  public void init() {
-
-  }
 }

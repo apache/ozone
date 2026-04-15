@@ -79,9 +79,5 @@ public class ReconPipelineFactory extends PipelineFactory {
       // Do nothing in Recon.
     }
 
-    @Override
-    public void shutdown() {
-      // Do nothing
-    }
   }
 }

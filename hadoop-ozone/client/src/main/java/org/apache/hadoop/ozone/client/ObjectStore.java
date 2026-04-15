@@ -28,7 +28,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -83,7 +82,7 @@ public class ObjectStore {
    * @param proxy ClientProtocol proxy.
    */
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
-    this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
+    this.proxy = proxy;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     s3BucketLayout = OmUtils.validateBucketLayout(
         conf.getTrimmed(

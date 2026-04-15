@@ -79,6 +79,9 @@ See more details in the [README](https://github.com/apache/ozone/blob/master/had
 
 ## Jira guideline
 
+If you do not have an ASF Jira account yet, please request one from the official ASF self-service page:
+[Request a Jira account](https://selfserve.apache.org/jira-account.html?project=ozone).
+
 When creating a new jira for any kind of new feature, improvement or bug, please follow below guideline: 
 
   1. **Title:** Title should be a one-liner stating the problem.

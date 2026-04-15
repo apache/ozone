@@ -556,6 +556,65 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(2, toDeleteKeyMap.size());
   }
 
+  @Test
+  public void testValidateAndUpdateCacheWithUncommittedBlockForEmptyPart() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    createParentPath(volumeName, bucketName);
+
+    // Create key to be overwritten
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
+        bucketName, keyName);
+
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
+
+    OMClientResponse omClientResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);
+
+    long clientID = Time.now();
+    String multipartUploadID = omClientResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    List<KeyLocation> emptyKeyLocationInfos = new ArrayList<>();
+    List<KeyLocation> originalKeyLocationList = getKeyLocation(1);
+    List<OmKeyLocationInfo> originalKeyLocationInfos = originalKeyLocationList
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
+        bucketName, keyName, clientID, multipartUploadID, 1, emptyKeyLocationInfos);
+
+    S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
+        getS3MultipartUploadCommitReq(commitMultipartRequest);
+
+    addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID, originalKeyLocationInfos);
+
+    omClientResponse =
+        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
+
+    assertSame(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
+
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager.getMultipartInfoTable().get(multipartKey);
+    assertNotNull(multipartKeyInfo);
+    assertEquals(1, multipartKeyInfo.getPartKeyInfoMap().size());
+    PartKeyInfo partKeyInfo = multipartKeyInfo.getPartKeyInfo(1);
+    assertNotNull(partKeyInfo);
+
+    Map<String, RepeatedOmKeyInfo> toDeleteKeyMap =
+        ((S3MultipartUploadCommitPartResponse) omClientResponse).getKeyToDelete();
+    assertNull(toDeleteKeyMap);
+  }
+
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
     OMRequestTestUtils.addKeyToTable(true, true, volumeName, bucketName,

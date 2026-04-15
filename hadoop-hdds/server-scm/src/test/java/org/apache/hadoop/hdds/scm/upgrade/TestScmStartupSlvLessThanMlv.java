@@ -53,6 +53,13 @@ public class TestScmStartupSlvLessThanMlv {
     File scmSubdir = tempDir.resolve("scm").resolve("current").toFile();
     assertTrue(scmSubdir.mkdirs());
 
+    // Create Ratis directories to simulate a realistic downgrade scenario
+    // where SCM was previously running with a newer version
+    File ratisDir = tempDir.resolve("scm.ratis").toFile();
+    File snapshotDir = tempDir.resolve("scm.ratis.snapshot").toFile();
+    assertTrue(ratisDir.mkdirs());
+    assertTrue(snapshotDir.mkdirs());
+
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
         tempDir.toAbsolutePath().toString());

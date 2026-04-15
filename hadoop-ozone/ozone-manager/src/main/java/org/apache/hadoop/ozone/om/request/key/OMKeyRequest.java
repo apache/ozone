@@ -993,6 +993,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (keyArgs.hasExpectedDataGeneration()) {
         builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
+      if (keyArgs.hasExpectedETag()) {
+        builder.setExpectedETag(keyArgs.getExpectedETag());
+      }
 
       return builder.build();
     }
@@ -1040,6 +1043,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setUpdateID(transactionLogIndex)
             .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
+    if (keyArgs.hasExpectedDataGeneration()) {
+      builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+    }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
       OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
@@ -1155,7 +1161,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected OmKeyInfo wrapUncommittedBlocksAsPseudoKey(
       List<OmKeyLocationInfo> uncommitted, OmKeyInfo omKeyInfo) {
-    if (uncommitted.isEmpty()) {
+    if (uncommitted.isEmpty() || omKeyInfo.getDataSize() == 0) {
       return null;
     }
     LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",

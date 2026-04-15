@@ -365,6 +365,56 @@ public class TestRatisPipelineProvider {
     }
   }
 
+  @Test
+  public void testCreatePipelineWithDefaultLimit() throws Exception {
+    // Create conf without setting OZONE_DATANODE_PIPELINE_LIMIT
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
+
+    // MockNodeManager(true, 10) typically gives 8 healthy nodes in this test suite.
+    nodeManager = new MockNodeManager(true, nodeCount);
+    // Give a large quota in MockNodeManager so we don't fail early due to mock quota.
+    nodeManager.setNumPipelinePerDatanode(100);
+
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
+    stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+
+    provider = new MockRatisPipelineProvider(nodeManager, stateManager, conf);
+
+    int healthyCount = nodeManager.getNodes(NodeStatus.inServiceHealthy()).size();
+    int defaultLimit = ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
+    assertEquals(2, defaultLimit);
+
+    // Max pipelines before exceeding per-DN default limit.
+    int maxPipelines = (healthyCount * defaultLimit)
+        / ReplicationFactor.THREE.getNumber();
+
+    // Create pipelines up to maxPipelines.
+    for (int i = 0; i < maxPipelines; i++) {
+      Pipeline p = provider.create(
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+          new ArrayList<>(), new ArrayList<>());
+      stateManager.addPipeline(p.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+    }
+
+    // Next pipeline creation should fail with default limit message.
+    SCMException ex = assertThrows(SCMException.class, () ->
+        provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            new ArrayList<>(), new ArrayList<>())
+    );
+
+    assertThat(ex.getMessage())
+        .contains("limit per datanode: " + defaultLimit)
+        .contains("replicationConfig: RATIS/THREE");
+  }
+
   @ParameterizedTest
   @CsvSource({ "1, 3", "2, 6"})
   public void testCreatePipelineThrowErrorWithDataNodeLimit(int limit, int pipelineCount) throws Exception {

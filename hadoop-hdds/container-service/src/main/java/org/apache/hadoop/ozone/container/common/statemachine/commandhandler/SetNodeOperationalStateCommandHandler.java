@@ -50,6 +50,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(SetNodeOperationalStateCommandHandler.class);
   private final ConfigurationSource conf;
   private final Consumer<HddsProtos.NodeOperationalState> replicationSupervisor;
+  private final Consumer<HddsProtos.NodeOperationalState> diskBalancerService;
   private final AtomicInteger invocationCount = new AtomicInteger(0);
   private final MutableRate opsLatencyMs;
 
@@ -59,9 +60,11 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    * @param conf - Configuration for the datanode.
    */
   public SetNodeOperationalStateCommandHandler(ConfigurationSource conf,
-      Consumer<HddsProtos.NodeOperationalState> replicationSupervisor) {
+      Consumer<HddsProtos.NodeOperationalState> replicationSupervisor,
+      Consumer<HddsProtos.NodeOperationalState> diskBalancerService) {
     this.conf = conf;
     this.replicationSupervisor = replicationSupervisor;
+    this.diskBalancerService = diskBalancerService;
     MetricsRegistry registry = new MetricsRegistry(
         SetNodeOperationalStateCommandHandler.class.getSimpleName());
     this.opsLatencyMs = registry.newRate(Type.setNodeOperationalStateCommand + "Ms");
@@ -99,6 +102,12 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       // TODO - this should probably be raised, but it will break the command
       //      handler interface.
     }
+
+    // Handle DiskBalancerService state changes
+    if (diskBalancerService != null) {
+      diskBalancerService.accept(state);
+    }
+
     replicationSupervisor.accept(state);
     this.opsLatencyMs.add(Time.monotonicNow() - startTime);
   }

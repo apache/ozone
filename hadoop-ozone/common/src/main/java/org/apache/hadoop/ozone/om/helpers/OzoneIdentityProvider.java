@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
 
-import io.netty.util.internal.StringUtil;
 import java.util.Objects;
 import org.apache.hadoop.ipc_.CallerContext;
 import org.apache.hadoop.ipc_.IdentityProvider;
@@ -59,7 +58,7 @@ public class OzoneIdentityProvider implements IdentityProvider {
       // If the prefix is not present then its set by a user
       // and the value should be ignored.
       if (Objects.nonNull(callerContext) &&
-          !StringUtil.isNullOrEmpty(callerContext.getContext()) &&
+          callerContext.getContext() != null &&
           callerContext.getContext()
               .startsWith(OM_S3_CALLER_CONTEXT_PREFIX)) {
         return callerContext.getContext()

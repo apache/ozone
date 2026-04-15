@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.ratis.util.function.CheckedSupplier;
 
@@ -106,5 +107,20 @@ public class OzoneKeyDetails extends OzoneKey {
   @JsonIgnore
   public OzoneInputStream getContent() throws IOException {
     return this.contentSupplier.get();
+  }
+
+  public boolean hasEtag() {
+    return getMetadata().containsKey(OzoneConsts.ETAG);
+  }
+
+  public boolean isEtagEquals(String matchingETag) {
+    String currentETag = getMetadata().get(OzoneConsts.ETAG);
+    if (currentETag == null) {
+      return false;
+    }
+    if (matchingETag.equals("*")) {
+      return true;
+    }
+    return currentETag.equals(matchingETag);
   }
 }

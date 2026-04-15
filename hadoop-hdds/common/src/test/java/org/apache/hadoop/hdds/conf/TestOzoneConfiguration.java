@@ -143,7 +143,6 @@ public class TestOzoneConfiguration {
 
     assertEquals("host", configuration.getBindHost());
     assertEquals("address", configuration.getClientAddress());
-    assertTrue(configuration.isEnabled());
     assertEquals(5555, configuration.getPort());
     assertEquals(600, configuration.getWaitTime());
     assertSame(Integer.class, configuration.getMyClass());
@@ -219,7 +218,6 @@ public class TestOzoneConfiguration {
     SimpleConfiguration configuration =
         ozoneConfiguration.getObject(SimpleConfiguration.class);
 
-    assertTrue(configuration.isEnabled());
     assertEquals(9878, configuration.getPort());
     assertSame(Object.class, configuration.getMyClass());
     assertEquals(10, configuration.getThreshold());
@@ -232,7 +230,6 @@ public class TestOzoneConfiguration {
     SimpleConfiguration object = new SimpleConfiguration();
     object.setBindHost("host");
     object.setClientAddress("address");
-    object.setEnabled(true);
     object.setPort(5555);
     object.setWaitTime(600);
     object.setMyClass(this.getClass());
@@ -247,7 +244,6 @@ public class TestOzoneConfiguration {
     // THEN
     assertEquals(object.getBindHost(), subject.get("test.scm.client.bind.host"));
     assertEquals(object.getClientAddress(), subject.get("test.scm.client.address"));
-    assertEquals(object.isEnabled(), subject.getBoolean("test.scm.client.enabled", false));
     assertEquals(object.getPort(), subject.getInt("test.scm.client.port", 0));
     assertEquals(TimeUnit.SECONDS.toMinutes(object.getWaitTime()),
         subject.getTimeDuration("test.scm.client.wait", 0, TimeUnit.MINUTES));
@@ -272,7 +268,6 @@ public class TestOzoneConfiguration {
     // THEN
     assertEquals("0.0.0.0", subject.get("test.scm.client.bind.host"));
     assertEquals("localhost", subject.get("test.scm.client.address"));
-    assertTrue(subject.getBoolean("test.scm.client.enabled", false));
     assertEquals(9878, subject.getInt("test.scm.client.port", 123));
     assertEquals(TimeUnit.MINUTES.toSeconds(30),
         subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));

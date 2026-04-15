@@ -29,10 +29,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -40,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,15 +55,24 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
 
   private final long nsSummaryFlushToDBMaxThreshold;
+  private final int maxIterators;
+  private final int maxWorkers;
+  private final int maxKeysInMemory;
 
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                               reconNamespaceSummaryManager,
                               ReconOMMetadataManager
                               reconOMMetadataManager,
-                              long nsSummaryFlushToDBMaxThreshold) {
+                              long nsSummaryFlushToDBMaxThreshold,
+                              int maxIterators,
+                              int maxWorkers,
+                              int maxKeysInMemory) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
+    this.maxIterators = maxIterators;
+    this.maxWorkers = maxWorkers;
+    this.maxKeysInMemory = maxKeysInMemory;
   }
 
   // We listen to updates from FSO-enabled FileTable, DirTable, DeletedTable and DeletedDirTable
@@ -222,55 +234,174 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   }
 
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
-    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    // We run reprocess in two phases with separate flushers so that directory
+    // skeletons are fully persisted before file updates rely on them.
+    final int queueCapacity = maxWorkers * 10;
 
-    try {
-      Table<String, OmDirectoryInfo> dirTable =
-          omMetadataManager.getDirectoryTable();
-      try (TableIterator<String,
-              ? extends Table.KeyValue<String, OmDirectoryInfo>>
-                dirTableIter = dirTable.iterator()) {
-        while (dirTableIter.hasNext()) {
-          Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
-          OmDirectoryInfo directoryInfo = kv.getValue();
-          handlePutDirEvent(directoryInfo, nsSummaryMap);
-          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-            if (!flushAndCommitNSToDB(nsSummaryMap)) {
-              return false;
-            }
-          }
-        }
+    try (NSSummaryAsyncFlusher dirFlusher =
+             NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
+                 "NSSummaryTaskWithFSO-dir", queueCapacity)) {
+      if (!processDirTableInParallel(omMetadataManager, dirFlusher)) {
+        return false;
       }
-
-      // Get fileTable used by FSO
-      Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getFileTable();
-
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-              keyTableIter = keyTable.iterator()) {
-        while (keyTableIter.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-          OmKeyInfo keyInfo = kv.getValue();
-          handlePutKeyEvent(keyInfo, nsSummaryMap, keyInfo.getParentObjectID());
-          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-            if (!flushAndCommitNSToDB(nsSummaryMap)) {
-              return false;
-            }
-          }
-        }
-      }
-
-    } catch (IOException ioEx) {
-      LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
-              ioEx);
+    } catch (Exception ex) {
+      LOG.error("Unable to reprocess Namespace Summary data in Recon DB (dir phase).", ex);
       return false;
     }
-    // flush and commit left out keys at end
-    if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      LOG.info("flushAndCommitNSToDB failed during reprocessWithFSO.");
+
+    try (NSSummaryAsyncFlusher fileFlusher =
+             NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
+                 "NSSummaryTaskWithFSO-file", queueCapacity)) {
+      if (!processFileTableInParallel(omMetadataManager, fileFlusher)) {
+        return false;
+      }
+    } catch (Exception ex) {
+      LOG.error("Unable to reprocess Namespace Summary data in Recon DB (file phase).", ex);
       return false;
     }
+
     LOG.info("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
   }
+
+  /**
+   * Process dirTable in parallel using per-worker maps with async flushing.
+   */
+  private boolean processDirTableInParallel(OMMetadataManager omMetadataManager,
+                                            NSSummaryAsyncFlusher asyncFlusher) {
+    Table<String, OmDirectoryInfo> dirTable = omMetadataManager.getDirectoryTable();
+
+    // Per-worker maps for lockless updates
+    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+
+    // Divide threshold by worker count
+    final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
+
+    Function<Table.KeyValue<String, OmDirectoryInfo>, Void> kvOperation = kv -> {
+      // Get this worker's private map
+      long threadId = Thread.currentThread().getId();
+      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
+
+      try {
+        // Check if async flusher has failed - stop immediately if so
+        asyncFlusher.checkForFailures();
+
+        // Update immediate parent only, NO DB reads during reprocess
+        handlePutDirEventReprocess(kv.getValue(), workerMap);
+
+        // Submit to async queue when threshold reached
+        if (workerMap.size() >= perWorkerThreshold) {
+          asyncFlusher.submitForFlush(workerMap);
+          // Get fresh map for this worker
+          allWorkerMaps.put(threadId, new HashMap<>());
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      return null;
+    };
+
+    LOG.debug("Starting dirTable parallel iteration");
+    long dirStartTime = System.currentTimeMillis();
+
+    try (ParallelTableIteratorOperation<String, OmDirectoryInfo> parallelIter =
+        new ParallelTableIteratorOperation<>(omMetadataManager, dirTable, StringCodec.get(),
+            maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
+      parallelIter.performTaskOnTableVals("NSSummaryTaskWithFSO-dirTable", null, null, kvOperation);
+    } catch (Exception ex) {
+      LOG.error("Unable to process dirTable in parallel", ex);
+      return false;
+    }
+
+    long dirEndTime = System.currentTimeMillis();
+    LOG.debug("Completed dirTable parallel iteration in {} ms", (dirEndTime - dirStartTime));
+
+    // Submit any remaining worker maps
+    for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {
+      if (!remainingMap.isEmpty()) {
+        try {
+          asyncFlusher.submitForFlush(remainingMap);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return false;
+        } catch (IOException e) {
+          LOG.error("Failed to submit remaining map for flush", e);
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Process fileTable in parallel using per-worker maps with async flushing.
+   */
+  private boolean processFileTableInParallel(OMMetadataManager omMetadataManager,
+                                             NSSummaryAsyncFlusher asyncFlusher) {
+    Table<String, OmKeyInfo> fileTable = omMetadataManager.getFileTable();
+
+    // Per-worker maps for lockless updates
+    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+
+    // Divide threshold by worker count
+    final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
+
+    Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
+      // Get this worker's private map
+      long threadId = Thread.currentThread().getId();
+      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
+
+      try {
+        // Check if async flusher has failed - stop immediately if so
+        asyncFlusher.checkForFailures();
+
+        // Update immediate parent only, NO DB reads during reprocess
+        OmKeyInfo keyInfo = kv.getValue();
+        handlePutKeyEventReprocess(keyInfo, workerMap, keyInfo.getParentObjectID());
+
+        // Submit to async queue when threshold reached
+        if (workerMap.size() >= perWorkerThreshold) {
+          asyncFlusher.submitForFlush(workerMap);
+          // Get fresh map for this worker
+          allWorkerMaps.put(threadId, new HashMap<>());
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+      return null;
+    };
+
+    LOG.debug("Starting fileTable parallel iteration");
+    long fileStartTime = System.currentTimeMillis();
+
+    try (ParallelTableIteratorOperation<String, OmKeyInfo> parallelIter =
+             new ParallelTableIteratorOperation<>(omMetadataManager, fileTable, StringCodec.get(),
+                 maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
+      parallelIter.performTaskOnTableVals("NSSummaryTaskWithFSO-fileTable", null, null, kvOperation);
+    } catch (Exception ex) {
+      LOG.error("Unable to process fileTable in parallel", ex);
+      return false;
+    }
+
+    long fileEndTime = System.currentTimeMillis();
+    LOG.debug("Completed fileTable parallel iteration in {} ms", (fileEndTime - fileStartTime));
+
+    // Submit any remaining worker maps
+    for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {
+      if (!remainingMap.isEmpty()) {
+        try {
+          asyncFlusher.submitForFlush(remainingMap);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return false;
+        } catch (IOException e) {
+          LOG.error("Failed to submit remaining map for flush", e);
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
 }

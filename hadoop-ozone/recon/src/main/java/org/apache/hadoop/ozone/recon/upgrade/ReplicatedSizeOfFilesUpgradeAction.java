@@ -30,8 +30,7 @@ import org.slf4j.LoggerFactory;
  * The action triggers a full rebuild of the NSSummary ensuring that the new field: replicatedSizeOfFiles is correctly
  * populated for all objects.
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.REPLICATED_SIZE_OF_FILES,
-    type = ReconUpgradeAction.UpgradeActionType.FINALIZE)
+@UpgradeActionRecon(feature = ReconLayoutFeature.REPLICATED_SIZE_OF_FILES)
 public class ReplicatedSizeOfFilesUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReplicatedSizeOfFilesUpgradeAction.class);
@@ -57,10 +56,5 @@ public class ReplicatedSizeOfFilesUpgradeAction implements ReconUpgradeAction {
       throw new RuntimeException("Failed to rebuild NSSummary during upgrade", e);
     }
     LOG.info("Completed full rebuild of NSSummary for REPLICATED_SIZE_OF_FILES upgrade.");
-  }
-
-  @Override
-  public UpgradeActionType getType() {
-    return UpgradeActionType.FINALIZE;
   }
 }

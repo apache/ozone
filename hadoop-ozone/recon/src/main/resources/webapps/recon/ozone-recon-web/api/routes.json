@@ -53,5 +53,10 @@
   "/keys/deletePending/dirs?limit=*": "/dirdeletePending",
   "/datanodes/decommission/info": "/decommissioninfo",
   "/datanodes/decommission/info/datanode?uuid=*": "/DatanodesDecommissionInfo",
-  "/datanodes/remove": "/datanodesRemove"
+  "/datanodes/remove": "/datanodesRemove",
+
+  "/storageDistribution": "/utilization",
+  "/pendingDeletion?component=dn&limit=*": "/pendingDeletionDN",
+  "/pendingDeletion?component=om": "/pendingDeletionOM",
+  "/pendingDeletion?component=scm": "/pendingDeletionSCM"
 }

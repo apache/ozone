@@ -175,7 +175,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   public String getStatusText() {
     String status = String.format("%1.2f%% of [" + getContainerType() + "] " +
             "Containers(%s / %s) with at least N reported replica (=%1.2f) >= " +
-            "safeModeCutoff (=%1.2f);",
+            "safeModeCutoff (=%1.2f)",
         getCurrentContainerThreshold() * 100,
         getNumberOfContainersWithMinReplica(), getTotalNumberOfContainers(),
         getCurrentContainerThreshold(), getSafeModeCutoff());
@@ -186,7 +186,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
     if (!sampleContainers.isEmpty()) {
       String sampleECContainerText = "Sample  " + getContainerType() + " Containers not satisfying the criteria : "
-          + sampleContainers + ";";
+          + sampleContainers;
       status = status.concat("\n").concat(sampleECContainerText);
     }
 

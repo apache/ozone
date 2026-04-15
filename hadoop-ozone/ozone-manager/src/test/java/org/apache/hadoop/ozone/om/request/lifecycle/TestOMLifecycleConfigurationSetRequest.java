@@ -218,6 +218,8 @@ public class TestOMLifecycleConfigurationSetRequest extends
     OMLifecycleConfigurationSetRequest request =
         new OMLifecycleConfigurationSetRequest(originalRequest);
 
+    // sleep to make sure two requests' timestamp will be different.
+    Thread.sleep(1);
     OMRequest modifiedRequest = request.preExecute(ozoneManager);
     verifyRequest(modifiedRequest, originalRequest);
   }
