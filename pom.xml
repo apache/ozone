@@ -2361,6 +2361,28 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>${maven-javadoc-plugin.version}</version>
+        <configuration>
+          <doclint>none</doclint>
+          <notimestamp>true</notimestamp>
+          <maxmemory>1024m</maxmemory>
+          <doctitle>Apache Ozone API - ${project.version}</doctitle>
+          <windowtitle>Apache Ozone ${project.version} API</windowtitle>
+          <source>${maven.compiler.release}</source>
+          <charset>${project.reporting.outputEncoding}</charset>
+          <useStandardDocletOptions>true</useStandardDocletOptions>
+          <includeDependencySources>false</includeDependencySources>
+          <excludePackageNames>org.apache.hadoop.hdds.protocol.datanode.proto:org.apache.hadoop.hdds.protocol.proto:org.apache.hadoop.hdds.protocol.scm.proto:org.apache.hadoop.ozone.protocol.proto:org.apache.hadoop.ozone.security.proto:org.apache.hadoop.ozone.storage.proto:org.apache.ozone.recon.schema.generated:org.apache.ozone.recon.schema.generated.tables</excludePackageNames>
+          <sourceFileExcludes>
+            <exclude>**/package-info.java</exclude>
+            <exclude>**/org/apache/ozone/recon/schema/generated/tables/**/*.java</exclude>
+          </sourceFileExcludes>
+          <outputDirectory>${project.build.directory}/site/</outputDirectory>
+        </configuration>
+      </plugin>
     </plugins>
     <extensions>
       <extension>
@@ -2398,6 +2420,8 @@
 
               <useStandardDocletOptions>true</useStandardDocletOptions>
               <includeDependencySources>false</includeDependencySources>
+              <reportOutputDirectory>${project.build.directory}/site</reportOutputDirectory>
+              <destDir>apidocs</destDir>
             </configuration>
           </reportSet>
         </reportSets>
