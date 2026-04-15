@@ -131,8 +131,17 @@ public class SnapshotDiffHandler extends Handler {
       response = store.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
           forceFullDiff, diffDisableNativeLibs);
     } catch (OMException ex) {
+      // submit snapshot diff falls back to legacy snapshotDiff is server does not support it.
       if (ex.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
-        getSnapshotDiff(store, volumeName, bucketName);
+        SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+            token, pageSize, forceFullDiff, diffDisableNativeLibs);
+        try (PrintWriter writer = out()) {
+          if (json) {
+            writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
+          } else {
+            writer.println(diffResponse);
+          }
+        }
       }
       return;
     }

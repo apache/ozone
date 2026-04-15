@@ -124,8 +124,13 @@ public class SnapshotDiffResponse {
       }
       break;
     case NOT_FOUND:
-      str.append("No snapshot diff job found. Job may not have been submitted or was removed during cleanup.\n" +
-          "Submit a new snapshot diff job without using the --get-report option.\n");
+      if (isReportOnly) {
+        str.append("No snapshot diff job found. Job may not have been submitted or was removed during cleanup.\n" +
+            "Submit a new snapshot diff job without using the --get-report option.\n");
+
+      } else {
+        str.append("Invalid state for submit snapshot diff call");
+      }
       break;
     default:
       str.append("Snapshot diff job is ")
