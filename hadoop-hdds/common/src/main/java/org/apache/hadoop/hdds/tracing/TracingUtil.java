@@ -289,7 +289,7 @@ public final class TracingUtil {
    * If a parent span exists in the current context, this becomes a child span.
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
-                                                            CheckedRunnable<E> runnable) throws E {
+      CheckedRunnable<E> runnable) throws E {
     if (shouldByPassSpanCreation()) {
       runnable.run();
       return;
@@ -299,7 +299,7 @@ public final class TracingUtil {
   }
 
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
-                                                            CheckedSupplier<R, E> supplier) throws E {
+      CheckedSupplier<R, E> supplier) throws E {
     if (shouldByPassSpanCreation()) {
       return supplier.get();
     }

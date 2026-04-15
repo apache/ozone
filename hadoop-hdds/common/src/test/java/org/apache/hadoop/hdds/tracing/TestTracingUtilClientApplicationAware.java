@@ -133,6 +133,7 @@ public class TestTracingUtilClientApplicationAware {
 
     Tracer appTracer = GlobalOpenTelemetry.get().getTracer("test-app");
     Span parent = appTracer.spanBuilder("parent").startSpan();
+    final String parentSpanId = parent.getSpanContext().getSpanId();
     try (Scope ignored = parent.makeCurrent()) {
       TracingUtil.executeInNewSpan("child-from-global", () ->
           assertThat(Span.current().getSpanContext().isValid()).isTrue());
@@ -146,11 +147,19 @@ public class TestTracingUtilClientApplicationAware {
             + "the child must be created with GlobalOpenTelemetry.")
         .isTrue();
 
+    // Child span must use the Ozone client scope on GlobalOpenTelemetry (not the test-app parent scope).
     assertThat(exportedSpans)
         .filteredOn(s -> "child-from-global".equals(s.getName()))
         .singleElement()
         .extracting(s -> s.getInstrumentationScopeInfo().getName())
         .isEqualTo(OZONE_CLIENT_TRACER_SCOPE);
+
+    // Child must link to the application parent span in the same trace.
+    assertThat(exportedSpans)
+        .filteredOn(s -> "child-from-global".equals(s.getName()))
+        .singleElement()
+        .extracting(SpanData::getParentSpanId)
+        .isEqualTo(parentSpanId);
   }
 
   @Test
