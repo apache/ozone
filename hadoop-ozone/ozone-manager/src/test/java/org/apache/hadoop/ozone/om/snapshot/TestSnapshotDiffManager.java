@@ -188,7 +188,7 @@ public class TestSnapshotDiffManager {
   private final List<String> snapshotNames = new ArrayList<>();
   private final List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
   private final List<SnapshotDiffJob> snapDiffJobs = new ArrayList<>();
-  private final OMMetrics omMetrics = OMMetrics.create();
+  private OMMetrics omMetrics;
   @TempDir
   private File dbDir;
   @Mock
@@ -228,6 +228,9 @@ public class TestSnapshotDiffManager {
   public void init() throws RocksDBException, IOException, ExecutionException {
     ExitUtils.disableSystemExit();
     ExitUtil.disableSystemExit();
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    omMetrics = OMMetrics.create(conf);
 
     dbOptions = new ManagedDBOptions();
     dbOptions.setCreateIfMissing(true);

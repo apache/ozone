@@ -1041,10 +1041,11 @@ public class TestOzoneManagerStateMachine {
 
   @Test
   public void testRatisEventsRecording() {
-    OMMetrics metrics = OMMetrics.create();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OMMetrics metrics = OMMetrics.create(conf);
     when(om.getMetrics()).thenReturn(metrics);
     when(om.getOmSnapshotManager()).thenReturn(mock(OmSnapshotManager.class));
-    when(om.getConfiguration()).thenReturn(new OzoneConfiguration());
+    when(om.getConfiguration()).thenReturn(conf);
     AuditMessage auditMessage = mock(AuditMessage.class);
     when(auditMessage.getOp()).thenReturn("LEADER_CHANGE");
     when(om.buildAuditMessageForSuccess(any(), any())).thenReturn(auditMessage);

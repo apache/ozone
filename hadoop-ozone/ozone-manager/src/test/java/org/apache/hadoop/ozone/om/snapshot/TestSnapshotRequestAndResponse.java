@@ -142,9 +142,9 @@ public class TestSnapshotRequestAndResponse {
   @BeforeEach
   public void baseSetup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
-    omMetrics = OMMetrics.create();
-    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    omMetrics = OMMetrics.create(ozoneConfiguration);
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         testDir.getAbsolutePath());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
