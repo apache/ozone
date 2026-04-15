@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.UnsafeByteOperations;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.CallerContext;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1482,11 +1484,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final OMRequest omRequest = createOMRequest(Type.SubmitSnapshotDiff)
         .setSubmitSnapshotDiffRequest(requestBuilder)
         .build();
-    final OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
+    final OMResponse omResponse;
+    try {
+      omResponse = submitRequest(omRequest);
+      handleError(omResponse);
+    } catch (IOException ex) {
+      if ((ex instanceof RemoteException) &&
+          (InvalidProtocolBufferException.class.getName().equals(((RemoteException) ex).getClassName()))) {
+        throw new OMException("Server does not support SubmitSnapshotDiff API", ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
+      throw ex;
+    }
     OzoneManagerProtocolProtos.SubmitSnapshotDiffResponse submitDiffResponse =
         omResponse.getSubmitSnapshotDiffResponse();
-
     return new SubmitSnapshotDiffResponse(submitDiffResponse.getResponse());
   }
 

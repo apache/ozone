@@ -81,12 +81,9 @@ HSync Can Be Used To Create Keys
     Freon DFSG      sync=HSYNC    n=1    path=${pfspath}
 
 Snapshot Diff RPC Is Compatible
-    # Snapshot diff requires snapshot support + FSO buckets in these tests.
-    Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
-    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
-
-    ${status}    ${help} =    Run Keyword And Ignore Error    Execute    ozone sh snapshot --help
-    Run Keyword If    '${status}' == 'FAIL'    Pass Execution    Snapshot CLI not supported by this client
+    # Snapshot diff requires snapshot support in these tests.
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Snapshot CLI not supported by this client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Snapshot CLI not supported by this client
 
     ${bucket} =      Set Variable    snapdiff-${CLIENT_VERSION}
     ${fromSnap} =    Set Variable    snapdiff-from-${CLIENT_VERSION}
@@ -113,16 +110,28 @@ Snapshot Diff Report Should Contain Created Keys
     ${status}    ${output} =    Run Keyword And Ignore Error
     ...    Execute    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
 
+    # new client
     IF    '${status}' == 'PASS'
         # On newer servers, --get-report does not submit jobs. If the job is not
         # found, submit it first (this keeps new-client/new-server behavior).
         ${notFound} =    Run Keyword And Return Status
         ...    Should Contain    ${output}    No snapshot diff job found
         IF    ${notFound}
-            Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+            ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+                           Should Contain    ${output}    Submitting a new job
+        ELSE
+        # On older servers, --get-report falls back to the legacy snapshot diff command,
+        # which submits the job if it doesn't exist. In this case, both snapshot diff and  --get-report
+        # should return the report.
+            ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+                           Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
+                           Should Contain    ${output}    ${key1}
+                           Should Contain    ${output}    ${key2}
         END
         ${output} =    Execute    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
     ELSE
+        # old client, which does not support --get-report.
+        # The snapshot diff command should return the report, submitting a job if necessary.
         ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
     END
 

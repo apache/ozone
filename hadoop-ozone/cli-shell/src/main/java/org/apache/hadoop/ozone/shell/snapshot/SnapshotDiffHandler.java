@@ -31,11 +31,13 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import picocli.CommandLine;
 
 /**
@@ -124,9 +126,18 @@ public class SnapshotDiffHandler extends Handler {
 
   private void submitSnapshotDiff(ObjectStore store, String volumeName,
                                String bucketName) throws IOException {
+    SubmitSnapshotDiffResponse response;
+    try {
+      response = store.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+          forceFullDiff, diffDisableNativeLibs);
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+        getSnapshotDiff(store, volumeName, bucketName);
+      }
+      return;
+    }
     try (PrintWriter writer = out()) {
-      writer.println(store.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-          forceFullDiff, diffDisableNativeLibs));
+      writer.println(response);
     }
   }
 
