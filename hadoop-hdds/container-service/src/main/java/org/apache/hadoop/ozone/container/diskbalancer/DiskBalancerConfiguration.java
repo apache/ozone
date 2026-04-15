@@ -21,10 +21,16 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 
 import jakarta.annotation.Nonnull;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +42,11 @@ import org.slf4j.LoggerFactory;
 public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
+
+  /**
+   * Default {@link #containerStates}: CLOSED and QUASI_CLOSED containers may be disk-balanced.
+   */
+  public static final String DEFAULT_CONTAINER_STATES = "CLOSED,QUASI_CLOSED";
 
   @Config(key = "hdds.datanode.disk.balancer.info.dir", type = ConfigType.STRING,
       defaultValue = "", tags = {ConfigTag.DISKBALANCER},
@@ -121,14 +132,15 @@ public final class DiskBalancerConfiguration {
           "Unit could be defined with postfix (ns,ms,s,m,h,d).")
   private long replicaDeletionDelay = Duration.ofMinutes(5).toMillis();
 
-  @Config(key = "hdds.datanode.disk.balancer.include.non.standard.containers",
-      defaultValue = "false",
-      type = ConfigType.BOOLEAN,
+  @Config(key = "hdds.datanode.disk.balancer.container.states",
+      defaultValue = DEFAULT_CONTAINER_STATES,
+      type = ConfigType.STRING,
       tags = { DATANODE, ConfigTag.DISKBALANCER },
-      description = "If true, balancer include non-standard states, i.e, QUASI_CLOSED." +
-          " So both CLOSED and QUASI_CLOSED state containers are eligible for move. " +
-          "If false (default), balancer only moves CLOSED containers.")
-  private boolean includeNonStandardContainers = false;
+      description = "Container lifecycle state names (CLOSED, QUASI_CLOSED) that " +
+          "are eligible to be moved between disks on a datanode. " +
+          "Names are case-insensitive. The default includes CLOSED and QUASI_CLOSED; " +
+          "additional states can be enabled by adding the states here.")
+  private String containerStates = DEFAULT_CONTAINER_STATES;
 
   public DiskBalancerConfiguration(Double threshold,
       Long bandwidthInMB,
@@ -271,12 +283,46 @@ public final class DiskBalancerConfiguration {
     this.parallelThread = parallelThread;
   }
 
-  public boolean getIncludeNonStandardContainers() {
-    return includeNonStandardContainers;
+  public String getContainerStates() {
+    return containerStates;
   }
 
-  public void setIncludeNonStandardContainers(boolean includeNonStandardContainers) {
-    this.includeNonStandardContainers = includeNonStandardContainers;
+  public void setContainerStates(String containerStates) {
+    this.containerStates = containerStates;
+  }
+
+  /**
+   * Container lifecycle states eligible for disk balancing, parsed from {@link #getContainerStates()}:
+   * a comma-separated list of {@link State} names (case-insensitive, whitespace trimmed).
+   *
+   * @return unmodifiable non-empty set
+   */
+  public Set<State> getMovableContainerStates() {
+    String raw = containerStates;
+    if (raw == null || raw.trim().isEmpty()) {
+      throw new IllegalArgumentException(
+          "hdds.datanode.disk.balancer.container.states must not be empty.");
+    }
+    Set<State> states = new HashSet<>();
+    for (String part : raw.split(",")) {
+      String name = part.trim();
+      if (name.isEmpty()) {
+        continue;
+      }
+      try {
+        states.add(State.valueOf(name.toUpperCase(Locale.ROOT)));
+      } catch (IllegalArgumentException ex) {
+        throw new IllegalArgumentException(
+            "Invalid container state '" + name + "' in hdds.datanode.disk.balancer.container.states. "
+                + "Valid names are: " + Arrays.toString(State.values()),
+            ex);
+      }
+    }
+    if (states.isEmpty()) {
+      throw new IllegalArgumentException(
+          "hdds.datanode.disk.balancer.container.states must list at least one valid state.");
+    }
+    return Collections.unmodifiableSet(states);
   }
 
   @Override

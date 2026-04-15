@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * exceeding the upper threshold. Space is reserved on the destination only when a container is
  * chosen, using the actual container size.
  *
- * Which replica states may move is defined by {@link MovableContainerStates}.
+ * Which container states may move is defined by {@link DiskBalancerConfiguration#getMovableContainerStates()}.
  */
 public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
@@ -64,11 +64,12 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
           () -> CacheBuilder.newBuilder().recordStats().expireAfterAccess(1, HOURS).build());
 
   private final ReentrantLock lock;
-  private final MovableContainerStates movableContainerStates;
+  private final Set<State> movableContainerStates;
 
   public DefaultContainerChoosingPolicy(ReentrantLock globalLock, ConfigurationSource conf) {
     this.lock = globalLock;
-    this.movableContainerStates = MovableContainerStates.fromConfig(conf);
+    this.movableContainerStates = conf.getObject(DiskBalancerConfiguration.class)
+        .getMovableContainerStates();
   }
 
   @Override
@@ -197,9 +198,9 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
         continue;
       }
 
-      if (!movableContainerStates.allows(containerData.getState())) {
+      if (!movableContainerStates.contains(containerData.getState())) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Skipping container {} from volume {}: state is {}. Policy: {}",
+          LOG.debug("Skipping container {} from volume {}: state is {}. Allowed container states: {}",
               containerId, src.getStorageDir().getPath(), containerData.getState(), movableContainerStates);
         }
         continue;
@@ -252,34 +253,6 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
           i, vol.getStorageDir().getPath(), String.format("%.10f", vfu.getUtilization()),
           usage.getCapacity(), vfu.getEffectiveUsed(), usage.getAvailable(),
           usableSpace, vol.getCommittedBytes(), deltaMap.getOrDefault(vol, 0L));
-    }
-  }
-
-  /**
-   * This shows which container {@link State}s can be moved.
-   * {@link #CLOSED_ONLY}
-   * {@link #NON_STANDARD_INCLUDED}: CLOSED as well as QUASI_CLOSED (add more container states in
-   * {@link #allows} when needed).
-   */
-  public enum MovableContainerStates {
-    CLOSED_ONLY,
-    NON_STANDARD_INCLUDED;
-
-    public static MovableContainerStates fromConfig(ConfigurationSource conf) {
-      boolean includeNonStandard =
-          conf.getObject(DiskBalancerConfiguration.class).getIncludeNonStandardContainers();
-      return includeNonStandard ? NON_STANDARD_INCLUDED : CLOSED_ONLY;
-    }
-
-    public boolean allows(State state) {
-      switch (state) {
-      case CLOSED:
-        return true;
-      case QUASI_CLOSED:
-        return this == NON_STANDARD_INCLUDED;
-      default:
-        return false;
-      }
     }
   }
 }

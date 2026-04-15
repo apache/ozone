@@ -69,7 +69,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class tests for volume and container selection in DefaultContainerChoosingPolicy.
@@ -373,17 +372,18 @@ public class TestDefaultContainerChoosingPolicy {
   }
 
   /**
-   * With {@link DiskBalancerConfiguration#getIncludeNonStandardContainers()} true, QUASI_CLOSED is
-   * chosen;
-   * with false (default), only CLOSED is eligible to move.
+   * When {@link DiskBalancerConfiguration#getContainerStates()} lists QUASI_CLOSED, the smallest
+   * movable quasi-closed container may be chosen; with CLOSED only, only CLOSED replicas are
+   * eligible.
    */
-  @ParameterizedTest(name = "includeNonStandardContainers={0}")
-  @ValueSource(booleans = {true, false})
-  public void testQuasiClosedEligibilityDependsOnIncludeNonStandard(boolean includeNonStandardContainers)
+  @ParameterizedTest(name = "containerStates={0}")
+  @MethodSource("quasiClosedEligibilityParams")
+  public void testQuasiClosedEligibilityDependsOnContainerStates(String containerStates,
+      long expectedContainerId)
       throws IOException {
     OzoneConfiguration testConf = new OzoneConfiguration();
     DiskBalancerConfiguration dbc = testConf.getObject(DiskBalancerConfiguration.class);
-    dbc.setIncludeNonStandardContainers(includeNonStandardContainers);
+    dbc.setContainerStates(containerStates);
     testConf.setFromObject(dbc);
     ContainerChoosingPolicy policyUnderTest = new DefaultContainerChoosingPolicy(
         new ReentrantLock(), testConf);
@@ -413,19 +413,22 @@ public class TestDefaultContainerChoosingPolicy {
     ContainerCandidate candidate = policyUnderTest.chooseVolumesAndContainer(ozoneContainer,
         volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
 
-    if (includeNonStandardContainers) {
-      assertNotNull(candidate);
-      assertEquals(sourceVolume, candidate.getSourceVolume());
-      assertEquals(destVolume, candidate.getDestVolume());
-      assertEquals(2L, candidate.getContainerData().getContainerID());
+    assertNotNull(candidate);
+    assertEquals(sourceVolume, candidate.getSourceVolume());
+    assertEquals(destVolume, candidate.getDestVolume());
+    assertEquals(expectedContainerId, candidate.getContainerData().getContainerID());
+    if (expectedContainerId == 2L) {
       assertTrue(candidate.getContainerData().isQuasiClosed());
     } else {
-      assertNotNull(candidate);
-      assertEquals(sourceVolume, candidate.getSourceVolume());
-      assertEquals(destVolume, candidate.getDestVolume());
-      assertEquals(3L, candidate.getContainerData().getContainerID());
       assertTrue(candidate.getContainerData().isClosed());
     }
+  }
+
+  private static Stream<Arguments> quasiClosedEligibilityParams() {
+    return Stream.of(
+        Arguments.arguments(DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, 2L),
+        Arguments.arguments("CLOSED", 3L)
+    );
   }
 
   /**
