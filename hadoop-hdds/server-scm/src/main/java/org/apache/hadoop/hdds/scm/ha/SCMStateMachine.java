@@ -96,7 +96,7 @@ public class SCMStateMachine extends BaseStateMachine {
     this.scm = scm;
     this.handlers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
-    this.metrics = StorageContainerManager.getMetrics();
+    this.metrics = scm.getMetrics();
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isDefault()) {
       updateLastAppliedTermIndex(latestTrxInfo.getTerm(),

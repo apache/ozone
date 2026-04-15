@@ -188,7 +188,6 @@ public class TestSnapshotDiffManager {
   private final List<String> snapshotNames = new ArrayList<>();
   private final List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
   private final List<SnapshotDiffJob> snapDiffJobs = new ArrayList<>();
-  private OMMetrics omMetrics;
   @TempDir
   private File dbDir;
   @Mock
@@ -230,7 +229,7 @@ public class TestSnapshotDiffManager {
     ExitUtil.disableSystemExit();
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    omMetrics = OMMetrics.create(conf);
+    OMMetrics omMetrics = OMMetrics.create(conf);
 
     dbOptions = new ManagedDBOptions();
     dbOptions.setCreateIfMissing(true);
