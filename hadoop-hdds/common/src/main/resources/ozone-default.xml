@@ -3610,8 +3610,10 @@
     <value>10000</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
-      Total container count drift threshold above which Recon escalates from
-      incremental SCM container sync to a full SCM DB snapshot sync.
+      Non-OPEN container count drift threshold above which Recon escalates from
+      incremental SCM container sync to a full SCM DB snapshot sync. Missing
+      OPEN containers stay on the incremental path because they are short-lived
+      and can be repaired cheaply without replacing the full SCM DB.
     </description>
   </property>
   <property>

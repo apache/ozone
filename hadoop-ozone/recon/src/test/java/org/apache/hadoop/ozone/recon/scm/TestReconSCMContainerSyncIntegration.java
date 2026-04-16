@@ -35,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -223,6 +225,7 @@ public class TestReconSCMContainerSyncIntegration
     void largeTotalDriftReturnsFullSnapshot() throws Exception {
       // Recon empty, SCM has 200,000 containers → well above default 10k threshold
       when(mockScm.getContainerCount()).thenReturn(200_000L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
       assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
     }
@@ -236,11 +239,32 @@ public class TestReconSCMContainerSyncIntegration
 
       // Drift = 51 → FULL_SNAPSHOT with custom threshold 50
       when(mockScm.getContainerCount()).thenReturn(51L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
       assertEquals(SyncAction.FULL_SNAPSHOT, customHelper.decideSyncAction());
 
       // Drift = 50 → TARGETED_SYNC (50 is at threshold, not above)
       seedRecon(1, 1, CLOSED); // Recon now has 1, SCM 51 → drift = 50
       assertEquals(SyncAction.TARGETED_SYNC, customHelper.decideSyncAction());
+    }
+
+    @Test
+    void largeOpenOnlyDriftReturnsTargetedSync() throws Exception {
+      // SCM is ahead only on OPEN containers. This should remain on the
+      // incremental path rather than forcing a full snapshot.
+      when(mockScm.getContainerCount()).thenReturn(20_000L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(20_000L);
+
+      assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
+    }
+
+    @Test
+    void largeNonOpenDriftStillReturnsFullSnapshot() throws Exception {
+      // Most of SCM's drift is in stable states, so a full snapshot is still
+      // the correct escalation path.
+      when(mockScm.getContainerCount()).thenReturn(20_000L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(5_000L);
+
+      assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
     }
 
     @Test
@@ -560,6 +584,41 @@ public class TestReconSCMContainerSyncIntegration
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(OPEN, getContainerManager().getContainer(cid).getState());
+    }
+
+    @Test
+    void openSyncUsesCursorAndOnlyFetchesNewOpenContainers() throws Exception {
+      getConf().setLong(
+          ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE, 2L);
+      ReconStorageContainerSyncHelper pagedHelper = new ReconStorageContainerSyncHelper(
+          mockScm, getConf(), getContainerManager());
+
+      when(mockScm.getContainerCount(OPEN)).thenReturn(2L, 1L, 0L);
+      when(mockScm.getListOfContainerIDs(
+          eq(ContainerID.valueOf(1L)), eq(2), eq(OPEN)))
+          .thenReturn(idRange(10, 12));
+      when(mockScm.getListOfContainerIDs(
+          eq(ContainerID.valueOf(12L)), eq(2), eq(OPEN)))
+          .thenReturn(Collections.emptyList());
+      when(mockScm.getListOfContainerIDs(
+          eq(ContainerID.valueOf(12L)), eq(1), eq(OPEN)))
+          .thenReturn(Collections.singletonList(ContainerID.valueOf(20L)));
+      when(mockScm.getListOfContainerIDs(
+          eq(ContainerID.valueOf(21L)), eq(2), eq(OPEN)))
+          .thenReturn(Collections.emptyList());
+      when(mockScm.getExistContainerWithPipelinesInBatch(Arrays.asList(10L, 11L)))
+          .thenReturn(Arrays.asList(containerCwp(10L, OPEN), containerCwp(11L, OPEN)));
+      when(mockScm.getExistContainerWithPipelinesInBatch(Collections.singletonList(20L)))
+          .thenReturn(Collections.singletonList(containerCwp(20L, OPEN)));
+
+      assertTrue(pagedHelper.syncWithSCMContainerInfo());
+      assertEquals(2, getContainerManager().getContainers(OPEN).size());
+
+      assertTrue(pagedHelper.syncWithSCMContainerInfo());
+      assertEquals(3, getContainerManager().getContainers(OPEN).size());
+
+      verify(mockScm, times(1)).getListOfContainerIDs(
+          eq(ContainerID.valueOf(1L)), eq(2), eq(OPEN));
     }
   }
 
@@ -1091,6 +1150,7 @@ public class TestReconSCMContainerSyncIntegration
     void decideSyncAction100kDriftTriggerFullSnapshot() throws Exception {
       // SCM has 100k containers, Recon is empty → drift 100k > threshold 10k
       when(mockScm.getContainerCount()).thenReturn(100_000L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
       assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
     }
@@ -1101,6 +1161,7 @@ public class TestReconSCMContainerSyncIntegration
       seedRecon(1, 50_000, CLOSED);
 
       when(mockScm.getContainerCount()).thenReturn(100_000L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
       assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
     }
@@ -1111,22 +1172,23 @@ public class TestReconSCMContainerSyncIntegration
       seedRecon(1, 95_000, CLOSED);
 
       when(mockScm.getContainerCount()).thenReturn(100_000L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
       assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
 
     @Test
-    void decideSyncAction100kOpenDriftTriggersTargetedSync() throws Exception {
-      // Total counts match but 10k OPEN drift (SCM advanced them to CLOSED) →
-      // triggers TARGETED_SYNC via per-state check
+    void decideSyncAction100kOpenToClosedDriftTriggersFullSnapshot() throws Exception {
+      // Total counts match, but SCM has advanced every OPEN container to a
+      // stable non-OPEN state. That creates a large non-OPEN drift and should
+      // escalate to FULL_SNAPSHOT under the new policy.
       seedRecon(1, 100_000, OPEN); // all OPEN in Recon
 
       when(mockScm.getContainerCount()).thenReturn(100_000L); // total matches
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);          // SCM has 0 OPEN
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
 
-      // OPEN drift = 100k, far above default threshold of 5
-      assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
+      assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
     }
 
     @Test

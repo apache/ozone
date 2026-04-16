@@ -89,6 +89,12 @@ class ReconStorageContainerSyncHelper {
    * updated by the scheduler thread and read by tests.
    */
   private volatile int pass4BatchOffset = 0;
+  /**
+   * Monotonic cursor for Pass 2 (OPEN add-only sync). OPEN containers are
+   * created with increasing container IDs, so each cycle only needs to scan
+   * from the last-seen ID onward rather than rescanning the full OPEN set.
+   */
+  private volatile long pass2OpenStartContainerId = 1L;
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerSyncHelper.class);
@@ -137,12 +143,15 @@ class ReconStorageContainerSyncHelper {
    *
    * <p>Decision logic:
    * <ol>
-   *   <li>If {@code |SCM_total - Recon_total| > ozone.recon.scm.container.threshold}
-   *       (default 10,000): return {@link SyncAction#FULL_SNAPSHOT}. The gap is
-   *       too large for incremental repair; a full checkpoint replacement is
-   *       cheaper and more reliable at that scale.</li>
-   *   <li>If total drift is positive but within the threshold (1 to 10,000):
-   *       return {@link SyncAction#TARGETED_SYNC}.</li>
+   *   <li>If {@code |(SCM_total - SCM_open) - (Recon_total - Recon_open)| >
+   *       ozone.recon.scm.container.threshold} (default 10,000): return
+   *       {@link SyncAction#FULL_SNAPSHOT}. Large drift in non-OPEN containers
+   *       means Recon is badly behind on stable SCM state and a full checkpoint
+   *       replacement is cheaper and more reliable at that scale.</li>
+   *   <li>If total drift is positive but the non-OPEN drift is at or below the
+   *       threshold: return {@link SyncAction#TARGETED_SYNC}. This keeps large
+   *       OPEN-only gaps on the incremental path because missing OPEN
+   *       containers can be repaired cheaply without replacing the full SCM DB.</li>
    *   <li>If total drift is zero, check per-state drift for each active
    *       (non-terminal) lifecycle state against
    *       {@code ozone.recon.scm.per.state.drift.threshold} (default 5):
@@ -173,21 +182,31 @@ class ReconStorageContainerSyncHelper {
         OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD,
         OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT);
     List<ContainerInfo> reconContainers = containerManager.getContainers();
-
-    // --- Check 1: total container count drift ---
-    long scmTotal = scmServiceProvider.getContainerCount();
     long reconTotal = reconContainers.size();
-    long totalDrift = Math.abs(scmTotal - reconTotal);
+    long reconOpen = reconContainers.stream()
+        .filter(c -> c.getState() == HddsProtos.LifeCycleState.OPEN)
+        .count();
 
-    if (totalDrift > largeThreshold) {
-      LOG.warn("Total container drift {} exceeds threshold {} "
-              + "(SCM={}, Recon={}). Triggering full snapshot.",
-          totalDrift, largeThreshold, scmTotal, reconTotal);
+    // --- Check 1: large non-OPEN drift escalates to full snapshot ---
+    long scmTotal = scmServiceProvider.getContainerCount();
+    long scmOpen = scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.OPEN);
+    long totalDrift = Math.abs(scmTotal - reconTotal);
+    long scmNonOpen = Math.max(0, scmTotal - scmOpen);
+    long reconNonOpen = Math.max(0, reconTotal - reconOpen);
+    long nonOpenDrift = Math.abs(scmNonOpen - reconNonOpen);
+
+    if (nonOpenDrift > largeThreshold) {
+      LOG.warn("Non-OPEN container drift {} exceeds threshold {} "
+              + "(SCM_non_OPEN={}, Recon_non_OPEN={}, SCM_total={}, Recon_total={}). "
+              + "Triggering full snapshot.",
+          nonOpenDrift, largeThreshold, scmNonOpen, reconNonOpen, scmTotal, reconTotal);
       return SyncAction.FULL_SNAPSHOT;
     }
     if (totalDrift > 0) {
       LOG.info("Total container drift {} detected (SCM={}, Recon={}). "
-          + "Using targeted sync.", totalDrift, scmTotal, reconTotal);
+              + "Non-OPEN drift is {} (SCM_non_OPEN={}, Recon_non_OPEN={}), so "
+              + "using targeted sync.",
+          totalDrift, scmTotal, reconTotal, nonOpenDrift, scmNonOpen, reconNonOpen);
       return SyncAction.TARGETED_SYNC;
     }
 
@@ -196,12 +215,8 @@ class ReconStorageContainerSyncHelper {
     // These checks intentionally use the lightweight per-state count RPCs so
     // the decision path remains cheap. CLOSED is derived as the remainder after
     // subtracting OPEN and QUASI_CLOSED from the total on each side.
-    long scmOpen = scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.OPEN);
     long scmQuasiClosed =
         scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
-    long reconOpen = reconContainers.stream()
-        .filter(c -> c.getState() == HddsProtos.LifeCycleState.OPEN)
-        .count();
     long reconQuasiClosed = reconContainers.stream()
         .filter(c -> c.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED)
         .count();
@@ -234,7 +249,7 @@ class ReconStorageContainerSyncHelper {
    */
   public boolean syncWithSCMContainerInfo() {
     boolean pass1 = syncClosedContainers();
-    boolean pass2 = syncAddOnlyState(HddsProtos.LifeCycleState.OPEN);
+    boolean pass2 = syncOpenContainersIncrementally();
     boolean pass3 = syncQuasiClosedContainers();
     boolean pass4 = retireDeletedContainers();
     return pass1 && pass2 && pass3 && pass4;
@@ -362,6 +377,52 @@ class ReconStorageContainerSyncHelper {
   // ---------------------------------------------------------------------------
 
   /**
+   * Fetches only the newly created OPEN containers from SCM, starting at the
+   * last-seen OPEN container ID from the previous cycle, and adds any that are
+   * absent from Recon.
+   *
+   * <p>This deliberately avoids rescanning the full OPEN set every cycle.
+   * OPEN container IDs are monotonic, so once Recon has scanned through a
+   * given ID range it can continue from the next ID in later cycles. This
+   * keeps OPEN drift on an incremental path while CLOSED/QUASI_CLOSED still use
+   * full state scans for correction.
+   */
+  private boolean syncOpenContainersIncrementally() {
+    try {
+      long totalOpen = scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.OPEN);
+      if (totalOpen == 0) {
+        LOG.debug("Pass 2 (OPEN): no containers found in SCM.");
+        return true;
+      }
+
+      long retrieved = 0;
+      int addedCount = 0;
+      long batchSize = Math.min(totalOpen, getStatePaginationBatchSize());
+      ContainerID startContainerId = ContainerID.valueOf(pass2OpenStartContainerId);
+
+      while (true) {
+        List<ContainerID> batch = scmServiceProvider.getListOfContainerIDs(
+            startContainerId, (int) batchSize, HddsProtos.LifeCycleState.OPEN);
+        if (batch == null || batch.isEmpty()) {
+          LOG.info("Pass 2 (OPEN): sync complete from cursor {}, checked {}, added {}.",
+              pass2OpenStartContainerId, retrieved, addedCount);
+          return true;
+        }
+
+        addedCount += addMissingContainersForState(batch, HddsProtos.LifeCycleState.OPEN);
+        retrieved += batch.size();
+
+        long lastID = batch.get(batch.size() - 1).getId();
+        pass2OpenStartContainerId = lastID + 1;
+        startContainerId = ContainerID.valueOf(pass2OpenStartContainerId);
+      }
+    } catch (Exception e) {
+      LOG.error("Pass 2 (OPEN): unexpected error during sync.", e);
+      return false;
+    }
+  }
+
+  /**
    * Fetches SCM's container list for {@code state} (paginated) and adds any
    * container that is completely absent from Recon. Does not modify state of
    * containers already present in Recon.
@@ -402,34 +463,7 @@ class ReconStorageContainerSyncHelper {
           return false;
         }
 
-        // Collect all missing container IDs in this page and fetch them in one
-        // batch RPC.  The batch API has a null-pipeline fallback: if a pipeline
-        // lookup fails (e.g., pipeline not yet OPEN or cleaned up), SCM still
-        // returns the container with pipeline=null so Recon can record it.  The
-        // individual getContainerWithPipeline call throws in those cases and the
-        // container is silently skipped — the root cause of ContainerNotFoundException
-        // errors in downstream test code.
-        List<Long> missingIds = new ArrayList<>();
-        for (ContainerID containerID : batch) {
-          if (!containerManager.containerExist(containerID)) {
-            missingIds.add(containerID.getId());
-          }
-        }
-        if (!missingIds.isEmpty()) {
-          List<ContainerWithPipeline> cwpList =
-              scmServiceProvider.getExistContainerWithPipelinesInBatch(missingIds);
-          for (ContainerWithPipeline cwp : cwpList) {
-            try {
-              containerManager.addNewContainer(cwp);
-              addedCount++;
-              LOG.info("Pass ({}): added missing container {}.", state,
-                  cwp.getContainerInfo().getContainerID());
-            } catch (IOException e) {
-              LOG.error("Pass ({}): could not add missing container {}.", state,
-                  cwp.getContainerInfo().getContainerID(), e);
-            }
-          }
-        }
+        addedCount += addMissingContainersForState(batch, state);
 
         long lastID = batch.get(batch.size() - 1).getId();
         startContainerId = ContainerID.valueOf(lastID + 1);
@@ -442,6 +476,39 @@ class ReconStorageContainerSyncHelper {
       LOG.error("Pass ({}): unexpected error during sync.", state, e);
       return false;
     }
+  }
+
+  private int addMissingContainersForState(List<ContainerID> batch,
+                                           HddsProtos.LifeCycleState state) {
+    // Collect all missing container IDs in this page and fetch them in one
+    // batch RPC. The batch API has a null-pipeline fallback: if a pipeline
+    // lookup fails (e.g., pipeline not yet OPEN or cleaned up), SCM still
+    // returns the container with pipeline=null so Recon can record it.
+    List<Long> missingIds = new ArrayList<>();
+    for (ContainerID containerID : batch) {
+      if (!containerManager.containerExist(containerID)) {
+        missingIds.add(containerID.getId());
+      }
+    }
+    if (missingIds.isEmpty()) {
+      return 0;
+    }
+
+    int addedCount = 0;
+    List<ContainerWithPipeline> cwpList =
+        scmServiceProvider.getExistContainerWithPipelinesInBatch(missingIds);
+    for (ContainerWithPipeline cwp : cwpList) {
+      try {
+        containerManager.addNewContainer(cwp);
+        addedCount++;
+        LOG.info("Pass ({}): added missing container {}.", state,
+            cwp.getContainerInfo().getContainerID());
+      } catch (IOException e) {
+        LOG.error("Pass ({}): could not add missing container {}.", state,
+            cwp.getContainerInfo().getContainerID(), e);
+      }
+    }
+    return addedCount;
   }
 
   // ---------------------------------------------------------------------------

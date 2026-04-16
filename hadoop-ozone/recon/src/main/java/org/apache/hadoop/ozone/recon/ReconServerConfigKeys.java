@@ -136,11 +136,14 @@ public final class  ReconServerConfigKeys {
    * Total container count drift threshold above which the periodic incremental
    * sync escalates to a full SCM DB snapshot.
    *
-   * <p>When {@code |SCM_total_containers - Recon_total_containers|} exceeds
-   * this value the targeted 4-pass sync becomes expensive (many batched RPC
-   * rounds) and a full checkpoint replacement is cheaper and more reliable.
-   * For drift at or below this value the incremental sync corrects the gap
-   * without replacing the entire database.
+   * <p>When {@code |(SCM_total_containers - SCM_open_containers) -
+   * (Recon_total_containers - Recon_open_containers)|} exceeds this value the
+   * targeted 4-pass sync becomes expensive (many batched RPC rounds) and a
+   * full checkpoint replacement is cheaper and more reliable. The comparison
+   * intentionally excludes OPEN containers because missing OPEN containers are
+   * short-lived and can be repaired incrementally without replacing the full
+   * SCM DB. For drift at or below this value the incremental sync corrects the
+   * gap without replacing the entire database.
    *
    * <p>Note: a full snapshot is also scheduled unconditionally every 24h
    * (configurable via {@code ozone.recon.scm.snapshot.task.interval.delay})

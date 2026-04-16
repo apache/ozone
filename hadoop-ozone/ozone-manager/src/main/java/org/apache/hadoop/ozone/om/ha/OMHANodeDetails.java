@@ -326,7 +326,7 @@ public class OMHANodeDetails {
 
   private static void throwConfException(String message, String... arguments)
       throws IllegalArgumentException {
-    String exceptionMsg = String.format(message, (Object[]) arguments);
+    String exceptionMsg = String.format(message, arguments);
     LOG.error(exceptionMsg);
     throw new OzoneIllegalArgumentException(exceptionMsg);
   }

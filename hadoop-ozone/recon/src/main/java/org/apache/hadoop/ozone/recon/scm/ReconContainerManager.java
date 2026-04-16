@@ -227,6 +227,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
    *       then query SCM to advance further if possible.</li>
    *   <li>CLOSING in Recon + any report → query SCM to advance to
    *       QUASI_CLOSED or CLOSED if SCM has already moved there.</li>
+   *   <li>DELETED in Recon + live replica report → rehydrate the container from
+   *       SCM if SCM still records it in a live state such as QUASI_CLOSED or
+   *       CLOSED.</li>
    * </ol>
    *
    * <p>Querying SCM for the authoritative state prevents containers from getting
@@ -241,6 +244,11 @@ public class ReconContainerManager extends ContainerManagerImpl {
       throws IOException, InvalidStateTransitionException {
     ContainerInfo containerInfo = getContainer(containerID);
     HddsProtos.LifeCycleState reconState = containerInfo.getState();
+
+    if (reconState == HddsProtos.LifeCycleState.DELETED) {
+      recoverDeletedContainerFromScm(containerID, replicaState);
+      return;
+    }
 
     // Only act on transient pre-closed states where a DN report signals change
     boolean isTransient = reconState == HddsProtos.LifeCycleState.OPEN
@@ -292,6 +300,42 @@ public class ReconContainerManager extends ContainerManagerImpl {
     } catch (IOException e) {
       LOG.warn("Failed to fetch authoritative state for container {} from SCM. "
           + "Container may remain in CLOSING until next periodic sync.", containerID, e);
+    }
+  }
+
+  private void recoverDeletedContainerFromScm(
+      ContainerID containerID, ContainerReplicaProto.State replicaState)
+      throws IOException {
+    if (replicaState != ContainerReplicaProto.State.CLOSED
+        && replicaState != ContainerReplicaProto.State.QUASI_CLOSED) {
+      return;
+    }
+
+    try {
+      ContainerWithPipeline scmContainer =
+          scmClient.getContainerWithPipeline(containerID.getId());
+      HddsProtos.LifeCycleState scmState =
+          scmContainer.getContainerInfo().getState();
+      if (scmState != HddsProtos.LifeCycleState.CLOSED
+          && scmState != HddsProtos.LifeCycleState.QUASI_CLOSED) {
+        LOG.info("Container {} is DELETED in Recon and DN reported {}, but SCM "
+                + "still reports {}. Skipping recovery.", containerID, replicaState, scmState);
+        return;
+      }
+
+      // Reverse transitions are not supported by the lifecycle state machine,
+      // so rebuild the container record from SCM's authoritative metadata.
+      deleteContainer(containerID);
+      addNewContainer(scmContainer);
+      LOG.info("Recovered container {} from DELETED in Recon to {} based on "
+              + "DN report {} and SCM state {}.", containerID, scmState, replicaState, scmState);
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Container {} disappeared from Recon while recovering DELETED "
+          + "state; retry on next report.", containerID, e);
+    } catch (IOException e) {
+      LOG.warn("Failed to recover container {} from DELETED state using SCM "
+          + "metadata.", containerID, e);
+      throw e;
     }
   }
 
