@@ -34,6 +34,10 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.util.Pair;
 
+/**
+ * Helper methods used by {@link RewriteTablePathOzoneAction} when rewriting
+ * Iceberg table paths on Ozone-backed tables.
+ */
 final class RewriteTablePathOzoneUtils {
 
   private static final String RESULT_LOCATION = "file-list";
@@ -65,7 +69,7 @@ final class RewriteTablePathOzoneUtils {
   }
 
   static boolean fileExist(String path, FileIO io) {
-    if (path == null || path.trim().isEmpty()) {
+    if (path == null || path.isBlank()) {
       return false;
     }
     return io.newInputFile(path).exists();
@@ -87,7 +91,7 @@ final class RewriteTablePathOzoneUtils {
 
   static void checkNonNullNonEmpty(String value, String name) {
     Objects.requireNonNull(value, () -> name + " is null");
-    if (value.trim().isEmpty()) {
+    if (value.isBlank()) {
       throw new IllegalArgumentException(name + " is empty");
     }
   }

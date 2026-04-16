@@ -58,7 +58,6 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   private int parallelism;
 
   private final Table table;
-  private ExecutorService executorService;
 
   public RewriteTablePathOzoneAction(Table table) {
     this.table = table;
@@ -103,7 +102,8 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   @Override
   public Result execute() {
     validateInputs();
-    this.executorService = Executors.newFixedThreadPool(parallelism);
+    // TODO: should use for parallel manifest and position delete file rewriting.
+    ExecutorService executorService = Executors.newFixedThreadPool(parallelism);
     try {
       return doExecute();
     } finally {
