@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -75,7 +76,7 @@ class TestRewriteTablePathOzoneAction {
 
   @BeforeEach
   public void setupTableLocation() {
-      String tableLocation = tableDir.toUri().toString().replaceFirst("^file:///", "file:/") + TABLE_NAME;
+    String tableLocation = tableDir.toUri().toString().replaceFirst("^file:///", "file:/") + TABLE_NAME;
     this.table = createTable(tableLocation + "/");
     this.sourcePrefix = tableLocation;
     this.targetPrefix = targetDir.toUri().toString().replaceFirst("^file:///", "file:/") + TABLE_NAME;
@@ -193,7 +194,7 @@ class TestRewriteTablePathOzoneAction {
    * - Every metadata-log entry path starts with target
    * - Every snapshot's manifest-list path starts with target
    * - Every statistics file path starts with target
-   * - None of the above contain the source prefix
+   * - None of the above contain the source prefix.
    */
   private void assertAllInternalPathsRewritten(Set<Pair<String, String>> csvPairs, String target) {
     for (Pair<String, String> pair : csvPairs) {
