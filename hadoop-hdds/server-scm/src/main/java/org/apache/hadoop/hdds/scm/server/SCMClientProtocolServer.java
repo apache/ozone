@@ -116,6 +116,7 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -1153,19 +1154,40 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser(), true);
 
-      // Returning a placeholder for now.
-      HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
-          .setScmFinalized(true)
-          .setNumDatanodesFinalized(10)
-          .setNumDatanodesTotal(10)
-          .setShouldFinalize(true)
-          .build();
+      UpgradeFinalization.Status scmUpgradeStatus =
+          scm.getLayoutVersionManager().getUpgradeState();
+      int totalDatanodes = scm.getScmNodeManager().getAllNodeCount();
+      int finalizedDatanodes = scm.getScmNodeManager().getNumDatanodesFinalized();
+      HddsProtos.UpgradeStatus result = buildUpgradeStatus(
+          scmUpgradeStatus, finalizedDatanodes, totalDatanodes);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, null));
       return result;
     } catch (IOException ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.QUERY_UPGRADE_STATUS, null, ex));
       throw ex;
     }
+  }
+
+  static HddsProtos.UpgradeStatus buildUpgradeStatus(
+      UpgradeFinalization.Status scmUpgradeStatus,
+      int finalizedDatanodes,
+      int totalDatanodes) {
+    return HddsProtos.UpgradeStatus.newBuilder()
+        .setScmFinalized(isScmFinalized(scmUpgradeStatus))
+        .setNumDatanodesFinalized(finalizedDatanodes)
+        .setNumDatanodesTotal(totalDatanodes)
+        .setShouldFinalize(shouldFinalize(scmUpgradeStatus))
+        .build();
+  }
+
+  static boolean isScmFinalized(UpgradeFinalization.Status scmUpgradeStatus) {
+    return UpgradeFinalization.isFinalized(scmUpgradeStatus)
+        || UpgradeFinalization.isDone(scmUpgradeStatus);
+  }
+
+  static boolean shouldFinalize(UpgradeFinalization.Status scmUpgradeStatus) {
+    return UpgradeFinalization.Status.FINALIZATION_REQUIRED.equals(
+        scmUpgradeStatus);
   }
 
   @Override

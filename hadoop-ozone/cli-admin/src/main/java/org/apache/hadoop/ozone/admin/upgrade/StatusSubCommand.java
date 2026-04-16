@@ -39,8 +39,7 @@ public class StatusSubCommand extends ScmSubcommand {
   public void execute(ScmClient client) throws IOException {
     HddsProtos.UpgradeStatus status = client.queryUpgradeStatus();
 
-    // Temporary output to validate the command is working.
-    out().println("Update status:");
+    out().println("Upgrade status:");
     out().println("    SCM Finalized: " + status.getScmFinalized());
     out().println("    Datanodes finalized: " + status.getNumDatanodesFinalized());
     out().println("    Total Datanodes: " + status.getNumDatanodesTotal());
