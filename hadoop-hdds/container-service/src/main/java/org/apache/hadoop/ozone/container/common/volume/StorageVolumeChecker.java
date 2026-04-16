@@ -221,16 +221,10 @@ public class StorageVolumeChecker {
     final Set<StorageVolume> healthyVolumes = ConcurrentHashMap.newKeySet();
     final Set<StorageVolume> failedVolumes = ConcurrentHashMap.newKeySet();
     final Set<StorageVolume> allVolumes = new HashSet<>();
+    final Object resultLock = this;
 
     final AtomicLong numVolumes = new AtomicLong(volumes.size());
     final CountDownLatch latch = new CountDownLatch(1);
-
-    // Shared set used to guarantee exactly-one call to
-    // recordTimeoutAndCheckFailure() per volume, regardless of whether the
-    // per-check timeout (ResultHandler.onFailure) or the global latch timeout
-    // (pending-volumes loop below) fires first.  The first path to CAS-add the
-    // volume owns the tolerance decision; the other path skips it.
-    final Set<StorageVolume> timeoutHandledSet = ConcurrentHashMap.newKeySet();
 
     for (StorageVolume v : volumes) {
       Optional<ListenableFuture<VolumeCheckResult>> olf =
@@ -241,7 +235,7 @@ public class StorageVolumeChecker {
         Futures.addCallback(olf.get(),
             new ResultHandler(v, healthyVolumes, failedVolumes,
                 numVolumes, (ignored1, ignored2) -> latch.countDown(),
-                timeoutHandledSet),
+                true, resultLock),
             MoreExecutors.directExecutor());
       } else {
         if (v instanceof HddsVolume) {
@@ -265,26 +259,23 @@ public class StorageVolumeChecker {
             maxAllowedTimeForCheckMs);
       }
 
+      final Set<StorageVolume> failedSnapshot = new HashSet<>(failedVolumes);
+      final Set<StorageVolume> healthySnapshot = new HashSet<>(healthyVolumes);
+
       // Volumes that explicitly reported FAILED via check() are always
       // returned — the IO-failure sliding window in StorageVolume.check()
       // already applied its own tolerance.
-      final Set<StorageVolume> result = new HashSet<>(failedVolumes);
+      final Set<StorageVolume> result = new HashSet<>(failedSnapshot);
 
       // Volumes still pending (neither healthy nor explicitly failed) at
-      // latch-timeout time.  onFailure() may have already handled some of
-      // these via timeoutHandledSet; skip those to avoid double-counting.
+      // latch-timeout time. Timeout accounting for batch checks happens here
+      // in one place, regardless of whether the per-check timeout callback
+      // has already fired.
       final Set<StorageVolume> pendingVolumes =
           new HashSet<>(Sets.difference(allVolumes,
-              Sets.union(healthyVolumes, failedVolumes)));
+              Sets.union(healthySnapshot, failedSnapshot)));
 
       for (StorageVolume v : pendingVolumes) {
-        if (!timeoutHandledSet.add(v)) {
-          // onFailure() already handled this volume's timeout (per-check
-          // timeout fired before the latch).  The tolerance decision was
-          // already made there; nothing left to do.
-          continue;
-        }
-        // Latch fired first — this is the first (and only) handler.
         if (v.recordTimeoutAndCheckFailure()) {
           // Tolerance exceeded — mark as failed.
           result.add(v);
@@ -333,7 +324,7 @@ public class StorageVolumeChecker {
       Futures.addCallback(olf.get(),
           new ResultHandler(volume,
               ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
-              new AtomicLong(1), callback, null),
+              new AtomicLong(1), callback, false, this),
           checkVolumeResultHandlerExecutorService
       );
       return true;
@@ -355,39 +346,37 @@ public class StorageVolumeChecker {
     private final Callback callback;
 
     /**
-     * Shared set used to guarantee exactly-one call to
-     * {@link StorageVolume#recordTimeoutAndCheckFailure()} per volume when both
-     * the per-check timeout ({@link #onFailure}) and the global latch timeout
-     * (pending-volumes loop in {@code checkAllVolumes}) can race for the same
-     * volume.
-     * <p>
-     * {@code null} for the {@code checkVolume()} path, where no latch exists
-     * and {@link #onFailure} is the sole timeout handler.
+     * For batch checks, timeout accounting is deferred to
+     * {@link StorageVolumeChecker#checkAllVolumes(Collection)} so all pending
+     * volumes are processed in one place. For single-volume checks,
+     * {@link #onFailure(Throwable)} handles timeout accounting directly.
      */
-    @Nullable
-    private final Set<StorageVolume> timeoutHandledSet;
+    private final boolean timeoutHandledInCheckAllVolumes;
+    private final Object resultLock;
 
     /**
      * @param healthyVolumes    set of healthy volumes.
      * @param failedVolumes     set of failed volumes.
      * @param volumeCounter     triggers callback when it reaches 0.
      * @param callback          invoked when volumeCounter reaches 0.
-     * @param timeoutHandledSet shared CAS set for exactly-once timeout
-     *                          handling; {@code null} for
-     *                          {@code checkVolume()}.
+     * @param timeoutHandledInCheckAllVolumes true when timeout accounting is
+     *                                        deferred to checkAllVolumes.
+     * @param resultLock lock shared with checkAllVolumes result snapshotting.
      */
     ResultHandler(StorageVolume volume,
         Set<StorageVolume> healthyVolumes,
         Set<StorageVolume> failedVolumes,
         AtomicLong volumeCounter,
         @Nullable Callback callback,
-        @Nullable Set<StorageVolume> timeoutHandledSet) {
+        boolean timeoutHandledInCheckAllVolumes,
+        Object resultLock) {
       this.volume = volume;
       this.healthyVolumes = healthyVolumes;
       this.failedVolumes = failedVolumes;
       this.volumeCounter = volumeCounter;
       this.callback = callback;
-      this.timeoutHandledSet = timeoutHandledSet;
+      this.timeoutHandledInCheckAllVolumes = timeoutHandledInCheckAllVolumes;
+      this.resultLock = resultLock;
     }
 
     @Override
@@ -435,34 +424,33 @@ public class StorageVolumeChecker {
       // with TimeoutException on timeout.
       boolean isTimeout = exception instanceof TimeoutException;
       if (isTimeout) {
-        // timeoutHandledSet is null for checkVolume() (sole timeout handler).
-        // For checkAllVolumes(), the set is shared with the pending-volumes
-        // loop; CAS-add determines which path owns the tolerance decision.
-        boolean firstToHandle =
-            (timeoutHandledSet == null) || timeoutHandledSet.add(volume);
-        if (firstToHandle) {
-          if (!volume.recordTimeoutAndCheckFailure()) {
-            // Within tolerance: do NOT trigger the failure callback.
-            // The volume is not marked failed; the next check cycle will
-            // re-evaluate its health. cleanup() is intentionally not called
-            // to avoid firing handleVolumeFailures() with an empty failed set.
-            return;
-          }
-          // Tolerance exceeded — fall through to markFailed()/cleanup().
+        if (timeoutHandledInCheckAllVolumes) {
+          cleanup();
+          return;
         }
-        // else: the pending-volumes loop already handled this timeout.
-        // Fall through to markFailed()/cleanup() for counter bookkeeping only.
+        if (!volume.recordTimeoutAndCheckFailure()) {
+          // Within tolerance: do NOT trigger the failure callback.
+          // The volume is not marked failed; the next check cycle will
+          // re-evaluate its health. cleanup() is intentionally not called
+          // to avoid firing handleVolumeFailures() with an empty failed set.
+          return;
+        }
+        // Tolerance exceeded — fall through to markFailed()/cleanup().
       }
       markFailed();
       cleanup();
     }
 
     private void markHealthy() {
-      healthyVolumes.add(volume);
+      synchronized (resultLock) {
+        healthyVolumes.add(volume);
+      }
     }
 
     private void markFailed() {
-      failedVolumes.add(volume);
+      synchronized (resultLock) {
+        failedVolumes.add(volume);
+      }
     }
 
     private void cleanup() {

@@ -63,6 +63,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String DISK_CHECK_MIN_GAP_KEY = "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY = "hdds.datanode.disk.check.timeout";
   public static final String DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY = "hdds.datanode.disk.check.sliding.window.timeout";
+  public static final String DISK_CHECK_TIMEOUT_TEST_ENABLED_KEY =
+      "hdds.datanode.disk.check.timeout.test.enabled";
+  public static final String DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_KEY =
+      "hdds.datanode.disk.check.timeout.failures.tolerated";
+  public static final String DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_KEY =
+      "hdds.datanode.disk.check.timeout.sliding.window.timeout";
 
   // Minimum space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
@@ -103,6 +109,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final Duration DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT =
       Duration.ofMinutes(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT).plus(DISK_CHECK_TIMEOUT_DEFAULT);
+  static final boolean DISK_CHECK_TIMEOUT_TEST_ENABLED_DEFAULT = true;
+  static final int DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT = 1;
+  static final Duration DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_DEFAULT =
+      Duration.ofMinutes(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT)
+          .plus(DISK_CHECK_TIMEOUT_DEFAULT);
 
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
@@ -430,6 +441,39 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private Duration diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
 
+  @Config(key = "hdds.datanode.disk.check.timeout.test.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = { DATANODE },
+      description = "Enable or disable timeout-based volume failure tracking "
+          + "independently of the disk IO health checks."
+  )
+  private boolean isDiskCheckTimeoutTestEnabled =
+      DISK_CHECK_TIMEOUT_TEST_ENABLED_DEFAULT;
+
+  @Config(key = "hdds.datanode.disk.check.timeout.failures.tolerated",
+      defaultValue = "1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of volume check timeouts allowed within the "
+          + "timeout sliding window before the volume is marked as failed."
+  )
+  private int diskCheckTimeoutFailureTolerance =
+      DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT;
+
+  @Config(key = "hdds.datanode.disk.check.timeout.sliding.window.timeout",
+      defaultValue = "70m",
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "Time interval after which a timed out volume check "
+          + "event stored in the timeout sliding window will expire. "
+          + "Do not set this below the periodic disk check interval or "
+          + "timeout events may not accumulate across sparse checks. "
+          + "Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration diskCheckTimeoutSlidingWindowTimeout =
+      DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_DEFAULT;
+
   @Config(key = "hdds.datanode.chunk.data.validation.check",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
@@ -676,6 +720,17 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       }
     }
 
+    if (!isDiskCheckTimeoutTestEnabled) {
+      LOG.info("Disk check timeout tracking has been disabled.");
+    } else if (diskCheckTimeoutFailureTolerance < 0) {
+      LOG.warn("{} must be greater than or equal to 0 but was set to {}. Defaulting to {}",
+          DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_KEY,
+          diskCheckTimeoutFailureTolerance,
+          DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT);
+      diskCheckTimeoutFailureTolerance =
+          DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT;
+    }
+
     if (diskCheckMinGap.isNegative()) {
       LOG.warn(DISK_CHECK_MIN_GAP_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
@@ -707,6 +762,28 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           diskCheckSlidingWindowTimeout.toMinutes(),
           DurationFormatUtils.formatDurationHMS(defaultTimeout.toMillis()));
       diskCheckSlidingWindowTimeout = defaultTimeout;
+    }
+
+    if (diskCheckTimeoutSlidingWindowTimeout.isNegative()) {
+      Duration defaultTimeout =
+          Duration.ofMinutes(periodicDiskCheckIntervalMinutes).plus(diskCheckTimeout);
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_KEY,
+          diskCheckTimeoutSlidingWindowTimeout,
+          defaultTimeout);
+      diskCheckTimeoutSlidingWindowTimeout = defaultTimeout;
+    }
+
+    if (diskCheckTimeoutSlidingWindowTimeout
+        .compareTo(Duration.ofMinutes(periodicDiskCheckIntervalMinutes)) < 0) {
+      Duration defaultTimeout =
+          Duration.ofMinutes(periodicDiskCheckIntervalMinutes).plus(diskCheckTimeout);
+      LOG.warn("{} must be greater than or equal to {} minutes and was set to {} minutes. Defaulting to {}",
+          DISK_CHECK_TIMEOUT_SLIDING_WINDOW_TIMEOUT_KEY,
+          periodicDiskCheckIntervalMinutes,
+          diskCheckTimeoutSlidingWindowTimeout.toMinutes(),
+          DurationFormatUtils.formatDurationHMS(defaultTimeout.toMillis()));
+      diskCheckTimeoutSlidingWindowTimeout = defaultTimeout;
     }
 
     if (blockDeleteCommandWorkerInterval.isNegative()) {
@@ -942,6 +1019,30 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setDiskCheckSlidingWindowTimeout(Duration duration) {
     diskCheckSlidingWindowTimeout = duration;
+  }
+
+  public boolean isDiskCheckTimeoutTestEnabled() {
+    return isDiskCheckTimeoutTestEnabled;
+  }
+
+  public void setDiskCheckTimeoutTestEnabled(boolean enabled) {
+    isDiskCheckTimeoutTestEnabled = enabled;
+  }
+
+  public int getDiskCheckTimeoutFailureTolerance() {
+    return diskCheckTimeoutFailureTolerance;
+  }
+
+  public void setDiskCheckTimeoutFailureTolerance(int tolerance) {
+    diskCheckTimeoutFailureTolerance = tolerance;
+  }
+
+  public Duration getDiskCheckTimeoutSlidingWindowTimeout() {
+    return diskCheckTimeoutSlidingWindowTimeout;
+  }
+
+  public void setDiskCheckTimeoutSlidingWindowTimeout(Duration duration) {
+    diskCheckTimeoutSlidingWindowTimeout = duration;
   }
 
   public int getBlockDeleteThreads() {

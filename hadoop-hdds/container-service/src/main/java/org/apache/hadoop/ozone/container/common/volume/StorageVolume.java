@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -73,7 +72,6 @@ import org.slf4j.LoggerFactory;
 public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckResult> {
 
   private static final Logger LOG = LoggerFactory.getLogger(StorageVolume.class);
-  private static final Duration TIMEOUT_FAILURE_WINDOW = Duration.ofMinutes(70);
 
   // The name of the directory used for temporary files on the volume.
   public static final String TMP_DIR_NAME = "tmp";
@@ -112,6 +110,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   tests run, then the volume is considered failed.
    */
   private final boolean isDiskCheckEnabled;
+  private final boolean isTimeoutCheckEnabled;
   private SlidingWindow ioTestSlidingWindow;
   private SlidingWindow timeoutFailureSlidingWindow;
   private int healthCheckFileSize;
@@ -163,11 +162,12 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.conf = b.conf;
       this.dnConf = conf.getObject(DatanodeConfiguration.class);
       this.isDiskCheckEnabled = dnConf.isDiskCheckEnabled();
+      this.isTimeoutCheckEnabled = dnConf.isDiskCheckTimeoutTestEnabled();
       this.ioTestSlidingWindow = new SlidingWindow(dnConf.getVolumeIOFailureTolerance(),
           dnConf.getDiskCheckSlidingWindowTimeout(), b.getClock());
       this.timeoutFailureSlidingWindow = new SlidingWindow(
-          dnConf.getVolumeIOFailureTolerance(), TIMEOUT_FAILURE_WINDOW,
-          b.getClock());
+          dnConf.getDiskCheckTimeoutFailureTolerance(),
+          dnConf.getDiskCheckTimeoutSlidingWindowTimeout(), b.getClock());
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
@@ -176,6 +176,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
       this.isDiskCheckEnabled = false;
+      this.isTimeoutCheckEnabled = false;
       this.conf = null;
       this.dnConf = null;
     }
@@ -776,6 +777,9 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
    *         marked failed; {@code false} otherwise.
    */
   public boolean recordTimeoutAndCheckFailure() {
+    if (!isTimeoutCheckEnabled) {
+      return false;
+    }
     timeoutFailureSlidingWindow.add();
     if (timeoutFailureSlidingWindow.isExceeded()) {
       LOG.error("Volume {} check timed out more than the {} tolerated times "

@@ -93,6 +93,14 @@ public class TestStorageVolumeHealthChecks {
     FileUtils.deleteDirectory(volumePath.toFile());
     DiskCheckUtil.clearTestImpl();
     TEST_CLOCK.set(Instant.now());
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckEnabled(true);
+    dnConf.setDiskCheckTimeoutTestEnabled(true);
+    dnConf.setVolumeIOFailureTolerance(1);
+    dnConf.setDiskCheckTimeoutFailureTolerance(1);
+    dnConf.setDiskCheckSlidingWindowTimeout(Duration.ofMinutes(70));
+    dnConf.setDiskCheckTimeoutSlidingWindowTimeout(Duration.ofMinutes(70));
+    CONF.setFromObject(dnConf);
   }
 
   @ParameterizedTest
@@ -389,6 +397,25 @@ public class TestStorageVolumeHealthChecks {
     assertFalse(volume.recordTimeoutAndCheckFailure(),
         "Timeout after the window expires should be tolerated again");
     assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
+  }
+
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testTimeoutCheckDisabled(StorageVolume.Builder<?> builder)
+      throws Exception {
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeoutTestEnabled(false);
+    CONF.setFromObject(dnConf);
+
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Timeout tracking should be disabled");
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Disabled timeout tracking should never fail the volume");
+    assertEquals(0, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
   }
 
   /**
