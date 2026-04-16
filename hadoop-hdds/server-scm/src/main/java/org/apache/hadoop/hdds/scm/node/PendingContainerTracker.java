@@ -197,27 +197,20 @@ public class PendingContainerTracker {
   }
 
   /**
-   * Whether the datanode can fit another container of {@code containerSize} after accounting for
-   * SCM pending allocations for {@code node} (this tracker) and usable space on {@code datanodeInfo}.
-   * Combines {@link #getPendingAllocationSize} with the per-disk slot check in one call.
+   * Whether the datanode can fit another container of {@link #maxContainerSize} after accounting for
+   * SCM pending allocations for {@code node} (this tracker) and usable space across volumes on
+   * {@code datanodeInfo}. Pending bytes are {@link #getPendingContainerCount} × {@code maxContainerSize};
+   * effective allocatable space sums full-container slots per storage report.
    *
    * @param node identity used to look up pending allocations (same DN as {@code datanodeInfo})
    * @param datanodeInfo storage reports for the datanode
-   * @param containerSize required container size in bytes (typically SCM max container size)
    */
   public boolean hasEffectiveAllocatableSpaceForNewContainer(
-      DatanodeDetails node, DatanodeInfo datanodeInfo, long containerSize) {
+      DatanodeDetails node, DatanodeInfo datanodeInfo) {
     Objects.requireNonNull(node, "node == null");
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
-    if (containerSize <= 0) {
-      return false;
-    }
-    long pendingBytes = getPendingAllocationSize(node);
-    return hasAllocatableSpaceAfterPending(datanodeInfo, containerSize, pendingBytes);
-  }
 
-  private boolean hasAllocatableSpaceAfterPending(
-      DatanodeInfo datanodeInfo, long containerSize, long pendingAllocationBytes) {
+    long pendingAllocationSize = getPendingContainerCount(node) * maxContainerSize;
     List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
     Objects.requireNonNull(storageReports, "storageReports == null");
     if (storageReports.isEmpty()) {
@@ -226,9 +219,9 @@ public class PendingContainerTracker {
     long effectiveAllocatableSpace = 0L;
     for (StorageReportProto report : storageReports) {
       long usableSpace = VolumeUsage.getUsableSpace(report);
-      long containersOnThisDisk = usableSpace / containerSize;
-      effectiveAllocatableSpace += containersOnThisDisk * containerSize;
-      if (effectiveAllocatableSpace - pendingAllocationBytes >= containerSize) {
+      long containersOnThisDisk = usableSpace / maxContainerSize;
+      effectiveAllocatableSpace += containersOnThisDisk * maxContainerSize;
+      if (effectiveAllocatableSpace - pendingAllocationSize >= maxContainerSize) {
         return true;
       }
     }
@@ -299,20 +292,6 @@ public class PendingContainerTracker {
 
   private boolean removeContainerFromBucket(ContainerID containerID, DatanodeID dnID) {
     return datanodeBuckets.get(dnID).remove(containerID, dnID);
-  }
-
-  /**
-   * Bytes of SCM-side pending container allocations for this datanode (count × configured max
-   * container size).
-   * <p>Note: this call may advance the internal tumbling window if the roll interval has elapsed,
-   * ensuring the returned value reflects the most up-to-date pending state.</p>
-   *
-   * @param node The DataNode
-   * @return Total bytes of pending container allocations
-   */
-  public long getPendingAllocationSize(DatanodeDetails node) {
-    Objects.requireNonNull(node, "node == null");
-    return getPendingContainerCount(node) * maxContainerSize;
   }
 
   /**
