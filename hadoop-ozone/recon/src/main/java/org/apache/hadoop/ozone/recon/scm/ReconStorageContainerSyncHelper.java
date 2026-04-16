@@ -422,62 +422,6 @@ class ReconStorageContainerSyncHelper {
     }
   }
 
-  /**
-   * Fetches SCM's container list for {@code state} (paginated) and adds any
-   * container that is completely absent from Recon. Does not modify state of
-   * containers already present in Recon.
-   *
-   * <p>Missing container IDs are collected per page and then fetched in a single
-   * {@code getExistContainerWithPipelinesInBatch} call.  This batch API has a
-   * null-pipeline fallback: when a pipeline lookup fails for a given container
-   * (e.g., pipeline not yet OPEN, already cleaned up, or
-   * {@code createPipelineForRead} fails for 0-replica containers), SCM returns
-   * the container with {@code pipeline=null} rather than throwing.  Recon's
-   * {@code addNewContainer} handles a null pipeline gracefully by recording the
-   * container without pipeline tracking.  Using the individual
-   * {@code getContainerWithPipeline} call instead would throw IOException in
-   * those cases and silently skip the container, leaving it permanently absent
-   * from Recon and causing {@code ContainerNotFoundException} when callers later
-   * attempt state transitions.
-   *
-   * @param state the lifecycle state to sync
-   * @return {@code true} if the pass completed without fatal error
-   */
-  private boolean syncAddOnlyState(HddsProtos.LifeCycleState state) {
-    try {
-      long totalForState = scmServiceProvider.getContainerCount(state);
-      if (totalForState == 0) {
-        LOG.debug("Pass ({}): no containers found in SCM.", state);
-        return true;
-      }
-
-      ContainerID startContainerId = ContainerID.valueOf(1);
-      long retrieved = 0;
-      int addedCount = 0;
-
-      while (retrieved < totalForState) {
-        List<ContainerID> batch = getContainerIDsByState(startContainerId, state);
-        if (batch == null || batch.isEmpty()) {
-          LOG.warn("Pass ({}): SCM reported {} containers, but returned an "
-              + "empty batch after {} were retrieved.", state, totalForState, retrieved);
-          return false;
-        }
-
-        addedCount += addMissingContainersForState(batch, state);
-
-        long lastID = batch.get(batch.size() - 1).getId();
-        startContainerId = ContainerID.valueOf(lastID + 1);
-        retrieved += batch.size();
-      }
-
-      LOG.info("Pass ({}): sync complete, checked {}, added {}.", state, retrieved, addedCount);
-      return true;
-    } catch (Exception e) {
-      LOG.error("Pass ({}): unexpected error during sync.", state, e);
-      return false;
-    }
-  }
-
   private int addMissingContainersForState(List<ContainerID> batch,
                                            HddsProtos.LifeCycleState state) {
     // Collect all missing container IDs in this page and fetch them in one
