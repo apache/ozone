@@ -30,6 +30,9 @@
             })
             .when("/snapshots", {
                 template: "<om-snapshots></om-snapshots>"
+            })
+            .when("/ratis_events", {
+                template: "<ratis-events></ratis-events>"
             });
     });
     angular.module('ozoneManager').component('omSnapshots', {
@@ -129,6 +132,24 @@
                 }
                 return ($scope.currentPage - 1) * $scope.RecordsToDisplay + 1;
             }
+        }
+    });
+    angular.module('ozoneManager').component('ratisEvents', {
+        templateUrl: 'ratis-events.html',
+        controller: function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    var metrics = result.data.beans[0];
+                    var rawEvents = metrics['tag.RatisEvents'] ? metrics['tag.RatisEvents'].split('\n') : [];
+                    ctrl.events = rawEvents.map(function(e) {
+                        var parts = e.split('|');
+                        return {
+                            timestamp: parts[0],
+                            description: parts[1]
+                        };
+                    });
+                });
         }
     });
     angular.module('ozoneManager').component('omMetrics', {

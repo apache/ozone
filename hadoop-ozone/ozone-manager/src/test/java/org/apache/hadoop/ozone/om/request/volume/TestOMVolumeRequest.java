@@ -61,8 +61,8 @@ public class TestOMVolumeRequest {
   @BeforeEach
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
-    omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,

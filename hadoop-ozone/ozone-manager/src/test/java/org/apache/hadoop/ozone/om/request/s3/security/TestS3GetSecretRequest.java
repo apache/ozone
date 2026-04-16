@@ -133,8 +133,8 @@ public class TestS3GetSecretRequest {
     when(call.getRemoteUser()).thenReturn(ugiAlice);
     Server.getCurCall().set(call);
 
-    omMetrics = OMMetrics.create();
     OzoneConfiguration conf = new OzoneConfiguration();
+    omMetrics = OMMetrics.create(conf);
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here

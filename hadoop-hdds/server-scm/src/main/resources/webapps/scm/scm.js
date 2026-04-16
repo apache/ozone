@@ -19,6 +19,32 @@
     "use strict";
     angular.module('scm', ['ozone', 'nvd3']);
 
+    angular.module('scm').config(function ($routeProvider) {
+        $routeProvider
+            .when("/ratis_events", {
+                template: "<ratis-events></ratis-events>"
+            });
+    });
+
+    angular.module('scm').component('ratisEvents', {
+        templateUrl: 'ratis-events.html',
+        controller: function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=StorageContainerManager,name=SCMMetrics")
+                .then(function (result) {
+                    var metrics = result.data.beans[0];
+                  var rawEvents = metrics['tag.RatisEvents'] ? metrics['tag.RatisEvents'].split('\n') : [];
+                    ctrl.events = rawEvents.map(function(e) {
+                        var parts = e.split('|');
+                        return {
+                            timestamp: parts[0],
+                            description: parts[1]
+                        };
+                    });
+                });
+        }
+    });
+
     angular.module('scm').component('scmOverview', {
         templateUrl: 'scm-overview.html',
         require: {
