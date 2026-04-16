@@ -379,24 +379,33 @@ public abstract class EndpointBase {
       OzoneVolume volume = getVolume();
       ownerSetter.accept(volume);
       return query.apply(volume);
-    } catch (OMException e) {
-      if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-        return Collections.emptyIterator();
-      } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            "listBuckets", e);
-      } else if (isExpiredToken(e)) {
-        throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), e);
-      } else if (e.getResult() == ResultCodes.INVALID_TOKEN) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            s3Auth.getAccessID(), e);
-      } else if (e.getResult() == ResultCodes.TIMEOUT ||
-          e.getResult() == ResultCodes.INTERNAL_ERROR) {
-        throw newError(S3ErrorTable.INTERNAL_ERROR,
-            "listBuckets", e);
-      } else {
-        throw e;
+    } catch (RuntimeException e) {
+      if (e.getCause() instanceof OMException) {
+        return handleOMException((OMException) e.getCause());
       }
+      throw e;
+    } catch (OMException e) {
+      return handleOMException(e);
+    }
+  }
+
+  private Iterator<OzoneBucket> handleOMException(OMException e) throws OMException {
+    if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+      return Collections.emptyIterator();
+    } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
+      throw newError(S3ErrorTable.ACCESS_DENIED,
+          "listBuckets", e);
+    } else if (isExpiredToken(e)) {
+      throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), e);
+    } else if (e.getResult() == ResultCodes.INVALID_TOKEN) {
+      throw newError(S3ErrorTable.ACCESS_DENIED,
+          s3Auth.getAccessID(), e);
+    } else if (e.getResult() == ResultCodes.TIMEOUT ||
+        e.getResult() == ResultCodes.INTERNAL_ERROR) {
+      throw newError(S3ErrorTable.INTERNAL_ERROR,
+          "listBuckets", e);
+    } else {
+      throw e;
     }
   }
 

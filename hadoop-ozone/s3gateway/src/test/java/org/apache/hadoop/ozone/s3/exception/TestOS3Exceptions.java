@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.exception;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
@@ -48,9 +49,19 @@ public class TestOS3Exceptions {
     assertEquals(expected, val);
   }
 
+  /**
+   * AWS S3 returns HTTP 400 Bad Request for ExpiredToken (not 403).
+   */
+  @Test
+  public void testExpiredTokenUsesBadRequestHttpStatus() {
+    assertEquals(HTTP_BAD_REQUEST, S3ErrorTable.EXPIRED_TOKEN.getHttpCode());
+    final OS3Exception fromTable = S3ErrorTable.newError(S3ErrorTable.EXPIRED_TOKEN, "resource");
+    assertEquals(HTTP_BAD_REQUEST, fromTable.getHttpCode());
+  }
+
   @Test
   public void testOS3ExceptionWithToken0() {
-    OS3Exception ex = new OS3Exception("ExpiredToken", "The provided token has expired.", 403);
+    OS3Exception ex = new OS3Exception("ExpiredToken", "The provided token has expired.", 400);
     ex = S3ErrorTable.newError(ex, "resource");
     ex.setRequestId(OzoneUtils.getRequestID());
     ex.setHostId(OzoneUtils.getRequestID());

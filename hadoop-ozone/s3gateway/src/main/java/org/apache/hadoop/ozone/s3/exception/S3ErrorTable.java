@@ -115,7 +115,7 @@ public final class S3ErrorTable {
       "resource.", HTTP_FORBIDDEN);
 
   public static final OS3Exception EXPIRED_TOKEN = new OS3Exception(
-      "ExpiredToken", "The provided token has expired.", HTTP_FORBIDDEN);
+      "ExpiredToken", "The provided token has expired.", HTTP_BAD_REQUEST);
 
   public static final OS3Exception PRECOND_FAILED = new OS3Exception(
       "PreconditionFailed", "At least one of the pre-conditions you " +
