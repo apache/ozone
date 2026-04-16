@@ -72,7 +72,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE extends Enum
       TYPE type,
       String traceId) throws ServiceException {
     Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
-    try (Scope currentscope = span.makeCurrent()) {
+    try (Scope currentScope = span.makeCurrent()) {
       if (logger.isTraceEnabled()) {
         logger.trace(
             "[service={}] [type={}] request is received: <json>{}</json>",
