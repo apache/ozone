@@ -5044,4 +5044,16 @@
     <value>5m</value>
     <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
   </property>
+  <property>
+    <name>ozone.scm.ratis.events.max.limit</name>
+    <value>100</value>
+    <tag>OZONE, RATIS, SCM</tag>
+    <description>The maximum number of events that can be pending in SCM Ratis.</description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.events.max.limit</name>
+    <value>100</value>
+    <tag>OZONE, RATIS, OM</tag>
+    <description>The maximum number of events that can be pending in OM Ratis.</description>
+  </property>
 </configuration>
