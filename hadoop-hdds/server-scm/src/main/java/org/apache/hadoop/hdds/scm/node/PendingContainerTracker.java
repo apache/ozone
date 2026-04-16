@@ -104,11 +104,11 @@ public class PendingContainerTracker {
       long elapsed = now - lastRollTime;
 
       if (elapsed >= 2 * rollIntervalMs) {
+        int dropped = getCount();
         previousWindow.clear();
         currentWindow.clear();
         lastRollTime = now;
-        LOG.debug("Double roll interval elapsed: ({}ms) dropped: {} pending containers from both windows",
-            elapsed, getCount());
+        LOG.debug("Double roll interval elapsed ({}ms): dropped {} pending containers", elapsed, dropped);
       } else if (elapsed >= rollIntervalMs) {
         previousWindow.clear();
         final Set<ContainerID> tmp = previousWindow;
