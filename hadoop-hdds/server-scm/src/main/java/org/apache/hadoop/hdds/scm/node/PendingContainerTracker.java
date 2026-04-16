@@ -223,9 +223,12 @@ public class PendingContainerTracker {
     if (storageReports.isEmpty()) {
       return false;
     }
+    long effectiveAllocatableSpace = 0L;
     for (StorageReportProto report : storageReports) {
       long usableSpace = VolumeUsage.getUsableSpace(report);
-      if (usableSpace - pendingAllocationBytes >= containerSize) {
+      long containersOnThisDisk = usableSpace / containerSize;
+      effectiveAllocatableSpace += containersOnThisDisk * containerSize;
+      if (effectiveAllocatableSpace - pendingAllocationBytes >= containerSize) {
         return true;
       }
     }

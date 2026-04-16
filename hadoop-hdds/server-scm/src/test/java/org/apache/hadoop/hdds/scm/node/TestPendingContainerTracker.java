@@ -27,6 +27,8 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -317,5 +319,67 @@ public class TestPendingContainerTracker {
 
     // Should still only have 100 containers
     assertEquals(100, tracker.getPendingContainerCount(dn));
+  }
+
+  @Test
+  public void testMultiVolumeAccumulatedSpaceIsNotEnough() {
+    DatanodeDetails dn = datanodes.get(0);
+    long containerSize = MAX_CONTAINER_SIZE;
+    
+    List<StorageReportProto> reports = new ArrayList<>();
+    reports.add(createStorageReport(dn, 100 * containerSize, containerSize / 4, 0));
+    reports.add(createStorageReport(dn, 100 * containerSize, containerSize / 4, 0));
+    reports.add(createStorageReport(dn, 100 * containerSize, containerSize / 2, 0));
+    DatanodeInfo dnInfo = new DatanodeInfo(dn, NodeStatus.inServiceHealthy(), null);
+    dnInfo.updateStorageReports(reports);
+
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo, containerSize));
+  }
+
+  @Test
+  public void testMultiVolumeWithPendingAllocation() {
+    DatanodeDetails dn = datanodes.get(0);
+    long containerSize = MAX_CONTAINER_SIZE;
+
+    // Remaining space available for 3 containers across all the volumes
+    tracker.recordPendingAllocationForDatanode(dn, containers.get(0));
+    tracker.recordPendingAllocationForDatanode(dn, containers.get(1));
+
+    List<StorageReportProto> reports = new ArrayList<>();
+    reports.add(createStorageReport(dn, 100 * containerSize, containerSize, 0));
+    reports.add(createStorageReport(dn, 50 * containerSize, containerSize, 0));
+    reports.add(createStorageReport(dn, 100 * containerSize, containerSize, 0));
+    DatanodeInfo dnInfo = new DatanodeInfo(dn, NodeStatus.inServiceHealthy(), null);
+    dnInfo.updateStorageReports(reports);
+    // Remaining space available for 1 container across all the volume after 2 container allocation
+
+    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo, containerSize));
+
+    tracker.recordPendingAllocationForDatanode(dn, containers.get(2));
+    // Remaining space available for 0 container across all the volume
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo, containerSize));
+  }
+
+  @Test
+  public void testMultiVolumeWithCommittedBytes() {
+    DatanodeDetails dn = datanodes.get(0);
+    long containerSize = MAX_CONTAINER_SIZE;
+    
+    List<StorageReportProto> reports = new ArrayList<>();
+    reports.add(createStorageReport(dn, 100 * containerSize, 6 * containerSize, 5 * containerSize));
+    reports.add(createStorageReport(dn, 50 * containerSize, 3 * containerSize, 3 * containerSize));
+    DatanodeInfo dnInfo = new DatanodeInfo(dn, NodeStatus.inServiceHealthy(), null);
+    dnInfo.updateStorageReports(reports);
+    // Remaining space available for 1 container across all the volume considering committed bytes
+
+    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo, containerSize));
+    tracker.recordPendingAllocationForDatanode(dn, containers.get(0));
+    // Remaining space available for 0 container across all the volume considering
+    // committed bytes and container allocation
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo, containerSize));
+  }
+
+  private StorageReportProto createStorageReport(DatanodeDetails dn, long capacity, long remaining, long committed) {
+    return HddsTestUtils.createStorageReports(dn.getID(), capacity, remaining, committed).get(0);
   }
 }
