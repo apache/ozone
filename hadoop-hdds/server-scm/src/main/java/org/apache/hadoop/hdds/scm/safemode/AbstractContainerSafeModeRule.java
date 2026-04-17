@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
+import org.apache.hadoop.util.Time;
 
 /**
  * Abstract class for Container Safe mode exit rule.
@@ -136,7 +138,13 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   @Override
   public synchronized void refresh(boolean forceRefresh) {
     if (forceRefresh || !validate()) {
-      initializeRule();
+      final long startNanos = Time.monotonicNowNanos();
+      try {
+        initializeRule();
+      } finally {
+        long durationMs = TimeUnit.NANOSECONDS.toMillis(Time.monotonicNowNanos() - startNanos);
+        getSafeModeMetrics().setLastContainerSafeModeRuleRefreshDurationMs(getContainerType(), durationMs);
+      }
     }
   }
 
