@@ -22,8 +22,10 @@ import java.util.ArrayList;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.ratis.protocol.Message;
 
 /** Code generated for {@link DeletedBlockLogStateManager}.  Do not modify. */
 public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockLogStateManager> {
@@ -106,35 +108,41 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
 
   @SuppressWarnings("unchecked")
   @Override
-  public Object invokeLocal(String methodName, Object[] p) throws Exception {
+  public Message invokeLocal(String methodName, Object[] p) throws Exception {
+    final Class<?> returnType;
+    final Object returnValue;
     switch (methodName) {
     case "addTransactionsToDB":
       final ArrayList arg0 = p.length > 0 ? (ArrayList) p[0] : null;
       final DeletedBlocksTransactionSummary arg1 = p.length > 1 ? (DeletedBlocksTransactionSummary) p[1] : null;
       getImpl().addTransactionsToDB(arg0, arg1);
-      return null;
+      return Message.EMPTY;
 
     case "getReadOnlyIterator":
-      return getImpl().getReadOnlyIterator();
+      returnType = Table.KeyValueIterator.class;
+      returnValue = getImpl().getReadOnlyIterator();
+      break;
 
     case "onFlush":
       getImpl().onFlush();
-      return null;
+      return Message.EMPTY;
 
     case "reinitialize":
       final Table arg2 = p.length > 0 ? (Table) p[0] : null;
       final Table arg3 = p.length > 1 ? (Table) p[1] : null;
       getImpl().reinitialize(arg2, arg3);
-      return null;
+      return Message.EMPTY;
 
     case "removeTransactionsFromDB":
       final ArrayList arg4 = p.length > 0 ? (ArrayList) p[0] : null;
       final DeletedBlocksTransactionSummary arg5 = p.length > 1 ? (DeletedBlocksTransactionSummary) p[1] : null;
       getImpl().removeTransactionsFromDB(arg4, arg5);
-      return null;
+      return Message.EMPTY;
 
     default:
       throw new IllegalArgumentException("Method not found: " + methodName + " in DeletedBlockLogStateManager");
     }
+
+    return SCMRatisResponse.encode(returnValue, returnType);
   }
 }
