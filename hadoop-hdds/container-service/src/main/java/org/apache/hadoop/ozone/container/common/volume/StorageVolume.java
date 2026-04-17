@@ -27,12 +27,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedList;
+import java.time.Clock;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -43,6 +41,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
@@ -110,10 +109,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   If more than ioFailureTolerance IO checks fail out of the last ioTestCount
   tests run, then the volume is considered failed.
    */
-  private final int ioTestCount;
-  private final int ioFailureTolerance;
-  private AtomicInteger currentIOFailureCount;
-  private Queue<Boolean> ioTestSlidingWindow;
+  private final boolean isDiskCheckEnabled;
+  private SlidingWindow ioTestSlidingWindow;
   private int healthCheckFileSize;
 
   /**
@@ -162,10 +159,9 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
       this.conf = b.conf;
       this.dnConf = conf.getObject(DatanodeConfiguration.class);
-      this.ioTestCount = dnConf.getVolumeIOTestCount();
-      this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
-      this.ioTestSlidingWindow = new LinkedList<>();
-      this.currentIOFailureCount = new AtomicInteger(0);
+      this.isDiskCheckEnabled = dnConf.isDiskCheckEnabled();
+      this.ioTestSlidingWindow = new SlidingWindow(dnConf.getVolumeIOFailureTolerance(),
+          dnConf.getDiskCheckSlidingWindowTimeout(), b.getClock());
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
@@ -173,8 +169,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
-      this.ioTestCount = 0;
-      this.ioFailureTolerance = 0;
+      this.isDiskCheckEnabled = false;
       this.conf = null;
       this.dnConf = null;
     }
@@ -411,6 +406,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     private boolean failedVolume = false;
     private String datanodeUuid;
     private String clusterID;
+    private Clock clock = new SlidingWindow.MonotonicClock();
 
     public Builder(String volumeRootStr, String storageDirStr) {
       this.volumeRootStr = volumeRootStr;
@@ -457,6 +453,11 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       return this.getThis();
     }
 
+    public T clock(Clock c) {
+      this.clock = c;
+      return this.getThis();
+    }
+
     public abstract StorageVolume build() throws IOException;
 
     public String getVolumeRootStr() {
@@ -473,6 +474,10 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
     public String getStorageDirStr() {
       return this.storageDirStr;
+    }
+
+    public Clock getClock() {
+      return this.clock;
     }
   }
 
@@ -552,6 +557,14 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
   public VolumeSet getVolumeSet() {
     return this.volumeSet;
+  }
+
+  public boolean getDiskCheckEnabled() {
+    return isDiskCheckEnabled;
+  }
+
+  public SlidingWindow getIoTestSlidingWindow() {
+    return ioTestSlidingWindow;
   }
 
   public StorageType getStorageType() {
@@ -662,7 +675,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
    * check consists of a directory check and an IO check.
    *
    * If the directory check fails, the volume check fails immediately.
-   * The IO check is allows to fail up to {@code ioFailureTolerance} times
+   * The IO check is allowed to fail up to {@code ioFailureTolerance} times
    * out of the last {@code ioTestCount} IO checks before this volume check is
    * failed. Each call to this method runs one IO check.
    *
@@ -690,8 +703,7 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       return VolumeCheckResult.FAILED;
     }
 
-    // If IO test count is set to 0, IO tests for disk health are disabled.
-    if (ioTestCount == 0) {
+    if (!isDiskCheckEnabled) {
       return VolumeCheckResult.HEALTHY;
     }
 
@@ -700,7 +712,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     // to avoid volume failure we can ignore checking disk read/write
     int minimumDiskSpace = healthCheckFileSize * 2;
     if (getCurrentUsage().getAvailable() < minimumDiskSpace) {
-      ioTestSlidingWindow.add(true);
       return VolumeCheckResult.HEALTHY;
     }
 
@@ -719,38 +730,24 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     // We can check again if disk is full. If it is full,
     // in this case keep volume as healthy so that READ can still be served
     if (!diskChecksPassed && getCurrentUsage().getAvailable() < minimumDiskSpace) {
-      ioTestSlidingWindow.add(true);
       return VolumeCheckResult.HEALTHY;
     }
 
-    // Move the sliding window of IO test results forward 1 by adding the
-    // latest entry and removing the oldest entry from the window.
-    // Update the failure counter for the new window.
-    ioTestSlidingWindow.add(diskChecksPassed);
     if (!diskChecksPassed) {
-      currentIOFailureCount.incrementAndGet();
-    }
-    if (ioTestSlidingWindow.size() > ioTestCount &&
-        Objects.equals(ioTestSlidingWindow.poll(), Boolean.FALSE)) {
-      currentIOFailureCount.decrementAndGet();
+      ioTestSlidingWindow.add();
     }
 
-    // If the failure threshold has been crossed, fail the volume without
-    // further scans.
+    // If the failure threshold has been crossed, fail the volume without further scans.
     // Once the volume is failed, it will not be checked anymore.
     // The failure counts can be left as is.
-    if (currentIOFailureCount.get() > ioFailureTolerance) {
-      LOG.error("Failed IO test for volume {}: the last {} runs " +
-              "encountered {} out of {} tolerated failures.", this,
-          ioTestSlidingWindow.size(), currentIOFailureCount,
-          ioFailureTolerance);
+    if (ioTestSlidingWindow.isExceeded()) {
+      LOG.error("Failed IO test for volume {}: encountered more than the {} tolerated failures within the past {} ms.",
+          this, ioTestSlidingWindow.getWindowSize(), ioTestSlidingWindow.getExpiryDurationMillis());
       return VolumeCheckResult.FAILED;
-    } else if (LOG.isDebugEnabled()) {
-      LOG.debug("IO test results for volume {}: the last {} runs encountered " +
-              "{} out of {} tolerated failures", this,
-          ioTestSlidingWindow.size(),
-          currentIOFailureCount, ioFailureTolerance);
     }
+
+    LOG.debug("IO test results for volume {}: encountered {} out of {} tolerated failures",
+        this, ioTestSlidingWindow.getNumEventsInWindow(), ioTestSlidingWindow.getWindowSize());
 
     return VolumeCheckResult.HEALTHY;
   }

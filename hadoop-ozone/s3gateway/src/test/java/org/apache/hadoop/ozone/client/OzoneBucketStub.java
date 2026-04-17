@@ -105,6 +105,10 @@ public final class OzoneBucketStub extends OzoneBucket {
     }
   }
 
+  boolean isEmpty() {
+    return keyDetails.isEmpty();
+  }
+
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
     return createKey(key, size,

@@ -34,8 +34,8 @@ public class AclOption implements CommandLine.ITypeConverter<OzoneAcl> {
   @CommandLine.Option(names = {"--acls", "--acl", "-al", "-a"}, split = ",",
       required = true,
       converter = AclOption.class,
-      description = "Comma separated ACL list:\n" +
-          "Example: user:user2:a OR user:user1:rw,group:hadoop:a\n" +
+      description = "Comma separated ACL list:%n" +
+          "Example: user:user2:a OR user:user1:rw,group:hadoop:a%n" +
           "r = READ, " +
           "w = WRITE, " +
           "c = CREATE, " +

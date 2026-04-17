@@ -2914,7 +2914,7 @@ public abstract class Server {
         long startTimeNanos = 0;
         // True iff the connection for this call has been dropped.
         // Set to true by default and update to false later if the connection
-        // can be succesfully read.
+        // can be successfully read.
         boolean connDropped = true;
 
         try {

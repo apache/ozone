@@ -15,19 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha;
+package org.apache.hadoop.ozone.debug.kerberos;
 
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
- * Invokes methods without using reflection.
+ * Prints environment variables relevant to Kerberos and Ozone.
  */
-public interface ScmInvoker<T> {
-  RequestType getType();
+public class EnvironmentProbe extends ConfigProbe {
 
-  Class<T> getApi();
+  @Override
+  public String name() {
+    return "Environment Variables";
+  }
 
-  T getImpl();
+  @Override
+  public ProbeResult test(OzoneConfiguration conf) {
 
-  Object invokeLocal(String methodName, Object[] args) throws Exception;
+    printValue("KRB5_CONFIG", System.getenv("KRB5_CONFIG"));
+    printValue("KRB5CCNAME", System.getenv("KRB5CCNAME"));
+    printValue("OZONE_CONF_DIR", System.getenv("OZONE_CONF_DIR"));
+    printValue("HADOOP_CONF_DIR", System.getenv("HADOOP_CONF_DIR"));
+    printValue("JAVA_SECURITY_KRB5_CONF", System.getenv("JAVA_SECURITY_KRB5_CONF"));
+
+    return ProbeResult.PASS;
+  }
 }

@@ -73,13 +73,14 @@ final class ObjectEndpointStreaming {
       int chunkSize, Map<String, String> keyMetadata,
       Map<String, String> tags, MultiDigestInputStream body,
       HttpHeaders headers, boolean isSignedPayload,
-      PerformanceStringBuilder perf, String ifNoneMatch, String ifMatch)
+      PerformanceStringBuilder perf,
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException, OS3Exception {
 
     try {
       return putKeyWithStream(bucket, keyPath,
           length, chunkSize, replicationConfig, keyMetadata, tags, body,
-          headers, isSignedPayload, perf, ifNoneMatch, ifMatch);
+          headers, isSignedPayload, perf, writeConditions);
     } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
       if (ex instanceof OMException) {
@@ -115,16 +116,15 @@ final class ObjectEndpointStreaming {
       HttpHeaders headers,
       boolean isSignedPayload,
       PerformanceStringBuilder perf,
-      String ifNoneMatch,
-      String ifMatch)
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, isSignedPayload);
     long writeLen;
     String md5Hash;
     try (OzoneDataStreamOutput streamOutput = openStreamKeyForPut(bucket,
-        keyPath, length, replicationConfig, keyMetadata, tags, ifNoneMatch,
-        ifMatch)) {
+        keyPath, length, replicationConfig, keyMetadata, tags,
+        writeConditions)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       md5Hash = DatatypeConverter.printHexBinary(body.getMessageDigest(OzoneConsts.MD5_HASH).digest())
@@ -163,14 +163,14 @@ final class ObjectEndpointStreaming {
   private static OzoneDataStreamOutput openStreamKeyForPut(OzoneBucket bucket,
       String keyPath, long length, ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata, Map<String, String> tags,
-      String ifNoneMatch, String ifMatch) throws IOException {
-    if (ifNoneMatch != null && "*".equals(ObjectEndpoint.parseETag(ifNoneMatch))) {
+      S3ConditionalRequest.WriteConditions writeConditions) throws IOException {
+    if (writeConditions.hasIfNoneMatch()) {
       return bucket.createStreamKeyIfNotExists(keyPath, length,
           replicationConfig, keyMetadata, tags);
     }
-    if (ifMatch != null) {
+    if (writeConditions.hasIfMatch()) {
       return bucket.rewriteStreamKeyIfMatch(keyPath, length,
-          ObjectEndpoint.parseETag(ifMatch), replicationConfig, keyMetadata,
+          writeConditions.getExpectedETag(), replicationConfig, keyMetadata,
           tags);
     }
     return bucket.createStreamKey(keyPath, length, replicationConfig,

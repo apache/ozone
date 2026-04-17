@@ -91,7 +91,7 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
     try {
       options = DBConfigFromFile.readDBOptionsFromFile(optionsPath);
     } catch (RocksDBException e) {
-      throw new RocksDatabaseException("Error occured when reading RocksDBOptions from: " + optionsPath, e);
+      throw new RocksDatabaseException("Error occurred when reading RocksDBOptions from: " + optionsPath, e);
     }
     return options;
   }
@@ -105,7 +105,7 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
     try {
       cfoptionsFromFile = DBConfigFromFile.readCFOptionsFromFile(optionsPath, DEFAULT_COLUMN_FAMILY_NAME);
     } catch (RocksDBException ex) {
-      throw new RocksDatabaseException("Error occured when reading CFOptions from: " + optionsPath, ex);
+      throw new RocksDatabaseException("Error occurred when reading CFOptions from: " + optionsPath, ex);
     }
     usedCfOptions = cfoptionsFromFile != null ? cfoptionsFromFile :
         dbProfile.getColumnFamilyOptions(config);

@@ -54,6 +54,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +66,7 @@ import org.slf4j.LoggerFactory;
 public class StreamBlockInputStream extends BlockExtendedInputStream {
   private static final Logger LOG = LoggerFactory.getLogger(StreamBlockInputStream.class);
   private static final int EOF = -1;
+  private static final String STREAM_CLOSE_REASON = "StreamBlockInputStream closed";
   private static final AtomicInteger STREAM_ID = new AtomicInteger(0);
   private static final AtomicInteger READER_ID = new AtomicInteger(0);
 
@@ -225,12 +227,36 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private synchronized void closeStream() {
-    if (streamingReader != null) {
-      LOG.debug("Closing {}", streamingReader);
-      streamingReader.onCompleted();
-      streamingReader = null;
+    if (streamingReader == null) {
+      buffer = null;
+      return;
     }
+
+    final StreamingReader reader = streamingReader;
+    streamingReader = null;
     buffer = null;
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Closing {}", reader);
+    }
+
+    reader.onCompleted();
+
+    final StreamingReadResponse response = reader.getResponse();
+    if (response != null) {
+      final ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver =
+          response.getRequestObserver();
+      try {
+        requestObserver.onCompleted();
+      } catch (RuntimeException e) {
+        LOG.warn("Failed to close gRPC request stream for {}", reader, e);
+        try {
+          requestObserver.cancel(STREAM_CLOSE_REASON, e);
+        } catch (RuntimeException cancelEx) {
+          LOG.warn("Failed to cancel gRPC request stream for {}", reader, cancelEx);
+        }
+      }
+    }
   }
 
   protected synchronized void checkOpen() throws IOException {

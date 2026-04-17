@@ -628,36 +628,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
         if (existing != null) {
-          throw new OMException("Key already exists",
-              OMException.ResultCodes.KEY_ALREADY_EXISTS);
+          throw new OMException("Atomic create-if-not-exists conflicted with an existing key",
+              OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
         }
       } else {
         if (existing == null) {
-          throw new OMException("Atomic rewrite is not allowed for a new key", KEY_NOT_FOUND);
+          throw new OMException("Atomic rewrite conflicted because the key no longer exists",
+              OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
         }
         if (expectedGen != existing.getUpdateID()) {
           throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
               ") does not match the expected generation to rewrite (" + expectedGen + ")",
-              KEY_NOT_FOUND);
+              OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);
         }
-      }
-    }
-
-    if (toCommit.getExpectedETag() != null) {
-      String expectedETag = toCommit.getExpectedETag();
-      auditMap.put("expectedETag", expectedETag);
-
-      if (existing == null) {
-        throw new OMException("Key not found for If-Match at commit",
-            OMException.ResultCodes.KEY_NOT_FOUND);
-      }
-      if (!existing.hasEtag()) {
-        throw new OMException("Key does not have an ETag at commit",
-            OMException.ResultCodes.ETAG_NOT_AVAILABLE);
-      }
-      if (!existing.isEtagEquals(expectedETag)) {
-        throw new OMException("ETag changed during write (concurrent modification)",
-            OMException.ResultCodes.ETAG_MISMATCH);
       }
     }
   }

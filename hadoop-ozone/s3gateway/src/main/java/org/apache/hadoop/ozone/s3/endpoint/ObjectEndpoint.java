@@ -189,6 +189,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw newError(S3ErrorTable.NO_OVERWRITE, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS) {
         throw newError(PRECOND_FAILED, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.ATOMIC_WRITE_CONFLICT) {
+        throw newError(S3ErrorTable.CONDITIONAL_REQUEST_CONFLICT, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.ETAG_MISMATCH) {
         throw newError(PRECOND_FAILED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
@@ -280,37 +282,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
-      String ifNoneMatch = getHeaders().getHeaderString(
-          S3Consts.IF_NONE_MATCH_HEADER);
-      String ifMatch = getHeaders().getHeaderString(
-          S3Consts.IF_MATCH_HEADER);
-
-      if (ifNoneMatch != null && StringUtils.isBlank(ifNoneMatch)) {
-        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-        ex.setErrorMessage("If-None-Match header cannot be empty.");
-        throw ex;
-      }
-      if (ifMatch != null && StringUtils.isBlank(ifMatch)) {
-        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-        ex.setErrorMessage("If-Match header cannot be empty.");
-        throw ex;
-      }
-
-      String ifNoneMatchTrimmed = ifNoneMatch == null ? null : ifNoneMatch.trim();
-      String ifMatchTrimmed = ifMatch == null ? null : ifMatch.trim();
-
-      if (ifNoneMatchTrimmed != null && ifMatchTrimmed != null) {
-        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-        ex.setErrorMessage("If-Match and If-None-Match cannot be specified together.");
-        throw ex;
-      }
-
-      if (ifNoneMatchTrimmed != null
-          && !"*".equals(stripQuotes(ifNoneMatchTrimmed))) {
-        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-        ex.setErrorMessage("Only If-None-Match: * is supported for conditional put.");
-        throw ex;
-      }
+      S3ConditionalRequest.WriteConditions writeConditions =
+          S3ConditionalRequest.parseWriteConditions(getHeaders(), keyPath);
 
       // Normal put object
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
@@ -329,8 +302,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
                 customMetadata, tags, multiDigestInputStream, getHeaders(),
-                signatureInfo.isSignPayload(), perf, ifNoneMatchTrimmed,
-                ifMatchTrimmed);
+                signatureInfo.isSignPayload(), perf, writeConditions);
         md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
@@ -338,8 +310,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
         try (OzoneOutputStream output = openKeyForPut(
             volume.getName(), bucketName, keyPath, length,
-            replicationConfig, customMetadata, tags, ifNoneMatchTrimmed,
-            ifMatchTrimmed)) {
+            replicationConfig, customMetadata, tags, writeConditions)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -449,6 +420,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       isFile(keyPath, keyDetails);
 
+      Response conditionalResponse = S3ConditionalRequest
+          .evaluateReadPreconditions(getHeaders(), keyPath, keyDetails);
+      if (conditionalResponse != null) {
+        long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(
+            startNanos);
+        perf.appendMetaLatencyNanos(metadataLatencyNs);
+        long opLatencyNs = getMetrics().updateGetKeySuccessStats(startNanos);
+        perf.appendOpLatencyNanos(opLatencyNs);
+        return conditionalResponse;
+      }
+
       long length = keyDetails.getDataSize();
 
       LOG.debug("Data length of the key {} is {}", keyPath, length);
@@ -509,15 +491,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
 
       responseBuilder.header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
-
-      String eTag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
-      if (eTag != null) {
-        responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
-        String partsCount = extractPartsCount(eTag);
-        if (partsCount != null) {
-          responseBuilder.header(MP_PARTS_COUNT, partsCount);
-        }
-      }
+      addEntityTagHeader(responseBuilder, keyDetails);
 
       MultivaluedMap<String, String> queryParams =
           getContext().getUriInfo().getQueryParameters();
@@ -569,6 +543,20 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
+  static void addEntityTagHeader(ResponseBuilder responseBuilder, OzoneKey key) {
+    String eTag = key.getMetadata().get(OzoneConsts.ETAG);
+    if (eTag != null) {
+      // Should not return ETag header if the ETag is not set
+      // doing so will result in "null" string being returned instead
+      // which breaks some AWS SDK implementation
+      responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
+      String partsCount = extractPartsCount(eTag);
+      if (partsCount != null) {
+        responseBuilder.header(MP_PARTS_COUNT, partsCount);
+      }
+    }
+  }
+
   /**
    * Rest endpoint to check existence of an object in a bucket.
    * <p>
@@ -591,6 +579,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
+      Response conditionalResponse = S3ConditionalRequest
+          .evaluateReadPreconditions(getHeaders(), keyPath, key);
+      if (conditionalResponse != null) {
+        getMetrics().updateHeadKeySuccessStats(startNanos);
+        auditReadSuccess(s3GAction);
+        return conditionalResponse;
+      }
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       auditReadFailure(s3GAction, ex);
@@ -618,18 +613,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .header(HttpHeaders.CONTENT_LENGTH, key.getDataSize())
         .header(HttpHeaders.CONTENT_TYPE, "binary/octet-stream")
         .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
-
-    String eTag = key.getMetadata().get(OzoneConsts.ETAG);
-    if (eTag != null) {
-      // Should not return ETag header if the ETag is not set
-      // doing so will result in "null" string being returned instead
-      // which breaks some AWS SDK implementation
-      response.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
-      String partsCount = extractPartsCount(eTag);
-      if (partsCount != null) {
-        response.header(MP_PARTS_COUNT, partsCount);
-      }
-    }
+    addEntityTagHeader(response, key);
 
     addLastModifiedDate(response, key);
     addCustomMetadataHeaders(response, key);
@@ -916,7 +900,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             getHeaders().getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
         String copySourceIfUnmodifiedSince =
             getHeaders().getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
-        if (!checkCopySourceModificationTime(sourceKeyModificationTime,
+        if (!S3ConditionalRequest.checkCopySourceModificationTime(
+            sourceKeyModificationTime,
             copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
           throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
         }
@@ -1179,33 +1164,23 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OzoneOutputStream openKeyForPut(String volumeName, String bucketName, String keyPath, long length,
       ReplicationConfig replicationConfig, Map<String, String> customMetadata,
-      Map<String, String> tags, String ifNoneMatch, String ifMatch)
+      Map<String, String> tags,
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
-    if (ifNoneMatch != null && "*".equals(stripQuotes(ifNoneMatch.trim()))) {
+    if (writeConditions.hasIfNoneMatch()) {
       return getClientProtocol().createKeyIfNotExists(
           volumeName, bucketName, keyPath, length, replicationConfig,
           customMetadata, tags);
-    } else if (ifMatch != null) {
-      String expectedETag = parseETag(ifMatch);
+    } else if (writeConditions.hasIfMatch()) {
       return getClientProtocol().rewriteKeyIfMatch(
-          volumeName, bucketName, keyPath, length, expectedETag,
+          volumeName, bucketName, keyPath, length,
+          writeConditions.getExpectedETag(),
           replicationConfig, customMetadata, tags);
     } else {
       return getClientProtocol().createKey(
           volumeName, bucketName, keyPath, length, replicationConfig,
           customMetadata, tags);
     }
-  }
-
-  /**
-   * Parses an ETag from a conditional header value, removing surrounding
-   * quotes if present.
-   */
-  static String parseETag(String headerValue) {
-    if (headerValue == null) {
-      return null;
-    }
-    return stripQuotes(headerValue.trim());
   }
 
   /** Request context shared among {@code ObjectOperationHandler}s. */

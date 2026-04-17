@@ -286,9 +286,9 @@ public final class LambdaTestUtils {
     public String toString() {
       final StringBuilder sb = new StringBuilder(
           "FixedRetryInterval{");
-      sb.append("interval=").append(intervalMillis);
-      sb.append(", invocationCount=").append(invocationCount);
-      sb.append('}');
+      sb.append("interval=").append(intervalMillis)
+          .append(", invocationCount=").append(invocationCount)
+          .append('}');
       return sb.toString();
     }
   }

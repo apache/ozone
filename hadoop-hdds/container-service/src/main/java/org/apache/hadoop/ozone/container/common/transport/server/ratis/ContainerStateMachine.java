@@ -1330,13 +1330,13 @@ public class ContainerStateMachine extends BaseStateMachine {
 
       if (containerController != null) {
         String location = containerController.getContainerLocation(contId);
-        builder.append(", container path=");
-        builder.append(location);
+        builder.append(", container path=")
+            .append(location);
       }
     } catch (Exception t) {
       LOG.info("smProtoToString failed", t);
-      builder.append("smProtoToString failed with ");
-      builder.append(t.getMessage());
+      builder.append("smProtoToString failed with ")
+          .append(t.getMessage());
     }
     return builder.toString();
   }
