@@ -14,7 +14,59 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
+<h1>Snapshots</h1>
+<div class="row">
+    <div class="col-md-4">
+        <div class="input-group">
+            <span class="input-group-addon">Volume</span>
+            <input type="text" class="form-control" ng-model="searchVolume" placeholder="volume">
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="input-group">
+            <span class="input-group-addon">Bucket</span>
+            <input type="text" class="form-control" ng-model="searchBucket" placeholder="bucket">
+        </div>
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-primary" ng-click="$ctrl.listSnapshots(searchVolume, searchBucket)" ng-disabled="!searchVolume || !searchBucket">Search</button>
+    </div>
+</div>
 
+<div ng-if="!searchVolume || !searchBucket" style="color: grey; margin-top: 5px;">
+    <i>Please enter both volume and bucket to search snapshots.</i>
+</div>
+
+<div style="margin-bottom: 20px;"></div>
+
+<table class="table table-bordered table-striped" ng-if="$ctrl.snapshots && $ctrl.snapshots.length > 0">
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>Status</th>
+        <th>Creation Time</th>
+        <th title="Total size of all files and directories visible in this snapshot.">Referenced Size</th>
+        <th title="Size of data held exclusively by this snapshot. Deleting this snapshot will reclaim this much space.">Exclusive Size</th>
+        <th>Snapshot ID</th>
+        <th>Snapshot Path</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr ng-repeat="snapshot in $ctrl.snapshots">
+        <td>{{snapshot.name}}</td>
+        <td title="{{snapshot.snapshotStatus === 'SNAPSHOT_ACTIVE' ? 'active' : 'deletion in progress'}}">
+            {{snapshot.snapshotStatus === 'SNAPSHOT_ACTIVE' ? 'active' : 'deletion in progress'}}
+        </td>
+        <td>{{snapshot.creationTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
+        <td>{{$ctrl.formatBytes(snapshot.referencedSize)}}</td>
+        <td>{{$ctrl.formatBytes(snapshot.exclusiveSize)}}</td>
+        <td>{{snapshot.snapshotId}}</td>
+        <td>{{snapshot.snapshotPath}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<div style="margin-bottom: 20px;"></div>
 
 <h1>Snapshot Diff Jobs</h1>
 
