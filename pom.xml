@@ -1736,8 +1736,6 @@
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
-            <doclint>none</doclint>
-            <notimestamp>true</notimestamp>
             <maxmemory>1024m</maxmemory>
             <doctitle>Apache Ozone API - ${project.version}</doctitle>
             <windowtitle>Apache Ozone ${project.version} API</windowtitle>
@@ -1750,6 +1748,8 @@
               <exclude>**/package-info.java</exclude>
               <exclude>**/org/apache/ozone/recon/schema/generated/tables/**/*.java</exclude>
             </sourceFileExcludes>
+            <doclint>none</doclint>
+            <notimestamp>true</notimestamp>
           </configuration>
         </plugin>
         <plugin>
