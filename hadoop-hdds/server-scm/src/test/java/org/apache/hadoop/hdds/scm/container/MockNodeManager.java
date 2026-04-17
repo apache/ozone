@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -113,6 +114,7 @@ public class MockNodeManager implements NodeManager {
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
   private int numPipelinePerDatanode;
+  private PendingContainerTracker pendingContainerTracker;
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -939,6 +941,24 @@ public class MockNodeManager implements NodeManager {
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
+  }
+
+  @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    if (pendingContainerTracker == null) {
+      pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024);
+    }
+    return pendingContainerTracker;
+  }
+
+  @Override
+  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node, long containerSize) {
+    DatanodeInfo info = getDatanodeInfo(node);
+    if (info == null) {
+      return false;
+    }
+    return getPendingContainerTracker()
+        .hasEffectiveAllocatableSpaceForNewContainer(node, info, containerSize);
   }
 
   /**

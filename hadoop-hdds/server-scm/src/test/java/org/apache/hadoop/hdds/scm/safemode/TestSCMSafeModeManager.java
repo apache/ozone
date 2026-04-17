@@ -584,7 +584,8 @@ public class TestSCMSafeModeManager {
     ContainerManager containerManager = new ContainerManagerImpl(config,
         SCMHAManagerStub.getInstance(true), null, pipelineManager,
         scmMetadataStore.getContainerTable(),
-        new ContainerReplicaPendingOps(Clock.system(ZoneId.systemDefault()), null));
+        new ContainerReplicaPendingOps(Clock.system(ZoneId.systemDefault()), null),
+        nodeManager);
 
     scmSafeModeManager = new SCMSafeModeManager(config, nodeManager, pipelineManager,
         containerManager, serviceManager, queue, scmContext);

@@ -49,6 +49,9 @@ public final class SCMNodeMetrics implements MetricsSource {
   private @Metric MutableCounterLong numNodeReportProcessingFailed;
   private @Metric MutableCounterLong numNodeCommandQueueReportProcessed;
   private @Metric MutableCounterLong numNodeCommandQueueReportProcessingFailed;
+  // Pending container allocations at SCM (per-DN tracker), not yet on datanodes.
+  private @Metric MutableCounterLong numPendingContainersAdded;
+  private @Metric MutableCounterLong numPendingContainersRemoved;
   private @Metric String textMetric;
 
   private final MetricsRegistry registry;
@@ -122,6 +125,22 @@ public final class SCMNodeMetrics implements MetricsSource {
    */
   void incNumNodeCommandQueueReportProcessingFailed() {
     numNodeCommandQueueReportProcessingFailed.incr();
+  }
+
+  void incNumPendingContainersAdded() {
+    numPendingContainersAdded.incr();
+  }
+
+  void incNumPendingContainersRemoved() {
+    numPendingContainersRemoved.incr();
+  }
+
+  public long getNumPendingContainersAdded() {
+    return numPendingContainersAdded.value();
+  }
+
+  public long getNumPendingContainersRemoved() {
+    return numPendingContainersRemoved.value();
   }
 
   /**
