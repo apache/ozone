@@ -1746,7 +1746,10 @@
             <useStandardDocletOptions>true</useStandardDocletOptions>
             <includeDependencySources>false</includeDependencySources>
             <excludePackageNames>*.generated.*:*.proto.*:*.protobuf.*</excludePackageNames>
-            <sourceFileExcludes>**/generated/**,**/proto/**,**/protobuf/**</sourceFileExcludes>
+            <sourceFileExcludes>
+              <exclude>**/package-info.java</exclude>
+              <exclude>**/org/apache/ozone/recon/schema/generated/tables/**/*.java</exclude>
+            </sourceFileExcludes>
           </configuration>
         </plugin>
         <plugin>
