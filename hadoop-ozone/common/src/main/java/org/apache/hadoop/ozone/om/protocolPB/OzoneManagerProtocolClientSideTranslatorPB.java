@@ -1396,7 +1396,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            boolean disableNativeDiff)
       throws IOException {
     return snapshotDiffInternal(volumeName, bucketName, fromSnapshot, toSnapshot, token,
-        pageSize, forceFullDiff, disableNativeDiff);
+        pageSize, forceFullDiff, disableNativeDiff, false);
   }
 
   /**
@@ -1411,7 +1411,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            int pageSize)
       throws IOException {
     return snapshotDiffInternal(volumeName, bucketName, fromSnapshot, toSnapshot, token,
-        pageSize, null, null);
+        pageSize, null, null, true);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -1422,7 +1422,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                                     String token,
                                                     int pageSize,
                                                     Boolean forceFullDiff,
-                                                    Boolean disableNativeDiff)
+                                                    Boolean disableNativeDiff,
+                                                    boolean reportOnly)
       throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
@@ -1457,7 +1458,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
         diffResponse.getWaitTimeInMs(),
-        diffResponse.getReason());
+        diffResponse.getReason(),
+        reportOnly);
   }
 
   /**

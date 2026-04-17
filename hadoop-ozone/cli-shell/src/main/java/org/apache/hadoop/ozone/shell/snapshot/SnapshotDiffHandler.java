@@ -142,8 +142,9 @@ public class SnapshotDiffHandler extends Handler {
             writer.println(diffResponse);
           }
         }
+        return;
       }
-      return;
+      throw ex;
     }
     try (PrintWriter writer = out()) {
       writer.println(response);

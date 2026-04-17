@@ -98,8 +98,7 @@ Snapshot Diff RPC Is Compatible
     Execute          ozone sh key put /vol1/${bucket}/${key2} ${TESTFILE}
     Execute          ozone sh snapshot create /vol1/${bucket} ${toSnap}
 
-    # Wait until report generation is complete and validate output includes the created keys.
-    Wait Until Keyword Succeeds    2min    5sec    Snapshot Diff Report Should Contain Created Keys
+    Snapshot Diff Report Should Contain Created Keys
     ...    /vol1/${bucket}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
 
 *** Keywords ***
@@ -110,7 +109,6 @@ Snapshot Diff Report Should Contain Created Keys
     ${status}    ${output} =    Run Keyword And Ignore Error
     ...    Execute    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
 
-    # new client
     IF    '${status}' == 'PASS'
         # On newer servers, --get-report does not submit jobs. If the job is not
         # found, submit it first (this keeps new-client/new-server behavior).
@@ -120,21 +118,29 @@ Snapshot Diff Report Should Contain Created Keys
             ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
                            Should Contain    ${output}    Submitting a new job
         ELSE
-        # On older servers, --get-report falls back to the legacy snapshot diff command,
-        # which submits the job if it doesn't exist. In this case, both snapshot diff and  --get-report
-        # should return the report.
-            ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
-                           Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
-                           Should Contain    ${output}    ${key1}
-                           Should Contain    ${output}    ${key2}
+        # On older servers, --get-report falls back to the legacy snapshot diff command.
+        # Ensure the submit path succeeds without failing the test.
+            ${submitStatus}    ${submitOutput} =    Run Keyword And Ignore Error
+            ...    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+            Run Keyword If    '${submitStatus}' == 'FAIL'
+            ...    Fail    Snapshot diff submit failed: ${submitOutput}
         END
-        ${output} =    Execute    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
+        Wait Until Keyword Succeeds    2min    5sec
+        ...    Snapshot Diff Command Should Contain Created Keys
+        ...    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
+        ...    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
     ELSE
         # old client, which does not support --get-report.
         # The snapshot diff command should return the report, submitting a job if necessary.
-        ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+        Wait Until Keyword Succeeds    2min    5sec
+        ...    Snapshot Diff Command Should Contain Created Keys
+        ...    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+        ...    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
     END
 
+Snapshot Diff Command Should Contain Created Keys
+    [Arguments]    ${command}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
+    ${output} =    Execute    ${command}
     Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
     Should Contain    ${output}    ${key1}
     Should Contain    ${output}    ${key2}

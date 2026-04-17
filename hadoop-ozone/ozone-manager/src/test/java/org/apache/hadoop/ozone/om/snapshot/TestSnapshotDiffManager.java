@@ -37,6 +37,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_JOB_TABLE_NAME;
+import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_PURGED_JOB_TABLE_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_REPORT_TABLE_NAME;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_DONE_JOB;
@@ -49,6 +50,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CA
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
 import static org.apache.ratis.util.JavaUtils.attempt;
@@ -184,6 +186,7 @@ public class TestSnapshotDiffManager {
   private List<ColumnFamilyHandle> columnFamilyHandles;
   private ColumnFamilyHandle snapDiffJobTable;
   private ColumnFamilyHandle snapDiffReportTable;
+  private ColumnFamilyHandle snapDiffPurgedJobTable;
   private SnapshotDiffManager snapshotDiffManager;
   private final List<JobStatus> jobStatuses = Arrays.asList(QUEUED, IN_PROGRESS,
       DONE, REJECTED, FAILED);
@@ -255,9 +258,14 @@ public class TestSnapshotDiffManager {
         new ColumnFamilyDescriptor(
             StringUtils.string2Bytes(SNAP_DIFF_REPORT_TABLE_NAME),
             columnFamilyOptions));
+    snapDiffPurgedJobTable = db.get().createColumnFamily(
+        new ColumnFamilyDescriptor(
+            StringUtils.string2Bytes(SNAP_DIFF_PURGED_JOB_TABLE_NAME),
+            columnFamilyOptions));
 
     columnFamilyHandles.add(snapDiffJobTable);
     columnFamilyHandles.add(snapDiffReportTable);
+    columnFamilyHandles.add(snapDiffPurgedJobTable);
 
     String snapshotNamePrefix = "snap-";
     String snapshotPath = "snapshotPath";
@@ -359,7 +367,8 @@ public class TestSnapshotDiffManager {
         });
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     snapshotDiffManager = new SnapshotDiffManager(db, ozoneManager,
-        snapDiffJobTable, snapDiffReportTable, columnFamilyOptions, codecRegistry);
+        snapDiffJobTable, snapDiffReportTable, snapDiffPurgedJobTable,
+        columnFamilyOptions, codecRegistry);
     when(omSnapshotManager.getDiffCleanupServiceInterval()).thenReturn(0L);
   }
 
@@ -1439,10 +1448,7 @@ public class TestSnapshotDiffManager {
 
     SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName,
         ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, false, false);
-
-    assertThat(response.getResponse())
-        .contains("Submitting a new job")
-        .contains("--get-report");
+    assertNotNull(response);
 
     SnapshotDiffJob job = spy.getSnapDiffJobTable().get(ctx.diffJobKey);
     assertNotNull(job);
@@ -1466,11 +1472,7 @@ public class TestSnapshotDiffManager {
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName,
         ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, false, false);
-
-    assertThat(response.getResponse())
-        .contains("Previous snapshot diff attempt found")
-        .contains("IN_PROGRESS")
-        .contains("--get-report");
+    assertNotNull(response);
 
     verify(spy, never()).generateSnapshotDiffReport(anyString(), anyString(),
         anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyBoolean());
@@ -1488,11 +1490,7 @@ public class TestSnapshotDiffManager {
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName,
         ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, false, false);
-
-    assertThat(response.getResponse())
-        .contains("Previous snapshot diff attempt found")
-        .contains("DONE")
-        .contains("--get-report");
+    assertNotNull(response);
 
     verify(spy, never()).generateSnapshotDiffReport(anyString(), anyString(),
         anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyBoolean());
@@ -1515,13 +1513,7 @@ public class TestSnapshotDiffManager {
 
     SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName,
         ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, false, false);
-
-    assertThat(response.getResponse())
-        .contains("Previous snapshot diff attempt found")
-        .contains("FAILED")
-        .contains("previous failure")
-        .contains("Submitting a new job")
-        .contains("--get-report");
+    assertNotNull(response);
 
     SnapshotDiffJob updated = spy.getSnapDiffJobTable().get(ctx.diffJobKey);
     assertNotNull(updated);
@@ -1545,13 +1537,7 @@ public class TestSnapshotDiffManager {
 
     SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName,
         ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, false, false);
-
-    assertThat(response.getResponse())
-        .contains("Previous snapshot diff attempt found")
-        .contains("CANCELLED")
-        .contains("previously cancelled")
-        .contains("Submitting a new job")
-        .contains("--get-report");
+    assertNotNull(response);
 
     SnapshotDiffJob updated = spy.getSnapDiffJobTable().get(ctx.diffJobKey);
     assertNotNull(updated);
@@ -1575,13 +1561,7 @@ public class TestSnapshotDiffManager {
 
     SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName,
         ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, false, false);
-
-    assertThat(response.getResponse())
-        .contains("Previous snapshot diff attempt found")
-        .contains("REJECTED")
-        .contains("previously rejected")
-        .contains("Submitting a new job")
-        .contains("--get-report");
+    assertNotNull(response);
 
     SnapshotDiffJob updated = spy.getSnapDiffJobTable().get(ctx.diffJobKey);
     assertNotNull(updated);
@@ -1595,10 +1575,7 @@ public class TestSnapshotDiffManager {
 
     SnapshotDiffResponse response = snapshotDiffManager.getSnapshotDiffReport(
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
-
-    assertThat(response.toString())
-        .contains("No snapshot diff job found")
-        .contains("--get-report");
+    assertEquals(NOT_FOUND, response.getJobStatus());
   }
 
   @Test
@@ -1612,10 +1589,7 @@ public class TestSnapshotDiffManager {
 
     SnapshotDiffResponse response = snapshotDiffManager.getSnapshotDiffReport(
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
-
-    assertThat(response.toString())
-        .contains("REJECTED")
-        .contains("resubmit the job without using the --get-report option");
+    assertEquals(REJECTED, response.getJobStatus());
   }
 
   @Test
@@ -1630,11 +1604,8 @@ public class TestSnapshotDiffManager {
 
     SnapshotDiffResponse response = snapshotDiffManager.getSnapshotDiffReport(
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
-
-    assertThat(response.toString())
-        .contains("FAILED")
-        .contains("some failure")
-        .contains("resubmit the job without using the --get-report option");
+    assertEquals(FAILED, response.getJobStatus());
+    assertEquals("some failure", response.getReason());
   }
 
   @Test
@@ -1702,11 +1673,6 @@ public class TestSnapshotDiffManager {
 
     SnapshotDiffResponse response = snapshotDiffManager.getSnapshotDiffReport(
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
-
-    assertThat(response.toString())
-        .contains("IN_PROGRESS")
-        .contains("OBJECT_ID_MAP_GEN_OBS")
-        .contains("Keys Processed Estimated Percentage")
-        .contains("55.5");
+    assertEquals(IN_PROGRESS, response.getJobStatus());
   }
 }

@@ -88,6 +88,9 @@ public class TestSnapshotDiffManagerMXBean {
     ColumnFamilyHandle reportCFH = db.get().createColumnFamily(
         new ColumnFamilyDescriptor("reportTable".getBytes(StandardCharsets.UTF_8),
             columnFamilyOptions));
+    ColumnFamilyHandle purgedJobCFH = db.get().createColumnFamily(
+        new ColumnFamilyDescriptor("purgedJobTable".getBytes(StandardCharsets.UTF_8),
+            columnFamilyOptions));
 
     snapDiffJobTable = new RocksDbPersistentMap<>(db, jobCFH,
         codecRegistry, String.class, SnapshotDiffJob.class);
@@ -105,7 +108,7 @@ public class TestSnapshotDiffManagerMXBean {
     when(ozoneManager.getOmSnapshotManager()).thenReturn(mock(OmSnapshotManager.class));
 
     snapshotDiffManager = new SnapshotDiffManager(db, ozoneManager,
-        jobCFH, reportCFH, columnFamilyOptions, codecRegistry);
+        jobCFH, reportCFH, purgedJobCFH, columnFamilyOptions, codecRegistry);
 
     mbs = ManagementFactory.getPlatformMBeanServer();
   }
