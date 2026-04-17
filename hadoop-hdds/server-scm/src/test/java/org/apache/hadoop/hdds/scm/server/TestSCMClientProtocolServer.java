@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
@@ -136,6 +138,67 @@ public class TestSCMClientProtocolServer {
     // Test call from a legacy client, which uses a different method of listContainer
     assertEquals(10, scmServer.listContainer(1, 10, null,
         HddsProtos.ReplicationFactor.THREE).getContainerInfoList().size());
+  }
+
+  @Test
+  public void testBuildUpgradeStatusMapsFinalizationRequired() {
+    HddsProtos.UpgradeStatus status = SCMClientProtocolServer.buildUpgradeStatus(
+        UpgradeFinalization.Status.FINALIZATION_REQUIRED, 1, 2);
+
+    assertFalse(status.getScmFinalized());
+    assertTrue(status.getShouldFinalize());
+    assertEquals(1, status.getNumDatanodesFinalized());
+    assertEquals(2, status.getNumDatanodesTotal());
+  }
+
+  @Test
+  public void testBuildUpgradeStatusMapsFinalizationInProgress() {
+    HddsProtos.UpgradeStatus status = SCMClientProtocolServer.buildUpgradeStatus(
+        UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS, 1, 2);
+
+    assertFalse(status.getScmFinalized());
+    assertFalse(status.getShouldFinalize());
+  }
+
+  @Test
+  public void testBuildUpgradeStatusMapsStartingFinalization() {
+    HddsProtos.UpgradeStatus status = SCMClientProtocolServer.buildUpgradeStatus(
+        UpgradeFinalization.Status.STARTING_FINALIZATION, 1, 2);
+
+    assertFalse(status.getScmFinalized());
+    assertFalse(status.getShouldFinalize());
+    assertEquals(1, status.getNumDatanodesFinalized());
+    assertEquals(2, status.getNumDatanodesTotal());
+  }
+
+  @Test
+  public void testBuildUpgradeStatusMapsCompletedStatesToFinalized() {
+    HddsProtos.UpgradeStatus doneStatus =
+        SCMClientProtocolServer.buildUpgradeStatus(
+            UpgradeFinalization.Status.FINALIZATION_DONE, 2, 2);
+    HddsProtos.UpgradeStatus finalizedStatus =
+        SCMClientProtocolServer.buildUpgradeStatus(
+            UpgradeFinalization.Status.ALREADY_FINALIZED, 2, 2);
+
+    assertTrue(doneStatus.getScmFinalized());
+    assertFalse(doneStatus.getShouldFinalize());
+    assertTrue(finalizedStatus.getScmFinalized());
+    assertFalse(finalizedStatus.getShouldFinalize());
+  }
+
+  @Test
+  public void testBuildUpgradeStatusFromVersionManagerState() {
+    HddsProtos.UpgradeStatus needsFinalization =
+        SCMClientProtocolServer.buildUpgradeStatus(UpgradeFinalization.Status.FINALIZATION_REQUIRED, 1, 3);
+    assertFalse(needsFinalization.getScmFinalized());
+    assertTrue(needsFinalization.getShouldFinalize());
+    assertEquals(1, needsFinalization.getNumDatanodesFinalized());
+    assertEquals(3, needsFinalization.getNumDatanodesTotal());
+
+    HddsProtos.UpgradeStatus alreadyFinalized =
+        SCMClientProtocolServer.buildUpgradeStatus(UpgradeFinalization.Status.ALREADY_FINALIZED, 3, 3);
+    assertTrue(alreadyFinalized.getScmFinalized());
+    assertFalse(alreadyFinalized.getShouldFinalize());
   }
 
   private StorageContainerManager mockStorageContainerManager() {

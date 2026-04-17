@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -140,6 +141,7 @@ public class SCMNodeManager implements NodeManager {
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
   private final NonWritableNodeFilter nonWritableNodeFilter;
   private final int numContainerPerVolume;
+  private final AtomicInteger datanodesFinalized;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -202,6 +204,7 @@ public class SCMNodeManager implements NodeManager {
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
     this.nonWritableNodeFilter = new NonWritableNodeFilter(conf);
+    this.datanodesFinalized = new AtomicInteger(0);
   }
 
   @Override
@@ -422,6 +425,7 @@ public class SCMNodeManager implements NodeManager {
       try {
         clusterMap.add(datanodeDetails);
         nodeStateManager.addNode(datanodeDetails, layoutInfo);
+        datanodesFinalized.addAndGet(isDatanodeFinalized(layoutInfo) ? 1 : 0);
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
@@ -447,7 +451,9 @@ public class SCMNodeManager implements NodeManager {
             hostName, ipAddress, dnId)) {
           LOG.info("Updating datanode from {} to {}", oldNode, datanodeDetails);
           clusterMap.update(oldNode, datanodeDetails);
+          LayoutVersionProto oldLayoutVersion = oldNode.getLastKnownLayoutVersion();
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
+          updateDatanodesFinalizedCount(oldLayoutVersion, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
           Preconditions.checkState(dn.getParent() != null);
           processNodeReport(datanodeDetails, nodeReport);
@@ -457,7 +463,9 @@ public class SCMNodeManager implements NodeManager {
           LOG.info("Update the version for registered datanode {}, " +
               "oldVersion = {}, newVersion = {}.",
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
+          LayoutVersionProto oldLayoutVersion = oldNode.getLastKnownLayoutVersion();
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
+          updateDatanodesFinalizedCount(oldLayoutVersion, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -732,8 +740,11 @@ public class SCMNodeManager implements NodeManager {
     }
 
     try {
+      DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+      LayoutVersionProto oldLayoutVersion = datanodeInfo.getLastKnownLayoutVersion();
       nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
           layoutVersionReport);
+      updateDatanodesFinalizedCount(oldLayoutVersion, layoutVersionReport);
     } catch (NodeNotFoundException e) {
       LOG.error("SCM trying to process Layout Version from an " +
           "unregistered node {}.", datanodeDetails);
@@ -1051,6 +1062,28 @@ public class SCMNodeManager implements NodeManager {
           dn.getUuid());
       return null;
     }
+  }
+
+  @Override
+  public int getNumDatanodesFinalized() {
+    return datanodesFinalized.get();
+  }
+
+  private void updateDatanodesFinalizedCount(
+      LayoutVersionProto previous, LayoutVersionProto current) {
+    int previousValue = isDatanodeFinalized(previous) ? 1 : 0;
+    int currentValue = isDatanodeFinalized(current) ? 1 : 0;
+    if (previousValue != currentValue) {
+      datanodesFinalized.addAndGet(currentValue - previousValue);
+    }
+  }
+
+  private static boolean isDatanodeFinalized(LayoutVersionProto layoutVersion) {
+    if (layoutVersion == null) {
+      return false;
+    }
+    return layoutVersion.getMetadataLayoutVersion()
+        >= layoutVersion.getSoftwareLayoutVersion();
   }
 
   /**
@@ -1978,6 +2011,11 @@ public class SCMNodeManager implements NodeManager {
       if (datanodeDetails.isDecommissioned() || nodeStatus.isDead()) {
         if (clusterMap.contains(datanodeDetails)) {
           clusterMap.remove(datanodeDetails);
+        }
+        DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+        if (datanodeInfo != null) {
+          updateDatanodesFinalizedCount(
+              datanodeInfo.getLastKnownLayoutVersion(), null);
         }
         nodeStateManager.removeNode(datanodeDetails.getID());
         removeFromDnsToDnIdMap(datanodeDetails.getID(), datanodeDetails.getIpAddress());

@@ -737,6 +737,37 @@ public class TestSCMNodeManager {
     testProcessLayoutVersionReportHigherMlv();
   }
 
+  @Test
+  public void testDatanodeFinalizedCounterTracksLayoutVersionReports()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails node =
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
+      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+          "Initial datanode should be counted as finalized");
+
+      int softwareVersion =
+          nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
+      int metadataVersion =
+          nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
+      nodeManager.processLayoutVersionReport(node,
+          LayoutVersionProto.newBuilder()
+              .setMetadataLayoutVersion(metadataVersion - 1)
+              .setSoftwareLayoutVersion(softwareVersion)
+              .build());
+      assertEquals(0, nodeManager.getNumDatanodesFinalized(),
+          "Lower metadata layout version should decrement finalized count");
+
+      nodeManager.processLayoutVersionReport(node,
+          LayoutVersionProto.newBuilder()
+              .setMetadataLayoutVersion(metadataVersion)
+              .setSoftwareLayoutVersion(softwareVersion)
+              .build());
+      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+          "Restored metadata layout version should restore finalized count");
+    }
+  }
+
   // Currently invoked by testProcessLayoutVersion.
   public void testProcessLayoutVersionReportHigherMlv()
       throws IOException {

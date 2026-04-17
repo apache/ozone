@@ -145,6 +145,25 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   /**
+   * Returns the number of datanodes currently marked finalized by SCM layout version
+   * metadata/software comparison.
+   */
+  default int getNumDatanodesFinalized() {
+    return (int) getAllNodes().stream()
+        .filter(DatanodeInfo.class::isInstance)
+        .map(DatanodeInfo.class::cast)
+        .filter(datanodeInfo -> {
+          LayoutVersionProto layoutVersion = datanodeInfo.getLastKnownLayoutVersion();
+          if (layoutVersion == null) {
+            return false;
+          }
+          return layoutVersion.getMetadataLayoutVersion()
+              >= layoutVersion.getSoftwareLayoutVersion();
+        })
+        .count();
+  }
+
+  /**
    * Returns the aggregated node stats.
    * @return the aggregated node stats.
    */
