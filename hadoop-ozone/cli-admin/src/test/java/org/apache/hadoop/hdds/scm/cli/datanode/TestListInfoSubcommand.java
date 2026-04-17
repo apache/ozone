@@ -411,7 +411,10 @@ public class TestListInfoSubcommand {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--nodes-with-failed-volumes",
         "--id", nodes.get(0).getNodeID().getUuid());
-    assertThrows(IOException.class, () -> cmd.execute(scmClient));
+    CommandLine.ParameterException ex = assertThrows(
+        CommandLine.ParameterException.class, () -> cmd.execute(scmClient));
+    assertTrue(ex.getMessage().contains(
+        "--nodes-with-failed-volumes cannot be used with --id/--node-id"));
   }
 
   private void validateOrdering(JsonNode root, String orderDirection) {

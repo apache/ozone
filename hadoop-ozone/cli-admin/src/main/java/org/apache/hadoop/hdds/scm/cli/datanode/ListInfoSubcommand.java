@@ -70,6 +70,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
       defaultValue = "false")
   private boolean nodeWithFailedVolumes;
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
   private ExclusiveNodeOptions exclusiveNodeOptions;
 
@@ -92,7 +95,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     if (nodeWithFailedVolumes && exclusiveNodeOptions != null
         && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
-      throw new IOException(
+      throw new CommandLine.ParameterException(spec.commandLine(),
           "--nodes-with-failed-volumes cannot be used with --id/--node-id. "
           + "Use them separately.");
     }
