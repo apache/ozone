@@ -183,6 +183,53 @@ public class TestBackgroundContainerDataScanner extends
             eq(deletedContainer.getContainerData().getContainerID()), any());
   }
 
+  /**
+   * If the data checksum of a container changes from its initial value when the scan started, it means that
+   * reconciliation updated the container while the scan was running.
+   * The container scanner should redo the scan instead of persisting the potentially stale merkle tree it built.
+   */
+  @Test
+  public void testContainerRescannedWhenChecksumChanges() throws Exception {
+    Container<?> rescanned = mockKeyValueContainer();
+    when(rescanned.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(rescanned.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getHealthyDataScanResult());
+    when(rescanned.getContainerData().getDataChecksum()).thenReturn(1L, 2L);
+
+    setContainers(rescanned, healthy);
+
+    scanner.runIteration();
+    verify(rescanned, times(2)).scanData(any(), any());
+  }
+
+  @Test
+  public void testContainerScanMaxRetries() throws Exception {
+    Container<?> rescanned = mockKeyValueContainer();
+    when(rescanned.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(rescanned.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getHealthyDataScanResult());
+    // Simulate checksum continuously changing
+    when(rescanned.getContainerData().getDataChecksum()).thenReturn(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
+
+    setContainers(rescanned, healthy);
+
+    scanner.runIteration();
+    
+    // max retries is 2 by default, so it should be scanned 3 times (1 initial + 2 retries)
+    verify(rescanned, times(3)).scanData(any(), any());
+    
+    // Check that timestamp is not updated when aborted
+    verify(controller, never())
+        .updateDataScanTimestamp(eq(rescanned.getContainerData().getContainerID()), any());
+    
+    // Check that merkle tree is not written
+    verify(controller, never())
+        .updateContainerChecksum(eq(rescanned.getContainerData().getContainerID()), any());
+        
+    // Check that container is not marked unhealthy
+    verifyContainerMarkedUnhealthy(rescanned, never());
+  }
+
   @Test
   @Override
   public void testUnhealthyContainerRescanned() throws Exception {

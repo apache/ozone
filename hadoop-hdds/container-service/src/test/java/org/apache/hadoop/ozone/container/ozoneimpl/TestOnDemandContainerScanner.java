@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -276,6 +277,55 @@ public class TestOnDemandContainerScanner extends
     onDemandScanner.shutdown();
     // Interrupting the healthy container's scan should not mark it unhealthy.
     verifyContainerMarkedUnhealthy(healthy, never());
+  }
+
+  /**
+   * If the data checksum of a container changes from its initial value when the scan started, it means that
+   * reconciliation updated the container while the scan was running.
+   * The container scanner should redo the scan instead of persisting the potentially stale merkle tree it built.
+   */
+  @Test
+  public void testContainerRescannedWhenChecksumChanges() throws Exception {
+    Container<?> rescanned = mockKeyValueContainer();
+    when(rescanned.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(rescanned.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getHealthyDataScanResult());
+    when(rescanned.getContainerData().getDataChecksum()).thenReturn(1L, 2L);
+
+    scanContainer(rescanned);
+    verify(rescanned, times(2)).scanData(any(), any());
+
+    // With a retry, the scan should still eventually succeed and update these values.
+    verify(controller, times(1))
+        .updateDataScanTimestamp(eq(rescanned.getContainerData().getContainerID()), any());
+    verify(controller, times(1))
+        .updateContainerChecksum(eq(rescanned.getContainerData().getContainerID()), any());
+  }
+
+  @Test
+  public void testContainerScanMaxRetries() throws Exception {
+    Container<?> rescanned = mockKeyValueContainer();
+    when(rescanned.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(rescanned.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getHealthyDataScanResult());
+    // Simulate checksum continuously changing
+    when(rescanned.getContainerData().getDataChecksum()).thenReturn(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
+
+    scanContainer(rescanned);
+    
+    // max retries is 2 by default, so it should be scanned 3 times (1 initial + 2 retries)
+    verify(rescanned, times(3)).scanData(any(), any());
+    
+    // Check that timestamp is not updated when aborted
+    verify(controller, never())
+        .updateDataScanTimestamp(eq(rescanned.getContainerData().getContainerID()), any());
+
+    // Check that merkle tree is not written
+    verify(controller, never())
+        .updateContainerChecksum(eq(rescanned.getContainerData().getContainerID()), any());
+
+    // Check that container is not marked unhealthy
+    verifyContainerMarkedUnhealthy(rescanned, never());
   }
 
   @Test

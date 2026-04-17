@@ -38,23 +38,26 @@ public final class ContainerScanHelper {
   private final ContainerController controller;
   private final AbstractContainerScannerMetrics metrics;
   private final long minScanGap;
+  private final int maxRetries;
 
   public static ContainerScanHelper withoutScanGap(Logger log, ContainerController controller,
-      AbstractContainerScannerMetrics metrics) {
-    return new ContainerScanHelper(log, controller, metrics, 0);
+      AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
+    return new ContainerScanHelper(log, controller, metrics, 0, conf.getDataScanMaxRetries());
   }
 
   public static ContainerScanHelper withScanGap(Logger log, ContainerController controller,
       AbstractContainerScannerMetrics metrics, ContainerScannerConfiguration conf) {
-    return new ContainerScanHelper(log, controller, metrics, conf.getContainerScanMinGap());
+    return new ContainerScanHelper(log, controller, metrics, conf.getContainerScanMinGap(),
+        conf.getDataScanMaxRetries());
   }
 
   private ContainerScanHelper(Logger log, ContainerController controller,
-                             AbstractContainerScannerMetrics metrics, long minScanGap) {
+                             AbstractContainerScannerMetrics metrics, long minScanGap, int maxRetries) {
     this.log = log;
     this.controller = controller;
     this.metrics = metrics;
     this.minScanGap = minScanGap;
+    this.maxRetries = maxRetries;
   }
 
   public void scanData(Container<?> container, DataTransferThrottler throttler, Canceler canceler)
@@ -65,7 +68,29 @@ public final class ContainerScanHelper {
     ContainerData containerData = container.getContainerData();
     long containerId = containerData.getContainerID();
     logScanStart(containerData, "data");
-    DataScanResult result = container.scanData(throttler, canceler);
+
+    DataScanResult result = null;
+    int retryCount = 0;
+    boolean scanCompleted = false;
+    
+    while (retryCount <= maxRetries && !scanCompleted) {
+      long initialChecksum = containerData.getDataChecksum();
+
+      result = container.scanData(throttler, canceler);
+
+      if (result.isDeleted() || initialChecksum == containerData.getDataChecksum()) {
+        scanCompleted = true;
+      } else {
+        if (retryCount >= maxRetries) {
+          log.warn("Container [{}] data checksum changed during the scan. Maximum retries ({}) exceeded. " +
+              "Skipping this scan.", containerId, maxRetries);
+          return;
+        }
+        log.info("Container [{}] data checksum changed during the scan. Rescanning. Retry count: {}/{}",
+            containerId, retryCount + 1, maxRetries);
+        retryCount++;
+      }
+    }
 
     if (result.isDeleted()) {
       log.debug("Container [{}] has been deleted during the data scan.", containerId);
