@@ -186,7 +186,6 @@ public class TestSnapshotDiffManager {
   private List<ColumnFamilyHandle> columnFamilyHandles;
   private ColumnFamilyHandle snapDiffJobTable;
   private ColumnFamilyHandle snapDiffReportTable;
-  private ColumnFamilyHandle snapDiffPurgedJobTable;
   private SnapshotDiffManager snapshotDiffManager;
   private final List<JobStatus> jobStatuses = Arrays.asList(QUEUED, IN_PROGRESS,
       DONE, REJECTED, FAILED);
@@ -258,7 +257,7 @@ public class TestSnapshotDiffManager {
         new ColumnFamilyDescriptor(
             StringUtils.string2Bytes(SNAP_DIFF_REPORT_TABLE_NAME),
             columnFamilyOptions));
-    snapDiffPurgedJobTable = db.get().createColumnFamily(
+    ColumnFamilyHandle snapDiffPurgedJobTable = db.get().createColumnFamily(
         new ColumnFamilyDescriptor(
             StringUtils.string2Bytes(SNAP_DIFF_PURGED_JOB_TABLE_NAME),
             columnFamilyOptions));
