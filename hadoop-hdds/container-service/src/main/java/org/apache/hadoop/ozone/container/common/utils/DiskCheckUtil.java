@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
  * where the disk is mounted.
  */
 public final class DiskCheckUtil {
+  public static final String TOO_MANY_OPEN_FILES = "Too many open files";
   // For testing purposes, an alternate check implementation can be provided
   // to inject failures.
   private static DiskChecks impl = new DiskChecksImpl();
@@ -156,6 +157,14 @@ public final class DiskCheckUtil {
         logError(storageDir, String.format("Could not write file %s " +
             "for volume check.", testFile.getAbsolutePath()), ioEx);
         return false;
+      } catch (Throwable ex) {
+        String msg = ex.getMessage();
+        String causeMsg = ex.getCause() != null ? ex.getCause().getMessage() : null;
+        causeMsg = causeMsg != null ? causeMsg : "";
+        if ((msg != null && msg.contains(TOO_MANY_OPEN_FILES)) || causeMsg.contains(TOO_MANY_OPEN_FILES)) {
+          LOG.warn("Could not write file {} for volume check.", testFile.getAbsolutePath(), ex);
+          return true;
+        }
       }
 
       // Read data back from the test file.
@@ -173,9 +182,19 @@ public final class DiskCheckUtil {
             "for volume check.", testFile.getAbsolutePath()), notFoundEx);
         return false;
       } catch (IOException ioEx) {
+        String ioem = ioEx.getMessage();
+        String causeMsg = ioEx.getCause() != null ? ioEx.getCause().getMessage() : null;
+        causeMsg = causeMsg != null ? causeMsg : "";
+        if ((ioem != null && ioem.contains(TOO_MANY_OPEN_FILES)) || causeMsg.contains(TOO_MANY_OPEN_FILES)) {
+          LOG.warn("Could not read file {} for volume check.", testFile.getAbsolutePath(), ioEx);
+          return true;
+        }
         logError(storageDir, String.format("Could not read file %s " +
             "for volume check.", testFile.getAbsolutePath()), ioEx);
         return false;
+      } catch (Throwable t) {
+        logError(storageDir, String.format("Could not read file %s " +
+            "for volume check.", testFile.getAbsolutePath()), t);
       }
 
       // Check that test file has the expected content.
@@ -201,7 +220,7 @@ public final class DiskCheckUtil {
       LOG.error("Volume {} failed health check. {}", storageDir, message);
     }
 
-    private void logError(File storageDir, String message, Exception ex) {
+    private void logError(File storageDir, String message, Throwable ex) {
       LOG.error("Volume {} failed health check. {}", storageDir, message, ex);
     }
   }
