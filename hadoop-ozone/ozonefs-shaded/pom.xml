@@ -180,10 +180,9 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
                   <resources>
-                    <resource>META-INF/BC1024KE.DSA</resource>
-                    <resource>META-INF/BC2048KE.DSA</resource>
-                    <resource>META-INF/BC1024KE.SF</resource>
-                    <resource>META-INF/BC2048KE.SF</resource>
+                    <resource>META-INF/*.DSA</resource>
+                    <resource>META-INF/*.RSA</resource>
+                    <resource>META-INF/*.SF</resource>
                   </resources>
                 </transformer>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
