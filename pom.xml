@@ -1743,7 +1743,7 @@
             <charset>${project.reporting.outputEncoding}</charset>
             <useStandardDocletOptions>true</useStandardDocletOptions>
             <includeDependencySources>false</includeDependencySources>
-            <excludePackageNames>*.generated.*:*.proto.*:*.protobuf.*</excludePackageNames>
+            <excludePackageNames>*.generated:*.proto:*.protobuf</excludePackageNames>
             <sourceFileExcludes>
               <exclude>**/package-info.java</exclude>
               <exclude>**/org/apache/ozone/recon/schema/generated/tables/**/*.java</exclude>
