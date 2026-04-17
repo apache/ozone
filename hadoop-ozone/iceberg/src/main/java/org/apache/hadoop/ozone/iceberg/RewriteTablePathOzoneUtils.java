@@ -33,6 +33,8 @@ import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.util.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Helper methods used by {@link RewriteTablePathOzoneAction} when rewriting
@@ -41,6 +43,7 @@ import org.apache.iceberg.util.Pair;
 final class RewriteTablePathOzoneUtils {
 
   private static final String RESULT_LOCATION = "file-list";
+  private static final Logger LOG = LoggerFactory.getLogger(RewriteTablePathOzoneUtils.class);
   
   private RewriteTablePathOzoneUtils() {
     // utility class
@@ -78,15 +81,10 @@ final class RewriteTablePathOzoneUtils {
   static String getMetadataLocation(Table tbl) {
     String currentMetadataPath = ((HasTableOperations) tbl).operations().current().metadataFileLocation();
     int lastIndex = currentMetadataPath.lastIndexOf(RewriteTablePathUtil.FILE_SEPARATOR);
-    String metadataDir = "";
-    if (lastIndex != -1) {
-      metadataDir = currentMetadataPath.substring(0, lastIndex + 1);
-    }
-
-    if (metadataDir.isEmpty()) {
+    if (lastIndex == -1) {
       throw new IllegalArgumentException("Failed to get the metadata file root directory");
     }
-    return metadataDir;
+    return currentMetadataPath.substring(0, lastIndex + 1);
   }
 
   static void checkNonNullNonEmpty(String value, String name) {
@@ -111,6 +109,7 @@ final class RewriteTablePathOzoneUtils {
         writer.newLine();
       }
     } catch (IOException e) {
+      LOG.error("Failed to write CSV to {}", outputFile.location(), e);
       throw new RuntimeIOException(e);
     }
   }
