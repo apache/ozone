@@ -226,17 +226,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.disk.balancer.container.states</name>
-    <value>CLOSED,QUASI_CLOSED</value>
-    <tag>OZONE, DATANODE, DISKBALANCER</tag>
-    <description>Comma-separated container lifecycle state names (e.g. CLOSED,
-      QUASI_CLOSED) that are eligible to be moved between disks on a datanode.
-      Names are case-insensitive. Extend the default list when additional states
-      are supported for disk balancing. All defined container states are OPEN,
-      CLOSING, QUASI_CLOSED, CLOSED, UNHEALTHY, INVALID, DELETED, RECOVERING.
-    </description>
-  </property>
-  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value>org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>

@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -79,6 +80,8 @@ public class TestDefaultContainerChoosingPolicy {
   private Path baseDir;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final Set<State> DEFAULT_MOVABLE_STATES =
+      CONF.getObject(DiskBalancerConfiguration.class).getMovableContainerStates();
   private static final long MB = 1024L * 1024L;
   private static final long VOLUME_CAPACITY = 2500L * MB; // 2500MB
   private static final long DEFAULT_CONTAINER_SIZE = 100L * MB; // 100MB
@@ -95,7 +98,7 @@ public class TestDefaultContainerChoosingPolicy {
   @BeforeEach
   public void setup() throws Exception {
     datanodeUuid = UUID.randomUUID().toString();
-    policy = new DefaultContainerChoosingPolicy(new ReentrantLock(), CONF);
+    policy = new DefaultContainerChoosingPolicy(new ReentrantLock());
     deltaMap = new HashMap<>();
     inProgressContainerIDs = new HashSet<>();
   }
@@ -386,7 +389,7 @@ public class TestDefaultContainerChoosingPolicy {
     dbc.setContainerStates(containerStates);
     testConf.setFromObject(dbc);
     ContainerChoosingPolicy policyUnderTest = new DefaultContainerChoosingPolicy(
-        new ReentrantLock(), testConf);
+        new ReentrantLock());
 
     inProgressContainerIDs.clear();
     deltaMap.clear();
@@ -410,8 +413,10 @@ public class TestDefaultContainerChoosingPolicy {
 
     mockContainerSet(containerSet);
 
+    Set<State> movable = testConf.getObject(DiskBalancerConfiguration.class)
+        .getMovableContainerStates();
     ContainerCandidate candidate = policyUnderTest.chooseVolumesAndContainer(ozoneContainer,
-        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, movable);
 
     assertNotNull(candidate);
     assertEquals(sourceVolume, candidate.getSourceVolume());
@@ -460,7 +465,8 @@ public class TestDefaultContainerChoosingPolicy {
     List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, deltaMap);
 
     ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
-        volumeSet, deltaMap, inProgressContainerIDs, scenario.getThresholdPercentage());
+        volumeSet, deltaMap, inProgressContainerIDs, scenario.getThresholdPercentage(),
+        DEFAULT_MOVABLE_STATES);
 
     if (scenario.shouldFindPair()) {
       assertNotNull(result);

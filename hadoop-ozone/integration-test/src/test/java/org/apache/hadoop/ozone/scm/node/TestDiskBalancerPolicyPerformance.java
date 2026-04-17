@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerConfiguration;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
@@ -88,6 +90,8 @@ public class TestDiskBalancerPolicyPerformance {
   private static final int NUM_ITERATIONS = 10000;
   private static final int MAX_IN_PROGRESS = 2500;
   private static final double THRESHOLD = 10.0;
+
+  private Set<State> defaultMovableStates;
 
   private OzoneConfiguration conf;
 
@@ -119,7 +123,8 @@ public class TestDiskBalancerPolicyPerformance {
     ContainerController containerController = new ContainerController(containerSet, null);
     when(ozoneContainer.getController()).thenReturn(containerController);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
-    policy = new DefaultContainerChoosingPolicy(new ReentrantLock(), conf);
+    policy = new DefaultContainerChoosingPolicy(new ReentrantLock());
+    defaultMovableStates = conf.getObject(DiskBalancerConfiguration.class).getMovableContainerStates();
     executor = Executors.newFixedThreadPool(NUM_THREADS);
   }
 
@@ -157,7 +162,7 @@ public class TestDiskBalancerPolicyPerformance {
       volume.setConf(testConf);
     }
     assertNull(policy.chooseVolumesAndContainer(ozoneContainer, volumeSet,
-        deltaMap, inProgressContainerIDs, THRESHOLD));
+        deltaMap, inProgressContainerIDs, THRESHOLD, defaultMovableStates));
     assertEquals(NUM_VOLUMES, volumeSet.getVolumesList().size());
   }
 
@@ -185,7 +190,7 @@ public class TestDiskBalancerPolicyPerformance {
             long threadStart = System.nanoTime();
             try {
               ContainerCandidate candidate = pol.chooseVolumesAndContainer(ozoneContainer,
-                  volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
+                  volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, defaultMovableStates);
 
               if (candidate == null) {
                 containerCandidateNotChosen++;
@@ -242,7 +247,7 @@ public class TestDiskBalancerPolicyPerformance {
     deltaMap.clear();
 
     ContainerCandidate first = policy.chooseVolumesAndContainer(ozoneContainer,
-        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, defaultMovableStates);
     assertNotNull(first, "Expected to choose a container on first call");
     long firstContainerId = first.getContainerData().getContainerID();
 
@@ -256,7 +261,7 @@ public class TestDiskBalancerPolicyPerformance {
     containerSet.removeContainerOnlyFromMemory(secondId);
 
     ContainerCandidate second = policy.chooseVolumesAndContainer(ozoneContainer,
-        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, defaultMovableStates);
     assertNotNull(second, "Expected to choose a container on second call");
     assertTrue(second.getContainerData().getContainerID() != firstContainerId
         && second.getContainerData().getContainerID() != secondId,

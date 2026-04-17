@@ -133,13 +133,16 @@ public final class DiskBalancerConfiguration {
           "Unit could be defined with postfix (ns,ms,s,m,h,d).")
   private long replicaDeletionDelay = Duration.ofMinutes(5).toMillis();
 
-  @Config(key = "hdds.datanode.disk.balancer.container.states",
+  private static final String HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES =
+      "hdds.datanode.disk.balancer.container.states";
+
+  @Config(key = HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES,
       defaultValue = DEFAULT_CONTAINER_STATES,
       type = ConfigType.STRING,
       tags = { DATANODE, ConfigTag.DISKBALANCER },
       description = "Container lifecycle state names (CLOSED, QUASI_CLOSED) that " +
           "are eligible to be moved between disks on a datanode. " +
-          "Names are case-insensitive. The default includes CLOSED and QUASI_CLOSED; " +
+          "Names must match the enum exactly (uppercase). The default includes CLOSED and QUASI_CLOSED; " +
           "additional states can be enabled by adding the states here.")
   private String containerStates = DEFAULT_CONTAINER_STATES;
 
@@ -294,15 +297,14 @@ public final class DiskBalancerConfiguration {
 
   /**
    * Container lifecycle states eligible for disk balancing, parsed from {@link #getContainerStates()}:
-   * a comma-separated list of {@link State} names (case-insensitive, whitespace trimmed).
+   * a comma-separated list of {@link State} names (case-sensitive, uppercase; whitespace trimmed).
    *
    * @return unmodifiable non-empty set
    */
   public Set<State> getMovableContainerStates() {
     String raw = containerStates;
     if (StringUtils.isBlank(raw)) {
-      throw new IllegalArgumentException(
-          "hdds.datanode.disk.balancer.container.states must not be empty.");
+      throw new IllegalArgumentException(HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + " must not be empty.");
     }
     Set<State> states = new HashSet<>();
     for (String part : raw.split(",")) {
@@ -311,19 +313,39 @@ public final class DiskBalancerConfiguration {
         continue;
       }
       try {
-        states.add(State.valueOf(name.toUpperCase(Locale.ROOT)));
+        states.add(State.valueOf(name));
       } catch (IllegalArgumentException ex) {
+        if (wouldMatchContainerStateIfUppercased(name)) {
+          throw new IllegalArgumentException(
+              "Invalid container state '" + name + "': use uppercase enum names "
+                  + "(e.g. CLOSED, QUASI_CLOSED). Valid names are: "
+                  + Arrays.toString(State.values()),
+              ex);
+        }
         throw new IllegalArgumentException(
-            "Invalid container state '" + name + "' in hdds.datanode.disk.balancer.container.states. "
+            "Invalid container state '" + name + "' in " + HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + ". "
                 + "Valid names are: " + Arrays.toString(State.values()),
             ex);
       }
     }
     if (states.isEmpty()) {
       throw new IllegalArgumentException(
-          "hdds.datanode.disk.balancer.container.states must list at least one valid state.");
+          HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + " must list at least one valid state.");
     }
     return Collections.unmodifiableSet(states);
+  }
+
+  private static boolean wouldMatchContainerStateIfUppercased(String name) {
+    String upper = name.toUpperCase(Locale.ROOT);
+    if (upper.equals(name)) {
+      return false;
+    }
+    try {
+      State.valueOf(upper);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   @Override
@@ -333,10 +355,12 @@ public final class DiskBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
+            "%-50s %s%n" +
             "%-50s %s%n",
             "Key", "Value",
         "Threshold", threshold, "Max disk bandwidth", diskBandwidthInMB,
-        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven);
+        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven,
+        "Container states", containerStates);
   }
 
   public HddsProtos.DiskBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -346,7 +370,8 @@ public final class DiskBalancerConfiguration {
     builder.setThreshold(threshold)
         .setDiskBandwidthInMB(diskBandwidthInMB)
         .setParallelThread(parallelThread)
-        .setStopAfterDiskEven(stopAfterDiskEven);
+        .setStopAfterDiskEven(stopAfterDiskEven)
+        .setContainerStates(containerStates);
     return builder;
   }
 
@@ -372,6 +397,10 @@ public final class DiskBalancerConfiguration {
     }
     if (newConfigProto.hasStopAfterDiskEven()) {
       existingConfig.setStopAfterDiskEven(newConfigProto.getStopAfterDiskEven());
+    }
+    if (newConfigProto.hasContainerStates()) {
+      existingConfig.setContainerStates(newConfigProto.getContainerStates());
+      existingConfig.getMovableContainerStates();
     }
     return existingConfig;
   }

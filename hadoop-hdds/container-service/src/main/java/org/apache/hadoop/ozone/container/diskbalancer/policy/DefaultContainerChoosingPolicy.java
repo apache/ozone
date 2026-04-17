@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -41,7 +40,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerConfiguration;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
@@ -64,18 +62,15 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
           () -> CacheBuilder.newBuilder().recordStats().expireAfterAccess(1, HOURS).build());
 
   private final ReentrantLock lock;
-  private final Set<State> movableContainerStates;
 
-  public DefaultContainerChoosingPolicy(ReentrantLock globalLock, ConfigurationSource conf) {
+  public DefaultContainerChoosingPolicy(ReentrantLock globalLock) {
     this.lock = globalLock;
-    this.movableContainerStates = conf.getObject(DiskBalancerConfiguration.class)
-        .getMovableContainerStates();
   }
 
   @Override
   public ContainerCandidate chooseVolumesAndContainer(OzoneContainer ozoneContainer,
       MutableVolumeSet volumeSet, Map<HddsVolume, Long> deltaMap, Set<ContainerID> inProgressContainerIDs,
-      double thresholdPercentage) {
+      double thresholdPercentage, Set<State> movableContainerStates) {
     lock.lock();
     try {
       // Create truly immutable snapshot of volumes to ensure consistency
@@ -126,7 +121,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
         if (dstUsage.getUtilization() < srcUsage.getUtilization() &&
             dstUsage.computeUsableSpace() > 0) {
           ContainerData containerData = chooseContainer(ozoneContainer,
-              src, dst, dstUsage, inProgressContainerIDs, upperThreshold);
+              src, dst, dstUsage, inProgressContainerIDs, upperThreshold, movableContainerStates);
           if (containerData != null) {
             long containerSize = containerData.getBytesUsed();
             dst.incCommittedBytes(containerSize);
@@ -155,7 +150,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
    */
   private ContainerData chooseContainer(OzoneContainer ozoneContainer,
       HddsVolume src, HddsVolume dst, VolumeFixedUsage dstUsage,
-      Set<ContainerID> inProgressContainerIDs, double upperThreshold) {
+      Set<ContainerID> inProgressContainerIDs, double upperThreshold, Set<State> movableContainerStates) {
     final Iterator<Container<?>> itr;
     try {
       itr = CACHE.get().get(src, () -> ozoneContainer.getController().getContainers(src));

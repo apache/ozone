@@ -33,7 +33,10 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -41,6 +44,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -118,7 +122,7 @@ public class TestDiskBalancerService {
    * Creates stale diskBalancer directories to simulate leftover directories
    * from previous failed container moves.
    *
-   * @param volumeSet the volume set containing volumes to create stale dirs for
+   * @param volSet the volume set containing volumes to create stale dirs for
    * @param clusterId the cluster ID to use when constructing paths for uninitialized volumes
    * @throws IOException if directory creation fails
    */
@@ -172,7 +176,7 @@ public class TestDiskBalancerService {
 
     // Set a low bandwidth to delay job
     DiskBalancerInfo initialInfo = new DiskBalancerInfo(DiskBalancerRunningStatus.RUNNING, 10.0d, 1L, 5,
-        true, DiskBalancerVersion.DEFAULT_VERSION);
+        true, DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(initialInfo);
 
     svc.start();
@@ -313,7 +317,7 @@ public class TestDiskBalancerService {
     // Set operational state to RUNNING
     DiskBalancerInfo info = new DiskBalancerInfo(
         DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, parallelThread,
-        false, DiskBalancerVersion.DEFAULT_VERSION);
+        false, DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(info);
 
     ContainerChoosingPolicy containerPolicy = mock(ContainerChoosingPolicy.class);
@@ -328,7 +332,7 @@ public class TestDiskBalancerService {
     when(containerData.getContainerID()).thenAnswer(invocation -> System.nanoTime());
     when(containerData.getBytesUsed()).thenReturn(100L);
 
-    when(containerPolicy.chooseVolumesAndContainer(any(), any(), any(), any(), anyDouble()))
+    when(containerPolicy.chooseVolumesAndContainer(any(), any(), any(), any(), anyDouble(), any()))
         .thenReturn(new ContainerCandidate(containerData, source, dest));
 
     // Test when no tasks are in progress, it should schedule up to the limit
@@ -507,4 +511,39 @@ public class TestDiskBalancerService {
     svc.shutdown();
     testVolumeSet.shutdown();
   }
+
+  private static Stream<Arguments> movableContainerStatesCases() {
+    return Stream.of(
+        Arguments.of("CLOSED,QUASI_CLOSED", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of("closed", false, null, "uppercase"),
+        Arguments.of("NOT_A_STATE", false, null, null),
+        Arguments.of("OPEN,CLOSED", true,
+            new HashSet<>(Arrays.asList(State.OPEN, State.CLOSED)), null)
+    );
+  }
+
+  /**
+   * {@link DiskBalancerConfiguration#getMovableContainerStates()} accepts only exact enum names;
+   * wrong casing and unknown names fail with an error.
+   */
+  @ParameterizedTest(name = "containerStates={0}")
+  @MethodSource("movableContainerStatesCases")
+  public void testMovableContainerStates(String containerStates, boolean expectSuccess,
+      Set<State> expectedStates, String messageMustContain) {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+    config.setContainerStates(containerStates);
+    if (expectSuccess) {
+      Set<State> states = config.getMovableContainerStates();
+      assertEquals(expectedStates, states);
+    } else {
+      IllegalArgumentException ex =
+          assertThrows(IllegalArgumentException.class, config::getMovableContainerStates);
+      if (messageMustContain != null) {
+        assertTrue(ex.getMessage().contains(messageMustContain),
+            () -> "Expected message to contain '" + messageMustContain + "': " + ex.getMessage());
+      }
+    }
+  }
+
 }
