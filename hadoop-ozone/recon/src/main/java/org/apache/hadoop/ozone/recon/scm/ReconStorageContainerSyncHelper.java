@@ -239,7 +239,7 @@ class ReconStorageContainerSyncHelper {
       }
     }
 
-    LOG.debug("No significant drift detected (total drift={}). No sync needed.", totalDrift);
+    LOG.info("No significant drift detected (total drift={}). No sync needed.", totalDrift);
     return SyncAction.NO_ACTION;
   }
 
@@ -725,9 +725,8 @@ class ReconStorageContainerSyncHelper {
 
   /**
    * Uses the state-filtered container-ID list RPC as the source of truth for
-   * targeted sync. The state-filtered count RPC is still wired through the
-   * legacy closed-container request and does not reliably represent non-CLOSED
-   * states.
+   * targeted sync pagination, while the state-aware count RPC is used only to
+   * avoid unnecessary list calls when SCM has no containers in the state.
    */
   private List<ContainerID> getContainerIDsByState(
       ContainerID startContainerId,
