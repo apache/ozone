@@ -244,7 +244,8 @@
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-core</artifactId>
-      <!-- <scope>test</scope> but transitive via spring-jdbc -->
+      <!-- needed at compile time for NestedRuntimeException hierarchy used by spring-jdbc/spring-tx,
+           but never directly imported; suppress the "unused declared" warning -->
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
@@ -331,11 +332,46 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <configuration>
-          <ignoredUnusedDeclaredDependencies>
-            <ignoredUnusedDeclaredDependency>javax.annotation:javax.annotation-api:jar</ignoredUnusedDeclaredDependency>
-          </ignoredUnusedDeclaredDependencies>
-        </configuration>
+        <executions>
+          <execution>
+            <!--
+              Override the inherited "analyze" execution to add module-specific ignore lists.
+              These deps are used for annotation processing, runtime injection, or tooling —
+              not directly referenced in the compiled bytecode.
+            -->
+            <id>analyze</id>
+            <configuration>
+              <ignoredUnusedDeclaredDependencies>
+                <ignoredUnusedDeclaredDependency>aopalliance:aopalliance:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>com.google.inject.extensions:guice-assistedinject:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>com.jolbox:bonecp:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>info.picocli:picocli:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>javax.annotation:javax.annotation-api:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.apache.derby:derby:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.apache.ozone:ozone-reconcodegen:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.apache.ratis:ratis-proto:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.glassfish.hk2.external:jakarta.inject:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.glassfish.jersey.inject:jersey-hk2:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.glassfish.jersey.media:jersey-media-jaxb:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.glassfish.jersey.media:jersey-media-json-jackson:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.mockito:mockito-inline:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.rocksdb:rocksdbjni:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.slf4j:slf4j-reload4j:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.springframework:spring-core:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.springframework:spring-jdbc:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.springframework:spring-tx:jar</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.xerial:sqlite-jdbc:jar</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
+              <ignoredNonTestScopedDependencies>
+                <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.commons:commons-collections4:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:hdds-container-service:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.apache.ozone:hdds-managed-rocksdb:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.springframework:spring-core:jar</ignoredNonTestScopedDependency>
+              </ignoredNonTestScopedDependencies>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

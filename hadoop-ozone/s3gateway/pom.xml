@@ -125,7 +125,8 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
-      <!-- <scope>test</scope> but transitive via ozone-client -->
+      <!-- needed at compile time: AbstractDataStreamOutput (superclass of OzoneDataStreamOutput)
+           lives here; never directly imported but javac needs the full class hierarchy -->
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -278,6 +279,24 @@
                 </artifactItem>
               </artifactItems>
               <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+          <execution>
+            <id>analyze</id>
+            <configuration>
+              <ignoredUnusedDeclaredDependencies combine.children="append">
+                <!--
+                  These Jetty modules and Jersey/Ozone client are runtime dependencies
+                  for the embedded web server and JAX-RS integration; their types are
+                  loaded via service-loader or reflection and not directly imported
+                  in the compiled bytecode of the gateway main sources.
+                -->
+                <ignoredUnusedDeclaredDependency>org.apache.ozone:hdds-client</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.eclipse.jetty:jetty-servlet</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.eclipse.jetty:jetty-webapp</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.apache.ozone:ozone-interface-client</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.glassfish.jersey.core:jersey-common</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
             </configuration>
           </execution>
         </executions>

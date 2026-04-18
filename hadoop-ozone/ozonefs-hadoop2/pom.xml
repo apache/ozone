@@ -120,14 +120,17 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
-        <configuration>
-          <ignoredUnusedDeclaredDependencies>
-            <ignoredUnusedDeclaredDependency>org.assertj:*</ignoredUnusedDeclaredDependency>
-            <ignoredUnusedDeclaredDependency>org.junit.jupiter:*</ignoredUnusedDeclaredDependency>
-            <ignoredUnusedDeclaredDependency>org.mockito:*</ignoredUnusedDeclaredDependency>
-          </ignoredUnusedDeclaredDependencies>
-        </configuration>
         <executions>
+          <execution>
+            <id>analyze</id>
+            <configuration>
+              <ignoredUnusedDeclaredDependencies combine.children="append">
+                <ignoredUnusedDeclaredDependency>org.assertj:*</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.junit.jupiter:*</ignoredUnusedDeclaredDependency>
+                <ignoredUnusedDeclaredDependency>org.mockito:*</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
+            </configuration>
+          </execution>
           <execution>
             <id>include-dependencies</id>
             <goals>

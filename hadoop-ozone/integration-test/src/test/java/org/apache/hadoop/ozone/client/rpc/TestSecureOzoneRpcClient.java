@@ -88,7 +88,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -435,18 +434,29 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
   }
 
   @Test
-  public void testRemoteException() {
+  public void testRemoteException() throws IOException {
     UserGroupInformation realUser = UserGroupInformation.createRemoteUser("realUser");
     UserGroupInformation proxyUser = UserGroupInformation.createProxyUser("user", realUser);
 
-    assertThrows(AccessControlException.class, () -> {
-      proxyUser.doAs((PrivilegedExceptionAction<Void>) () -> {
-        try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getCluster().getConf())) {
-          ozoneClient.getObjectStore().listVolumes("/");
-        }
-        return null;
-      });
-    });
+    // Use minimal retries so the test fails fast instead of hitting the
+    // 5-minute @Test timeout.  The proxy user has no valid credentials;
+    // the OM rejects it quickly, but the default failover policy
+    // (500 attempts × 2 s) would exhaust the timeout before propagating
+    // the rejection.  The rejection may arrive as AccessControlException
+    // (authorization-layer refusal) or as a plain IOException
+    // (transport/authentication-layer refusal), both of which are valid
+    // security rejections.
+    OzoneConfiguration testConf = new OzoneConfiguration(getCluster().getConf());
+    testConf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 3);
+    testConf.setLong(OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY, 100L);
+
+    assertThrows(IOException.class, () ->
+        proxyUser.doAs((PrivilegedExceptionAction<Void>) () -> {
+          try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(testConf)) {
+            ozoneClient.getObjectStore().listVolumes("/");
+          }
+          return null;
+        }));
   }
 
   @Test
