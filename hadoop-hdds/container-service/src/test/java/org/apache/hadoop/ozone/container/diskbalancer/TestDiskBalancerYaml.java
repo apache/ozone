@@ -22,10 +22,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANC
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests to test DiskBalancer's YAML operation.
@@ -34,24 +37,28 @@ public class TestDiskBalancerYaml {
   @TempDir
   private Path tmpDir;
 
-  @Test
-  public void testCreateYaml() throws IOException {
-    double threshold = 10;
-    long bandwidthInMB = 100;
-    int parallelThread = 5;
-    boolean stopAfterDiskEven = true;
-    DiskBalancerVersion version = DiskBalancerVersion.DEFAULT_VERSION;
-
-    File file = new File(tmpDir.toString(),
-        OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
-
-    DiskBalancerInfo info = new DiskBalancerInfo(DiskBalancerRunningStatus.RUNNING, threshold,
-        bandwidthInMB, parallelThread, stopAfterDiskEven, version);
-
+  @ParameterizedTest
+  @MethodSource("diskBalancerYamlCases")
+  public void testDiskBalancerYamlRoundTrip(double threshold, long bandwidthInMB, int parallelThread,
+      boolean stopAfterDiskEven, String containerStates) throws IOException {
+    File file = new File(tmpDir.toString(), OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING,
+        threshold,
+        bandwidthInMB,
+        parallelThread,
+        stopAfterDiskEven,
+        containerStates,
+        DiskBalancerVersion.DEFAULT_VERSION);
     DiskBalancerYaml.createDiskBalancerInfoFile(info, file);
-
     DiskBalancerInfo newInfo = DiskBalancerYaml.readDiskBalancerInfoFile(file);
-
     Assertions.assertEquals(info, newInfo);
+  }
+
+  public static Stream<Arguments> diskBalancerYamlCases() {
+    return Stream.of(
+        Arguments.of(10d, 100L, 5, true, DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES),
+        Arguments.of(15d, 200L, 10, false, "CLOSED")
+    );
   }
 }

@@ -21,10 +21,17 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 
 import jakarta.annotation.Nonnull;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +43,11 @@ import org.slf4j.LoggerFactory;
 public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
+
+  /**
+   * Default {@link #containerStates}: CLOSED and QUASI_CLOSED containers may be disk-balanced.
+   */
+  public static final String DEFAULT_CONTAINER_STATES = "CLOSED,QUASI_CLOSED";
 
   @Config(key = "hdds.datanode.disk.balancer.info.dir", type = ConfigType.STRING,
       defaultValue = "", tags = {ConfigTag.DISKBALANCER},
@@ -120,6 +132,19 @@ public final class DiskBalancerConfiguration {
           "destination volume before the source container replica is deleted. " +
           "Unit could be defined with postfix (ns,ms,s,m,h,d).")
   private long replicaDeletionDelay = Duration.ofMinutes(5).toMillis();
+
+  private static final String HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES =
+      "hdds.datanode.disk.balancer.container.states";
+
+  @Config(key = HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES,
+      defaultValue = DEFAULT_CONTAINER_STATES,
+      type = ConfigType.STRING,
+      tags = { DATANODE, ConfigTag.DISKBALANCER },
+      description = "Container lifecycle state names (CLOSED, QUASI_CLOSED) that " +
+          "are eligible to be moved between disks on a datanode. " +
+          "Names must match the enum exactly (uppercase). The default includes CLOSED and QUASI_CLOSED; " +
+          "additional states can be enabled by adding the states here.")
+  private String containerStates = DEFAULT_CONTAINER_STATES;
 
   public DiskBalancerConfiguration(Double threshold,
       Long bandwidthInMB,
@@ -262,6 +287,67 @@ public final class DiskBalancerConfiguration {
     this.parallelThread = parallelThread;
   }
 
+  public String getContainerStates() {
+    return containerStates;
+  }
+
+  public void setContainerStates(String containerStates) {
+    this.containerStates = containerStates;
+  }
+
+  /**
+   * Container lifecycle states eligible for disk balancing, parsed from {@link #getContainerStates()}:
+   * a comma-separated list of {@link State} names (case-sensitive, uppercase; whitespace trimmed).
+   *
+   * @return unmodifiable non-empty set
+   */
+  public Set<State> getMovableContainerStates() {
+    String raw = containerStates;
+    if (StringUtils.isBlank(raw)) {
+      throw new IllegalArgumentException(HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + " must not be empty.");
+    }
+    Set<State> states = new HashSet<>();
+    for (String part : raw.split(",")) {
+      String name = part.trim();
+      if (name.isEmpty()) {
+        continue;
+      }
+      try {
+        states.add(State.valueOf(name));
+      } catch (IllegalArgumentException ex) {
+        if (wouldMatchContainerStateIfUppercased(name)) {
+          throw new IllegalArgumentException(
+              "Invalid container state '" + name + "': use uppercase enum names "
+                  + "(e.g. CLOSED, QUASI_CLOSED). Valid names are: "
+                  + Arrays.toString(State.values()),
+              ex);
+        }
+        throw new IllegalArgumentException(
+            "Invalid container state '" + name + "' in " + HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + ". "
+                + "Valid names are: " + Arrays.toString(State.values()),
+            ex);
+      }
+    }
+    if (states.isEmpty()) {
+      throw new IllegalArgumentException(
+          HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + " must list at least one valid state.");
+    }
+    return Collections.unmodifiableSet(states);
+  }
+
+  private static boolean wouldMatchContainerStateIfUppercased(String name) {
+    String upper = name.toUpperCase(Locale.ROOT);
+    if (upper.equals(name)) {
+      return false;
+    }
+    try {
+      State.valueOf(upper);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
   @Override
   public String toString() {
     return String.format("Disk Balancer Configuration values:%n" +
@@ -269,10 +355,12 @@ public final class DiskBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
+            "%-50s %s%n" +
             "%-50s %s%n",
             "Key", "Value",
         "Threshold", threshold, "Max disk bandwidth", diskBandwidthInMB,
-        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven);
+        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven,
+        "Container states", containerStates);
   }
 
   public HddsProtos.DiskBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -282,7 +370,8 @@ public final class DiskBalancerConfiguration {
     builder.setThreshold(threshold)
         .setDiskBandwidthInMB(diskBandwidthInMB)
         .setParallelThread(parallelThread)
-        .setStopAfterDiskEven(stopAfterDiskEven);
+        .setStopAfterDiskEven(stopAfterDiskEven)
+        .setContainerStates(containerStates);
     return builder;
   }
 
@@ -308,6 +397,10 @@ public final class DiskBalancerConfiguration {
     }
     if (newConfigProto.hasStopAfterDiskEven()) {
       existingConfig.setStopAfterDiskEven(newConfigProto.getStopAfterDiskEven());
+    }
+    if (newConfigProto.hasContainerStates()) {
+      existingConfig.setContainerStates(newConfigProto.getContainerStates());
+      existingConfig.getMovableContainerStates();
     }
     return existingConfig;
   }

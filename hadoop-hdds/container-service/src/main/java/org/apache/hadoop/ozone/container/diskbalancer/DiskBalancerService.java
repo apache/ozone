@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -100,6 +99,7 @@ public class DiskBalancerService extends BackgroundService {
   private int parallelThread;
   private boolean stopAfterDiskEven;
   private DiskBalancerVersion version;
+  private String containerStates;
 
   // State field using proto enum
   private volatile DiskBalancerRunningStatus operationalState =
@@ -130,6 +130,8 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
 
+  private Set<State> movableContainerStates;
+
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
       int workerSize, ConfigurationSource conf) throws IOException {
@@ -153,8 +155,9 @@ public class DiskBalancerService extends BackgroundService {
       throw new IOException(e);
     }
 
-    replicaDeletionDelay = conf.getObject(DiskBalancerConfiguration.class)
-        .getReplicaDeletionDelay();
+    DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
+    replicaDeletionDelay = diskBalancerConfiguration.getReplicaDeletionDelay();
+    setContainerStates(diskBalancerConfiguration.getContainerStates());
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
@@ -250,6 +253,7 @@ public class DiskBalancerService extends BackgroundService {
     setParallelThread(diskBalancerInfo.getParallelThread());
     setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
+    setContainerStates(diskBalancerInfo.getContainerStates());
 
     // Default executorService is ScheduledThreadPoolExecutor, so we can
     // update the poll size by setting corePoolSize.
@@ -360,6 +364,18 @@ public class DiskBalancerService extends BackgroundService {
     this.version = version;
   }
 
+  /**
+   * Stores the comma-separated state names and rebuilds {@link #movableContainerStates} from it.
+   * The string is what we persist; the set is used for fast {@code contains} checks
+   * when selecting containers and before moves.
+   */
+  public void setContainerStates(String containerStates) {
+    this.containerStates = containerStates;
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+    config.setContainerStates(containerStates);
+    movableContainerStates = config.getMovableContainerStates();
+  }
+
   @Override
   public synchronized void start() {
     // Clean up any stale diskBalancer tmp directories from previous runs
@@ -397,7 +413,7 @@ public class DiskBalancerService extends BackgroundService {
 
     for (int i = 0; i < availableTaskCount; i++) {
       ContainerCandidate candidate = volumeContainerChoosingPolicy.chooseVolumesAndContainer(
-          ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold);
+          ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold, movableContainerStates);
       if (candidate != null) {
         HddsVolume sourceVolume = candidate.getSourceVolume();
         HddsVolume destVolume = candidate.getDestVolume();
@@ -485,14 +501,10 @@ public class DiskBalancerService extends BackgroundService {
       }
 
       // Double check container state before acquiring lock to start move process.
-      // Container state may have changed after selection. Only CLOSED containers can be moved.
-      // QUASI_CLOSED is allowed when test mode is enabled, this is done to test in production
-      // these containers are rejected.
+      // Container state may have changed after selection.
       State containerState = container.getContainerData().getState();
-      boolean isTestMode = DefaultContainerChoosingPolicy.isTest();
-      if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
-        LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
-            containerId, containerState);
+      if (!movableContainerStates.contains(containerState)) {
+        LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
         postCall(false, startTime);
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
@@ -689,7 +701,7 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     DiskBalancerInfo info = new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
-        parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
+        parallelThread, stopAfterDiskEven, version, containerStates, metrics.getSuccessCount(),
         metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDataDensity);
     info.setIdealUsage(getIdealUsage(volumeUsages));
     info.setVolumeInfo(buildVolumeReportProto(volumeUsages));
