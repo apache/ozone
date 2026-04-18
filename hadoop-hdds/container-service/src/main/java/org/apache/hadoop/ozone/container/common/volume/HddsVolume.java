@@ -307,13 +307,13 @@ public class HddsVolume extends StorageVolume {
 
   @VisibleForTesting
   public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
-    if (!getDiskCheckEnabled()) {
+    if (!(getDiskCheckEnabled() && getDatanodeConfig().isRocksDbDiskCheckEnabled())) {
       return VolumeCheckResult.HEALTHY;
     }
 
     // We attempt to open RocksDb twice to ignore any transient errors
     // and to confirm that we actually cannot open RocksDb in readonly mode.
-    final int maxAttempts = 2;
+    final int maxAttempts = getDatanodeConfig().getDiskCheckRetryAttempts();
     final Duration maxRetryGap = getDatanodeConfig().getDiskCheckRetryGap();
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
       try (ManagedOptions managedOptions = new ManagedOptions();
@@ -336,7 +336,6 @@ public class HddsVolume extends StorageVolume {
         }
       }
     }
-
 
     if (getIoTestSlidingWindow().isExceeded()) {
       LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
