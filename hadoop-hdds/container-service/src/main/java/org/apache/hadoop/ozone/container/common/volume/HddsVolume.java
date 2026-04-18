@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -306,20 +307,34 @@ public class HddsVolume extends StorageVolume {
 
   @VisibleForTesting
   public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
-    if (!getDiskCheckEnabled()) {
+    if (!(getDiskCheckEnabled() && getDatanodeConfig().isRocksDbDiskCheckEnabled())) {
       return VolumeCheckResult.HEALTHY;
     }
 
-    try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
-      // Do nothing. Only check if rocksdb is accessible.
-      LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}.", dbFile, getStorageDir());
-    } catch (Exception e) {
-      if (Thread.currentThread().isInterrupted()) {
-        throw new InterruptedException("Check of database for volume " + this + " interrupted.");
+    // We attempt to open RocksDb twice to ignore any transient errors
+    // and to confirm that we actually cannot open RocksDb in readonly mode.
+    final int maxAttempts = getDatanodeConfig().getDiskCheckRetryAttempts();
+    final Duration maxRetryGap = getDatanodeConfig().getDiskCheckRetryGap();
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      try (ManagedOptions managedOptions = new ManagedOptions();
+           ManagedRocksDB ignored =
+               ManagedRocksDB.openAsSecondary(managedOptions, dbFile.toString(), getTmpDir().getPath())) {
+        // Do nothing. Only check if rocksdb is accessible.
+        LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}.", dbFile, getStorageDir());
+        break;
+      } catch (Exception e) {
+        if (Thread.currentThread().isInterrupted()) {
+          throw new InterruptedException("Check of database for volume " + this + " interrupted.");
+        }
+
+        if (attempt == maxAttempts - 1) {
+          LOG.error("Could not open Volume DB located at {}", dbFile, e);
+          getIoTestSlidingWindow().add();
+        } else {
+          LOG.warn("Could not open Volume DB located at {}", dbFile, e);
+          Thread.sleep(maxRetryGap.toMillis());
+        }
       }
-      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
-      getIoTestSlidingWindow().add();
     }
 
     if (getIoTestSlidingWindow().isExceeded()) {
