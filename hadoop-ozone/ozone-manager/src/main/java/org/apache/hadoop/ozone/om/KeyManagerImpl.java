@@ -966,9 +966,22 @@ public class KeyManagerImpl implements KeyManager {
       OmBucketInfo bucketInfo, long objectId, String currentKeyPath,
       Function<KeyManager, Table<String, T>> table) throws IOException {
     String renameKey = metadataManager.getRenameKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName(), objectId);
-    String renamedKey = metadataManager.getSnapshotRenamedTable().getIfExist(renameKey);
-    return (previousSnapshotKM) -> table.apply(previousSnapshotKM).get(
-        renamedKey != null ? renamedKey : currentKeyPath);
+    Table<String, String> renamedTable = metadataManager.getSnapshotRenamedTable();
+    String renamedKey = renamedTable.getIfExist(renameKey);
+    if (renamedKey == null) {
+      // Snapshot reads should not rely solely on table cache.
+      renamedKey = renamedTable.getSkipCache(renameKey);
+    }
+    final String resolvedRenamedKey = renamedKey;
+    return (previousSnapshotKM) -> {
+      Table<String, T> previousTable = table.apply(previousSnapshotKM);
+      String lookupKey = resolvedRenamedKey != null ? resolvedRenamedKey : currentKeyPath;
+      T value = previousTable.get(lookupKey);
+      if (value == null) {
+        value = previousTable.getSkipCache(lookupKey);
+      }
+      return value;
+    };
   }
 
   @Override
