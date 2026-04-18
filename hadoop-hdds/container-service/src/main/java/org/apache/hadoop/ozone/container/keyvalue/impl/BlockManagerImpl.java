@@ -21,11 +21,13 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -63,6 +65,7 @@ public class BlockManagerImpl implements BlockManager {
   private final int readMappedBufferThreshold;
   private final int readMappedBufferMaxCount;
   private final boolean readNettyChunkedNioFile;
+  private final AtomicBoolean hbaseSupportFinalized;
 
   /**
    * Constructs a Block Manager.
@@ -84,6 +87,8 @@ public class BlockManagerImpl implements BlockManager {
     this.readNettyChunkedNioFile = config.getBoolean(
         ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_DEFAULT);
+    this.hbaseSupportFinalized = new AtomicBoolean(
+        VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT));
   }
 
   @Override
@@ -227,13 +232,12 @@ public class BlockManagerImpl implements BlockManager {
           }
         }
 
-        boolean incrementalEnabled = true;
-        if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
+        boolean incrementalEnabled = isIncrementalChunkListFeatureFinalized();
+        if (!incrementalEnabled) {
           if (isPartialChunkList(data)) {
             throw new StorageContainerException("DataNode has not finalized " +
                 "upgrading to a version that supports incremental chunk list.", UNSUPPORTED_REQUEST);
           }
-          incrementalEnabled = false;
         }
         db.getStore().putBlockByID(batch, incrementalEnabled, localID, data,
             containerData, endOfBlock);
@@ -459,6 +463,22 @@ public class BlockManagerImpl implements BlockManager {
       KeyValueContainerData containerData) throws IOException {
     String blockKey = containerData.getBlockKey(blockID.getLocalID());
     return db.getStore().getBlockByID(blockID, blockKey);
+  }
+
+  @VisibleForTesting
+  boolean isIncrementalChunkListFeatureFinalized() {
+    if (hbaseSupportFinalized.get()) {
+      return true;
+    }
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.HBASE_SUPPORT)) {
+      if (hbaseSupportFinalized.compareAndSet(false, true)) {
+        LOG.info("Layout feature {} is finalized. Skipping finalization checks "
+                + "for incremental chunk list on subsequent putBlock requests.",
+            HDDSLayoutFeature.HBASE_SUPPORT);
+      }
+      return true;
+    }
+    return false;
   }
 
   private static boolean isPartialChunkList(BlockData data) {
