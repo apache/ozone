@@ -251,6 +251,7 @@ public final class OmUtils {
     case SnapshotDiff:
     case CancelSnapshotDiff:
     case ListSnapshotDiffJobs:
+    case SubmitSnapshotDiff:
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
@@ -441,6 +442,7 @@ public final class OmUtils {
     case SnapshotDiff:
     case CancelSnapshotDiff:
     case ListSnapshotDiffJobs:
+    case SubmitSnapshotDiff:
     case PrintCompactionLogDag:
       // Snapshot diff is a local to a single OM node so we should not send it arbitrarily
       // to any OM nodes

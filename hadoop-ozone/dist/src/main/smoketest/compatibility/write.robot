@@ -79,3 +79,68 @@ HSync Can Be Used To Create Keys
     Freon DFSG      sync=HSYNC    n=1    path=${o3fspath}
     ${pfspath} =    Format FS URL         ofs      $vol1    bucket1
     Freon DFSG      sync=HSYNC    n=1    path=${pfspath}
+
+Snapshot Diff RPC Is Compatible
+    # Snapshot diff requires snapshot support in these tests.
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Snapshot CLI not supported by this client
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Snapshot CLI not supported by this client
+
+    ${bucket} =      Set Variable    snapdiff-${CLIENT_VERSION}
+    ${fromSnap} =    Set Variable    snapdiff-from-${CLIENT_VERSION}
+    ${toSnap} =      Set Variable    snapdiff-to-${CLIENT_VERSION}
+    ${key1} =        Set Variable    snapdiff-key1-${CLIENT_VERSION}
+    ${key2} =        Set Variable    snapdiff-key2-${CLIENT_VERSION}
+
+    Execute          ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/${bucket}
+    Execute          ozone sh key put /vol1/${bucket}/base ${TESTFILE}
+    Execute          ozone sh snapshot create /vol1/${bucket} ${fromSnap}
+    Execute          ozone sh key put /vol1/${bucket}/${key1} ${TESTFILE}
+    Execute          ozone sh key put /vol1/${bucket}/${key2} ${TESTFILE}
+    Execute          ozone sh snapshot create /vol1/${bucket} ${toSnap}
+
+    Snapshot Diff Report Should Contain Created Keys
+    ...    /vol1/${bucket}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
+
+*** Keywords ***
+Snapshot Diff Report Should Contain Created Keys
+    [Arguments]    ${bucketPath}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
+
+    # New clients support --get-report. Old clients don't; fall back to the legacy call.
+    ${status}    ${output} =    Run Keyword And Ignore Error
+    ...    Execute    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
+
+    IF    '${status}' == 'PASS'
+        # On newer servers, --get-report does not submit jobs. If the job is not
+        # found, submit it first (this keeps new-client/new-server behavior).
+        ${notFound} =    Run Keyword And Return Status
+        ...    Should Contain    ${output}    No snapshot diff job found
+        IF    ${notFound}
+            ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+                           Should Contain    ${output}    Submitting a new job
+        ELSE
+        # On older servers, --get-report falls back to the legacy snapshot diff command.
+        # Ensure the submit path succeeds without failing the test.
+            ${submitStatus}    ${submitOutput} =    Run Keyword And Ignore Error
+            ...    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+            Run Keyword If    '${submitStatus}' == 'FAIL'
+            ...    Fail    Snapshot diff submit failed: ${submitOutput}
+        END
+        Wait Until Keyword Succeeds    2min    5sec
+        ...    Snapshot Diff Command Should Contain Created Keys
+        ...    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
+        ...    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
+    ELSE
+        # old client, which does not support --get-report.
+        # The snapshot diff command should return the report, submitting a job if necessary.
+        Wait Until Keyword Succeeds    2min    5sec
+        ...    Snapshot Diff Command Should Contain Created Keys
+        ...    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
+        ...    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
+    END
+
+Snapshot Diff Command Should Contain Created Keys
+    [Arguments]    ${command}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
+    ${output} =    Execute    ${command}
+    Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
+    Should Contain    ${output}    ${key1}
+    Should Contain    ${output}    ${key2}

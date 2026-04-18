@@ -93,9 +93,14 @@ Manage snapshots using `ozone sh` or `ozone fs` (Hadoop-compatible) commands:
     ```
     Requires read privileges on the bucket.
 
-*   **Snapshot Diff:** Shows changes between two snapshots or a snapshot and the live bucket.
+*   **Submit Snapshot Diff:** Submit job to find diff between two snapshots or a snapshot and the live bucket.
     ```shell
     ozone sh snapshot diff /vol1/bucket1 <snap1> <snap2_or_live_bucket>
+    ```
+  
+*   **Get Snapshot Diff Report:** Shows changes between two snapshots or a snapshot and the live bucket.
+    ```shell
+    ozone sh snapshot diff --get-report /vol1/bucket1 <snap1> <snap2_or_live_bucket>
     ```
     Output prefixes: `+` (add), `-` (delete), `M` (modify), `R` (rename). Use `-p`, `-t` for pagination.
     Manage diff jobs: `ozone sh snapshot listDiff /vol1/bucket1`, `ozone sh snapshot cancelDiff <jobId>`.
