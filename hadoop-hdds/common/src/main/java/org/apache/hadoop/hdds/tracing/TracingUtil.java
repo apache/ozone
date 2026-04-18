@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.tracing;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
@@ -48,10 +49,12 @@ import org.slf4j.LoggerFactory;
 public final class TracingUtil {
   private static final Logger LOG = LoggerFactory.getLogger(TracingUtil.class);
   private static final String NULL_SPAN_AS_STRING = "";
+  private static final String OZONE_CLIENT_TRACER_SCOPE = "org.apache.hadoop.ozone.client";
 
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
   private static SdkTracerProvider sdkTracerProvider;
+  private static volatile TracingConfig clientTracingConfig;
 
   private TracingUtil() {
   }
@@ -61,6 +64,7 @@ public final class TracingUtil {
    */
   public static synchronized void initTracing(
       String serviceName, TracingConfig tracingConfig) {
+    clientTracingConfig = tracingConfig;
     if (!tracingConfig.isTracingEnabled() || isInit) {
       return;
     }
@@ -72,6 +76,38 @@ public final class TracingUtil {
     } catch (Exception e) {
       LOG.error("Failed to initialize tracing", e);
     }
+  }
+
+  /**
+   * When ozone tracing is off , client tracing is off and no context exist thn
+   * span creation should be skipped.
+   */
+  private static boolean shouldByPassSpanCreation() {
+    if (clientTracingConfig == null) {
+      return false;
+    }
+    //if ozone tracing is true then resolve tracer as usual and create span
+    if (clientTracingConfig.isTracingEnabled()) {
+      return false;
+    }
+    boolean hasValidContext = Span.current().getSpanContext().isValid();
+    boolean clientApplicationTracing = clientTracingConfig.isClientApplicationAware();
+
+    //if ozone tracing is false but context exists and client tracing is true then create span.
+    return !(hasValidContext && clientApplicationTracing);
+  }
+
+  /**
+   * When Ozone OTLP tracing is off but the app has an active span, use the app SDK via GlobalOpenTelemetry.
+   */
+  private static Tracer resolveTracerForNewSpan(Span parentSpan) {
+    if (clientTracingConfig != null
+        && !clientTracingConfig.isTracingEnabled()
+        && clientTracingConfig.isClientApplicationAware()
+        && parentSpan.getSpanContext().isValid()) {
+      return GlobalOpenTelemetry.get().getTracer(OZONE_CLIENT_TRACER_SCOPE);
+    }
+    return tracer;
   }
 
   /**
@@ -254,15 +290,19 @@ public final class TracingUtil {
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
       CheckedRunnable<E> runnable) throws E {
+    if (shouldByPassSpanCreation()) {
+      runnable.run();
+      return;
+    }
     Span span = buildSpan(spanName);
     executeInSpan(span, runnable);
   }
 
-  /**
-   * Execute {@code supplier} inside an activated new span.
-   */
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
       CheckedSupplier<R, E> supplier) throws E {
+    if (shouldByPassSpanCreation()) {
+      return supplier.get();
+    }
     Span span = buildSpan(spanName);
     return executeInSpan(span, supplier);
   }
@@ -317,6 +357,9 @@ public final class TracingUtil {
    * in case of Exceptions.
    */
   public static TraceCloseable createActivatedSpan(String spanName) {
+    if (shouldByPassSpanCreation()) {
+      return () -> { };
+    }
     Span span = buildSpan(spanName);
     Scope scope = span.makeCurrent();
     return () -> {
@@ -380,11 +423,11 @@ public final class TracingUtil {
   private static Span buildSpan(String spanName) {
     Context currentContext = Context.current();
     Span parentSpan = Span.fromContext(currentContext);
+    Tracer spanTracer = resolveTracerForNewSpan(parentSpan);
 
     if (parentSpan.getSpanContext().isValid()) {
-      return tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
-    } else {
-      return tracer.spanBuilder(spanName).setNoParent().startSpan();
+      return spanTracer.spanBuilder(spanName).setParent(currentContext).startSpan();
     }
+    return spanTracer.spanBuilder(spanName).setNoParent().startSpan();
   }
 }
