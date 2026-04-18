@@ -18,11 +18,14 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -89,6 +92,15 @@ public class TestStorageVolumeHealthChecks {
     // needs to be cleared before each test.
     FileUtils.deleteDirectory(volumePath.toFile());
     DiskCheckUtil.clearTestImpl();
+    TEST_CLOCK.set(Instant.now());
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckEnabled(true);
+    dnConf.setDiskCheckTimeoutTestEnabled(true);
+    dnConf.setVolumeIOFailureTolerance(1);
+    dnConf.setDiskCheckTimeoutFailureTolerance(1);
+    dnConf.setDiskCheckSlidingWindowTimeout(Duration.ofMinutes(70));
+    dnConf.setDiskCheckTimeoutSlidingWindowTimeout(Duration.ofMinutes(70));
+    CONF.setFromObject(dnConf);
   }
 
   @ParameterizedTest
@@ -322,6 +334,88 @@ public class TestStorageVolumeHealthChecks {
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
     volume.check(false);
+  }
+
+  /**
+   * With the default settings (ioFailureTolerance=1), the first simulated
+   * timeout within the timeout window must be tolerated.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testFirstTimeoutWithinWindowIsTolerated(
+      StorageVolume.Builder<?> builder)
+      throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "First timeout within the window should be tolerated");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
+  }
+
+  /**
+   * With the default settings (ioFailureTolerance=1), the second timeout
+   * within the timeout window must fail the volume.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testSecondTimeoutWithinWindowFails(
+      StorageVolume.Builder<?> builder)
+      throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "First timeout should be tolerated");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
+
+    assertTrue(volume.recordTimeoutAndCheckFailure(),
+        "Second timeout in the window should exceed tolerance and return true");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getWindowSize());
+  }
+
+  /**
+   * Timeout events automatically expire from the timeout window, so an old
+   * timeout does not need an explicit reset before a later timeout is
+   * tolerated again.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testExpiredTimeoutDoesNotCountTowardLaterFailure(
+      StorageVolume.Builder<?> builder) throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "First timeout should be tolerated");
+    TEST_CLOCK.fastForward(
+        volume.getTimeoutFailureSlidingWindow().getExpiryDurationMillis() + 1);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Timeout after the window expires should be tolerated again");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
+  }
+
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testTimeoutCheckDisabled(StorageVolume.Builder<?> builder)
+      throws Exception {
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeoutTestEnabled(false);
+    CONF.setFromObject(dnConf);
+
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Timeout tracking should be disabled");
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Disabled timeout tracking should never fail the volume");
+    assertEquals(0, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
   }
 
   /**
