@@ -158,8 +158,8 @@ public class OS3Exception extends RuntimeException {
         this.getRequestId());
   }
 
-  /** Create a copy with specific message. */
   public OS3Exception withMessage(String message) {
-    return new OS3Exception(code, message, httpCode);
+    setErrorMessage(message);
+    return this;
   }
 }

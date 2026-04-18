@@ -38,7 +38,7 @@ jobs:
 
       - name: Restore cache for Maven dependencies
         id: restore-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.4
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -60,7 +60,7 @@ jobs:
       - name: Restore NodeJS tarballs
         id: restore-nodejs
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.4
         with:
           path: ~/.m2/repository/com/github/eirslett/node
           key: nodejs-${{ steps.nodejs-version.outputs.nodejs-version }}
@@ -85,7 +85,7 @@ jobs:
 
       - name: Save cache for Maven dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v5.0.4
         with:
           path: |
             ~/.m2/repository/*/*/*

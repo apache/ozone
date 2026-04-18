@@ -25,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -71,9 +72,14 @@ public interface SCMRatisServer {
 
   RaftPeerId getLeaderId();
 
-  default <T> T getProxyHandler(final RequestType type, final Class<T> intf, final T impl) {
+  default <T extends SCMHandler> T getProxyHandler(ScmInvoker<T> invoker) {
+    registerStateMachineHandler(invoker.getType(), invoker);
+    return invoker.getProxy();
+  }
+
+  default <T extends SCMHandler> T getProxyHandler(Class<T> intf, T impl) {
     final SCMHAInvocationHandler invocationHandler =
-        new SCMHAInvocationHandler(type, impl, this);
+        new SCMHAInvocationHandler(impl.getType(), impl, this);
     return intf.cast(Proxy.newProxyInstance(getClass().getClassLoader(),
         new Class<?>[] {intf}, invocationHandler));
   }

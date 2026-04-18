@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -79,8 +78,7 @@ public class TestBucketDelete {
   @Test
   public void testDeleteWithBucketNotEmpty() throws Exception {
     try {
-      ObjectStoreStub stub = (ObjectStoreStub) objectStoreStub;
-      stub.setBucketEmptyStatus(bucketName, false);
+      objectStoreStub.getS3Bucket(bucketName).createDirectory("dir");
       bucketEndpoint.delete(bucketName);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getCode(), ex.getCode());

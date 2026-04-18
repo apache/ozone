@@ -27,7 +27,109 @@
         $routeProvider
             .when("/metrics/ozoneManager", {
                 template: "<om-metrics></om-metrics>"
+            })
+            .when("/snapshots", {
+                template: "<om-snapshots></om-snapshots>"
             });
+    });
+    angular.module('ozoneManager').component('omSnapshots', {
+        templateUrl: 'om-snapshots.html',
+        controller: function ($http, $scope) {
+            var ctrl = this;
+            ctrl.snapshotMetrics = [];
+            ctrl.snapshotDiffJobs = [];
+            ctrl.snapshotUsageMetrics = {
+                'NumSnapshotActive': 0,
+                'NumSnapshotDeleted': 0,
+                'NumSnapshotCacheSize': 0
+            };
+            $scope.reverse = false;
+            $scope.columnName = "jobId";
+            let snapDiffJobsCopy = [];
+            $scope.RecordsToDisplay = "10";
+            $scope.currentPage = 1;
+            $scope.lastIndex = 0;
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        var metrics = result.data.beans[0];
+                        ctrl.snapshotUsageMetrics.NumSnapshotActive = metrics.NumSnapshotActive || 0;
+                        ctrl.snapshotUsageMetrics.NumSnapshotDeleted = metrics.NumSnapshotDeleted || 0;
+                        ctrl.snapshotUsageMetrics.NumSnapshotCacheSize = metrics.NumSnapshotCacheSize || 0;
+                    }
+                });
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OmSnapshotInternalMetrics")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        var metrics = result.data.beans[0];
+                        for (var key in metrics) {
+                            if (!isIgnoredJmxKeys(key)) {
+                                ctrl.snapshotMetrics.push({key: key, value: metrics[key]});
+                            }
+                        }
+                    }
+                });
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=SnapshotDiffManager")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        snapDiffJobsCopy = result.data.beans[0].SnapshotDiffJobs;
+                        $scope.totalItems = snapDiffJobsCopy.length;
+                        $scope.lastIndex = Math.ceil(snapDiffJobsCopy.length / $scope.RecordsToDisplay);
+                        ctrl.snapshotDiffJobs = snapDiffJobsCopy.slice(0, $scope.RecordsToDisplay);
+                    }
+                });
+
+            /*if option is 'All' display all records else display specified record on page*/
+            $scope.UpdateRecordsToShow = () => {
+                if($scope.RecordsToDisplay == 'All') {
+                    $scope.lastIndex = 1;
+                    ctrl.snapshotDiffJobs = snapDiffJobsCopy;
+                } else {
+                    $scope.lastIndex = Math.ceil(snapDiffJobsCopy.length / $scope.RecordsToDisplay);
+                    ctrl.snapshotDiffJobs = snapDiffJobsCopy.slice(0, $scope.RecordsToDisplay);
+                }
+                $scope.currentPage = 1;
+            }
+            /* Page Slicing  logic */
+            $scope.handlePagination = (pageIndex, isDisabled) => {
+                if(!isDisabled && $scope.RecordsToDisplay != 'All') {
+                    pageIndex = parseInt(pageIndex);
+                    let startIndex = 0, endIndex = 0;
+                    $scope.currentPage = pageIndex;
+                    startIndex = ($scope.currentPage - 1) * parseInt($scope.RecordsToDisplay);
+                    endIndex = startIndex + parseInt($scope.RecordsToDisplay);
+                    ctrl.snapshotDiffJobs = snapDiffJobsCopy.slice(startIndex, endIndex);
+                }
+            }
+            /*column sort logic*/
+            $scope.columnSort = (colName) => {
+                $scope.columnName = colName;
+                $scope.reverse = !$scope.reverse;
+            }
+            /*show page*/
+            $scope.getPagesArray = function () {
+                return Array.from({ length: $scope.lastIndex }, (_, index) => index + 1);
+            };
+            /*show last item index*/
+            $scope.getCurrentPageLastItemIndex = ()  => {
+                if ($scope.RecordsToDisplay == 'All') {
+                    return $scope.totalItems;
+                }
+
+                let endIndex = $scope.currentPage * parseInt($scope.RecordsToDisplay);
+                return Math.min(endIndex, $scope.totalItems);
+            }
+            /*show first item index*/
+            $scope.getCurrentPageFirstItemIndex = () => {
+                if ($scope.RecordsToDisplay == 'All') {
+                    return 1;
+                }
+                return ($scope.currentPage - 1) * $scope.RecordsToDisplay + 1;
+            }
+        }
     });
     angular.module('ozoneManager').component('omMetrics', {
         templateUrl: 'om-metrics.html',

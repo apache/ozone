@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.ItemsFromStdin;
 import picocli.CommandLine;
@@ -30,13 +31,22 @@ public class ContainerIDParameters extends ItemsFromStdin {
   private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Parameters(description = "Container IDs" + FORMAT_DESCRIPTION,
-      arity = "1..*",
+      arity = "0..*",
       paramLabel = "<container ID>")
   public void setContainerIDs(List<String> arguments) {
     setItems(arguments);
   }
 
   public List<Long> getValidatedIDs() {
+    return getValidatedIDs(true);
+  }
+
+  public List<Long> getValidatedIDs(boolean required) {
+    if (required && size() == 0 && !isReadFromStdin()) {
+      throw new CommandLine.MissingParameterException(spec.commandLine(),
+          spec.commandLine().getCommandSpec().args(),
+          "Missing required parameter: '<container ID>'");
+    }
     List<Long> containerIDs = new ArrayList<>(size());
     List<String> invalidIDs = new ArrayList<>();
 
@@ -62,6 +72,6 @@ public class ContainerIDParameters extends ItemsFromStdin {
       throw new CommandLine.ParameterException(spec.commandLine(),
           "Container IDs must be positive integers. Invalid container IDs: " + String.join(" ", invalidIDs));
     }
-    return containerIDs;
+    return new ArrayList<>(new LinkedHashSet<>(containerIDs));
   }
 }

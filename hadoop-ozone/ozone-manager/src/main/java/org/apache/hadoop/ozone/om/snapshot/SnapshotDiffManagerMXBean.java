@@ -15,34 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha;
+package org.apache.hadoop.ozone.om.snapshot;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 
 /**
- * Reflection util for SCM HA.
+ * JMX interface for SnapshotDiffManager.
  */
-public final class ReflectionUtil {
-
-  private static Map<String, Class<?>> classCache = new HashMap<>();
-
-  private ReflectionUtil() {
-  }
-
+@InterfaceAudience.Private
+public interface SnapshotDiffManagerMXBean {
   /**
-   * Returns the {@code Class} object associated with the given string name.
-   *
-   * @param className the fully qualified name of the desired class.
-   * @return the {@code Class} object for the class with the
-   *         specified name.
-   * @throws ClassNotFoundException if the class cannot be located
+   * Returns all snapshot diff jobs.
+   * @return list of snapshot diff jobs
    */
-  public static Class<?> getClass(String className)
-      throws ClassNotFoundException {
-    if (!classCache.containsKey(className)) {
-      classCache.put(className, Class.forName(className));
-    }
-    return classCache.get(className);
-  }
+  List<SnapshotDiffJob> getSnapshotDiffJobs();
 }

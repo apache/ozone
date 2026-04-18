@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -298,15 +297,6 @@ public class ECReconstructionCoordinator implements Closeable {
             int readLen;
             try {
               readLen = sis.recoverChunks(bufs);
-              Set<Integer> failedIndexes = sis.getFailedIndexes();
-              if (!failedIndexes.isEmpty()) {
-                // There was a problem reading some of the block indexes, but we
-                // did not get an exception as there must have been spare indexes
-                // to try and recover from. Therefore we should log out the block
-                // group details in the same way as for the exception case below.
-                logBlockGroupDetails(blockLocationInfo, repConfig,
-                    blockDataGroup);
-              }
             } catch (IOException e) {
               // When we see exceptions here, it could be due to some transient
               // issue that causes the block read to fail when reconstructing it,

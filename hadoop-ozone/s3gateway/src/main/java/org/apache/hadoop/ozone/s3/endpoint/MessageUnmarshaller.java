@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
@@ -28,10 +29,10 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.MessageBodyReader;
-import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.UnmarshallerHandler;
 import javax.xml.parsers.SAXParserFactory;
+import org.apache.hadoop.util.XMLUtils;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
 
@@ -51,8 +52,7 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
 
     try {
       context = JAXBContext.newInstance(cls);
-      saxParserFactory = SAXParserFactory.newInstance();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      saxParserFactory = XMLUtils.newSecureSAXParserFactory();
     } catch (Exception ex) {
       throw new AssertionError("Can not instantiate XML parser for " + cls.getSimpleName(), ex);
     }
@@ -82,7 +82,7 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
       filter.parse(new InputSource(inputStream));
       return cls.cast(unmarshallerHandler.getResult());
     } catch (Exception e) {
-      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
+      throw wrapOS3Exception(newError(INVALID_REQUEST, null, e).withMessage(e.getMessage()));
     }
   }
 

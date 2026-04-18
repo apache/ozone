@@ -15,25 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.container.replication;
+package org.apache.hadoop.ozone.debug.kerberos;
+
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
- * A class which extents ReplicationQueue and does nothing. This is used when
- * checking containers in a read-only mode, where we don't want to queue them
- * for replication.
+ * Prints environment variables relevant to Kerberos and Ozone.
  */
-public class NullReplicationQueue extends ReplicationQueue {
+public class EnvironmentProbe extends ConfigProbe {
 
   @Override
-  public void enqueue(ContainerHealthResult.UnderReplicatedHealthResult
-                          underReplicatedHealthResult) {
-    // Do nothing
+  public String name() {
+    return "Environment Variables";
   }
 
   @Override
-  public void enqueue(ContainerHealthResult.OverReplicatedHealthResult
-                          overReplicatedHealthResult) {
-    // Do nothing
-  }
+  public ProbeResult test(OzoneConfiguration conf) {
 
+    printValue("KRB5_CONFIG", System.getenv("KRB5_CONFIG"));
+    printValue("KRB5CCNAME", System.getenv("KRB5CCNAME"));
+    printValue("OZONE_CONF_DIR", System.getenv("OZONE_CONF_DIR"));
+    printValue("HADOOP_CONF_DIR", System.getenv("HADOOP_CONF_DIR"));
+    printValue("JAVA_SECURITY_KRB5_CONF", System.getenv("JAVA_SECURITY_KRB5_CONF"));
+
+    return ProbeResult.PASS;
+  }
 }

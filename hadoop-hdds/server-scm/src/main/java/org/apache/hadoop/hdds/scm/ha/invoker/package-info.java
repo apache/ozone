@@ -15,18 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
-
-import javax.ws.rs.ext.Provider;
-
 /**
- * Custom unmarshaller to read PutBucketAclRequest wo namespace.
+ * Invoker implementations for SCM HA to dispatch local method calls
+ * without using reflection.
  */
-@Provider
-public class PutBucketAclRequestUnmarshaller extends MessageUnmarshaller<S3BucketAcl> {
-
-  public PutBucketAclRequestUnmarshaller() {
-    super(S3BucketAcl.class);
-  }
-
-}
+package org.apache.hadoop.hdds.scm.ha.invoker;
