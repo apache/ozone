@@ -128,6 +128,13 @@ public class StorageContainerServiceProviderImpl
   }
 
   @Override
+  public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId) throws IOException {
+    return scmClient.getContainerReplicas(containerId,
+        ClientVersion.CURRENT_VERSION);
+  }
+
+  @Override
   public DBCheckpoint getSCMDBSnapshot() {
     String snapshotFileName = RECON_SCM_SNAPSHOT_DB + "_" +
         System.currentTimeMillis();

@@ -98,4 +98,14 @@ public interface StorageContainerServiceProvider {
    * @return Total number of containers in SCM.
    */
   long getContainerCount(HddsProtos.LifeCycleState state) throws IOException;
+
+  /**
+   * Requests SCM for the current replica set of a container.
+   *
+   * @param containerId containerId
+   * @return the current SCM replica set for the container
+   * @throws IOException in case of any exception
+   */
+  List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
+      long containerId) throws IOException;
 }

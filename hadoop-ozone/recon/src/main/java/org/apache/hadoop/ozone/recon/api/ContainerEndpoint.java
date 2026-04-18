@@ -49,6 +49,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -79,8 +80,10 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.util.SeekableIterator;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
@@ -104,6 +107,7 @@ public class ContainerEndpoint {
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
+  private final StorageContainerServiceProvider scmServiceProvider;
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
   private BucketLayout layout = BucketLayout.DEFAULT;
@@ -152,6 +156,9 @@ public class ContainerEndpoint {
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconSCM = reconSCM;
+    this.scmServiceProvider = reconSCM instanceof ReconStorageContainerManagerFacade
+        ? ((ReconStorageContainerManagerFacade) reconSCM).getScmServiceProvider()
+        : null;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.omMetadataManager = omMetadataManager;
   }
@@ -458,9 +465,8 @@ public class ContainerEndpoint {
           containerManager.getContainer(ContainerID.valueOf(containerID));
       long keyCount = containerInfo.getNumberOfKeys();
       UUID pipelineID = containerInfo.getPipelineID().getId();
-      List<ContainerHistory> datanodes =
-          containerManager.getLatestContainerHistory(containerID,
-              containerInfo.getReplicationConfig().getRequiredNodes());
+      List<ContainerHistory> datanodes = getReplicaDetailsForUnhealthyContainer(
+          containerID, containerInfo.getReplicationConfig().getRequiredNodes());
       UnhealthyContainers unhealthyContainers = new UnhealthyContainers(
           record.getContainerId(),
           record.getContainerState(),
@@ -474,6 +480,74 @@ public class ContainerEndpoint {
     } catch (IOException ioEx) {
       throw new UncheckedIOException(ioEx);
     }
+  }
+
+  /**
+   * For unhealthy containers, use SCM replica details only. If SCM replica
+   * lookup is unavailable, return no replicas instead of falling back to
+   * Recon-local state or history, which may diverge from SCM.
+   */
+  private List<ContainerHistory> getReplicaDetailsForUnhealthyContainer(
+      long containerID, int historyLimit) throws IOException {
+    List<ContainerHistory> scmReplicas = getScmReplicaDetails(containerID);
+    if (!scmReplicas.isEmpty()) {
+      return scmReplicas;
+    }
+    return new ArrayList<>();
+  }
+
+  private List<ContainerHistory> getScmReplicaDetails(long containerID)
+      throws IOException {
+    if (scmServiceProvider == null) {
+      return new ArrayList<>();
+    }
+
+    Map<String, ContainerHistory> historyByDn = new HashMap<>();
+    for (ContainerHistory history :
+        containerManager.getAllContainerHistory(containerID)) {
+      historyByDn.put(history.getDatanodeUuid(), history);
+    }
+
+    try {
+      List<HddsProtos.SCMContainerReplicaProto> scmReplicas =
+          scmServiceProvider.getContainerReplicas(containerID);
+      if (scmReplicas == null) {
+        return new ArrayList<>();
+      }
+
+      return scmReplicas.stream()
+          .map(replica -> toContainerHistory(containerID, replica,
+              historyByDn.get(getDatanodeUuid(replica))))
+          .sorted(Comparator.comparing(ContainerHistory::getDatanodeHost)
+              .thenComparing(ContainerHistory::getDatanodeUuid))
+          .collect(Collectors.toList());
+    } catch (IOException ex) {
+      LOG.warn("Unable to fetch SCM replica details for container {}.",
+          containerID, ex);
+      return new ArrayList<>();
+    }
+  }
+
+  private ContainerHistory toContainerHistory(long containerID,
+      HddsProtos.SCMContainerReplicaProto replica, ContainerHistory history) {
+    DatanodeDetails dn = DatanodeDetails.getFromProtoBuf(
+        replica.getDatanodeDetails());
+    long firstSeenTime = history != null ? history.getFirstSeenTime() : 0L;
+    long lastSeenTime = history != null ? history.getLastSeenTime() : 0L;
+    return new ContainerHistory(
+        containerID,
+        dn.getUuidString(),
+        dn.getHostName(),
+        firstSeenTime,
+        lastSeenTime,
+        replica.getSequenceID(),
+        replica.getState(),
+        replica.getDataChecksum());
+  }
+
+  private String getDatanodeUuid(HddsProtos.SCMContainerReplicaProto replica) {
+    return DatanodeDetails.getFromProtoBuf(replica.getDatanodeDetails())
+        .getUuidString();
   }
 
   /**

@@ -66,9 +66,11 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -177,6 +179,7 @@ public class TestContainerEndpoint {
   private UUID uuid2;
   private UUID uuid3;
   private UUID uuid4;
+  private UUID uuid5;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -850,6 +853,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
+    uuid5 = newDatanode("host5", "127.0.0.5");
     createUnhealthyRecords(5, 4, 3, 2, 1);
 
     response = containerEndpoint.getUnhealthyContainers(1000, 0, 0);
@@ -863,10 +867,6 @@ public class TestContainerEndpoint {
 
     Collection<UnhealthyContainerMetadata> records
         = responseObject.getContainers();
-    assertTrue(records.stream()
-        .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
-            .map(ContainerHistory::getState))
-        .allMatch(s -> s.equals("UNHEALTHY")));
     List<UnhealthyContainerMetadata> missing = records
         .stream()
         .filter(r -> r.getContainerState()
@@ -902,6 +902,15 @@ public class TestContainerEndpoint {
     assertEquals(12345L, overRep.get(0).getUnhealthySince());
     assertEquals(6L, overRep.get(0).getContainerID());
     assertNull(overRep.get(0).getReason());
+    assertEquals(5, overRep.get(0).getReplicas().size());
+    assertTrue(overRep.get(0).getReplicas().stream()
+        .map(ContainerHistory::getState)
+        .allMatch(s -> s.equals(ContainerReplicaProto.State.CLOSED.toString())));
+    assertTrue(overRep.get(0).getReplicas().stream()
+        .map(ContainerHistory::getDatanodeHost)
+        .collect(Collectors.toSet())
+        .containsAll(Arrays.asList("host1", "host2", "host3", "host4",
+            "host5")));
 
     List<UnhealthyContainerMetadata> underRep = records
         .stream()
@@ -915,6 +924,9 @@ public class TestContainerEndpoint {
     assertEquals(12345L, underRep.get(0).getUnhealthySince());
     assertEquals(10L, underRep.get(0).getContainerID());
     assertNull(underRep.get(0).getReason());
+    assertEquals(1, underRep.get(0).getReplicas().size());
+    assertEquals(ContainerReplicaProto.State.CLOSED.toString(),
+        underRep.get(0).getReplicas().get(0).getState());
 
     List<UnhealthyContainerMetadata> misRep = records
         .stream()
@@ -928,6 +940,9 @@ public class TestContainerEndpoint {
     assertEquals(12345L, misRep.get(0).getUnhealthySince());
     assertEquals(13L, misRep.get(0).getContainerID());
     assertEquals("some reason", misRep.get(0).getReason());
+    assertEquals(1, misRep.get(0).getReplicas().size());
+    assertEquals(ContainerReplicaProto.State.CLOSED.toString(),
+        misRep.get(0).getReplicas().get(0).getState());
 
     List<UnhealthyContainerMetadata> replicaMismatch = records
         .stream()
@@ -941,6 +956,10 @@ public class TestContainerEndpoint {
     assertEquals(12345L, replicaMismatch.get(0).getUnhealthySince());
     assertEquals(15L, replicaMismatch.get(0).getContainerID());
     List<ContainerHistory> replicas = replicaMismatch.get(0).getReplicas();
+    assertEquals(3, replicas.size());
+    assertTrue(replicas.stream()
+        .map(ContainerHistory::getState)
+        .allMatch(s -> s.equals(ContainerReplicaProto.State.CLOSED.toString())));
     assertTrue(replicas.stream().anyMatch(checksum -> checksum.getDataChecksum() == 1234L));
     assertTrue(replicas.stream().anyMatch(checksum -> checksum.getDataChecksum() == 2345L));
   }
@@ -971,6 +990,7 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
+    uuid5 = newDatanode("host5", "127.0.0.5");
     createUnhealthyRecords(5, 4, 3, 2, 1);
 
     // Check for unhealthy containers
@@ -1033,17 +1053,13 @@ public class TestContainerEndpoint {
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
+    uuid5 = newDatanode("host5", "127.0.0.5");
     createUnhealthyRecords(5, 4, 3, 2, 0);
 
     // Get first batch with no pagination (prevStartKey=0, prevLastKey=0)
     UnhealthyContainersResponse firstBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
             3, 0, 0).getEntity();
-    assertTrue(firstBatch.getContainers().stream()
-        .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
-            .map(ContainerHistory::getState))
-        .allMatch(s -> s.equals("UNHEALTHY")));
-
     // For pagination, use the last container ID from the first batch as prevLastKey
     long lastContainerIdFromFirstBatch = firstBatch.getContainers().stream()
         .map(i -> i.getContainerID()).max(Long::compareTo).get();
@@ -1126,7 +1142,8 @@ public class TestContainerEndpoint {
   }
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
-                                      int misRep, int dataChecksum) {
+                                      int misRep, int dataChecksum)
+      throws IOException {
     int cid = 0;
     for (int i = 0; i < missing; i++) {
       createUnhealthyRecord(++cid, UnHealthyContainerStates.MISSING.toString(),
@@ -1155,7 +1172,8 @@ public class TestContainerEndpoint {
   }
 
   private void createUnhealthyRecord(int id, String state, int expected,
-                                     int actual, int delta, String reason, boolean dataChecksumMismatch) {
+                                     int actual, int delta, String reason,
+                                     boolean dataChecksumMismatch) throws IOException {
     long cID = Integer.toUnsignedLong(id);
     ArrayList<ContainerHealthSchemaManager.UnhealthyContainerRecord> records =
         new ArrayList<>();
@@ -1173,6 +1191,30 @@ public class TestContainerEndpoint {
         "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
         "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
+
+    addCurrentReplicas(cID, actual, dataChecksumMismatch);
+  }
+
+  private void addCurrentReplicas(long containerID, int actual,
+      boolean dataChecksumMismatch) throws IOException {
+    List<UUID> uuids = Arrays.asList(uuid1, uuid2, uuid3, uuid4, uuid5);
+    for (int i = 0; i < actual; i++) {
+      long checksum = (dataChecksumMismatch && i == 0) ? 2345L : 1234L;
+      reconContainerManager.updateContainerReplica(ContainerID.valueOf(containerID),
+          ContainerReplica.newBuilder()
+              .setContainerID(ContainerID.valueOf(containerID))
+              .setContainerState(ContainerReplicaProto.State.CLOSED)
+              .setDatanodeDetails(reconContainerManager.getNodeDB()
+                  .get(DatanodeID.of(uuids.get(i))))
+              .setOriginNodeId(DatanodeID.of(uuids.get(i)))
+              .setSequenceId(1L)
+              .setReplicaIndex(0)
+              .setKeyCount(0L)
+              .setBytesUsed(0L)
+              .setEmpty(false)
+              .setChecksums(ContainerChecksums.of(checksum, 0L))
+              .build());
+    }
   }
 
   protected ContainerWithPipeline getTestContainer(
