@@ -238,6 +238,11 @@ public enum S3ErrorTable {
     }
   }
 
+  public static OS3Exception newError(String bucket, String resource, OMException e) {
+    S3ErrorTable err = translateResultCode(e);
+    return newError(err, NO_SUCH_BUCKET == err ? bucket : resource, e);
+  }
+
   public static OS3Exception newError(String resource, OMException e) {
     return newError(translateResultCode(e), resource, e);
   }
