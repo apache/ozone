@@ -24,13 +24,16 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpc
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
@@ -45,6 +48,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -419,7 +423,9 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1,
+    // Two threads: one for the periodic full-snapshot task and one for the
+    // incremental-sync/decideSyncAction task so they never block each other.
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2,
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix +
                                                      "SyncSCMContainerInfo-%d")
             .build());
@@ -432,34 +438,98 @@ public class ReconStorageContainerManagerFacade
     } else {
       initializePipelinesFromScm();
     }
-    LOG.debug("Started the SCM Container Info sync scheduler.");
-    long interval = ozoneConfiguration.getTimeDuration(
+    // -----------------------------------------------------------------------
+    // Scheduler 1 (full snapshot): runs every 24h (default).
+    // Unconditionally replaces Recon's recon-scm.db with a fresh SCM
+    // checkpoint.  This is the safety net that keeps the two databases
+    // structurally in sync even if incremental sync misses an edge case.
+    // -----------------------------------------------------------------------
+    long snapshotInterval = ozoneConfiguration.getTimeDuration(
         OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
         OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
-    long initialDelay = ozoneConfiguration.getTimeDuration(
+    long snapshotInitialDelay = ozoneConfiguration.getTimeDuration(
         OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
         OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
         TimeUnit.MILLISECONDS);
-    // This periodic sync with SCM container cache is needed because during
-    // the window when recon will be down and any container being added
-    // newly and went missing, that container will not be reported as missing by
-    // recon till there is a difference of container count equivalent to
-    // threshold value defined in "ozone.recon.scm.container.threshold"
-    // between SCM container cache and recon container cache.
     scheduler.scheduleWithFixedDelay(() -> {
       try {
-        boolean isSuccess = syncWithSCMContainerInfo();
-        if (!isSuccess) {
-          LOG.debug("SCM container info sync is already running.");
+        updateReconSCMDBWithNewSnapshot();
+      } catch (IOException e) {
+        LOG.error("Failed to refresh Recon SCM DB snapshot.", e);
+      }
+    }, snapshotInitialDelay, snapshotInterval, TimeUnit.MILLISECONDS);
+
+    // -----------------------------------------------------------------------
+    // Scheduler 2 (incremental/targeted sync): runs every 1h (default).
+    //
+    // Each cycle calls decideSyncAction() — two lightweight count RPCs to SCM
+    // — and then:
+    //
+    //   |total drift| > threshold (default 10,000)
+    //       → full snapshot: replace Recon's entire SCM DB from SCM checkpoint
+    //
+    //   0 < |total drift| <= threshold
+    //       → targeted sync: 4-pass incremental repair
+    //
+    //   total drift = 0 but per-state drift (OPEN or QUASI_CLOSED) > threshold (default 5)
+    //       → targeted sync: corrects containers stuck in a stale lifecycle state
+    //
+    //   no drift detected
+    //       → no action this cycle
+    //
+    // Running this on a 1h cadence (vs the old 24h) means container state
+    // discrepancies are detected and corrected within an hour without waiting
+    // for the next full snapshot.
+    // -----------------------------------------------------------------------
+    long syncInterval = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY,
+        OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+    long syncInitialDelay = ozoneConfiguration.getTimeDuration(
+        OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY,
+        OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    LOG.debug("Started the SCM Container Info sync scheduler (interval={}ms, initialDelay={}ms).",
+        syncInterval, syncInitialDelay);
+    scheduler.scheduleWithFixedDelay(() -> {
+      if (!isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+        LOG.debug("SCM container info sync is already running; skipping this cycle.");
+        return;
+      }
+      try {
+        ReconStorageContainerSyncHelper.SyncAction action =
+            containerSyncHelper.decideSyncAction();
+        switch (action) {
+        case FULL_SNAPSHOT:
+          LOG.info("Tiered sync decision: FULL_SNAPSHOT. "
+              + "Replacing Recon SCM DB with fresh SCM checkpoint.");
+          // updateReconSCMDBWithNewSnapshot guards itself with its own CAS;
+          // release our guard first so its internal guard can acquire.
+          isSyncDataFromSCMRunning.set(false);
+          updateReconSCMDBWithNewSnapshot();
+          return;   // finally block below will not double-release
+        case TARGETED_SYNC:
+          LOG.info("Tiered sync decision: TARGETED_SYNC. Running 4-pass incremental sync.");
+          boolean success = containerSyncHelper.syncWithSCMContainerInfo();
+          if (!success) {
+            LOG.warn("Targeted sync completed with one or more pass failures. "
+                + "Check logs above for details.");
+          }
+          break;
+        case NO_ACTION:
+          LOG.debug("Tiered sync decision: NO_ACTION. No drift detected this cycle.");
+          break;
+        default:
+          LOG.warn("Unknown SyncAction {}; skipping sync.", action);
+          break;
         }
       } catch (Throwable t) {
-        LOG.error("Unexpected exception while syncing data from SCM.", t);
+        LOG.error("Unexpected exception during periodic SCM container sync.", t);
       } finally {
         isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
     },
-        initialDelay,
-        interval,
+        syncInitialDelay,
+        syncInterval,
         TimeUnit.MILLISECONDS);
     getDatanodeProtocolServer().start();
     reconSafeModeMgrTask.start();
@@ -550,77 +620,114 @@ public class ReconStorageContainerManagerFacade
 
   public void updateReconSCMDBWithNewSnapshot() throws IOException {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
-      DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
-      if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
-        LOG.info("Got new checkpoint from SCM : " +
-            dbSnapshot.getCheckpointLocation());
-        try {
-          initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
-        } catch (IOException e) {
-          LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+      try {
+        DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+        if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
+          LOG.info("Got new checkpoint from SCM : " +
+              dbSnapshot.getCheckpointLocation());
+          try {
+            initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
+          } catch (IOException e) {
+            LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
+          }
+        } else {
+          LOG.error("Null snapshot location got from SCM.");
         }
-      } else {
-        LOG.error("Null snapshot location got from SCM.");
+      } finally {
+        isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
     } else {
       LOG.warn("SCM DB sync is already running.");
     }
   }
 
+  /**
+   * Runs the four-pass targeted sync unconditionally (all states: CLOSED,
+   * OPEN, QUASI_CLOSED, and DELETED). This method is the direct
+   * entry point for the REST trigger endpoint
+   * {@code POST /api/v1/triggerdbsync/scm} and for any caller that explicitly
+   * wants an incremental sync rather than a drift-evaluated decision.
+   *
+   * <p>For the periodic scheduler the tiered
+   * {@link ReconStorageContainerSyncHelper#decideSyncAction()} path is used
+   * instead, which may escalate to a full snapshot or skip work entirely
+   * depending on observed drift.
+   */
   public boolean syncWithSCMContainerInfo() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
-      return containerSyncHelper.syncWithSCMContainerInfo();
+      try {
+        return containerSyncHelper.syncWithSCMContainerInfo();
+      } finally {
+        isSyncDataFromSCMRunning.compareAndSet(true, false);
+      }
     } else {
       LOG.debug("SCM DB sync is already running.");
       return false;
     }
   }
 
-  private void deleteOldSCMDB() throws IOException {
-    if (dbStore != null) {
-      File oldDBLocation = dbStore.getDbLocation();
-      if (oldDBLocation.exists()) {
-        LOG.info("Cleaning up old SCM snapshot db at {}.",
-            oldDBLocation.getAbsolutePath());
-        FileUtils.deleteDirectory(oldDBLocation);
-      }
+  private void deleteSCMDB(File dbLocation) throws IOException {
+    if (dbLocation != null && dbLocation.exists()) {
+      LOG.info("Cleaning up old SCM snapshot db at {}.",
+          dbLocation.getAbsolutePath());
+      FileUtils.deleteDirectory(dbLocation);
     }
   }
 
   private void initializeNewRdbStore(File dbFile) throws IOException {
-    try {
-      final DBStore newStore = DBStoreBuilder.newBuilder(ozoneConfiguration, ReconSCMDBDefinition.get(), dbFile)
-          .build();
-      final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(dbStore);
-      final Table<DatanodeID, DatanodeDetails> newNodeTable = ReconSCMDBDefinition.NODES.getTable(newStore);
-      try (TableIterator<DatanodeID, ? extends KeyValue<DatanodeID, DatanodeDetails>> iterator = nodeTable.iterator()) {
+    final DBStore oldStore = dbStore;
+    final File oldDbLocation = oldStore != null ? oldStore.getDbLocation() : null;
+    final File newDb = new File(dbFile.getParent(),
+        ReconSCMDBDefinition.RECON_SCM_DB_NAME);
+
+    Map<DatanodeID, DatanodeDetails> existingNodes = new HashMap<>();
+    if (oldStore != null) {
+      final Table<DatanodeID, DatanodeDetails> nodeTable =
+          ReconSCMDBDefinition.NODES.getTable(oldStore);
+      try (TableIterator<DatanodeID,
+          ? extends KeyValue<DatanodeID, DatanodeDetails>> iterator =
+               nodeTable.iterator()) {
         while (iterator.hasNext()) {
-          final KeyValue<DatanodeID, DatanodeDetails> keyValue = iterator.next();
-          newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+          final KeyValue<DatanodeID, DatanodeDetails> keyValue =
+              iterator.next();
+          existingNodes.put(keyValue.getKey(), keyValue.getValue());
         }
       }
-      sequenceIdGen.reinitialize(
-          ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
-      pipelineManager.reinitialize(
-          ReconSCMDBDefinition.PIPELINES.getTable(newStore));
-      containerManager.reinitialize(
-          ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
-      nodeManager.reinitialize(
-          ReconSCMDBDefinition.NODES.getTable(newStore));
-      IOUtils.close(LOG, dbStore);
-      deleteOldSCMDB();
-      dbStore = newStore;
-      File newDb = new File(dbFile.getParent() +
-          OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
-      boolean success = dbFile.renameTo(newDb);
-      if (success) {
-        LOG.info("SCM snapshot linked to Recon DB.");
-      }
-      LOG.info("Created SCM DB handle from snapshot at {}.",
-          dbFile.getAbsolutePath());
-    } catch (IOException ioEx) {
-      LOG.error("Unable to initialize Recon SCM DB snapshot store.", ioEx);
     }
+
+    IOUtils.close(LOG, oldStore);
+    if (oldDbLocation != null && !oldDbLocation.equals(dbFile)) {
+      deleteSCMDB(oldDbLocation);
+    }
+
+    if (!dbFile.equals(newDb)) {
+      if (newDb.exists()) {
+        deleteSCMDB(newDb);
+      }
+      FileUtils.moveDirectory(dbFile, newDb);
+      LOG.info("SCM snapshot moved to Recon DB path {}.",
+          newDb.getAbsolutePath());
+    }
+
+    final DBStore newStore = DBStoreBuilder.newBuilder(
+        ozoneConfiguration, ReconSCMDBDefinition.get(), newDb).build();
+    final Table<DatanodeID, DatanodeDetails> newNodeTable =
+        ReconSCMDBDefinition.NODES.getTable(newStore);
+    for (Map.Entry<DatanodeID, DatanodeDetails> entry : existingNodes.entrySet()) {
+      newNodeTable.put(entry.getKey(), entry.getValue());
+    }
+
+    sequenceIdGen.reinitialize(
+        ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
+    pipelineManager.reinitialize(
+        ReconSCMDBDefinition.PIPELINES.getTable(newStore));
+    containerManager.reinitialize(
+        ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
+    nodeManager.reinitialize(
+        ReconSCMDBDefinition.NODES.getTable(newStore));
+    dbStore = newStore;
+    LOG.info("Created SCM DB handle from snapshot at {}.",
+        newDb.getAbsolutePath());
   }
 
   @Override

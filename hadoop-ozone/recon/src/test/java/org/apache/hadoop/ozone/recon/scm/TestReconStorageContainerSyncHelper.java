@@ -23,13 +23,11 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SC
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
@@ -76,12 +74,16 @@ class TestReconStorageContainerSyncHelper {
         eq(ContainerID.valueOf(1L)), eq(1), eq(CLOSED)))
         .thenReturn(Collections.singletonList(cid));
     when(mockContainerManager.containerExist(cid)).thenReturn(false);
-    when(mockScmServiceProvider.getContainerWithPipeline(42L)).thenReturn(cwp);
+    // Pass 1 now uses getExistContainerWithPipelinesInBatch for missing containers so that
+    // the null-pipeline fallback prevents silent skipping when pipeline lookups fail.
+    when(mockScmServiceProvider.getExistContainerWithPipelinesInBatch(
+        Collections.singletonList(42L))).thenReturn(Collections.singletonList(cwp));
 
     boolean result = syncHelper.syncWithSCMContainerInfo();
 
     assertTrue(result);
-    verify(mockScmServiceProvider).getContainerWithPipeline(42L);
+    verify(mockScmServiceProvider).getExistContainerWithPipelinesInBatch(
+        Collections.singletonList(42L));
     verify(mockContainerManager).addNewContainer(cwp);
   }
 
@@ -118,11 +120,27 @@ class TestReconStorageContainerSyncHelper {
         eq(ContainerID.valueOf(3L)), eq(2), eq(CLOSED)))
         .thenReturn(Collections.singletonList(cid3));
 
+    // Stub getContainer for cid3 (exists in Recon) so processSyncedClosedContainer
+    // reads its state and confirms no correction is needed.
+    ContainerInfo closedInfo3 = new ContainerInfo.Builder()
+        .setContainerID(3L)
+        .setState(CLOSED)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setOwner("test")
+        .build();
+
     when(mockContainerManager.containerExist(cid1)).thenReturn(false);
     when(mockContainerManager.containerExist(cid2)).thenReturn(false);
     when(mockContainerManager.containerExist(cid3)).thenReturn(true);
-    when(mockScmServiceProvider.getContainerWithPipeline(1L)).thenReturn(cwp1);
-    when(mockScmServiceProvider.getContainerWithPipeline(2L)).thenReturn(cwp2);
+    when(mockContainerManager.getContainer(cid3)).thenReturn(closedInfo3);
+    // Pass 1 fetches each missing CLOSED container individually.
+    when(mockScmServiceProvider.getExistContainerWithPipelinesInBatch(
+        Collections.singletonList(1L)))
+        .thenReturn(Collections.singletonList(cwp1));
+    when(mockScmServiceProvider.getExistContainerWithPipelinesInBatch(
+        Collections.singletonList(2L)))
+        .thenReturn(Collections.singletonList(cwp2));
+    // Page 2: cid3 already exists in Recon; no batch call needed for that page.
 
     boolean result = pagedHelper.syncWithSCMContainerInfo();
 
@@ -143,17 +161,27 @@ class TestReconStorageContainerSyncHelper {
   @Test
   void testContainerAlreadyInReconIsSkipped() throws Exception {
     ContainerID cid = ContainerID.valueOf(7L);
+    // Stub getContainer to return a CLOSED container so processSyncedClosedContainer
+    // finds no state drift and returns without further action.
+    ContainerInfo closedInfo = new ContainerInfo.Builder()
+        .setContainerID(7L)
+        .setState(CLOSED)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setOwner("test")
+        .build();
 
     when(mockScmServiceProvider.getContainerCount(CLOSED)).thenReturn(1L);
     when(mockScmServiceProvider.getListOfContainerIDs(
         eq(ContainerID.valueOf(1L)), eq(1), eq(CLOSED)))
         .thenReturn(Collections.singletonList(cid));
     when(mockContainerManager.containerExist(cid)).thenReturn(true);
+    when(mockContainerManager.getContainer(cid)).thenReturn(closedInfo);
 
     boolean result = syncHelper.syncWithSCMContainerInfo();
 
     assertTrue(result);
-    verify(mockScmServiceProvider, never()).getContainerWithPipeline(anyLong());
+    // Container already in Recon: no batch fetch needed, no add attempted.
+    verify(mockScmServiceProvider, never()).getExistContainerWithPipelinesInBatch(any());
     verify(mockContainerManager, never()).addNewContainer(any());
   }
 
@@ -164,7 +192,10 @@ class TestReconStorageContainerSyncHelper {
     boolean result = syncHelper.syncWithSCMContainerInfo();
 
     assertTrue(result);
-    verifyNoInteractions(mockContainerManager);
+    // Pass 4 calls getContainers() (returns empty list, no action taken) so we assert
+    // on the meaningful mutations: no containers added, no state transitions applied.
+    verify(mockContainerManager, never()).addNewContainer(any());
+    verify(mockContainerManager, never()).updateContainerState(any(), any());
     verify(mockScmServiceProvider, never())
         .getListOfContainerIDs(any(), any(Integer.class), any());
   }
@@ -179,7 +210,11 @@ class TestReconStorageContainerSyncHelper {
     boolean result = syncHelper.syncWithSCMContainerInfo();
 
     assertFalse(result);
-    verifyNoInteractions(mockContainerManager);
+    // Empty batch → Pass 1 returns false immediately without adding any containers.
+    // Pass 4 may call getContainers() (returning empty list, which is harmless), so
+    // we assert on addNewContainer specifically rather than verifyNoInteractions.
+    verify(mockContainerManager, never()).addNewContainer(any());
+    verify(mockContainerManager, never()).updateContainerState(any(), any());
   }
 
 }

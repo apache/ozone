@@ -18,7 +18,11 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static java.util.Comparator.comparingLong;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLEANUP;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -45,6 +49,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -114,8 +119,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
           datanodeDetails.getHostName());
       ContainerWithPipeline containerWithPipeline =
           scmClient.getContainerWithPipeline(containerID.getId());
+      Pipeline pipeline = containerWithPipeline.getPipeline();
       LOG.debug("Verified new container from SCM {}, {} ",
-          containerID, containerWithPipeline.getPipeline().getId());
+          containerID, pipeline != null ? pipeline.getId() : "<null-pipeline>");
       // no need call "containerExist" to check, because
       // 1 containerExist and addNewContainer can not be atomic
       // 2 addNewContainer will double check the existence
@@ -179,33 +185,157 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   /**
-   *  Check if container state is not open. In SCM, container state
-   *  changes to CLOSING first, and then the close command is pushed down
-   *  to Datanodes. Recon 'learns' this from DN, and hence replica state
-   *  will move container state to 'CLOSING'.
+   * Transitions a container from OPEN to CLOSING, keeping the per-pipeline
+   * open-container count in {@link #pipelineToOpenContainer} accurate.
    *
-   * @param containerID containerID to check
-   * @param state  state to be compared
+   * <p>Must be called whenever an OPEN container is moved to CLOSING so that
+   * the pipeline's open-container count stays consistent.  Both the DN-report
+   * driven path ({@link #checkContainerStateAndUpdate}) and the periodic sync
+   * passes ({@code processSyncedClosedContainer}, {@code syncQuasiClosedContainers})
+   * use this method to avoid divergence in the count exposed to the Recon Node API.
+   *
+   * <p>If the container was recorded without a pipeline (null pipeline at
+   * {@code addNewContainer} time) the count decrement is safely skipped.
+   *
+   * @param containerID   container to advance from OPEN to CLOSING
+   * @param containerInfo already-fetched {@code ContainerInfo} for the container
+   *                      (avoids a redundant lookup inside this method)
+   * @throws IOException                     if the state update fails
+   * @throws InvalidStateTransitionException if the container is not in OPEN state
    */
-
-  private void checkContainerStateAndUpdate(ContainerID containerID,
-                                            ContainerReplicaProto.State state)
-          throws IOException, InvalidStateTransitionException {
-    ContainerInfo containerInfo = getContainer(containerID);
-    if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)
-        && !state.equals(ContainerReplicaProto.State.OPEN)
-        && isHealthy(state)) {
-      LOG.info("Container {} has state OPEN, but given state is {}.",
-          containerID, state);
-      final PipelineID pipelineID = containerInfo.getPipelineID();
-      // subtract open container count from the map
+  void transitionOpenToClosing(ContainerID containerID, ContainerInfo containerInfo)
+      throws IOException, InvalidStateTransitionException {
+    PipelineID pipelineID = containerInfo.getPipelineID();
+    if (pipelineID != null) {
       int curCnt = pipelineToOpenContainer.getOrDefault(pipelineID, 0);
       if (curCnt == 1) {
         pipelineToOpenContainer.remove(pipelineID);
       } else if (curCnt > 0) {
         pipelineToOpenContainer.put(pipelineID, curCnt - 1);
       }
-      updateContainerState(containerID, FINALIZE);
+    }
+    updateContainerState(containerID, FINALIZE);  // OPEN → CLOSING
+  }
+
+  /**
+   * Check if container state needs to advance based on a DN replica report and
+   * SCM's authoritative lifecycle state.
+   *
+   * <p>Two scenarios handled:
+   * <ol>
+   *   <li>OPEN in Recon + non-OPEN healthy replica → FINALIZE (OPEN→CLOSING),
+   *       then query SCM to advance further if possible.</li>
+   *   <li>CLOSING in Recon + any report → query SCM to advance to
+   *       QUASI_CLOSED or CLOSED if SCM has already moved there.</li>
+   *   <li>DELETED in Recon + live replica report → rehydrate the container from
+   *       SCM if SCM still records it in a live state such as QUASI_CLOSED or
+   *       CLOSED.</li>
+   * </ol>
+   *
+   * <p>Querying SCM for the authoritative state prevents containers from getting
+   * permanently stuck at CLOSING when the DN report that would normally
+   * trigger the next transition was missed (e.g., Recon downtime).
+   *
+   * @param containerID containerID to check
+   * @param replicaState replica state reported by DataNode
+   */
+  private void checkContainerStateAndUpdate(ContainerID containerID,
+                                            ContainerReplicaProto.State replicaState)
+      throws IOException, InvalidStateTransitionException {
+    ContainerInfo containerInfo = getContainer(containerID);
+    HddsProtos.LifeCycleState reconState = containerInfo.getState();
+
+    if (reconState == HddsProtos.LifeCycleState.DELETED) {
+      recoverDeletedContainerFromScm(containerID, replicaState);
+      return;
+    }
+
+    // Only act on transient pre-closed states where a DN report signals change
+    boolean isTransient = reconState == HddsProtos.LifeCycleState.OPEN
+        || reconState == HddsProtos.LifeCycleState.CLOSING;
+    if (!isTransient
+        || replicaState == ContainerReplicaProto.State.OPEN
+        || !isHealthy(replicaState)) {
+      return;
+    }
+
+    if (reconState == HddsProtos.LifeCycleState.OPEN) {
+      LOG.info("Container {} is OPEN in Recon but DN reports replica state {}. "
+          + "Moving to CLOSING.", containerID, replicaState);
+      transitionOpenToClosing(containerID, containerInfo);  // OPEN → CLOSING + counter update
+      // Fall through: now CLOSING — query SCM to advance further if possible
+    }
+
+    // Container is now CLOSING in Recon. Query SCM for the authoritative
+    // state so we do not permanently stick at CLOSING when the next DN
+    // transition report was missed.
+    try {
+      ContainerWithPipeline scmContainer =
+          scmClient.getContainerWithPipeline(containerID.getId());
+      HddsProtos.LifeCycleState scmState =
+          scmContainer.getContainerInfo().getState();
+
+      // Idempotent transitions are safe even if already past the target state.
+      if (scmState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+        updateContainerState(containerID, QUASI_CLOSE);  // CLOSING → QUASI_CLOSED
+        LOG.info("Container {} advanced to QUASI_CLOSED in Recon (SCM state: {}).",
+            containerID, scmState);
+      } else if (scmState == HddsProtos.LifeCycleState.CLOSED) {
+        updateContainerState(containerID, CLOSE);        // CLOSING → CLOSED
+        LOG.info("Container {} advanced to CLOSED in Recon (SCM state: {}).",
+            containerID, scmState);
+      } else if (scmState == HddsProtos.LifeCycleState.DELETING
+          || scmState == HddsProtos.LifeCycleState.DELETED) {
+        // Unusual but possible: SCM already deleted this container.
+        // Drive through CLOSE first (idempotent), then DELETE, then CLEANUP.
+        updateContainerState(containerID, CLOSE);
+        updateContainerState(containerID, DELETE);
+        if (scmState == HddsProtos.LifeCycleState.DELETED) {
+          updateContainerState(containerID, CLEANUP);
+        }
+        LOG.info("Container {} advanced to {} in Recon (SCM state: {}).",
+            containerID, scmState, scmState);
+      }
+      // If scmState is still CLOSING: nothing more to do now; wait for next report.
+    } catch (IOException e) {
+      LOG.warn("Failed to fetch authoritative state for container {} from SCM. "
+          + "Container may remain in CLOSING until next periodic sync.", containerID, e);
+    }
+  }
+
+  private void recoverDeletedContainerFromScm(
+      ContainerID containerID, ContainerReplicaProto.State replicaState)
+      throws IOException {
+    if (replicaState != ContainerReplicaProto.State.CLOSED
+        && replicaState != ContainerReplicaProto.State.QUASI_CLOSED) {
+      return;
+    }
+
+    try {
+      ContainerWithPipeline scmContainer =
+          scmClient.getContainerWithPipeline(containerID.getId());
+      HddsProtos.LifeCycleState scmState =
+          scmContainer.getContainerInfo().getState();
+      if (scmState != HddsProtos.LifeCycleState.CLOSED
+          && scmState != HddsProtos.LifeCycleState.QUASI_CLOSED) {
+        LOG.info("Container {} is DELETED in Recon and DN reported {}, but SCM "
+                + "still reports {}. Skipping recovery.", containerID, replicaState, scmState);
+        return;
+      }
+
+      // Reverse transitions are not supported by the lifecycle state machine,
+      // so rebuild the container record from SCM's authoritative metadata.
+      deleteContainer(containerID);
+      addNewContainer(scmContainer);
+      LOG.info("Recovered container {} from DELETED in Recon to {} based on "
+              + "DN report {} and SCM state {}.", containerID, scmState, replicaState, scmState);
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Container {} disappeared from Recon while recovering DELETED "
+          + "state; retry on next report.", containerID, e);
+    } catch (IOException e) {
+      LOG.warn("Failed to recover container {} from DELETED state using SCM "
+          + "metadata.", containerID, e);
+      throw e;
     }
   }
 
@@ -218,7 +348,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
   /**
    * Adds a new container to Recon's container manager.
    *
-   * @param containerWithPipeline containerInfo with pipeline info
+   * <p>For OPEN containers a valid pipeline is expected. If the pipeline is
+   * {@code null} (e.g., returned by SCM when the pipeline has already been
+   * cleaned up for a QUASI_CLOSED container that arrived via the sync path),
+   * the container is still recorded in the state manager without pipeline
+   * tracking so that it is not permanently absent from Recon.
+   *
+   * @param containerWithPipeline containerInfo with pipeline info (pipeline may be null)
    * @throws IOException on Error.
    */
   public void addNewContainer(ContainerWithPipeline containerWithPipeline)
@@ -227,33 +363,41 @@ public class ReconContainerManager extends ContainerManagerImpl {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
-        PipelineID pipelineID = containerWithPipeline.getPipeline().getId();
-        // Check if the pipeline is present in Recon if not add it.
-        if (reconPipelineManager.addPipeline(containerWithPipeline.getPipeline())) {
-          LOG.info("Added new pipeline {} to Recon pipeline metadata from SCM.", pipelineID);
+        Pipeline pipeline = containerWithPipeline.getPipeline();
+        if (pipeline != null) {
+          PipelineID pipelineID = pipeline.getId();
+          // Check if the pipeline is present in Recon; add it if not.
+          if (reconPipelineManager.addPipeline(pipeline)) {
+            LOG.info("Added new pipeline {} to Recon pipeline metadata from SCM.", pipelineID);
+          }
+          getContainerStateManager().addContainer(containerInfo.getProtobuf());
+          pipelineManager.addContainerToPipeline(pipelineID, containerInfo.containerID());
+          // Update open container count on all datanodes on this pipeline.
+          pipelineToOpenContainer.put(pipelineID,
+              pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
+          LOG.info("Successfully added OPEN container {} with pipeline {} to Recon.",
+              containerInfo.containerID(), pipelineID);
+        } else {
+          // Pipeline not available (cleaned up in SCM). Record the container
+          // without pipeline tracking so it is not permanently absent from Recon.
+          getContainerStateManager().addContainer(containerInfo.getProtobuf());
+          LOG.warn("Added OPEN container {} to Recon without pipeline "
+              + "(pipeline was null — likely cleaned up on SCM side). "
+              + "Pipeline tracking unavailable for this container.",
+              containerInfo.containerID());
         }
-
-        getContainerStateManager().addContainer(containerInfo.getProtobuf());
-        pipelineManager.addContainerToPipeline(
-            containerWithPipeline.getPipeline().getId(),
-            containerInfo.containerID());
-        // update open container count on all datanodes on this pipeline
-        pipelineToOpenContainer.put(pipelineID,
-            pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
-        LOG.info("Successfully added container {} to Recon.",
-            containerInfo.containerID());
-
       } else {
         getContainerStateManager().addContainer(containerInfo.getProtobuf());
-        LOG.info("Successfully added no open container {} to Recon.",
-            containerInfo.containerID());
+        LOG.info("Successfully added container {} in state {} to Recon.",
+            containerInfo.containerID(), containerInfo.getState());
       }
     } catch (IOException ex) {
-      LOG.info("Exception while adding container {} .",
-          containerInfo.containerID(), ex);
-      pipelineManager.removeContainerFromPipeline(
-          containerInfo.getPipelineID(),
-          ContainerID.valueOf(containerInfo.getContainerID()));
+      LOG.info("Exception while adding container {}.", containerInfo.containerID(), ex);
+      PipelineID pipelineID = containerInfo.getPipelineID();
+      if (pipelineID != null) {
+        pipelineManager.removeContainerFromPipeline(
+            pipelineID, ContainerID.valueOf(containerInfo.getContainerID()));
+      }
       throw ex;
     }
   }

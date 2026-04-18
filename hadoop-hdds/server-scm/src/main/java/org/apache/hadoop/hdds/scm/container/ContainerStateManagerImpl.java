@@ -239,7 +239,8 @@ public final class ContainerStateManagerImpl
         final ContainerInfo container = iterator.next();
         Objects.requireNonNull(container, "container == null");
         containers.addContainer(container);
-        if (container.getState() == LifeCycleState.OPEN) {
+        if (container.getState() == LifeCycleState.OPEN
+            && container.getPipelineID() != null) {
           try {
             pipelineManager.addContainerToPipelineSCMStart(
                 container.getPipelineID(), container.containerID());
@@ -260,8 +261,12 @@ public final class ContainerStateManagerImpl
       getContainerStateChangeActions() {
     final Map<LifeCycleEvent, CheckedConsumer<ContainerInfo, IOException>>
         actions = new EnumMap<>(LifeCycleEvent.class);
-    actions.put(FINALIZE, info -> pipelineManager
-        .removeContainerFromPipeline(info.getPipelineID(), info.containerID()));
+    actions.put(FINALIZE, info -> {
+      if (info.getPipelineID() != null) {
+        pipelineManager.removeContainerFromPipeline(
+            info.getPipelineID(), info.containerID());
+      }
+    });
     return actions;
   }
 
@@ -334,12 +339,16 @@ public final class ContainerStateManagerImpl
           transactionBuffer.addToBuffer(containerStore,
               containerID, container);
           containers.addContainer(container);
-          if (pipelineManager.containsPipeline(pipelineID)) {
+          if (pipelineID != null && pipelineManager.containsPipeline(pipelineID)) {
             pipelineManager.addContainerToPipeline(pipelineID, containerID);
           } else if (containerInfo.getState().
               equals(LifeCycleState.OPEN)) {
-            // Pipeline should exist, but not
-            throw new PipelineNotFoundException();
+            if (pipelineID != null) {
+              // OPEN containers normally require a live pipeline reference.
+              throw new PipelineNotFoundException();
+            }
+            LOG.warn("Adding OPEN container {} without pipeline tracking "
+                    + "because its pipeline ID is null.", containerID);
           }
           //recon may receive report of closed container,
           // no corresponding Pipeline can be synced for scm.

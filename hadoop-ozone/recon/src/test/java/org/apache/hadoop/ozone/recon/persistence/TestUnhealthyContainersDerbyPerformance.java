@@ -593,7 +593,45 @@ public class TestUnhealthyContainersDerbyPerformance {
   }
 
   // -----------------------------------------------------------------------
-  // Test 8 — Batch DELETE performance for 1M records
+  // Test 8 — Large IN-clause read must be internally chunked
+  // -----------------------------------------------------------------------
+
+  /**
+   * Verifies that loading existing in-state-since values for a large set of
+   * container IDs does not generate a single oversized Derby statement.
+   *
+   * <p>This regression test covers the read path used by
+   * {@link org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask} while it
+   * preserves {@code in_state_since} values across scan cycles. Before
+   * internal chunking, passing a large ID list here caused Derby to fail with
+   * {@code ERROR 42ZA0: Statement too complex} and
+   * {@code constant_pool > 65535} during statement compilation.</p>
+   */
+  @Test
+  @Order(8)
+  public void testExistingInStateSinceLookupChunksLargeContainerIdList() {
+    int lookupCount = 20_000;
+    int expectedRecords = lookupCount * STATE_COUNT;
+    List<Long> containerIds = new ArrayList<>(lookupCount);
+
+    for (long id = 1; id <= lookupCount; id++) {
+      containerIds.add(id);
+    }
+
+    long start = System.nanoTime();
+    Map<ContainerHealthSchemaManager.ContainerStateKey, Long> existing =
+        schemaManager.getExistingInStateSinceByContainerIds(containerIds);
+    long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+    LOG.info("Large in-state-since lookup complete: {} container IDs -> {} rows in {} ms",
+        lookupCount, existing.size(), elapsedMs);
+
+    assertEquals(expectedRecords, existing.size(),
+        "Lookup should return one record per existing container/state pair");
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 9 — Batch DELETE performance for 1M records
   // -----------------------------------------------------------------------
 
   /**
@@ -615,7 +653,7 @@ public class TestUnhealthyContainersDerbyPerformance {
    * all read-only tests.</p>
    */
   @Test
-  @Order(8)
+  @Order(9)
   public void testBatchDeletePerformanceOneMillionRecords() {
     int deleteCount = CONTAINER_ID_RANGE;               // 200 000 container IDs
     int expectedDeleted = deleteCount * STATE_COUNT;    // 1 000 000 rows
@@ -623,7 +661,7 @@ public class TestUnhealthyContainersDerbyPerformance {
     int internalChunks = (int) Math.ceil(
         (double) deleteCount / DELETE_CHUNK_SIZE);
 
-    LOG.info("--- Test 8: Batch DELETE — {} IDs × {} states = {} rows  "
+    LOG.info("--- Test 9: Batch DELETE — {} IDs × {} states = {} rows  "
             + "({} internal SQL statements of {} IDs) ---",
         deleteCount, STATE_COUNT, expectedDeleted,
         internalChunks, DELETE_CHUNK_SIZE);
@@ -659,17 +697,17 @@ public class TestUnhealthyContainersDerbyPerformance {
   }
 
   // -----------------------------------------------------------------------
-  // Test 9 — Re-read counts after full delete
+  // Test 10 — Re-read counts after full delete
   // -----------------------------------------------------------------------
 
   /**
    * After full delete, verifies that each state has 0 records.
    */
   @Test
-  @Order(9)
+  @Order(10)
   public void testCountByStateAfterFullDelete() {
     int expectedPerState = 0;
-    LOG.info("--- Test 9: COUNT by state after full delete (expected {} each) ---",
+    LOG.info("--- Test 10: COUNT by state after full delete (expected {} each) ---",
         expectedPerState);
 
     DSLContext dsl = schemaDefinition.getDSLContext();

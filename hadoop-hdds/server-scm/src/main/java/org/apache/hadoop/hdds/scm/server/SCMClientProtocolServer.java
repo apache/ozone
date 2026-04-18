@@ -416,8 +416,21 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
       } catch (IOException ex) {
-        //not found , just go ahead
-        LOG.error("Container with common pipeline not found: {}", ex);
+        // Pipeline lookup failed (e.g., QUASI_CLOSED container whose pipeline
+        // has already been cleaned up). Return the container metadata without a
+        // pipeline so that callers (e.g., Recon's sync) can still record the
+        // container rather than losing it silently.
+        LOG.warn("Pipeline lookup failed for container {}; returning container "
+            + "without pipeline. Cause: {}", containerID, ex.getMessage());
+        try {
+          ContainerInfo info = scm.getContainerManager()
+              .getContainer(ContainerID.valueOf(containerID));
+          cpList.add(new ContainerWithPipeline(info, null));
+        } catch (ContainerNotFoundException notFound) {
+          // Container truly does not exist in SCM — exclude it from the result.
+          LOG.error("Container {} not found in SCM and will not be returned "
+              + "to caller.", containerID, notFound);
+        }
       }
     }
     return cpList;

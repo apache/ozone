@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.recon.scm;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -180,6 +182,35 @@ public class TestReconContainerManager
     getContainerManager().checkAndAddNewContainer(containerID, State.CLOSED,
         datanodeDetails);
     assertEquals(CLOSING,
+        getContainerManager().getContainer(containerID).getState());
+  }
+
+  @Test
+  public void testRecoverDeletedContainerToClosedFromDnReport() throws Exception {
+    ContainerWithPipeline deletedContainer = getTestContainer(101L, DELETED);
+    ContainerID containerID = deletedContainer.getContainerInfo().containerID();
+    getContainerManager().addNewContainer(deletedContainer);
+    assertEquals(DELETED, getContainerManager().getContainer(containerID).getState());
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    getContainerManager().checkAndAddNewContainer(containerID, State.CLOSED,
+        datanodeDetails);
+
+    assertEquals(CLOSED, getContainerManager().getContainer(containerID).getState());
+  }
+
+  @Test
+  public void testRecoverDeletedContainerToQuasiClosedFromDnReport() throws Exception {
+    ContainerWithPipeline deletedContainer = getTestContainer(102L, DELETED);
+    ContainerID containerID = deletedContainer.getContainerInfo().containerID();
+    getContainerManager().addNewContainer(deletedContainer);
+    assertEquals(DELETED, getContainerManager().getContainer(containerID).getState());
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    getContainerManager().checkAndAddNewContainer(containerID, State.QUASI_CLOSED,
+        datanodeDetails);
+
+    assertEquals(QUASI_CLOSED,
         getContainerManager().getContainer(containerID).getState());
   }
 

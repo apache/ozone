@@ -1544,7 +1544,15 @@
             ]
           },
           {
-            "name": "GetContainerCountRequestProto"
+            "name": "GetContainerCountRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "state",
+                "type": "LifeCycleState",
+                "optional": true
+              }
+            ]
           },
           {
             "name": "GetContainerCountResponseProto",

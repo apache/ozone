@@ -155,6 +155,30 @@ public class AbstractReconContainerManagerTest {
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
 
+    ContainerInfo closedContainerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(101L)
+            .setNumberOfKeys(10)
+            .setPipelineID(pipeline.getId())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+            .setOwner("test")
+            .setState(LifeCycleState.CLOSED)
+            .build();
+    ContainerWithPipeline closedContainerWithPipeline =
+        new ContainerWithPipeline(closedContainerInfo, pipeline);
+
+    ContainerInfo quasiClosedContainerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(102L)
+            .setNumberOfKeys(10)
+            .setPipelineID(pipeline.getId())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+            .setOwner("test")
+            .setState(LifeCycleState.QUASI_CLOSED)
+            .build();
+    ContainerWithPipeline quasiClosedContainerWithPipeline =
+        new ContainerWithPipeline(quasiClosedContainerInfo, pipeline);
+
     List<Long> containerList = new LinkedList<>();
     List<ContainerWithPipeline> verifiedContainerPipeline =
         new LinkedList<>();
@@ -182,6 +206,10 @@ public class AbstractReconContainerManagerTest {
         StorageContainerServiceProvider.class);
     when(scmServiceProviderMock.getContainerWithPipeline(100L))
         .thenReturn(containerWithPipeline);
+    when(scmServiceProviderMock.getContainerWithPipeline(101L))
+        .thenReturn(closedContainerWithPipeline);
+    when(scmServiceProviderMock.getContainerWithPipeline(102L))
+        .thenReturn(quasiClosedContainerWithPipeline);
     when(scmServiceProviderMock
         .getExistContainerWithPipelinesInBatch(containerList))
         .thenReturn(verifiedContainerPipeline);
