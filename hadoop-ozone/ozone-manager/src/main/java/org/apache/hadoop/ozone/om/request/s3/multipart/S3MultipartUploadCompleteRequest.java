@@ -251,6 +251,13 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
           .getMultipartInfoTable().get(multipartKey);
+      
+      if (!ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
+          && multipartKeyInfo.getSchemaVersion() != 0) {
+        throw new OMException("MPU parts-table split behavior is not allowed " +
+          "before cluster finalization for commit part request.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
 
       String ozoneKey = omMetadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
