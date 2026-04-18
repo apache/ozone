@@ -27,6 +27,7 @@ import static java.net.HttpURLConnection.HTTP_PRECON_FAILED;
 import static org.apache.hadoop.ozone.OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -191,6 +192,54 @@ public enum S3ErrorTable {
 
   public int getHttpCode() {
     return httpCode;
+  }
+
+  /** Converts result code of @{code OMException} to {@code S3ErrorTable}, which
+   * should be thrown via {@link #newError(S3ErrorTable, String, Exception)}. */
+  public static S3ErrorTable translateResultCode(OMException ex) {
+    switch (ex.getResult()) {
+    case ACCESS_DENIED:
+    case INVALID_TOKEN:
+    case PERMISSION_DENIED:
+      return ACCESS_DENIED;
+    case ATOMIC_WRITE_CONFLICT:
+      return CONDITIONAL_REQUEST_CONFLICT;
+    case BUCKET_ALREADY_EXISTS:
+      return BUCKET_ALREADY_EXISTS;
+    case BUCKET_NOT_EMPTY:
+      return BUCKET_NOT_EMPTY;
+    case BUCKET_NOT_FOUND:
+    case VOLUME_NOT_FOUND:
+      return NO_SUCH_BUCKET;
+    case ENTITY_TOO_SMALL:
+      return ENTITY_TOO_SMALL;
+    case ETAG_MISMATCH:
+    case ETAG_NOT_AVAILABLE:
+    case KEY_ALREADY_EXISTS:
+      return PRECOND_FAILED;
+    case FILE_ALREADY_EXISTS:
+      return NO_OVERWRITE;
+    case INVALID_BUCKET_NAME:
+      return INVALID_BUCKET_NAME;
+    case INVALID_PART:
+      return INVALID_PART;
+    case INVALID_PART_ORDER:
+      return INVALID_PART_ORDER;
+    case INVALID_REQUEST:
+      return INVALID_REQUEST;
+    case KEY_NOT_FOUND:
+      return NO_SUCH_KEY;
+    case NOT_SUPPORTED_OPERATION:
+      return NOT_IMPLEMENTED;
+    case QUOTA_EXCEEDED:
+      return QUOTA_EXCEEDED;
+    default:
+      return INTERNAL_ERROR;
+    }
+  }
+
+  public static OS3Exception newError(String resource, OMException e) {
+    return newError(translateResultCode(e), resource, e);
   }
 
   public static OS3Exception newError(S3ErrorTable e, String resource) {
