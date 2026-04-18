@@ -129,6 +129,7 @@ public class ReconControllerModule extends AbstractModule {
     install(new ReconOmTaskBindingModule());
     install(new ReconDaoBindingModule());
     bind(ReconTaskStatusUpdaterManager.class).in(Singleton.class);
+    install(new org.apache.hadoop.ozone.recon.chatbot.ChatbotModule());
 
     bind(ReconTaskController.class)
         .to(ReconTaskControllerImpl.class).in(Singleton.class);
