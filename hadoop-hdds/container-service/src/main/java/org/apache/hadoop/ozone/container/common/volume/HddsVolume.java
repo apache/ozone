@@ -313,7 +313,6 @@ public class HddsVolume extends StorageVolume {
 
     // We attempt to open RocksDb twice to ignore any transient errors
     // and to confirm that we actually cannot open RocksDb in readonly mode.
-    final boolean isVolumeTestResultHealthy = true;
     final int maxAttempts = 2;
     final Duration maxRetryGap = getDatanodeConfig().getDiskCheckRetryGap();
     for (int attempt = 0; attempt < maxAttempts; attempt++) {

@@ -63,6 +63,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String DISK_CHECK_MIN_GAP_KEY = "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY = "hdds.datanode.disk.check.timeout";
   public static final String DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY = "hdds.datanode.disk.check.sliding.window.timeout";
+  public static final String DISK_CHECK_RETRY_GAP_KEY = "hdds.datanode.disk.check.retry.gap";
 
   // Minimum space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
@@ -103,6 +104,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final Duration DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT =
       Duration.ofMinutes(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT).plus(DISK_CHECK_TIMEOUT_DEFAULT);
+
+  static final Duration DISK_CHECK_RETRY_GAP_DEFAULT = Duration.ofMinutes(1);
 
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
@@ -430,6 +433,17 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private Duration diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
 
+  @Config(key = DISK_CHECK_RETRY_GAP_KEY,
+      defaultValue = "1m",
+      type = ConfigType.TIME,
+      tags = {DATANODE},
+      description = "Time to wait between retries of disk checks."
+          + " To ignore transient issues, the RocksDb instance on a disk is validated multiple times before"
+          + " declaring failure. This configuration defines the time to wait between the retry attempts."
+          + " Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration diskCheckRetryGap = DISK_CHECK_RETRY_GAP_DEFAULT;
+
   @Config(key = "hdds.datanode.chunk.data.validation.check",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
@@ -709,6 +723,19 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       diskCheckSlidingWindowTimeout = defaultTimeout;
     }
 
+    if (diskCheckRetryGap.isNegative()) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          DISK_CHECK_RETRY_GAP_KEY, diskCheckRetryGap, DISK_CHECK_RETRY_GAP_DEFAULT);
+      diskCheckRetryGap = DISK_CHECK_RETRY_GAP_DEFAULT;
+    }
+
+    if (diskCheckRetryGap.compareTo(diskCheckTimeout) > 0) {
+      LOG.warn("{} was set to {}. It must be less than {} which is {}. Defaulting to {}",
+          DISK_CHECK_RETRY_GAP_KEY, diskCheckRetryGap, DISK_CHECK_TIMEOUT_KEY, diskCheckTimeout,
+          DISK_CHECK_RETRY_GAP_DEFAULT);
+      diskCheckRetryGap = DISK_CHECK_RETRY_GAP_DEFAULT;
+    }
+
     if (blockDeleteCommandWorkerInterval.isNegative()) {
       LOG.warn(BLOCK_DELETE_COMMAND_WORKER_INTERVAL +
           " must be greater than zero and was set to {}. Defaulting to {}",
@@ -922,6 +949,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public Duration getDiskCheckTimeout() {
     return diskCheckTimeout;
+  }
+
+  public Duration getDiskCheckRetryGap() {
+    return diskCheckRetryGap;
   }
 
   public void setDiskCheckTimeout(Duration duration) {
