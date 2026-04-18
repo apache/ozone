@@ -29,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -42,13 +44,18 @@ import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeInfoMetrics;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -226,5 +233,42 @@ public class TestContainerUtils {
     assertEquals(expected.getProtoBufMessage(), actual.getProtoBufMessage());
     assertEquals(expected.getInitialVersion(), actual.getInitialVersion());
     assertEquals(expected.getIpAddress(), actual.getIpAddress());
+  }
+
+  @Test
+  public void assertSpaceAvailabilityIncrementsSoftBandWhenBetweenReportedAndHard()
+      throws Exception {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    ContainerUtils.assertSpaceAvailability(1L, volume, 50);
+
+    verify(metrics).incNumWriteRequestsInSoftBandMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsRejectedHardMinFreeSpace();
+  }
+
+  @Test
+  public void assertSpaceAvailabilityIncrementsHardRejectWhenHardLimitViolated() {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    StorageContainerException ex = assertThrows(StorageContainerException.class,
+        () -> ContainerUtils.assertSpaceAvailability(1L, volume, 80));
+    assertEquals(Result.DISK_OUT_OF_SPACE, ex.getResult());
+
+    verify(metrics).incNumWriteRequestsRejectedHardMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsInSoftBandMinFreeSpace();
   }
 }

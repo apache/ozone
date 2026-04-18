@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.STORAGE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Duration;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.conf.Config;
@@ -75,6 +76,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
   public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.02f;
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT =
+      "hdds.datanode.volume.min.free.space.hard.limit.percent";
+  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT =
+      0.015f;
 
   public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
@@ -290,11 +295,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "-1",
       type = ConfigType.SIZE,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
-      description = "This determines the free space to be used for closing containers" +
-          " When the difference between volume capacity and used reaches this number," +
-          " containers that reside on this volume will be closed and no new containers" +
-          " would be allocated on this volume." +
-          " Max of min.free.space and min.free.space.percent will be used as final value."
+      description = "Minimum free space (bytes) applied together with min.free.space.percent "
+          + "(reported to SCM in heartbeat as freeSpaceToSpare) and "
+          + "min.free.space.hard.limit.percent (local write enforcement). "
+          + "The effective value for each tier is max(this bytes, capacity * ratio)."
   )
   private long minFreeSpace = getDefaultFreeSpace();
 
@@ -302,13 +306,25 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "0.02", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
-      description = "This determines the free space percent to be used for closing containers" +
-          " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
-          " containers that reside on this volume will be closed and no new containers" +
-          " would be allocated on this volume." +
-          " Max of min.free.space or min.free.space.percent will be used as final value."
+      description = "Minimum fraction of volume capacity reported to SCM as freeSpaceToSpare "
+          + "(heartbeat / storage reports). Local write rejection uses "
+          + "hdds.datanode.volume.min.free.space.hard.limit.percent instead. "
+          + "The soft band is the gap between these two (e.g. 2000GB disk: 2% = 40GB reported vs "
+          + "1.5% = 30GB hard → 10GB band) where the DN may send close-container actions while "
+          + "writes still succeed."
   )
   private float minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
+  @Config(key = "hdds.datanode.volume.min.free.space.hard.limit.percent",
+      defaultValue = "0.015",
+      type = ConfigType.FLOAT,
+      tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
+      description = "Minimum fraction of volume capacity reserved for local enforcement: "
+          + "writes fail when available space would drop below max(this ratio * capacity, "
+          + "hdds.datanode.volume.min.free.space). Should be <= min.free.space.percent "
+          + "so SCM can plan for a larger headroom than the DN enforces locally."
+  )
+  private float minFreeSpaceHardLimitRatio =
+      HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
 
   @Config(key = "hdds.datanode.periodic.disk.check.interval.minutes",
       defaultValue = "60",
@@ -774,6 +790,23 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           minFreeSpaceRatio);
       minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
     }
+    if (minFreeSpaceHardLimitRatio > 1 || minFreeSpaceHardLimitRatio < 0) {
+      LOG.warn("{} = {} is invalid, should be between 0 and 1; resetting to default {}",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
+          minFreeSpaceHardLimitRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT);
+      minFreeSpaceHardLimitRatio =
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
+    }
+    if (minFreeSpaceHardLimitRatio > minFreeSpaceRatio) {
+      LOG.warn("{} = {} must not exceed {} = {}, setting hard limit to soft limit. "
+              + "Set hard.limit.percent <= min.free.space.percent to enable the soft band.",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
+          minFreeSpaceHardLimitRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          minFreeSpaceRatio);
+      minFreeSpaceHardLimitRatio = minFreeSpaceRatio;
+    }
 
     if (minFreeSpace < 0) {
       minFreeSpace = getDefaultFreeSpace();
@@ -840,8 +873,31 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     this.containerCloseThreads = containerCloseThreads;
   }
 
+  /**
+   * Minimum free space reported to SCM (freeSpaceToSpare in storage reports).
+   */
   public long getMinFreeSpace(long capacity) {
     return Math.max((long) (capacity * minFreeSpaceRatio), minFreeSpace);
+  }
+
+  /**
+   * Minimum free space enforced locally for writes (disk full / out-of-space)
+   * and for choosing a volume for a new container (same threshold as writes).
+   */
+  public long getHardLimitMinFreeSpace(long capacity) {
+    return Math.max((long) (capacity * minFreeSpaceHardLimitRatio), minFreeSpace);
+  }
+
+  /**
+   * Width of the soft band: reported spare minus hard spare. For example, with 2000GB capacity,
+   * 2% reported (40GB) and 1.5% hard (30GB), this is 10GB — the gap where the DN may send
+   * close-container actions while writes still succeed.
+   */
+  @VisibleForTesting
+  public long getSoftBandMinFreeSpaceWidth(long capacity) {
+    long reported = getMinFreeSpace(capacity);
+    long hard = getHardLimitMinFreeSpace(capacity);
+    return Math.max(0L, reported - hard);
   }
 
   public long getMinFreeSpace() {
@@ -850,6 +906,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public float getMinFreeSpaceRatio() {
     return minFreeSpaceRatio;
+  }
+
+  @VisibleForTesting
+  public float getMinFreeSpaceHardLimitRatio() {
+    return minFreeSpaceHardLimitRatio;
   }
 
   public long getPeriodicDiskCheckIntervalMinutes() {
