@@ -255,8 +255,7 @@ public enum S3ErrorTable {
    */
   public static OS3Exception newError(S3ErrorTable e, String resource,
       Exception ex) {
-    OS3Exception err =  new OS3Exception(e.getCode(), e.getErrorMessage(),
-        e.getHttpCode());
+    OS3Exception err = new OS3Exception(e, ex);
     err.setResource(resource);
     if (e.getHttpCode() == HTTP_INTERNAL_ERROR) {
       LOG.error("Internal Error: {}", err.toXml(), ex);
