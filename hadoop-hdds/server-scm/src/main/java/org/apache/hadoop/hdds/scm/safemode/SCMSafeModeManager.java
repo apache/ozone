@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.HashMap;
@@ -88,6 +90,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private long safeModeLogIntervalMs;
   private ScheduledExecutorService safeModeLogExecutor;
   private ScheduledFuture<?> safeModeLogTask;
+  private final long refreshIntervalMs;
 
   public SCMSafeModeManager(final ConfigurationSource conf,
                             final NodeManager nodeManager,
@@ -117,11 +120,39 @@ public class SCMSafeModeManager implements SafeModeManager {
       status.set(SafeModeStatus.OUT_OF_SAFE_MODE);
       emitSafeModeStatus();
     }
+
+    this.refreshIntervalMs = conf.getTimeDuration(
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+  }
+
+  private void startRefresh() {
+    final boolean enabled = refreshIntervalMs > 0;
+    LOG.info("Container safe mode rule refresh: enabled? {}, {}={}ms",
+        enabled, HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, refreshIntervalMs);
+    if (!enabled) {
+      return;
+    }
+    final String name = "safemode-refreshing(" + refreshIntervalMs + "ms)-thread";
+    final Thread t = new Thread(() -> {
+      try {
+        while (getInSafeMode()) {
+          Thread.sleep(refreshIntervalMs);
+          runRefreshAndValidate();
+        }
+      } catch (InterruptedException e) {
+        LOG.info("Interrupted {}", name, e);
+      }
+    }, name);
+    t.setDaemon(true);
+    t.start();
   }
 
   public void start() {
     emitSafeModeStatus();
     startSafeModePeriodicLogger();
+    startRefresh();
   }
 
   public void stop() {
@@ -204,6 +235,13 @@ public class SCMSafeModeManager implements SafeModeManager {
    * Refresh Rule state and validate rules.
    */
   public void refreshAndValidate() {
+    if (refreshIntervalMs > 0) {
+      return; // use executor to refresh
+    }
+    runRefreshAndValidate();
+  }
+
+  private void runRefreshAndValidate() {
     if (getInSafeMode()) {
       exitRules.values().forEach(rule -> {
         rule.refresh(false);

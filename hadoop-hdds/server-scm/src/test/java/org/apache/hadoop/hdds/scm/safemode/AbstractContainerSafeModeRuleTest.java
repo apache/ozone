@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -57,10 +60,14 @@ public abstract class AbstractContainerSafeModeRuleTest {
     final ContainerManager containerManager = mock(ContainerManager.class);
     final ConfigurationSource conf = mock(ConfigurationSource.class);
     final EventQueue eventQueue = mock(EventQueue.class);
-    final SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
+    SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
     final SafeModeMetrics metrics = mock(SafeModeMetrics.class);
 
     when(safeModeManager.getSafeModeMetrics()).thenReturn(metrics);
+    when(conf.getTimeDuration(
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL,
+        HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS)).thenReturn(0L);
     containers = new ArrayList<>();
     when(containerManager.getContainers(getReplicationType())).thenReturn(containers);
     when(containerManager.getContainer(any(ContainerID.class))).thenAnswer(invocation -> {
