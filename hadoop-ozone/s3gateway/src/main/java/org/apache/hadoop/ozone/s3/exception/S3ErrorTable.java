@@ -251,9 +251,19 @@ public enum S3ErrorTable {
     return new OS3Exception(translateResultCode(cause), cause, resource);
   }
 
+  /** Creates new {@link OS3Exception} for {@link S3ErrorTable}. */
+  public static OS3Exception newError(S3ErrorTable errorCode) {
+    return new OS3Exception(errorCode, null, null);
+  }
+
   /** Creates new {@link OS3Exception} for {@link S3ErrorTable} and {@code resource}. */
   public static OS3Exception newError(S3ErrorTable errorCode, @Nullable String resource) {
     return new OS3Exception(errorCode, null, resource);
+  }
+
+  /** Creates new {@link OS3Exception} for {@link S3ErrorTable}, {@code resource} and {@code cause}. */
+  public static OS3Exception newError(S3ErrorTable errorCode, Exception cause) {
+    return new OS3Exception(errorCode, cause, null);
   }
 
   /** Creates new {@link OS3Exception} for {@link S3ErrorTable}, {@code resource} and {@code cause}. */
