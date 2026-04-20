@@ -446,4 +446,17 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * {@link #getPendingContainerTracker()}.
    */
   boolean hasSpaceForNewContainerAllocation(DatanodeDetails node);
+
+  /**
+   * Records a pending container allocation for {@code node} so that subsequent
+   * space checks via {@link #hasSpaceForNewContainerAllocation} account for the
+   * in-flight allocation before the datanode sends an ICR.
+   *
+   * @param node        the datanode that will receive the new container replica
+   * @param containerID the container being allocated
+   */
+  default void recordPendingAllocationForDatanode(DatanodeDetails node,
+      ContainerID containerID) {
+    getPendingContainerTracker().recordPendingAllocationForDatanode(node, containerID);
+  }
 }

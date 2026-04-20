@@ -273,6 +273,14 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
+  @Override
+  public void recordPendingAllocationForDatanode(DatanodeDetails node,
+      ContainerID containerID) {
+    Objects.requireNonNull(node, "node==null");
+    Objects.requireNonNull(containerID, "containerID==null");
+    pendingContainerTracker.recordPendingAllocationForDatanode(node, containerID);
+  }
+
   protected NodeStateManager getNodeStateManager() {
     return nodeStateManager;
   }

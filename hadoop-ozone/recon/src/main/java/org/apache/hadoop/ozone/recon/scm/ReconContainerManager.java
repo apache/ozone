@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -86,11 +85,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
       ReconContainerMetadataManager reconContainerMetadataManager,
       SCMHAManager scmhaManager,
       SequenceIdGenerator sequenceIdGen,
-      ContainerReplicaPendingOps pendingOps,
-      NodeManager nodeManager)
+      ContainerReplicaPendingOps pendingOps)
       throws IOException {
     super(conf, scmhaManager, sequenceIdGen, pipelineManager, containerStore,
-        pendingOps, nodeManager);
+        pendingOps);
     this.scmClient = scm;
     this.pipelineManager = pipelineManager;
     this.containerHealthSchemaManager = containerHealthSchemaManager;

@@ -116,8 +116,7 @@ public class AbstractReconContainerManagerTest {
         mock(ReconContainerMetadataManager.class),
         scmhaManager,
         sequenceIdGen,
-        pendingOps,
-        nodeManager);
+        pendingOps);
   }
 
   @AfterEach
