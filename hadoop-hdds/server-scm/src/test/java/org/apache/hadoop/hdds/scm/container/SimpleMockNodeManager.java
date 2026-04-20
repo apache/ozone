@@ -449,14 +449,15 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public PendingContainerTracker getPendingContainerTracker() {
+    int rollIntervalMs = 5 * 60 * 1000;
     if (pendingContainerTracker == null) {
-      pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024);
+      pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024, rollIntervalMs, null);
     }
     return pendingContainerTracker;
   }
 
   @Override
-  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node, long containerSize) {
+  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node) {
     return true;
   }
 

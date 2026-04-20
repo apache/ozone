@@ -445,5 +445,5 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * True if the node can accept another container of the given size, accounting for
    * {@link #getPendingContainerTracker()}.
    */
-  boolean hasSpaceForNewContainerAllocation(DatanodeDetails node, long containerSize);
+  boolean hasSpaceForNewContainerAllocation(DatanodeDetails node);
 }

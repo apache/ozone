@@ -20,11 +20,11 @@ package org.apache.hadoop.hdds.scm.container;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -135,13 +135,12 @@ public class TestPendingContainerTrackerIntegration {
     // Verify pending containers are tracked for all nodes in pipeline
     List<DatanodeDetails> nodesWithPending = new ArrayList<>();
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      long pendingSize = pendingTracker.getPendingAllocationSize(dn);
-      if (pendingSize > 0) {
+      long pendingCount = pendingTracker.getPendingContainerCount(dn);
+      if (pendingCount > 0) {
         nodesWithPending.add(dn);
-        LOG.info("DataNode {} has {} bytes pending", dn.getUuidString(), pendingSize);
+        LOG.info("DataNode {} has {} pending containers", dn.getUuidString(), pendingCount);
 
-        Set<ContainerID> pendingContainers = pendingTracker.getPendingContainers(dn);
-        assertThat(pendingContainers).contains(container.containerID());
+        assertThat(pendingTracker.containsPendingContainer(dn, container.containerID()));
       }
     }
 
@@ -155,7 +154,7 @@ public class TestPendingContainerTrackerIntegration {
 
     // Write a key
     String keyName = "testKey1";
-    byte[] data = "Hello Ozone - Testing Pending Container Tracker".getBytes(UTF_8);
+    byte[] data = "Testing Pending Container Tracker".getBytes(UTF_8);
 
     LOG.info("Writing key: {}", keyName);
     try (OzoneOutputStream out = bucket.createKey(keyName, data.length,
@@ -168,8 +167,7 @@ public class TestPendingContainerTrackerIntegration {
     // Wait for ICRs to be sent
     GenericTestUtils.waitFor(() -> {
       for (DatanodeDetails dn : nodesWithPending) {
-        Set<ContainerID> pendingContainers = pendingTracker.getPendingContainers(dn);
-        if (pendingContainers.contains(container.containerID())) {
+        if (pendingTracker.containsPendingContainer(dn, container.containerID())) {
           LOG.info("Still waiting for ICR from DN {}", dn.getUuidString());
           return false;
         }
@@ -181,8 +179,7 @@ public class TestPendingContainerTrackerIntegration {
 
     // Verify all pending containers removed
     for (DatanodeDetails dn : nodesWithPending) {
-      Set<ContainerID> pendingContainers = pendingTracker.getPendingContainers(dn);
-      assertThat(pendingContainers).doesNotContain(container.containerID());
+      assertFalse(pendingTracker.containsPendingContainer(dn, container.containerID()));
     }
 
     // Verify remove metrics increased
@@ -207,20 +204,16 @@ public class TestPendingContainerTrackerIntegration {
     DatanodeDetails firstNode = pipeline.getFirstNode();
     
     // Record initial state
-    long initialSize = pendingTracker.getPendingAllocationSize(firstNode);
-    int initialCount = pendingTracker.getPendingContainers(firstNode).size();
-    
-    LOG.info("Initial pending state: size={}, count={}", initialSize, initialCount);
-    
+    long initialCount = pendingTracker.getPendingContainerCount(firstNode);
+
+    LOG.info("Initial pending state: count={}", initialCount);
+
     // Try adding the same container again (simulates retry or duplicate allocation)
     pendingTracker.recordPendingAllocationForDatanode(firstNode, container.containerID());
-    
-    long afterSize = pendingTracker.getPendingAllocationSize(firstNode);
-    int afterCount = pendingTracker.getPendingContainers(firstNode).size();
-    
-    // Size and count should remain the same (idempotent)
-    assertEquals(initialSize, afterSize,
-        "Pending size should not change when adding duplicate container");
+
+    long afterCount = pendingTracker.getPendingContainerCount(firstNode);
+
+    // Count should remain the same (idempotent)
     assertEquals(initialCount, afterCount,
         "Pending count should not change when adding duplicate container");
 

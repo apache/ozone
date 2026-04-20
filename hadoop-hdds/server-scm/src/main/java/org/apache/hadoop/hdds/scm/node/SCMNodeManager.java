@@ -257,11 +257,8 @@ public class SCMNodeManager implements NodeManager {
    * SCM pending allocations.
    */
   @Override
-  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node,
-      long containerSize) {
-    if (node == null) {
-      return false;
-    }
+  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node) {
+    Objects.requireNonNull(node, "node==null");
     try {
       DatanodeInfo datanodeInfo = getDatanodeInfo(node);
       if (datanodeInfo == null) {
@@ -269,7 +266,7 @@ public class SCMNodeManager implements NodeManager {
         return false;
       }
       return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(
-          node, datanodeInfo, containerSize);
+          node, datanodeInfo);
     } catch (Exception e) {
       LOG.warn("Error checking allocatable space for node {}", node.getUuidString(), e);
       return false;
@@ -1175,8 +1172,6 @@ public class SCMNodeManager implements NodeManager {
         freeSpaceToSpare += reportProto.getFreeSpaceToSpare();
         reserved += reportProto.getReserved();
       }
-      // SCM-side pending container allocations (not yet in DN reports) count toward committed.
-      committed += pendingContainerTracker.getPendingAllocationSize(datanodeDetails);
       return new SCMNodeStat(capacity, used, remaining, committed,
           freeSpaceToSpare, reserved);
     } catch (NodeNotFoundException e) {
