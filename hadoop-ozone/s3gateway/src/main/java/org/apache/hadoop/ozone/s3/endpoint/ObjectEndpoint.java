@@ -619,19 +619,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       return handler.handleDeleteRequest(context, keyPath);
     } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
-        // keys. Just return 204
-        return Response.status(Status.NO_CONTENT).build();
-      } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
-        // With PREFIX metadata layout, a dir deletion without recursive flag
-        // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.
-        // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
-        // keys. Just return 204
-        return Response.status(Status.NO_CONTENT).build();
-      } else {
-        throw newError(bucketName, keyPath, ex);
-      }
+      throw newError(bucketName, keyPath, ex);
     }
   }
 
@@ -648,7 +636,20 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       getMetrics().updateDeleteKeySuccessStats(startNanos);
       return Response.status(Status.NO_CONTENT).build();
-
+    } catch (OMException ex) {
+      getMetrics().updateDeleteKeyFailureStats(startNanos);
+      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
+        // keys. Just return 204
+        return Response.status(Status.NO_CONTENT).build();
+      } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
+        // With PREFIX metadata layout, a dir deletion without recursive flag
+        // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.
+        // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
+        // keys. Just return 204
+        return Response.status(Status.NO_CONTENT).build();
+      }
+      throw newError(context.getBucketName(), keyPath, ex);
     } catch (Exception ex) {
       getMetrics().updateDeleteKeyFailureStats(startNanos);
       throw ex;
