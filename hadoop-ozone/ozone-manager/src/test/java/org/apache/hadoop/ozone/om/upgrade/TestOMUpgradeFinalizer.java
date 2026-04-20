@@ -262,9 +262,9 @@ public class TestOMUpgradeFinalizer {
         (Answer<Void>) inv -> {
           storedLayoutVersion = inv.getArgument(0, Integer.class);
           return null;
-        }).when(st).setLayoutVersion(anyInt());
+        }).when(st).setApparentVersion(anyInt());
 
-    lenient().when(st.getLayoutVersion())
+    lenient().when(st.getApparentVersion())
         .thenAnswer((Answer<Integer>) ignore -> storedLayoutVersion);
 
     when(mock.getOmStorage()).thenReturn(st);

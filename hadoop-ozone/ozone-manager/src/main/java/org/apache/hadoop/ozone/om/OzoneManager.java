@@ -532,7 +532,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
-    versionManager = new OMLayoutVersionManager(omStorage.getLayoutVersion());
+    versionManager = new OMLayoutVersionManager(omStorage.getApparentVersion());
     upgradeFinalizer = new OMUpgradeFinalizer(versionManager);
     replicationConfigValidator =
         conf.getObject(ReplicationConfigValidator.class);
@@ -1545,13 +1545,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             "OM initialization succeeded.Current cluster id for sd="
                 + omStorage.getStorageDir() + ";cid=" + omStorage
                 .getClusterID() + ";layoutVersion=" + omStorage
-                .getLayoutVersion());
+                .getApparentVersion());
       } else {
         System.out.println(
             "OM already initialized.Reusing existing cluster id for sd="
                 + omStorage.getStorageDir() + ";cid=" + omStorage
                 .getClusterID() + ";layoutVersion=" + omStorage
-                .getLayoutVersion());
+                .getApparentVersion());
       }
     } catch (IOException ioe) {
       LOG.error("Could not initialize OM version file", ioe);
