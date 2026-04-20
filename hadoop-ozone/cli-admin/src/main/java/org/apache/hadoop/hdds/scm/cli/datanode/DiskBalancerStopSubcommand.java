@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static java.util.stream.Collectors.toList;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +43,9 @@ public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
     try {
       diskBalancerProxy.stopDiskBalancer();
       Map<String, Object> result = new java.util.LinkedHashMap<>();
-      result.put("datanode", hostName);
+      // Format datanode string with hostname if available
+      String formattedDatanode = formatDatanodeDisplayName(hostName);
+      result.put("datanode", formattedDatanode);
       result.put("action", "stop");
       result.put("status", "success");
       return result;
@@ -61,7 +65,9 @@ public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
       // Simpler message for batch mode
       if (!failedNodes.isEmpty()) {
         System.err.printf("Failed to stop DiskBalancer on nodes: [%s]%n",
-            String.join(", ", failedNodes));
+            String.join(", ", failedNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       } else {
         System.out.println("Stopped DiskBalancer on all IN_SERVICE nodes.");
       }
@@ -69,11 +75,15 @@ public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
       // Detailed message for specific nodes
       if (!successNodes.isEmpty()) {
         System.out.printf("Stopped DiskBalancer on nodes: [%s]%n", 
-            String.join(", ", successNodes));
+            String.join(", ", successNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       }
       if (!failedNodes.isEmpty()) {
         System.err.printf("Failed to stop DiskBalancer on nodes: [%s]%n", 
-            String.join(", ", failedNodes));
+            String.join(", ", failedNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       }
     }
   }

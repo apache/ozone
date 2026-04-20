@@ -234,6 +234,7 @@ public class TestFailoverWithSCMHA {
     SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     scmClientConfig.setRetryCount(2);
     scmClientConfig.setRetryInterval(50);
+    scmClientConfig.setMaxRetryTimeout(150);
     conf.setFromObject(scmClientConfig);
 
     Map<String, String> configOverrides = new HashMap<>();

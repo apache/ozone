@@ -68,4 +68,9 @@ abstract class BucketOperationHandler extends EndpointBase {
       throws IOException, OS3Exception {
     return null;
   }
+
+  BucketOperationHandler copyDependenciesFrom(EndpointBase other) {
+    other.copyDependenciesTo(this);
+    return this;
+  }
 }

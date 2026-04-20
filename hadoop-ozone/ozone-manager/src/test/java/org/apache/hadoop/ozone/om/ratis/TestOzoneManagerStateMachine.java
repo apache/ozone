@@ -223,7 +223,7 @@ public class TestOzoneManagerStateMachine {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneManagerPrepareState ps = new OzoneManagerPrepareState(conf);
     when(om.getPrepareState()).thenReturn(ps);
-    when(om.getAclsEnabled()).thenReturn(true);
+    when(om.isAdminAuthorizationEnabled()).thenReturn(true);
     when(om.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
 
     OMRequest prepareRequest = OMRequest.newBuilder()

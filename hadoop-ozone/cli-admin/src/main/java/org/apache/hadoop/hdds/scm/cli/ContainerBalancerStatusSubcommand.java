@@ -127,7 +127,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             configuration.getUtilizationThreshold(), "Max Datanodes to Involve per Iteration(percent)",
             configuration.getDatanodesInvolvedMaxPercentagePerIteration(),
             "Max Size to Move per Iteration",
-            configuration.getDatanodesInvolvedMaxPercentagePerIteration() / OzoneConsts.GB,
+            configuration.getSizeMovedMaxPerIteration() / OzoneConsts.GB,
             "Max Size Entering Target per Iteration",
             configuration.getSizeEnteringTargetMax() / OzoneConsts.GB,
             "Max Size Leaving Source per Iteration",

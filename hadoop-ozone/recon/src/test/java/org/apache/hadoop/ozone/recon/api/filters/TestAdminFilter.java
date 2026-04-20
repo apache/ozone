@@ -198,6 +198,7 @@ public class TestAdminFilter {
 
   private void testAdminFilterWithPrincipal(OzoneConfiguration conf,
       String principalToUse, boolean shouldPass) throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
     ReconServer mockReconServer = createMockReconServer(conf);
 
     Principal mockPrincipal = mock(Principal.class);
@@ -208,7 +209,7 @@ public class TestAdminFilter {
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     FilterChain mockFilterChain = mock(FilterChain.class);
 
-    ReconAdminFilter filter = new ReconAdminFilter(mockReconServer);
+    ReconAdminFilter filter = new ReconAdminFilter(mockReconServer, conf);
     filter.init(null);
     filter.doFilter(mockRequest, mockResponse, mockFilterChain);
 

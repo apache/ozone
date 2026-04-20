@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -76,6 +78,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   private StorageContainerManager scm;
   private Map<RequestType, Object> handlers;
+  private Map<RequestType, ScmInvoker<?>> invokers;
   private SCMHADBTransactionBuffer transactionBuffer;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
@@ -92,6 +95,7 @@ public class SCMStateMachine extends BaseStateMachine {
       SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
     this.handlers = new EnumMap<>(RequestType.class);
+    this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isDefault()) {
@@ -114,6 +118,11 @@ public class SCMStateMachine extends BaseStateMachine {
 
   public void registerHandler(RequestType type, Object handler) {
     handlers.put(type, handler);
+  }
+
+  public void registerInvoker(RequestType type,
+      ScmInvoker<?> invoker) {
+    invokers.put(type, invoker);
   }
 
   @Override
@@ -178,18 +187,23 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   private Message process(final SCMRatisRequest request) throws Exception {
-    try {
-      final Object handler = handlers.get(request.getType());
+    final ScmInvoker<?> invoker = invokers.get(request.getType());
+    if (invoker != null) {
+      return invoker.invokeLocal(request.getOperation(), request.getArguments());
+    }
+    return process(request, handlers.get(request.getType()));
+  }
 
+  public static Message process(final SCMRatisRequest request, Object handler) throws Exception {
+    try {
       if (handler == null) {
         throw new IOException("No handler found for request type " +
             request.getType());
       }
 
-      final Object result = handler.getClass().getMethod(
-          request.getOperation(), request.getParameterTypes())
-          .invoke(handler, request.getArguments());
-      return SCMRatisResponse.encode(result);
+      final Method method = handler.getClass().getMethod(request.getOperation(), request.getParameterTypes());
+      final Object result = method.invoke(handler, request.getArguments());
+      return SCMRatisResponse.encode(result, method.getReturnType());
     } catch (NoSuchMethodException | SecurityException ex) {
       throw new InvalidProtocolBufferException(ex.getMessage());
     } catch (InvocationTargetException e) {

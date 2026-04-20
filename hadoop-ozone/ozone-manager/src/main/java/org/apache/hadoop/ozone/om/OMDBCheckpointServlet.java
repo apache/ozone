@@ -54,6 +54,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
@@ -81,10 +82,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
  *
- * When Ozone ACL is enabled (`ozone.acl.enabled`=`true`), only users/principals
- * configured in `ozone.administrator` (along with the user that starts OM,
- * which automatically becomes an Ozone administrator but not necessarily in
- * the config) are allowed to access this endpoint.
+ * When Ozone authorization is enabled (`ozone.authorization.enabled`=`true`),
+ * only users/principals configured in `ozone.administrator` (along with the user
+ * that starts OM, which automatically becomes an Ozone administrator but not
+ * necessarily in the config) are allowed to access this endpoint.
  *
  * If Kerberos is enabled, the principal should be appended to
  * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
@@ -125,12 +126,32 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     initialize(om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
+        om.isAdminAuthorizationEnabled(),
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
 
     lock = new Lock(om);
+  }
+
+  @Override
+  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+      boolean isFormData, boolean flush) {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    boolean isOmLeader = om.isLeaderReady();
+    if (!isOmLeader) {
+      String msg = "Unable to process metadata snapshot request as "
+          + "this OM is not the leader or not ready to serve requests";
+      LOG.warn(msg);
+      try {
+        response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, msg);
+      } catch (IOException e) {
+        LOG.warn("Failed to send error response, falling back to status only", e);
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      }
+      return;
+    }
+    super.processMetadataSnapshotRequest(request, response, isFormData, flush);
   }
 
   @Override

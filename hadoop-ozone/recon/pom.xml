@@ -23,7 +23,7 @@
   <name>Apache Ozone Recon</name>
   <properties>
     <classpath.skip>false</classpath.skip>
-    <pnpm.version>8.15.7</pnpm.version>
+    <pnpm.version>10.28.2</pnpm.version>
   </properties>
   <dependencies>
     <dependency>

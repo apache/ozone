@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvide
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -53,9 +52,7 @@ public class Hadoop3OmTransport implements OmTransport {
   private final OzoneManagerProtocolPB rpcProxy;
 
   private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
-  private final boolean followerReadEnabled;
-  private final ReadConsistencyHint defaultLeaderReadConsistencyHint;
-  private HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
+  private final HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
 
   public Hadoop3OmTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
@@ -67,10 +64,9 @@ public class Hadoop3OmTransport implements OmTransport {
     this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider<>(
             conf, ugi, omServiceId, OzoneManagerProtocolPB.class);
 
-    followerReadEnabled = conf.getBoolean(
+    boolean followerReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT
-    );
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT);
 
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
@@ -79,37 +75,29 @@ public class Hadoop3OmTransport implements OmTransport {
     String defaultLeaderReadConsistencyStr = conf.get(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY,
         OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT);
     ReadConsistency defaultLeaderReadConsistency = ReadConsistency.valueOf(defaultLeaderReadConsistencyStr);
-    defaultLeaderReadConsistencyHint = defaultLeaderReadConsistency.getHint();
 
     // TODO: In the future, we might support more FollowerReadProxyProvider strategies depending on factors
     //  like latency, applied index, etc.
     //  So instead of enabling using follower read configuration, we can simply let user to configure the
     //  failover proxy provider instead (similar to dfs.client.failover.proxy.provider.<nameservice>)
-    if (followerReadEnabled) {
-      String defaultFollowerReadConsistencyStr = conf.get(
-          OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY,
-          OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT
-      );
-      ReadConsistency defaultFollowerReadConsistency =
-          ReadConsistency.valueOf(defaultFollowerReadConsistencyStr);
-      this.followerReadFailoverProxyProvider =
-          new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider,
-              defaultFollowerReadConsistency,
-              defaultLeaderReadConsistency);
-      this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
-    } else {
-      // TODO HDDS-14682: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider
-      //  even if the follower read is not enabled. We can try this to ensure that the tests still pass which
-      //  suggests that the HadoopRpcOMFollowerReadFailoverProxyProvider is a indeed a superset of
-      //  HadoopRpcOMFollowerReadFailoverProxyProvider
-      this.rpcProxy = OzoneManagerProtocolPB.newProxy(omFailoverProxyProvider, maxFailovers);
-    }
+    String defaultFollowerReadConsistencyStr = conf.get(
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT
+    );
+    ReadConsistency defaultFollowerReadConsistency =
+        ReadConsistency.valueOf(defaultFollowerReadConsistencyStr);
+    this.followerReadFailoverProxyProvider =
+        new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider,
+            defaultFollowerReadConsistency,
+            defaultLeaderReadConsistency,
+            followerReadEnabled);
+    this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
   }
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
     try {
-      return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, getOMRequest(payload));
+      return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
           HadoopRpcOMFailoverProxyProvider.getNotLeaderException(e);
@@ -118,23 +106,6 @@ public class Hadoop3OmTransport implements OmTransport {
       }
       throw new IOException("Could not determine or connect to OM Leader.");
     }
-  }
-
-  private OMRequest getOMRequest(OMRequest basePayload) {
-    // TODO HDDS-14682: We can remove this logic once we always use FollowerReadProxyProvider
-    if (followerReadEnabled) {
-      // Follower read uses FollowerReadInvocationHandler to set the invocation handler
-      // Return the request payload as is
-      return basePayload;
-    }
-    if (basePayload.hasReadConsistencyHint()) {
-      // If there is already user-defined read consistency hint, we should respect it
-      return basePayload;
-    }
-
-    return basePayload.toBuilder()
-        .setReadConsistencyHint(defaultLeaderReadConsistencyHint)
-        .build();
   }
 
   @Override

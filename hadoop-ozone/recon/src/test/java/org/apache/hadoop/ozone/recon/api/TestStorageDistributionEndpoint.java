@@ -138,9 +138,9 @@ public class TestStorageDistributionEndpoint {
     assertEquals(OPEN_KEY_BYTES + OPEN_MPU_KEY_BYTES,
         distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getTotalOpenKeyBytes());
     assertEquals(EXPECTED_COMMITTED_KEY_BYTES,
-        distributionResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
+        distributionResponse.getUsedSpaceBreakDown().getFinalizedKeyBytes());
     assertEquals(COMMITTED * 3,
-        distributionResponse.getGlobalStorage().getTotalOzonePreAllocatedContainerSpace());
+        distributionResponse.getGlobalStorage().getTotalOzoneCommittedSpace());
     for (int i = 0; i < 3; i++) {
       DatanodeStorageReport report = distributionResponse.getDataNodeUsage().get(i);
       assertEquals(OZONE_CAPACITY, report.getCapacity());

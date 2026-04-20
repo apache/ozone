@@ -181,10 +181,10 @@ public final class OzoneAcl {
 
     // Check if acl string contains scope info.
     if (parts[2].matches(ACL_SCOPE_REGEX)) {
-      int indexOfOpenBracket = parts[2].indexOf("[");
+      int indexOfOpenBracket = parts[2].indexOf('[');
       bits = parts[2].substring(0, indexOfOpenBracket);
       aclScope = AclScope.valueOf(parts[2].substring(indexOfOpenBracket + 1,
-          parts[2].indexOf("]")));
+          parts[2].indexOf(']')));
     }
 
     EnumSet<ACLType> acls = EnumSet.noneOf(ACLType.class);

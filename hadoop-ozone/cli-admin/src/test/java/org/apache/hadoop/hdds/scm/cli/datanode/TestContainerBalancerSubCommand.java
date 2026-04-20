@@ -71,7 +71,7 @@ class TestContainerBalancerSubCommand {
       "Key                                                Value\n" +
       "Threshold                                          10.0\n" +
       "Max Datanodes to Involve per Iteration(percent)    20\n" +
-      "Max Size to Move per Iteration                     0GB\n" +
+      "Max Size to Move per Iteration                     50GB\n" +
       "Max Size Entering Target per Iteration             26GB\n" +
       "Max Size Leaving Source per Iteration              26GB\n" +
       "Number of Iterations                               3\n" +

@@ -24,7 +24,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 /**
  * Codec for type BigInteger.
  */
-public class ScmBigIntegerCodec implements ScmCodec<BigInteger> {
+class ScmBigIntegerCodec implements ScmCodec<BigInteger> {
 
   @Override
   public ByteString serialize(BigInteger object) {
@@ -33,7 +33,7 @@ public class ScmBigIntegerCodec implements ScmCodec<BigInteger> {
   }
 
   @Override
-  public BigInteger deserialize(Class< ? > type, ByteString value) {
+  public BigInteger deserialize(ByteString value) {
     return new BigInteger(value.toByteArray());
   }
 }

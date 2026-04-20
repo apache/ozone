@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,7 @@ public class TestStorageVolumeHealthChecks {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final TestClock TEST_CLOCK = TestClock.newInstance();
 
   @TempDir
   private static Path volumePath;
@@ -57,19 +59,22 @@ public class TestStorageVolumeHealthChecks {
         new HddsVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     MetadataVolume.Builder metadataVolumeBuilder =
         new MetadataVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     DbVolume.Builder dbVolumeBuilder =
         new DbVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     return Stream.of(
         Arguments.of(Named.of("HDDS Volume", hddsVolumeBuilder)),
@@ -188,7 +193,7 @@ public class TestStorageVolumeHealthChecks {
   public void testCheckIODisabled(StorageVolume.Builder<?> builder)
       throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setVolumeIOTestCount(0);
+    dnConf.setDiskCheckEnabled(false);
     CONF.setFromObject(dnConf);
 
     builder.conf(CONF);
@@ -208,46 +213,17 @@ public class TestStorageVolumeHealthChecks {
   }
 
   @Test
-  public void testCheckIODefaultConfigs() {
-    CONF.clear();
-    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    // Make sure default values are not invalid.
-    assertThat(dnConf.getVolumeIOFailureTolerance())
-        .isLessThan(dnConf.getVolumeIOTestCount());
-  }
-
-  @Test
   public void testCheckIOInvalidConfig() {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
 
-    // When failure tolerance is above test count, default values should be
-    // used.
-    dnConf.setVolumeIOTestCount(3);
     dnConf.setVolumeIOFailureTolerance(4);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration.class);
-    assertEquals(dnConf.getVolumeIOTestCount(),
-        DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-    assertEquals(dnConf.getVolumeIOFailureTolerance(),
-        DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
-
-    // When test count and failure tolerance are set to the same value,
-    // Default values should be used.
-    dnConf.setVolumeIOTestCount(2);
-    dnConf.setVolumeIOFailureTolerance(2);
-    CONF.setFromObject(dnConf);
-    dnConf = CONF.getObject(DatanodeConfiguration.class);
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT,
-        dnConf.getVolumeIOTestCount());
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
-        dnConf.getVolumeIOFailureTolerance());
+    assertEquals(4, dnConf.getVolumeIOFailureTolerance());
 
     // Negative test count should reset to default value.
-    dnConf.setVolumeIOTestCount(-1);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration .class);
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT,
-        dnConf.getVolumeIOTestCount());
 
     // Negative failure tolerance should reset to default value.
     dnConf.setVolumeIOFailureTolerance(-1);
@@ -302,15 +278,22 @@ public class TestStorageVolumeHealthChecks {
       int ioTestCount, int ioFailureTolerance, boolean... checkResults)
       throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setVolumeIOTestCount(ioTestCount);
     dnConf.setVolumeIOFailureTolerance(ioFailureTolerance);
+    dnConf.setDiskCheckSlidingWindowTimeout(Duration.ofMillis(ioTestCount));
     CONF.setFromObject(dnConf);
     builder.conf(CONF);
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
+    // Sliding window protocol transitioned from count-based to a time-based system
+    // Update the event rate so that all the tested events are processed within the same sliding window period
+    long slidingWindowTimeoutMillis = volume.getConf().getObject(DatanodeConfiguration.class)
+        .getDiskCheckSlidingWindowTimeout().toMillis();
+    long eventRateMillis = slidingWindowTimeoutMillis / ioTestCount;
 
     for (int i = 0; i < checkResults.length; i++) {
+      // Sleep to allow entries in the sliding window to eventually timeout
+      TEST_CLOCK.fastForward(eventRateMillis);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override

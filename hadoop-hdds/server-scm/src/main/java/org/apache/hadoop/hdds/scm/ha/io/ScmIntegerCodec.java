@@ -17,22 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Ints;
+import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * Encodes/decodes an integer to a byte string.
  */
-public class ScmIntegerCodec implements ScmCodec<Integer> {
+class ScmIntegerCodec implements ScmCodec<Integer> {
   @Override
   public ByteString serialize(Integer object) {
     // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(object));
+    return UnsafeByteOperations.unsafeWrap(IntegerCodec.get().toByteArray(object));
   }
 
   @Override
-  public Integer deserialize(Class<?> type, ByteString value) {
-    return Ints.fromByteArray(value.toByteArray());
+  public Integer deserialize(ByteString value) {
+    return IntegerCodec.get().fromByteArray(value.toByteArray());
   }
 }

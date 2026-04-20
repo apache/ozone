@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -184,6 +185,8 @@ public class TestOMHALeaderSpecificACLEnforcement {
    */
   private OzoneConfiguration createBaseConfiguration() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     
     // Enable ACL for proper permission testing
     conf.setBoolean(OZONE_ACL_ENABLED, true);

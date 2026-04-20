@@ -393,26 +393,11 @@
       <plugin>
         <groupId>dev.aspectj</groupId>
         <artifactId>aspectj-maven-plugin</artifactId>
-        <configuration>
-          <source>${maven.compiler.release}</source>
-          <target>${maven.compiler.release}</target>
-          <argumentFileDirectory>${project.build.directory}/aspectj-build</argumentFileDirectory>
-        </configuration>
-        <dependencies>
-          <dependency>
-            <groupId>org.aspectj</groupId>
-            <artifactId>aspectjtools</artifactId>
-            <version>${aspectj.version}</version>
-          </dependency>
-        </dependencies>
         <executions>
           <execution>
             <goals>
               <goal>compile</goal>
             </goals>
-            <configuration>
-              <complianceLevel>${maven.compiler.release}</complianceLevel>
-            </configuration>
           </execution>
         </executions>
       </plugin>

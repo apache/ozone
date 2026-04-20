@@ -93,8 +93,8 @@ public class TimedOutTestsListener implements TestExecutionListener {
           Thread.State.WAITING.equals(thread.getState()) ?
               "WAITING (on object monitor)" : thread.getState()));
       for (StackTraceElement stackTraceElement : e.getValue()) {
-        dump.append("\n        at ");
-        dump.append(stackTraceElement);
+        dump.append("\n        at ")
+            .append(stackTraceElement);
       }
       dump.append('\n');
     }

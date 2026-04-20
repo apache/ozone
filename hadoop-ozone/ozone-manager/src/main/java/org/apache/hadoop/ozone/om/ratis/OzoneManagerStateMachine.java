@@ -369,7 +369,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       UserGroupInformation userGroupInformation =
           UserGroupInformation.createRemoteUser(
           request.getUserInfo().getUserName());
-      if (ozoneManager.getAclsEnabled()
+      if (ozoneManager.isAdminAuthorizationEnabled()
           && !ozoneManager.isAdmin(userGroupInformation)) {
         String message = "Access denied for user " + userGroupInformation
             + ". Superuser privilege is required to prepare upgrade/downgrade.";
