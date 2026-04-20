@@ -52,11 +52,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
   @Override
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
-  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    return super.preExecute(ozoneManager);
-  }
-
-  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
