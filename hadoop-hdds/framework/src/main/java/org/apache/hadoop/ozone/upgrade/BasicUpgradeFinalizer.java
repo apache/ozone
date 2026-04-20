@@ -116,6 +116,23 @@ public abstract class BasicUpgradeFinalizer
   }
 
   @Override
+  public void finalize(T service) throws IOException {
+    UpgradeFinalization.Status status = versionManager.getUpgradeState();
+    if (isFinalized(status)) {
+      return;
+    }
+    try {
+      if (status == FINALIZATION_REQUIRED) {
+        finalizationExecutor.execute(service, this);
+      }
+    } catch (NotLeaderException e) {
+      LOG.info("Leader change encountered during finalization. This component will continue finalization as " +
+          "directed by the new leader.", e);
+      // TODO - should we throw here?
+    }
+  }
+
+  @Override
   public synchronized StatusAndMessages reportStatus(
       String upgradeClientID, boolean takeover) throws UpgradeException {
     if (takeover) {

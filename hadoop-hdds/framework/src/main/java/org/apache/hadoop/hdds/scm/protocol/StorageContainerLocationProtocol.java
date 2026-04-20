@@ -480,6 +480,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
   StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException;
 
+  void finalizeUpgrade() throws IOException;
+
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;

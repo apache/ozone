@@ -88,6 +88,7 @@ message ScmContainerLocationRequest {
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
   optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
   optional QueryUpgradeStatusRequestProto queryUpgradeStatusRequest = 51;
+  optional FinalizeUpgradeRequestProto finalizeUpgradeRequest = 52;
 }
 
 message ScmContainerLocationResponse {
@@ -147,6 +148,7 @@ message ScmContainerLocationResponse {
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
   optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
   optional QueryUpgradeStatusResponseProto queryUpgradeStatusResponse = 51;
+  optional FinalizeUpgradeResponseProto finalizeUpgradeResponse = 52;
 
   enum Status {
     OK = 1;
@@ -205,6 +207,7 @@ enum Type {
   ReconcileContainer = 45;
   GetDeletedBlocksTransactionSummary = 46;
   QueryUpgradeStatus = 47;
+  FinalizeUpgrade = 48;
 }
 
 /**
@@ -578,6 +581,12 @@ message QueryUpgradeStatusRequestProto {
 
 message QueryUpgradeStatusResponseProto {
   required hadoop.hdds.UpgradeStatus status = 1;
+}
+
+message FinalizeUpgradeRequestProto {
+}
+
+message FinalizeUpgradeResponseProto {
 }
 
 message ContainerTokenSecretProto {

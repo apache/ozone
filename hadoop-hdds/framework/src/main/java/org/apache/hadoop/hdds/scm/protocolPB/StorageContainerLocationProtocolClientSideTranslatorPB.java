@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
@@ -1126,6 +1127,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     return new StatusAndMessages(
         UpgradeFinalization.Status.valueOf(status.getStatus().name()),
         status.getMessagesList());
+  }
+
+  @Override
+  public void finalizeUpgrade() throws IOException {
+    FinalizeUpgradeRequestProto req = FinalizeUpgradeRequestProto.newBuilder()
+        .build();
+    submitRequest(Type.FinalizeUpgrade, builder -> builder.setFinalizeUpgradeRequest(req))
+        .getFinalizeUpgradeResponse();
   }
 
   @Override

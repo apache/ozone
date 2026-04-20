@@ -29,6 +29,7 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpc
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -1102,31 +1103,35 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  @Deprecated
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
       IOException {
-    final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("upgradeClientID", upgradeClientID);
-    try {
-      // check admin authorization
-      getScm().checkAdminAccess(getRemoteUser(), false);
-      // TODO HDDS-6762: Return to the client once the FINALIZATION_STARTED
-      //  checkpoint has been crossed and continue finalizing asynchronously.
-      StatusAndMessages result = scm.getFinalizationManager().finalizeUpgrade(upgradeClientID);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.FINALIZE_SCM_UPGRADE, auditMap));
-      return result;
-    } catch (Exception ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.FINALIZE_SCM_UPGRADE, auditMap, ex));
-      throw ex;
-    }
-
+    finalizeUpgrade();
+    return new StatusAndMessages(FINALIZATION_IN_PROGRESS, Collections.emptyList());
   }
 
   @Override
+  public void finalizeUpgrade() throws IOException {
+    final Map<String, String> auditMap = Collections.emptyMap();
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      scm.getFinalizationManager().finalizeUpgrade();
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.FINALIZE_SCM_UPGRADE, auditMap));
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.FINALIZE_SCM_UPGRADE, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  @Deprecated
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException {
+
+    // This method, we change to call the queryUpgradeStatus and create a StatusAndMessages object that reflects
+    // the state.
+
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("upgradeClientID", upgradeClientID);
     auditMap.put("force", String.valueOf(force));

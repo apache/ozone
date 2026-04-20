@@ -96,7 +96,7 @@ public class TestScmHAFinalization {
     finalizationFuture = Executors.newSingleThreadExecutor().submit(
         () -> {
           try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
+            scmClient.finalizeUpgrade();
           } catch (IOException ex) {
             LOG.info("finalization client failed. This may be expected if the" +
                 " test injected failures.", ex);

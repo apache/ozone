@@ -754,6 +754,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setQueryUpgradeStatusResponse(getQueryUpgradeStatus(request.getQueryUpgradeStatusRequest()))
             .build();
+      case FinalizeUpgrade:
+        impl.finalizeUpgrade();
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
