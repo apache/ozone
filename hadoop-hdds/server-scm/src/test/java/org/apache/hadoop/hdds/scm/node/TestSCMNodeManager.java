@@ -753,7 +753,7 @@ public class TestSCMNodeManager {
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion());
     SCMContext nodeManagerContext = SCMContext.emptyContext();
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
@@ -832,7 +832,7 @@ public class TestSCMNodeManager {
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion());
     createNodeManager(getConf());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
@@ -2024,7 +2024,7 @@ public class TestSCMNodeManager {
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion());
     createNodeManager(getConf());
     SCMNodeManager nodeManager = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),

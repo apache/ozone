@@ -36,23 +36,24 @@ import org.slf4j.LoggerFactory;
 public class OMFinalizeUpgradeResponse extends OMClientResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFinalizeUpgradeResponse.class);
-  private int layoutVersionToWrite = -1;
+  private int serializedApparentVersion = -1;
 
   public OMFinalizeUpgradeResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse,
-      int layoutVersionToWrite) {
+      int serializedApparentVersion) {
     super(omResponse);
-    this.layoutVersionToWrite = layoutVersionToWrite;
+    this.serializedApparentVersion = serializedApparentVersion;
   }
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    if (layoutVersionToWrite != -1) {
-      LOG.info("Layout version to persist to DB : {}", layoutVersionToWrite);
+    if (serializedApparentVersion != -1) {
+      LOG.info("Serialized apparent component version to persist to DB : {}",
+          serializedApparentVersion);
       omMetadataManager.getMetaTable().putWithBatch(batchOperation,
           LAYOUT_VERSION_KEY,
-          String.valueOf(layoutVersionToWrite));
+          String.valueOf(serializedApparentVersion));
     }
   }
 }

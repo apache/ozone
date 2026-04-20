@@ -95,6 +95,8 @@ public class TestBasicUpgradeFinalizer {
     StatusAndMessages res =
         finalizer.finalize("test-client-1", mockObj);
 
+    // TODO this test class will be removed with BasicUpgradeFinalizer when all components are migrated to the new
+    //  version framework.
     assertEquals(ALREADY_FINALIZED, res.status());
     assertFalse(finalizer.preCalled || finalizer.finalizeCalled ||
         finalizer.postCalled);
@@ -222,12 +224,12 @@ public class TestBasicUpgradeFinalizer {
 
       super.finalizeLayoutFeature(lf, lf.action(), mockStorage);
 
-      inOrder.verify(mockStorage).setLayoutVersion(eq(lf.layoutVersion()));
+      inOrder.verify(mockStorage).setApparentVersion(eq(lf.layoutVersion()));
       try {
         inOrder.verify(mockStorage).persistCurrentState();
       } catch (IOException ex) {
         throw new UpgradeException(ex,
-            UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+            UpgradeException.ResultCodes.UPGRADE_FINALIZATION_FAILED);
       }
       finalizeCalled = true;
     }

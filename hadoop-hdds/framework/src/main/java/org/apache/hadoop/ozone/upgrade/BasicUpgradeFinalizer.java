@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.APPARENT_VERSION_UPDATE_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPGRADE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_IN_PROGRESS_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZED_MSG;
@@ -291,11 +291,11 @@ public abstract class BasicUpgradeFinalizer
   }
 
   private int currentStoredLayoutVersion(Storage config) {
-    return config.getLayoutVersion();
+    return config.getApparentVersion();
   }
 
   private void updateStorageLayoutVersion(int version, Storage config) {
-    config.setLayoutVersion(version);
+    config.setApparentVersion(version);
   }
 
   private void persistStorage(Storage config) throws IOException {
@@ -326,13 +326,13 @@ public abstract class BasicUpgradeFinalizer
   protected void logFinalizationFailureAndThrow(Exception e, String feature)
       throws UpgradeException {
     String msg = "Error during finalization of " + feature + ".";
-    logAndThrow(e, msg, LAYOUT_FEATURE_FINALIZATION_FAILED);
+    logAndThrow(e, msg, UPGRADE_FINALIZATION_FAILED);
   }
 
   private void logLayoutVersionUpdateFailureAndThrow(IOException e)
       throws UpgradeException {
     String msg = "Updating the LayoutVersion in the VERSION file failed.";
-    logAndThrow(e, msg, UPDATE_LAYOUT_VERSION_FAILED);
+    logAndThrow(e, msg, APPARENT_VERSION_UPDATE_FAILED);
   }
 
   private void logAndThrow(Exception e, String msg, ResultCodes resultCode)

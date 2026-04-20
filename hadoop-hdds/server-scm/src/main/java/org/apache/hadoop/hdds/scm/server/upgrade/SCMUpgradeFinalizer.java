@@ -70,7 +70,7 @@ public class SCMUpgradeFinalizer extends
         LOG.info("No layout features to finalize.");
       }
     } catch (IOException ex) {
-      throw new UpgradeException(ex, UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+      throw new UpgradeException(ex, UpgradeException.ResultCodes.UPGRADE_FINALIZATION_FAILED);
     }
   }
 

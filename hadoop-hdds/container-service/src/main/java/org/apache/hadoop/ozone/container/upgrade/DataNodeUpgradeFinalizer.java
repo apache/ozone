@@ -47,7 +47,7 @@ public class DataNodeUpgradeFinalizer extends
       String msg = String.format("Failed to finalize datanode layout feature " +
           "%s. It is not an HDDS Layout Feature.", layoutFeature);
       throw new UpgradeException(msg,
-          UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+          UpgradeException.ResultCodes.UPGRADE_FINALIZATION_FAILED);
     }
   }
 }

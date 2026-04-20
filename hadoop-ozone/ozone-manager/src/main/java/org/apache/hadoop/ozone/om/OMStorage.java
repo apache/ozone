@@ -25,8 +25,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 
 /**
  * Ozone Manager VERSION file representation.
@@ -91,8 +91,8 @@ public class OMStorage extends Storage {
    */
   public OMStorage(OzoneConfiguration conf) throws IOException {
     super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR,
-        getInitLayoutVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
-            OMLayoutVersionManager::maxLayoutVersion));
+        getInitApparentVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
+            () -> OzoneManagerVersion.SOFTWARE_VERSION.serialize()));
   }
 
   /**

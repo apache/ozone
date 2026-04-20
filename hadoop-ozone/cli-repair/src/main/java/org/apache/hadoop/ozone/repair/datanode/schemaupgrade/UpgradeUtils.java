@@ -98,7 +98,7 @@ final class UpgradeUtils {
     DatanodeLayoutStorage layoutStorage =
         new DatanodeLayoutStorage(conf, dnDetail.getUuidString());
     HDDSLayoutVersionManager layoutVersionManager =
-        new HDDSLayoutVersionManager(layoutStorage.getLayoutVersion());
+        new HDDSLayoutVersionManager(layoutStorage.getApparentVersion());
 
     final int metadataLayoutVersion =
         layoutVersionManager.getMetadataLayoutVersion();

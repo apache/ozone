@@ -696,7 +696,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
-        scmStorageConfig.getLayoutVersion());
+        scmStorageConfig.getApparentVersion());
     VersionedDatanodeFeatures.initialize(scmLayoutVersionManager);
 
     UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
@@ -1320,7 +1320,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
-            scmStorageConfig.getLayoutVersion(), scmStorageConfig.getScmId());
+            scmStorageConfig.getApparentVersion(), scmStorageConfig.getScmId());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
@@ -1354,7 +1354,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
               + ";cid={}; layoutVersion={}; HAEnabled={}",
           scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
-          scmStorageConfig.getLayoutVersion(), scmStorageConfig.isSCMHAEnabled());
+          scmStorageConfig.getApparentVersion(), scmStorageConfig.isSCMHAEnabled());
       return true;
     }
   }
