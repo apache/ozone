@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneManagerVersion.SOFTWARE_VERSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,53 +30,53 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneClusterImpl;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Test that the ozone manager will not start when it loads a VERSION file
- * indicating a metadata layout version larger than its software layout version.
+ * Ensures OM does not start when the VERSION file records an apparent version newer than the software version
+ * baked into this process ({@link org.apache.hadoop.ozone.OzoneManagerVersion#SOFTWARE_VERSION}).
  */
-public class TestOmStartupSlvLessThanMlv {
+public class TestOmStartupInvalidApparentVersion {
 
   @TempDir
   private Path folder;
 
   @Test
-  public void testStartupSlvLessThanMlv() throws Exception {
-    // Add subdirectories under the temporary folder where the version file
-    // will be placed.
+  public void testStartupFailsWhenApparentVersionBetweenLastLayoutFeatureAndZdu()
+      throws Exception {
+    assertStartupFailsWithComponentVersionMessage(OMLayoutFeature.SNAPSHOT_DEFRAG.layoutVersion() + 1);
+  }
+
+  @Test
+  public void testStartupFailsWhenApparentVersionBeyondLastKnownComponentVersion()
+      throws Exception {
+    assertStartupFailsWithComponentVersionMessage(SOFTWARE_VERSION.serialize() + 1);
+  }
+
+  private void assertStartupFailsWithComponentVersionMessage(int serializedApparentVersion)
+      throws Exception {
     String subDir = folder.toAbsolutePath() + "/om/current";
     File omSubdir = Files.createDirectories(Paths.get(subDir)).toFile();
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.toAbsolutePath().toString());
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, folder.toAbsolutePath().toString());
 
-    // Set metadata layout version larger than software layout version.
-    int largestSlv = 0;
-    for (LayoutFeature f: OMLayoutFeature.values()) {
-      largestSlv = Math.max(largestSlv, f.layoutVersion());
-    }
-    int mlv = largestSlv + 1;
-
-    // Create version file with MLV > SLV, which should fail the cluster build.
-    UpgradeTestUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, mlv);
+    UpgradeTestUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, serializedApparentVersion);
 
     MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf);
 
+    String expectedMessage =
+        "Initialization failed. Disk contains unknown apparent version " + serializedApparentVersion
+            + " for software version " + SOFTWARE_VERSION + ". Make sure OM was not downgraded after"
+            + " finalization";
+
     GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
-      OMException omException = assertThrows(OMException.class,
-          clusterBuilder::build);
-      String expectedMessage = String.format("Cannot initialize " +
-          "VersionManager. Metadata layout version (%s) > software layout" +
-          " version (%s)", mlv, mlv - 1);
-      assertEquals(expectedMessage, omException.getMessage());
+      IOException ioException = assertThrows(IOException.class, clusterBuilder::build);
+      assertEquals(expectedMessage, ioException.getMessage());
     });
   }
 }

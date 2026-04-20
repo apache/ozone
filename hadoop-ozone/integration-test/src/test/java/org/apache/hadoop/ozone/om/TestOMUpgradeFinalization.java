@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.assertClusterPrepared;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,6 +33,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -110,12 +110,13 @@ class TestOMUpgradeFinalization {
         waitFor(() -> !omStateMachine.getLifeCycle().getCurrentState()
             .isPausingOrPaused(), 1000, 60000);
 
-        assertEquals(maxLayoutVersion(),
-            downedOM.getVersionManager().getMetadataLayoutVersion());
+        int expectedSerialized = OzoneManagerVersion.SOFTWARE_VERSION.serialize();
+        assertEquals(expectedSerialized,
+            downedOM.getVersionManager().getApparentVersion().serialize());
         String lvString = downedOM.getMetadataManager().getMetaTable()
             .get(LAYOUT_VERSION_KEY);
         assertNotNull(lvString);
-        assertEquals(maxLayoutVersion(), Integer.parseInt(lvString));
+        assertEquals(expectedSerialized, Integer.parseInt(lvString));
       }
     }
   }

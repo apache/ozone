@@ -79,9 +79,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
 
       FinalizeUpgradeRequest request =
           getOmRequest().getFinalizeUpgradeRequest();
-
       String upgradeClientID = request.getUpgradeClientId();
-
       StatusAndMessages omStatus =
           ozoneManager.finalizeUpgrade(upgradeClientID);
 
@@ -93,7 +91,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
               .build();
 
       OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-      int lV = ozoneManager.getVersionManager().getMetadataLayoutVersion();
+      int lV = ozoneManager.getVersionManager().getApparentVersion().serialize();
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(LAYOUT_VERSION_KEY),
           CacheValue.get(context.getIndex(), String.valueOf(lV)));
@@ -104,7 +102,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
               .build();
       responseBuilder.setFinalizeUpgradeResponse(omResponse);
       response = new OMFinalizeUpgradeResponse(responseBuilder.build(),
-          ozoneManager.getVersionManager().getMetadataLayoutVersion());
+          ozoneManager.getVersionManager().getApparentVersion().serialize());
       LOG.trace("Returning response: {}", response);
     } catch (IOException e) {
       exception = e;
