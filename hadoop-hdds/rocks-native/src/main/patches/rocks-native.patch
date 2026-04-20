@@ -405,6 +405,7 @@ index 000000000..5ba8a82ee
 +    if (magic_number == kPlainTableMagicNumber ||
 +        magic_number == kLegacyPlainTableMagicNumber) {
 +      rep_->soptions_.use_mmap_reads = true;
++      fopts = rep_->soptions_;
 +
 +      fs->NewRandomAccessFile(file_path, fopts, &file, nullptr);
 +      rep_->file_.reset(new RandomAccessFileReader(std::move(file), file_path));

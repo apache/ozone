@@ -77,10 +77,15 @@ dn_with_num="$(sed -E 's/^.*-(datanode[0-9]+)-[0-9]+$/\1/' <<< "$container")"
 
 datafile="$(jq -r '.keyLocations[0][0].file' ${chunkinfo})"
 container_id="$(jq -r '.keyLocations[0][0].blockData.blockID.containerID' ${chunkinfo})"
+local_block_id="$(jq -r '.keyLocations[0][0].blockData.blockID.localID // .keyLocations[0][0].blockData.blockID.localId' ${chunkinfo})"
 pipeline_id="$(docker-compose exec -T ${SCM} bash -c \
   "ozone admin container info ${container_id} --json | jq -r '.writePipelineID.id // .writePipelineId.id'")"
 if [ -z "${pipeline_id}" ] || [ "${pipeline_id}" = "null" ]; then
   echo "Failed to determine write pipeline for container ${container_id}" >&2
+  exit 1
+fi
+if [ -z "${local_block_id}" ] || [ "${local_block_id}" = "null" ]; then
+  echo "Failed to determine local block ID for container ${container_id}" >&2
   exit 1
 fi
 
@@ -111,8 +116,29 @@ if [ -z "${target_container_db}" ]; then
 fi
 backup_container_db="${local_db_backup_path}/${container}${target_container_db}"
 if [ ! -e "${backup_container_db}" ]; then
-  echo "Failed to locate backup for ${target_container_db} on ${container}" >&2
-  exit 1
+  echo "No pre-key backup found for ${target_container_db} on ${container}; creating rollback copy by deleting block metadata"
+
+  docker stop "${container}"
+
+  wait_for_datanode "${container}" STALE 60
+
+  mkdir -p "$(dirname "${backup_container_db}")"
+  docker cp "${container}:${target_container_db}" "${backup_container_db}"
+
+  container_image="$(docker inspect -f '{{.Config.Image}}' "${container}")"
+  docker run --rm \
+    -v "${local_db_backup_path}:${local_db_backup_path}" \
+    --entrypoint bash "${container_image}" -c '
+      set -euo pipefail
+      backup_container_db="$1"
+      local_block_id="$2"
+
+      ldb --db="${backup_container_db}" --column_family=block_data delete "${local_block_id}"
+    ' _ "${backup_container_db}" "${local_block_id}" || exit 1
+
+  docker start "${container}"
+
+  wait_for_datanode "${container}" HEALTHY 60
 fi
 
 docker stop "${container}"
