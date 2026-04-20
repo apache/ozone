@@ -1133,8 +1133,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public void finalizeUpgrade() throws IOException {
     FinalizeUpgradeRequestProto req = FinalizeUpgradeRequestProto.newBuilder()
         .build();
-    submitRequest(Type.FinalizeUpgrade, builder -> builder.setFinalizeUpgradeRequest(req))
-        .getFinalizeUpgradeResponse();
+    submitRequest(Type.FinalizeUpgrade, builder -> builder.setFinalizeUpgradeRequest(req));
   }
 
   @Override
