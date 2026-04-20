@@ -35,7 +35,7 @@
     "build": "vite build",
     "serve": "vite preview",
     "test": "vitest",
-    "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 9888",
+    "mock:api": "json-server --watch api/db.json --routes api/routes.json --middlewares api/pagination.js --port 9888",
     "dev": "npm-run-all --parallel mock:api start",
     "lint": "eslint src/*",
     "lint:fix": "eslint --fix src/*"

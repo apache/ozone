@@ -109,7 +109,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.4
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -167,7 +167,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.4
         with:
           path: |
             ~/.m2/repository/*/*/*

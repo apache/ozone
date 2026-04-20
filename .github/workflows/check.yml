@@ -164,7 +164,7 @@ jobs:
 
       - name: Cache for NPM dependencies
         if: ${{ inputs.needs-npm-cache }}
-        uses: actions/cache@v5
+        uses: actions/cache@v5.0.4
         with:
           path: |
             ~/.pnpm-store
@@ -174,7 +174,7 @@ jobs:
 
       - name: Cache for Maven dependencies
         if: ${{ inputs.needs-maven-cache }}
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.4
         with:
           path: |
             ~/.m2/repository/*/*/*

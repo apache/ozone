@@ -202,6 +202,7 @@ message Node {
     repeated NodeOperationalState nodeOperationalStates = 3;
     optional int32 totalVolumeCount = 4;
     optional int32 healthyVolumeCount = 5;
+    repeated string failedVolumes = 6;
 }
 
 message NodePool {

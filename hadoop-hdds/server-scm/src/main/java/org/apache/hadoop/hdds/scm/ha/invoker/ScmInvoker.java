@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.ratis.protocol.Message;
 
 /**
  * Invokes methods without using reflection.
@@ -56,7 +57,7 @@ public abstract class ScmInvoker<T extends SCMHandler> {
   }
 
   /** For non-@Replicate methods. */
-  abstract Object invokeLocal(String methodName, Object[] args) throws Exception;
+  public abstract Message invokeLocal(String methodName, Object[] args) throws Exception;
 
   /** For @Replicate DIRECT methods. */
   final Object invokeReplicateDirect(NameAndParameterTypes method, Object[] args) throws SCMException {

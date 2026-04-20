@@ -338,7 +338,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v5.0.4
         with:
           path: |
             ~/.m2/repository/*/*/*
