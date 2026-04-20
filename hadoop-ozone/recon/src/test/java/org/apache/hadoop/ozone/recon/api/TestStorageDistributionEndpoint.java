@@ -39,8 +39,8 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
@@ -225,7 +225,7 @@ public class TestStorageDistributionEndpoint {
           .build();
       pendingDeletionMetrics.add(new DatanodePendingDeletionMetrics(hostName,
           uuid.toString(), PENDING_DELETION_SIZE));
-      dataNodes.add(new DatanodeInfo(datanode, null, null));
+      dataNodes.add(new DatanodeInfo(datanode, NodeStatus.inServiceHealthy(), null));
       when(nodeManager.getNodeStat(datanode))
           .thenReturn(new SCMNodeMetric(OZONE_CAPACITY, OZONE_USED, OZONE_REMAINING, COMMITTED,
               MIN_FREE_SPACE, RESERVED));
@@ -248,14 +248,6 @@ public class TestStorageDistributionEndpoint {
 
     }
     when(nodeManager.getAllNodes()).thenReturn(dataNodes);
-    when(nodeManager.getStats())
-        .thenReturn(new SCMNodeStat(
-          OZONE_CAPACITY * numNodes,
-            OZONE_USED * numNodes,
-            OZONE_REMAINING * numNodes,
-            COMMITTED * numNodes,
-            MIN_FREE_SPACE * numNodes,
-            RESERVED * numNodes));
 
 
     Map<String, Long> pendingSizes = new HashMap<>();
