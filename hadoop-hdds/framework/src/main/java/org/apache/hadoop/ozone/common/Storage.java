@@ -132,6 +132,11 @@ public abstract class Storage {
     storageInfo.setApparentVersion(version);
   }
 
+  /** Same as {@link #getApparentVersion()}; for callers still using layout-version naming. */
+  public int getLayoutVersion() {
+    return getApparentVersion();
+  }
+
   /**
    * Retrieves the storageInfo instance to read/write the common
    * version file properties.
