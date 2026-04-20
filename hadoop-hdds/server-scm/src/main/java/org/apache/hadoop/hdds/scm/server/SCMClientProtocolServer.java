@@ -1176,7 +1176,7 @@ public class SCMClientProtocolServer implements
         .setScmFinalized(isScmFinalized(scmUpgradeStatus))
         .setNumDatanodesFinalized(finalizedDatanodes)
         .setNumDatanodesTotal(totalDatanodes)
-        .setShouldFinalize(shouldFinalize(scmUpgradeStatus))
+        .setShouldFinalize(shouldFinalize(scmUpgradeStatus, finalizedDatanodes, totalDatanodes))
         .build();
   }
 
@@ -1185,9 +1185,10 @@ public class SCMClientProtocolServer implements
         || UpgradeFinalization.isDone(scmUpgradeStatus);
   }
 
-  static boolean shouldFinalize(UpgradeFinalization.Status scmUpgradeStatus) {
-    return UpgradeFinalization.Status.FINALIZATION_REQUIRED.equals(
-        scmUpgradeStatus);
+  static boolean shouldFinalize(UpgradeFinalization.Status scmUpgradeStatus,
+      int finalizedDatanodes, int totalDatanodes) {
+    return UpgradeFinalization.Status.FINALIZATION_REQUIRED.equals(scmUpgradeStatus)
+        && finalizedDatanodes == totalDatanodes;
   }
 
   @Override

@@ -768,6 +768,34 @@ public class TestSCMNodeManager {
     }
   }
 
+  @Test
+  public void testDatanodeFinalizedCounterTracksRegistrationAndRemoveNode()
+      throws IOException, AuthenticationException, NodeNotFoundException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails finalizedNode =
+          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+          "Finalized registration should increment finalized count");
+
+      DatanodeDetails nonFinalizedNode =
+          registerWithCapacity(nodeManager, SMALLER_MLV_LAYOUT_PROTO, success);
+      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+          "Non-finalized registration should not increment finalized count");
+
+      nonFinalizedNode.setPersistedOpState(
+          HddsProtos.NodeOperationalState.DECOMMISSIONED);
+      nodeManager.removeNode(nonFinalizedNode);
+      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+          "Removing a non-finalized node should not change finalized count");
+
+      finalizedNode.setPersistedOpState(
+          HddsProtos.NodeOperationalState.DECOMMISSIONED);
+      nodeManager.removeNode(finalizedNode);
+      assertEquals(0, nodeManager.getNumDatanodesFinalized(),
+          "Removing a finalized node should decrement finalized count");
+    }
+  }
+
   // Currently invoked by testProcessLayoutVersion.
   public void testProcessLayoutVersionReportHigherMlv()
       throws IOException {

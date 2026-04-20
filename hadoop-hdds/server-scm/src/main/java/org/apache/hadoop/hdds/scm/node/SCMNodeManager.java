@@ -1078,7 +1078,7 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  private static boolean isDatanodeFinalized(LayoutVersionProto layoutVersion) {
+  public static boolean isDatanodeFinalized(LayoutVersionProto layoutVersion) {
     if (layoutVersion == null) {
       return false;
     }

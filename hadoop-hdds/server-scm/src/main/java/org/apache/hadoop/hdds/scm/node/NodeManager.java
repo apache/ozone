@@ -152,14 +152,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     return (int) getAllNodes().stream()
         .filter(DatanodeInfo.class::isInstance)
         .map(DatanodeInfo.class::cast)
-        .filter(datanodeInfo -> {
-          LayoutVersionProto layoutVersion = datanodeInfo.getLastKnownLayoutVersion();
-          if (layoutVersion == null) {
-            return false;
-          }
-          return layoutVersion.getMetadataLayoutVersion()
-              >= layoutVersion.getSoftwareLayoutVersion();
-        })
+        .filter(datanodeInfo ->
+            SCMNodeManager.isDatanodeFinalized(datanodeInfo.getLastKnownLayoutVersion()))
         .count();
   }
 

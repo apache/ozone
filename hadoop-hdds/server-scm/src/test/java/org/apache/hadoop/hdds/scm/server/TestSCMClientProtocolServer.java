@@ -146,9 +146,20 @@ public class TestSCMClientProtocolServer {
         UpgradeFinalization.Status.FINALIZATION_REQUIRED, 1, 2);
 
     assertFalse(status.getScmFinalized());
-    assertTrue(status.getShouldFinalize());
+    assertFalse(status.getShouldFinalize());
     assertEquals(1, status.getNumDatanodesFinalized());
     assertEquals(2, status.getNumDatanodesTotal());
+  }
+
+  @Test
+  public void testBuildUpgradeStatusMapsFinalizationRequiredAllNodesFinalized() {
+    HddsProtos.UpgradeStatus status = SCMClientProtocolServer.buildUpgradeStatus(
+        UpgradeFinalization.Status.FINALIZATION_REQUIRED, 3, 3);
+
+    assertFalse(status.getScmFinalized());
+    assertTrue(status.getShouldFinalize());
+    assertEquals(3, status.getNumDatanodesFinalized());
+    assertEquals(3, status.getNumDatanodesTotal());
   }
 
   @Test
@@ -191,7 +202,7 @@ public class TestSCMClientProtocolServer {
     HddsProtos.UpgradeStatus needsFinalization =
         SCMClientProtocolServer.buildUpgradeStatus(UpgradeFinalization.Status.FINALIZATION_REQUIRED, 1, 3);
     assertFalse(needsFinalization.getScmFinalized());
-    assertTrue(needsFinalization.getShouldFinalize());
+    assertFalse(needsFinalization.getShouldFinalize());
     assertEquals(1, needsFinalization.getNumDatanodesFinalized());
     assertEquals(3, needsFinalization.getNumDatanodesTotal());
 
