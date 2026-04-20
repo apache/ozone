@@ -95,6 +95,11 @@ public class OMStorage extends Storage {
             () -> OzoneManagerVersion.SOFTWARE_VERSION.serialize()));
   }
 
+  /** Same as {@link #getApparentVersion()}; for callers still using layout-version naming. */
+  public int getLayoutVersion() {
+    return getApparentVersion();
+  }
+
   /**
    * Sets the certificate serial id to be stored in the VERSION file
    * representation.
