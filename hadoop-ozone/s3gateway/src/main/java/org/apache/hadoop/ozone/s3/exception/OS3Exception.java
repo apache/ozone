@@ -66,12 +66,16 @@ public class OS3Exception extends RuntimeException {
     //Added for JaxB.
   }
 
-  OS3Exception(S3ErrorTable error, Exception cause) {
+  OS3Exception(S3ErrorTable error, Exception cause, String resource) {
     super(error.getErrorMessage(), cause);
 
     code = error.getCode();
     errorMessage = error.getErrorMessage();
     httpCode = error.getHttpCode();
+    this.resource = resource;
+
+    // logging in S3ErrorTable to respect any existing log level setting
+    S3ErrorTable.log(this);
   }
 
   public String getCode() {

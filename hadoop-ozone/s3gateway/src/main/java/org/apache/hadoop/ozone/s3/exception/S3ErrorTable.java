@@ -27,6 +27,7 @@ import static java.net.HttpURLConnection.HTTP_PRECON_FAILED;
 import static org.apache.hadoop.ozone.OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
 
+import jakarta.annotation.Nullable;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,35 +239,33 @@ public enum S3ErrorTable {
     }
   }
 
-  public static OS3Exception newError(String bucket, String resource, OMException e) {
-    S3ErrorTable err = translateResultCode(e);
-    return newError(err, NO_SUCH_BUCKET == err ? bucket : resource, e);
+  /** Same as {@link #newError(String, OMException)}, but uses {@code bucket} as the {@code resource}
+   * in case of {@link #NO_SUCH_BUCKET} error. */
+  public static OS3Exception newError(String bucket, String resource, OMException cause) {
+    S3ErrorTable errorCode = translateResultCode(cause);
+    return new OS3Exception(errorCode, cause, NO_SUCH_BUCKET == errorCode ? bucket : resource);
   }
 
-  public static OS3Exception newError(String resource, OMException e) {
-    return newError(translateResultCode(e), resource, e);
+  /** Creates new {@link OS3Exception} for {@link OMException} and {@code resource}. */
+  public static OS3Exception newError(@Nullable String resource, OMException cause) {
+    return new OS3Exception(translateResultCode(cause), cause, resource);
   }
 
-  public static OS3Exception newError(S3ErrorTable e, String resource) {
-    return newError(e, resource, null);
+  /** Creates new {@link OS3Exception} for {@link S3ErrorTable} and {@code resource}. */
+  public static OS3Exception newError(S3ErrorTable errorCode, @Nullable String resource) {
+    return new OS3Exception(errorCode, null, resource);
   }
 
-  /**
-   * Create a new {@link OS3Exception} for the given error.
-   * @param e Error Template
-   * @param resource Resource associated with this exception
-   * @param ex the original exception, may be null
-   * @return creates a new instance of error based on the template
-   */
-  public static OS3Exception newError(S3ErrorTable e, String resource,
-      Exception ex) {
-    OS3Exception err = new OS3Exception(e, ex);
-    err.setResource(resource);
-    if (e.getHttpCode() == HTTP_INTERNAL_ERROR) {
-      LOG.error("Internal Error: {}", err.toXml(), ex);
+  /** Creates new {@link OS3Exception} for {@link S3ErrorTable}, {@code resource} and {@code cause}. */
+  public static OS3Exception newError(S3ErrorTable errorCode, @Nullable String resource, Exception cause) {
+    return new OS3Exception(errorCode, cause, resource);
+  }
+
+  static void log(OS3Exception err) {
+    if (err.getHttpCode() == HTTP_INTERNAL_ERROR) {
+      LOG.error("Internal Error: {}", err.toXml(), err.getCause());
     } else if (LOG.isDebugEnabled()) {
-      LOG.debug(err.toXml(), ex);
+      LOG.debug(err.toXml(), err.getCause());
     }
-    return err;
   }
 }
