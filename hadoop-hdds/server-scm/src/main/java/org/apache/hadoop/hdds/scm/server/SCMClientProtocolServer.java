@@ -29,7 +29,8 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpc
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.STARTING_FINALIZATION;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -1106,8 +1107,11 @@ public class SCMClientProtocolServer implements
   @Deprecated
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
       IOException {
+    if (scm.getLayoutVersionManager().getUpgradeState() == ALREADY_FINALIZED) {
+      return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
+    }
     finalizeUpgrade();
-    return new StatusAndMessages(FINALIZATION_IN_PROGRESS, Collections.emptyList());
+    return new StatusAndMessages(STARTING_FINALIZATION, Collections.emptyList());
   }
 
   @Override
