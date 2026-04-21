@@ -195,7 +195,7 @@ public enum S3ErrorTable {
     return httpCode;
   }
 
-  /** Converts result code of @{code OMException} to {@code S3ErrorTable}, which
+  /** Converts result code of {@code OMException} to {@code S3ErrorTable}, which
    * should be thrown via {@link #newError(S3ErrorTable, String, Exception)}. */
   public static S3ErrorTable translateResultCode(OMException ex) {
     switch (ex.getResult()) {
@@ -261,7 +261,7 @@ public enum S3ErrorTable {
     return new OS3Exception(errorCode, null, resource);
   }
 
-  /** Creates new {@link OS3Exception} for {@link S3ErrorTable}, {@code resource} and {@code cause}. */
+  /** Creates new {@link OS3Exception} for {@link S3ErrorTable} and {@code cause}. */
   public static OS3Exception newError(S3ErrorTable errorCode, Exception cause) {
     return new OS3Exception(errorCode, cause, null);
   }
