@@ -26,6 +26,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
@@ -69,26 +70,20 @@ public class SnapshotListJSONServlet extends HttpServlet {
       }
 
       String prefix = request.getParameter("prefix");
-      String startItem = request.getParameter("startItem");
-      String maxKeysStr = request.getParameter("maxKeys");
 
-      int maxKeys = 100;
-      if (maxKeysStr != null) {
-        maxKeys = Integer.parseInt(maxKeysStr);
-      }
+      final int maxKeys = 100;
 
       ObjectMapper objectMapper = new ObjectMapper();
       objectMapper.addMixIn(SnapshotInfo.class, SnapshotInfoMixin.class);
       objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
       response.setContentType("application/json; charset=utf8");
-      PrintWriter writer = response.getWriter();
-      try {
-        ListSnapshotResponse listSnapshotResponse = om.listSnapshot(volume, bucket, prefix, startItem, maxKeys);
-        writer.write(objectMapper.writeValueAsString(listSnapshotResponse.getSnapshotInfos()));
-      } finally {
-        if (writer != null) {
-          writer.close();
-        }
+      try (PrintWriter writer = response.getWriter()) {
+        String lastSnapshot = null;
+        do {
+          ListSnapshotResponse listSnapshotResponse = om.listSnapshot(volume, bucket, prefix, lastSnapshot, maxKeys);
+          writer.write(objectMapper.writeValueAsString(listSnapshotResponse.getSnapshotInfos()));
+          lastSnapshot = listSnapshotResponse.getLastSnapshot();
+        } while (StringUtils.isNotEmpty(lastSnapshot));
       }
     } catch (IOException e) {
       LOG.error("Caught an exception while processing SnapshotList request", e);

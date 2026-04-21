@@ -59,7 +59,7 @@
         </td>
         <td>{{snapshot.creationTime | date:'yyyy-MM-dd HH:mm:ss'}}</td>
         <td>{{$ctrl.formatBytes(snapshot.referencedSize)}}</td>
-        <td>{{$ctrl.formatBytes(snapshot.exclusiveSize)}}</td>
+        <td>{{$ctrl.formatBytes(snapshot.exclusiveSize + snapshot.exclusiveSizeDeltaFromDirDeepCleaning)}}</td>
         <td>{{snapshot.snapshotId}}</td>
         <td>{{snapshot.snapshotPath}}</td>
     </tr>
