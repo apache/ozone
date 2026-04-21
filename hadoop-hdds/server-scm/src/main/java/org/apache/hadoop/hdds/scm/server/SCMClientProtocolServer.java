@@ -101,6 +101,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -1154,12 +1155,16 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser(), true);
 
-      UpgradeFinalization.Status scmUpgradeStatus =
-          scm.getLayoutVersionManager().getUpgradeState();
-      int totalDatanodes = scm.getScmNodeManager().getAllNodeCount();
-      int finalizedDatanodes = scm.getScmNodeManager().getNumDatanodesFinalized();
+      UpgradeFinalization.Status scmUpgradeStatus = scm.getLayoutVersionManager().getUpgradeState();
+      SCMUpgradeFinalizer.DatanodeFinalizationCounts datanodeFinalizationCounts =
+          SCMUpgradeFinalizer.getNumFinalizedDatanodes(scm.getScmNodeManager());
+      int finalizedDatanodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
+      int healthyDatanodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
+
       HddsProtos.UpgradeStatus result = buildUpgradeStatus(
-          scmUpgradeStatus, finalizedDatanodes, totalDatanodes);
+          scmUpgradeStatus,
+          finalizedDatanodes,
+          healthyDatanodes);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, null));
       return result;
     } catch (IOException ex) {
@@ -1171,12 +1176,13 @@ public class SCMClientProtocolServer implements
   static HddsProtos.UpgradeStatus buildUpgradeStatus(
       UpgradeFinalization.Status scmUpgradeStatus,
       int finalizedDatanodes,
-      int totalDatanodes) {
+      int healthyDatanodes) {
     return HddsProtos.UpgradeStatus.newBuilder()
         .setScmFinalized(isScmFinalized(scmUpgradeStatus))
         .setNumDatanodesFinalized(finalizedDatanodes)
-        .setNumDatanodesTotal(totalDatanodes)
-        .setShouldFinalize(shouldFinalize(scmUpgradeStatus, finalizedDatanodes, totalDatanodes))
+        .setNumDatanodesTotal(healthyDatanodes)
+        .setShouldFinalize(
+            shouldFinalize(scmUpgradeStatus, finalizedDatanodes, healthyDatanodes))
         .build();
   }
 
@@ -1186,9 +1192,9 @@ public class SCMClientProtocolServer implements
   }
 
   static boolean shouldFinalize(UpgradeFinalization.Status scmUpgradeStatus,
-      int finalizedDatanodes, int totalDatanodes) {
+      int finalizedDatanodes, int healthyDatanodes) {
     return UpgradeFinalization.Status.FINALIZATION_REQUIRED.equals(scmUpgradeStatus)
-        && finalizedDatanodes == totalDatanodes;
+        && finalizedDatanodes == healthyDatanodes;
   }
 
   @Override

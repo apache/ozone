@@ -96,6 +96,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -743,7 +744,8 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       DatanodeDetails node =
           HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
-      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+      assertEquals(1, SCMUpgradeFinalizer.getNumFinalizedDatanodes(nodeManager)
+              .getNumFinalizedDatanodes(),
           "Initial datanode should be counted as finalized");
 
       int softwareVersion =
@@ -755,7 +757,8 @@ public class TestSCMNodeManager {
               .setMetadataLayoutVersion(metadataVersion - 1)
               .setSoftwareLayoutVersion(softwareVersion)
               .build());
-      assertEquals(0, nodeManager.getNumDatanodesFinalized(),
+      assertEquals(0, SCMUpgradeFinalizer.getNumFinalizedDatanodes(nodeManager)
+              .getNumFinalizedDatanodes(),
           "Lower metadata layout version should decrement finalized count");
 
       nodeManager.processLayoutVersionReport(node,
@@ -763,7 +766,8 @@ public class TestSCMNodeManager {
               .setMetadataLayoutVersion(metadataVersion)
               .setSoftwareLayoutVersion(softwareVersion)
               .build());
-      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+      assertEquals(1, SCMUpgradeFinalizer.getNumFinalizedDatanodes(nodeManager)
+              .getNumFinalizedDatanodes(),
           "Restored metadata layout version should restore finalized count");
     }
   }
@@ -774,24 +778,27 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       DatanodeDetails finalizedNode =
           registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
-      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+      assertEquals(1, SCMUpgradeFinalizer.getNumFinalizedDatanodes(nodeManager)
+              .getNumFinalizedDatanodes(),
           "Finalized registration should increment finalized count");
 
       DatanodeDetails nonFinalizedNode =
           registerWithCapacity(nodeManager, SMALLER_MLV_LAYOUT_PROTO, success);
-      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+      assertEquals(1, SCMUpgradeFinalizer.getNumFinalizedDatanodes(nodeManager)
+              .getNumFinalizedDatanodes(),
           "Non-finalized registration should not increment finalized count");
 
       nonFinalizedNode.setPersistedOpState(
           HddsProtos.NodeOperationalState.DECOMMISSIONED);
       nodeManager.removeNode(nonFinalizedNode);
-      assertEquals(1, nodeManager.getNumDatanodesFinalized(),
+      assertEquals(1, SCMUpgradeFinalizer.getNumFinalizedDatanodes(nodeManager)
+              .getNumFinalizedDatanodes(),
           "Removing a non-finalized node should not change finalized count");
 
       finalizedNode.setPersistedOpState(
           HddsProtos.NodeOperationalState.DECOMMISSIONED);
       nodeManager.removeNode(finalizedNode);
-      assertEquals(0, nodeManager.getNumDatanodesFinalized(),
+      assertEquals(0, SCMUpgradeFinalizer.getNumFinalizedDatanodes(nodeManager).getNumFinalizedDatanodes(),
           "Removing a finalized node should decrement finalized count");
     }
   }
