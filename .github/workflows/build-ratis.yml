@@ -67,6 +67,7 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          persist-credentials: false
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.ref }}
       - name: Cache for maven dependencies
@@ -115,6 +116,7 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          persist-credentials: false
           repository: apache/ratis-thirdparty
           ref: ${{ needs.ratis.outputs.thirdparty-version }}
       - name: Get component versions
