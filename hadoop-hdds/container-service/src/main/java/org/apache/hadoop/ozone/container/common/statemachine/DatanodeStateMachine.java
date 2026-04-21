@@ -195,6 +195,9 @@ public class DatanodeStateMachine implements Closeable {
     }
     nextHB = new AtomicLong(Time.monotonicNow());
 
+    ReplicationConfig replicationConfig =
+        conf.getObject(ReplicationConfig.class);
+
     ContainerImporter importer = new ContainerImporter(conf,
         container.getContainerSet(),
         container.getController(),
@@ -205,15 +208,14 @@ public class DatanodeStateMachine implements Closeable {
         importer,
         new SimpleContainerDownloader(conf, certClient));
     ContainerReplicator pushReplicator = new PushReplicator(conf,
-        new OnDemandContainerReplicationSource(container.getController()),
+        new OnDemandContainerReplicationSource(container.getController(),
+            replicationConfig),
         new GrpcContainerUploader(conf, certClient, container.getController())
     );
 
     pullReplicatorWithMetrics = new MeasuredReplicator(pullReplicator, "pull");
     pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push");
 
-    ReplicationConfig replicationConfig =
-        conf.getObject(ReplicationConfig.class);
     supervisor = ReplicationSupervisor.newBuilder()
         .stateContext(context)
         .datanodeConfig(dnConf)

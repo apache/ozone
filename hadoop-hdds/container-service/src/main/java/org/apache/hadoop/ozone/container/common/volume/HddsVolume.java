@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
@@ -106,6 +107,9 @@ public class HddsVolume extends StorageVolume {
   private File deletedContainerDir;
   private final AtomicBoolean dbLoaded = new AtomicBoolean(false);
   private final AtomicBoolean dbLoadFailure = new AtomicBoolean(false);
+
+  private final AtomicInteger activeOutboundReplications =
+      new AtomicInteger(0);
 
   /**
    * Builder for HddsVolume.
@@ -628,5 +632,17 @@ public class HddsVolume extends StorageVolume {
     } catch (Exception e) {
       LOG.warn("compact rocksdb error in {}", dbFilePath, e);
     }
+  }
+
+  public int incActiveOutboundReplications() {
+    return activeOutboundReplications.incrementAndGet();
+  }
+
+  public int decActiveOutboundReplications() {
+    return activeOutboundReplications.decrementAndGet();
+  }
+
+  public int getActiveOutboundReplications() {
+    return activeOutboundReplications.get();
   }
 }
