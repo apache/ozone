@@ -224,6 +224,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       + "to the pending commands on all source datanodes")
   private MutableCounterLong replicateContainerCmdsDeferredTotal;
 
+  @Metric("Number of times EC reconstruction was triggered for decommission " +
+      "due to source node load.")
+  private MutableCounterLong ecReconstructionDecommissionTriggeredTotal;
+
+  @Metric("Number of times EC reconstruction was throttled due to global " +
+      "reconstruction limit.")
+  private MutableCounterLong ecReconstructionGlobalLimitReachedTotal;
+
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
@@ -289,6 +297,8 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     partialReplicationTotal.snapshot(builder, all);
     ecPartialReplicationForMisReplicationTotal.snapshot(builder, all);
     partialReplicationForMisReplicationTotal.snapshot(builder, all);
+    ecReconstructionDecommissionTriggeredTotal.snapshot(builder, all);
+    ecReconstructionGlobalLimitReachedTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -570,6 +580,22 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getPartialReplicationForMisReplicationTotal() {
     return this.partialReplicationForMisReplicationTotal.value();
+  }
+
+  public void incrEcReconstructionDecommissionTriggeredTotal() {
+    this.ecReconstructionDecommissionTriggeredTotal.incr();
+  }
+
+  public long getEcReconstructionDecommissionTriggeredTotal() {
+    return this.ecReconstructionDecommissionTriggeredTotal.value();
+  }
+
+  public void incrEcReconstructionGlobalLimitReachedTotal() {
+    this.ecReconstructionGlobalLimitReachedTotal.incr();
+  }
+
+  public long getEcReconstructionGlobalLimitReachedTotal() {
+    return this.ecReconstructionGlobalLimitReachedTotal.value();
   }
 
 }

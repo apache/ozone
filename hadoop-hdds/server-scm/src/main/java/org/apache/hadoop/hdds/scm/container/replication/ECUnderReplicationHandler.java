@@ -488,6 +488,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           LOG.info("Source node {} is highly loaded, switching to " +
                   "reconstruction for decommissioning container {}",
               source.getLeft().getDatanodeDetails(), container.containerID());
+          metrics.incrEcReconstructionDecommissionTriggeredTotal();
           return processReconstruction(replicaCount,
               new ArrayList<>(decomIndexes), sources, availableSourceNodes,
               excludedNodes, usedNodes);

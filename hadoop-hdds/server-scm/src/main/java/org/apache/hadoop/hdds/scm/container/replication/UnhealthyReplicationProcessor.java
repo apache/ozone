@@ -116,6 +116,8 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
         LOG.info("The maximum number of pending reconstruction commands ({}) " +
                 "are scheduled. Ending the iteration.",
             replicationManager.getReconstructionInFlightLimit());
+        replicationManager.getMetrics()
+            .incrEcReconstructionGlobalLimitReachedTotal();
         break;
       }
       HealthResult healthResult =

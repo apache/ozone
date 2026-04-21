@@ -85,7 +85,11 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             supervisor.getReplicationSkippedCount())
         .addGauge(Interns.info("maxReplicationStreams", "Maximum number of "
             + "concurrent replication tasks which can run simultaneously"),
-            supervisor.getMaxReplicationStreams());
+            supervisor.getMaxReplicationStreams())
+        .addGauge(Interns.info("volumeOutboundConcurrencyWaitTotal",
+            "Total number of times a replication task was delayed due to " +
+                "volume outbound limit"),
+            supervisor.getVolumeOutboundConcurrencyWaitTotal());
 
     Map<String, String> metricsMap = ReplicationSupervisor.getMetricsMap();
     if (!metricsMap.isEmpty()) {
