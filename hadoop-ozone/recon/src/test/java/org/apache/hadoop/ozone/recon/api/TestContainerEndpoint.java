@@ -982,8 +982,9 @@ public class TestContainerEndpoint {
     assertEquals(0, responseObject.getMisReplicatedCount());
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
-    // Add unhealthy records
-    putContainerInfos(5);
+    // Add unhealthy records for all container IDs created by
+    // createUnhealthyRecords(5, 4, 3, 2, 1), which uses IDs 1..15.
+    putContainerInfos(15);
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
