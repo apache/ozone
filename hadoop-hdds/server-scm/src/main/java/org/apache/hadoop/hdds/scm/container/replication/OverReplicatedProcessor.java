@@ -55,6 +55,11 @@ public class OverReplicatedProcessor extends UnhealthyReplicationProcessor
   }
 
   @Override
+  protected boolean reconstructionLimitReached(ReplicationManager rm) {
+    return false;
+  }
+
+  @Override
   protected int sendDatanodeCommands(
       ReplicationManager replicationManager,
       ContainerHealthResult.OverReplicatedHealthResult healthResult)

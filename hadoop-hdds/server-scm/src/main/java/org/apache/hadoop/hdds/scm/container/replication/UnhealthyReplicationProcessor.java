@@ -77,6 +77,13 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
       ReplicationManager rm, long inflightLimit);
 
   /**
+   * Check if the reconstruction operation limit is reached.
+   * @param rm The ReplicationManager instance
+   * @return True if the limit is reached, false otherwise.
+   */
+  protected abstract boolean reconstructionLimitReached(ReplicationManager rm);
+
+  /**
    * Read messages from the ReplicationManager under replicated queue and,
    * form commands to correct replication. The commands are added
    * to the event queue and the PendingReplicaOps are adjusted.
@@ -103,6 +110,12 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
             "Ending the iteration.", inflightLimit);
         replicationManager
             .getMetrics().incrPendingReplicationLimitReachedTotal();
+        break;
+      }
+      if (reconstructionLimitReached(replicationManager)) {
+        LOG.info("The maximum number of pending reconstruction commands ({}) " +
+                "are scheduled. Ending the iteration.",
+            replicationManager.getReconstructionInFlightLimit());
         break;
       }
       HealthResult healthResult =
