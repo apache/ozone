@@ -456,6 +456,27 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   }
 
   /**
+   * Returns true if the given datanode's replication load (queued replication
+   * and reconstruction commands) exceeds the configured load factor threshold.
+   *
+   * @param datanode the datanode to check
+   * @return true if the node is highly loaded, false otherwise
+   */
+  public boolean isNodeHighlyLoaded(DatanodeDetails datanode) {
+    try {
+      int limit = getReplicationLimit(datanode);
+      if (limit <= 0) {
+        return true;
+      }
+      double loadFactor = (double) getQueuedReplicationCount(datanode) / limit;
+      return loadFactor >= rmConf.getEcDecommissionReconstructionLoadFactor();
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Node {} not found when checking load factor", datanode, e);
+      return true;
+    }
+  }
+
+  /**
    * Sends delete container command for the given container to the given
    * datanode.
    *
@@ -1332,10 +1353,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         defaultValue = "false",
         reconfigurable = true,
         tags = { SCM },
-        description = "Reserved for HDDS-15072. When implemented, if true, SCM " +
-            "will switch from 1-1 replication to multi-source reconstruction for " +
-            "EC containers on decommissioning nodes when the node's load exceeds " +
-            "the threshold. Not read by SCM in this release."
+        description = "If true, SCM switches from 1-1 replication to " +
+            "multi-source reconstruction for EC containers on decommissioning " +
+            "nodes when the node's load exceeds the threshold."
     )
     private boolean ecDecommissionReconstructionEnabled = false;
 
@@ -1344,10 +1364,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         defaultValue = "0.9",
         reconfigurable = true,
         tags = { SCM },
-        description = "Reserved for HDDS-15072. When implemented, the threshold " +
-            "factor (between 0 and 1) of a node's replication limit at which " +
-            "SCM switches to reconstruction for EC decommission. Not read by " +
-            "SCM in this release. Default is 0.9."
+        description = "The threshold factor (between 0 and 1) of a node's " +
+            "effective replication limit at which SCM switches to reconstruction " +
+            "for EC decommission. Default is 0.9."
     )
     private double ecDecommissionReconstructionLoadFactor = 0.9;
 
