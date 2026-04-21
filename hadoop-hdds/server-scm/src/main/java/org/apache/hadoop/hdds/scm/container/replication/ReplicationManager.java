@@ -463,6 +463,27 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   }
 
   /**
+   * Returns true if the given datanode's replication load (queued replication
+   * and reconstruction commands) exceeds the configured load factor threshold.
+   *
+   * @param datanode the datanode to check
+   * @return true if the node is highly loaded, false otherwise
+   */
+  public boolean isNodeHighlyLoaded(DatanodeDetails datanode) {
+    try {
+      int limit = getReplicationLimit(datanode);
+      if (limit <= 0) {
+        return true;
+      }
+      double loadFactor = (double) getQueuedReplicationCount(datanode) / limit;
+      return loadFactor >= rmConf.getEcDecommissionReconstructionLoadFactor();
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Node {} not found when checking load factor", datanode, e);
+      return true;
+    }
+  }
+
+  /**
    * Sends delete container command for the given container to the given
    * datanode.
    *
