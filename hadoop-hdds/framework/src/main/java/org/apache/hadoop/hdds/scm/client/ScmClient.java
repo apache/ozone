@@ -450,6 +450,8 @@ public interface ScmClient extends Closeable {
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
 
+  void finalizeUpgrade() throws IOException;
+
   HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException;
 
   DecommissionScmResponseProto decommissionScm(

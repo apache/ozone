@@ -583,6 +583,11 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public void finalizeUpgrade() throws IOException {
+    storageContainerLocationClient.finalizeUpgrade();
+  }
+
+  @Override
   public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
     return storageContainerLocationClient.queryUpgradeStatus();
   }

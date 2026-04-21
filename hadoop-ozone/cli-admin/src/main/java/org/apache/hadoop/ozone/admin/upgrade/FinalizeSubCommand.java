@@ -17,23 +17,27 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
-import org.apache.hadoop.hdds.cli.AdminSubcommand;
+import java.io.IOException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.kohsuke.MetaInfServices;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
 /**
- * Subcommand to group upgrade related operations.
+ * Sub command to finalize a cluster upgrade.
  */
 @CommandLine.Command(
-    name = "upgrade",
-    description = "Operations related to Ozone cluster upgrade",
+    name = "finalize",
+    description = "Finalize a cluster upgrade",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class,
-    subcommands = {
-        FinalizeSubCommand.class,
-        StatusSubCommand.class
-    })
-@MetaInfServices(AdminSubcommand.class)
-public class UpgradeCommands implements AdminSubcommand {
+    versionProvider = HddsVersionProvider.class)
+public class FinalizeSubCommand extends ScmSubcommand {
+
+  @Override
+  public void execute(ScmClient client) throws IOException {
+    client.finalizeUpgrade();
+
+    out().println("Cluster finalize has been started. Monitor progress with the ozone admin upgrade status command");
+  }
 }
+
