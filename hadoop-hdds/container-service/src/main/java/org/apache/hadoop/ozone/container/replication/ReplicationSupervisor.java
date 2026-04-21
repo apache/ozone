@@ -173,11 +173,13 @@ public final class ReplicationSupervisor {
             .setDaemon(true)
             .setNameFormat(threadNamePrefix + "ContainerReplicationThread-%d")
             .build();
+        VolumeAwarePriorityQueue vaQueue =
+            new VolumeAwarePriorityQueue(replicationConfig);
         ThreadPoolExecutor tpe = new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
             replicationConfig.getReplicationMaxStreams(),
             60, TimeUnit.SECONDS,
-            new PriorityBlockingQueue<>(),
+            vaQueue,
             threadFactory);
         executor = tpe;
         executorThreadUpdater = threadCount -> {
@@ -424,6 +426,16 @@ public final class ReplicationSupervisor {
         LOG.warn("Failed {}", this, e);
         failureCounter.get(task.getMetricName()).incrementAndGet();
       } finally {
+        for (HddsVolume vol : task.getVolumes()) {
+          vol.decActiveOutboundReplications();
+        }
+        if (executor instanceof ThreadPoolExecutor) {
+          BlockingQueue<Runnable> queue =
+              ((ThreadPoolExecutor) executor).getQueue();
+          if (queue instanceof VolumeAwarePriorityQueue) {
+            ((VolumeAwarePriorityQueue) queue).signalVolumeAvailable();
+          }
+        }
         queuedCounter.get(task.getMetricName()).decrementAndGet();
         opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
@@ -553,5 +565,141 @@ public final class ReplicationSupervisor {
   public long getReplicationRequestTotalTime(String metricsName) {
     MutableRate rate = opsLatencyMs.get(metricsName);
     return rate != null ? (long) Math.ceil(rate.lastStat().total()) : 0;
+  }
+
+  /**
+   * A custom implementation of a PriorityBlockingQueue that is aware of the
+   * outbound replication limit per volume.
+   * It skips over tasks whose volumes are currently at their limit.
+   */
+  private static final class VolumeAwarePriorityQueue
+      extends LinkedBlockingQueue<Runnable> {
+
+    private final PriorityQueue<TaskRunner> queue;
+    private final Lock lock = new ReentrantLock();
+    private final Condition notEmpty = lock.newCondition();
+    private final ReplicationConfig replicationConfig;
+
+    private VolumeAwarePriorityQueue(ReplicationConfig config) {
+      this.replicationConfig = config;
+      queue = new PriorityQueue<>(TASK_RUNNER_COMPARATOR);
+    }
+
+    @Override
+    public boolean offer(Runnable r) {
+      if (!(r instanceof TaskRunner)) {
+        return false;
+      }
+      TaskRunner taskRunner = (TaskRunner) r;
+      lock.lock();
+      try {
+        boolean added = queue.offer(taskRunner);
+        if (added) {
+          notEmpty.signal();
+        }
+        return added;
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    @Override
+    public Runnable take() throws InterruptedException {
+      lock.lock();
+      try {
+        while (true) {
+          TaskRunner task = findRunnableTask();
+          if (task != null) {
+            return task;
+          }
+          notEmpty.await();
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    @Override
+    public Runnable poll(long timeout, TimeUnit unit)
+        throws InterruptedException {
+      long nanos = unit.toNanos(timeout);
+      lock.lock();
+      try {
+        while (true) {
+          TaskRunner task = findRunnableTask();
+          if (task != null) {
+            return task;
+          }
+          if (nanos <= 0) {
+            return null;
+          }
+          nanos = notEmpty.awaitNanos(nanos);
+        }
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    private TaskRunner findRunnableTask() {
+      Iterator<TaskRunner> it = queue.iterator();
+      while (it.hasNext()) {
+        TaskRunner taskRunner = it.next();
+        Collection<HddsVolume> volumes = taskRunner.task.getVolumes();
+        boolean canRun = true;
+        for (HddsVolume vol : volumes) {
+          if (vol.getActiveOutboundReplications() >=
+              replicationConfig.getVolumeOutboundLimit()) {
+            canRun = false;
+            break;
+          }
+        }
+        if (canRun) {
+          it.remove();
+          // Pre-increment to reserve the slot
+          for (HddsVolume vol : volumes) {
+            vol.incActiveOutboundReplications();
+          }
+          return taskRunner;
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Signal the queue that a volume slot has become available.
+     */
+    public void signalVolumeAvailable() {
+      lock.lock();
+      try {
+        notEmpty.signalAll();
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    @Override
+    public int size() {
+      lock.lock();
+      try {
+        return queue.size();
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    @Override
+    public boolean isEmpty() {
+      return size() == 0;
+    }
+
+    @Override
+    public void clear() {
+      lock.lock();
+      try {
+        queue.clear();
+      } finally {
+        lock.unlock();
+      }
+    }
   }
 }

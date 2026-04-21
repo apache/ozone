@@ -69,7 +69,7 @@ class TestPushReplicator {
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, compression);
     ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
-        subject);
+        subject, null);
 
     // WHEN
     subject.replicate(task);
@@ -90,7 +90,7 @@ class TestPushReplicator {
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, NO_COMPRESSION);
     ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
-        subject);
+        subject, null);
 
     // WHEN
     subject.replicate(task);
@@ -112,7 +112,7 @@ class TestPushReplicator {
     ContainerReplicator subject = createSubject(containerID, target,
         output, completion, NO_COMPRESSION);
     ReplicationTask task = new ReplicationTask(toTarget(containerID, target),
-        subject);
+        subject, null);
 
     // WHEN
     subject.replicate(task);

@@ -54,7 +54,8 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
     ECReconstructionCommandInfo reconstructionCommandInfo =
         new ECReconstructionCommandInfo(ecContainersCommand);
     ECReconstructionCoordinatorTask task = new ECReconstructionCoordinatorTask(
-        coordinator, reconstructionCommandInfo);
+        coordinator, reconstructionCommandInfo, container.getController(),
+        context.getParent().getDatanodeDetails());
     this.supervisor.addTask(task);
   }
 

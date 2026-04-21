@@ -64,9 +64,9 @@ public class TestMeasuredReplicator {
   @Test
   public void measureFailureSuccessAndBytes() {
     //WHEN
-    measuredReplicator.replicate(new ReplicationTask(forTest(1), replicator));
-    measuredReplicator.replicate(new ReplicationTask(forTest(2), replicator));
-    measuredReplicator.replicate(new ReplicationTask(forTest(3), replicator));
+    measuredReplicator.replicate(new ReplicationTask(forTest(1), replicator, null));
+    measuredReplicator.replicate(new ReplicationTask(forTest(2), replicator, null));
+    measuredReplicator.replicate(new ReplicationTask(forTest(3), replicator, null));
 
     //THEN
     //even containers should be failed
@@ -84,9 +84,9 @@ public class TestMeasuredReplicator {
   public void testReplicationTime() throws Exception {
     //WHEN
     //will wait at least the 300ms
-    measuredReplicator.replicate(new ReplicationTask(forTest(101), replicator));
-    measuredReplicator.replicate(new ReplicationTask(forTest(201), replicator));
-    measuredReplicator.replicate(new ReplicationTask(forTest(300), replicator));
+    measuredReplicator.replicate(new ReplicationTask(forTest(101), replicator, null));
+    measuredReplicator.replicate(new ReplicationTask(forTest(201), replicator, null));
+    measuredReplicator.replicate(new ReplicationTask(forTest(300), replicator, null));
 
     //THEN
     //even containers should be failed
@@ -104,7 +104,7 @@ public class TestMeasuredReplicator {
   public void testFailureTimeSuccessExcluded() {
     //WHEN
     //will wait at least the 15ms
-    measuredReplicator.replicate(new ReplicationTask(forTest(15), replicator));
+    measuredReplicator.replicate(new ReplicationTask(forTest(15), replicator, null));
 
 
     //THEN
@@ -116,7 +116,7 @@ public class TestMeasuredReplicator {
   public void testSuccessTimeFailureExcluded() {
     //WHEN
     //will wait at least the 10ms
-    measuredReplicator.replicate(new ReplicationTask(forTest(10), replicator));
+    measuredReplicator.replicate(new ReplicationTask(forTest(10), replicator, null));
 
 
     //THEN
@@ -127,7 +127,7 @@ public class TestMeasuredReplicator {
   @Test
   public void testReplicationQueueTimeMetrics() {
     final Instant queued = Instant.now().minus(1, ChronoUnit.SECONDS);
-    ReplicationTask task = new ReplicationTask(forTest(100), replicator) {
+    ReplicationTask task = new ReplicationTask(forTest(100), replicator, null) {
       @Override
       public Instant getQueued() {
         return queued;

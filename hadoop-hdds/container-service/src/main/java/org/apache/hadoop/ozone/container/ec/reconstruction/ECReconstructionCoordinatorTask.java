@@ -17,7 +17,15 @@
 
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
+import java.util.SortedMap;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -32,18 +40,24 @@ public class ECReconstructionCoordinatorTask
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
   private final ECReconstructionCoordinator reconstructionCoordinator;
   private final ECReconstructionCommandInfo reconstructionCommandInfo;
+  private final ContainerController containerController;
+  private final DatanodeDetails self;
   private final String debugString;
   public static final String METRIC_NAME = "ECReconstructions";
   public static final String METRIC_DESCRIPTION_SEGMENT = "EC reconstructions";
 
   public ECReconstructionCoordinatorTask(
       ECReconstructionCoordinator coordinator,
-      ECReconstructionCommandInfo reconstructionCommandInfo) {
+      ECReconstructionCommandInfo reconstructionCommandInfo,
+      ContainerController containerController,
+      DatanodeDetails self) {
     super(reconstructionCommandInfo.getContainerID(),
         reconstructionCommandInfo.getDeadline(),
         reconstructionCommandInfo.getTerm());
     this.reconstructionCoordinator = coordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
+    this.containerController = containerController;
+    this.self = self;
     debugString = reconstructionCommandInfo.toString();
   }
 
@@ -116,5 +130,33 @@ public class ECReconstructionCoordinatorTask
   @Override
   public int hashCode() {
     return Objects.hash(getContainerId());
+  }
+
+  @Override
+  public Collection<HddsVolume> getVolumes() {
+    if (containerController == null || self == null) {
+      return Collections.emptyList();
+    }
+    List<HddsVolume> volumes = new ArrayList<>();
+    SortedMap<Integer, DatanodeDetails> sources =
+        reconstructionCommandInfo.getSourceNodeMap();
+    boolean hasLocalSource = false;
+    for (DatanodeDetails dn : sources.values()) {
+      if (dn.equals(self)) {
+        hasLocalSource = true;
+        break;
+      }
+    }
+    if (hasLocalSource) {
+      org.apache.hadoop.ozone.container.common.interfaces.Container<?>
+          container = containerController.getContainer(getContainerId());
+      if (container != null) {
+        HddsVolume vol = (HddsVolume) container.getContainerData().getVolume();
+        if (vol != null) {
+          volumes.add(vol);
+        }
+      }
+    }
+    return volumes;
   }
 }

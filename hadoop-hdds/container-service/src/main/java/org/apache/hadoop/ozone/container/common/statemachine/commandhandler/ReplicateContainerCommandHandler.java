@@ -83,7 +83,8 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
         replicateCommand.getTargetDatanode() == null ?
             downloadReplicator : pushReplicator;
 
-    ReplicationTask task = new ReplicationTask(replicateCommand, replicator);
+    ReplicationTask task = new ReplicationTask(replicateCommand, replicator,
+        container.getController());
     supervisor.addTask(task);
   }
 

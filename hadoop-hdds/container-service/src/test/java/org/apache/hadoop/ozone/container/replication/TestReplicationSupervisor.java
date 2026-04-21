@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
+import java.util.function.Function;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -68,7 +69,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
+import java.util.function.IntConsumer;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -494,13 +495,13 @@ public class TestReplicationSupervisor {
 
     ReplicateContainerCommand cmd = createCommand(1);
     cmd.setDeadline(clock.millis() + 10000);
-    ReplicationTask task1 = new ReplicationTask(cmd, replicatorRef.get());
+    ReplicationTask task1 = new ReplicationTask(cmd, replicatorRef.get(), null);
     cmd = createCommand(2);
     cmd.setDeadline(clock.millis() + 20000);
-    ReplicationTask task2 = new ReplicationTask(cmd, replicatorRef.get());
+    ReplicationTask task2 = new ReplicationTask(cmd, replicatorRef.get(), null);
     cmd = createCommand(3);
     // No deadline set
-    ReplicationTask task3 = new ReplicationTask(cmd, replicatorRef.get());
+    ReplicationTask task3 = new ReplicationTask(cmd, replicatorRef.get(), null);
     // no deadline set
 
     clock.fastForward(15000);
@@ -532,8 +533,8 @@ public class TestReplicationSupervisor {
     pushCmd.setTerm(CURRENT_TERM);
     ReplicateContainerCommand pullCmd = createCommand(2);
 
-    supervisor.addTask(new ReplicationTask(pushCmd, replicatorRef.get()));
-    supervisor.addTask(new ReplicationTask(pullCmd, replicatorRef.get()));
+    supervisor.addTask(new ReplicationTask(pushCmd, replicatorRef.get(), null));
+    supervisor.addTask(new ReplicationTask(pullCmd, replicatorRef.get(), null));
 
     assertEquals(2, supervisor.getReplicationRequestCount());
     assertEquals(1, supervisor.getReplicationSuccessCount());
@@ -597,14 +598,14 @@ public class TestReplicationSupervisor {
 
       ReplicateContainerCommand cmd1 = createCommand(6L);
       cmd1.setDeadline(clock.millis() + 10000);
-      ReplicationTask task1 = new ReplicationTask(cmd1, replicatorRef.get());
+      ReplicationTask task1 = new ReplicationTask(cmd1, replicatorRef.get(), null);
       clock.fastForward(15000);
       replicationSupervisor.addTask(task1);
 
       ReconstructECContainersCommand cmd2 = createReconstructionCmd(7L);
       cmd2.setDeadline(clock.millis() + 10000);
       ECReconstructionCoordinatorTask task2 = new ECReconstructionCoordinatorTask(
-          ecReplicatorRef.get(), new ECReconstructionCommandInfo(cmd2));
+          ecReplicatorRef.get(), new ECReconstructionCommandInfo(cmd2), null, datanode);
       clock.fastForward(15000);
       ecReconstructionSupervisor.addTask(task2);
       ecReconstructionSupervisor.addTask(createECTask(8L));
@@ -948,7 +949,7 @@ public class TestReplicationSupervisor {
 
   private ReplicationTask createTask(long containerId) {
     ReplicateContainerCommand cmd = createCommand(containerId);
-    return new ReplicationTask(cmd, replicatorRef.get());
+    return new ReplicationTask(cmd, replicatorRef.get(), null);
   }
 
   private ReconcileContainerTask createReconciliationTask(long containerId) {
@@ -962,13 +963,13 @@ public class TestReplicationSupervisor {
 
   private ECReconstructionCoordinatorTask createECTask(long containerId) {
     return new ECReconstructionCoordinatorTask(null,
-        createReconstructionCmdInfo(containerId));
+        createReconstructionCmdInfo(containerId), null, null);
   }
 
   private ECReconstructionCoordinatorTask createECTaskWithCoordinator(long containerId) {
     ECReconstructionCommandInfo ecReconstructionCommandInfo = createReconstructionCmdInfo(containerId);
     return new ECReconstructionCoordinatorTask(ecReplicatorRef.get(),
-        ecReconstructionCommandInfo);
+        ecReconstructionCommandInfo, null, null);
   }
 
   private static ReplicateContainerCommand createCommand(long containerId) {
@@ -1191,7 +1192,7 @@ public class TestReplicationSupervisor {
     for (int i = 0; i < 10; i++) {
       List<DatanodeDetails> sources =
           singletonList(datanodes.get(i % datanodes.size()));
-      rs.addTask(new ReplicationTask(fromSources(i, sources), noopReplicator));
+      rs.addTask(new ReplicationTask(fromSources(i, sources), noopReplicator, null));
     }
   }
 }

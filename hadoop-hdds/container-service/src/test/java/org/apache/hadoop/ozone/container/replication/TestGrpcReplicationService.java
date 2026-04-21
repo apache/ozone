@@ -199,7 +199,7 @@ class TestGrpcReplicationService {
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
 
     ReplicationTask task =
-        new ReplicationTask(toTarget(CONTAINER_ID, datanode), pushReplicator);
+        new ReplicationTask(toTarget(CONTAINER_ID, datanode), pushReplicator, null);
 
     pushReplicator.replicate(task);
 

@@ -17,9 +17,13 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 /**
@@ -29,6 +33,7 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
+  private final ContainerController containerController;
   private final String debugString;
   public static final String METRIC_NAME = "ContainerReplications";
   public static final String METRIC_DESCRIPTION_SEGMENT = "container replications";
@@ -39,11 +44,13 @@ public class ReplicationTask extends AbstractReplicationTask {
   private long transferredBytes;
 
   public ReplicationTask(ReplicateContainerCommand cmd,
-                         ContainerReplicator replicator) {
+                         ContainerReplicator replicator,
+                         ContainerController containerController) {
     super(cmd.getContainerID(), cmd.getDeadline(), cmd.getTerm());
     setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
+    this.containerController = containerController;
     if (cmd.getTargetDatanode() != null) {
       // Only push replication will have a target datanode set, and it must be
       // sent to the source datanode to be executed. It is possible the source
@@ -63,7 +70,7 @@ public class ReplicationTask extends AbstractReplicationTask {
       ContainerReplicator replicator
   ) {
     this(ReplicateContainerCommand.fromSources(containerId, sources),
-        replicator);
+        replicator, null);
   }
 
   @Override
@@ -132,5 +139,21 @@ public class ReplicationTask extends AbstractReplicationTask {
   @Override
   public void runTask() {
     replicator.replicate(this);
+  }
+
+  @Override
+  public Collection<HddsVolume> getVolumes() {
+    if (cmd.getTargetDatanode() != null && containerController != null) {
+      // This is a push command, we are the source.
+      org.apache.hadoop.ozone.container.common.interfaces.Container<?>
+          container = containerController.getContainer(getContainerId());
+      if (container != null) {
+        HddsVolume vol = (HddsVolume) container.getContainerData().getVolume();
+        if (vol != null) {
+          return Collections.singletonList(vol);
+        }
+      }
+    }
+    return Collections.emptyList();
   }
 }

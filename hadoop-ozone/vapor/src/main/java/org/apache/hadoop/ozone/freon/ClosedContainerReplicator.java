@@ -148,7 +148,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
           replicationTasks.add(new ReplicationTask(
               ReplicateContainerCommand.fromSources(container.getContainerID(),
-                  datanodesWithContainer), replicator));
+                  datanodesWithContainer), replicator, controller));
         }
       }
 
