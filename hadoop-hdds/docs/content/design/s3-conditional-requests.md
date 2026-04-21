@@ -28,7 +28,8 @@ AWS S3 supports conditional requests using HTTP conditional headers,
 enabling atomic operations, cache optimization, and preventing race
 conditions. This includes:
 
-- **Conditional Writes** (PutObject): `If-Match` and `If-None-Match` headers for atomic operations
+- **Conditional Writes** (PutObject, CompleteMultipartUpload):
+  `If-Match` and `If-None-Match` headers for atomic operations
 - **Conditional Reads** (GetObject, HeadObject): `If-Match`,
   `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since` for cache
   validation
@@ -50,6 +51,9 @@ conditions. This includes:
 - **Create-only semantics**: Prevent accidental overwrites (`If-None-Match: *`)
 - **Optimistic locking**: Enable concurrent access with conflict detection
 - **Leader election**: Implement distributed coordination using S3 as backing store
+- **Conditional multipart completion**: Finalize uploaded MPU parts only
+  when the current destination object still satisfies the caller's
+  precondition
 
 ### Conditional Reads
 
@@ -87,6 +91,33 @@ conditions. This includes:
 
 - Cannot use both headers together in the same request.
 - No additional charges for failed conditional requests.
+
+### AWS S3 Conditional CompleteMultipartUpload Specification
+
+Conditional multipart completion applies to
+`CompleteMultipartUpload`. Although the request finalizes an existing
+multipart upload, the conditional headers are evaluated against the
+current committed object at the destination key, not against the MPU's
+temporary part state.
+
+#### Supported Headers
+
+|   |   |   |
+|---|---|---|
+|**Header**|**Meaning**|**Failure result**|
+|`If-None-Match: "*"`|Complete the MPU only if no committed object currently exists at the destination key.|`412 Precondition Failed` if the destination key already exists.|
+|`If-Match: "<etag>"`|Complete the MPU only if the current committed object exists and its ETag matches.|`412 Precondition Failed` if the object is missing or the ETag does not match.|
+
+#### Restrictions and Notes
+
+- `If-Match` and `If-None-Match` must not be used together.
+- `CreateMultipartUpload`, `UploadPart`, and `UploadPartCopy` do not
+  use these destination write headers. The precondition is enforced only
+  when the client calls `CompleteMultipartUpload`.
+- In-progress multipart uploads do not count as an existing committed
+  object for `If-None-Match: *`.
+- The MPU parts remain associated with the multipart upload until the
+  complete request succeeds or the upload is aborted.
 
 ### AWS S3 Conditional Read Specification
 
@@ -383,6 +414,103 @@ rides on the standard atomic rewrite path.
 |`KEY_NOT_FOUND`|412|PreconditionFailed|If-Match failed (key missing or concurrent modification)|
 |`ETAG_NOT_AVAILABLE`|412|PreconditionFailed|If-Match failed (key has no ETag, e.g., created via OFS)|
 |`ETAG_MISMATCH`|412|PreconditionFailed|If-Match failed (ETag mismatch)|
+
+## AWS S3 Conditional CompleteMultipartUpload Implementation
+
+Conditional MPU completion should reuse the same conditional write fields
+already present in `KeyArgs`, but unlike normal conditional `PUT`, it
+does not need an open-key plus later commit bridge. The final key is
+assembled and committed inside one OM transaction in
+`S3MultipartUploadCompleteRequest.validateAndUpdateCache(...)` while
+holding the normal bucket write lock.
+
+### Request Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant GW as S3 Gateway
+    participant OM as Ozone Manager
+
+    User->>GW: CompleteMultipartUpload with optional If-None-Match / If-Match
+    GW->>GW: Parse conditional write headers
+    GW->>OM: completeMultipartUpload(keyArgs + partsList)
+    OM->>OM: Acquire bucket lock
+    OM->>OM: Load current committed key and MPU state
+    OM->>OM: Validate destination precondition
+    alt Precondition failed
+        OM-->>GW: KEY_ALREADY_EXISTS / KEY_NOT_FOUND / ETAG_*
+        GW-->>User: 412 Precondition Failed
+    else Preconditions pass
+        OM->>OM: Validate MPU parts and build final key
+        OM->>OM: Write key table entry and remove MPU state
+        OM-->>GW: Success
+        GW-->>User: 200 OK
+    end
+```
+
+### Gateway Flow
+
+1. Parse `If-None-Match` / `If-Match` using the same shared helper used
+   by conditional `PUT`.
+2. Extend the existing `completeMultipartUpload` client API, or add a
+   conditional overload, so the gateway can pass the parsed condition to
+   OM through `OmKeyArgs`.
+3. Populate the request as follows:
+   - `If-None-Match: *` ->
+     `expectedDataGeneration = OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS`
+   - `If-Match: "<etag>"` -> `expectedETag = <etag>`
+4. Ensure the OM protocol translator copies these optional fields from
+   `OmKeyArgs` into the `CompleteMultiPartUploadRequest` `KeyArgs`.
+5. Map conditional validation failures to the same S3
+   `PreconditionFailed` response used by the other conditional write
+   paths.
+
+### OM Validation
+
+Validation should occur in
+`S3MultipartUploadCompleteRequest.validateAndUpdateCache(...)` after the
+request acquires the bucket write lock and before it assembles the final
+key from the uploaded parts.
+
+The proposed flow is:
+
+1. Load the current committed destination key from `keyTable`.
+2. Reuse the same `If-Match` validation helper already used by
+   conditional `PUT` to convert `expectedETag` into
+   `expectedDataGeneration`.
+3. Reuse the same atomic rewrite validation helper to evaluate:
+   - create-if-absent semantics for `If-None-Match: *`
+   - generation/ETag match semantics for `If-Match`
+4. If validation passes, continue with the existing MPU complete logic:
+   validate part order, validate part identity, compute the MPU ETag,
+   write the final key, and delete the multipart metadata/open-key
+   state.
+5. Clear conditional-only fields before persisting the committed key so
+   they remain request-scoped metadata rather than part of the final key
+   state.
+
+Because the final destination validation and the key-table write happen
+under the same OM bucket lock in one request, this path does not need a
+separate second-phase commit revalidation step like conditional
+`PutObject`.
+
+### Error Mapping
+
+|   |   |   |   |
+|---|---|---|---|
+|**OM Error**|**S3 Status**|**S3 Error Code**|**Scenario**|
+|`KEY_ALREADY_EXISTS`|412|PreconditionFailed|`If-None-Match` failed because a committed destination object already exists|
+|`KEY_NOT_FOUND`|412|PreconditionFailed|`If-Match` failed because the current destination object is missing|
+|`ETAG_NOT_AVAILABLE`|412|PreconditionFailed|Destination key has no ETag metadata|
+|`ETAG_MISMATCH`|412|PreconditionFailed|Destination ETag mismatch|
+
+If Ozone later introduces an explicit conflict result for this path, the
+gateway should map it to `409 ConditionalRequestConflict`, reusing the
+same S3 error mapping as conditional `PutObject`. The initial MPU
+complete design does not require a dedicated second-phase conflict
+signal because the validation and final key update are already
+serialized in one OM transaction.
 
 ## AWS S3 Conditional Read Implementation
 
