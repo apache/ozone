@@ -87,6 +87,7 @@ public class StorageVolumeChecker {
   private final Timer timer;
 
   private final ExecutorService checkVolumeResultHandlerExecutorService;
+  private final Object resultLock = new Object();
 
   private final DatanodeConfiguration dnConf;
 
@@ -221,7 +222,6 @@ public class StorageVolumeChecker {
     final Set<StorageVolume> healthyVolumes = ConcurrentHashMap.newKeySet();
     final Set<StorageVolume> failedVolumes = ConcurrentHashMap.newKeySet();
     final Set<StorageVolume> allVolumes = new HashSet<>();
-    final Object resultLock = this;
 
     final AtomicLong numVolumes = new AtomicLong(volumes.size());
     final CountDownLatch latch = new CountDownLatch(1);
@@ -252,7 +252,7 @@ public class StorageVolumeChecker {
     boolean completedOnTime =
         latch.await(maxAllowedTimeForCheckMs, TimeUnit.MILLISECONDS);
 
-    synchronized (this) {
+    synchronized (resultLock) {
       if (!completedOnTime) {
         LOG.warn("checkAllVolumes timed out after {} ms."
             + " Evaluating per-volume latch-timeout tolerance.",
@@ -324,7 +324,7 @@ public class StorageVolumeChecker {
       Futures.addCallback(olf.get(),
           new ResultHandler(volume,
               ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
-              new AtomicLong(1), callback, false, this),
+              new AtomicLong(1), callback, false, resultLock),
           checkVolumeResultHandlerExecutorService
       );
       return true;
@@ -428,14 +428,9 @@ public class StorageVolumeChecker {
           cleanup();
           return;
         }
-        if (!volume.recordTimeoutAndCheckFailure()) {
-          // Within tolerance: do NOT trigger the failure callback.
-          // The volume is not marked failed; the next check cycle will
-          // re-evaluate its health. cleanup() is intentionally not called
-          // to avoid firing handleVolumeFailures() with an empty failed set.
-          return;
-        }
-        // Tolerance exceeded — fall through to markFailed()/cleanup().
+        markFailed(true);
+        cleanup();
+        return;
       }
       markFailed();
       cleanup();
@@ -448,7 +443,15 @@ public class StorageVolumeChecker {
     }
 
     private void markFailed() {
+      markFailed(false);
+    }
+
+    private void markFailed(boolean checkTimeoutFailureTolerance) {
       synchronized (resultLock) {
+        if (checkTimeoutFailureTolerance
+            && !volume.recordTimeoutAndCheckFailure()) {
+          return;
+        }
         failedVolumes.add(volume);
       }
     }

@@ -337,8 +337,8 @@ public class TestStorageVolumeHealthChecks {
   }
 
   /**
-   * With the default settings (ioFailureTolerance=1), the first simulated
-   * timeout within the timeout window must be tolerated.
+   * With the default settings (diskCheckTimeoutFailureTolerance=1), the first
+   * simulated timeout within the timeout window must be tolerated.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
@@ -355,8 +355,8 @@ public class TestStorageVolumeHealthChecks {
   }
 
   /**
-   * With the default settings (ioFailureTolerance=1), the second timeout
-   * within the timeout window must fail the volume.
+   * With the default settings (diskCheckTimeoutFailureTolerance=1), the
+   * second timeout within the timeout window must fail the volume.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")

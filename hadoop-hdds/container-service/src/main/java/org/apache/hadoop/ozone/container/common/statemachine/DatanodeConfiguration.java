@@ -462,7 +462,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       DISK_CHECK_TIMEOUT_FAILURES_TOLERATED_DEFAULT;
 
   @Config(key = "hdds.datanode.disk.check.timeout.sliding.window.timeout",
-      defaultValue = "70m",
+      defaultValue = "90m",
       type = ConfigType.TIME,
       tags = { DATANODE },
       description = "Time interval after which a timed out volume check "

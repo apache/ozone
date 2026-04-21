@@ -375,7 +375,7 @@ public class TestStorageVolumeChecker {
   /**
    * Verifies that when the per-check timeout inside {@link ThrottledAsyncChecker}
    * fires on {@link StorageVolumeChecker#checkVolume}, the first timeout is
-   * tolerated (callback not invoked, volume not failed) and the second timeout
+   * tolerated (callback invoked with no failed volumes) and the second timeout
    * within the timeout window causes the volume to be failed.
    *
    * <p>This test uses the real {@link ThrottledAsyncChecker} (not
@@ -403,24 +403,41 @@ public class TestStorageVolumeChecker {
     when(volume.recordTimeoutAndCheckFailure()).thenReturn(false).thenReturn(true);
 
     AtomicLong callbackCount = new AtomicLong(0);
+    AtomicLong failedVolumeCount = new AtomicLong(-1);
+    CountDownLatch firstCallback = new CountDownLatch(1);
+    CountDownLatch secondCallback = new CountDownLatch(1);
     StorageVolumeChecker checker =
         new StorageVolumeChecker(timeoutConf, new FakeTimer(), "test-");
 
-    // First checkVolume — should time out and be tolerated (callback NOT fired).
-    checker.checkVolume(volume, (healthy, failed) -> callbackCount.incrementAndGet());
+    // First checkVolume — should time out, be tolerated, and invoke callback
+    // with no failed volumes.
+    checker.checkVolume(volume, (healthy, failed) -> {
+      failedVolumeCount.set(failed.size());
+      callbackCount.incrementAndGet();
+      firstCallback.countDown();
+    });
 
-    // Wait long enough for the timeout to fire.
-    Thread.sleep(600);
-    assertEquals(0, callbackCount.get(),
-        "Callback must NOT fire for a tolerated timeout");
+    assertTrue(firstCallback.await(2, TimeUnit.SECONDS),
+        "Callback should fire within 2 seconds for a tolerated timeout");
+    assertEquals(1, callbackCount.get(),
+        "Callback must fire for a tolerated timeout");
+    assertEquals(0, failedVolumeCount.get(),
+        "Failed set must stay empty for a tolerated timeout");
     verify(volume, times(1)).recordTimeoutAndCheckFailure();
 
     // Second checkVolume — should time out and exceed tolerance (callback fired).
-    checker.checkVolume(volume, (healthy, failed) -> callbackCount.incrementAndGet());
-    Thread.sleep(600);
+    checker.checkVolume(volume, (healthy, failed) -> {
+      failedVolumeCount.set(failed.size());
+      callbackCount.incrementAndGet();
+      secondCallback.countDown();
+    });
+    assertTrue(secondCallback.await(2, TimeUnit.SECONDS),
+        "Callback should fire within 2 seconds when tolerance is exceeded");
 
-    assertEquals(1, callbackCount.get(),
+    assertEquals(2, callbackCount.get(),
         "Callback must fire when tolerance is exceeded");
+    assertEquals(1, failedVolumeCount.get(),
+        "Failed set must contain the volume when tolerance is exceeded");
 
     blockLatch.countDown();
     checker.shutdownAndWait(5, TimeUnit.SECONDS);
