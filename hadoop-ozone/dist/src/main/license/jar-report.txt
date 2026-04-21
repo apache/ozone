@@ -87,6 +87,7 @@ share/ozone/lib/hppc.jar
 share/ozone/lib/httpclient.jar
 share/ozone/lib/httpcore.jar
 share/ozone/lib/iceberg-api.jar
+share/ozone/lib/iceberg-bundled-guava.jar
 share/ozone/lib/iceberg-common.jar
 share/ozone/lib/iceberg-core.jar
 share/ozone/lib/istack-commons-runtime.jar
