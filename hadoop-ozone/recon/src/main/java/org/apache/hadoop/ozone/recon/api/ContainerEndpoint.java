@@ -465,8 +465,8 @@ public class ContainerEndpoint {
           containerManager.getContainer(ContainerID.valueOf(containerID));
       long keyCount = containerInfo.getNumberOfKeys();
       UUID pipelineID = containerInfo.getPipelineID().getId();
-      List<ContainerHistory> datanodes = getReplicaDetailsForUnhealthyContainer(
-          containerID, containerInfo.getReplicationConfig().getRequiredNodes());
+      List<ContainerHistory> datanodes =
+          getReplicaDetailsForUnhealthyContainer(containerID);
       UnhealthyContainers unhealthyContainers = new UnhealthyContainers(
           record.getContainerId(),
           record.getContainerState(),
@@ -488,7 +488,7 @@ public class ContainerEndpoint {
    * Recon-local state or history, which may diverge from SCM.
    */
   private List<ContainerHistory> getReplicaDetailsForUnhealthyContainer(
-      long containerID, int historyLimit) throws IOException {
+      long containerID) throws IOException {
     List<ContainerHistory> scmReplicas = getScmReplicaDetails(containerID);
     if (!scmReplicas.isEmpty()) {
       return scmReplicas;

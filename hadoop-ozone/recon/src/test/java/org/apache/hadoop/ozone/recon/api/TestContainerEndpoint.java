@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -145,6 +146,7 @@ public class TestContainerEndpoint {
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneConfiguration omConfiguration;
+  private StorageContainerServiceProvider scmServiceProvider;
 
   private ContainerID containerID = ContainerID.valueOf(1L);
   private Pipeline pipeline;
@@ -214,6 +216,8 @@ public class TestContainerEndpoint {
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
+    scmServiceProvider =
+        reconTestInjector.getInstance(StorageContainerServiceProvider.class);
     this.reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
@@ -240,6 +244,7 @@ public class TestContainerEndpoint {
     }
 
     omConfiguration = new OzoneConfiguration();
+    reset(scmServiceProvider);
 
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     BlockID blockID1 = new BlockID(1, 101);
@@ -880,15 +885,8 @@ public class TestContainerEndpoint {
     assertEquals(1L, missing.get(0).getContainerID());
     assertEquals(keyCount, missing.get(0).getKeys());
     assertEquals(pipelineID.getId(), missing.get(0).getPipelineID());
-    assertEquals(3, missing.get(0).getReplicas().size());
+    assertEquals(0, missing.get(0).getReplicas().size());
     assertNull(missing.get(0).getReason());
-
-    Set<String> datanodes = Collections.unmodifiableSet(
-        new HashSet<>(Arrays.asList("host2", "host3", "host4")));
-    List<ContainerHistory> containerReplicas = missing.get(0).getReplicas();
-    containerReplicas.forEach(history -> {
-      assertThat(datanodes).contains(history.getDatanodeHost());
-    });
 
     List<UnhealthyContainerMetadata> overRep = records
         .stream()
@@ -1007,9 +1005,7 @@ public class TestContainerEndpoint {
 
     Collection<UnhealthyContainerMetadata> records = responseObject.getContainers();
     assertTrue(records.stream()
-        .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
-            .map(ContainerHistory::getState))
-        .allMatch(s -> s.equals("UNHEALTHY")));
+        .allMatch(containerMetadata -> containerMetadata.getReplicas().isEmpty()));
 
     // Verify only missing containers are returned
     assertEquals(5, records.size());
@@ -1195,14 +1191,17 @@ public class TestContainerEndpoint {
     addCurrentReplicas(cID, actual, dataChecksumMismatch);
   }
 
-  private void addCurrentReplicas(long containerID, int actual,
+  private void addCurrentReplicas(long containerId, int actual,
       boolean dataChecksumMismatch) throws IOException {
+    when(scmServiceProvider.getContainerReplicas(containerId))
+        .thenReturn(buildScmReplicaProtos(actual, dataChecksumMismatch));
+
     List<UUID> uuids = Arrays.asList(uuid1, uuid2, uuid3, uuid4, uuid5);
     for (int i = 0; i < actual; i++) {
       long checksum = (dataChecksumMismatch && i == 0) ? 2345L : 1234L;
-      reconContainerManager.updateContainerReplica(ContainerID.valueOf(containerID),
+      reconContainerManager.updateContainerReplica(ContainerID.valueOf(containerId),
           ContainerReplica.newBuilder()
-              .setContainerID(ContainerID.valueOf(containerID))
+              .setContainerID(ContainerID.valueOf(containerId))
               .setContainerState(ContainerReplicaProto.State.CLOSED)
               .setDatanodeDetails(reconContainerManager.getNodeDB()
                   .get(DatanodeID.of(uuids.get(i))))
@@ -1215,6 +1214,25 @@ public class TestContainerEndpoint {
               .setChecksums(ContainerChecksums.of(checksum, 0L))
               .build());
     }
+  }
+
+  private List<HddsProtos.SCMContainerReplicaProto> buildScmReplicaProtos(
+      int actual, boolean dataChecksumMismatch) throws IOException {
+    List<UUID> uuids = Arrays.asList(uuid1, uuid2, uuid3, uuid4, uuid5);
+    List<HddsProtos.SCMContainerReplicaProto> replicas = new ArrayList<>();
+    for (int i = 0; i < actual; i++) {
+      UUID uuid = uuids.get(i);
+      long checksum = (dataChecksumMismatch && i == 0) ? 2345L : 1234L;
+      DatanodeDetails datanodeDetails = reconContainerManager.getNodeDB()
+          .get(DatanodeID.of(uuid));
+      replicas.add(HddsProtos.SCMContainerReplicaProto.newBuilder()
+          .setSequenceID(1L)
+          .setState(ContainerReplicaProto.State.CLOSED.toString())
+          .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
+          .setDataChecksum(checksum)
+          .build());
+    }
+    return replicas;
   }
 
   protected ContainerWithPipeline getTestContainer(
