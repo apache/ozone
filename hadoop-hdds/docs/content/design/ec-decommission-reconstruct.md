@@ -96,7 +96,64 @@ Start EC decommission with 1-1 replication. Once the number of in-flight decommi
 
 This behavior can be enabled/disabled with a feature flag `hdds.scm.replication.decommission.ec.reconstruction.enabled`
 
-We will implement both, use solution 1 as a baseline. The solution 2 is more sophsticated and should balance between overhead and parallelism.
+We will implement all three, using solution 1 as a baseline. Solution 2 and 3 provide more sophisticated balancing between overhead and parallelism.
+
+## Solution 3
+
+This implementation plan outlines the transition from single-source replication to multi-source reconstruction for EC container decommission, as described in HDDS-15014. The plan focuses on SCM-side dynamic switching and Datanode-side disk-level fairness.
+
+### Phase 1: SCM Configuration and Global Capacity
+We will introduce new configuration properties in `ReplicationManagerConfiguration` to control the behavior and protect cluster resources.
+
+1.  **New Configuration Keys:**
+    *   `hdds.scm.replication.decommission.ec.reconstruction.enabled` (Boolean, default: false): Feature flag to enable/disable the switch to reconstruction during decommission.
+    *   `hdds.scm.replication.decommission.ec.reconstruction.load.factor` (Double, default: 0.9): The threshold of a node's replication limit at which SCM switches to reconstruction.
+    *   `hdds.scm.replication.reconstruction.global.limit` (Int, default: 50): Cluster-wide cap on concurrent reconstruction tasks to prevent aggregate network saturation.
+2.  **Global Throttling Implementation:**
+    *   Implement an atomic counter in `ReplicationManager` to track active `ReconstructECContainersCommand` tasks.
+    *   The SCM will skip scheduling new reconstruction tasks if this global limit is reached, falling back to replication or re-queuing the container.
+
+### Phase 2: SCM Logic - The Dynamic Switch
+The SCM will monitor the load on decommissioning Datanodes and dynamically shift to reconstruction to offload the source node.
+
+1.  **Load Factor Calculation:**
+    *   SCM will calculate a node's load using: $\frac{\text{queued replication} + (\text{queued reconstruction} \times \text{weight})}{\text{effective replication limit}}$.
+    *   The "effective replication limit" correctly accounts for the `hdds.datanode.replication.outofservice.limit.factor` for decommissioning/maintenance nodes.
+2.  **ECUnderReplicationHandler Enhancement:**
+    *   In `processDecommissioningIndexes`, if a source Datanode's load factor exceeds the configured threshold (default 90%):
+        *   **Action:** Generate a `ReconstructECContainersCommand` instead of individual `ReplicateContainerCommands`.
+        *   **Optimization:** When selecting source Datanodes for this reconstruction, SCM will exclude the decommissioning node if $k$ other replicas are available. This transforms a node-level bottleneck into a parallelized cluster-wide task.
+
+### Phase 3: Datanode Logic - Disk-Level Fairness
+To protect physical disks from head contention (thrashing) when many replication tasks are permitted on a single node, we will implement a volume-aware dispatcher in the `ReplicationSupervisor`.
+
+1.  **Volume Tracking:**
+    *   Add an `activeOutboundReplications` atomic counter to `HddsVolume`.
+    *   Introduce `hdds.datanode.replication.volume.outbound.limit` (Default: 2).
+2.  **Volume-Aware Dispatching:**
+    *   Replace the standard `PriorityBlockingQueue` dispatcher with a logic that "looks ahead" in the queue.
+    *   When a worker thread is ready:
+        1.  It iterates through the priority queue for the next task.
+        2.  It resolves the task's source volume(s) using the `ContainerController`.
+        3.  If a task's source volume is at the outbound limit, the thread skips over it (leaving it at the head of the queue) and checks the next task.
+        4.  This allows tasks for idle volumes to "leapfrog" bottlenecked volumes, maximizing node throughput without disk thrashing.
+3.  **Starvation Prevention:**
+    *   By keeping skipped tasks at the head of the queue, they are guaranteed to be evaluated first as soon as a volume slot opens or a thread becomes available.
+    *   A `Condition` wake-up will be triggered whenever a task completes and releases a volume slot.
+
+### Phase 4: Observability and Robustness
+1.  **SCM Metrics:**
+    *   `ec_reconstruction_decommission_triggered_total`: Counter for switches triggered by the load factor.
+    *   `ec_reconstruction_global_limit_reached_total`: Counter for global reconstruction throttling.
+2.  **Datanode Metrics:**
+    *   `volume_outbound_concurrency_wait_total`: Count of times a task was skipped due to volume load.
+3.  **Fault Tolerance:**
+    *   If reconstruction fails due to source/target issues, SCM will automatically retry in the next cycle, re-evaluating the best strategy (replication vs. reconstruction) based on the latest node load.
+
+### Phase 5: Verification Strategy
+1.  **Simulation:** Decommission a dense node and verify SCM switching behavior at the 90% load mark.
+2.  **Disk Fairness:** Stress test a single Datanode volume with 10+ replication commands and verify that only 2 (by default) are active, while others are correctly bypassed for tasks targeting other volumes.
+3.  **Global Cap:** Verify that the cluster-wide reconstruction limit effectively throttles background traffic during simultaneous decommission of multiple large nodes.
 
 # Expected result:
 
