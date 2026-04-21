@@ -190,6 +190,9 @@ public class SCMUpgradeFinalizer extends
     return new DatanodeFinalizationCounts(finalizedNodes, totalHealthyNodes, unfinalizedNodes);
   }
 
+  /**
+   * Class to store the number finalized, unfinalized and healthy datanodes
+   */
   public static final class DatanodeFinalizationCounts {
     private final int numFinalizedDatanodes;
     private final int totalHealthyDatanodes;
