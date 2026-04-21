@@ -1194,7 +1194,8 @@ public class TestContainerEndpoint {
   private void addCurrentReplicas(long containerId, int actual,
       boolean dataChecksumMismatch) throws IOException {
     when(scmServiceProvider.getContainerReplicas(containerId))
-        .thenReturn(buildScmReplicaProtos(actual, dataChecksumMismatch));
+        .thenReturn(buildScmReplicaProtos(containerId, actual,
+            dataChecksumMismatch));
 
     List<UUID> uuids = Arrays.asList(uuid1, uuid2, uuid3, uuid4, uuid5);
     for (int i = 0; i < actual; i++) {
@@ -1217,7 +1218,8 @@ public class TestContainerEndpoint {
   }
 
   private List<HddsProtos.SCMContainerReplicaProto> buildScmReplicaProtos(
-      int actual, boolean dataChecksumMismatch) throws IOException {
+      long containerId, int actual, boolean dataChecksumMismatch)
+      throws IOException {
     List<UUID> uuids = Arrays.asList(uuid1, uuid2, uuid3, uuid4, uuid5);
     List<HddsProtos.SCMContainerReplicaProto> replicas = new ArrayList<>();
     for (int i = 0; i < actual; i++) {
@@ -1226,9 +1228,13 @@ public class TestContainerEndpoint {
       DatanodeDetails datanodeDetails = reconContainerManager.getNodeDB()
           .get(DatanodeID.of(uuid));
       replicas.add(HddsProtos.SCMContainerReplicaProto.newBuilder()
+          .setContainerID(containerId)
           .setSequenceID(1L)
           .setState(ContainerReplicaProto.State.CLOSED.toString())
           .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
+          .setBytesUsed(0L)
+          .setPlaceOfBirth(DatanodeID.of(uuid).toString())
+          .setKeyCount(0L)
           .setDataChecksum(checksum)
           .build());
     }
