@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
@@ -81,7 +82,7 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
       filter.parse(new InputSource(inputStream));
       return cls.cast(unmarshallerHandler.getResult());
     } catch (Exception e) {
-      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
+      throw wrapOS3Exception(newError(INVALID_REQUEST, null, e).withMessage(e.getMessage()));
     }
   }
 

@@ -142,6 +142,14 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
+  public List<ContainerID> getContainerIDs(final ContainerID startID,
+                                           final int count,
+                                           final LifeCycleState state) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    return containerStateManager.getContainerIDs(state, startID, count);
+  }
+
+  @Override
   public List<ContainerInfo> getContainers(final ContainerID startID,
                                            final int count) {
     scmContainerManagerMetrics.incNumListContainersOps();
@@ -286,6 +294,21 @@ public class ContainerManagerImpl implements ContainerManager {
           // Delegate to @Replicate method with current sequenceId
           containerStateManager.updateContainerStateWithSequenceId(protoId, event, info.getSequenceId());
         }
+      } else {
+        throw new ContainerNotFoundException(cid);
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
+  public void updateContainerInfo(final ContainerID cid, ContainerInfoProto containerInfo)
+      throws IOException {
+    lock.lock();
+    try {
+      if (containerExist(cid)) {
+        containerStateManager.updateContainerInfo(containerInfo);
       } else {
         throw new ContainerNotFoundException(cid);
       }

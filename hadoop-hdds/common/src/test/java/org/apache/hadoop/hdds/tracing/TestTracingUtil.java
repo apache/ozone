@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
 import org.junit.jupiter.api.Test;
@@ -58,7 +57,7 @@ public class TestTracingUtil {
 
   private static MutableConfigurationSource tracingEnabled() {
     MutableConfigurationSource config = new InMemoryConfigurationForTesting();
-    config.setBoolean(ScmConfigKeys.HDDS_TRACING_ENABLED, true);
+    config.setBoolean("ozone.tracing.enabled", true);
     return config;
   }
 

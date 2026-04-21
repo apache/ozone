@@ -17,11 +17,15 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 
 /**
- * DiskBalancer's information to persist.
+ * DiskBalancer's information to persist and for report.
+ * Report-only fields (idealUsage, volumeInfo) are NOT persisted to YAML.
  */
 public class DiskBalancerInfo {
   private DiskBalancerRunningStatus operationalState;
@@ -35,6 +39,10 @@ public class DiskBalancerInfo {
   private long bytesToMove;
   private long balancedBytes;
   private double volumeDataDensity;
+  // Report-only: ideal usage from volume snapshot. NOT persisted.
+  private double idealUsage;
+  // Report-only: per-volume info. NOT persisted.
+  private List<VolumeReportProto> volumeInfo;
 
   public DiskBalancerInfo(DiskBalancerRunningStatus operationalState, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
@@ -206,6 +214,22 @@ public class DiskBalancerInfo {
 
   public void setVolumeDataDensity(double volumeDataDensity) {
     this.volumeDataDensity = volumeDataDensity;
+  }
+
+  public double getIdealUsage() {
+    return idealUsage;
+  }
+
+  public void setIdealUsage(double idealUsage) {
+    this.idealUsage = idealUsage;
+  }
+
+  public List<VolumeReportProto> getVolumeInfo() {
+    return volumeInfo != null ? volumeInfo : Collections.emptyList();
+  }
+
+  public void setVolumeInfo(List<VolumeReportProto> volumeInfo) {
+    this.volumeInfo = volumeInfo;
   }
 
   @Override

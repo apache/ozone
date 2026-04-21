@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
@@ -124,13 +125,21 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   }
 
   private void createKey(long counter) throws Exception {
-    final String key = generateObjectName(counter);
+    try (TracingUtil.TraceCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
+      createKeyWithData(counter);
+    }
+  }
 
+  private void createKeyWithData(long counter) throws Exception {
+    final String key = generateObjectName(counter);
     timer.time(() -> {
       try (OutputStream stream = bucket.createKey(key, keySize.toBytes(),
           replicationConfig, metadata)) {
-        contentGenerator.write(stream);
-        stream.flush();
+
+        try (TracingUtil.TraceCloseable writeScope = TracingUtil.createActivatedSpan("writeKeyData")) {
+          contentGenerator.write(stream);
+          stream.flush();
+        }
       }
       return null;
     });

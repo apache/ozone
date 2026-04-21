@@ -776,6 +776,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    * Helper function to do FileSystem#listStatus recursively.
    * Simulate what FsShell does, using DFS.
    */
+  @SuppressWarnings("PMD.UseArraysAsList")
   private void listStatusRecursiveHelper(Path curPath, List<FileStatus> result)
       throws IOException {
     FileStatus[] startList = fs.listStatus(curPath);

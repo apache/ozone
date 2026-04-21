@@ -220,7 +220,7 @@ public class TestSnapshotDiffManager {
   public static void initCodecRegistry() {
     codecRegistry = CodecRegistry.newBuilder()
         .addCodec(DiffReportEntry.class, getDiffReportEntryCodec())
-        .addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec())
+        .addCodec(SnapshotDiffJob.class, SnapshotDiffJob.codec())
         .build();
   }
 
@@ -1364,5 +1364,22 @@ public class TestSnapshotDiffManager {
         assertEquals(diffJob.getStatus(), snapshotDiffReport.getJobStatus());
       }
     }
+  }
+
+  @Test
+  public void testGetSnapshotDiffJobs() throws Exception {
+    // Initially no jobs
+    List<SnapshotDiffJob> jobs = snapshotDiffManager.getSnapshotDiffJobs();
+    assertEquals(0, jobs.size());
+
+    // Submit a job
+    snapshotDiffManager.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME,
+        snapshotNames.get(0), snapshotNames.get(1),
+        "", 100, false, false);
+
+    jobs = snapshotDiffManager.getSnapshotDiffJobs();
+    assertEquals(1, jobs.size());
+    assertEquals(snapshotNames.get(0), jobs.get(0).getFromSnapshot());
+    assertEquals(snapshotNames.get(1), jobs.get(0).getToSnapshot());
   }
 }

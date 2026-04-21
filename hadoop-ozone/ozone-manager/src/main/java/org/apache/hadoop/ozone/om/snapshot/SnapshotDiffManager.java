@@ -95,9 +95,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.management.ObjectName;
 import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -111,6 +114,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -147,7 +151,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to generate snapshot diff.
  */
-public class SnapshotDiffManager implements AutoCloseable {
+@InterfaceAudience.Private
+public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMXBean {
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final Map<DiffType, String> DIFF_TYPE_STRING_MAP =
@@ -177,6 +182,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    */
   private final PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
   private final ExecutorService snapDiffExecutor;
+  private ObjectName snapshotDiffManagerBeanName;
 
   /**
    * Directory to keep hardlinks of SST files for a snapDiff job temporarily.
@@ -280,6 +286,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // When we build snapDiff HA aware, we will revisit this.
     // Details: https://github.com/apache/ozone/pull/4438#discussion_r1149788226
     this.loadJobsOnStartUp();
+    this.registerMXBean();
   }
 
   @VisibleForTesting
@@ -1515,7 +1522,33 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @Override
+  public List<SnapshotDiffJob> getSnapshotDiffJobs() {
+    List<SnapshotDiffJob> jobs = new ArrayList<>();
+    try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
+             snapDiffJobTable.iterator()) {
+      while (iterator.hasNext()) {
+        jobs.add(iterator.next().getValue());
+      }
+    }
+    return jobs;
+  }
+
+  private void registerMXBean() {
+    this.snapshotDiffManagerBeanName = HddsUtils.registerWithJmxProperties(
+        "OzoneManager", "SnapshotDiffManager",
+        Collections.emptyMap(), this);
+  }
+
+  private void unregisterMXBean() {
+    if (this.snapshotDiffManagerBeanName != null) {
+      MBeans.unregister(this.snapshotDiffManagerBeanName);
+      this.snapshotDiffManagerBeanName = null;
+    }
+  }
+
+  @Override
   public void close() {
+    unregisterMXBean();
     if (snapDiffExecutor != null) {
       closeExecutorService(snapDiffExecutor, "SnapDiffExecutor");
     }

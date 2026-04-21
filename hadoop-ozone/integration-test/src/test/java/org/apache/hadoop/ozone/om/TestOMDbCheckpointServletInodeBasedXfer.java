@@ -987,7 +987,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         if (!trimmedLine.contains("\t")) {
           continue;
         }
-        int tabIndex = trimmedLine.indexOf("\t");
+        int tabIndex = trimmedLine.indexOf('\t');
         if (tabIndex > 0) {
           // value is the full path that needs to be constructed
           String value = trimmedLine.substring(0, tabIndex).trim();

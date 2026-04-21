@@ -790,8 +790,8 @@ public class TestOMDirectoryCreateRequestWithFSO {
     for (int i = 0; i < depth; i++) {
       String dirName = RandomStringUtils.secure().nextAlphabetic(5);
       dirs.add(dirName);
-      buf.append(OzoneConsts.OM_KEY_PREFIX);
-      buf.append(dirName);
+      buf.append(OzoneConsts.OM_KEY_PREFIX)
+          .append(dirName);
     }
     return buf.toString();
   }

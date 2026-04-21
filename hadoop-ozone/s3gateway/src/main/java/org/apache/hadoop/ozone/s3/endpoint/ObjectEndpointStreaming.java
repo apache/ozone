@@ -73,12 +73,14 @@ final class ObjectEndpointStreaming {
       int chunkSize, Map<String, String> keyMetadata,
       Map<String, String> tags, MultiDigestInputStream body,
       HttpHeaders headers, boolean isSignedPayload,
-      PerformanceStringBuilder perf)
+      PerformanceStringBuilder perf,
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException, OS3Exception {
 
     try {
       return putKeyWithStream(bucket, keyPath,
-          length, chunkSize, replicationConfig, keyMetadata, tags, body, headers, isSignedPayload, perf);
+          length, chunkSize, replicationConfig, keyMetadata, tags, body,
+          headers, isSignedPayload, perf, writeConditions);
     } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
       if (ex instanceof OMException) {
@@ -113,14 +115,16 @@ final class ObjectEndpointStreaming {
       MultiDigestInputStream body,
       HttpHeaders headers,
       boolean isSignedPayload,
-      PerformanceStringBuilder perf)
+      PerformanceStringBuilder perf,
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, isSignedPayload);
     long writeLen;
     String md5Hash;
-    try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
-        length, replicationConfig, keyMetadata, tags)) {
+    try (OzoneDataStreamOutput streamOutput = openStreamKeyForPut(bucket,
+        keyPath, length, replicationConfig, keyMetadata, tags,
+        writeConditions)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       md5Hash = DatatypeConverter.printHexBinary(body.getMessageDigest(OzoneConsts.MD5_HASH).digest())
@@ -153,6 +157,24 @@ final class ObjectEndpointStreaming {
       streamOutput.getKeyDataStreamOutput().setPreCommits(preCommits);
     }
     return Pair.of(md5Hash, writeLen);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private static OzoneDataStreamOutput openStreamKeyForPut(OzoneBucket bucket,
+      String keyPath, long length, ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags,
+      S3ConditionalRequest.WriteConditions writeConditions) throws IOException {
+    if (writeConditions.hasIfNoneMatch()) {
+      return bucket.createStreamKeyIfNotExists(keyPath, length,
+          replicationConfig, keyMetadata, tags);
+    }
+    if (writeConditions.hasIfMatch()) {
+      return bucket.rewriteStreamKeyIfMatch(keyPath, length,
+          writeConditions.getExpectedETag(), replicationConfig, keyMetadata,
+          tags);
+    }
+    return bucket.createStreamKey(keyPath, length, replicationConfig,
+        keyMetadata, tags);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")

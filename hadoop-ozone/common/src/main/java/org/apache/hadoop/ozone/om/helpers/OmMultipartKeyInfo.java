@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 
@@ -46,6 +48,14 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       OmMultipartKeyInfo.class);
 
   private final String uploadID;
+  private final String volumeName;
+  private final String bucketName;
+  private final String keyName;
+  private final String ownerName;
+  /**
+   * ACL information inherited during MPU initiation.
+   */
+  private final ImmutableList<OzoneAcl> acls;
   private final long creationTime;
   private final ReplicationConfig replicationConfig;
   private PartKeyInfoMap partKeyInfoMap;
@@ -73,6 +83,11 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
    * ------------------------------------------|
    */
   private final long parentID;
+
+  // This stores the schema version of the multipart key.
+  // 0 - Legacy Schema -> Uses the same table to store the multipart part info
+  // 1 - New Schema -> Uses a separate table to store the multipart part info
+  private final byte schemaVersion;
 
   public static Codec<OmMultipartKeyInfo> getCodec() {
     return CODEC;
@@ -124,11 +139,11 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return new PartKeyInfoMap(list);
     }
 
-    PartKeyInfoMap(List<PartKeyInfo> sorted) {
+    public PartKeyInfoMap(List<PartKeyInfo> sorted) {
       this.sorted = Collections.unmodifiableList(sorted);
     }
 
-    PartKeyInfoMap(SortedMap<Integer, PartKeyInfo> sorted) {
+    public PartKeyInfoMap(SortedMap<Integer, PartKeyInfo> sorted) {
       this(new ArrayList<>(sorted.values()));
     }
 
@@ -166,16 +181,27 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   private OmMultipartKeyInfo(Builder b) {
     super(b);
     this.uploadID = b.uploadID;
+    this.volumeName = b.volumeName;
+    this.bucketName = b.bucketName;
+    this.keyName = b.keyName;
+    this.ownerName = b.ownerName;
+    this.acls = b.acls.build();
     this.creationTime = b.creationTime;
     this.replicationConfig = b.replicationConfig;
     this.partKeyInfoMap = new PartKeyInfoMap(b.partKeyInfoList);
     this.parentID = b.parentID;
+    this.schemaVersion = b.schemaVersion;
   }
 
   /** Copy constructor. */
   private OmMultipartKeyInfo(OmMultipartKeyInfo b) {
     super(b);
     this.uploadID = b.uploadID;
+    this.volumeName = b.volumeName;
+    this.bucketName = b.bucketName;
+    this.keyName = b.keyName;
+    this.ownerName = b.ownerName;
+    this.acls = b.acls;
     this.creationTime = b.creationTime;
     this.replicationConfig = b.replicationConfig;
     // PartKeyInfoMap is an immutable data structure. Whenever a PartKeyInfo
@@ -183,6 +209,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     // so here we can directly pass in partKeyInfoMap
     this.partKeyInfoMap = b.partKeyInfoMap;
     this.parentID = b.parentID;
+    this.schemaVersion = b.schemaVersion;
   }
 
   /**
@@ -206,11 +233,35 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     return creationTime;
   }
 
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
+  }
+
+  public String getKeyName() {
+    return keyName;
+  }
+
+  public String getOwnerName() {
+    return ownerName;
+  }
+
+  public List<OzoneAcl> getAcls() {
+    return acls;
+  }
+
   public PartKeyInfoMap getPartKeyInfoMap() {
     return partKeyInfoMap;
   }
 
   public void addPartKeyInfo(PartKeyInfo partKeyInfo) {
+    if (schemaVersion == 1) {
+      throw new IllegalStateException(
+          "PartKeyInfoMap is not supported for schemaVersion 1");
+    }
     this.partKeyInfoMap = PartKeyInfoMap.put(partKeyInfo, partKeyInfoMap);
   }
 
@@ -222,6 +273,10 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     return replicationConfig;
   }
 
+  public byte getSchemaVersion() {
+    return schemaVersion;
+  }
+
   public Builder toBuilder() {
     return new Builder(this);
   }
@@ -231,29 +286,66 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
    */
   public static class Builder extends WithObjectID.Builder<OmMultipartKeyInfo> {
     private String uploadID;
+    private String volumeName;
+    private String bucketName;
+    private String keyName;
+    private String ownerName;
     private long creationTime;
     private ReplicationConfig replicationConfig;
+    private final AclListBuilder acls;
     private final TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long parentID;
+    private byte schemaVersion;
 
     public Builder() {
+      this.acls = AclListBuilder.empty();
       this.partKeyInfoList = new TreeMap<>();
     }
 
     public Builder(OmMultipartKeyInfo multipartKeyInfo) {
       super(multipartKeyInfo);
       this.uploadID = multipartKeyInfo.uploadID;
+      this.volumeName = multipartKeyInfo.volumeName;
+      this.bucketName = multipartKeyInfo.bucketName;
+      this.keyName = multipartKeyInfo.keyName;
+      this.ownerName = multipartKeyInfo.ownerName;
       this.creationTime = multipartKeyInfo.creationTime;
       this.replicationConfig = multipartKeyInfo.replicationConfig;
+      this.acls = AclListBuilder.of(multipartKeyInfo.acls);
       this.partKeyInfoList = new TreeMap<>();
-      for (PartKeyInfo partKeyInfo : multipartKeyInfo.partKeyInfoMap) {
-        this.partKeyInfoList.put(partKeyInfo.getPartNumber(), partKeyInfo);
+
+      if (multipartKeyInfo.getSchemaVersion() == 0) {
+        for (PartKeyInfo partKeyInfo : multipartKeyInfo.partKeyInfoMap) {
+          this.partKeyInfoList.put(partKeyInfo.getPartNumber(), partKeyInfo);
+        }
       }
+
       this.parentID = multipartKeyInfo.parentID;
+      this.schemaVersion = multipartKeyInfo.schemaVersion;
     }
 
     public Builder setUploadID(String uploadId) {
       this.uploadID = uploadId;
+      return this;
+    }
+
+    public Builder setVolumeName(String volName) {
+      this.volumeName = volName;
+      return this;
+    }
+
+    public Builder setBucketName(String buckName) {
+      this.bucketName = buckName;
+      return this;
+    }
+
+    public Builder setKeyName(String keyObjName) {
+      this.keyName = keyObjName;
+      return this;
+    }
+
+    public Builder setOwnerName(String owner) {
+      this.ownerName = owner;
       return this;
     }
 
@@ -281,6 +373,24 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return this;
     }
 
+    public Builder setAcls(List<OzoneAcl> listOfAcls) {
+      if (listOfAcls != null) {
+        this.acls.set(listOfAcls);
+      }
+      return this;
+    }
+
+    public AclListBuilder acls() {
+      return acls;
+    }
+
+    public Builder addAcl(OzoneAcl ozoneAcl) {
+      if (ozoneAcl != null) {
+        this.acls.add(ozoneAcl);
+      }
+      return this;
+    }
+
     @Override
     public Builder setObjectID(long obId) {
       super.setObjectID(obId);
@@ -298,6 +408,11 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return this;
     }
 
+    public Builder setSchemaVersion(byte schemaVersion) {
+      this.schemaVersion = schemaVersion;
+      return this;
+    }
+
     @Override
     protected OmMultipartKeyInfo buildObject() {
       return new OmMultipartKeyInfo(this);
@@ -312,8 +427,10 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   public static Builder builderFromProto(
       MultipartKeyInfo multipartKeyInfo) {
     final SortedMap<Integer, PartKeyInfo> list = new TreeMap<>();
-    multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
-        list.put(partKeyInfo.getPartNumber(), partKeyInfo));
+    if (!multipartKeyInfo.hasSchemaVersion() || multipartKeyInfo.getSchemaVersion() == 0) {
+      multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
+          list.put(partKeyInfo.getPartNumber(), partKeyInfo));
+    }
 
     final ReplicationConfig replicationConfig = ReplicationConfig.fromProto(
         multipartKeyInfo.getType(),
@@ -323,12 +440,22 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
 
     return new Builder()
         .setUploadID(multipartKeyInfo.getUploadID())
+        .setVolumeName(multipartKeyInfo.hasVolumeName() ?
+            multipartKeyInfo.getVolumeName() : null)
+        .setBucketName(multipartKeyInfo.hasBucketName() ?
+            multipartKeyInfo.getBucketName() : null)
+        .setKeyName(multipartKeyInfo.hasKeyName() ?
+            multipartKeyInfo.getKeyName() : null)
+        .setOwnerName(multipartKeyInfo.hasOwnerName() ?
+            multipartKeyInfo.getOwnerName() : null)
         .setCreationTime(multipartKeyInfo.getCreationTime())
         .setReplicationConfig(replicationConfig)
+        .setAcls(OzoneAclUtil.fromProtobuf(multipartKeyInfo.getAclsList()))
         .setPartKeyInfoList(list)
         .setObjectID(multipartKeyInfo.getObjectID())
         .setUpdateID(multipartKeyInfo.getUpdateID())
-        .setParentID(multipartKeyInfo.getParentID());
+        .setParentID(multipartKeyInfo.getParentID())
+        .setSchemaVersion((byte) multipartKeyInfo.getSchemaVersion());
   }
 
   /**
@@ -346,13 +473,31 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
    * @return MultipartKeyInfo
    */
   public MultipartKeyInfo getProto() {
+    if (schemaVersion == 1 && partKeyInfoMap != null && partKeyInfoMap.size() > 0) {
+      throw new IllegalStateException(
+          "PartKeyInfoMap must be empty for schemaVersion 1");
+    }
+
     MultipartKeyInfo.Builder builder = MultipartKeyInfo.newBuilder()
         .setUploadID(uploadID)
         .setCreationTime(creationTime)
         .setType(replicationConfig.getReplicationType())
         .setObjectID(getObjectID())
         .setUpdateID(getUpdateID())
-        .setParentID(parentID);
+        .setParentID(parentID)
+        .setSchemaVersion(schemaVersion);
+    if (volumeName != null) {
+      builder.setVolumeName(volumeName);
+    }
+    if (bucketName != null) {
+      builder.setBucketName(bucketName);
+    }
+    if (keyName != null) {
+      builder.setKeyName(keyName);
+    }
+    if (ownerName != null) {
+      builder.setOwnerName(ownerName);
+    }
 
     if (replicationConfig instanceof ECReplicationConfig) {
       ECReplicationConfig ecConf = (ECReplicationConfig) replicationConfig;
@@ -361,7 +506,10 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
     }
 
-    builder.addAllPartKeyInfoList(partKeyInfoMap);
+    builder.addAllAcls(OzoneAclUtil.toProtobuf(acls));
+    if (schemaVersion == 0) {
+      builder.addAllPartKeyInfoList(partKeyInfoMap);
+    }
     return builder.build();
   }
 

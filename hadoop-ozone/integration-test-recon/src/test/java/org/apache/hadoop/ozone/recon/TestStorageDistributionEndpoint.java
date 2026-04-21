@@ -252,7 +252,7 @@ public class TestStorageDistributionEndpoint {
       assertEquals(60, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getTotalOpenKeyBytes());
       assertEquals(30, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getMultipartOpenKeyBytes());
       assertEquals(30, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getOpenKeyAndFileBytes());
-      assertEquals(60, storageResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
+      assertEquals(60, storageResponse.getUsedSpaceBreakDown().getFinalizedKeyBytes());
       assertEquals(3, storageResponse.getDataNodeUsage().size());
       List<DatanodeStorageReport> reports = storageResponse.getDataNodeUsage();
       List<HddsProtos.DatanodeUsageInfoProto> scmReports =
@@ -289,7 +289,7 @@ public class TestStorageDistributionEndpoint {
       }
       assertEquals(totalReserved, storageResponse.getGlobalStorage().getTotalReservedSpace());
       assertEquals(totalMinFreeSpace, storageResponse.getGlobalStorage().getTotalMinimumFreeSpace());
-      assertEquals(totalPreAllocated, storageResponse.getGlobalStorage().getTotalOzonePreAllocatedContainerSpace());
+      assertEquals(totalPreAllocated, storageResponse.getGlobalStorage().getTotalOzoneCommittedSpace());
       assertEquals(totalOzoneCapacity, storageResponse.getGlobalStorage().getTotalOzoneCapacity());
       assertEquals(totalOzoneUsedSpace, storageResponse.getGlobalStorage().getTotalOzoneUsedSpace());
       assertEquals(totalFileSystemCapacity, storageResponse.getGlobalStorage().getTotalFileSystemCapacity());

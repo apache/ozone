@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.SEQUENCE_ID;
+import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT;
 
@@ -187,7 +187,7 @@ public class SequenceIdGenerator {
   /**
    * Maintain SequenceIdTable in RocksDB.
    */
-  interface StateManager {
+  interface StateManager extends SCMHandler {
     /**
      * Compare And Swap lastId saved in db from expectedLastId to newLastId.
      * If based on Ratis, it will submit a raft client request.
@@ -213,6 +213,11 @@ public class SequenceIdGenerator {
      * during SCM reload.
      */
     void reinitialize(Table<String, Long> sequenceIdTable) throws IOException;
+
+    @Override
+    default RequestType getType() {
+      return RequestType.SEQUENCE_ID;
+    }
   }
 
   /**
@@ -321,7 +326,7 @@ public class SequenceIdGenerator {
 
         final StateManager impl = new StateManagerImpl(table, buffer);
 
-        return ratisServer.getProxyHandler(SEQUENCE_ID, StateManager.class, impl);
+        return ratisServer.getProxyHandler(StateManager.class, impl);
       }
     }
   }

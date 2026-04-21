@@ -184,15 +184,15 @@ public class ProgressBar {
     for (int j = 0; j < (100 - percent) / shrinkTimes; j++) {
       sb.append(' ');
     }
-    sb.append("|  ");
-    sb.append(value).append('/').append(maxValue);
+    sb.append("|  ")
+        .append(value).append('/').append(maxValue);
     long timeInSec = TimeUnit.SECONDS.convert(
         System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
     String timeToPrint = String.format("%d:%02d:%02d", timeInSec / 3600,
         (timeInSec % 3600) / 60, timeInSec % 60);
-    sb.append(" Time: ").append(timeToPrint);
-    sb.append("|  ");
-    sb.append(realTimeMessage);
+    sb.append(" Time: ").append(timeToPrint)
+        .append("|  ")
+        .append(realTimeMessage);
     stream.print(sb.toString());
   }
 }

@@ -84,7 +84,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
   @CommandLine.Option(
       names = {"-s", "--start"},
-      description = "The item to start the listing from.\n" +
+      description = "The item to start the listing from.%n" +
           "i.e. continuation token. " +
           "This will be excluded from the result.",
       defaultValue = ""
@@ -197,8 +197,8 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   private String getMessageString(ListOpenFilesResult res, List<OpenKeySession> openFileList) {
     StringBuilder sb = new StringBuilder();
     sb.append(res.getTotalOpenKeyCount())
-          .append(" total open files. Showing ");
-    sb.append(openFileList.size())
+        .append(" total open files. Showing ")
+        .append(openFileList.size())
         .append(" open files (limit ")
         .append(limit)
         .append(") under path prefix:\n  ")

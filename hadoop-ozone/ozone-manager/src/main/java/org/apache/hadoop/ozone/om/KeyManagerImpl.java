@@ -1237,16 +1237,16 @@ public class KeyManagerImpl implements KeyManager {
       String partFileName = OzoneFSUtils.getFileName(partKeyInfo.getPartName());
 
       StringBuilder fullKeyPartName = new StringBuilder();
-      fullKeyPartName.append(OZONE_URI_DELIMITER);
-      fullKeyPartName.append(volName);
-      fullKeyPartName.append(OZONE_URI_DELIMITER);
-      fullKeyPartName.append(buckName);
+      fullKeyPartName.append(OZONE_URI_DELIMITER)
+          .append(volName)
+          .append(OZONE_URI_DELIMITER)
+          .append(buckName);
       if (StringUtils.isNotEmpty(parentDir)) {
-        fullKeyPartName.append(OZONE_URI_DELIMITER);
-        fullKeyPartName.append(parentDir);
+        fullKeyPartName.append(OZONE_URI_DELIMITER)
+            .append(parentDir);
       }
-      fullKeyPartName.append(OZONE_URI_DELIMITER);
-      fullKeyPartName.append(partFileName);
+      fullKeyPartName.append(OZONE_URI_DELIMITER)
+          .append(partFileName);
 
       return fullKeyPartName.toString();
     }
