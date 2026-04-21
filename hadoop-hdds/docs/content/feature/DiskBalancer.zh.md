@@ -155,6 +155,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 | `-b/--bandwidth-in-mb`              | 最大磁盘带宽，单位为 MB/s（默认值：10）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                             | `-b 20`<br>`--bandwidth-in-mb 50`              |
 | `-p/--parallel-thread`              | 并行线程数（默认值：1）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                        | `-p 5`<br>`--parallel-thread 10`               |
 | `-s/--stop-after-disk-even`         | 磁盘平衡完成后自动停止（默认值：false）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
+| `-c/--container-states`             | 以逗号分隔的容器生命周期状态名称，表示可在磁盘之间移动的状态。配合 `start` 和 `update` 命令使用。                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states OPEN,CLOSED` |
 
 ### 示例
 **启动 DiskBalancer：**

@@ -76,9 +76,10 @@ public final class DiskBalancerYaml {
         throw new IOException("Unable to parse yaml file.", e);
       }
 
-      String containerStates = StringUtils.isNotBlank(diskBalancerInfoYaml.getContainerStates())
-          ? diskBalancerInfoYaml.getContainerStates().trim()
-          : DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES;
+      // getContainerStates() may be null if the key is absent; isNotBlank(null) is false.
+      String cs = diskBalancerInfoYaml.getContainerStates();
+      String containerStates = StringUtils.isNotBlank(cs)
+          ? cs.trim() : DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES;
       diskBalancerInfo = new DiskBalancerInfo(
           diskBalancerInfoYaml.operationalState,
           diskBalancerInfoYaml.getThreshold(),

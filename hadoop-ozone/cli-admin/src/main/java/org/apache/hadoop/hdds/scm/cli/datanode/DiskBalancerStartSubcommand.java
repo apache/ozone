@@ -58,7 +58,7 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       arity = "1")
   private Boolean stopAfterDiskEven;
 
-  @Option(names = {"--c", "--container-states"},
+  @Option(names = {"-c", "--container-states"},
       description = "Comma-separated container lifecycle state names eligible for disk balancing "
           + "(e.g. CLOSED,QUASI_CLOSED). Must be uppercase enum names.")
   private String containerStates;

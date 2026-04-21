@@ -140,8 +140,8 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
         .append(" - EstTimeLeft is calculated based on EstimatedBytesToMove and configured disk bandwidth.%n")
         .append(" - Both EstimatedBytes and EstTimeLeft could be non-zero while no containers" +
             " can be moved, especially when the configured threshold or disk capacity is too small.%n")
-        .append(" - ContainerStates indicate the state of container which is eligible for balancing," +
-            " by default CLOSED and QUASI_CLOSED are allowed.");
+        .append(" - ContainerStates indicates which container lifecycle states are eligible for balancing;" +
+            " by default, CLOSED and QUASI_CLOSED are allowed.");
 
     return String.format(formatBuilder.toString(),
         contentList.toArray(new String[0]));

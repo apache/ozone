@@ -45,7 +45,8 @@ public final class DiskBalancerConfiguration {
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
 
   /**
-   * Default {@link #containerStates}: CLOSED and QUASI_CLOSED containers may be disk-balanced.
+   * Default value for {@code hdds.datanode.disk.balancer.container.states}: {@value}
+   * (CLOSED and QUASI_CLOSED containers may be disk-balanced).
    */
   public static final String DEFAULT_CONTAINER_STATES = "CLOSED,QUASI_CLOSED";
 
@@ -291,18 +292,35 @@ public final class DiskBalancerConfiguration {
     return containerStates;
   }
 
+  /**
+   * Sets the comma-separated container state names and validates them immediately.
+   * <p>
+   * Ozone configuration injection may set the raw container-states string without invoking this
+   * setter; {@link #getMovableContainerStates()} still parses the current field value on read.
+   *
+   * @param containerStates comma-separated {@link State} names (case-sensitive, uppercase);
+   *     whitespace allowed around commas and tokens
+   * @throws IllegalArgumentException if blank, empty after parsing tokens, or unknown state
+   */
   public void setContainerStates(String containerStates) {
+    parseMovableContainerStates(containerStates);
     this.containerStates = containerStates;
   }
 
   /**
-   * Container lifecycle states eligible for disk balancing, parsed from {@link #getContainerStates()}:
-   * a comma-separated list of {@link State} names (case-sensitive, uppercase; whitespace trimmed).
+   * Container lifecycle states eligible for disk balancing, derived from {@link #getContainerStates()}:
+   * same rules as {@link #setContainerStates(String)}.
    *
    * @return unmodifiable non-empty set
    */
   public Set<State> getMovableContainerStates() {
-    String raw = containerStates;
+    return parseMovableContainerStates(this.containerStates);
+  }
+
+  /**
+   * Parses and validates {@code hdds.datanode.disk.balancer.container.states}.
+   */
+  private static Set<State> parseMovableContainerStates(String raw) {
     if (StringUtils.isBlank(raw)) {
       throw new IllegalArgumentException(HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + " must not be empty.");
     }
@@ -400,7 +418,6 @@ public final class DiskBalancerConfiguration {
     }
     if (newConfigProto.hasContainerStates()) {
       existingConfig.setContainerStates(newConfigProto.getContainerStates());
-      existingConfig.getMovableContainerStates();
     }
     return existingConfig;
   }

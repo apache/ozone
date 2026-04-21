@@ -33,6 +33,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,10 +43,10 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
@@ -99,7 +100,6 @@ public class DiskBalancerService extends BackgroundService {
   private int parallelThread;
   private boolean stopAfterDiskEven;
   private DiskBalancerVersion version;
-  private String containerStates;
 
   // State field using proto enum
   private volatile DiskBalancerRunningStatus operationalState =
@@ -305,7 +305,7 @@ public class DiskBalancerService extends BackgroundService {
    * Read {@link DiskBalancerInfo} from a local info file.
    *
    * @param path DiskBalancerInfo file local path
-   * @return {@link DatanodeDetails}
+   * @return parsed {@link DiskBalancerInfo}
    * @throws IOException If the conf file is malformed or other I/O exceptions
    */
   private synchronized DiskBalancerInfo readDiskBalancerInfoFile(
@@ -365,15 +365,26 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   /**
-   * Stores the comma-separated state names and rebuilds {@link #movableContainerStates} from it.
-   * The string is what we persist; the set is used for fast {@code contains} checks
-   * when selecting containers and before moves.
+   * Validates and applies container-state configuration.
+   * <p>
+   * Only the parsed set of {@link State} values is stored in memory. Status and YAML use a
+   * canonical comma-separated list (enum names sorted lexically), which may differ from the
+   * original input string.
    */
   public void setContainerStates(String containerStates) {
-    this.containerStates = containerStates;
-    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
-    config.setContainerStates(containerStates);
-    movableContainerStates = config.getMovableContainerStates();
+    DiskBalancerConfiguration validated = new DiskBalancerConfiguration();
+    validated.setContainerStates(containerStates);
+    this.movableContainerStates = validated.getMovableContainerStates();
+  }
+
+  /**
+   * Stable comma-separated {@link State} names for persistence and RPC.
+   */
+  private static String formatContainerStates(Set<State> states) {
+    return states.stream()
+        .sorted(Comparator.comparing(State::name))
+        .map(State::name)
+        .collect(Collectors.joining(","));
   }
 
   @Override
@@ -701,7 +712,8 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     DiskBalancerInfo info = new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
-        parallelThread, stopAfterDiskEven, version, containerStates, metrics.getSuccessCount(),
+        parallelThread, stopAfterDiskEven, version, formatContainerStates(movableContainerStates),
+        metrics.getSuccessCount(),
         metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDataDensity);
     info.setIdealUsage(getIdealUsage(volumeUsages));
     info.setVolumeInfo(buildVolumeReportProto(volumeUsages));

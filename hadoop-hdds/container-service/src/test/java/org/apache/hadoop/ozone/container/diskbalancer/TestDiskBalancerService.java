@@ -516,29 +516,40 @@ public class TestDiskBalancerService {
     return Stream.of(
         Arguments.of("CLOSED,QUASI_CLOSED", true,
             new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
-        Arguments.of("closed", false, null, "uppercase"),
-        Arguments.of("NOT_A_STATE", false, null, null),
+        Arguments.of(" CLOSED , QUASI_CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of("  QUASI_CLOSED  ", true,
+            new HashSet<>(Arrays.asList(State.QUASI_CLOSED)), null),
         Arguments.of("OPEN,CLOSED", true,
-            new HashSet<>(Arrays.asList(State.OPEN, State.CLOSED)), null)
+            new HashSet<>(Arrays.asList(State.OPEN, State.CLOSED)), null),
+        Arguments.of("  QUASI_CLOSED,CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of("  QUASI_CLOSED , CLOSED ", true,
+            new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
+        Arguments.of(null, false, null, "must not be empty"),
+        Arguments.of("", false, null, "must not be empty"),
+        Arguments.of("   ", false, null, "must not be empty"),
+        Arguments.of(",,,", false, null, "at least one valid"),
+        Arguments.of("closed", false, null, "uppercase"),
+        Arguments.of("NOT_A_STATE", false, null, "Invalid container state")
     );
   }
 
   /**
-   * {@link DiskBalancerConfiguration#getMovableContainerStates()} accepts only exact enum names;
-   * wrong casing and unknown names fail with an error.
+   * {@link DiskBalancerConfiguration#setContainerStates(String)} accepts only exact enum names;
+   * blank input, empty token lists, wrong casing, and unknown names fail with an error.
    */
   @ParameterizedTest(name = "containerStates={0}")
   @MethodSource("movableContainerStatesCases")
   public void testMovableContainerStates(String containerStates, boolean expectSuccess,
       Set<State> expectedStates, String messageMustContain) {
     DiskBalancerConfiguration config = new DiskBalancerConfiguration();
-    config.setContainerStates(containerStates);
     if (expectSuccess) {
-      Set<State> states = config.getMovableContainerStates();
-      assertEquals(expectedStates, states);
+      config.setContainerStates(containerStates);
+      assertEquals(expectedStates, config.getMovableContainerStates());
     } else {
-      IllegalArgumentException ex =
-          assertThrows(IllegalArgumentException.class, config::getMovableContainerStates);
+      IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+          () -> config.setContainerStates(containerStates));
       if (messageMustContain != null) {
         assertTrue(ex.getMessage().contains(messageMustContain),
             () -> "Expected message to contain '" + messageMustContain + "': " + ex.getMessage());

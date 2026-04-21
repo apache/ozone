@@ -21,10 +21,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANC
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -60,5 +63,44 @@ public class TestDiskBalancerYaml {
         Arguments.of(10d, 100L, 5, true, DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES),
         Arguments.of(15d, 200L, 10, false, "CLOSED")
     );
+  }
+
+  /**
+   * When {@code containerStates} is missing from the YAML bean, read path must use the same default
+   * as {@link DiskBalancerConfiguration#DEFAULT_CONTAINER_STATES}.
+   */
+  @Test
+  public void testReadYamlMissingContainerStatesUsesDefault() throws IOException {
+    File file = new File(tmpDir.toString(), OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
+    String yaml = ""
+        + "operationalState: RUNNING\n"
+        + "threshold: 10.0\n"
+        + "bandwidthInMB: 100\n"
+        + "parallelThread: 5\n"
+        + "stopAfterDiskEven: true\n"
+        + "version: 1\n";
+    Files.write(file.toPath(), yaml.getBytes(StandardCharsets.UTF_8));
+    DiskBalancerInfo info = DiskBalancerYaml.readDiskBalancerInfoFile(file);
+    Assertions.assertEquals(DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, info.getContainerStates());
+    Assertions.assertEquals(DiskBalancerVersion.DEFAULT_VERSION, info.getVersion());
+  }
+
+  /**
+   * Explicit YAML {@code containerStates: null} (or null from deserialization) must also default.
+   */
+  @Test
+  public void testReadYamlNullContainerStatesUsesDefault() throws IOException {
+    File file = new File(tmpDir.toString(), OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
+    String yaml = ""
+        + "operationalState: RUNNING\n"
+        + "threshold: 10.0\n"
+        + "bandwidthInMB: 100\n"
+        + "parallelThread: 5\n"
+        + "stopAfterDiskEven: true\n"
+        + "containerStates: null\n"
+        + "version: 1\n";
+    Files.write(file.toPath(), yaml.getBytes(StandardCharsets.UTF_8));
+    DiskBalancerInfo info = DiskBalancerYaml.readDiskBalancerInfoFile(file);
+    Assertions.assertEquals(DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, info.getContainerStates());
   }
 }
