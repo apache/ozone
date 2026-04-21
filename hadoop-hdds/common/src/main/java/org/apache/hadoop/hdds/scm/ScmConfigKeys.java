@@ -584,15 +584,6 @@ public final class ScmConfigKeys {
   public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
           1000L;
 
-  /**
-   * the config will transfer value to ratis config
-   * raft.server.snapshot.creation.gap, used by ratis to take snapshot
-   * when manual trigger using api.
-   */
-  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_GAP
-      = "ozone.scm.ha.ratis.server.snapshot.creation.gap";
-  public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT =
-      1024L;
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =
           "ozone.scm.ha.ratis.snapshot.dir";
 
