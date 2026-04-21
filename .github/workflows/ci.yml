@@ -26,6 +26,14 @@ on:
         description: Ozone ref (branch, tag or commit SHA)
         default: ''
         required: false
+    secrets:
+      DEVELOCITY_ACCESS_KEY:
+        description: 'Token for submitting build scan to Develocity'
+        required: false
+      SONARCLOUD_TOKEN:
+        description: 'Token for submitting coverage data to SonarCloud'
+        required: false
+
 env:
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
@@ -123,7 +131,8 @@ jobs:
       sha: ${{ needs.build-info.outputs.sha }}
       timeout-minutes: 60
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
 
   generate-config-doc:
     needs:
@@ -145,7 +154,6 @@ jobs:
       github.repository == 'apache/ozone' &&
       github.ref_name == 'master'
     uses: ./.github/workflows/update-ozone-site-config-doc.yml
-    secrets: inherit
     permissions:
       contents: read
 
@@ -177,7 +185,8 @@ jobs:
       split: ${{ matrix.java }}
       timeout-minutes: 45
       with-coverage: false
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
 
   basic:
     needs:
@@ -192,7 +201,8 @@ jobs:
       script: ${{ matrix.check }}
       sha: ${{ needs.build-info.outputs.sha }}
       timeout-minutes: 30
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
@@ -203,7 +213,8 @@ jobs:
       - build-info
       - build
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-binary-tarball: true
@@ -216,7 +227,8 @@ jobs:
       - build-info
       - build
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-repo: true
@@ -231,7 +243,8 @@ jobs:
       - basic
     if: needs.build-info.outputs.needs-compile == 'true'
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-repo: true
@@ -247,7 +260,8 @@ jobs:
       - dependency
       - license
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-repo: true
@@ -268,7 +282,8 @@ jobs:
       - license
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: 11 # Hadoop may not work with newer Java
       needs-ozone-binary-tarball: true
@@ -293,7 +308,8 @@ jobs:
       - license
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
@@ -311,7 +327,8 @@ jobs:
       - license
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       pre-script: sudo hostname localhost

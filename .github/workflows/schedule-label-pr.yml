@@ -27,4 +27,3 @@ permissions: { }
 jobs:
   label:
     uses: ./.github/workflows/label-pr.yml
-    secrets: inherit

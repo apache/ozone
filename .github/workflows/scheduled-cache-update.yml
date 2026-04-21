@@ -26,4 +26,3 @@ permissions: { }
 jobs:
   update:
     uses: ./.github/workflows/populate-cache.yml
-    secrets: inherit
