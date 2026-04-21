@@ -48,7 +48,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
 import java.time.Instant;
@@ -1801,4 +1803,70 @@ public class TestReplicationManager {
         });
   }
 
+  @Test
+  public void testInflightReconstructionLimit() throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(2);
+    ReplicationManager rm = createReplicationManager();
+    assertEquals(2, rm.getReconstructionInFlightLimit());
+    assertEquals(0, rm.getInflightReconstructionCount());
+    assertFalse(rm.isReconstructionLimitReached());
+
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    
+    // Send one reconstruction command with 2 fragments
+    ReconstructECContainersCommand cmd1 = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()),
+        integers2ByteString(ImmutableList.of(1, 2)), (ECReplicationConfig) repConfig);
+
+    rm.sendThrottledReconstructionCommand(container, cmd1);
+    assertEquals(1, rm.getInflightReconstructionCount());
+    assertFalse(rm.isReconstructionLimitReached());
+
+    // Send another reconstruction command with 1 fragment
+    ReconstructECContainersCommand cmd2 = new ReconstructECContainersCommand(
+        2L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()),
+        integers2ByteString(ImmutableList.of(3)), (ECReplicationConfig) repConfig);    
+    rm.sendThrottledReconstructionCommand(container, cmd2);
+    assertEquals(2, rm.getInflightReconstructionCount());
+    assertTrue(rm.isReconstructionLimitReached());
+
+    // Complete one fragment of cmd1
+    ContainerReplicaOp op1 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, 
+        cmd1.getTargetDatanodes().get(0), 1, cmd1, Long.MAX_VALUE, 0);
+    rm.opCompleted(op1, container.containerID(), false);
+    // Still 2 because cmd1 is not fully finished
+    assertEquals(2, rm.getInflightReconstructionCount());
+
+    // Complete second fragment of cmd1
+    ContainerReplicaOp op2 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, 
+        cmd1.getTargetDatanodes().get(1), 2, cmd1, Long.MAX_VALUE, 0);
+    rm.opCompleted(op2, container.containerID(), false);
+    // Now 1
+    assertEquals(1, rm.getInflightReconstructionCount());
+    assertFalse(rm.isReconstructionLimitReached());
+
+    // Complete cmd2
+    ContainerReplicaOp op3 = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, 
+        cmd2.getTargetDatanodes().get(0), 3, cmd2, Long.MAX_VALUE, 0);
+    rm.opCompleted(op3, container.containerID(), false);
+    assertEquals(0, rm.getInflightReconstructionCount());
+  }
+
+  private static ByteString integers2ByteString(List<Integer> src) {
+    byte[] dst = new byte[src.size()];
+    for (int i = 0; i < src.size(); i++) {
+      dst[i] = src.get(i).byteValue();
+    }
+    return dst.length > 0 ? UnsafeByteOperations.unsafeWrap(dst)
+        : ByteString.EMPTY;
+  }
 }
