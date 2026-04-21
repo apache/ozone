@@ -133,16 +133,22 @@ jobs:
         run: |
           args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true -Drocks_tools_native"
           if [[ "$RATIS_VERSION" != "" ]]; then
-            args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
-            args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
-            args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
-            args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
-            args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
+            args="$args -Dratis.version=$ratis_version"
+            args="$args -Dratis.thirdparty.version=$ratis_thirdparty_version"
+            args="$args -Dratis-thirdparty.grpc.version=$grpc_version"
+            args="$args -Dratis-thirdparty.netty.version=$netty_version"
+            args="$args -Dratis-thirdparty.protobuf.version=$protobuf_version"
           fi
 
           args="$args -am -pl :$SUBMODULE"
 
           hadoop-ozone/dev-support/checks/build.sh $args
+        env:
+          ratis_version: ${{ needs.ratis.outputs.ratis-version }}
+          ratis_thirdparty_version: ${{ needs.ratis.outputs.thirdparty-version }}
+          grpc_version: ${{ needs.ratis.outputs.grpc-version }}
+          netty_version: ${{ needs.ratis.outputs.netty-version }}
+          protobuf_version: ${{ needs.ratis.outputs.protobuf-version }}
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
@@ -197,17 +203,17 @@ jobs:
           java-version: ${{ github.event.inputs.java-version }}
       - name: Execute tests
         run: |
-          if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then
+          if [[ -e "$repo_path" ]]; then
             export OZONE_REPO_CACHED=true
           fi
 
           args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
           if [[ "$RATIS_VERSION" != "" ]]; then
-            args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
-            args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
-            args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
-            args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
-            args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
+            args="$args -Dratis.version=$ratis_version"
+            args="$args -Dratis.thirdparty.version=$ratis_thirdparty_version"
+            args="$args -Dratis-thirdparty.grpc.version=$grpc_version"
+            args="$args -Dratis-thirdparty.netty.version=$netty_version"
+            args="$args -Dratis-thirdparty.protobuf.version=$protobuf_version"
           fi
 
           args="$args -pl :$SUBMODULE"
@@ -224,6 +230,12 @@ jobs:
         continue-on-error: true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          repo_path: ${{ steps.download-ozone-repo.outputs.download-path }}
+          ratis_version: ${{ needs.ratis.outputs.ratis-version }}
+          ratis_thirdparty_version: ${{ needs.ratis.outputs.thirdparty-version }}
+          grpc_version: ${{ needs.ratis.outputs.grpc-version }}
+          netty_version: ${{ needs.ratis.outputs.netty-version }}
+          protobuf_version: ${{ needs.ratis.outputs.protobuf-version }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
         if: ${{ !cancelled() }}

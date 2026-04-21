@@ -90,9 +90,10 @@ jobs:
           ratis_sha=$(git rev-parse --short HEAD)
           ratis_version="$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=project.version | sed -e "s/-SNAPSHOT/-${ratis_sha}-SNAPSHOT/")"
           echo "ratis=${ratis_version}" >> $GITHUB_OUTPUT
+          echo "ratis_version=${ratis_version}" >> $GITHUB_ENV
       - name: Run a full build
         run: |
-          mvn -B --no-transfer-progress -Dscan=false versions:set -DnewVersion=${{ steps.versions.outputs.ratis }}
+          mvn -B --no-transfer-progress -Dscan=false versions:set -DnewVersion="$ratis_version"
           dev-support/checks/build.sh
       - name: Store Maven repo for tests
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -130,8 +131,14 @@ jobs:
     steps:
       - name: Print versions
         run: |
-          echo ${{ needs.ratis.outputs.ratis-version }}
-          echo ${{ needs.ratis.outputs.thirdparty-version }}
-          echo ${{ needs.ratis-thirdparty.outputs.grpc-version }}
-          echo ${{ needs.ratis-thirdparty.outputs.netty-version }}
-          echo ${{ needs.ratis-thirdparty.outputs.protobuf-version }}
+          echo "Ratis: $ratis_version"
+          echo "Thirdparty: $ratis_thirdparty_version"
+          echo "Grpc: $grpc_version"
+          echo "Netty: $netty_version"
+          echo "Protobuf: $protobuf_version"
+        env:
+          ratis_version: ${{ needs.ratis.outputs.ratis-version }}
+          ratis_thirdparty_version: ${{ needs.ratis.outputs.thirdparty-version }}
+          grpc_version: ${{ needs.ratis-thirdparty.outputs.grpc-version }}
+          netty_version: ${{ needs.ratis-thirdparty.outputs.netty-version }}
+          protobuf_version: ${{ needs.ratis-thirdparty.outputs.protobuf-version }}
