@@ -72,8 +72,7 @@ public class TestDiskBalancerYaml {
   @Test
   public void testReadYamlMissingContainerStatesUsesDefault() throws IOException {
     File file = new File(tmpDir.toString(), OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
-    String yaml = ""
-        + "operationalState: RUNNING\n"
+    String yaml = "operationalState: RUNNING\n"
         + "threshold: 10.0\n"
         + "bandwidthInMB: 100\n"
         + "parallelThread: 5\n"
@@ -91,8 +90,7 @@ public class TestDiskBalancerYaml {
   @Test
   public void testReadYamlNullContainerStatesUsesDefault() throws IOException {
     File file = new File(tmpDir.toString(), OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
-    String yaml = ""
-        + "operationalState: RUNNING\n"
+    String yaml = "operationalState: RUNNING\n"
         + "threshold: 10.0\n"
         + "bandwidthInMB: 100\n"
         + "parallelThread: 5\n"
