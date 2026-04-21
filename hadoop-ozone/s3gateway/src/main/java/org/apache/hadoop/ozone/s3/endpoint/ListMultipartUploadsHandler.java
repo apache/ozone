@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 
 import java.io.IOException;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
+import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
@@ -47,11 +49,16 @@ class ListMultipartUploadsHandler extends BucketOperationHandler {
     final String keyMarker = queryParams().get(QueryParams.KEY_MARKER);
     final int maxUploads = Math.min(queryParams().getInt(QueryParams.MAX_UPLOADS, 1000), 1000);
     final String prefix = queryParams().get(QueryParams.PREFIX);
+    final String delimiter = queryParams().get(QueryParams.DELIMITER);
+    final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
     final String uploadIdMarker = queryParams().get(QueryParams.UPLOAD_ID_MARKER);
 
     if (maxUploads < 1) {
       throw newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads",
           new Exception("max-uploads must be positive"));
+    }
+    if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
     }
 
     long startNanos = context.getStartNanos();
@@ -65,17 +72,20 @@ class ListMultipartUploadsHandler extends BucketOperationHandler {
 
       ListMultipartUploadsResult result = new ListMultipartUploadsResult();
       result.setBucket(bucketName);
-      result.setKeyMarker(keyMarker);
+      result.setKeyMarker(EncodingTypeObject.createNullable(keyMarker, encodingType));
       result.setUploadIdMarker(uploadIdMarker);
-      result.setNextKeyMarker(ozoneMultipartUploadList.getNextKeyMarker());
-      result.setPrefix(prefix);
+      result.setNextKeyMarker(EncodingTypeObject.createNullable(
+          ozoneMultipartUploadList.getNextKeyMarker(), encodingType));
+      result.setPrefix(EncodingTypeObject.createNullable(prefix, encodingType));
+      result.setDelimiter(EncodingTypeObject.createNullable(delimiter, encodingType));
+      result.setEncodingType(encodingType);
       result.setNextUploadIdMarker(ozoneMultipartUploadList.getNextUploadIdMarker());
       result.setMaxUploads(maxUploads);
       result.setTruncated(ozoneMultipartUploadList.isTruncated());
 
       ozoneMultipartUploadList.getUploads().forEach(upload -> result.addUpload(
           new ListMultipartUploadsResult.Upload(
-              upload.getKeyName(),
+              EncodingTypeObject.createNullable(upload.getKeyName(), encodingType),
               upload.getUploadId(),
               upload.getCreationTime(),
               S3StorageType.fromReplicationConfig(upload.getReplicationConfig())

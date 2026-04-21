@@ -112,6 +112,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
     final String marker = queryParams().get(QueryParams.MARKER);
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
+    final int maxUploads = queryParams().getInt(QueryParams.MAX_UPLOADS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX, "");
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
@@ -122,6 +123,14 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       if (prefix == null) {
         prefix = "";
+      }
+      final String uploads = queryParams().get(QueryParams.UPLOADS);
+      if (uploads != null) {
+        context.setAction(S3GAction.LIST_MULTIPART_UPLOAD);
+        final String uploadIdMarker = queryParams().get(QueryParams.UPLOAD_ID_MARKER);
+        final String keyMarker = queryParams().get(QueryParams.KEY_MARKER);
+        return listMultipartUploads(bucketName, prefix, delimiter, encodingType,
+            keyMarker, uploadIdMarker, maxUploads);
       }
       maxKeys = validateMaxKeys(maxKeys);
 
@@ -308,8 +317,7 @@ public class BucketEndpoint extends BucketOperationHandler {
               keyMarker, uploadIdMarker, sanitizedMaxUploads,
               ozoneMultipartUploadList);
 
-      AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-          getAuditParameters()));
+      auditReadSuccess(s3GAction);
 
       getMetrics().updateListMultipartUploadsSuccessStats(startNanos);
       return Response.ok(result).build();
@@ -380,12 +388,8 @@ public class BucketEndpoint extends BucketOperationHandler {
     for (OzoneMultipartUpload upload : pendingUploads) {
       String keyName = upload.getKeyName();
 
-      if (bucket.getBucketLayout().isFileSystemOptimized()
-          && StringUtils.isNotEmpty(normalizedPrefix)
+      if (StringUtils.isNotEmpty(normalizedPrefix)
           && !keyName.startsWith(normalizedPrefix)) {
-        continue;
-      }
-      if (keyName.length() < normalizedPrefix.length()) {
         continue;
       }
 
@@ -410,6 +414,7 @@ public class BucketEndpoint extends BucketOperationHandler {
             && currentDirName.equals(prevDir)) {
           lastProcessedKey = keyName;
           lastProcessedUploadId = upload.getUploadId();
+          processedUploads++;
           continue;
         }
         break;
