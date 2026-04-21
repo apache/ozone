@@ -71,6 +71,7 @@ env:
   # SUREFIRE-1722, SUREFIRE-1815
   SUREFIRE_VERSION: 3.0.0-M4
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}-java{5}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations, inputs.java-version) || '' }}
+permissions: { }
 jobs:
   prepare-job:
     runs-on: ubuntu-slim

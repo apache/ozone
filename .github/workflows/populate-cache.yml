@@ -29,6 +29,8 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions: { }
+
 jobs:
   build:
     runs-on: ubuntu-24.04

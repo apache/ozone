@@ -20,6 +20,8 @@ on:
 concurrency:
   group: ci-${{ github.event.pull_request.number || case(github.repository == 'apache/ozone', github.sha, github.ref_name) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.repository != 'apache/ozone' }}
+permissions:
+  contents: read
 jobs:
   CI:
     if: github.event_name == 'pull_request'

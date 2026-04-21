@@ -21,6 +21,8 @@ on:
         type: string
         required: true
 
+permissions: { }
+
 jobs:
   generate-config-doc:
     runs-on: ubuntu-slim

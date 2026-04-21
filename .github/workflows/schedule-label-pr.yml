@@ -22,6 +22,8 @@ on:
   schedule:
     - cron: '*/5 * * * *'
 
+permissions: { }
+
 jobs:
   label:
     uses: ./.github/workflows/label-pr.yml

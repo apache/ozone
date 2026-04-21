@@ -138,6 +138,8 @@ env:
   OZONE_VOLUME_OWNER: 1000
   SCRIPT: ${{ inputs.script }}
 
+permissions: { }
+
 jobs:
   check:
     name: ${{ (inputs.split && format('{0} ({1})', inputs.script, inputs.split)) || inputs.script }}

@@ -22,6 +22,9 @@ env:
   REPO_OWNER: "${{ github.repository_owner }}"
   SHA: ${{ github.sha }}
 
+permissions:
+  contents: read
+
 jobs:
   update-ozone-site-config-doc:
     runs-on: ubuntu-slim

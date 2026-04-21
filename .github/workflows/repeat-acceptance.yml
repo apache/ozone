@@ -50,6 +50,7 @@ env:
   JAVA_VERSION: 8
   SPLITS: ${{ github.event.inputs.splits }}
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}[{1}]-{2}', inputs.test-suite || inputs.test-filter, inputs.ref, inputs.splits) || '' }}
+permissions: { }
 jobs:
   prepare-job:
     runs-on: ubuntu-slim

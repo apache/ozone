@@ -34,6 +34,8 @@ env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 
+permissions: { }
+
 jobs:
   build-info:
     runs-on: ubuntu-slim
@@ -144,6 +146,8 @@ jobs:
       github.ref_name == 'master'
     uses: ./.github/workflows/update-ozone-site-config-doc.yml
     secrets: inherit
+    permissions:
+      contents: read
 
   compile:
     needs:
