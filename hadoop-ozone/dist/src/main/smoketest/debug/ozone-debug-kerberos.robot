@@ -19,10 +19,17 @@ Library             OperatingSystem
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
+*** Keywords ***
+Verify Principal Translation
+    [Arguments]    ${principal}    ${expected_short}
+    ${output} =    Execute         ozone debug kerberos translate-principal ${principal}
+    Should Contain    ${output}    Local user = ${expected_short}
+    Should Contain    ${output}    PASS : 1
+
 *** Test Cases ***
 Diagnose Kerberos
     [Documentation]    Exercises the ozone debug kerberos diagnose command.
-    ${output} =        Execute    ozone debug kerberos diagnose
+    ${output} =        Execute      ozone debug kerberos diagnose
     Should Contain     ${output}    == Ozone Kerberos Diagnostics ==
     Should Contain     ${output}    [PASS] Kerberos Configuration
     Should Contain     ${output}    [PASS] Kerberos kinit Command
@@ -39,7 +46,7 @@ Translate Principal
 
 Translate Multiple Principals At Once
     [Documentation]    Exercises translation of multiple principals passed in a single command.
-    ${output} =        Execute    ozone debug kerberos translate-principal testuser/om@EXAMPLE.COM om/om@EXAMPLE.COM
+    ${output} =        Execute      ozone debug kerberos translate-principal testuser/om@EXAMPLE.COM om/om@EXAMPLE.COM
     Should Contain     ${output}    [PASS] testuser/om@EXAMPLE.COM
     Should Contain     ${output}    [PASS] om/om@EXAMPLE.COM
     Should Contain     ${output}    PASS : 2
@@ -50,11 +57,3 @@ Translate Invalid Principal
     Should Be Equal As Integers    ${rc}    1
     Should Contain      ${output}    [FAIL] om/om@cloudera.com
     Should Contain      ${output}    No rules applied to
-
-
-*** Keywords ***
-Verify Principal Translation
-    [Arguments]    ${principal}    ${expected_short}
-    ${output} =    Execute         ozone debug kerberos translate-principal ${principal}
-    Should Contain    ${output}    ${expected_short}
-    Should Contain    ${output}    PASS : 1
