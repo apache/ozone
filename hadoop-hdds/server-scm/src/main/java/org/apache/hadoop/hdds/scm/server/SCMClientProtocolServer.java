@@ -1193,8 +1193,7 @@ public class SCMClientProtocolServer implements
 
   static boolean shouldFinalize(UpgradeFinalization.Status scmUpgradeStatus,
       int finalizedDatanodes, int healthyDatanodes) {
-    return UpgradeFinalization.Status.FINALIZATION_REQUIRED.equals(scmUpgradeStatus)
-        && finalizedDatanodes == healthyDatanodes;
+    return isScmFinalized(scmUpgradeStatus) && finalizedDatanodes == healthyDatanodes;
   }
 
   @Override
