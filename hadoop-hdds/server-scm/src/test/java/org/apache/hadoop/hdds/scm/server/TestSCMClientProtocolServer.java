@@ -157,7 +157,9 @@ public class TestSCMClientProtocolServer {
         UpgradeFinalization.Status.FINALIZATION_REQUIRED, 3, 3);
 
     assertFalse(status.getScmFinalized());
-    assertTrue(status.getShouldFinalize());
+    assertEquals(SCMClientProtocolServer.shouldFinalize(
+        UpgradeFinalization.Status.FINALIZATION_REQUIRED, 3, 3),
+        status.getShouldFinalize());
     assertEquals(3, status.getNumDatanodesFinalized());
     assertEquals(3, status.getNumDatanodesTotal());
   }
@@ -192,9 +194,9 @@ public class TestSCMClientProtocolServer {
             UpgradeFinalization.Status.ALREADY_FINALIZED, 2, 2);
 
     assertTrue(doneStatus.getScmFinalized());
-    assertFalse(doneStatus.getShouldFinalize());
+    assertTrue(doneStatus.getShouldFinalize());
     assertTrue(finalizedStatus.getScmFinalized());
-    assertFalse(finalizedStatus.getShouldFinalize());
+    assertTrue(finalizedStatus.getShouldFinalize());
   }
 
   @Test
@@ -209,7 +211,7 @@ public class TestSCMClientProtocolServer {
     HddsProtos.UpgradeStatus alreadyFinalized =
         SCMClientProtocolServer.buildUpgradeStatus(UpgradeFinalization.Status.ALREADY_FINALIZED, 3, 3);
     assertTrue(alreadyFinalized.getScmFinalized());
-    assertFalse(alreadyFinalized.getShouldFinalize());
+    assertTrue(alreadyFinalized.getShouldFinalize());
   }
 
   private StorageContainerManager mockStorageContainerManager() {
