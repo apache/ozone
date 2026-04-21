@@ -45,7 +45,9 @@ public class TracingConfig extends ReconfigurableConfig {
       type = ConfigType.BOOLEAN,
       reconfigurable = true,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
-      description = "If true, tracing is initialized and spans may be exported (subject to sampling)."
+      description = "If true, Ozone initializes its own tracer and exports spans (subject to sampling). "
+          + "If false, the Ozone client does not use that tracer; optional child spans under an "
+          + "application trace are controlled by ozone.tracing.client.application-aware."
   )
   private boolean tracingEnabled;
 
@@ -85,9 +87,11 @@ public class TracingConfig extends ReconfigurableConfig {
       type = ConfigType.BOOLEAN,
       reconfigurable = true,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
-      description = "When true and Ozone's own tracing is disabled, the client may still "
-          + "emit child spans using the application's OpenTelemetry (GlobalOpenTelemetry) "
-          + "when an active span exists in Context."
+      description = "This is used when ozone.tracing.enabled is false. If true and "
+      + "an active span exists in the current OpenTelemetry Context (application "
+      + "GlobalOpenTelemetry), the client may create child spans under that trace. If no "
+      + "active span exists, no spans are created. If false, no spans are created regardless "
+      + "of application context."
   )
   private boolean clientApplicationAware;
 
