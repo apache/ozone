@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * exceeding the upper threshold. Space is reserved on the destination only when a container is
  * chosen, using the actual container size.
  *
- * Which container states may move is defined by {@link DiskBalancerConfiguration#getMovableContainerStates()}.
+ * Which container states may move is determined by {@code DiskBalancerConfiguration#getMovableContainerStates()}.
  */
 public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
