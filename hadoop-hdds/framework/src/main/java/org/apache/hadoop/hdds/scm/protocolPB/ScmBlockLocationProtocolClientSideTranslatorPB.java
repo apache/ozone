@@ -233,6 +233,13 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       blocks.add(builder.build());
     }
 
+    if (!blocks.isEmpty()) {
+      String blockIds = blocks.stream()
+          .map(b -> b.getBlockID().toString())
+          .collect(Collectors.joining(", "));
+      TracingUtil.getActiveSpan().addEvent("SCM allocated block(s): " + blockIds);
+    }
+
     return blocks;
   }
 
