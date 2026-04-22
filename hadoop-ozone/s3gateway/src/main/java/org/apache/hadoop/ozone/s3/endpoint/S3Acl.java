@@ -157,16 +157,6 @@ public final class S3Acl {
   private S3Acl() {
   }
 
-  public static boolean isGranteeTypeSupported(String typeStr) {
-    ACLIdentityType type =  ACLIdentityType.getTypeFromGranteeType(typeStr);
-    return type == null ? false : type.isSupported();
-  }
-
-  public static boolean isHeaderTypeSupported(String typeStr) {
-    ACLIdentityType type =  ACLIdentityType.getTypeFromHeaderType(typeStr);
-    return type == null ? false : type.isSupported();
-  }
-
   public static List<Grant> ozoneNativeAclToS3Acl(OzoneAcl ozoneAcl) {
     // Since currently only "CanonicalUser" is supported, which maps to Ozone
     // "USER"
