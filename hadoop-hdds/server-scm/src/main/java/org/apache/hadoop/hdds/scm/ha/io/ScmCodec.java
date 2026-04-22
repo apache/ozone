@@ -29,6 +29,5 @@ public interface ScmCodec<T> {
 
   ByteString serialize(T object) throws InvalidProtocolBufferException;
 
-  T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException;
-
+  T deserialize(ByteString value) throws InvalidProtocolBufferException;
 }

@@ -67,7 +67,7 @@ public class TestSCMRatisResponse {
         .build();
     SCMRatisResponse response = SCMRatisResponse.decode(reply);
     assertTrue(response.isSuccess());
-    assertEquals(Message.EMPTY, SCMRatisResponse.encode(response.getResult()));
+    assertEquals(Message.EMPTY, SCMRatisResponse.encode(response.getResult(), Object.class));
   }
 
   @Test
@@ -94,7 +94,7 @@ public class TestSCMRatisResponse {
     Message message = Message.valueOf("test");
     // Should fail with exception.
     assertThrows(InvalidProtocolBufferException.class,
-        () -> SCMRatisResponse.encode(message));
+        () -> SCMRatisResponse.encode(message, message.getClass()));
   }
 
   @Test

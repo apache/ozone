@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -282,6 +283,41 @@ public class TestEmptyContainerHandler {
     verify(replicationManager, times(0)).updateContainerState(
         any(ContainerID.class),
         any(HddsProtos.LifeCycleEvent.class));
+  }
+
+  /**
+   * A QUASI_CLOSED container with all empty replicas should be deleted.
+   * Handler should return true and send delete commands to all replicas.
+   */
+  @Test
+  public void testEmptyQuasiClosedRatisContainerReturnsTrue()
+          throws IOException {
+    long keyCount = 0L;
+    long bytesUsed = 0L;
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+            ratisReplicationConfig, 1, QUASI_CLOSED, keyCount, bytesUsed);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.QUASI_CLOSED, keyCount, bytesUsed,
+            0, 0, 0);
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    assertAndVerify(readRequest, true, 0, 1);
+    assertAndVerify(request, true, 3, 1);
   }
 
   /**

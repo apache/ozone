@@ -15,34 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha;
+package org.apache.hadoop.ozone.debug.kerberos;
 
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
- * Reflection util for SCM HA.
+ * Prints environment variables relevant to Kerberos and Ozone.
  */
-public final class ReflectionUtil {
+public class EnvironmentProbe extends ConfigProbe {
 
-  private static Map<String, Class<?>> classCache = new HashMap<>();
-
-  private ReflectionUtil() {
+  @Override
+  public String name() {
+    return "Environment Variables";
   }
 
-  /**
-   * Returns the {@code Class} object associated with the given string name.
-   *
-   * @param className the fully qualified name of the desired class.
-   * @return the {@code Class} object for the class with the
-   *         specified name.
-   * @throws ClassNotFoundException if the class cannot be located
-   */
-  public static Class<?> getClass(String className)
-      throws ClassNotFoundException {
-    if (!classCache.containsKey(className)) {
-      classCache.put(className, Class.forName(className));
-    }
-    return classCache.get(className);
+  @Override
+  public ProbeResult test(OzoneConfiguration conf) {
+
+    printValue("KRB5_CONFIG", System.getenv("KRB5_CONFIG"));
+    printValue("KRB5CCNAME", System.getenv("KRB5CCNAME"));
+    printValue("OZONE_CONF_DIR", System.getenv("OZONE_CONF_DIR"));
+    printValue("HADOOP_CONF_DIR", System.getenv("HADOOP_CONF_DIR"));
+    printValue("JAVA_SECURITY_KRB5_CONF", System.getenv("JAVA_SECURITY_KRB5_CONF"));
+
+    return ProbeResult.PASS;
   }
 }

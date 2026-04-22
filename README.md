@@ -46,7 +46,7 @@ Ozone is a top level project under the [Apache Software Foundation](https://apac
 
 ## Download
 
-Latest release artifacts (source release and binary packages) are [available](https://ozone.apache.org/downloads/) from the Ozone web page.
+Latest release artifacts (source release and binary packages) are [available](https://ozone.apache.org/download/) from the Ozone web page.
 
 ## Quick start
 
@@ -84,7 +84,7 @@ aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /
 
 ### Run Ozone from released artifact
 
-If you need a more realistic cluster, you can [download](https://ozone.apache.org/downloads/) the latest (binary) release package, and start a cluster with the help of docker-compose:
+If you need a more realistic cluster, you can [download](https://ozone.apache.org/download/) the latest (binary) release package, and start a cluster with the help of docker-compose:
 
 After you untar the binary:
 

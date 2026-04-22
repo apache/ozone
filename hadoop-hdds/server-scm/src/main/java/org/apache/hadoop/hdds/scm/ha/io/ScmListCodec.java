@@ -50,7 +50,8 @@ class ScmListCodec implements ScmCodec<Object> {
     }
 
     final Class<?> resolved = resolver.get(elements.get(0).getClass());
-    final ScmCodec<Object> elementCodec = ScmCodecFactory.getCodec(resolved);
+    final ScmCodec<Object> elementCodec = ScmCodecFactory.getInstance().getCodec(resolved);
+
     final ListArgument.Builder builder = ListArgument.newBuilder()
         .setType(resolved.getName());
     for (Object e : elements) {
@@ -60,23 +61,20 @@ class ScmListCodec implements ScmCodec<Object> {
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    if (!List.class.isAssignableFrom(type)) {
-      throw new InvalidProtocolBufferException(
-          "Unexpected non-list type: " + type);
-    }
+  public Object deserialize(ByteString value) throws InvalidProtocolBufferException {
     final ListArgument argument = ListArgument.parseFrom(
         value.asReadOnlyByteBuffer());
     if (!argument.hasType()) {
       throw new InvalidProtocolBufferException(
           "Missing ListArgument.type: " + argument);
     }
+
     final Class<?> elementClass = resolver.get(argument.getType());
-    final ScmCodec<?> elementCodec = ScmCodecFactory.getCodec(elementClass);
+
+    final ScmCodec<?> elementCodec = ScmCodecFactory.getInstance().getCodec(elementClass);
     final List<Object> list = new ArrayList<>();
     for (ByteString element : argument.getValueList()) {
-      list.add(elementCodec.deserialize(elementClass, element));
+      list.add(elementCodec.deserialize(element));
     }
     return list;
   }

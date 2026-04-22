@@ -59,6 +59,7 @@ for HADOOP_TEST_IMAGE in $HADOOP_TEST_IMAGES; do
   hadoop_version=$(docker run --rm "${HADOOP_TEST_IMAGE}" bash -c "hadoop version | grep -m1 '^Hadoop' | cut -f2 -d' '")
   export HADOOP_MAJOR_VERSION=${hadoop_version%%.*}
 
+  retry docker-compose --ansi never --profile hadoop pull nm rm
   docker-compose --ansi never --profile hadoop up -d nm rm
 
   execute_command_in_container rm hadoop version

@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.security.acl;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -48,6 +50,7 @@ public class OzoneNativeAuthorizer implements OzoneManagerAuthorizer {
       LoggerFactory.getLogger(OzoneNativeAuthorizer.class);
 
   private static final Predicate<UserGroupInformation> NO_ADMIN = any -> false;
+  private static final Predicate<UserGroupInformation> NO_BLACKLIST = any -> false;
 
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
@@ -55,6 +58,8 @@ public class OzoneNativeAuthorizer implements OzoneManagerAuthorizer {
   private PrefixManager prefixManager;
   private Predicate<UserGroupInformation> adminCheck = NO_ADMIN;
   private Predicate<UserGroupInformation> readOnlyAdminCheck = NO_ADMIN;
+  private Predicate<UserGroupInformation> blacklistCheck = NO_BLACKLIST;
+  private Predicate<UserGroupInformation> readOnlyBlacklistCheck = NO_BLACKLIST;
   private BooleanSupplier allowListAllVolumes = () -> false;
 
   public OzoneNativeAuthorizer() {
@@ -98,6 +103,21 @@ public class OzoneNativeAuthorizer implements OzoneManagerAuthorizer {
     } else {
       throw new OMException("Unexpected input received. OM native acls are " +
           "configured to work with OzoneObjInfo type only.", INVALID_REQUEST);
+    }
+
+    if (blacklistCheck.test(context.getClientUgi())) {
+      LOG.debug("Permission DENIED on request {} for object {}. "
+          + "Reason: user is under the blacklist", context, ozObject);
+      return false;
+    }
+
+    if (readOnlyBlacklistCheck.test(context.getClientUgi())
+        && (context.getAclRights() == ACLType.READ
+        || context.getAclRights() == ACLType.READ_ACL
+        || context.getAclRights() == ACLType.LIST)) {
+      LOG.debug("Permission DENIED on request {} for object {}. "
+          + "Reason: user is under a read blacklist", context, ozObject);
+      return false;
     }
 
     // bypass all checks for admin
@@ -197,6 +217,8 @@ public class OzoneNativeAuthorizer implements OzoneManagerAuthorizer {
     allowListAllVolumes = () -> om.getConfig().isListAllVolumesAllowed();
     setAdminCheck(om::isAdmin);
     setReadOnlyAdminCheck(om::isReadOnlyAdmin);
+    setBlacklistCheck(om::isBlacklisted);
+    setReadOnlyBlacklistCheck(om::isReadBlacklisted);
 
     keyManager = km;
     prefixManager = pm;
@@ -209,6 +231,31 @@ public class OzoneNativeAuthorizer implements OzoneManagerAuthorizer {
 
   public void setReadOnlyAdminCheck(Predicate<UserGroupInformation> check) {
     readOnlyAdminCheck = Objects.requireNonNull(check, "read-only admin check");
+  }
+
+  @VisibleForTesting
+  void setOzoneAdmins(OzoneAdmins ozoneAdmins) {
+    setAdminCheck(ozoneAdmins::isAdmin);
+  }
+
+  @VisibleForTesting
+  void setOzoneBlacklist(OzoneBlacklist ozoneBlacklist) {
+    setBlacklistCheck(ozoneBlacklist::isBlacklisted);
+  }
+
+  @VisibleForTesting
+  void setOzoneReadBlacklist(OzoneBlacklist readBlacklist) {
+    setReadOnlyBlacklistCheck(readBlacklist::isBlacklisted);
+  }
+
+  public void setBlacklistCheck(Predicate<UserGroupInformation> check) {
+    blacklistCheck = Objects.requireNonNull(check, "blacklist check");
+  }
+
+  public void setReadOnlyBlacklistCheck(
+      Predicate<UserGroupInformation> check) {
+    readOnlyBlacklistCheck = Objects.requireNonNull(check,
+        "read-only blacklist check");
   }
 
   public boolean getAllowListAllVolumes() {

@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -56,6 +57,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
         .addAll(new WritableECContainerProviderConfig()
             .reconfigurableProperties())
         .addAll(new ScmConfig().reconfigurableProperties())
+        .addAll(new TracingConfig().reconfigurableProperties())
         .build();
 
     assertProperties(getSubject(), expected);

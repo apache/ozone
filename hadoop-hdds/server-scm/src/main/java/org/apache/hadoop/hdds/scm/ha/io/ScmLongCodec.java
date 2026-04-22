@@ -33,7 +33,7 @@ class ScmLongCodec implements ScmCodec<Long> {
   }
 
   @Override
-  public Long deserialize(Class<?> type, ByteString value) {
+  public Long deserialize(ByteString value) {
     return LongCodec.get().fromByteArray(value.toByteArray());
   }
 

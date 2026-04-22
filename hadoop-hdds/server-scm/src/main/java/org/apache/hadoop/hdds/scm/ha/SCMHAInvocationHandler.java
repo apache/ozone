@@ -45,12 +45,9 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   private final Object localHandler;
   private final SCMRatisServer ratisHandler;
 
-  /**
-   * TODO.
-   */
   public SCMHAInvocationHandler(final RequestType requestType,
-                                final Object localHandler,
-                                final SCMRatisServer ratisHandler) {
+      final Object localHandler,
+      final SCMRatisServer ratisHandler) {
     this.requestType = requestType;
     this.localHandler = localHandler;
     this.ratisHandler = ratisHandler;
@@ -101,6 +98,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Invoking method {} on target {}", method, ratisHandler);
     }
+
     try {
       switch (method.getAnnotation(Replicate.class).invocationType()) {
       case CLIENT:
@@ -140,7 +138,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     throw response.getException();
   }
 
-  private static SCMException translateException(Throwable t) {
+  public static SCMException translateException(Throwable t) {
     if (t instanceof SCMException) {
       return (SCMException) t;
     }

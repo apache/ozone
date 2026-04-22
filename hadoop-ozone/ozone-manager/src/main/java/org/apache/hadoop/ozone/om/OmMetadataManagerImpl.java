@@ -108,6 +108,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -160,6 +162,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Table<String, OmKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
+  private Table<OmMultipartPartKey, OmMultipartPartInfo> multipartPartsTable;
   private Table<String, RepeatedOmKeyInfo> deletedTable;
 
   private Table<String, OmDirectoryInfo> dirTable;
@@ -386,6 +389,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return multipartInfoTable;
   }
 
+  @Override
+  public Table<OmMultipartPartKey, OmMultipartPartInfo> getMultipartPartsTable() {
+    return multipartPartsTable;
+  }
+
   /**
    * Start metadata manager.
    */
@@ -464,6 +472,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE_DEF);
     multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE_DEF);
+    multipartPartsTable = initializer.get(OMDBDefinition.MULTIPART_PARTS_TABLE_DEF);
     deletedTable = initializer.get(OMDBDefinition.DELETED_TABLE_DEF);
 
     dirTable = initializer.get(OMDBDefinition.DIRECTORY_TABLE_DEF);
@@ -604,9 +613,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public String getOzoneKey(String volume, String bucket, String key) {
     StringBuilder builder = new StringBuilder()
-        .append(OM_KEY_PREFIX).append(volume);
-    // TODO : Throw if the Bucket is null?
-    builder.append(OM_KEY_PREFIX).append(bucket);
+        .append(OM_KEY_PREFIX).append(volume)
+        .append(OM_KEY_PREFIX).append(bucket); // TODO : Throw if the Bucket is null?
     if (StringUtils.isNotBlank(key)) {
       builder.append(OM_KEY_PREFIX);
       if (!key.equals(OM_KEY_PREFIX)) {
@@ -1521,6 +1529,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               .addMultipartUploads(builder.setName(dbMultipartInfoKey)
                   .build());
           numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
+          // TODO: Add the expired part handling from the new table when the complete flow is done
         }
 
       }
@@ -1769,11 +1778,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                 long parentID, String fileName,
                                 String clientId) {
     StringBuilder openKey = new StringBuilder();
-    openKey.append(OM_KEY_PREFIX).append(volumeId);
-    openKey.append(OM_KEY_PREFIX).append(bucketId);
-    openKey.append(OM_KEY_PREFIX).append(parentID);
-    openKey.append(OM_KEY_PREFIX).append(fileName);
-    openKey.append(OM_KEY_PREFIX).append(clientId);
+    openKey.append(OM_KEY_PREFIX).append(volumeId)
+        .append(OM_KEY_PREFIX).append(bucketId)
+        .append(OM_KEY_PREFIX).append(parentID)
+        .append(OM_KEY_PREFIX).append(fileName)
+        .append(OM_KEY_PREFIX).append(clientId);
     return openKey.toString();
   }
 
@@ -1781,9 +1790,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public String getRenameKey(String volumeName, String bucketName,
                              long objectID) {
     StringBuilder renameKey = new StringBuilder();
-    renameKey.append(OM_KEY_PREFIX).append(volumeName);
-    renameKey.append(OM_KEY_PREFIX).append(bucketName);
-    renameKey.append(OM_KEY_PREFIX).append(objectID);
+    renameKey.append(OM_KEY_PREFIX).append(volumeName)
+        .append(OM_KEY_PREFIX).append(bucketName)
+        .append(OM_KEY_PREFIX).append(objectID);
     return renameKey.toString();
   }
 
@@ -1798,11 +1807,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                 long parentID, String fileName,
                                 String uploadId) {
     StringBuilder openKey = new StringBuilder();
-    openKey.append(OM_KEY_PREFIX).append(volumeId);
-    openKey.append(OM_KEY_PREFIX).append(bucketId);
-    openKey.append(OM_KEY_PREFIX).append(parentID);
-    openKey.append(OM_KEY_PREFIX).append(fileName);
-    openKey.append(OM_KEY_PREFIX).append(uploadId);
+    openKey.append(OM_KEY_PREFIX).append(volumeId)
+        .append(OM_KEY_PREFIX).append(bucketId)
+        .append(OM_KEY_PREFIX).append(parentID)
+        .append(OM_KEY_PREFIX).append(fileName)
+        .append(OM_KEY_PREFIX).append(uploadId);
     return openKey.toString();
   }
 

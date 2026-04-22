@@ -24,7 +24,7 @@ importers:
         specifier: ~4.10.3
         version: 4.10.3(react-dom@16.14.0(react@16.14.0))(react@16.14.0)
       axios:
-        specifier: ~1.13.5
+        specifier: 1.13.6
         version: 1.13.6
       classnames:
         specifier: ^2.3.2

@@ -119,8 +119,8 @@ public class TestOmRatisSnapshotProvider {
 
     OmRatisSnapshotProvider.writeFormData(connection, sstFiles);
 
-    sb.append(fileName).append(CR_NL);
-    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append("--").append(CR_NL);
+    sb.append(fileName).append(CR_NL)
+        .append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append("--").append(CR_NL);
     assertEquals(sb.toString(),
         new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
@@ -141,8 +141,8 @@ public class TestOmRatisSnapshotProvider {
 
   private static StringBuilder getStringBuilder() {
     StringBuilder sb = new StringBuilder();
-    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append(CR_NL);
-    sb.append(CONTENT_DISPOSITION);
+    sb.append("--").append(MULTIPART_FORM_DATA_BOUNDARY).append(CR_NL)
+        .append(CONTENT_DISPOSITION);
     return sb;
   }
 

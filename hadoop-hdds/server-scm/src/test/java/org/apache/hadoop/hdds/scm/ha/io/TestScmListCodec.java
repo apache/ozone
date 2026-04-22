@@ -21,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
-import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -46,7 +45,7 @@ public class TestScmListCodec {
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
-        () -> codec.deserialize(List.class, listArg.toByteString()));
+        () -> codec.deserialize(listArg.toByteString()));
 
     assertTrue(ex.getMessage().contains("Missing ListArgument.type"));
   }

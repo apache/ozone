@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.security;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
-import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.CERT_ROTATE;
 
 import java.io.File;
 import java.io.IOException;
@@ -228,8 +227,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
       final RootCARotationHandler impl =
           new RootCARotationHandlerImpl(scm, rootCARotationManager);
 
-      return ratisServer.getProxyHandler(CERT_ROTATE,
-          RootCARotationHandler.class, impl);
+      return ratisServer.getProxyHandler(RootCARotationHandler.class, impl);
     }
   }
 }

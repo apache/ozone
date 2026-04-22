@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
@@ -179,24 +178,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             " considered as Unix Paths. Path has Violated FS Semantics " +
             "which caused put operation to fail.");
         throw os3Exception;
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.QUOTA_EXCEEDED) {
-        throw newError(S3ErrorTable.QUOTA_EXCEEDED, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.FILE_ALREADY_EXISTS) {
-        throw newError(S3ErrorTable.NO_OVERWRITE, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
-        throw newError(S3ErrorTable.INVALID_REQUEST, keyPath);
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath);
-      } else if (ex.getResult() == ResultCodes.NOT_SUPPORTED_OPERATION) {
-        // e.g. if putObjectTagging operation is applied on FSO directory
-        throw newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
+      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
+          && getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
+        // If-Match failed because the key doesn't exist
+        throw newError(PRECOND_FAILED, keyPath, ex);
       }
 
-      throw ex;
+      throw newError(bucketName, keyPath, ex);
     }
   }
 
@@ -230,7 +218,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
 
-      // Normal put object
       ReplicationConfig replicationConfig = getReplicationConfig(bucket);
 
       boolean enableEC = false;
@@ -271,6 +258,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
+      S3ConditionalRequest.WriteConditions writeConditions =
+          S3ConditionalRequest.parseWriteConditions(getHeaders(), keyPath);
+
       // Normal put object
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
           length, amzDecodedLength, keyPath);
@@ -287,15 +277,16 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
-                customMetadata, tags, multiDigestInputStream, getHeaders(), signatureInfo.isSignPayload(), perf);
+                customMetadata, tags, multiDigestInputStream, getHeaders(),
+                signatureInfo.isSignPayload(), perf, writeConditions);
         md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
         final String amzContentSha256Header =
             validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
-        try (OzoneOutputStream output = getClientProtocol().createKey(
-            volume.getName(), bucketName, keyPath, length, replicationConfig,
-            customMetadata, tags)) {
+        try (OzoneOutputStream output = openKeyForPut(
+            volume.getName(), bucketName, keyPath, length,
+            replicationConfig, customMetadata, tags, writeConditions)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -373,15 +364,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       return handler.handleGetRequest(context, keyPath);
     } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath, ex);
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else {
-        throw ex;
-      }
+      throw newError(bucketName, keyPath, ex);
     }
   }
 
@@ -404,6 +387,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getClientProtocol().getS3KeyDetails(bucketName, keyPath);
 
       isFile(keyPath, keyDetails);
+
+      Response conditionalResponse = S3ConditionalRequest
+          .evaluateReadPreconditions(getHeaders(), keyPath, keyDetails);
+      if (conditionalResponse != null) {
+        long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(
+            startNanos);
+        perf.appendMetaLatencyNanos(metadataLatencyNs);
+        long opLatencyNs = getMetrics().updateGetKeySuccessStats(startNanos);
+        perf.appendOpLatencyNanos(opLatencyNs);
+        return conditionalResponse;
+      }
 
       long length = keyDetails.getDataSize();
 
@@ -465,15 +459,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
 
       responseBuilder.header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
-
-      String eTag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
-      if (eTag != null) {
-        responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
-        String partsCount = extractPartsCount(eTag);
-        if (partsCount != null) {
-          responseBuilder.header(MP_PARTS_COUNT, partsCount);
-        }
-      }
+      addEntityTagHeader(responseBuilder, keyDetails);
 
       MultivaluedMap<String, String> queryParams =
           getContext().getUriInfo().getQueryParameters();
@@ -525,6 +511,20 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
+  static void addEntityTagHeader(ResponseBuilder responseBuilder, OzoneKey key) {
+    String eTag = key.getMetadata().get(OzoneConsts.ETAG);
+    if (eTag != null) {
+      // Should not return ETag header if the ETag is not set
+      // doing so will result in "null" string being returned instead
+      // which breaks some AWS SDK implementation
+      responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
+      String partsCount = extractPartsCount(eTag);
+      if (partsCount != null) {
+        responseBuilder.header(MP_PARTS_COUNT, partsCount);
+      }
+    }
+  }
+
   /**
    * Rest endpoint to check existence of an object in a bucket.
    * <p>
@@ -541,12 +541,19 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     OzoneKey key;
     try {
       if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
-        OzoneBucket bucket = getBucket(bucketName);
+        OzoneBucket bucket = getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
+      Response conditionalResponse = S3ConditionalRequest
+          .evaluateReadPreconditions(getHeaders(), keyPath, key);
+      if (conditionalResponse != null) {
+        getMetrics().updateHeadKeySuccessStats(startNanos);
+        auditReadSuccess(s3GAction);
+        return conditionalResponse;
+      }
       // TODO: return the specified range bytes of this object.
     } catch (OMException ex) {
       auditReadFailure(s3GAction, ex);
@@ -554,12 +561,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         // Just return 404 with no content
         return Response.status(Status.NOT_FOUND).build();
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else {
-        throw ex;
+        throw newError(bucketName, keyPath, ex);
       }
     } catch (Exception ex) {
       auditReadFailure(s3GAction, ex);
@@ -574,18 +577,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .header(HttpHeaders.CONTENT_LENGTH, key.getDataSize())
         .header(HttpHeaders.CONTENT_TYPE, "binary/octet-stream")
         .header(STORAGE_CLASS_HEADER, s3StorageType.toString());
-
-    String eTag = key.getMetadata().get(OzoneConsts.ETAG);
-    if (eTag != null) {
-      // Should not return ETag header if the ETag is not set
-      // doing so will result in "null" string being returned instead
-      // which breaks some AWS SDK implementation
-      response.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
-      String partsCount = extractPartsCount(eTag);
-      if (partsCount != null) {
-        response.header(MP_PARTS_COUNT, partsCount);
-      }
-    }
+    addEntityTagHeader(response, key);
 
     addLastModifiedDate(response, key);
     addCustomMetadataHeaders(response, key);
@@ -619,7 +611,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
    * for more details.
    */
   @DELETE
-  @SuppressWarnings("emptyblock")
   public Response delete(
       @PathParam(BUCKET) String bucketName,
       @PathParam(PATH) String keyPath
@@ -628,26 +619,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       return handler.handleDeleteRequest(context, keyPath);
     } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
-        // keys. Just return 204
-        return Response.status(Status.NO_CONTENT).build();
-      } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
-        // With PREFIX metadata layout, a dir deletion without recursive flag
-        // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.
-        // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
-        // keys. Just return 204
-        return Response.status(Status.NO_CONTENT).build();
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, keyPath, ex);
-      } else if (ex.getResult() == ResultCodes.NOT_SUPPORTED_OPERATION) {
-        // When deleteObjectTagging operation is applied on FSO directory
-        throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
-      } else {
-        throw ex;
-      }
+      throw newError(bucketName, keyPath, ex);
     }
   }
 
@@ -664,7 +636,20 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       getMetrics().updateDeleteKeySuccessStats(startNanos);
       return Response.status(Status.NO_CONTENT).build();
-
+    } catch (OMException ex) {
+      getMetrics().updateDeleteKeyFailureStats(startNanos);
+      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
+        // keys. Just return 204
+        return Response.status(Status.NO_CONTENT).build();
+      } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
+        // With PREFIX metadata layout, a dir deletion without recursive flag
+        // to true will throw DIRECTORY_NOT_EMPTY error for a non-empty dir.
+        // NOT_FOUND is not a problem, AWS doesn't throw exception for missing
+        // keys. Just return 204
+        return Response.status(Status.NO_CONTENT).build();
+      }
+      throw newError(context.getBucketName(), keyPath, ex);
     } catch (Exception ex) {
       getMetrics().updateDeleteKeyFailureStats(startNanos);
       throw ex;
@@ -687,7 +672,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     S3GAction s3GAction = S3GAction.INIT_MULTIPART_UPLOAD;
 
     try {
-      OzoneBucket ozoneBucket = getBucket(bucket);
+      OzoneBucket ozoneBucket = getVolume().getBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
 
       Map<String, String> customMetadata =
@@ -714,10 +699,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     } catch (OMException ex) {
       auditWriteFailure(s3GAction, ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
-      if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, key, ex);
-      }
-      throw ex;
+      throw newError(bucket, key, ex);
     } catch (Exception ex) {
       auditWriteFailure(s3GAction, ex);
       getMetrics().updateInitMultipartUploadFailureStats(startNanos);
@@ -772,14 +754,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     } catch (OMException ex) {
       auditWriteFailure(s3GAction, ex);
       getMetrics().updateCompleteMultipartUploadFailureStats(startNanos);
-      if (ex.getResult() == ResultCodes.INVALID_PART) {
-        throw newError(S3ErrorTable.INVALID_PART, key, ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_PART_ORDER) {
-        throw newError(S3ErrorTable.INVALID_PART_ORDER, key, ex);
-      } else if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
+      if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
-      } else if (ex.getResult() == ResultCodes.ENTITY_TOO_SMALL) {
-        throw newError(ENTITY_TOO_SMALL, key, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
         OS3Exception os3Exception = newError(INVALID_REQUEST, key, ex);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
@@ -794,12 +770,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             "considered as Unix Paths. A directory already exists with a " +
             "given KeyName caused failure for MPU");
         throw os3Exception;
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucket, ex);
       }
-      throw ex;
+      throw newError(bucket, key, ex);
     } catch (Exception ex) {
       auditWriteFailure(s3GAction, ex);
+      getMetrics().updateCompleteMultipartUploadFailureStats(startNanos);
       throw ex;
     }
   }
@@ -872,7 +847,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             getHeaders().getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
         String copySourceIfUnmodifiedSince =
             getHeaders().getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
-        if (!checkCopySourceModificationTime(sourceKeyModificationTime,
+        if (!S3ConditionalRequest.checkCopySourceModificationTime(
+            sourceKeyModificationTime,
             copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
           throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
         }
@@ -959,15 +935,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName + "/" + key, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_PART) {
         OS3Exception os3Exception = newError(
             S3ErrorTable.INVALID_ARGUMENT, String.valueOf(partNumber), ex);
         os3Exception.setErrorMessage(ex.getMessage());
         throw os3Exception;
       }
-      throw ex;
+      throw newError(bucketName, key, ex);
     } finally {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
@@ -1114,11 +1088,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket, ex);
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            destBucket + "/" + destkey, ex);
       }
-      throw ex;
+      throw newError(destBucket + "/" + destkey, ex);
     } finally {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
@@ -1127,7 +1098,33 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
     }
   }
-  
+
+  /**
+   * Opens a key for put, applying conditional write logic based on
+   * If-None-Match and If-Match headers.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private OzoneOutputStream openKeyForPut(String volumeName, String bucketName, String keyPath, long length,
+      ReplicationConfig replicationConfig, Map<String, String> customMetadata,
+      Map<String, String> tags,
+      S3ConditionalRequest.WriteConditions writeConditions)
+      throws IOException {
+    if (writeConditions.hasIfNoneMatch()) {
+      return getClientProtocol().createKeyIfNotExists(
+          volumeName, bucketName, keyPath, length, replicationConfig,
+          customMetadata, tags);
+    } else if (writeConditions.hasIfMatch()) {
+      return getClientProtocol().rewriteKeyIfMatch(
+          volumeName, bucketName, keyPath, length,
+          writeConditions.getExpectedETag(),
+          replicationConfig, customMetadata, tags);
+    } else {
+      return getClientProtocol().createKey(
+          volumeName, bucketName, keyPath, length, replicationConfig,
+          customMetadata, tags);
+    }
+  }
+
   /** Request context shared among {@code ObjectOperationHandler}s. */
   final class ObjectRequestContext extends S3RequestContext {
     private final String bucketName;

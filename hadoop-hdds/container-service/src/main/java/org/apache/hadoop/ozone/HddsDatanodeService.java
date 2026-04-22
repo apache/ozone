@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
@@ -78,7 +79,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClie
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -253,8 +254,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       datanodeDetails.setSetupTime(Time.now());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
-      TracingUtil.initTracing(
-          "HddsDatanodeService." + datanodeDetails.getID(), conf);
+      String tracingServiceName = "HddsDatanodeService." + datanodeDetails.getID();
+      TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
+      TracingReconfigurationCallback tracingReconfigurationCallback =
+          TracingReconfigurationCallback.init(tracingServiceName, tracingConfig);
       LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -304,6 +307,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
       reconfigurationHandler =
           new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
+              .register(tracingConfig)
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
@@ -324,6 +328,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       }
 
       reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+      reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
       datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode,
@@ -412,6 +417,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       HddsVolume hddsVolume = (HddsVolume) storageVolume;
       boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId, clusterId, conf, LOG, null);
       if (!result) {
+        LOG.error("Marking volume {} as failed", hddsVolume.getStorageDir().getPath());
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }
     }

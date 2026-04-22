@@ -30,6 +30,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -38,7 +39,6 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.http.HttpStatus;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +60,9 @@ import org.slf4j.LoggerFactory;
 public class BucketAclHandler extends BucketOperationHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(BucketAclHandler.class);
+
+  private static final Supplier<MessageUnmarshaller<S3BucketAcl>> UNMARSHALLER =
+      MemoizedSupplier.valueOf(() -> new MessageUnmarshaller<>(S3BucketAcl.class));
 
   /**
    * Determine if this handler should handle the current request.
@@ -84,7 +88,7 @@ public class BucketAclHandler extends BucketOperationHandler {
     context.setAction(S3GAction.GET_ACL);
 
     try {
-      OzoneBucket bucket = getBucket(bucketName);
+      OzoneBucket bucket = context.getVolume().getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       S3Owner owner = S3Owner.of(bucket.getOwner());
 
@@ -106,21 +110,9 @@ public class BucketAclHandler extends BucketOperationHandler {
           new S3BucketAcl.AccessControlList(grantList));
 
       getMetrics().updateGetAclSuccessStats(context.getStartNanos());
-      auditReadSuccess(context.getAction());
       return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
-    } catch (OMException ex) {
+    } catch (OMException | RuntimeException ex) {
       getMetrics().updateGetAclFailureStats(context.getStartNanos());
-      auditReadFailure(context.getAction(), ex);
-      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else {
-        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      }
-    } catch (OS3Exception ex) {
-      getMetrics().updateGetAclFailureStats(context.getStartNanos());
-      auditReadFailure(context.getAction(), ex);
       throw ex;
     }
   }
@@ -147,9 +139,9 @@ public class BucketAclHandler extends BucketOperationHandler {
     String grantFull = getHeaders().getHeaderString(S3Acl.GRANT_FULL_CONTROL);
 
     try {
-      OzoneBucket bucket = getBucket(bucketName);
+      OzoneVolume volume = context.getVolume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-      OzoneVolume volume = getVolume();
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();
       List<OzoneAcl> ozoneAclListOnVolume = new ArrayList<>();
@@ -157,8 +149,7 @@ public class BucketAclHandler extends BucketOperationHandler {
       if (grantReads == null && grantWrites == null && grantReadACP == null
           && grantWriteACP == null && grantFull == null) {
         // Handle grants in body
-        S3BucketAcl putBucketAclRequest =
-            new PutBucketAclRequestUnmarshaller().readFrom(body);
+        S3BucketAcl putBucketAclRequest = UNMARSHALLER.get().readFrom(body);
         ozoneAclListOnBucket.addAll(
             S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));
         ozoneAclListOnVolume.addAll(
@@ -224,22 +215,11 @@ public class BucketAclHandler extends BucketOperationHandler {
       }
 
       getMetrics().updatePutAclSuccessStats(context.getStartNanos());
-      auditWriteSuccess(context.getAction());
       return Response.status(HttpStatus.SC_OK).build();
 
-    } catch (OMException exception) {
+    } catch (OMException | RuntimeException exception) {
       getMetrics().updatePutAclFailureStats(context.getStartNanos());
-      auditWriteFailure(context.getAction(), exception);
-      if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
-      } else if (isAccessDenied(exception)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, exception);
-      }
       throw exception;
-    } catch (OS3Exception ex) {
-      getMetrics().updatePutAclFailureStats(context.getStartNanos());
-      auditWriteFailure(context.getAction(), ex);
-      throw ex;
     }
   }
 

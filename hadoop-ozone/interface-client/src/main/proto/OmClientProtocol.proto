@@ -156,6 +156,7 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
+  SubmitSnapshotDiff = 143;
 }
 
 enum SafeMode {
@@ -306,6 +307,8 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
+
+  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest       = 144;
 }
 
 message OMResponse {
@@ -439,6 +442,8 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
+
+  optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
 }
 
 enum Status {
@@ -568,6 +573,12 @@ enum Status {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
 
     TOO_MANY_SNAPSHOTS = 98;
+
+    ETAG_MISMATCH = 99;
+
+    ETAG_NOT_AVAILABLE = 100;
+
+    ATOMIC_WRITE_CONFLICT = 101;
 }
 
 /**
@@ -1085,6 +1096,11 @@ message KeyArgs {
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
     optional uint64 expectedDataGeneration = 23;
+
+    // expectedETag, when set, indicates that the existing key must have
+    // the given ETag for the operation to succeed. This is used for
+    // S3 conditional writes with the If-Match header.
+    optional string expectedETag = 24;
 }
 
 message KeyLocation {
@@ -1176,6 +1192,11 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+
+    // expectedETag, when set, indicates that the existing key must have
+    // the given ETag for the operation to succeed. This is used for
+    // S3 conditional writes with the If-Match header.
+    optional string expectedETag = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -2027,6 +2048,15 @@ message SnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional string token = 5;
   optional uint32 pageSize = 6;
+  optional bool forceFullDiff = 7 [deprecated = true];
+  optional bool disableNativeDiff = 8 [deprecated = true];
+}
+
+message SubmitSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
   optional bool forceFullDiff = 7;
   optional bool disableNativeDiff = 8;
 }
@@ -2166,6 +2196,7 @@ message SnapshotDiffResponse {
     REJECTED = 4;
     FAILED = 5;
     CANCELLED = 6;
+    NOT_FOUND = 7;
   }
 
   enum SubStatus {
@@ -2181,6 +2212,10 @@ message SnapshotDiffResponse {
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
   optional SubStatus subStatus = 5;
+}
+
+message SubmitSnapshotDiffResponse {
+  optional string response = 1;
 }
 
 message CancelSnapshotDiffResponse {

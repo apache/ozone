@@ -31,6 +31,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -685,9 +688,43 @@ public class DiskBalancerService extends BackgroundService {
       bytesToMove = calculateBytesToMove(volumeUsages);
     }
 
-    return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
+    DiskBalancerInfo info = new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
         parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
         metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDataDensity);
+    info.setIdealUsage(getIdealUsage(volumeUsages));
+    info.setVolumeInfo(buildVolumeReportProto(volumeUsages));
+    return info;
+  }
+
+  /**
+   * Build a list of VolumeReportProto from a list of VolumeFixedUsage.
+   * VolumeReportProto consists of information like StorageID,
+   * volume utilization and committed bytes to the client.
+   *
+   * @param volumeSet snapshot of VolumeFixedUsage which contains the usage information of each volume
+   * @return a list of VolumeReportProto which will be sent to clients for reporting volume status
+   */
+  public static List<VolumeReportProto> buildVolumeReportProto(List<VolumeFixedUsage> volumeSet) {
+    if (volumeSet == null || volumeSet.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<VolumeReportProto> result = new ArrayList<>();
+    for (VolumeFixedUsage v : volumeSet) {
+      HddsVolume volume = v.getVolume();
+      VolumeReportProto.Builder builder = VolumeReportProto.newBuilder()
+          .setStorageId(volume.getStorageID())
+          .setTotalCapacity(v.getUsage().getCapacity())
+          .setUsedSpace(v.getUsage().getUsedSpace())
+          .setCommittedBytes(volume.getCommittedBytes())
+          .setEffectiveUsedSpace(v.getEffectiveUsed())
+          .setUtilization(v.getUtilization());
+      if (volume.getStorageDir() != null) {
+        builder.setStoragePath(volume.getStorageDir().getPath());
+      }
+      result.add(builder.build());
+    }
+    return result;
   }
 
   public long calculateBytesToMove(List<VolumeFixedUsage> inputVolumeSet) {
