@@ -899,6 +899,28 @@ STS session policy AbortMultipartUpload must require key WRITE
     ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} abort-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --upload-id ${upload_id} --profile sts
     Should Not Contain            ${output}                     AccessDenied
 
+STS session policy containing only GetObject must deny GetObjectTagging
+    ${session_policy} =           Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${ICEBERG_BUCKET_TESTFILE}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${session_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    Get Object Should Succeed     ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+STS session policy containing only PutObject must deny PutObjectTagging and DeleteObjectTagging
+    ${key_suffix} =               Generate Random String        8   [LOWER]
+    ${key} =                      Set Variable                  sts-object-${key_suffix}.txt
+    ${local_path} =               Set Variable                  ${TEMP_DIR}/${key}
+    Create File                   ${local_path}                 put-object-only policy content
+    ${put_only_policy} =          Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${key}"}]}
+
+    Assume Role And Configure STS Profile                       policy_json=${put_only_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    Put Object Should Succeed     ${ICEBERG_BUCKET_OBS}  ${key}  ${local_path}
+
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --tagging '{"TagSet":[{"Key":"tag-key1","Value":"tag-value1"}]}' --profile sts
+    Should Contain                ${output}                     AccessDenied
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
 Revoking Permanent User Must Revoke Existing Session Token
     # Create session tokens for both buckets, verify they work, then revoke permanent user secret and verify both fail.
     Assume Role And Get Temporary Credentials                   perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
