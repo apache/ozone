@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 public class OMEventListenerPluginManager {
   public static final Logger LOG = LoggerFactory.getLogger(OMEventListenerPluginManager.class);
 
-  public static final String PLUGIN_DEST_BASE = "ozone.om.plugin.destination";
+  public static final String PLUGIN_DEST_BASE = "ozone.om.plugin.destination.";
 
   private final List<OMEventListener> plugins;
 
@@ -47,13 +47,23 @@ public class OMEventListenerPluginManager {
 
   public void startAll() {
     for (OMEventListener plugin : plugins) {
-      plugin.start();
+      try {
+        plugin.start();
+      } catch (Exception ex) {
+        LOG.error("Failed to start event listener plugin {}",
+            plugin.getClass().getName(), ex);
+      }
     }
   }
 
   public void shutdownAll() {
     for (OMEventListener plugin : plugins) {
-      plugin.shutdown();
+      try {
+        plugin.shutdown();
+      } catch (Exception ex) {
+        LOG.error("Failed to shut down event listener plugin {}",
+            plugin.getClass().getName(), ex);
+      }
     }
   }
 
@@ -88,12 +98,14 @@ public class OMEventListenerPluginManager {
         Class<? extends OMEventListener> cls = resolvePluginClass(conf, destName);
         LOG.info("Event listener plugin class is {}", cls);
 
-        OMEventListener impl = cls.newInstance();
+        OMEventListener impl = cls.getDeclaredConstructor().newInstance();
         impl.initialize(conf, pluginContext);
 
         plugins.add(impl);
-      } catch (Exception ex) {
+      } catch (ReflectiveOperationException ex) {
         LOG.error("Can't make instance of event listener plugin {}{}", PLUGIN_DEST_BASE, destName, ex);
+      } catch (Exception ex) {
+        LOG.error("Failed to initialize event listener plugin {}{}", PLUGIN_DEST_BASE, destName, ex);
       }
     }
 
@@ -103,7 +115,7 @@ public class OMEventListenerPluginManager {
   private static Class<? extends OMEventListener> resolvePluginClass(OzoneConfiguration conf,
                                                                      String destName) {
     String classnameProp = PLUGIN_DEST_BASE + destName + ".classname";
-    LOG.info("Gettting classname for {} with propety {}", destName, classnameProp);
+    LOG.info("Getting classname for {} with property {}", destName, classnameProp);
     Class<? extends OMEventListener> cls = conf.getClass(classnameProp, null, OMEventListener.class);
     if (null == cls) {
       throw new RuntimeException(String.format(

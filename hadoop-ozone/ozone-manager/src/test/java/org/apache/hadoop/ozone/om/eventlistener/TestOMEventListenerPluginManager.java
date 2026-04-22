@@ -55,7 +55,7 @@ public class TestOMEventListenerPluginManager {
   }
 
   @Test
-  public void testLoadSinglePlugin() throws InterruptedException {
+  public void testLoadSinglePlugin() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.om.plugin.destination.foo", "enabled");
     conf.set("ozone.om.plugin.destination.foo.classname", "org.apache.hadoop.ozone.om.eventlistener.FooPlugin");
@@ -67,7 +67,7 @@ public class TestOMEventListenerPluginManager {
   }
 
   @Test
-  public void testLoadMultiplePlugins() throws InterruptedException {
+  public void testLoadMultiplePlugins() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.om.plugin.destination.foo", "enabled");
     conf.set("ozone.om.plugin.destination.foo.classname", "org.apache.hadoop.ozone.om.eventlistener.FooPlugin");
@@ -83,7 +83,7 @@ public class TestOMEventListenerPluginManager {
   }
 
   @Test
-  public void testPluginMissingClassname() throws InterruptedException {
+  public void testPluginMissingClassname() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.om.plugin.destination.foo", "enabled");
 
@@ -94,7 +94,7 @@ public class TestOMEventListenerPluginManager {
   }
 
   @Test
-  public void testPluginClassDoesNotExist() throws InterruptedException {
+  public void testPluginClassDoesNotExist() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.om.plugin.destination.foo", "enabled");
     conf.set("ozone.om.plugin.destination.foo.classname", "org.apache.hadoop.ozone.om.eventlistener.NotExistingPlugin");
@@ -106,10 +106,10 @@ public class TestOMEventListenerPluginManager {
   }
 
   @Test
-  public void testPluginClassDoesNotImplementInterface() throws InterruptedException {
+  public void testPluginClassDoesNotImplementInterface() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.om.plugin.destination.foo", "enabled");
-    conf.set("ozone.om.plugin.destination.foo.classname", "org.apache.hadoop.ozone.om.eventlistener.BrokenFooPlugin");
+    conf.set("ozone.om.plugin.destination.foo.classname", BrokenFooPlugin.class.getName());
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
