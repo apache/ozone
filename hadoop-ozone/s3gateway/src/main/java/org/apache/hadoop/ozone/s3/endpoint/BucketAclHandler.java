@@ -26,7 +26,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -224,6 +223,9 @@ public class BucketAclHandler extends BucketOperationHandler {
       return;
     }
 
+    Set<IAccessAuthorizer.ACLType> aclsOnBucket = S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
+    Set<IAccessAuthorizer.ACLType> aclsOnVolume = S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
+
     String[] subValues = value.split(",");
     for (String acl : subValues) {
       String[] part = acl.split("=");
@@ -240,15 +242,8 @@ public class BucketAclHandler extends BucketOperationHandler {
 
       String userId = part[1];
 
-      // Build ACL on Bucket
-      EnumSet<IAccessAuthorizer.ACLType> aclsOnBucket =
-          S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
       bucketAclList.add(OzoneAcl.of(USER, userId, DEFAULT, aclsOnBucket));
       bucketAclList.add(OzoneAcl.of(USER, userId, ACCESS, aclsOnBucket));
-
-      // Build ACL on Volume
-      EnumSet<IAccessAuthorizer.ACLType> aclsOnVolume =
-          S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
       volumeAclList.add(OzoneAcl.of(USER, userId, ACCESS, aclsOnVolume));
     }
   }
