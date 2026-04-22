@@ -180,14 +180,16 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       System.out.println(line);
     }
 
+    System.out.println();
+
     // Compose next batch's command
     if (res.hasMore()) {
       String nextBatchCmd = getCmdForNextBatch(res.getContinuationToken());
 
-      System.out.println("\n" +
-          "To get the next batch of open keys, run:\n  " + nextBatchCmd);
+      System.out.println("To get the next batch of open keys, run:");
+      System.out.println("  " + nextBatchCmd);
     } else {
-      System.out.println("\nReached the end of the list.");
+      System.out.println("Reached the end of the list.");
     }
   }
 
@@ -201,13 +203,20 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
         .append(openFileList.size())
         .append(" open files (limit ")
         .append(limit)
-        .append(") under path prefix:\n  ")
+        .append(") under path prefix:")
+        .append(System.lineSeparator())
+        .append("  ")
         .append(pathPrefix);
     if (startItem != null && !startItem.isEmpty()) {
-      sb.append("\nafter continuation token:\n  ")
+      sb.append(System.lineSeparator())
+          .append("after continuation token:")
+          .append(System.lineSeparator())
+          .append("  ")
           .append(startItem);
     }
-    sb.append("\n\nClient ID\t\t\tCreation time\t\tHsync'ed\t");
+    sb.append(System.lineSeparator())
+        .append(System.lineSeparator())
+        .append("Client ID\t\t\tCreation time\t\tHsync'ed\t");
     if (showDeleted) {
       sb.append("Deleted\t");
     }
