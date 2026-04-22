@@ -112,7 +112,6 @@ public class BucketEndpoint extends BucketOperationHandler {
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
     final String marker = queryParams().get(QueryParams.MARKER);
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
-    final int maxUploads = queryParams().getInt(QueryParams.MAX_UPLOADS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX, "");
     String startAfter = queryParams().get(QueryParams.START_AFTER);
 
@@ -123,14 +122,6 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       if (prefix == null) {
         prefix = "";
-      }
-      final String uploads = queryParams().get(QueryParams.UPLOADS);
-      if (uploads != null) {
-        context.setAction(S3GAction.LIST_MULTIPART_UPLOAD);
-        final String uploadIdMarker = queryParams().get(QueryParams.UPLOAD_ID_MARKER);
-        final String keyMarker = queryParams().get(QueryParams.KEY_MARKER);
-        return listMultipartUploads(bucketName, prefix, delimiter, encodingType,
-            keyMarker, uploadIdMarker, maxUploads);
       }
       maxKeys = validateMaxKeys(maxKeys);
 
