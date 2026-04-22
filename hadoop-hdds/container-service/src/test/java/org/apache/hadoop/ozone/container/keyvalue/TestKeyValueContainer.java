@@ -32,12 +32,14 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -63,6 +65,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -198,6 +201,32 @@ public class TestKeyValueContainer {
         ".Container File does not exist");
     assertTrue(keyValueContainer.getContainerDBFile().exists(), "Container " +
         "DB does not exist");
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testCreateContainerWithStorageType(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    HddsVolume ssdVolume = new HddsVolume.Builder(
+        new File(folder, "ssd-volume").getAbsolutePath())
+        .conf(CONF)
+        .datanodeUuid(datanodeId.toString())
+        .storageType(StorageType.SSD)
+        .build();
+    StorageVolumeUtil.checkVolume(ssdVolume, scmId, scmId, CONF, null, null);
+    hddsVolumes.add(ssdVolume);
+
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(),
+        eq(StorageType.SSD))).thenReturn(ssdVolume);
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId,
+        StorageType.SSD);
+
+    assertSame(ssdVolume, keyValueContainerData.getVolume());
+    assertEquals(StorageType.SSD, keyValueContainerData.getStorageType());
+    verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong(),
+        eq(StorageType.SSD));
   }
 
   /**
