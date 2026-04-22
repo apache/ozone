@@ -470,6 +470,7 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     @Override
+    @SuppressWarnings("checkstyle:methodlength")
     public BackgroundTaskResult call() {
       long startTime = Time.monotonicNow();
       boolean moveSucceeded = true;
@@ -556,6 +557,16 @@ public class DiskBalancerService extends BackgroundService {
         // old caller can still hold the old Container object.
         ozoneContainer.getContainerSet().updateContainer(newContainer);
         destVolume.incrementUsedSpace(containerSize);
+
+        // Test injector: ContainerSet now references newContainer while this thread still holds
+        // readLock on the old replica.
+        if (injector != null) {
+          try {
+            injector.pause();
+          } catch (IOException ex) {
+            // test-only hook
+          }
+        }
         // Mark old container as DELETED and persist state.
         // markContainerForDelete require writeLock, so release readLock first
         container.readUnlock();
