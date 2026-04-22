@@ -158,33 +158,33 @@ public class BucketAclHandler extends BucketOperationHandler {
         // Handle grants in headers
         if (grantReads != null) {
           ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantReads,
-              S3Acl.ACLType.READ.getValue()));
+              S3Acl.ACLType.READ));
           ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantReads,
-              S3Acl.ACLType.READ.getValue()));
+              S3Acl.ACLType.READ));
         }
         if (grantWrites != null) {
           ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantWrites,
-              S3Acl.ACLType.WRITE.getValue()));
+              S3Acl.ACLType.WRITE));
           ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantWrites,
-              S3Acl.ACLType.WRITE.getValue()));
+              S3Acl.ACLType.WRITE));
         }
         if (grantReadACP != null) {
           ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantReadACP,
-              S3Acl.ACLType.READ_ACP.getValue()));
+              S3Acl.ACLType.READ_ACP));
           ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantReadACP,
-              S3Acl.ACLType.READ_ACP.getValue()));
+              S3Acl.ACLType.READ_ACP));
         }
         if (grantWriteACP != null) {
           ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantWriteACP,
-              S3Acl.ACLType.WRITE_ACP.getValue()));
+              S3Acl.ACLType.WRITE_ACP));
           ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantWriteACP,
-              S3Acl.ACLType.WRITE_ACP.getValue()));
+              S3Acl.ACLType.WRITE_ACP));
         }
         if (grantFull != null) {
           ozoneAclListOnBucket.addAll(getAndConvertAclOnBucket(grantFull,
-              S3Acl.ACLType.FULL_CONTROL.getValue()));
+              S3Acl.ACLType.FULL_CONTROL));
           ozoneAclListOnVolume.addAll(getAndConvertAclOnVolume(grantFull,
-              S3Acl.ACLType.FULL_CONTROL.getValue()));
+              S3Acl.ACLType.FULL_CONTROL));
         }
       }
 
@@ -229,7 +229,7 @@ public class BucketAclHandler extends BucketOperationHandler {
    * Example: x-amz-grant-write: id="111122223333", id="555566667777"
    */
   private List<OzoneAcl> getAndConvertAclOnBucket(
-      String value, String permission) throws OS3Exception {
+      String value, S3Acl.ACLType permission) throws OS3Exception {
     return parseAndConvertAcl(value, permission, true);
   }
 
@@ -237,7 +237,7 @@ public class BucketAclHandler extends BucketOperationHandler {
    * Convert ACL string to Ozone ACL on volume.
    */
   private List<OzoneAcl> getAndConvertAclOnVolume(
-      String value, String permission) throws OS3Exception {
+      String value, S3Acl.ACLType permission) throws OS3Exception {
     return parseAndConvertAcl(value, permission, false);
   }
 
@@ -254,7 +254,7 @@ public class BucketAclHandler extends BucketOperationHandler {
    * @throws OS3Exception if parsing fails or grantee type is not supported
    */
   private List<OzoneAcl> parseAndConvertAcl(
-      String value, String permission, boolean isBucket) throws OS3Exception {
+      String value, S3Acl.ACLType permission, boolean isBucket) throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     if (StringUtils.isEmpty(value)) {
       return ozoneAclList;

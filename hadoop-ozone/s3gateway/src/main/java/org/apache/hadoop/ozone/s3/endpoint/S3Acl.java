@@ -225,7 +225,11 @@ public final class S3Acl {
           grant.getGrantee().getXsiType());
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
-        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permission);
+        ACLType permissionType = ACLType.getType(permission);
+        if (permissionType == null) {
+          throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
+        }
+        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permissionType);
         OzoneAcl defaultOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.DEFAULT, acls
@@ -246,12 +250,8 @@ public final class S3Acl {
     return ozoneAclList;
   }
 
-  public static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnBucketFromS3Permission(String permission)
+  static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnBucketFromS3Permission(ACLType permissionType)
       throws OS3Exception {
-    ACLType permissionType = ACLType.getType(permission);
-    if (permissionType == null) {
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
-    }
     EnumSet<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
     switch (permissionType) {
     case FULL_CONTROL:
@@ -273,8 +273,8 @@ public final class S3Acl {
       acls.add(IAccessAuthorizer.ACLType.LIST);
       break;
     default:
-      LOG.error("Failed to recognize S3 permission {}", permission);
-      throw S3ErrorTable.newError(INVALID_ARGUMENT, permission);
+      LOG.error("Failed to recognize S3 permission {}", permissionType);
+      throw S3ErrorTable.newError(INVALID_ARGUMENT, permissionType.name());
     }
     return acls;
   }
@@ -289,7 +289,11 @@ public final class S3Acl {
           grant.getGrantee().getXsiType());
       if (identityType != null && identityType.isSupported()) {
         String permission = grant.getPermission();
-        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permission);
+        ACLType permissionType = ACLType.getType(permission);
+        if (permissionType == null) {
+          throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
+        }
+        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permissionType);
         OzoneAcl accessOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
@@ -306,13 +310,9 @@ public final class S3Acl {
   }
 
   // User privilege on volume follows the "lest privilege" principle.
-  public static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnVolumeFromS3Permission(String permission)
+  static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnVolumeFromS3Permission(ACLType permissionType)
       throws OS3Exception {
     EnumSet<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
-    ACLType permissionType = ACLType.getType(permission);
-    if (permissionType == null) {
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
-    }
     switch (permissionType) {
     case FULL_CONTROL:
       acls.add(IAccessAuthorizer.ACLType.READ);
@@ -337,8 +337,8 @@ public final class S3Acl {
       acls.add(IAccessAuthorizer.ACLType.READ);
       break;
     default:
-      LOG.error("Failed to recognize S3 permission {}", permission);
-      throw S3ErrorTable.newError(INVALID_ARGUMENT, permission);
+      LOG.error("Failed to recognize S3 permission {}", permissionType);
+      throw S3ErrorTable.newError(INVALID_ARGUMENT, permissionType.name());
     }
     return acls;
   }
