@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grantee;
@@ -227,7 +228,7 @@ public final class S3Acl {
         );
         ozoneAclListOnVolume.add(volumeAcl);
 
-        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permissionType);
+        Set<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permissionType);
         OzoneAcl defaultOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.DEFAULT, acls
@@ -247,9 +248,9 @@ public final class S3Acl {
     }
   }
 
-  static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnBucketFromS3Permission(ACLType permissionType)
+  static Set<IAccessAuthorizer.ACLType> getOzoneAclOnBucketFromS3Permission(ACLType permissionType)
       throws OS3Exception {
-    EnumSet<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
+    Set<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
     switch (permissionType) {
     case FULL_CONTROL:
       acls.add(IAccessAuthorizer.ACLType.ALL);
@@ -277,9 +278,9 @@ public final class S3Acl {
   }
 
   // User privilege on volume follows the "lest privilege" principle.
-  static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnVolumeFromS3Permission(ACLType permissionType)
+  static Set<IAccessAuthorizer.ACLType> getOzoneAclOnVolumeFromS3Permission(ACLType permissionType)
       throws OS3Exception {
-    EnumSet<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
+    Set<IAccessAuthorizer.ACLType> acls = EnumSet.noneOf(IAccessAuthorizer.ACLType.class);
     switch (permissionType) {
     case FULL_CONTROL:
       acls.add(IAccessAuthorizer.ACLType.READ);
