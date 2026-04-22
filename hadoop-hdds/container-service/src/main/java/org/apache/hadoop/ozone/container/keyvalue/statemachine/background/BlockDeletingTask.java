@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -139,24 +140,38 @@ public class BlockDeletingTask implements BackgroundTask {
 
   private ContainerBackgroundTaskResult handleDeleteTask() throws Exception {
     ContainerBackgroundTaskResult crr;
-    final Container container = ozoneContainer.getContainerSet()
-        .getContainer(containerData.getContainerID());
+    ContainerSet cs = ozoneContainer.getContainerSet();
+    final Container container = cs.getContainer(containerData.getContainerID());
+    if (container == null) {
+      return new ContainerBackgroundTaskResult();
+    }
     container.writeLock();
-    File dataDir = new File(containerData.getChunksPath());
-    long startTime = Time.monotonicNow();
-    // Scan container's db and get list of under deletion blocks
-    try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
-      if (containerData.hasSchema(SCHEMA_V1)) {
-        crr = deleteViaSchema1(meta, container, dataDir, startTime);
-      } else if (containerData.hasSchema(SCHEMA_V2)) {
-        crr = deleteViaSchema2(meta, container, dataDir, startTime);
-      } else if (containerData.hasSchema(SCHEMA_V3)) {
-        crr = deleteViaSchema3(meta, container, dataDir, startTime);
-      } else {
-        throw new UnsupportedOperationException(
-            "Only schema version 1,2,3 are supported.");
+    try {
+      // Re-fetch AFTER lock to verify the container is not having stale references while waiting for lock.
+      Container<?> current = cs.getContainer(containerData.getContainerID());
+      if (current == null || current.getContainerData() != containerData) {
+        LOG.warn("Container {} reference is stale. Aborting delete. SCM will retry with" +
+            " the current replica.", containerData.getContainerID());
+        return new ContainerBackgroundTaskResult();
       }
-      return crr;
+
+      File dataDir = new File(containerData.getChunksPath());
+      long startTime = Time.monotonicNow();
+      // Scan container's db and get list of under deletion blocks
+      try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
+        if (containerData.hasSchema(SCHEMA_V1)) {
+          crr = deleteViaSchema1(meta, container, dataDir, startTime);
+        } else if (containerData.hasSchema(SCHEMA_V2)) {
+          crr = deleteViaSchema2(meta, container, dataDir, startTime);
+        } else if (containerData.hasSchema(SCHEMA_V3)) {
+          crr = deleteViaSchema3(meta, container, dataDir, startTime);
+        } else {
+          throw new UnsupportedOperationException(
+              "Only schema version 1,2,3 are supported.");
+        }
+        return crr;
+
+      }
     } finally {
       container.writeUnlock();
     }

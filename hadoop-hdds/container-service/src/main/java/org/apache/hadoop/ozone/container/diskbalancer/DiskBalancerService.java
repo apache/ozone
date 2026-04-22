@@ -484,23 +484,23 @@ public class DiskBalancerService extends BackgroundService {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
 
-      // Double check container state before acquiring lock to start move process.
-      // Container state may have changed after selection. Only CLOSED containers can be moved.
-      // QUASI_CLOSED is allowed when test mode is enabled, this is done to test in production
-      // these containers are rejected.
-      State containerState = container.getContainerData().getState();
-      boolean isTestMode = DefaultContainerChoosingPolicy.isTest();
-      if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
-        LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
-            containerId, containerState);
-        postCall(false, startTime);
-        return BackgroundTaskResult.EmptyTaskResult.newResult();
-      }
-
       // hold read lock on the container first, to avoid other threads to update the container state,
       // such as block deletion.
       container.readLock();
       try {
+        // Double check container state after acquiring lock to start move process.
+        // Container state may have changed after selection. Only CLOSED containers can be moved.
+        // QUASI_CLOSED is allowed when test mode is enabled, this is done to test in production
+        // these containers are rejected.
+        State containerState = container.getContainerData().getState();
+        boolean isTestMode = DefaultContainerChoosingPolicy.isTest();
+        if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
+          LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
+              containerId, containerState);
+          postCall(false, startTime);
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        }
+
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
             .resolve(String.valueOf(containerId));

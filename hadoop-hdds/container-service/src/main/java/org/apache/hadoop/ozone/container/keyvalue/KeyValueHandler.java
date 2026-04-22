@@ -2296,6 +2296,15 @@ public class KeyValueHandler extends Handler {
     long startTime = clock.millis();
     container.writeLock();
     try {
+      // Re-fetch AFTER lock to verify the container is not having stale references while waiting for lock.
+      long containerId = container.getContainerData().getContainerID();
+      Container<?> current = containerSet.getContainer(containerId);
+      if (current == null || current != container) {
+        LOG.warn("Container {} reference is stale. Aborting delete." +
+            " SCM will retry with the current replica.", containerId);
+        return;
+      }
+
       final ContainerData data = container.getContainerData();
       if (container.getContainerData().getVolume().isFailed()) {
         // if the  volume in which the container resides fails
@@ -2354,7 +2363,6 @@ public class KeyValueHandler extends Handler {
             return;
           }
           container.markContainerForDelete();
-          long containerId = container.getContainerData().getContainerID();
           containerSet.removeContainer(containerId);
           ContainerLogger.logDeleted(container.getContainerData(), force);
           KeyValueContainerUtil.removeContainer(keyValueContainerData, conf);
