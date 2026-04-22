@@ -149,10 +149,7 @@ public class BucketAclHandler extends BucketOperationHandler {
           && grantWriteACP == null && grantFull == null) {
         // Handle grants in body
         S3BucketAcl putBucketAclRequest = UNMARSHALLER.get().readFrom(body);
-        ozoneAclListOnBucket.addAll(
-            S3Acl.s3AclToOzoneNativeAclOnBucket(putBucketAclRequest));
-        ozoneAclListOnVolume.addAll(
-            S3Acl.s3AclToOzoneNativeAclOnVolume(putBucketAclRequest));
+        S3Acl.s3AclToOzoneNativeAcl(putBucketAclRequest, ozoneAclListOnVolume, ozoneAclListOnBucket);
       } else {
         // Handle grants in headers
         if (grantReads != null) {

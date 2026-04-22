@@ -205,9 +205,9 @@ public final class S3Acl {
     return grantList;
   }
 
-  public static List<OzoneAcl> s3AclToOzoneNativeAclOnBucket(
-      S3BucketAcl bucketAcl) throws OS3Exception {
-    List<OzoneAcl> ozoneAclList = new ArrayList<>();
+  static void s3AclToOzoneNativeAcl(
+      S3BucketAcl bucketAcl, List<OzoneAcl> ozoneAclListOnVolume, List<OzoneAcl> ozoneAclListOnBucket
+  ) throws OS3Exception {
     List<Grant> grantList = bucketAcl.getAclList().getGrantList();
     for (Grant grant : grantList) {
       //  Only "CanonicalUser" is supported, which maps to Ozone "USER"
@@ -219,6 +219,14 @@ public final class S3Acl {
         if (permissionType == null) {
           throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
         }
+
+        OzoneAcl volumeAcl = OzoneAcl.of(
+            IAccessAuthorizer.ACLIdentityType.USER,
+            grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS,
+            getOzoneAclOnVolumeFromS3Permission(permissionType)
+        );
+        ozoneAclListOnVolume.add(volumeAcl);
+
         EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnBucketFromS3Permission(permissionType);
         OzoneAcl defaultOzoneAcl = OzoneAcl.of(
             IAccessAuthorizer.ACLIdentityType.USER,
@@ -228,8 +236,8 @@ public final class S3Acl {
             IAccessAuthorizer.ACLIdentityType.USER,
             grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
         );
-        ozoneAclList.add(defaultOzoneAcl);
-        ozoneAclList.add(accessOzoneAcl);
+        ozoneAclListOnBucket.add(defaultOzoneAcl);
+        ozoneAclListOnBucket.add(accessOzoneAcl);
       } else {
         LOG.error("Grantee type {} is not supported",
             grant.getGrantee().getXsiType());
@@ -237,7 +245,6 @@ public final class S3Acl {
             grant.getGrantee().getXsiType());
       }
     }
-    return ozoneAclList;
   }
 
   static EnumSet<IAccessAuthorizer.ACLType> getOzoneAclOnBucketFromS3Permission(ACLType permissionType)
@@ -267,36 +274,6 @@ public final class S3Acl {
       throw S3ErrorTable.newError(INVALID_ARGUMENT, permissionType.name());
     }
     return acls;
-  }
-
-  public static List<OzoneAcl> s3AclToOzoneNativeAclOnVolume(
-      S3BucketAcl bucketAcl) throws OS3Exception {
-    List<OzoneAcl> ozoneAclList = new ArrayList<>();
-    List<Grant> grantList = bucketAcl.getAclList().getGrantList();
-    for (Grant grant : grantList) {
-      //  Only "CanonicalUser" is supported, which maps to Ozone "USER"
-      ACLIdentityType identityType = ACLIdentityType.getTypeFromGranteeType(
-          grant.getGrantee().getXsiType());
-      if (identityType != null && identityType.isSupported()) {
-        String permission = grant.getPermission();
-        ACLType permissionType = ACLType.getType(permission);
-        if (permissionType == null) {
-          throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, permission);
-        }
-        EnumSet<IAccessAuthorizer.ACLType> acls = getOzoneAclOnVolumeFromS3Permission(permissionType);
-        OzoneAcl accessOzoneAcl = OzoneAcl.of(
-            IAccessAuthorizer.ACLIdentityType.USER,
-            grant.getGrantee().getId(), OzoneAcl.AclScope.ACCESS, acls
-        );
-        ozoneAclList.add(accessOzoneAcl);
-      } else {
-        LOG.error("Grantee type {} is not supported",
-            grant.getGrantee().getXsiType());
-        throw S3ErrorTable.newError(NOT_IMPLEMENTED,
-            grant.getGrantee().getXsiType());
-      }
-    }
-    return ozoneAclList;
   }
 
   // User privilege on volume follows the "lest privilege" principle.
