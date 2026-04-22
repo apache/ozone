@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#checks:skipped
+#checks:skipped HDDS-10150
 
 set -u -o pipefail
 
