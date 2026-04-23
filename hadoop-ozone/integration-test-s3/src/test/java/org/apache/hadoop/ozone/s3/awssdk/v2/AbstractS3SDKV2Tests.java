@@ -1109,6 +1109,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     software.amazon.awssdk.services.s3.model.LifecycleRule rule4 =
         software.amazon.awssdk.services.s3.model.LifecycleRule.builder()
             .id("abort-incomplete-mpu-no-filter")
+            .prefix("")
             .status(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED)
             .abortIncompleteMultipartUpload(
                 software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload.builder()
@@ -1156,6 +1157,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     software.amazon.awssdk.services.s3.model.LifecycleRule retrievedRule4 = rules.get(3);
     assertEquals("abort-incomplete-mpu-no-filter", retrievedRule4.id());
+    assertEquals("", retrievedRule4.prefix());
     assertEquals(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED, retrievedRule4.status());
     assertEquals(30, retrievedRule4.abortIncompleteMultipartUpload().daysAfterInitiation());
   }
