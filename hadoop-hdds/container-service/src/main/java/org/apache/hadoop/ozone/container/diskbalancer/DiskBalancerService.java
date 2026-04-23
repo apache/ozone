@@ -498,7 +498,7 @@ public class DiskBalancerService extends BackgroundService {
         if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
           LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
               containerId, containerState);
-          postCall(false, startTime);
+          moveSucceeded = false;
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
 
