@@ -77,7 +77,10 @@ public abstract class TestOzoneManagerHA {
   private static OzoneConfiguration conf;
   private static String omServiceId;
   private static int numOfOMs = 3;
-  private static final int LOG_PURGE_GAP = 50;
+  // Large enough that 100-volume tests do not cross the purge boundary,
+  // preventing unintended snapshot-install cycles in HA tests. Only
+  // testOMRestart deliberately creates enough entries to exceed this.
+  private static final int LOG_PURGE_GAP = 500;
   /* Reduce max number of retries to speed up unit test. */
   private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
