@@ -386,7 +386,9 @@ public abstract class BaseHttpServer implements AutoCloseable {
             sslConf.get(HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE,
                 HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE_DEFAULT))
         .excludeCiphers(
-            sslConf.get("ssl.server.exclude.cipher.list"));
+            sslConf.get("ssl.server.exclude.cipher.list"))
+        .includeCiphers(
+            sslConf.get("ssl.server.include.cipher.list"));
   }
 
   /**
