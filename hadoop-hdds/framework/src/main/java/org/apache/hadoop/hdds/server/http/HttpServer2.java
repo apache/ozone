@@ -593,35 +593,18 @@ public final class HttpServer2 implements FilterContainer {
       return conn;
     }
 
-    private void setEnabledProtocols(
-        SslContextFactory sslContextFactory) {
-      String enabledProtocols = conf.get(
-          SSLFactory.SSL_ENABLED_PROTOCOLS_KEY,
-          SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT);
-      if (!enabledProtocols.equals(
-          SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT)) {
-        String[] jettyExcludedProtocols =
-            sslContextFactory.getExcludeProtocols();
-        String[] enabledProtocolsArray =
-            StringUtils.getTrimmedStrings(enabledProtocols);
-        List<String> enabledProtocolsList =
-            Arrays.asList(enabledProtocolsArray);
+    private void setEnabledProtocols(SslContextFactory sslContextFactory) {
+      String enabledProtocols =
+          conf.get(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT);
+      if (!enabledProtocols.equals(SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT)) {
+        List<String> originalExcludedProtocols = Arrays.asList(sslContextFactory.getExcludeProtocols());
+        String[] enabledProtocolsArray = StringUtils.getTrimmedStrings(enabledProtocols);
 
-        List<String> resetExcludedProtocols = new ArrayList<>();
-        for (String jettyExcludedProtocol : jettyExcludedProtocols) {
-          if (!enabledProtocolsList.contains(jettyExcludedProtocol)) {
-            resetExcludedProtocols.add(jettyExcludedProtocol);
-          } else {
-            LOG.debug("Removed {} from exclude protocol list",
-                jettyExcludedProtocol);
-          }
-        }
+        List<String> finalExcludedProtocols = new ArrayList<>(originalExcludedProtocols);
+        finalExcludedProtocols.removeAll(Arrays.asList(enabledProtocolsArray));
 
-        sslContextFactory.setExcludeProtocols(
-            resetExcludedProtocols.toArray(new String[0]));
-        LOG.info("Reset exclude protocol list: {}",
-            resetExcludedProtocols);
-
+        sslContextFactory.setExcludeProtocols(finalExcludedProtocols.toArray(new String[0]));
+        LOG.info("Disabled protocols: {}", finalExcludedProtocols);
         sslContextFactory.setIncludeProtocols(enabledProtocolsArray);
         LOG.info("Enabled protocols: {}", enabledProtocols);
       }
