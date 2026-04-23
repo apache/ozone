@@ -566,8 +566,6 @@ public class TestBucketList {
 
   @Test
   public void listMultipartUploadsWithDelimiter() throws OS3Exception, IOException {
-    BucketEndpoint getBucket = new BucketEndpoint();
-
     OzoneClient ozoneClient = createClientWithMultipartUploads(
         "dir1/file1",
         "dir1/file2",
@@ -575,12 +573,12 @@ public class TestBucketList {
         "file4"
     );
 
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+    endpoint.queryParamsForTest().set(QueryParams.UPLOADS, "");
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
 
     ListMultipartUploadsResult result =
-        (ListMultipartUploadsResult) getBucket.get("b1", "/", null, null, 100,
-            "", null, null, "uploads", null, null, null, 1000).getEntity();
+        (ListMultipartUploadsResult) endpoint.get("b1").getEntity();
 
     // With delimiter="/", should have 2 CommonPrefixes (dir1/, dir2/) and 1 Upload (file4)
     assertEquals(2, result.getCommonPrefixes().size());
@@ -592,8 +590,6 @@ public class TestBucketList {
 
   @Test
   public void listMultipartUploadsWithDelimiterAndPrefix() throws OS3Exception, IOException {
-    BucketEndpoint getBucket = new BucketEndpoint();
-
     OzoneClient ozoneClient = createClientWithMultipartUploads(
         "test/dir1/file1",
         "test/dir1/file2",
@@ -601,12 +597,13 @@ public class TestBucketList {
         "test/file4"
     );
 
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+    endpoint.queryParamsForTest().set(QueryParams.UPLOADS, "");
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "test/");
 
     ListMultipartUploadsResult result =
-        (ListMultipartUploadsResult) getBucket.get("b1", "/", null, null, 100,
-            "test/", null, null, "uploads", null, null, null, 1000).getEntity();
+        (ListMultipartUploadsResult) endpoint.get("b1").getEntity();
 
     // With prefix="test/" and delimiter="/", should have 2 CommonPrefixes and 1 Upload
     assertEquals(2, result.getCommonPrefixes().size());
@@ -619,8 +616,6 @@ public class TestBucketList {
   @Test
   public void listMultipartUploadsWithDelimiterAndPagination()
       throws OS3Exception, IOException {
-    BucketEndpoint getBucket = new BucketEndpoint();
-
     OzoneClient ozoneClient = createClientWithMultipartUploads(
         "test/dir1/file1",
         "test/dir1/file2",
@@ -632,15 +627,17 @@ public class TestBucketList {
         "test/file8"
     );
 
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
-
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
     int maxUploads = 2;
 
     // First page: should get 2 CommonPrefixes (dir1/, dir2/)
+    endpoint.queryParamsForTest().set(QueryParams.UPLOADS, "");
+    endpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    endpoint.queryParamsForTest().set(QueryParams.PREFIX, "test/");
+    endpoint.queryParamsForTest().setInt(QueryParams.MAX_UPLOADS, maxUploads);
+
     ListMultipartUploadsResult result =
-        (ListMultipartUploadsResult) getBucket.get("b1", "/", null, null, 100,
-            "test/", null, null, "uploads", null, null, null, maxUploads).getEntity();
+        (ListMultipartUploadsResult) endpoint.get("b1").getEntity();
 
     assertEquals(2, result.getCommonPrefixes().size());
     assertEquals("test/dir1/", result.getCommonPrefixes().get(0).getPrefix().getName());
@@ -650,9 +647,10 @@ public class TestBucketList {
     assertNotNull(result.getNextKeyMarker());
 
     // Second page: should get 1 CommonPrefix (dir3/) and 1 Upload (file8)
-    result = (ListMultipartUploadsResult) getBucket.get("b1", "/", null, null, 100,
-        "test/", null, null, "uploads", null,
-        result.getNextKeyMarker().getName(), result.getNextUploadIdMarker(), maxUploads).getEntity();
+    endpoint.queryParamsForTest().set(QueryParams.KEY_MARKER, result.getNextKeyMarker().getName());
+    endpoint.queryParamsForTest().set(QueryParams.UPLOAD_ID_MARKER, result.getNextUploadIdMarker());
+
+    result = (ListMultipartUploadsResult) endpoint.get("b1").getEntity();
     assertEquals(1, result.getCommonPrefixes().size());
     assertEquals("test/dir3/", result.getCommonPrefixes().get(0).getPrefix().getName());
     assertEquals(1, result.getUploads().size());
@@ -662,8 +660,6 @@ public class TestBucketList {
 
   @Test
   public void listMultipartUploadsWithoutDelimiter() throws OS3Exception, IOException {
-    BucketEndpoint getBucket = new BucketEndpoint();
-
     OzoneClient ozoneClient = createClientWithMultipartUploads(
         "dir1/file1",
         "dir1/file2",
@@ -671,13 +667,12 @@ public class TestBucketList {
         "file4"
     );
 
-    getBucket.setClient(ozoneClient);
-    getBucket.setRequestIdentifier(new RequestIdentifier());
+    BucketEndpoint endpoint = newBucketEndpointBuilder().setClient(ozoneClient).build();
+    endpoint.queryParamsForTest().set(QueryParams.UPLOADS, "");
 
     // Without delimiter, all uploads should be returned as individual Upload entries
     ListMultipartUploadsResult result =
-        (ListMultipartUploadsResult) getBucket.get("b1", null, null, null, 100,
-            "", null, null, "uploads", null, null, null, 1000).getEntity();
+        (ListMultipartUploadsResult) endpoint.get("b1").getEntity();
 
     assertEquals(0, result.getCommonPrefixes().size());
     assertEquals(4, result.getUploads().size());
