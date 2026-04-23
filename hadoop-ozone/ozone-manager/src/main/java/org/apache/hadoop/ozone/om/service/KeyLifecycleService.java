@@ -267,6 +267,8 @@ public class KeyLifecycleService extends BackgroundService {
     private long numKeyRenamed = 0;
     private long sizeKeyRenamed = 0;
     private long numDirRenamed = 0;
+    private long numMultipartUploadIterated = 0;
+    private long numMultipartUploadAborted = 0;
 
     public LifecycleActionTask(OmLifecycleConfiguration lcConfig) {
       this.policy = lcConfig;
@@ -787,6 +789,7 @@ public class KeyLifecycleService extends BackgroundService {
 
           Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
           OmMultipartKeyInfo mpuKeyInfo = entry.getValue();
+          numMultipartUploadIterated++;
 
           // Extract multipart upload information from the key
           OmMultipartUpload upload = OmMultipartUpload.from(entry.getKey());
@@ -884,6 +887,8 @@ public class KeyLifecycleService extends BackgroundService {
 
         if (response != null) {
           if (response.getSuccess()) {
+            numMultipartUploadAborted += expiredUploads.size();
+
             LOG.info("Successfully aborted {} multipart uploads for bucket {}/{} in {} ns",
                 expiredUploads.size(), volumeName, bucketName, endTime - startTime);
           } else {
@@ -943,6 +948,7 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incrNumFailureTask();
       metrics.incNumKeyIterated(numKeyIterated);
       metrics.incNumDirIterated(numDirIterated);
+      metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
     }
 
     private void onSuccess(String bucketName) {
@@ -952,9 +958,13 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incTaskLatencyMs(timeSpent);
       metrics.incNumKeyIterated(numKeyIterated);
       metrics.incNumDirIterated(numDirIterated);
+      metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
+      metrics.incNumMultipartUploadAborted(numMultipartUploadAborted);
       LOG.info("Spend {} ms on bucket {} to iterate {} keys and {} dirs, deleted {} keys with {} bytes, " +
-          "and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash", timeSpent, bucketName, numKeyIterated,
-          numDirIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted, numKeyRenamed, sizeKeyRenamed, numDirRenamed);
+          "and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash" +
+          "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
+          numDirIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted, numKeyRenamed, sizeKeyRenamed, numDirRenamed,
+          numMultipartUploadAborted);
     }
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList, boolean dir) {
