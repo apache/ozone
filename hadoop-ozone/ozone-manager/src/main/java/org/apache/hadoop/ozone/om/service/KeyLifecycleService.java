@@ -776,7 +776,7 @@ public class KeyLifecycleService extends BackgroundService {
 
       LOG.debug("Processing AbortIncompleteMultipartUpload actions for bucket {}/{}", volumeName, bucketName);
 
-      List<OmMultipartUpload> expiredUploads = new ArrayList<>();
+      LimitedSizeList<OmMultipartUpload> expiredUploads = new LimitedSizeList<>(listMaxSize);
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
                omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
@@ -807,6 +807,12 @@ public class KeyLifecycleService extends BackgroundService {
           // Check each rule to see if this upload should be aborted
           for (OmLCRule rule : mpuRules) {
             if (shouldAbortUpload(upload, keyName, rule)) {
+              if (expiredUploads.isFull()) {
+                LOG.info("Multipart upload list reached batch size {}, aborting current batch for bucket {}/{}",
+                    listMaxSize, volumeName, bucketName);
+                abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+              }
+
               expiredUploads.add(upload);
               LOG.debug("Multipart upload {}/{}/{} with uploadId {} will be aborted",
                   volumeName, bucketName, keyName, upload.getUploadId());
@@ -820,9 +826,9 @@ public class KeyLifecycleService extends BackgroundService {
       }
 
       if (!expiredUploads.isEmpty()) {
-        LOG.info("{} expired multipart uploads found for bucket {}/{}",
+        LOG.info("{} expired multipart uploads remaining for bucket {}/{}",
             expiredUploads.size(), volumeName, bucketName);
-        abortExpiredMultipartUploads(bucketInfo, expiredUploads);
+        abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
       }
     }
 
@@ -913,6 +919,21 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
+    private void abortExpiredMultipartUploadsAndClear(OmBucketInfo bucketInfo,
+                                                      LimitedSizeList<OmMultipartUpload> expiredUploads) {
+      if (expiredUploads.isEmpty()) {
+        return;
+      }
+
+      List<OmMultipartUpload> uploadList = new ArrayList<>();
+      for(int i = 0; i < expiredUploads.size(); i++) {
+        uploadList.add(expiredUploads.get(i));
+      }
+
+      abortExpiredMultipartUploads(bucketInfo, uploadList);
+      expiredUploads.clear();
+    }
+
     /**
      * If prefix is /dir1/dir2, but dir1 doesn't exist, then it will return exception.
      * If prefix is /dir1/dir2, but dir2 doesn't exist, then it will return a list with dir1 only.
@@ -968,11 +989,11 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incNumDirIterated(numDirIterated);
       metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
       metrics.incNumMultipartUploadAborted(numMultipartUploadAborted);
-      LOG.info("Spend {} ms on bucket {} to iterate {} keys and {} dirs, deleted {} keys with {} bytes, " +
-          "and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash" +
-          "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
-          numDirIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted, numKeyRenamed, sizeKeyRenamed, numDirRenamed,
-          numMultipartUploadAborted);
+      LOG.info("Spend {} ms on bucket {} to iterate {} keys and {} dirs and {} multipart uploads, " +
+              "deleted {} keys with {} bytes, and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash, " +
+              "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
+          numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
+          numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
     }
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList, boolean dir) {
