@@ -414,7 +414,7 @@ public class OzoneConfiguration extends Configuration implements MutableConfigur
         new DeprecationDelta("hdds.recon.heartbeat.interval",
             HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL),
         new DeprecationDelta("hdds.tracing.enabled",
-            "ozone.tracing.enabled"),
+            "ozone.tracing.mode"),
     });
   }
 
