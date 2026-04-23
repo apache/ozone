@@ -1061,6 +1061,105 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(content, snapshotResponse.asUtf8String());
   }
 
+  @Test
+  public void testGetLifecycleWithAbortIncompleteMultipartUpload() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    software.amazon.awssdk.services.s3.model.LifecycleRule rule1 =
+        software.amazon.awssdk.services.s3.model.LifecycleRule.builder()
+            .id("abort-incomplete-mpu-with-prefix")
+            .prefix("uploads/")
+            .status(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED)
+            .abortIncompleteMultipartUpload(
+                software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload.builder()
+                    .daysAfterInitiation(7)
+                    .build())
+            .build();
+
+    software.amazon.awssdk.services.s3.model.LifecycleRule rule2 =
+        software.amazon.awssdk.services.s3.model.LifecycleRule.builder()
+            .id("abort-incomplete-mpu-with-tag")
+            .filter(software.amazon.awssdk.services.s3.model.LifecycleRuleFilter.builder()
+                .tag(Tag.builder().key("env").value("dev").build())
+                .build())
+            .status(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED)
+            .abortIncompleteMultipartUpload(
+                software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload.builder()
+                    .daysAfterInitiation(14)
+                    .build())
+            .build();
+
+    software.amazon.awssdk.services.s3.model.LifecycleRule rule3 =
+        software.amazon.awssdk.services.s3.model.LifecycleRule.builder()
+            .id("abort-incomplete-mpu-with-and-operator")
+            .filter(software.amazon.awssdk.services.s3.model.LifecycleRuleFilter.builder()
+                .and(software.amazon.awssdk.services.s3.model.LifecycleRuleAndOperator.builder()
+                    .prefix("temp/")
+                    .tags(Tag.builder().key("type").value("temporary").build())
+                    .build())
+                .build())
+            .status(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED)
+            .abortIncompleteMultipartUpload(
+                software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload.builder()
+                    .daysAfterInitiation(3)
+                    .build())
+            .build();
+
+    software.amazon.awssdk.services.s3.model.LifecycleRule rule4 =
+        software.amazon.awssdk.services.s3.model.LifecycleRule.builder()
+            .id("abort-incomplete-mpu-no-filter")
+            .status(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED)
+            .abortIncompleteMultipartUpload(
+                software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload.builder()
+                    .daysAfterInitiation(30)
+                    .build())
+            .build();
+
+    software.amazon.awssdk.services.s3.model.BucketLifecycleConfiguration configuration =
+        software.amazon.awssdk.services.s3.model.BucketLifecycleConfiguration.builder()
+            .rules(rule1, rule2, rule3, rule4)
+            .build();
+
+    s3Client.putBucketLifecycleConfiguration(b -> b
+        .bucket(bucketName)
+        .lifecycleConfiguration(configuration));
+
+    software.amazon.awssdk.services.s3.model.GetBucketLifecycleConfigurationResponse response =
+        s3Client.getBucketLifecycleConfiguration(b -> b.bucket(bucketName));
+
+    List<software.amazon.awssdk.services.s3.model.LifecycleRule> rules = response.rules();
+    assertEquals(4, rules.size());
+
+    software.amazon.awssdk.services.s3.model.LifecycleRule retrievedRule1 = rules.get(0);
+    assertEquals("abort-incomplete-mpu-with-prefix", retrievedRule1.id());
+    assertEquals("uploads/", retrievedRule1.prefix());
+    assertEquals(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED, retrievedRule1.status());
+    assertEquals(7, retrievedRule1.abortIncompleteMultipartUpload().daysAfterInitiation());
+
+    software.amazon.awssdk.services.s3.model.LifecycleRule retrievedRule2 = rules.get(1);
+    assertEquals("abort-incomplete-mpu-with-tag", retrievedRule2.id());
+    assertEquals(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED, retrievedRule2.status());
+    assertEquals(14, retrievedRule2.abortIncompleteMultipartUpload().daysAfterInitiation());
+    assertEquals("env", retrievedRule2.filter().tag().key());
+    assertEquals("dev", retrievedRule2.filter().tag().value());
+
+    software.amazon.awssdk.services.s3.model.LifecycleRule retrievedRule3 = rules.get(2);
+    assertEquals("abort-incomplete-mpu-with-and-operator", retrievedRule3.id());
+    assertEquals(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED, retrievedRule3.status());
+    assertEquals(3, retrievedRule3.abortIncompleteMultipartUpload().daysAfterInitiation());
+    assertEquals("temp/", retrievedRule3.filter().and().prefix());
+    assertEquals(1, retrievedRule3.filter().and().tags().size());
+    Tag andTag = retrievedRule3.filter().and().tags().get(0);
+    assertEquals("type", andTag.key());
+    assertEquals("temporary", andTag.value());
+    
+    software.amazon.awssdk.services.s3.model.LifecycleRule retrievedRule4 = rules.get(3);
+    assertEquals("abort-incomplete-mpu-no-filter", retrievedRule4.id());
+    assertEquals(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED, retrievedRule4.status());
+    assertEquals(30, retrievedRule4.abortIncompleteMultipartUpload().daysAfterInitiation());
+  }
+
   private String getBucketName() {
     return getBucketName("");
   }

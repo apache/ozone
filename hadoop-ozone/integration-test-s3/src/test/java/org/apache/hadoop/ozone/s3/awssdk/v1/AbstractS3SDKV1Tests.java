@@ -33,6 +33,7 @@ import com.amazonaws.AmazonServiceException;
 import com.amazonaws.AmazonServiceException.ErrorType;
 import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.AbortIncompleteMultipartUpload;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.Bucket;
@@ -1205,6 +1206,68 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     BucketLifecycleConfiguration configFromRequest =
         s3Client.getBucketLifecycleConfiguration(getRequest);
     assertEquals(retrievedConfig.getRules().size(), configFromRequest.getRules().size());
+  }
+
+  @Test
+  public void testGetLifecycleWithAbortIncompleteMultipartUpload() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();
+    List<BucketLifecycleConfiguration.Rule> rules = new ArrayList<>();
+
+    BucketLifecycleConfiguration.Rule rule1 = new BucketLifecycleConfiguration.Rule()
+        .withId("abort-incomplete-mpu-with-prefix")
+        .withPrefix("uploads/")
+        .withStatus(BucketLifecycleConfiguration.ENABLED);
+    rule1.setAbortIncompleteMultipartUpload(
+        new AbortIncompleteMultipartUpload().withDaysAfterInitiation(7));
+
+    BucketLifecycleConfiguration.Rule rule2 = new BucketLifecycleConfiguration.Rule()
+        .withId("abort-incomplete-mpu-temp")
+        .withPrefix("temp/")
+        .withStatus(BucketLifecycleConfiguration.ENABLED);
+    rule2.setAbortIncompleteMultipartUpload(
+        new AbortIncompleteMultipartUpload().withDaysAfterInitiation(3));
+
+    BucketLifecycleConfiguration.Rule rule3 = new BucketLifecycleConfiguration.Rule()
+        .withId("abort-incomplete-mpu-no-prefix")
+        .withPrefix("")
+        .withStatus(BucketLifecycleConfiguration.ENABLED);
+    rule3.setAbortIncompleteMultipartUpload(
+        new AbortIncompleteMultipartUpload().withDaysAfterInitiation(30));
+
+    rules.add(rule1);
+    rules.add(rule2);
+    rules.add(rule3);
+    configuration.setRules(rules);
+
+    // Set lifecycle configuration
+    s3Client.setBucketLifecycleConfiguration(bucketName, configuration);
+
+    // Get and verify the configuration
+    BucketLifecycleConfiguration retrievedConfig =
+        s3Client.getBucketLifecycleConfiguration(bucketName);
+
+    assertEquals(3, retrievedConfig.getRules().size());
+
+    BucketLifecycleConfiguration.Rule retrievedRule1 = retrievedConfig.getRules().get(0);
+    assertEquals("abort-incomplete-mpu-with-prefix", retrievedRule1.getId());
+    assertEquals("uploads/", retrievedRule1.getPrefix());
+    assertEquals(BucketLifecycleConfiguration.ENABLED, retrievedRule1.getStatus());
+    assertEquals(7, retrievedRule1.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+
+    BucketLifecycleConfiguration.Rule retrievedRule2 = retrievedConfig.getRules().get(1);
+    assertEquals("abort-incomplete-mpu-temp", retrievedRule2.getId());
+    assertEquals("temp/", retrievedRule2.getPrefix());
+    assertEquals(BucketLifecycleConfiguration.ENABLED, retrievedRule2.getStatus());
+    assertEquals(3, retrievedRule2.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+
+    BucketLifecycleConfiguration.Rule retrievedRule3 = retrievedConfig.getRules().get(2);
+    assertEquals("abort-incomplete-mpu-no-prefix", retrievedRule3.getId());
+    assertEquals("", retrievedRule3.getPrefix());
+    assertEquals(BucketLifecycleConfiguration.ENABLED, retrievedRule3.getStatus());
+    assertEquals(30, retrievedRule3.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
   }
 
   @Nested
