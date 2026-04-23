@@ -173,7 +173,7 @@ class ListMultipartUploadsHandler extends BucketOperationHandler {
 
       getMetrics().updateListMultipartUploadsSuccessStats(startNanos);
       return Response.ok(result).build();
-    } catch (Exception exception) {
+    } catch (IOException | RuntimeException exception) {
       getMetrics().updateListMultipartUploadsFailureStats(startNanos);
       throw exception;
     }
