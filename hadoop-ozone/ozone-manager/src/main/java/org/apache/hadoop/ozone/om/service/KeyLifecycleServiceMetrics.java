@@ -68,7 +68,6 @@ public final class KeyLifecycleServiceMetrics {
   @Metric("Total multipart uploads aborted")
   private MutableGaugeLong numMultipartUploadsAborted;
 
-
   private KeyLifecycleServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
   }

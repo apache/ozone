@@ -85,6 +85,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
@@ -804,9 +805,29 @@ public class KeyLifecycleService extends BackgroundService {
           upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
           String keyName = upload.getKeyName();
 
+          // Get the open key to access tags
+          String multipartOpenKey;
+          try {
+            multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
+                volumeName, bucketName, keyName, upload.getUploadId(),
+                omMetadataManager, bucketInfo.getBucketLayout());
+          } catch (OMException e) {
+            LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
+                volumeName, bucketName, keyName, e);
+            continue;
+          }
+
+          OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(bucketInfo.getBucketLayout())
+              .get(multipartOpenKey);
+          if (openKeyInfo == null) {
+            LOG.warn("Open key not found for multipart upload {}/{}/{}, skipping",
+                volumeName, bucketName, keyName);
+            continue;
+          }
+
           // Check each rule to see if this upload should be aborted
           for (OmLCRule rule : mpuRules) {
-            if (shouldAbortUpload(upload, keyName, rule)) {
+            if (shouldAbortUpload(openKeyInfo, upload, keyName, rule)) {
               if (expiredUploads.isFull()) {
                 LOG.info("Multipart upload list reached batch size {}, aborting current batch for bucket {}/{}",
                     listMaxSize, volumeName, bucketName);
@@ -835,25 +856,25 @@ public class KeyLifecycleService extends BackgroundService {
     /**
      * Check if a multipart upload should be aborted based on the lifecycle rule.
      *
+     * @param openKeyInfo the open key information with tags
      * @param upload the multipart upload information
      * @param keyName the key name of the upload
      * @param rule the lifecycle rule to evaluate against
      * @return true if the upload should be aborted, false otherwise
      */
-    private boolean shouldAbortUpload(OmMultipartUpload upload, String keyName, OmLCRule rule) {
+    private boolean shouldAbortUpload(OmKeyInfo openKeyInfo, OmMultipartUpload upload,
+                                      String keyName, OmLCRule rule) {
       // Check if upload age exceeds the threshold
       if (!rule.getAbortIncompleteMultipartUpload().shouldAbort(
           upload.getCreationTime().toEpochMilli())) {
         return false;
       }
 
-      // Check prefix matching
-      String effectivePrefix = rule.getEffectivePrefix();
-      if (effectivePrefix != null && !keyName.startsWith(effectivePrefix)) {
-        return false;
+      // Check prefix and tag filtering using the existing rule.match() logic
+      // The rule.match() method handles both prefix and tag filtering
+      if (!rule.match(openKeyInfo, keyName)) {
+        return false;  // Prefix or tag doesn't match
       }
-
-      // TODO: Add tag filtering support when multipart uploads support tags
 
       return true;
     }
@@ -926,7 +947,7 @@ public class KeyLifecycleService extends BackgroundService {
       }
 
       List<OmMultipartUpload> uploadList = new ArrayList<>();
-      for(int i = 0; i < expiredUploads.size(); i++) {
+      for (int i = 0; i < expiredUploads.size(); i++) {
         uploadList.add(expiredUploads.get(i));
       }
 
