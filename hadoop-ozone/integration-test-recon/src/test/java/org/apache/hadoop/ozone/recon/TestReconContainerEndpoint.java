@@ -36,11 +36,14 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.recon.api.ContainerEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperHelper;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -60,6 +63,9 @@ public class TestReconContainerEndpoint {
 
   @BeforeEach
   public void init() throws Exception {
+    // ContainerKeyMapper tasks share static maps/flags across the JVM; reset so a
+    // prior test method cannot break mapper state for this cluster instance.
+    ContainerKeyMapperHelper.clearSharedContainerCountMap();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
@@ -77,11 +83,15 @@ public class TestReconContainerEndpoint {
 
   @AfterEach
   public void shutdown() throws IOException {
-    if (client != null) {
-      client.close();
-    }
-    if (cluster != null) {
-      cluster.shutdown();
+    try {
+      if (client != null) {
+        client.close();
+      }
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    } finally {
+      ContainerKeyMapperHelper.clearSharedContainerCountMap();
     }
   }
 
@@ -117,6 +127,9 @@ public class TestReconContainerEndpoint {
     CompletableFuture<Void> completableFuture =
         omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
+    completableFuture.join();
+    // The buffer can be empty while tasks still finish processing a dequeued batch.
+    Thread.sleep(2000);
 
     //Search for the bucket from the bucket table and verify its FSO
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volName, bucketName);
@@ -186,14 +199,17 @@ public class TestReconContainerEndpoint {
     CompletableFuture<Void> completableFuture =
         omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
+    completableFuture.join();
+    Thread.sleep(2000);
 
     // Search for the bucket from the bucket table and verify its OBS
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volumeName, obsBucketName);
     assertNotNull(bucketInfo);
     assertEquals(BucketLayout.OBJECT_STORE, bucketInfo.getBucketLayout());
 
-    // Initialize the ContainerEndpoint
-    long containerId = 1L;
+    long containerId = getContainerIdForKey(volumeName, obsBucketName,
+        obsSingleFileKey);
+
     Response response = getContainerEndpointResponse(containerId);
 
     assertNotNull(response, "Response should not be null.");
@@ -224,6 +240,22 @@ public class TestReconContainerEndpoint {
             recon.getReconServer().getReconContainerMetadataManager(),
             omMetadataManagerInstance);
     return containerEndpoint.getKeysForContainer(containerId, 10, "");
+  }
+
+  private long getContainerIdForKey(String volumeName, String bucketName,
+      String keyName) throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .build();
+    OmKeyLocationInfo location = cluster.getOzoneManager()
+        .lookupKey(keyArgs)
+        .getKeyLocationVersions()
+        .get(0)
+        .getBlocksLatestVersionOnly()
+        .get(0);
+    return location.getContainerID();
   }
 
   private void writeTestData(String volumeName, String bucketName,
