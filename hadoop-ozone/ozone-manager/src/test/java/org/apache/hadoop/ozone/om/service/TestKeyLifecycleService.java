@@ -91,6 +91,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmLCAbortIncompleteMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
@@ -1605,6 +1606,112 @@ class TestKeyLifecycleService extends OzoneTestBase {
           (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(initialRenamedKeyCount, metrics.getNumKeyRenamed().value());
       assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testAbortIncompleteMultipartUploadWithFilters() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      // Create volume and bucket
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      long initialMultipartUploadIteratedCount = metrics.getNumMultipartUploadsIterated().value();
+      long initialMultipartUploadAbortedCount = metrics.getNumMultipartUploadsAborted().value();
+
+      // Create multipart uploads with different prefixes
+      // MPU 1: prefix "uploads/file1" (should be aborted - matches "uploads/" prefix rule)
+      OmKeyArgs keyArgs1 = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName("uploads/file1")
+          .setAcls(Collections.emptyList())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+          .setLocationInfoList(new ArrayList<>())
+          .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+          .build();
+      writeClient.initiateMultipartUpload(keyArgs1);
+
+      // MPU 2: prefix "uploads/file2" (should be aborted - matches "uploads/" prefix rule)
+      OmKeyArgs keyArgs2 = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName("uploads/file2")
+          .setAcls(Collections.emptyList())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+          .setLocationInfoList(new ArrayList<>())
+          .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+          .build();
+      writeClient.initiateMultipartUpload(keyArgs2);
+
+      // MPU 3: prefix "temp/file3" (should be aborted - matches "temp/" prefix rule)
+      OmKeyArgs keyArgs3 = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName("temp/file3")
+          .setAcls(Collections.emptyList())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+          .setLocationInfoList(new ArrayList<>())
+          .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+          .build();
+      writeClient.initiateMultipartUpload(keyArgs3);
+
+      // MPU 4: prefix "keep/file4" (should NOT be aborted - no matching rule)
+      OmKeyArgs keyArgs4 = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName("keep/file4")
+          .setAcls(Collections.emptyList())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+          .setLocationInfoList(new ArrayList<>())
+          .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+          .build();
+      writeClient.initiateMultipartUpload(keyArgs4);
+
+      List<OmLCRule> rules = new ArrayList<>();
+
+      // Rule 1: Abort MPUs with prefix "uploads/" after 0 days
+      OmLCRule rule1 = new OmLCRule.Builder()
+          .setId("abort-mpu-uploads")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder()
+              .setPrefix("uploads/")
+              .build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(0)
+              .build())
+          .build();
+      rules.add(rule1);
+
+      // Rule 2: Abort MPUs with prefix "temp/" after 0 days
+      OmLCRule rule2 = new OmLCRule.Builder()
+          .setId("abort-mpu-temp")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder()
+              .setPrefix("temp/")
+              .build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(0)
+              .build())
+          .build();
+      rules.add(rule2);
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, rules);
+      Thread.sleep(SERVICE_INTERVAL);
+
+      GenericTestUtils.waitFor(() ->
+              metrics.getNumMultipartUploadsIterated().value() - initialMultipartUploadIteratedCount >= 4,
+          WAIT_CHECK_INTERVAL, 10000);
+
+      GenericTestUtils.waitFor(() ->
+              metrics.getNumMultipartUploadsAborted().value() - initialMultipartUploadAbortedCount >= 3,
+          WAIT_CHECK_INTERVAL, 10000);
+      
+      // MPU4 (keep/file4) should still exist
+      assertEquals(1, metadataManager.getMultipartInfoTable().getEstimatedKeyCount());
+
       deleteLifecyclePolicy(volumeName, bucketName);
     }
   }

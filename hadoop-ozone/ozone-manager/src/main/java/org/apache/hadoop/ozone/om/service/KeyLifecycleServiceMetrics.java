@@ -181,4 +181,12 @@ public final class KeyLifecycleServiceMetrics {
   public void incNumMultipartUploadAborted(long count) {
     numMultipartUploadsAborted.incr(count);
   }
+
+  public MutableGaugeLong getNumMultipartUploadsIterated() {
+    return numMultipartUploadsIterated;
+  }
+
+  public MutableGaugeLong getNumMultipartUploadsAborted() {
+    return numMultipartUploadsAborted;
+  }
 }

@@ -1153,7 +1153,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     Tag andTag = retrievedRule3.filter().and().tags().get(0);
     assertEquals("type", andTag.key());
     assertEquals("temporary", andTag.value());
-    
+
     software.amazon.awssdk.services.s3.model.LifecycleRule retrievedRule4 = rules.get(3);
     assertEquals("abort-incomplete-mpu-no-filter", retrievedRule4.id());
     assertEquals(software.amazon.awssdk.services.s3.model.ExpirationStatus.ENABLED, retrievedRule4.status());
