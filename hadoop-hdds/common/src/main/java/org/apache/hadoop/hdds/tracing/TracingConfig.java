@@ -39,25 +39,6 @@ public class TracingConfig extends ReconfigurableConfig {
   private static final String OTEL_TRACES_SAMPLER_ARG = "OTEL_TRACES_SAMPLER_ARG";
   private static final String OTEL_SPAN_SAMPLING_ARG = "OTEL_SPAN_SAMPLING_ARG";
 
-  /**
-   * Tracing configuration in ozone.
-   */
-  public enum TracingMode {
-    /** No Ozone tracer; do not create spans from application context. */
-    TRACING_OFF,
-    /** No Ozone tracer; may create child spans under an application trace. */
-    TRACING_CLIENT,
-    /** Ozone initializes its OTLP tracer and exports spans (subject to sampling). */
-    TRACING_OZONE;
-
-    static TracingMode fromConfig(String raw) {
-      if (raw == null || raw.isEmpty()) {
-        return TRACING_CLIENT;
-      }
-      return valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
-    }
-  }
-
   @Config(
       key = "ozone.tracing.mode",
       defaultValue = "TRACING_CLIENT",
@@ -102,6 +83,25 @@ public class TracingConfig extends ReconfigurableConfig {
       description = "Optional per-span sampling: comma-separated spanName:rate entries."
   )
   private String spanSampling;
+
+  /**
+   * Tracing configuration in ozone.
+   */
+  public enum TracingMode {
+    /** No Ozone tracer; do not create spans from application context. */
+    TRACING_OFF,
+    /** No Ozone tracer; may create child spans under an application trace. */
+    TRACING_CLIENT,
+    /** Ozone initializes its OTLP tracer and exports spans (subject to sampling). */
+    TRACING_OZONE;
+
+    static TracingMode fromConfig(String raw) {
+      if (raw == null || raw.isEmpty()) {
+        return TRACING_CLIENT;
+      }
+      return valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
+    }
+  }
 
   public boolean isClientApplicationAware() {
     return tracingMode != TracingMode.TRACING_OFF;
