@@ -2547,6 +2547,24 @@
     <description>If HDDS GRPC server TLS is enabled.</description>
   </property>
   <property>
+    <name>hdds.grpc.tls.protocols</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS protocol versions for gRPC
+      server endpoints (e.g. "TLSv1.3" or "TLSv1.2,TLSv1.3"). When empty,
+      the TLS provider's defaults are used. Applies to server endpoints
+      only; clients are not restricted.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.ciphers</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS cipher suites for gRPC server
+      endpoints (e.g. "TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256").
+      When empty, the TLS provider's defaults are used. Applies to server
+      endpoints only; clients are not restricted.</description>
+  </property>
+  <property>
     <name>hdds.x509.default.duration</name>
     <value>P365D</value>
     <tag>OZONE, HDDS, SECURITY</tag>
