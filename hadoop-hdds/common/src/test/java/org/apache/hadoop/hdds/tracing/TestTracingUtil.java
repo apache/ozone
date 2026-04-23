@@ -57,7 +57,7 @@ public class TestTracingUtil {
 
   private static MutableConfigurationSource tracingEnabled() {
     MutableConfigurationSource config = new InMemoryConfigurationForTesting();
-    config.setBoolean("ozone.tracing.enabled", true);
+    config.set("ozone.tracing.mode", TracingConfig.TracingMode.TRACING_OZONE.name());
     return config;
   }
 

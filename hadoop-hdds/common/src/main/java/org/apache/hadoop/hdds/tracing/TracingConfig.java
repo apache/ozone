@@ -39,17 +39,39 @@ public class TracingConfig extends ReconfigurableConfig {
   private static final String OTEL_TRACES_SAMPLER_ARG = "OTEL_TRACES_SAMPLER_ARG";
   private static final String OTEL_SPAN_SAMPLING_ARG = "OTEL_SPAN_SAMPLING_ARG";
 
+  /**
+   * Tracing configuration in ozone.
+   */
+  public enum TracingMode {
+    /** No Ozone tracer; do not create spans from application context. */
+    TRACING_OFF,
+    /** No Ozone tracer; may create child spans under an application trace. */
+    TRACING_CLIENT,
+    /** Ozone initializes its OTLP tracer and exports spans (subject to sampling). */
+    TRACING_OZONE;
+
+    static TracingMode fromConfig(String raw) {
+      if (raw == null || raw.isEmpty()) {
+        return TRACING_CLIENT;
+      }
+      return valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
+    }
+  }
+
   @Config(
-      key = "ozone.tracing.enabled",
-      defaultValue = "false",
-      type = ConfigType.BOOLEAN,
+      key = "ozone.tracing.mode",
+      defaultValue = "TRACING_CLIENT",
+      type = ConfigType.STRING,
       reconfigurable = true,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
-      description = "If true, Ozone initializes its own tracer and exports spans (subject to sampling). "
-          + "If false, the Ozone client does not use that tracer; optional child spans under an "
-          + "application trace are controlled by ozone.tracing.client.application-aware."
+      description = "Tracing modes: " +
+          "TRACING_OZONE: Ozone's internal tracer is used to export spans to OTLP. " +
+          "TRACING_CLIENT: If context is present then The application's tracer is used to create child spans. " +
+          "TRACING_OFF: no tracing."
   )
-  private boolean tracingEnabled;
+  private String tracingModeRaw;
+
+  private TracingMode tracingMode = TracingMode.TRACING_CLIENT;
 
   @Config(
       key = "ozone.tracing.endpoint",
@@ -81,30 +103,34 @@ public class TracingConfig extends ReconfigurableConfig {
   )
   private String spanSampling;
 
-  @Config(
-      key = "ozone.tracing.client.application-aware",
-      defaultValue = "true",
-      type = ConfigType.BOOLEAN,
-      reconfigurable = true,
-      tags = { ConfigTag.OZONE, ConfigTag.HDDS },
-      description = "This is used when ozone.tracing.enabled is false. If true and "
-      + "an active span exists in the current OpenTelemetry Context (application "
-      + "GlobalOpenTelemetry), the client may create child spans under that trace. If no "
-      + "active span exists, no spans are created. If false, no spans are created regardless "
-      + "of application context."
-  )
-  private boolean clientApplicationAware;
-
   public boolean isClientApplicationAware() {
-    return clientApplicationAware;
+    return tracingMode != TracingMode.TRACING_OFF;
   }
 
   public boolean isTracingEnabled() {
-    return tracingEnabled;
+    return tracingMode == TracingMode.TRACING_OZONE;
+  }
+
+  private static TracingMode resolveTracingMode(String value) {
+    if (value == null || value.isEmpty()) {
+      return TracingMode.TRACING_CLIENT;
+    }
+    if (TracingMode.TRACING_OFF.name().equals(value)) {
+      return TracingMode.TRACING_OFF;
+    }
+    if (TracingMode.TRACING_CLIENT.name().equals(value)) {
+      return TracingMode.TRACING_CLIENT;
+    }
+    if (TracingMode.TRACING_OZONE.name().equals(value)) {
+      return TracingMode.TRACING_OZONE;
+    }
+    return TracingMode.TRACING_CLIENT;
   }
 
   @PostConstruct
   public void validate() {
+    tracingMode = resolveTracingMode(tracingModeRaw);
+
     if (tracingEndpoint.isEmpty()) {
       tracingEndpoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
     }

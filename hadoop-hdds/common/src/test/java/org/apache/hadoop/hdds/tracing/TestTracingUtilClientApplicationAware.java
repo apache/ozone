@@ -71,9 +71,17 @@ public class TestTracingUtilClientApplicationAware {
 
   private static TracingConfig clientTracingConfig(boolean tracingEnabled,
                                                    boolean clientApplicationAware) {
+    TracingConfig.TracingMode mode;
+    if (tracingEnabled) {
+      mode = TracingConfig.TracingMode.TRACING_OZONE;
+    } else if (clientApplicationAware) {
+      mode = TracingConfig.TracingMode.TRACING_CLIENT;
+    } else {
+      mode = TracingConfig.TracingMode.TRACING_OFF;
+    }
+
     MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
-    conf.setBoolean("ozone.tracing.enabled", tracingEnabled);
-    conf.setBoolean("ozone.tracing.client.application-aware", clientApplicationAware);
+    conf.set("ozone.tracing.mode", mode.name());
     return conf.getObject(TracingConfig.class);
   }
 
