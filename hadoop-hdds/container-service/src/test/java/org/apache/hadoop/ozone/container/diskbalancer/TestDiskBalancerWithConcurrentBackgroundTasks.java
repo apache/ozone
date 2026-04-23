@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -281,7 +281,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
         throw new RuntimeException(e);
       }
     });
-    assertTrue(deleteThreadPastSchedule.await(10, TimeUnit.SECONDS));
+    assertThat(deleteThreadPastSchedule.await(10, TimeUnit.SECONDS)).isTrue();
     // Give delete time to reach the lock queue while balancer is still paused at the hook.
     Thread.sleep(200);
 
@@ -374,7 +374,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
         throw new RuntimeException(e);
       }
     });
-    assertTrue(blockThreadStarted.await(10, TimeUnit.SECONDS));
+    assertThat(blockThreadStarted.await(10, TimeUnit.SECONDS)).isTrue();
     Thread.sleep(200);
 
     raceInjector.continueBalancer();
