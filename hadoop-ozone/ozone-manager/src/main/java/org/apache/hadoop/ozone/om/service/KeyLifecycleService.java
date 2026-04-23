@@ -792,7 +792,15 @@ public class KeyLifecycleService extends BackgroundService {
           numMultipartUploadIterated++;
 
           // Extract multipart upload information from the key
-          OmMultipartUpload upload = OmMultipartUpload.from(entry.getKey());
+          OmMultipartUpload upload;
+          try {
+            upload = OmMultipartUpload.from(entry.getKey());
+          } catch (IllegalArgumentException e) {
+            LOG.warn("Failed to parse multipart upload key {} in bucket {}/{}, skipping",
+                entry.getKey(), volumeName, bucketName, e);
+            continue;
+          }
+
           upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
           String keyName = upload.getKeyName();
 
