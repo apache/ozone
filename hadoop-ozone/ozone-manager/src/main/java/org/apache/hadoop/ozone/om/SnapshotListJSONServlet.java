@@ -71,7 +71,7 @@ public class SnapshotListJSONServlet extends HttpServlet {
 
       String prefix = request.getParameter("prefix");
 
-      final int maxKeys = 100;
+      final int maxKeys = 1000;
 
       ObjectMapper objectMapper = new ObjectMapper();
       objectMapper.addMixIn(SnapshotInfo.class, SnapshotInfoMixin.class);
