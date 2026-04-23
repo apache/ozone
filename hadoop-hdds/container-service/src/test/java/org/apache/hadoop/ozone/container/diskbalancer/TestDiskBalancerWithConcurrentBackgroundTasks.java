@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -246,7 +247,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
     KeyValueContainer oldReplica = createClosedContainer(CONTAINER_ID, hotVolume, versionInfo);
     Container staleContainerRef = oldReplica;
     String oldReplicaPathOnHot = oldReplica.getContainerData().getContainerPath();
-    assertTrue(new File(oldReplicaPathOnHot).exists());
+    assertThat(new File(oldReplicaPathOnHot)).exists();
 
     // Install injector so balancer pauses right after ContainerSet points at the new location of replica.
     AfterInMemoryUpdateInjector raceInjector = new AfterInMemoryUpdateInjector();
@@ -294,8 +295,8 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
         () -> kvLogs.getOutput().contains("reference is stale")
             && kvLogs.getOutput().contains("Aborting delete"),
         100, 10_000);
-    assertTrue(kvLogs.getOutput().contains(String.valueOf(CONTAINER_ID)),
-        "Stale-abort log should name the container id");
+    assertThat(kvLogs.getOutput()).as("Stale-abort log should name the container id")
+        .contains(String.valueOf(CONTAINER_ID));
 
     // Old replica: disk balancer marks it DELETED after the move; RM path must not drive that state.
     assertEquals(State.DELETED, staleContainerRef.getContainerState());
@@ -307,10 +308,10 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
     assertSame(currentContainerRef, after);
     assertEquals(State.CLOSED, after.getContainerState());
     assertEquals(coldVolume, after.getContainerData().getVolume());
-    assertTrue(new File(after.getContainerData().getContainerPath()).exists());
+    assertThat(new File(after.getContainerData().getContainerPath())).exists();
 
     // Disk balancer delayed cleanup removes the old replica from the source path — not RM delete.
-    assertFalse(new File(oldReplicaPathOnHot).exists());
+    assertThat(new File(oldReplicaPathOnHot)).doesNotExist();
     GenericTestUtils.waitFor(
         () -> diskBalancerLogs.getOutput().contains("Deleted expired container 42 after delay")
             && diskBalancerLogs.getOutput().contains(String.valueOf(CONTAINER_ID)),
@@ -380,15 +381,15 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
     CompletableFuture.allOf(balancerDone, blockDone).get(60, TimeUnit.SECONDS);
 
     // Must log abort; must not apply deletes against wrong paths / wrong DB.
-    assertTrue(logs.getOutput().contains("Container 42 reference is stale. Aborting delete."));
+    assertThat(logs.getOutput()).contains("Container 42 reference is stale. Aborting delete.");
 
     // Pending-delete metadata on the destination replica must be unchanged.
     KeyValueContainerData newContainerData =
         (KeyValueContainerData) containerSet.getContainer(CONTAINER_ID).getContainerData();
     assertEquals(pendingBefore, readPendingDeleteBlockCount(newContainerData));
-    assertTrue(new File(newContainerData.getChunksPath()).exists());
+    assertThat(new File(newContainerData.getChunksPath())).exists();
     // Disk balancer delayed cleanup removes the old replica from the source path — not RM delete.
-    assertFalse(new File(staleReplicaData.getContainerPath()).exists());
+    assertThat(new File(staleReplicaData.getContainerPath())).doesNotExist();
     GenericTestUtils.waitFor(
         () -> diskBalancerLogs.getOutput().contains("Deleted expired container 42 after delay")
             && diskBalancerLogs.getOutput().contains(String.valueOf(CONTAINER_ID)),
@@ -431,8 +432,10 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
 
   private static Comparator<HddsVolume> volumePolicyOrder() {
     return Comparator
-        .comparingDouble((HddsVolume v) ->
-            (double) v.getCurrentUsage().getUsedSpace() / v.getCurrentUsage().getCapacity())
+        .comparingDouble((HddsVolume v) -> {
+          SpaceUsageSource usage = v.getCurrentUsage();
+          return (double) (usage.getCapacity() - usage.getAvailable()) / usage.getCapacity();
+        })
         .thenComparing(HddsVolume::getStorageID);
   }
 

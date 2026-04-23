@@ -470,7 +470,6 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     @Override
-    @SuppressWarnings("checkstyle:methodlength")
     public BackgroundTaskResult call() {
       long startTime = Time.monotonicNow();
       boolean moveSucceeded = true;
@@ -560,13 +559,7 @@ public class DiskBalancerService extends BackgroundService {
 
         // Test injector: ContainerSet now references newContainer while this thread still holds
         // readLock on the old replica.
-        if (injector != null) {
-          try {
-            injector.pause();
-          } catch (IOException ex) {
-            // test-only hook
-          }
-        }
+        pauseInjector();
         // Mark old container as DELETED and persist state.
         // markContainerForDelete require writeLock, so release readLock first
         container.readUnlock();
@@ -584,13 +577,7 @@ public class DiskBalancerService extends BackgroundService {
         metrics.incrSuccessBytes(containerSize);
         totalBalancedBytes.addAndGet(containerSize);
       } catch (IOException e) {
-        if (injector != null) {
-          try {
-            injector.pause();
-          } catch (IOException ex) {
-            // do nothing
-          }
-        }
+        pauseInjector();
         moveSucceeded = false;
         LOG.warn("Failed to move container {}", containerId, e);
         if (diskBalancerTmpDir != null) {
@@ -845,6 +832,18 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
+  }
+
+  // call FaultInjector#pause when an injector is registered; ignore IOException.
+  @VisibleForTesting
+  private static void pauseInjector() {
+    if (injector != null) {
+      try {
+        injector.pause();
+      } catch (IOException ex) {
+        // do nothing
+      }
+    }
   }
 
   @VisibleForTesting
