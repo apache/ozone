@@ -932,6 +932,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     return diskCheckTimeout;
   }
 
+  public void setDiskCheckTimeout(Duration duration) {
+    diskCheckTimeout = duration;
+  }
+
   public void setDiskCheckEnabled(boolean diskCheckEnabled) {
     isDiskCheckEnabled = diskCheckEnabled;
   }
