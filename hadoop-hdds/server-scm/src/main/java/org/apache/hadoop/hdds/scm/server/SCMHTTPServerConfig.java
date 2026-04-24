@@ -30,21 +30,20 @@ public class SCMHTTPServerConfig {
 
   @Config(key = "hdds.scm.http.auth.kerberos.principal",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = {ConfigTag.SECURITY},
-      description = "This Kerberos principal is used when communicating to " +
-          "the HTTP server of SCM.The protocol used is SPNEGO."
+      defaultValue = "HTTP/_HOST@REALM",
+      tags = { ConfigTag.KERBEROS, ConfigTag.SCM, ConfigTag.SECURITY },
+      description = "SCM http server service principal if SPNEGO is enabled for SCM http server."
   )
-  private String principal = "";
+  private String principal;
 
   @Config(key = "hdds.scm.http.auth.kerberos.keytab",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = {ConfigTag.SECURITY},
+      defaultValue = "/etc/security/keytabs/HTTP.keytab",
+      tags = { ConfigTag.KERBEROS, ConfigTag.SCM, ConfigTag.SECURITY },
       description = "The keytab file used by SCM http server to login" +
-          " as its service principal."
+          " as its service principal if SPNEGO is enabled for SCM http server."
   )
-  private String keytab = "";
+  private String keytab;
 
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
