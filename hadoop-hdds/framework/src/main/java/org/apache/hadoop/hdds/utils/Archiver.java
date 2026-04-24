@@ -36,6 +36,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -90,7 +91,7 @@ public final class Archiver {
       final String dirName = nameLength == 0 || entryName.charAt(nameLength - 1) != '/'
           ? entryName + "/"
           : entryName;
-      entry = new TarArchiveEntry(dirName);
+      entry = new TarArchiveEntry(dirName, TarConstants.LF_DIR);
       entry.setMode(TarArchiveEntry.DEFAULT_DIR_MODE);
     } else {
       entry = new TarArchiveEntry(entryName);
