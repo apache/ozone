@@ -934,6 +934,81 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
+  public void testInstallSnapshotOzoneManagerNotInRunningState() throws Exception {
+    // Get the leader OM
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
+
+    // Find the inactive OM
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    // Do some transactions so that the log index increases
+    List<String> keys = writeKeysToIncreaseLogIndex(leaderRatisServer, 200);
+
+    // Get transaction Index
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TermIndex leaderOMTermIndex =
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
+    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
+    long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
+
+    // Start the inactive OM. Checkpoint installation will happen spontaneously.
+    cluster.startInactiveOM(followerNodeId);
+    OzoneManager.setTestInstallSnapshot(true);
+    LogCapturer logCapture = LogCapturer.captureLogs(OzoneManager.class);
+    assertLogCapture(logCapture, "OzoneManager is not in running state");
+    OzoneManager.setTestInstallSnapshot(false);
+
+    // The recently started OM should be lagging behind the leader OM.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 3s
+    GenericTestUtils.waitFor(() -> {
+      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+          >= leaderOMSnapshotIndex - 1;
+    }, 100, 30_000);
+
+    long followerOMLastAppliedIndex =
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
+
+    // After the new checkpoint is installed, the follower OM
+    // lastAppliedIndex must >= the snapshot index of the checkpoint. It
+    // could be great than snapshot index if there is any conf entry from ratis.
+    followerOMLastAppliedIndex = followerOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm()).isGreaterThanOrEqualTo(leaderOMSnapshotTermIndex);
+
+    // Verify that the follower OM's DB contains the transactions which were
+    // made while it was inactive.
+    OMMetadataManager followerOMMetaMngr = followerOM.getMetadataManager();
+    assertNotNull(followerOMMetaMngr.getVolumeTable().get(
+        followerOMMetaMngr.getVolumeKey(volumeName)));
+    assertNotNull(followerOMMetaMngr.getBucketTable().get(
+        followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
+    for (String key : keys) {
+      assertNotNull(followerOMMetaMngr.getKeyTable(
+              TEST_BUCKET_LAYOUT)
+          .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
+    }
+
+    // Wait installation finish
+    Thread.sleep(5000);
+    // Verify checkpoint installation was happened.
+    assertLogCapture(logCapture, "Reloaded OM state");
+    assertLogCapture(logCapture, "Install Checkpoint is finished");
+  }
+
+  @Test
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader OM
     final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
