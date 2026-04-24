@@ -322,8 +322,8 @@ services:
       - *krb5conf
       - *ozone-dir
       - *transformation
-  upgrade_client:
-    command: ["tail", "-f", "/dev/null"]
+  client:
+    command: ["sleep","1000000"]
     dns_search: .
     env_file:
       - docker-config
@@ -335,7 +335,7 @@ services:
       - "scm1.org:10.9.0.14"
       - "scm2.org:10.9.0.15"
       - "scm3.org:10.9.0.16"
-    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    image: ${OZONE_TEST_IMAGE}
     hostname: scm
     networks:
       net:
@@ -343,8 +343,7 @@ services:
     volumes:
       - *keytabs
       - *krb5conf
-      - ../../../..:/opt/hadoop
-      - ../../../..:/opt/ozone
+      - *ozone-dir
 
 networks:
   net:
