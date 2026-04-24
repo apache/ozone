@@ -75,9 +75,6 @@ public class SCMHTTPServerConfig {
         SCMHTTPServerConfig.class.getAnnotation(ConfigGroup.class).prefix() +
             ".";
 
-    public static final String HDDS_SCM_HTTP_AUTH_TYPE =
-        HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX + "type";
-
     public static final String HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY =
         HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";
 

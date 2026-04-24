@@ -627,6 +627,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT
       = "ozone.scm.ha.raft.server.rpc.first-election.timeout";
+  public static final String HDDS_SCM_HTTP_AUTH_TYPE = "hdds.scm.http.auth.type";
 
   /**
    * Never constructed.

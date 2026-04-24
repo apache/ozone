@@ -657,4 +657,22 @@ public class OzoneClientConfig {
     MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
     COMPOSITE_CRC  // Block/chunk-independent composite CRC
   }
+
+  /**
+   * String keys for tests and grep.
+   */
+  public static final class Keys {
+    public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
+        "ozone.client.fs.default.bucket.layout";
+    public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES =
+        "ozone.client.max.ec.stripe.write.retries";
+  }
+
+  /**
+   * Default values for tests.
+   */
+  public static final class Defaults {
+    public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
+        OzoneConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
+  }
 }
