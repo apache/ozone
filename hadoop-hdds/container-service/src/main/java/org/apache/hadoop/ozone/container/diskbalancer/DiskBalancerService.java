@@ -835,7 +835,6 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   // call FaultInjector#pause when an injector is registered; ignore IOException.
-  @VisibleForTesting
   private static void pauseInjector() {
     if (injector != null) {
       try {
