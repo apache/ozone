@@ -291,6 +291,9 @@ public class SnapshotDiffJob {
     if (largestEntryKey != null) {
       builder.setLargestEntryKey(largestEntryKey);
     }
+    if (StringUtils.isNotEmpty(reason)) {
+      builder.setMessage(reason);
+    }
 
     return builder.build();
   }
@@ -302,7 +305,7 @@ public class SnapshotDiffJob {
     SubStatus subStatus = (diffJobProto.hasSubStatus()) ?
         SubStatus.fromProtoBuf(diffJobProto.getSubStatus()) : null;
     String largestEntryKey = diffJobProto.hasLargestEntryKey() ? diffJobProto.getLargestEntryKey() : null;
-    return new SnapshotDiffJob(
+    SnapshotDiffJob job = new SnapshotDiffJob(
         diffJobProto.getCreationTime(),
         diffJobProto.getJobId(),
         status,
@@ -316,6 +319,10 @@ public class SnapshotDiffJob {
         subStatus,
         diffJobProto.getKeysProcessedPct(),
         largestEntryKey);
+    if (diffJobProto.hasMessage()) {
+      job.setReason(diffJobProto.getMessage());
+    }
+    return job;
   }
 
   /**

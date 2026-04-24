@@ -3748,6 +3748,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.ssl.enabled.protocols</name>
+    <tag>OZONE,SECURITY,CRYPTO_COMPLIANCE</tag>
+    <value/>
+    <description>
+      The supported SSL protocols used to restrict connections towards the WebUI of different components,
+      and the S3 GateWay.
+    </description>
+  </property>
+  <property>
     <name>ssl.server.keystore.location</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value/>

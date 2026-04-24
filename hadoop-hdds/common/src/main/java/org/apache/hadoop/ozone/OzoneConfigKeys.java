@@ -557,6 +557,7 @@ public final class OzoneConfigKeys {
       "ozone.http.policy";
   public static final String OZONE_HTTP_POLICY_DEFAULT =
       HttpConfig.Policy.HTTP_ONLY.name();
+  public static final String  OZONE_SSL_ENABLED_PROTOCOLS = "ozone.ssl.enabled.protocols";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.server.keystore.resource";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =

@@ -86,7 +86,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       }
     } else {
       if (!json) {
-        System.out.println("\nDecommission Status: DECOMMISSIONING - " +
+        System.out.println();
+        System.out.println("Decommission Status: DECOMMISSIONING - " +
             decommissioningNodes.size() + " node(s)");
       }
     }
@@ -134,7 +135,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   }
 
   private void printDetails(DatanodeDetails datanode) {
-    System.out.println("\nDatanode: " + datanode.getUuid().toString() +
+    System.out.println();
+    System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + ")");
   }
