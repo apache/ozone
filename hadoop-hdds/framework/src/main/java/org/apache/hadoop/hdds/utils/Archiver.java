@@ -28,6 +28,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
@@ -105,7 +106,20 @@ public final class Archiver {
   public static long includeFile(File file, String entryName,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
     final long bytes;
-    TarArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
+
+    TarArchiveEntry entry = new TarArchiveEntry(entryName);
+    entry.setMode(TarArchiveEntry.DEFAULT_FILE_MODE);
+    try {
+      BasicFileAttributes attrs = Files.readAttributes(
+          file.toPath(), BasicFileAttributes.class);
+      entry.setLastModifiedTime(attrs.lastModifiedTime());
+      entry.setLastAccessTime(attrs.lastAccessTime());
+      entry.setCreationTime(attrs.creationTime());
+    } catch (IOException e) {
+      entry.setModTime(file.lastModified()); // fallback
+    }
+    entry.setSize(file.length());
+
     archiveOutput.putArchiveEntry(entry);
     try (InputStream input = Files.newInputStream(file.toPath())) {
       bytes = IOUtils.copy(input, archiveOutput, getBufferSize(file.length()));
