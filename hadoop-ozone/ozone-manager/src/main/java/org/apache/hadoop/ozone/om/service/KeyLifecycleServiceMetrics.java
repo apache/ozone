@@ -189,4 +189,8 @@ public final class KeyLifecycleServiceMetrics {
   public MutableGaugeLong getNumMultipartUploadsAborted() {
     return numMultipartUploadsAborted;
   }
+
+  public MutableGaugeLong getNumSuccessTask() {
+    return numSuccessTask;
+  }
 }

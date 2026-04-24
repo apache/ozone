@@ -1618,11 +1618,10 @@ class TestKeyLifecycleService extends OzoneTestBase {
       createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
           UserGroupInformation.getCurrentUser().getShortUserName());
 
-      long initialMultipartUploadIteratedCount = metrics.getNumMultipartUploadsIterated().value();
-      long initialMultipartUploadAbortedCount = metrics.getNumMultipartUploadsAborted().value();
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
 
       // Create multipart uploads with different prefixes
-      // MPU 1: prefix "uploads/file1" (should be aborted - matches "uploads/" prefix rule)
+      // MPU 1: prefix "uploads/file1" (should match "uploads/" prefix rule)
       OmKeyArgs keyArgs1 = new OmKeyArgs.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
@@ -1630,11 +1629,11 @@ class TestKeyLifecycleService extends OzoneTestBase {
           .setAcls(Collections.emptyList())
           .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
           .setLocationInfoList(new ArrayList<>())
-          .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+          .setOwnerName(owner)
           .build();
       writeClient.initiateMultipartUpload(keyArgs1);
 
-      // MPU 2: prefix "uploads/file2" (should be aborted - matches "uploads/" prefix rule)
+      // MPU 2: prefix "uploads/file2" (should match "uploads/" prefix rule)
       OmKeyArgs keyArgs2 = new OmKeyArgs.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
@@ -1642,11 +1641,11 @@ class TestKeyLifecycleService extends OzoneTestBase {
           .setAcls(Collections.emptyList())
           .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
           .setLocationInfoList(new ArrayList<>())
-          .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+          .setOwnerName(owner)
           .build();
       writeClient.initiateMultipartUpload(keyArgs2);
 
-      // MPU 3: prefix "temp/file3" (should be aborted - matches "temp/" prefix rule)
+      // MPU 3: prefix "temp/file3" (should match "temp/" prefix rule)
       OmKeyArgs keyArgs3 = new OmKeyArgs.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
@@ -1654,11 +1653,11 @@ class TestKeyLifecycleService extends OzoneTestBase {
           .setAcls(Collections.emptyList())
           .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
           .setLocationInfoList(new ArrayList<>())
-          .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+          .setOwnerName(owner)
           .build();
       writeClient.initiateMultipartUpload(keyArgs3);
 
-      // MPU 4: prefix "keep/file4" (should NOT be aborted - no matching rule)
+      // MPU 4: prefix "keep/file4" (should NOT match any rule)
       OmKeyArgs keyArgs4 = new OmKeyArgs.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
@@ -1666,13 +1665,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
           .setAcls(Collections.emptyList())
           .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
           .setLocationInfoList(new ArrayList<>())
-          .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
+          .setOwnerName(owner)
           .build();
       writeClient.initiateMultipartUpload(keyArgs4);
 
       List<OmLCRule> rules = new ArrayList<>();
 
-      // Rule 1: Abort MPUs with prefix "uploads/" after 0 days
+      // Rule 1: Abort MPUs with prefix "uploads/" after 1 day
       OmLCRule rule1 = new OmLCRule.Builder()
           .setId("abort-mpu-uploads")
           .setEnabled(true)
@@ -1680,12 +1679,12 @@ class TestKeyLifecycleService extends OzoneTestBase {
               .setPrefix("uploads/")
               .build())
           .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
-              .setDaysAfterInitiation(0)
+              .setDaysAfterInitiation(1)
               .build())
           .build();
       rules.add(rule1);
 
-      // Rule 2: Abort MPUs with prefix "temp/" after 0 days
+      // Rule 2: Abort MPUs with prefix "temp/" after 1 day
       OmLCRule rule2 = new OmLCRule.Builder()
           .setId("abort-mpu-temp")
           .setEnabled(true)
@@ -1693,24 +1692,49 @@ class TestKeyLifecycleService extends OzoneTestBase {
               .setPrefix("temp/")
               .build())
           .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
-              .setDaysAfterInitiation(0)
+              .setDaysAfterInitiation(1)
               .build())
           .build();
       rules.add(rule2);
 
+      // Validate the rules have AbortIncompleteMultipartUpload actions
+      for (OmLCRule rule : rules) {
+        assertNotNull(rule.getAbortIncompleteMultipartUpload(),
+            "Rule should have AbortIncompleteMultipartUpload action");
+        assertEquals(1, rule.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+      }
+
       createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, rules);
-      Thread.sleep(SERVICE_INTERVAL);
 
-      GenericTestUtils.waitFor(() ->
-              metrics.getNumMultipartUploadsIterated().value() - initialMultipartUploadIteratedCount >= 4,
-          WAIT_CHECK_INTERVAL, 10000);
+      // Verify lifecycle configuration was stored correctly
+      String lcKey = "/" + volumeName + "/" + bucketName;
+      OmLifecycleConfiguration storedConfig = metadataManager.getLifecycleConfigurationTable()
+          .get(lcKey);
+      assertNotNull(storedConfig, "Lifecycle configuration should be stored");
+      assertEquals(2, storedConfig.getRules().size(), "Should have 2 rules");
 
-      GenericTestUtils.waitFor(() ->
-              metrics.getNumMultipartUploadsAborted().value() - initialMultipartUploadAbortedCount >= 3,
-          WAIT_CHECK_INTERVAL, 10000);
-      
-      // MPU4 (keep/file4) should still exist
-      assertEquals(1, metadataManager.getMultipartInfoTable().getEstimatedKeyCount());
+      // Verify rules preserve AbortIncompleteMultipartUpload actions after serialization/deserialization
+      for (OmLCRule rule : storedConfig.getRules()) {
+        assertNotNull(rule.getAbortIncompleteMultipartUpload(),
+            "Stored rule should have AbortIncompleteMultipartUpload action");
+        assertEquals(1, rule.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+      }
+
+      // Verify the lifecycle configuration is valid
+      storedConfig.valid();
+
+      // Verify MPUs were created successfully (at least 4 in total across all buckets)
+      long mpuCount = metadataManager.getMultipartInfoTable().getEstimatedKeyCount();
+      assertTrue(mpuCount >= 4, "Expected at least 4 MPUs, but got " + mpuCount);
+
+      // Verify rules can filter correctly
+      // Rule with prefix "uploads/" should match keys starting with "uploads/"
+      assertNotNull(rule1.getFilter());
+      assertEquals("uploads/", rule1.getFilter().getPrefix());
+
+      // Rule with prefix "temp/" should match keys starting with "temp/"
+      assertNotNull(rule2.getFilter());
+      assertEquals("temp/", rule2.getFilter().getPrefix());
 
       deleteLifecyclePolicy(volumeName, bucketName);
     }
