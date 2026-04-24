@@ -71,6 +71,7 @@ class REPL {
       }
 
       String prompt = shell.prompt() + "> ";
+      System.setProperty("ozone.interactive.shell", "true");
 
       final int batchSize = lines == null ? 0 : lines.size();
       if (batchSize > 0) {

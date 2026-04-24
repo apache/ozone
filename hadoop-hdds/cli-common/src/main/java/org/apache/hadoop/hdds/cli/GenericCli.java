@@ -78,7 +78,12 @@ public abstract class GenericCli implements GenericParentCommand {
     int exitCode = execute(argv);
 
     if (exitCode != ExitCode.OK) {
-      ExitUtils.terminate(exitCode, null, null);
+      if (cmd.getOut() != null) {
+        cmd.getOut().println("Command executed with exit code: " + exitCode);
+      }
+      if (System.getProperty("ozone.interactive.shell") == null) {
+        ExitUtils.terminate(exitCode, null, null);
+      }
     }
   }
 

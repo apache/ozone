@@ -221,6 +221,17 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.security.token.DtUtilShell
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
+    interactive | --interactive)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneInteractiveShell
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-shell"
+      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      # Add all CLI classpaths to support all subcommands dynamically
+      for cp_file in "ozone-cli-admin" "ozone-cli-debug" "ozone-cli-repair" "ozone-tools"; do
+        if [[ -f "${OZONE_HOME}/share/ozone/classpath/${cp_file}.classpath" ]]; then
+          ozone_add_classpath_from_file "${OZONE_HOME}/share/ozone/classpath/${cp_file}.classpath"
+        fi
+      done
+    ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
       OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
@@ -317,6 +328,10 @@ if [[ $# = 0 ]]; then
 fi
 
 OZONE_SUBCMD=$1
+
+if [[ "$OZONE_SUBCMD" == "--interactive" ]]; then
+  OZONE_SUBCMD="interactive"
+fi
 
 if [[ "$OZONE_SUBCMD" == "auditparser" ]] || [[ "$OZONE_SUBCMD" == "checknative" ]]; then
   echo "warning: 'ozone $OZONE_SUBCMD' is deprecated, use 'ozone debug $OZONE_SUBCMD' instead."
