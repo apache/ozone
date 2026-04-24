@@ -108,6 +108,9 @@ importers:
       eslint-plugin-prettier:
         specifier: ^3.4.1
         version: 3.4.1(eslint-config-prettier@8.10.2(eslint@7.32.0))(eslint@7.32.0)(prettier@2.8.8)
+      eslint-plugin-promise:
+        specifier: ^7.2.1
+        version: 7.2.1(eslint@7.32.0)
       eslint-plugin-react:
         specifier: ^7.32.2
         version: 7.37.5(eslint@7.32.0)
@@ -1917,6 +1920,12 @@ packages:
     peerDependenciesMeta:
       eslint-config-prettier:
         optional: true
+
+  eslint-plugin-promise@7.2.1:
+    resolution: {integrity: sha512-SWKjd+EuvWkYaS+uN2csvj0KoP43YTu7+phKQ5v+xw6+A0gutVX2yqCeCkC3uLCJFiPfR2dD8Es5L7yUsmvEaA==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    peerDependencies:
+      eslint: ^7.0.0 || ^8.0.0 || ^9.0.0
 
   eslint-plugin-react@7.37.5:
     resolution: {integrity: sha512-Qteup0SqU15kdocexFNAJMvCJEfa2xUKNV4CC1xsVMrIIqEy3SQ/rqyxCWNzfrd3/ldy6HMlD2e0JDVpDg2qIA==}
@@ -6312,6 +6321,11 @@ snapshots:
       prettier-linter-helpers: 1.0.1
     optionalDependencies:
       eslint-config-prettier: 8.10.2(eslint@7.32.0)
+
+  eslint-plugin-promise@7.2.1(eslint@7.32.0):
+    dependencies:
+      '@eslint-community/eslint-utils': 4.9.1(eslint@7.32.0)
+      eslint: 7.32.0
 
   eslint-plugin-react@7.37.5(eslint@7.32.0):
     dependencies:
