@@ -44,9 +44,9 @@ current snapshot, so the newest defragmented copy does not keep a full,
 independent copy of every historical SST file.
 
 Snapshot defragmentation was previously called snapshot compaction during the
-design phase. It is not RocksDB automatic compaction of snapshot DBs. Snapshot
-DB automatic compaction remains disabled because the snapshot diff path relies
-on stable SST metadata.
+design phase. Snapshot defragmentation is not the same as RocksDB automatic
+compaction of snapshot DBs. Snapshot DB automatic compaction remains disabled
+because the snapshot diff path relies on stable SST metadata.
 
 ## Current Implementation
 
@@ -61,6 +61,9 @@ The implementation is centered on these classes:
   snapshot versions, and removes orphaned version metadata.
 * `CompositeDeltaDiffComputer`, `RDBDifferComputer`, and `FullDiffComputer`:
   compute the SST files that may contain differences between two snapshots.
+* `SstFileSetReader` and `TableMergeIterator`: read candidate keys from delta
+  SST files as a sorted stream and compare the current and previous snapshot
+  tables without issuing an independent point lookup for every candidate key.
 * `OmSnapshotManager`: opens the current snapshot version and deletes old
   checkpoint directories after a version switch.
 
@@ -92,14 +95,25 @@ are sibling directories in `checkpointState`:
 ```
 
 Version `0` is the original, non-defragmented checkpoint and has no version
-suffix. Versions greater than `0` are produced by snapshot defragmentation. For
-example:
+suffix. Versions greater than `0` are produced by snapshot defragmentation.
+Normally only the current version's directory remains after a successful
+defrag cleanup. The following paths show how the directory name changes over a
+snapshot's lifetime; they are not expected to coexist in normal steady state:
 
 ```text
+# Before first defrag:
 /var/lib/ozone/om/db.snapshots/checkpointState/om.db-3d0a...9f62
+
+# After first successful defrag:
 /var/lib/ozone/om/db.snapshots/checkpointState/om.db-3d0a...9f62-1
+
+# After the next successful defrag:
 /var/lib/ozone/om/db.snapshots/checkpointState/om.db-3d0a...9f62-2
 ```
+
+Older directories can exist briefly during a version switch or after an
+interrupted cleanup, but the normal post-defrag path deletes older checkpoint
+directories for that snapshot DB.
 
 Each snapshot also has one local YAML sidecar next to the version `0`
 directory:
@@ -120,7 +134,17 @@ and deletes it on shutdown.
 
 When an OM DB checkpoint is served to another OM, the checkpoint code uses the
 current version from the local YAML metadata and includes that snapshot DB
-directory.
+directory. The bootstrap transfer also includes the required
+`om.db-<snapshot_uuid>.yaml` sidecars. The inode-based transfer path explicitly
+archives the YAML files for the snapshots present in the checkpoint and for any
+previous local-data nodes they depend on; the directory-walk transfer path
+includes sidecar files while selecting only the current snapshot DB directories.
+The bootstrap write lock waits for the OM double buffer to flush before
+collecting files, and the inode-based path also holds the snapshot cache lock
+and the local data manager lock while resolving snapshot directories and YAML
+paths. Snapshots in the intermediate `SNAPSHOT_DELETED` state can still be
+copied because they remain in `SnapshotInfo`; fully purged snapshots are no
+longer present there.
 
 ## Local Snapshot Metadata
 
@@ -130,20 +154,29 @@ Snapshot defrag metadata is stored in `OmSnapshotLocalData` YAML, not in
 | Field | Meaning |
 | :---- | :------ |
 | `snapshotId` | Snapshot UUID. Must match the checkpoint directory name. |
+| `checksum` | Checksum of the YAML representation, used to detect corrupted local metadata. |
 | `previousSnapshotId` | The previous snapshot in the same bucket path chain that this local data is resolved against. |
 | `version` | Current version to open. `0` means the original checkpoint; `> 0` means a defragmented version. |
 | `needsDefrag` | Explicit local flag that forces the service to defragment the snapshot. |
+| `isSSTFiltered` | YAML marker used by the older `SstFilteringService` path. Defrag disables that service when it is enabled. |
 | `versionSstFileInfos` | Map from snapshot version to `VersionMeta`. This replaces the earlier split between `notDefraggedSstFileList` and `defraggedSstFileList`. |
 | `VersionMeta.previousSnapshotVersion` | The version of `previousSnapshotId` that this version depends on. |
-| `VersionMeta.sstFiles` | SST file metadata for `keyTable`, `directoryTable`, and `fileTable`. |
+| `VersionMeta.sstFiles` | SST file metadata for `keyTable`, `directoryTable`, and `fileTable`. Each nested `SstFileInfo` uses `fileName`, `startKey`, `endKey`, and `columnFamily`; `fileName` is stored without the `.sst` extension. |
 | `dbTxSequenceNumber` | Largest RocksDB sequence number observed in tracked SST files when the original snapshot YAML is created. Used by the checkpoint differ. |
 | `transactionInfo` | Purge transaction marker used to remove local metadata only after the purge has flushed to disk. |
 | `lastDefragTime` | Serialized by the YAML class, but current defrag decisions are based on `version`, `needsDefrag`, and `versionSstFileInfos`. |
 
-On snapshot creation, OM creates the YAML file and captures the live SST file
-metadata for `keyTable`, `directoryTable`, and `fileTable` as version `0`.
-New and migrated snapshots are committed with `needsDefrag = true`. When a
-new defragmented version is added, the current version is incremented, the new
+On every snapshot creation, OM creates the YAML sidecar and captures live SST
+file metadata for `keyTable`, `directoryTable`, and `fileTable` as version
+`0`. This metadata is read from the newly created snapshot checkpoint DB, not
+from the active OM DB, so an active DB compaction immediately after checkpoint
+creation cannot corrupt the snapshot's local SST tracking. This happens even
+when the periodic snapshot defrag service is disabled. New snapshots are
+committed with `needsDefrag = true`. During upgrade/finalization,
+`OmSnapshotLocalDataManager` also creates missing YAML files for snapshots
+already present in `SnapshotInfo`; active snapshots get their tracked SST
+metadata, and the synthesized YAML is marked `needsDefrag = true`. When a new
+defragmented version is added, the current version is incremented, the new
 version's SST list is captured from RocksDB, and `needsDefrag` is cleared.
 
 `OmSnapshotLocalDataManager` keeps an in-memory graph of local version
@@ -166,6 +199,7 @@ Snapshot defragmentation is disabled by default.
 | `ozone.snapshot.defrag.service.interval` | `-1` | Background interval. A value `<= 0` disables the service. |
 | `ozone.snapshot.defrag.limit.per.task` | `1` | Maximum number of snapshots defragmented in one service run. |
 | `ozone.snapshot.defrag.service.timeout` | `300s` | Timeout for one service run. |
+| `ozone.om.snapshot.local.data.manager.service.interval` | `5m` | Interval for the local YAML/version orphan cleanup thread. A value `<= 0` disables the cleanup thread. |
 
 The service is gated by the `SNAPSHOT_DEFRAG` OM layout feature. It also
 requires the Rocks tools native library; if the library is unavailable, an
@@ -231,7 +265,9 @@ The main workflow is:
    the lock that prevents concurrent snapshot content changes while the service
    reloads non-incremental tables and switches versions. Snapshot reads and
    deep-clean writes use `SNAPSHOT_DB_LOCK` or read `SNAPSHOT_DB_CONTENT_LOCK`
-   in the same lock hierarchy.
+   in the same lock hierarchy. The DAG-based lock ordering allows the content
+   lock to be acquired before snapshot DB and local-data locks; code paths avoid
+   acquiring the content lock while already holding local-data locks.
 7. Dump and ingest non-incremental tables from the current snapshot into the
    checkpoint. The tracked tables (`keyTable`, `directoryTable`, `fileTable`)
    are skipped because they were already rebuilt.
@@ -244,10 +280,19 @@ The main workflow is:
 
 9. Open the new version, add its live SST metadata to
    `versionSstFileInfos`, update `version`, and clear `needsDefrag`.
-10. Delete older checkpoint directories for that snapshot after acquiring the
-    snapshot DB cache write lock. The YAML version metadata may remain longer
-    than the directories when another snapshot version still references it.
+10. After a successful version switch, delete older checkpoint directory
+    versions for that same snapshot after acquiring the snapshot DB cache write
+    lock. For example, after switching from version `1` to version `2`,
+    `om.db-<snapshot_uuid>-1` is removed locally once there are no open cached
+    handles for that snapshot DB. Version `0` is normally removed after the
+    first successful defrag that creates version `1`; if an older directory is
+    still present from an interrupted earlier cleanup, the same deletion path
+    can remove it. The YAML version metadata may remain longer than the
+    directories when another snapshot version still references it.
     `OmSnapshotLocalDataManager` removes orphaned version metadata later.
+    This directory deletion intentionally remains under
+    `SNAPSHOT_DB_CONTENT_LOCK` so stale cached handles cannot write to an old
+    version while it is being removed.
 11. Release `SNAPSHOT_DB_CONTENT_LOCK`.
 
 ```mermaid
@@ -285,7 +330,14 @@ DB checkpoints.
 If the DAG-based differ cannot produce a complete answer, the code falls back
 to `FullDiffComputer`. The full differ compares relevant SST files by inode
 when inode metadata is available, and falls back to comparing full file lists
-when inode comparison fails.
+when inode comparison fails. It considers files unique to either endpoint and
+skips common files only when the file identity proves that they are the same
+SST.
+
+The delta computers materialize candidate SSTs as hard links under
+`tmp_defrag/differSstFiles` before returning them to the defrag service. This
+keeps the source SST content stable while the service reads it, even if the
+original source path later becomes eligible for cleanup.
 
 The delta files identify candidate SSTs, not final row-level changes. The
 defrag service still reads keys from those files, compares current and previous
@@ -293,6 +345,40 @@ snapshot table values, writes only changed records or tombstones to a new SST
 file, and ingests that file into the checkpoint. If there is exactly one delta
 file for a table and the current snapshot version is already greater than `0`,
 the service can ingest that delta file directly.
+
+`SstFileSetReader` returns candidate keys as a sorted merged stream and can
+read tombstones through the raw SST reader. The defrag path uses key-only
+iteration, `CodecBuffer`, and direct buffers where possible. Because candidate
+keys are sorted, `TableMergeIterator` can walk the current and previous RocksDB
+tables with forward iterators and seeks instead of issuing independent point
+gets for every candidate key.
+
+## Snapshot Diff Before and After Defrag
+
+The snapshot diff API and report-generation flow do not change after snapshot
+defragmentation. `SnapshotDiffManager` still submits a diff job, opens the
+current snapshot DB versions through `OmSnapshotManager`, asks
+`CompositeDeltaDiffComputer` for candidate SST files, reads candidate keys with
+`SstFileSetReader`, compares the from/to snapshot tables with
+`TableMergeIterator`, and builds the object-ID maps used to produce the final
+diff report.
+
+The internal SST-candidate path changes based on the current local version of
+the to-snapshot:
+
+* Before defrag, the to-snapshot is version `0`, which is the original OM DB
+  checkpoint. `RDBDifferComputer` can ask `RocksDBCheckpointDiffer` to walk the
+  active DB compaction DAG and use the YAML `dbTxSequenceNumber` plus version
+  `0` SST metadata to identify changed SSTs. If the DAG cannot provide a
+  complete answer, `CompositeDeltaDiffComputer` falls back to `FullDiffComputer`.
+* After defrag, the to-snapshot's current version is greater than `0`, and that
+  version is a rewritten snapshot DB rather than an active DB checkpoint
+  produced by normal RocksDB compactions. The differ resolves the from-snapshot
+  dependency through `OmSnapshotLocalDataManager`, passes the YAML
+  `versionSstFileInfos` version map into `RocksDBCheckpointDiffer`, and compares
+  SST metadata for the relevant snapshot versions instead of using the
+  compaction-DAG walk. The full-diff fallback is still available, and
+  `--forceFullDiff` continues to bypass the DAG path.
 
 ## Snapshot Reads
 
@@ -307,6 +393,12 @@ and opens:
 The read path does not scan for the highest directory suffix on disk. The YAML
 current version is the source of truth: moving a new checkpoint directory is
 not visible to readers until the YAML current version is committed.
+
+Before opening a snapshot cache entry, the loader waits for the snapshot create
+transaction recorded in `SnapshotInfo.createTransactionInfo` to flush to the OM
+DB. This prevents a follower or a fast reader from opening a snapshot whose
+checkpoint directory or YAML sidecar exists in memory or on disk before the
+corresponding create transaction is durable.
 
 ## Snapshot Purge and Orphan Cleanup
 
@@ -324,11 +416,47 @@ for defrag, `OmSnapshotLocalDataManager` resolves the updated
 previous snapshot version is stale, the provider marks or reports the snapshot
 as needing defrag.
 
-Old version metadata and YAML files are cleaned separately from checkpoint
-directories. The local data manager periodically checks whether version nodes
-have no dependents and whether purge transactions have flushed to disk. Only
-then can it remove orphaned version entries or delete the YAML file for a
-purged snapshot.
+Old checkpoint directories for a snapshot are deleted immediately after that
+snapshot is successfully defragmented to a newer version. Old version metadata
+and YAML files are cleaned separately from checkpoint directories by
+`OmSnapshotLocalDataManagerService`, a single-threaded scheduler owned by
+`OmSnapshotLocalDataManager`.
+
+On startup, the local data manager loads all `om.db-<snapshot_uuid>.yaml`
+files, rebuilds the in-memory version dependency graph, and queues every
+loaded snapshot ID for an orphan check. Later commits can queue additional
+snapshot IDs:
+
+* when a snapshot gains or removes local versions;
+* when a snapshot's resolved `previousSnapshotId` changes after purge updates
+  the path chain;
+* when purge records `transactionInfo` in a snapshot's YAML.
+
+Each cleanup pass checks the queued snapshot IDs. A version entry can be
+removed from YAML when no other local version node depends on it and either:
+
+* the version is not `0` and is not the snapshot's current version; or
+* the snapshot itself has been purged.
+
+Version `0` is kept for active snapshots even when it has no dependents,
+because a newly created or unresolved snapshot can still depend on the original
+version. If a snapshot has purge `transactionInfo` but the purge transaction
+has not flushed to the OM DB yet, the cleanup thread keeps the YAML and
+re-queues the snapshot for a later pass. When the purge has flushed and no
+versions remain, the YAML file is deleted.
+
+## Metrics and Logging
+
+`OmSnapshotInternalMetrics` records defrag progress since the last OM restart:
+total defrag operations, total failures, skipped snapshots, full defrag
+operations and failures, incrementally defragged snapshots and failures, full
+defrag tables compacted, and incremental delta files processed.
+
+`OMPerformanceMetrics` records the latency of the last full defrag operation
+and the last incremental defrag operation in milliseconds. With trace logging
+enabled, `SnapshotDefragService` also logs before/after directory statistics
+for each defragmented snapshot, including total files, SST file count, and
+directory byte usage.
 
 ## Expected Effect
 
