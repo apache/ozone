@@ -115,6 +115,7 @@ public class MockNodeManager implements NodeManager {
   private int numHealthyDisksPerDatanode;
   private int numPipelinePerDatanode;
   private PendingContainerTracker pendingContainerTracker;
+  private final OzoneConfiguration conf = new OzoneConfiguration();
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -125,7 +126,7 @@ public class MockNodeManager implements NodeManager {
     this.node2ContainerMap = new NodeStateMap();
     this.dnsToUuidMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
-    this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
+    this.clusterMap = new NetworkTopologyImpl(conf);
     this.pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024, null);
   }
 
@@ -266,7 +267,7 @@ public class MockNodeManager implements NodeManager {
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
         DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-            UpgradeUtils.defaultLayoutVersionProto(), new OzoneConfiguration());
+            UpgradeUtils.defaultLayoutVersionProto(), conf);
 
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();
@@ -345,7 +346,7 @@ public class MockNodeManager implements NodeManager {
         nodeStatus = NodeStatus.inServiceDead();
       }
       DatanodeInfo di = new DatanodeInfo(entry.getKey(), nodeStatus,
-          UpgradeUtils.defaultLayoutVersionProto(), new OzoneConfiguration());
+          UpgradeUtils.defaultLayoutVersionProto(), conf);
 
       long capacity = entry.getValue().getCapacity().get();
       long used = entry.getValue().getScmUsed().get();
@@ -434,7 +435,7 @@ public class MockNodeManager implements NodeManager {
     }
 
     DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-        UpgradeUtils.defaultLayoutVersionProto(), new OzoneConfiguration());
+        UpgradeUtils.defaultLayoutVersionProto(), conf);
     long capacity = nodeMetricMap.get(dd).getCapacity().get();
     long used = nodeMetricMap.get(dd).getScmUsed().get();
     long remaining = nodeMetricMap.get(dd).getRemaining().get();
@@ -763,7 +764,7 @@ public class MockNodeManager implements NodeManager {
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
     final DatanodeInfo info = new DatanodeInfo(datanodeDetails,
-        NodeStatus.inServiceHealthy(), layoutInfo, new OzoneConfiguration());
+        NodeStatus.inServiceHealthy(), layoutInfo, conf);
     try {
       node2ContainerMap.addNode(info);
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),
