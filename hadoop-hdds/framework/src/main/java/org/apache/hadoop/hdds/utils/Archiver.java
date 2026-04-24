@@ -80,12 +80,29 @@ public final class Archiver {
     return output.toByteArray();
   }
 
+  private static TarArchiveEntry createBasicTarArchiveEntry(File file, String entryName)
+      throws IOException {
+    TarArchiveEntry entry = new TarArchiveEntry(entryName);
+    entry.setMode(TarArchiveEntry.DEFAULT_FILE_MODE);
+    try {
+      BasicFileAttributes attrs = Files.readAttributes(
+          file.toPath(), BasicFileAttributes.class);
+      entry.setLastModifiedTime(attrs.lastModifiedTime());
+      entry.setLastAccessTime(attrs.lastAccessTime());
+      entry.setCreationTime(attrs.creationTime());
+    } catch (IOException e) {
+      entry.setModTime(file.lastModified()); // fallback
+    }
+    entry.setSize(file.length());
+    return entry;
+  }
+
   public static void includePath(Path dir, String subdir,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
 
     // Add a directory entry before adding files, in case the directory is
     // empty.
-    TarArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
+    TarArchiveEntry entry = createBasicTarArchiveEntry(dir.toFile(), subdir);
     archiveOutput.putArchiveEntry(entry);
     archiveOutput.closeArchiveEntry();
 
@@ -106,20 +123,7 @@ public final class Archiver {
   public static long includeFile(File file, String entryName,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
     final long bytes;
-
-    TarArchiveEntry entry = new TarArchiveEntry(entryName);
-    entry.setMode(TarArchiveEntry.DEFAULT_FILE_MODE);
-    try {
-      BasicFileAttributes attrs = Files.readAttributes(
-          file.toPath(), BasicFileAttributes.class);
-      entry.setLastModifiedTime(attrs.lastModifiedTime());
-      entry.setLastAccessTime(attrs.lastAccessTime());
-      entry.setCreationTime(attrs.creationTime());
-    } catch (IOException e) {
-      entry.setModTime(file.lastModified()); // fallback
-    }
-    entry.setSize(file.length());
-
+    TarArchiveEntry entry = createBasicTarArchiveEntry(file, entryName);
     archiveOutput.putArchiveEntry(entry);
     try (InputStream input = Files.newInputStream(file.toPath())) {
       bytes = IOUtils.copy(input, archiveOutput, getBufferSize(file.length()));
@@ -152,7 +156,7 @@ public final class Archiver {
     long bytes = 0;
     try {
       Files.createLink(link.toPath(), file.toPath());
-      TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
+      TarArchiveEntry entry = createBasicTarArchiveEntry(link, entryName);
       archiveOutput.putArchiveEntry(entry);
       try (InputStream input = Files.newInputStream(link.toPath())) {
         bytes = IOUtils.copyLarge(input, archiveOutput);
