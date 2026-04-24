@@ -26,7 +26,7 @@ summary: Reduce the disk usage occupied by Ozone Snapshot metadata.
 
 [HDDS-13003](https://issues.apache.org/jira/browse/HDDS-13003)
 
-This is the design-history page for HDDS-13003. It keeps the original proposal
+This is a revised design doc for HDDS-13003. It keeps the original proposal
 structure and calls out where the implemented behavior differs from the initial
 proposal. For the current user-facing behavior, configuration, and on-disk
 layout, see
