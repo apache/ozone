@@ -98,14 +98,8 @@ public class TestBlockDeletionService {
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500, TimeUnit.MILLISECONDS);
     conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HBASE_SUPPORT.layoutVersion());
 
-    InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-        scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
-    SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
-
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(9)
-        .setSCMConfigurator(configurator)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setLayoutVersion(HBASE_SUPPORT.layoutVersion()).build())
         .build();

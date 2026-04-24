@@ -96,29 +96,4 @@ public final class UpgradeTestUtils {
 
     return executor;
   }
-
-  /**
-   * @param haltingPoint Where to halt finalization in the returned
-   *     executor's {@code execute} method.
-   * @param terminateLatch The latch that will be counted down 1 by the
-   *    executor when the upgrade finalization has been terminated.
-   * @param log Where to log messages about pausing and resuming finalization.
-   * @return A new InjectedUpgradeFinalizationExecutor
-   */
-  public static <T> InjectedUpgradeFinalizationExecutor<T>
-      newTerminatingFinalizationExecutor(
-          UpgradeTestInjectionPoints haltingPoint,
-      CountDownLatch terminateLatch, Logger log) {
-    InjectedUpgradeFinalizationExecutor<T>
-        executor =
-        new InjectedUpgradeFinalizationExecutor<>();
-    executor.configureTestInjectionFunction(haltingPoint, () -> {
-      log.info("Terminating upgrade finalization at point: {}. This is " +
-          "expected test execution.", haltingPoint);
-      terminateLatch.countDown();
-      return true;
-    });
-
-    return executor;
-  }
 }
