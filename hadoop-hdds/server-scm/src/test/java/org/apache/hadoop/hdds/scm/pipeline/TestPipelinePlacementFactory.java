@@ -103,7 +103,8 @@ public class TestPipelinePlacementFactory {
       cluster.add(datanodeDetails);
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(),
+          conf);
 
       StorageContainerDatanodeProtocolProtos.StorageReportProto storage1 =
           HddsTestUtils.createStorageReport(

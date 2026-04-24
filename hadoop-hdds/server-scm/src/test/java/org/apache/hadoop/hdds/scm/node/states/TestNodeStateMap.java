@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -52,7 +53,7 @@ public class TestNodeStateMap {
   }
 
   void addNode(DatanodeDetails datanode, NodeStatus status) throws NodeAlreadyExistsException {
-    map.addNode(new DatanodeInfo(datanode, status, null));
+    map.addNode(new DatanodeInfo(datanode, status, null, new OzoneConfiguration()));
   }
 
   @BeforeEach

@@ -134,6 +134,8 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private boolean checkPaused;
 
+  private final ConfigurationSource conf;
+
   /**
    * timestamp of the latest heartbeat check process.
    */
@@ -174,6 +176,7 @@ public class NodeStateManager implements Runnable, Closeable {
     this.nodeHealthSM = new StateMachine<>(NodeState.HEALTHY,
         finalStates);
     initializeStateMachines();
+    this.conf = conf;
     heartbeatCheckerIntervalMs = HddsServerUtil
         .getScmheartbeatCheckerInterval(conf);
     staleNodeIntervalMs = HddsServerUtil.getStaleNodeInterval(conf);
@@ -310,7 +313,7 @@ public class NodeStateManager implements Runnable, Closeable {
 
   private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, LayoutVersionProto layout) {
     final NodeStatus status = newNodeStatus(datanode, layout);
-    return new DatanodeInfo(datanode, status, layout);
+    return new DatanodeInfo(datanode, status, layout, conf);
   }
 
   /**

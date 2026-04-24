@@ -18,18 +18,12 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo.TwoWindowBucket;
 import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,8 +64,6 @@ public class PendingContainerTracker {
 
   private static final Logger LOG = LoggerFactory.getLogger(PendingContainerTracker.class);
 
-  private final DatanodeBuckets datanodeBuckets;
-
   /**
    * Maximum container size in bytes.
    */
@@ -82,108 +74,14 @@ public class PendingContainerTracker {
    */
   private final SCMNodeMetrics metrics;
 
-  /**
-   * Two-window bucket for a single DataNode.
-   * Contains current and previous window sets, plus last roll timestamp.
-   */
-  private static class TwoWindowBucket {
-    private Set<ContainerID> currentWindow = new HashSet<>();
-    private Set<ContainerID> previousWindow = new HashSet<>();
-    private long lastRollTime = Time.monotonicNow();
-    private final long rollIntervalMs;
-
-    TwoWindowBucket(long rollIntervalMs) {
-      this.rollIntervalMs = rollIntervalMs;
-    }
-
-    /**
-     * Roll one or both windows based on elapsed time.
-     */
-    synchronized void rollIfNeeded() {
-      long now = Time.monotonicNow();
-      long elapsed = now - lastRollTime;
-
-      if (elapsed >= 2 * rollIntervalMs) {
-        int dropped = getCount();
-        previousWindow.clear();
-        currentWindow.clear();
-        lastRollTime = now;
-        LOG.debug("Double roll interval elapsed ({}ms): dropped {} pending containers", elapsed, dropped);
-      } else if (elapsed >= rollIntervalMs) {
-        previousWindow.clear();
-        final Set<ContainerID> tmp = previousWindow;
-        previousWindow = currentWindow;
-        currentWindow = tmp;
-        lastRollTime = now;
-        LOG.debug("Rolled window. Previous window size: {} elapsed: ({}ms), Current window reset to empty",
-            previousWindow.size(), elapsed);
-      }
-    }
-
-    synchronized boolean contains(ContainerID containerID) {
-      return currentWindow.contains(containerID) || previousWindow.contains(containerID);
-    }
-
-    /**
-     * Add container to current window.
-     */
-    synchronized boolean add(ContainerID containerID, DatanodeID dnID) {
-      boolean added = currentWindow.add(containerID);
-      LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
-          containerID, dnID, added, getCount());
-      return added;
-    }
-
-    /**
-     * Remove container from both windows.
-     */
-    synchronized boolean remove(ContainerID containerID, DatanodeID dnID) {
-      boolean removedFromCurrent = currentWindow.remove(containerID);
-      boolean removedFromPrevious = previousWindow.remove(containerID);
-      boolean removed = removedFromCurrent || removedFromPrevious;
-      LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
-          containerID, dnID, removed, getCount());
-      return removed;
-    }
-
-    /**
-     * Count of pending containers in both windows.
-     */
-    synchronized int getCount() {
-      return currentWindow.size() + previousWindow.size();
-    }
-  }
-
-  /**
-   * Per-datanode two-window buckets.
-   */
-  private static class DatanodeBuckets {
-    private final ConcurrentHashMap<DatanodeID, TwoWindowBucket> map = new ConcurrentHashMap<>();
-    private final long rollIntervalMs;
-
-    DatanodeBuckets(long rollIntervalMs) {
-      this.rollIntervalMs = rollIntervalMs;
-    }
-
-    TwoWindowBucket get(DatanodeID id) {
-      final TwoWindowBucket bucket = map.compute(id, (k, b) -> b != null ? b : new TwoWindowBucket(rollIntervalMs));
-      bucket.rollIfNeeded();
-      return bucket;
-    }
-
-    TwoWindowBucket get(DatanodeDetails dn) {
-      Objects.requireNonNull(dn, "dn == null");
-      return get(dn.getID());
-    }
-  }
-
-  public PendingContainerTracker(long maxContainerSize, long rollIntervalMs,
-      SCMNodeMetrics metrics) {
-    this.datanodeBuckets = new DatanodeBuckets(rollIntervalMs);
+  public PendingContainerTracker(long maxContainerSize, SCMNodeMetrics metrics) {
     this.maxContainerSize = maxContainerSize;
     this.metrics = metrics;
-    LOG.info("PendingContainerTracker initialized with maxContainerSize={}B, rollInterval={}ms",
-        maxContainerSize, rollIntervalMs);
+    LOG.info("PendingContainerTracker initialized with maxContainerSize={}B", maxContainerSize);
+  }
+
+  private TwoWindowBucket getBucket(DatanodeInfo datanodeInfo) {
+    return datanodeInfo.getTwoWindowBucket();
   }
 
   /**
@@ -191,26 +89,23 @@ public class PendingContainerTracker {
    * Call on periodic paths (node report) so windows age even when there are no new
    * allocations or container reports touching this tracker.
    */
-  public void rollWindowsIfNeeded(DatanodeDetails node) {
-    Objects.requireNonNull(node, "node == null");
-    datanodeBuckets.get(node.getID());
+  public void rollWindowsIfNeeded(DatanodeInfo datanodeInfo) {
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
+    getBucket(datanodeInfo).rollIfNeeded();
   }
 
   /**
    * Whether the datanode can fit another container of {@link #maxContainerSize} after accounting for
-   * SCM pending allocations for {@code node} (this tracker) and usable space across volumes on
-   * {@code datanodeInfo}. Pending bytes are {@link #getPendingContainerCount} × {@code maxContainerSize};
+   * SCM pending allocations for {@code datanodeInfo} (this tracker) and usable space across volumes.
+   * Pending bytes are {@link #getPendingContainerCount} × {@code maxContainerSize};
    * effective allocatable space sums full-container slots per storage report.
    *
-   * @param node identity used to look up pending allocations (same DN as {@code datanodeInfo})
-   * @param datanodeInfo storage reports for the datanode
+   * @param datanodeInfo storage reports and pending-allocation bucket for the datanode
    */
-  public boolean hasEffectiveAllocatableSpaceForNewContainer(
-      DatanodeDetails node, DatanodeInfo datanodeInfo) {
-    Objects.requireNonNull(node, "node == null");
+  public boolean hasEffectiveAllocatableSpaceForNewContainer(DatanodeInfo datanodeInfo) {
     Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
 
-    long pendingAllocationSize = getPendingContainerCount(node) * maxContainerSize;
+    long pendingAllocationSize = getPendingContainerCount(datanodeInfo) * maxContainerSize;
     List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
     Objects.requireNonNull(storageReports, "storageReports == null");
     if (storageReports.isEmpty()) {
@@ -232,42 +127,21 @@ public class PendingContainerTracker {
   }
 
   /**
-   * Record a pending container allocation for all DataNodes in the pipeline.
-   * Container is added to the current window.
-   *
-   * @param pipeline The pipeline where container is allocated
-   * @param containerID The container being allocated
-   */
-  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
-    Objects.requireNonNull(pipeline, "pipeline == null");
-    Objects.requireNonNull(containerID, "containerID == null");
-
-    for (DatanodeDetails node : pipeline.getNodes()) {
-      recordPendingAllocationForDatanode(node, containerID);
-    }
-  }
-
-  /**
    * Record a pending container allocation for a single DataNode.
    * Container is added to the current window.
    *
-   * @param node The DataNode where container is being allocated/replicated
+   * @param datanodeInfo The DataNode where container is being allocated/replicated
    * @param containerID The container being allocated/replicated
    */
-  public void recordPendingAllocationForDatanode(DatanodeDetails node, ContainerID containerID) {
-    Objects.requireNonNull(node, "node == null");
+  public void recordPendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     Objects.requireNonNull(containerID, "containerID == null");
 
-    DatanodeID dnID = node.getID();
-    boolean added = addContainerToBucket(containerID, dnID);
+    boolean added = getBucket(datanodeInfo).add(containerID);
 
     if (added && metrics != null) {
       metrics.incNumPendingContainersAdded();
     }
-  }
-
-  private boolean addContainerToBucket(ContainerID containerID, DatanodeID dnID) {
-    return datanodeBuckets.get(dnID).add(containerID, dnID);
   }
 
   /**
@@ -275,45 +149,40 @@ public class PendingContainerTracker {
    * Removes from both current and previous windows.
    * Called when container is confirmed.
    *
-   * @param node The DataNode
+   * @param datanodeInfo The DataNode
    * @param containerID The container to remove from pending
    */
-  public void removePendingAllocation(DatanodeDetails node, ContainerID containerID) {
-    Objects.requireNonNull(node, "node == null");
+  public void removePendingAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     Objects.requireNonNull(containerID, "containerID == null");
 
-    DatanodeID dnID = node.getID();
-    boolean removed = removeContainerFromBucket(containerID, dnID);
+    boolean removed = getBucket(datanodeInfo).remove(containerID);
 
     if (removed && metrics != null) {
       metrics.incNumPendingContainersRemoved();
     }
   }
 
-  private boolean removeContainerFromBucket(ContainerID containerID, DatanodeID dnID) {
-    return datanodeBuckets.get(dnID).remove(containerID, dnID);
-  }
-
   /**
    * Number of pending container allocations for this datanode (union of current and previous
    * windows). This call may advance the internal tumbling window if the roll interval has elapsed.
    *
-   * @param node The DataNode
+   * @param datanodeInfo The DataNode
    * @return Pending container count
    */
-  public long getPendingContainerCount(DatanodeDetails node) {
-    Objects.requireNonNull(node, "node == null");
-    return datanodeBuckets.get(node).getCount();
+  public long getPendingContainerCount(DatanodeInfo datanodeInfo) {
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
+    return getBucket(datanodeInfo).getCount();
   }
 
   /**
    * Whether container is in the current or previous window for this datanode.
    */
   @VisibleForTesting
-  public boolean containsPendingContainer(DatanodeDetails node, ContainerID containerID) {
-    Objects.requireNonNull(node, "node == null");
+  public boolean containsPendingContainer(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
     Objects.requireNonNull(containerID, "containerID == null");
-    return datanodeBuckets.get(node).contains(containerID);
+    return getBucket(datanodeInfo).contains(containerID);
   }
 
   @VisibleForTesting

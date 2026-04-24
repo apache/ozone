@@ -17,21 +17,19 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -42,18 +40,15 @@ import org.junit.jupiter.api.Timeout;
 public class TestPendingContainerTracker {
 
   private static final long MAX_CONTAINER_SIZE = 5L * 1024 * 1024 * 1024; // 5GB
-  private static final long DEFAULT_ROLL_INTERVAL_MS = 5 * 60 * 1000;
   private static final int NUM_DATANODES = 1000;
-  private static final int NUM_PIPELINES = 1000;
   private static final int NUM_CONTAINERS = 10_000;
-  private List<DatanodeDetails> datanodes;
-  private List<Pipeline> pipelines;
+  private List<DatanodeInfo> datanodes;
   private List<ContainerID> containers;
 
+  private final OzoneConfiguration conf = new OzoneConfiguration();
   private PendingContainerTracker tracker;
-  private Pipeline pipeline;
-  private DatanodeDetails dn1;
-  private DatanodeDetails dn2;
+  private DatanodeInfo dn1;
+  private DatanodeInfo dn2;
 
   /** First three container IDs. */
   private ContainerID container1;
@@ -61,16 +56,13 @@ public class TestPendingContainerTracker {
 
   @BeforeEach
   public void setUp() throws IOException {
-    tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, DEFAULT_ROLL_INTERVAL_MS, null);
+    tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, null);
 
     datanodes = new ArrayList<>(NUM_DATANODES);
     for (int i = 0; i < NUM_DATANODES; i++) {
-      datanodes.add(MockDatanodeDetails.randomLocalDatanodeDetails());
-    }
-
-    pipelines = new ArrayList<>(NUM_PIPELINES);
-    for (int i = 0; i < NUM_PIPELINES; i++) {
-      pipelines.add(MockPipeline.createPipeline(Collections.singletonList(datanodes.get(i))));
+      datanodes.add(new DatanodeInfo(
+          MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
+          conf));
     }
 
     containers = new ArrayList<>(NUM_CONTAINERS);
@@ -78,7 +70,6 @@ public class TestPendingContainerTracker {
       containers.add(ContainerID.valueOf(id));
     }
 
-    pipeline = MockPipeline.createPipeline(datanodes.subList(0, 3));
     dn1 = datanodes.get(0);
     dn2 = datanodes.get(1);
 
@@ -88,9 +79,9 @@ public class TestPendingContainerTracker {
 
   @Test
   public void testRecordPendingAllocation() {
-    // Allocate first 100 containers across first 100 pipelines (1 DN each)
+    // Allocate first 100 containers, one per datanode
     for (int i = 0; i < 100; i++) {
-      tracker.recordPendingAllocation(pipelines.get(i), containers.get(i));
+      tracker.recordPendingAllocationForDatanode(datanodes.get(i), containers.get(i));
     }
 
     // Each of the first 100 DNs should have 1 pending container
@@ -107,9 +98,9 @@ public class TestPendingContainerTracker {
 
   @Test
   public void testRemovePendingAllocation() {
-    // Allocate containers 0-99 to first 100 pipelines
+    // Allocate containers 0-99, one per datanode
     for (int i = 0; i < 100; i++) {
-      tracker.recordPendingAllocation(pipelines.get(i), containers.get(i));
+      tracker.recordPendingAllocationForDatanode(datanodes.get(i), containers.get(i));
     }
 
     // Remove from first 50 DNs
@@ -137,29 +128,34 @@ public class TestPendingContainerTracker {
   @Timeout(30)
   public void testTwoWindowRollAgesOutContainerAfterTwoIntervals() throws InterruptedException {
     long rollMs = 200L;
-    PendingContainerTracker shortRollTracker =
-        new PendingContainerTracker(MAX_CONTAINER_SIZE, rollMs, null);
+    OzoneConfiguration shortConf = new OzoneConfiguration();
+    shortConf.set(OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL, rollMs + "ms");
+    DatanodeInfo shortDn = new DatanodeInfo(
+        MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
+        shortConf);
 
-    shortRollTracker.recordPendingAllocationForDatanode(dn1, container1);
-    assertEquals(1, shortRollTracker.getPendingContainerCount(dn1));
-    assertTrue(shortRollTracker.containsPendingContainer(dn1, container1));
+    PendingContainerTracker shortRollTracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, null);
+
+    shortRollTracker.recordPendingAllocationForDatanode(shortDn, container1);
+    assertEquals(1, shortRollTracker.getPendingContainerCount(shortDn));
+    assertTrue(shortRollTracker.containsPendingContainer(shortDn, container1));
 
     // First roll: C1 moves from currentWindow to previousWindow; union still includes C1
     Thread.sleep(rollMs + 80);
-    shortRollTracker.rollWindowsIfNeeded(dn1);
-    assertEquals(1, shortRollTracker.getPendingContainerCount(dn1));
-    assertTrue(shortRollTracker.containsPendingContainer(dn1, container1));
+    shortRollTracker.rollWindowsIfNeeded(shortDn);
+    assertEquals(1, shortRollTracker.getPendingContainerCount(shortDn));
+    assertTrue(shortRollTracker.containsPendingContainer(shortDn, container1));
 
     // Second roll: prior previousWindow (holding C1) is dropped; C1 is no longer pending
     Thread.sleep(rollMs + 80);
-    shortRollTracker.rollWindowsIfNeeded(dn1);
-    assertEquals(0, shortRollTracker.getPendingContainerCount(dn1));
-    assertEquals(0L, shortRollTracker.getPendingContainerCount(dn1) * MAX_CONTAINER_SIZE);
+    shortRollTracker.rollWindowsIfNeeded(shortDn);
+    assertEquals(0, shortRollTracker.getPendingContainerCount(shortDn));
+    assertEquals(0L, shortRollTracker.getPendingContainerCount(shortDn) * MAX_CONTAINER_SIZE);
   }
 
   @Test
   public void testRemoveNonExistentContainer() {
-    tracker.recordPendingAllocation(pipeline, container1);
+    datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, container1));
 
     // Remove a container that was never added - should not throw exception
     tracker.removePendingAllocation(dn1, container2);
@@ -170,7 +166,9 @@ public class TestPendingContainerTracker {
 
   @Test
   public void testUnknownDatanodeHasZeroPendingCount() {
-    DatanodeDetails unknownDN = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeInfo unknownDN = new DatanodeInfo(
+        MockDatanodeDetails.randomDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
+        conf);
     assertEquals(0, tracker.getPendingContainerCount(unknownDN));
   }
 
@@ -187,7 +185,7 @@ public class TestPendingContainerTracker {
       threads[i] = new Thread(() -> {
         for (int j = 0; j < operationsPerThread; j++) {
           ContainerID cid = ContainerID.valueOf(threadId * 1000L + j);
-          tracker.recordPendingAllocation(pipeline, cid);
+          datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, cid));
 
           if (j % 2 == 0) {
             tracker.removePendingAllocation(dn1, cid);
@@ -209,7 +207,7 @@ public class TestPendingContainerTracker {
 
   @Test
   public void testBucketsRetainedWhenEmpty() {
-    tracker.recordPendingAllocation(pipeline, container1);
+    datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, container1));
 
     assertEquals(1, tracker.getPendingContainerCount(dn1));
 
@@ -230,8 +228,8 @@ public class TestPendingContainerTracker {
     // In general, a container could be in previous window after a roll
 
     // Add containers
-    tracker.recordPendingAllocation(pipeline, container1);
-    tracker.recordPendingAllocation(pipeline, container2);
+    datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, container1));
+    datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, container2));
 
     assertEquals(2, tracker.getPendingContainerCount(dn1));
 
@@ -247,7 +245,7 @@ public class TestPendingContainerTracker {
   @Test
   public void testManyContainersOnSingleDatanode() {
     // Allocate first 1000 containers to the first datanode
-    DatanodeDetails dn = datanodes.get(0);
+    DatanodeInfo dn = datanodes.get(0);
     for (int i = 0; i < 1000; i++) {
       tracker.recordPendingAllocationForDatanode(dn, containers.get(i));
     }
@@ -274,7 +272,7 @@ public class TestPendingContainerTracker {
   public void testAllDatanodesWithMultipleContainers() {
     // Allocate 10 containers to each of the 1000 datanodes
     for (int dnIdx = 0; dnIdx < NUM_DATANODES; dnIdx++) {
-      DatanodeDetails dn = datanodes.get(dnIdx);
+      DatanodeInfo dn = datanodes.get(dnIdx);
       for (int cIdx = 0; cIdx < 10; cIdx++) {
         int containerIdx = dnIdx * 10 + cIdx;
         tracker.recordPendingAllocationForDatanode(dn, containers.get(containerIdx));
@@ -290,7 +288,7 @@ public class TestPendingContainerTracker {
 
     // Remove all containers from every 10th DN
     for (int dnIdx = 0; dnIdx < NUM_DATANODES; dnIdx += 10) {
-      DatanodeDetails dn = datanodes.get(dnIdx);
+      DatanodeInfo dn = datanodes.get(dnIdx);
       for (int cIdx = 0; cIdx < 10; cIdx++) {
         int containerIdx = dnIdx * 10 + cIdx;
         tracker.removePendingAllocation(dn, containers.get(containerIdx));
@@ -311,7 +309,7 @@ public class TestPendingContainerTracker {
   @Test
   public void testIdempotentRecording() {
     // Allocate same 100 containers multiple times to first 100 DNs
-    DatanodeDetails dn = datanodes.get(0);
+    DatanodeInfo dn = datanodes.get(0);
 
     for (int round = 0; round < 5; round++) {
       for (int i = 0; i < 100; i++) {
@@ -325,63 +323,64 @@ public class TestPendingContainerTracker {
 
   @Test
   public void testMultiVolumeAccumulatedSpaceIsNotEnough() {
-    DatanodeDetails dn = datanodes.get(0);
     long containerSize = MAX_CONTAINER_SIZE;
-    
+
+    // Use the same DatanodeInfo object for both recording and checking.
+    DatanodeInfo dnInfo = datanodes.get(0);
     List<StorageReportProto> reports = new ArrayList<>();
-    reports.add(createStorageReport(dn, 100 * containerSize, containerSize / 4, 0));
-    reports.add(createStorageReport(dn, 100 * containerSize, containerSize / 4, 0));
-    reports.add(createStorageReport(dn, 100 * containerSize, containerSize / 2, 0));
-    DatanodeInfo dnInfo = new DatanodeInfo(dn, NodeStatus.inServiceHealthy(), null);
+    reports.add(createStorageReport(dnInfo, 100 * containerSize, containerSize / 4, 0));
+    reports.add(createStorageReport(dnInfo, 100 * containerSize, containerSize / 4, 0));
+    reports.add(createStorageReport(dnInfo, 100 * containerSize, containerSize / 2, 0));
     dnInfo.updateStorageReports(reports);
 
-    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo));
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dnInfo));
   }
 
   @Test
   public void testMultiVolumeWithPendingAllocation() {
-    DatanodeDetails dn = datanodes.get(0);
     long containerSize = MAX_CONTAINER_SIZE;
 
+    // Use the same DatanodeInfo object for recording pending allocations and checking space.
+    DatanodeInfo dnInfo = datanodes.get(0);
+
     // Remaining space available for 3 containers across all the volumes
-    tracker.recordPendingAllocationForDatanode(dn, containers.get(0));
-    tracker.recordPendingAllocationForDatanode(dn, containers.get(1));
+    tracker.recordPendingAllocationForDatanode(dnInfo, containers.get(0));
+    tracker.recordPendingAllocationForDatanode(dnInfo, containers.get(1));
 
     List<StorageReportProto> reports = new ArrayList<>();
-    reports.add(createStorageReport(dn, 100 * containerSize, containerSize, 0));
-    reports.add(createStorageReport(dn, 50 * containerSize, containerSize, 0));
-    reports.add(createStorageReport(dn, 100 * containerSize, containerSize, 0));
-    DatanodeInfo dnInfo = new DatanodeInfo(dn, NodeStatus.inServiceHealthy(), null);
+    reports.add(createStorageReport(dnInfo, 100 * containerSize, containerSize, 0));
+    reports.add(createStorageReport(dnInfo, 50 * containerSize, containerSize, 0));
+    reports.add(createStorageReport(dnInfo, 100 * containerSize, containerSize, 0));
     dnInfo.updateStorageReports(reports);
     // Remaining space available for 1 container across all the volume after 2 container allocation
 
-    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo));
+    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(dnInfo));
 
-    tracker.recordPendingAllocationForDatanode(dn, containers.get(2));
+    tracker.recordPendingAllocationForDatanode(dnInfo, containers.get(2));
     // Remaining space available for 0 container across all the volume
-    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo));
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dnInfo));
   }
 
   @Test
   public void testMultiVolumeWithCommittedBytes() {
-    DatanodeDetails dn = datanodes.get(0);
     long containerSize = MAX_CONTAINER_SIZE;
-    
+
+    // Use the same DatanodeInfo object for recording pending allocations and checking space.
+    DatanodeInfo dnInfo = datanodes.get(0);
     List<StorageReportProto> reports = new ArrayList<>();
-    reports.add(createStorageReport(dn, 100 * containerSize, 6 * containerSize, 5 * containerSize));
-    reports.add(createStorageReport(dn, 50 * containerSize, 3 * containerSize, 3 * containerSize));
-    DatanodeInfo dnInfo = new DatanodeInfo(dn, NodeStatus.inServiceHealthy(), null);
+    reports.add(createStorageReport(dnInfo, 100 * containerSize, 6 * containerSize, 5 * containerSize));
+    reports.add(createStorageReport(dnInfo, 50 * containerSize, 3 * containerSize, 3 * containerSize));
     dnInfo.updateStorageReports(reports);
     // Remaining space available for 1 container across all the volume considering committed bytes
 
-    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo));
-    tracker.recordPendingAllocationForDatanode(dn, containers.get(0));
+    assertTrue(tracker.hasEffectiveAllocatableSpaceForNewContainer(dnInfo));
+    tracker.recordPendingAllocationForDatanode(dnInfo, containers.get(0));
     // Remaining space available for 0 container across all the volume considering
     // committed bytes and container allocation
-    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dn, dnInfo));
+    assertFalse(tracker.hasEffectiveAllocatableSpaceForNewContainer(dnInfo));
   }
 
-  private StorageReportProto createStorageReport(DatanodeDetails dn, long capacity, long remaining, long committed) {
+  private StorageReportProto createStorageReport(DatanodeInfo dn, long capacity, long remaining, long committed) {
     return HddsTestUtils.createStorageReports(dn.getID(), capacity, remaining, committed).get(0);
   }
 }

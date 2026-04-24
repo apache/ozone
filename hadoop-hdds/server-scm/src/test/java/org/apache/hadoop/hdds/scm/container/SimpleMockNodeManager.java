@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -66,7 +67,7 @@ public class SimpleMockNodeManager implements NodeManager {
   public void register(DatanodeDetails dd, NodeStatus status) {
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
-    nodeMap.put(dd.getID(), new DatanodeInfo(dd, status, null));
+    nodeMap.put(dd.getID(), new DatanodeInfo(dd, status, null, new OzoneConfiguration()));
   }
 
   public void setNodeStatus(DatanodeDetails dd, NodeStatus status) {
@@ -246,6 +247,15 @@ public class SimpleMockNodeManager implements NodeManager {
   @Nullable
   public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
     return null;
+  }
+
+  @Override
+  public void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
+  }
+
+  @Override
+  public boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID) {
+    return true;
   }
 
   @Override
