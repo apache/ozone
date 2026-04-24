@@ -159,7 +159,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final SnapshotChainManager snapshotChainManager;
   private final boolean deepCleanSnapshots;
   private ExecutorService deletionThreadPool;
-  private final int numberOfParallelThreadsPerStore;
+  private int numberOfParallelThreadsPerStore;
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
@@ -210,6 +210,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     shutdown();
     setInterval(newInterval, TimeUnit.SECONDS);
     setPoolSize(newCorePoolSize);
+    this.numberOfParallelThreadsPerStore = newCorePoolSize;
     start();
   }
 
