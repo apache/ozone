@@ -159,7 +159,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final SnapshotChainManager snapshotChainManager;
   private final boolean deepCleanSnapshots;
   private ExecutorService deletionThreadPool;
-  private final int numberOfParallelThreadsPerStore;
+  private volatile int numberOfParallelThreadsPerStore;
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
@@ -175,8 +175,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     this.numberOfParallelThreadsPerStore = dirDeletingServiceCorePoolSize;
-    this.deletionThreadPool = new ThreadPoolExecutor(0, numberOfParallelThreadsPerStore,
-        interval, unit, new LinkedBlockingDeque<>(Integer.MAX_VALUE));
+    this.deletionThreadPool = createDeletionThreadPool(numberOfParallelThreadsPerStore);
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
     registerReconfigCallbacks(ozoneManager.getReconfigurationHandler());
@@ -209,6 +208,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     shutdown();
     setInterval(newInterval, TimeUnit.SECONDS);
     setPoolSize(newCorePoolSize);
+    this.numberOfParallelThreadsPerStore = newCorePoolSize;
     start();
   }
 
@@ -251,10 +251,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public synchronized void start() {
     if (deletionThreadPool == null || deletionThreadPool.isShutdown() || deletionThreadPool.isTerminated()) {
-      this.deletionThreadPool = new ThreadPoolExecutor(0, numberOfParallelThreadsPerStore,
-          super.getIntervalMillis(), TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>(Integer.MAX_VALUE));
+      this.deletionThreadPool = createDeletionThreadPool(numberOfParallelThreadsPerStore);
     }
     super.start();
+  }
+
+  private ThreadPoolExecutor createDeletionThreadPool(int threadCount) {
+    ThreadPoolExecutor pool =
+        new ThreadPoolExecutor(threadCount, threadCount, super.getIntervalMillis(), TimeUnit.MILLISECONDS,
+            new LinkedBlockingDeque<>());
+    pool.allowCoreThreadTimeOut(true);
+    return pool;
   }
 
   private boolean isThreadPoolActive(ExecutorService threadPoolExecutor) {
