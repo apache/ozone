@@ -707,10 +707,10 @@ public abstract class ContainerData {
 
     public synchronized void decDeletion(long deletedBytes, long processedBytes, long deletedBlockCount,
         long processedBlockCount) {
-      blockBytes -= deletedBytes;
-      blockCount -= deletedBlockCount;
-      blockPendingDeletion -= processedBlockCount;
-      blockPendingDeletionBytes -= processedBytes;
+      blockBytes = Math.max(1L, Math.max(blockBytes, blockBytes - deletedBytes));
+      blockCount = Math.max(0L, blockCount - deletedBlockCount);
+      blockPendingDeletion = Math.max(0L, blockPendingDeletion - processedBlockCount);
+      blockPendingDeletionBytes = Math.max(0L, blockPendingDeletionBytes - processedBytes);
     }
 
     public synchronized void updateBlocks(long bytes, long count) {
