@@ -55,20 +55,13 @@ rolling_restart_service() {
     fi
   fi
 
-  # The data generation/validation is doing S3 API tests, so skip it in case the S3 gateway is updated
-  # TODO find a better solution
-  if [[ ${SERVICE} != "s3g" ]]; then
-    callback before_service_restart
-  fi
+  callback before_service_restart
 
   # Restart service with the requested image.
   prepare_for_image "${target_image}"
   create_containers "${SERVICE}"
 
-  # The data generation/validation is doing S3 API tests, so skip it in case the S3 gateway is updated
-  if [[ ${SERVICE} != "s3g" ]]; then
-    callback after_service_restart
-  fi
+  callback after_service_restart
 
   # Service-specific readiness checks.
   case "${SERVICE}" in
@@ -81,6 +74,9 @@ rolling_restart_service() {
       ;;
     dn*)
       wait_for_port "${SERVICE}" 9882 120
+      ;;
+    s3g*)
+      wait_for_port "${SERVICE}" 9878 120
       ;;
   esac
 }
@@ -106,14 +102,17 @@ rolling_restart_all_services() {
     rolling_restart_service "$s" "${target_image}"
   done
 
+  # OMs
   for s in om1 om2 om3; do
     OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
     rolling_restart_service "$s" "${target_image}"
   done
 
-  # S3 Gateway
-  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-s3g"
-  rolling_restart_service "s3g" "${target_image}"
+  # S3 Gateways (s3g is HAProxy and does not need to be upgraded)
+  for s in s3g1 s3g2 s3g3; do
+    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
+    rolling_restart_service "$s" "${target_image}"
+  done
 }
 
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"

@@ -484,6 +484,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
 
+  HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException;
+
   /**
    * Obtain a token which can be used to let datanodes verify authentication of
    * commands operating on {@code containerID}.
