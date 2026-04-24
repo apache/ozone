@@ -25,6 +25,9 @@ hideFromSectionPage: true
 -->
 # Snapshot Defragmentation
 
+For the design history, see
+[Improve Ozone Snapshot Scale with Snapshot Defragmentation]({{< ref "design/snapshot-defragmentation.md" >}}).
+
 ## Overview
 
 An Ozone snapshot is created as a RocksDB checkpoint of the active OM DB. A
