@@ -92,6 +92,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -101,7 +102,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizer;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -117,7 +117,6 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -1155,45 +1154,26 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser(), true);
 
-      UpgradeFinalization.Status scmUpgradeStatus = scm.getLayoutVersionManager().getUpgradeState();
-      SCMUpgradeFinalizer.DatanodeFinalizationCounts datanodeFinalizationCounts =
-          SCMUpgradeFinalizer.getNumFinalizedDatanodes(scm.getScmNodeManager());
+      boolean scmFinalized = !scm.getLayoutVersionManager().needsFinalization();
+      NodeManager.DatanodeFinalizationCounts datanodeFinalizationCounts =
+          scm.getScmNodeManager().getDatanodeFinalizationCounts();
       int finalizedDatanodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
       int healthyDatanodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
+      boolean shouldFinalize = scmFinalized && datanodeFinalizationCounts.allNodesFinalized();
 
-      HddsProtos.UpgradeStatus result = buildUpgradeStatus(
-          scmUpgradeStatus,
-          finalizedDatanodes,
-          healthyDatanodes);
+      HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
+          .setScmFinalized(scmFinalized)
+          .setNumDatanodesFinalized(finalizedDatanodes)
+          .setNumDatanodesTotal(healthyDatanodes)
+          .setShouldFinalize(shouldFinalize)
+          .build();
+
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, null));
       return result;
     } catch (IOException ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.QUERY_UPGRADE_STATUS, null, ex));
       throw ex;
     }
-  }
-
-  static HddsProtos.UpgradeStatus buildUpgradeStatus(
-      UpgradeFinalization.Status scmUpgradeStatus,
-      int finalizedDatanodes,
-      int healthyDatanodes) {
-    return HddsProtos.UpgradeStatus.newBuilder()
-        .setScmFinalized(isScmFinalized(scmUpgradeStatus))
-        .setNumDatanodesFinalized(finalizedDatanodes)
-        .setNumDatanodesTotal(healthyDatanodes)
-        .setShouldFinalize(
-            shouldFinalize(scmUpgradeStatus, finalizedDatanodes, healthyDatanodes))
-        .build();
-  }
-
-  static boolean isScmFinalized(UpgradeFinalization.Status scmUpgradeStatus) {
-    return UpgradeFinalization.isFinalized(scmUpgradeStatus)
-        || UpgradeFinalization.isDone(scmUpgradeStatus);
-  }
-
-  static boolean shouldFinalize(UpgradeFinalization.Status scmUpgradeStatus,
-      int finalizedDatanodes, int healthyDatanodes) {
-    return isScmFinalized(scmUpgradeStatus) && finalizedDatanodes == healthyDatanodes;
   }
 
   @Override

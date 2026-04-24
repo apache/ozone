@@ -48,6 +48,8 @@ import org.apache.hadoop.ozone.protocol.StorageContainerNodeProtocol;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -73,6 +75,8 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
+
+  Logger LOG = LoggerFactory.getLogger(NodeManager.class);
 
   /**
    * Register API without a layout version info object passed in. Useful for
@@ -142,6 +146,57 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /** @return the number of datanodes. */
   default int getAllNodeCount() {
     return getAllNodes().size();
+  }
+
+  /**
+   * @return DatanodeFinalizationCounts, finalized and total healthy node counts
+   */
+  default DatanodeFinalizationCounts getDatanodeFinalizationCounts() {
+    int finalizedNodes = 0;
+    int totalHealthyNodes = 0;
+
+    for (DatanodeDetails dn : getAllNodes()) {
+      try {
+        // Only count HEALTHY nodes. STALE/DEAD nodes are intentionally excluded
+        // for the following reasons:
+        //  - When a node goes STALE, its write pipelines are closed, so it
+        //    cannot be involved in writes regardless of finalization state.
+        //  - The ZDU write path is designed to handle datanodes at different
+        //    layout versions, so an unfinalized STALE node does not block
+        //    correctness if it later returns to HEALTHY.
+        //  - If it recovers to HEALTHY, it will receive a finalize command on
+        //    its next heartbeat and finalize quickly. If it is in bad shape,
+        //    it will likely go DEAD and can be ignored.
+        if (!getNodeStatus(dn).isHealthy()) {
+          continue;
+        }
+        totalHealthyNodes++;
+        DatanodeInfo datanodeInfo = getDatanodeInfo(dn);
+        if (datanodeInfo == null) {
+          LOG.warn("Could not get DatanodeInfo for {}, skipping in " +
+              "finalization wait.", dn.getHostName());
+          continue;
+        }
+
+        LayoutVersionProto dnLayout = datanodeInfo.getLastKnownLayoutVersion();
+        int dnMlv = dnLayout.getMetadataLayoutVersion();
+        int dnSlv = dnLayout.getSoftwareLayoutVersion();
+
+        if (dnMlv < dnSlv) {
+          // Datanode has not yet finalized
+          LOG.debug("Datanode {} has not yet finalized: MLV={}, SLV={}",
+              dn.getHostName(), dnMlv, dnSlv);
+        } else {
+          finalizedNodes++;
+        }
+      } catch (NodeNotFoundException e) {
+        // Node was removed while we were iterating. This is OK, skip it.
+        LOG.debug("Node {} not found while waiting for finalization, " +
+            "skipping.", dn);
+      }
+    }
+
+    return new DatanodeFinalizationCounts(finalizedNodes, totalHealthyNodes);
   }
 
   /**
@@ -420,4 +475,30 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   }
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  /**
+   * Class to store the number finalized and healthy datanodes.
+   */
+  final class DatanodeFinalizationCounts {
+    private final int numFinalizedDatanodes;
+    private final int totalHealthyDatanodes;
+
+    public DatanodeFinalizationCounts(int numFinalizedDatanodes,
+                                      int totalHealthyDatanodes) {
+      this.numFinalizedDatanodes = numFinalizedDatanodes;
+      this.totalHealthyDatanodes = totalHealthyDatanodes;
+    }
+
+    public int getNumFinalizedDatanodes() {
+      return numFinalizedDatanodes;
+    }
+
+    public int getTotalHealthyDatanodes() {
+      return totalHealthyDatanodes;
+    }
+
+    public boolean allNodesFinalized() {
+      return numFinalizedDatanodes == totalHealthyDatanodes;
+    }
+  }
 }

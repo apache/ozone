@@ -121,15 +121,13 @@ public class SCMUpgradeFinalizer extends
       // SCM is no longer the leader by throwing NotLeaderException.
       context.getSCMContext().getTermOfLeader();
 
-      DatanodeFinalizationCounts datanodeFinalizationCounts =
-          getNumFinalizedDatanodes(nodeManager);
+      NodeManager.DatanodeFinalizationCounts datanodeFinalizationCounts = nodeManager.getDatanodeFinalizationCounts();
       int finalizedNodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
       int totalHealthyNodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
-      int unfinalizedNodes = datanodeFinalizationCounts.getNumUnfinalizedDatanodes();
-
-      allDatanodesFinalized = unfinalizedNodes == 0;
+      allDatanodesFinalized = datanodeFinalizationCounts.allNodesFinalized();
 
       if (!allDatanodesFinalized) {
+        int unfinalizedNodes = totalHealthyNodes - finalizedNodes;
         LOG.info("Waiting for datanodes to finalize. Status: {}/{} healthy " +
                 "datanodes have finalized ({} remaining).",
             finalizedNodes, totalHealthyNodes, unfinalizedNodes);
@@ -144,78 +142,6 @@ public class SCMUpgradeFinalizer extends
         LOG.info("All {} HEALTHY datanodes have completed finalization.",
             totalHealthyNodes);
       }
-    }
-  }
-
-  public static DatanodeFinalizationCounts getNumFinalizedDatanodes(
-      NodeManager nodeManager) {
-    int finalizedNodes = 0;
-    int totalHealthyNodes = 0;
-    int unfinalizedNodes = 0;
-
-    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
-      try {
-        // Only check HEALTHY nodes. STALE/DEAD nodes will be told to
-        // finalize when they recover.
-        if (!nodeManager.getNodeStatus(dn).isHealthy()) {
-          continue;
-        }
-        totalHealthyNodes++;
-        DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(dn);
-        if (datanodeInfo == null) {
-          LOG.warn("Could not get DatanodeInfo for {}, skipping in " +
-              "finalization wait.", dn.getHostName());
-          continue;
-        }
-
-        LayoutVersionProto dnLayout = datanodeInfo.getLastKnownLayoutVersion();
-        int dnMlv = dnLayout.getMetadataLayoutVersion();
-        int dnSlv = dnLayout.getSoftwareLayoutVersion();
-
-        if (dnMlv < dnSlv) {
-          // Datanode has not yet finalized
-          unfinalizedNodes++;
-          LOG.debug("Datanode {} has not yet finalized: MLV={}, SLV={}",
-              dn.getHostName(), dnMlv, dnSlv);
-        } else {
-          finalizedNodes++;
-        }
-      } catch (NodeNotFoundException e) {
-        // Node was removed while we were iterating. This is OK, skip it.
-        LOG.debug("Node {} not found while waiting for finalization, " +
-            "skipping.", dn);
-      }
-    }
-
-    return new DatanodeFinalizationCounts(finalizedNodes, totalHealthyNodes, unfinalizedNodes);
-  }
-
-  /**
-   * Class to store the number finalized, unfinalized and healthy datanodes.
-   */
-  public static final class DatanodeFinalizationCounts {
-    private final int numFinalizedDatanodes;
-    private final int totalHealthyDatanodes;
-    private final int numUnfinalizedDatanodes;
-
-    public DatanodeFinalizationCounts(int numFinalizedDatanodes,
-        int totalHealthyDatanodes,
-        int numUnfinalizedDatanodes) {
-      this.numFinalizedDatanodes = numFinalizedDatanodes;
-      this.totalHealthyDatanodes = totalHealthyDatanodes;
-      this.numUnfinalizedDatanodes = numUnfinalizedDatanodes;
-    }
-
-    public int getNumFinalizedDatanodes() {
-      return numFinalizedDatanodes;
-    }
-
-    public int getTotalHealthyDatanodes() {
-      return totalHealthyDatanodes;
-    }
-
-    public int getNumUnfinalizedDatanodes() {
-      return numUnfinalizedDatanodes;
     }
   }
 }
