@@ -61,6 +61,11 @@ public class ReplicationTask extends AbstractReplicationTask {
     debugString = cmd.toString();
   }
 
+  public ReplicationTask(ReplicateContainerCommand cmd,
+                         ContainerReplicator replicator) {
+    this(cmd, replicator, null);
+  }
+
   /**
    * Intended to only be used in tests.
    */

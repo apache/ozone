@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.container.checksum;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Objects;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
@@ -77,6 +80,19 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
   @Override
   public String getMetricDescriptionSegment() {
     return METRIC_DESCRIPTION_SEGMENT;
+  }
+
+  @Override
+  public Collection<HddsVolume> getVolumes() {
+    org.apache.hadoop.ozone.container.common.interfaces.Container<?>
+        container = controller.getContainer(getContainerId());
+    if (container != null) {
+      HddsVolume vol = (HddsVolume) container.getContainerData().getVolume();
+      if (vol != null) {
+        return Collections.singletonList(vol);
+      }
+    }
+    return Collections.emptyList();
   }
 
   @Override

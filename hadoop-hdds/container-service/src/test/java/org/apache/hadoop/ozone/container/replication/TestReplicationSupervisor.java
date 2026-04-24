@@ -53,12 +53,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.AbstractExecutorService;
-import java.util.function.Function;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -69,7 +69,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.IntConsumer;
+import java.util.function.Function;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -873,6 +873,11 @@ public class TestReplicationSupervisor {
           "Interrupted waiting for the completion latch to be released");
       setStatus(DONE);
     }
+
+    @Override
+    public Collection<HddsVolume> getVolumes() {
+      return emptyList();
+    }
   }
 
   private static class OrderedTask extends  AbstractReplicationTask {
@@ -907,6 +912,11 @@ public class TestReplicationSupervisor {
       completeList.add(name);
       setStatus(DONE);
       completeLatch.countDown();
+    }
+
+    @Override
+    public Collection<HddsVolume> getVolumes() {
+      return emptyList();
     }
   }
 

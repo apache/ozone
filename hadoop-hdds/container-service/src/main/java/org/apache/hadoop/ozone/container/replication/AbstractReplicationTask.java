@@ -22,7 +22,9 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Collection;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 
 /**
  * Abstract class to capture common variables and methods for different types
@@ -89,6 +91,11 @@ public abstract class AbstractReplicationTask {
   public long getDeadline() {
     return deadlineMsSinceEpoch;
   }
+
+  /**
+   * Returns any volumes associated with this task.
+   */
+  public abstract Collection<HddsVolume> getVolumes();
 
   /**
    * Abstract method which needs to be overridden by the sub classes to execute
