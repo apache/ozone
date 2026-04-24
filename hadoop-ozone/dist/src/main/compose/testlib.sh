@@ -273,7 +273,7 @@ reorder_om_nodes() {
   local new_order="$1"
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
-    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om' -e 's3g-haproxy'); do
       docker exec "${c}" bash -c \
         "if [[ -f /etc/hadoop/ozone-site.xml ]]; then \
           sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \

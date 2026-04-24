@@ -1149,6 +1149,26 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), true);
+
+      // Returning a placeholder for now.
+      HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
+          .setScmFinalized(true)
+          .setNumDatanodesFinalized(10)
+          .setNumDatanodesTotal(10)
+          .setShouldFinalize(true)
+          .build();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, null));
+      return result;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.QUERY_UPGRADE_STATUS, null, ex));
+      throw ex;
+    }
+  }
+
+  @Override
   public StartContainerBalancerResponseProto startContainerBalancer(
       Optional<Double> threshold, Optional<Integer> iterations,
       Optional<Integer> maxDatanodesPercentageToInvolvePerIteration,
