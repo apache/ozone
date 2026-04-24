@@ -1,8 +1,10 @@
 ---
-title: Improve Ozone Snapshot Scale with Snapshot Defragmentation
+title: "Improve Ozone Snapshot Scale with Snapshot Defragmentation"
+weight: 1
+menu:
+   main:
+      parent: Features
 summary: Reduce the disk usage occupied by Ozone Snapshot metadata.
-jira: HDDS-13003
-status: implemented
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
