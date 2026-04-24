@@ -48,6 +48,8 @@ When keys are changed or deleted in the live bucket, their data blocks are retai
 
 **Snapshot Data Storage:** Snapshot metadata resides in OM's RocksDB. Diff job data is stored in `ozone.om.snapshot.diff.db.dir` (defaults to OM metadata directory).
 
+For snapshot metadata storage optimization, see [Snapshot Defragmentation]({{< ref "feature/Snapshot-Defragmentation.md" >}}).
+
 For more details, see Prashant Pogde’s [Introducing Apache Ozone Snapshots](https://medium.com/@prashantpogde/introducing-apache-ozone-snapshots-af82e976142f).
 
 ## User Tutorial
