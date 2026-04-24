@@ -82,8 +82,22 @@ public final class Archiver {
 
   private static TarArchiveEntry createBasicTarArchiveEntry(File file, String entryName)
       throws IOException {
-    TarArchiveEntry entry = new TarArchiveEntry(entryName);
-    entry.setMode(TarArchiveEntry.DEFAULT_FILE_MODE);
+    final Path path = file.toPath();
+
+    final TarArchiveEntry entry;
+    if (Files.isDirectory(path)) {
+      final int nameLength = entryName.length();
+      final String dirName = nameLength == 0 || entryName.charAt(nameLength - 1) != '/'
+          ? entryName + "/"
+          : entryName;
+      entry = new TarArchiveEntry(dirName);
+      entry.setMode(TarArchiveEntry.DEFAULT_DIR_MODE);
+    } else {
+      entry = new TarArchiveEntry(entryName);
+      entry.setMode(TarArchiveEntry.DEFAULT_FILE_MODE);
+      entry.setSize(Files.size(path));
+    }
+
     try {
       BasicFileAttributes attrs = Files.readAttributes(
           file.toPath(), BasicFileAttributes.class);
@@ -93,7 +107,6 @@ public final class Archiver {
     } catch (IOException e) {
       entry.setModTime(file.lastModified()); // fallback
     }
-    entry.setSize(file.length());
     return entry;
   }
 
