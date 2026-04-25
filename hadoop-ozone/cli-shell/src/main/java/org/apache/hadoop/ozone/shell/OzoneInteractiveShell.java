@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.shell;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
