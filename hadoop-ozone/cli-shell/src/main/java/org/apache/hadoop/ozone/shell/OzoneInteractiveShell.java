@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
@@ -26,6 +29,8 @@ import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
  * Interactive Shell for all Ozone commands.
  */
 public final class OzoneInteractiveShell {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneInteractiveShell.class);
 
   private OzoneInteractiveShell() {
   }
@@ -66,7 +71,8 @@ public final class OzoneInteractiveShell {
       GenericCli instance = (GenericCli) clazz.getDeclaredConstructor().newInstance();
       topCmd.addSubcommand(name, instance.getCmd());
     } catch (Exception e) {
-      // Ignore if the class is not present in the classpath
+      LOG.debug("Subcommand {} not loaded: class {} not found or could not be instantiated", 
+          name, className, e);
     }
   }
 
@@ -74,7 +80,7 @@ public final class OzoneInteractiveShell {
   private static class TopCommand implements Runnable {
     @Override
     public void run() {
-      // Top level command doesn't do anything by itself in REPL
+      // The top-level command is only used to group subcommands and has no execution logic itself.
     }
   }
 }
