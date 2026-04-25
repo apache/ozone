@@ -32,9 +32,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -61,11 +62,9 @@ import org.slf4j.LoggerFactory;
 public class DataNodeMetricsService {
   
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsService.class);
-  private static final int MAX_POOL_SIZE = 500;
-  private static final int KEEP_ALIVE_TIME = 5;
   private static final int POLL_INTERVAL_MS = 200;
 
-  private final ThreadPoolExecutor executorService;
+  private final ExecutorService executorService;
   private final ReconNodeManager reconNodeManager;
   private final boolean httpsEnabled;
   private final int minimumApiDelayMs;
@@ -97,13 +96,10 @@ public class DataNodeMetricsService {
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
     this.lastCollectionEndTime.set(-minimumApiDelayMs);
     int corePoolSize = Runtime.getRuntime().availableProcessors() * 2;
-    this.executorService = new ThreadPoolExecutor(
-        corePoolSize, MAX_POOL_SIZE,
-        KEEP_ALIVE_TIME, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(),
-        new ThreadFactoryBuilder()
-            .setNameFormat("DataNodeMetricsCollector-%d")
-            .build());
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat("DataNodeMetricsCollector-%d")
+        .build();
+    this.executorService = Executors.newFixedThreadPool(corePoolSize, threadFactory);
   }
 
   /**
