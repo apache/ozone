@@ -45,7 +45,7 @@ public class CrcComposer {
 
   private int curCompositeCrc = 0;
   private long curPositionInStripe = 0;
-  private ByteArrayOutputStream digestOut = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream digestOut = new ByteArrayOutputStream();
 
   /**
    * Returns a CrcComposer which will collapse all ingested CRCs into a single
@@ -53,12 +53,10 @@ public class CrcComposer {
    *
    * @param type type.
    * @param bytesPerCrcHint bytesPerCrcHint.
-   * @throws IOException raised on errors performing I/O.
    * @return a CrcComposer which will collapse all ingested CRCs into a single value.
    */
   public static CrcComposer newCrcComposer(
-      DataChecksum.Type type, long bytesPerCrcHint)
-      throws IOException {
+      DataChecksum.Type type, long bytesPerCrcHint) {
     return newStripedCrcComposer(type, bytesPerCrcHint, Long.MAX_VALUE);
   }
 
@@ -77,12 +75,10 @@ public class CrcComposer {
    * @param stripeLength stripeLength.
    * @return a CrcComposer which will collapse CRCs for every combined.
    * underlying data size which aligns with the specified stripe boundary.
-   * @throws IOException raised on errors performing I/O.
    */
   public static CrcComposer newStripedCrcComposer(
-      DataChecksum.Type type, long bytesPerCrcHint, long stripeLength)
-      throws IOException {
-    int polynomial = org.apache.hadoop.ozone.client.checksum.CrcUtil.getCrcPolynomialForType(type);
+      DataChecksum.Type type, long bytesPerCrcHint, long stripeLength) {
+    int polynomial = CrcUtil.getCrcPolynomialForType(type);
     return new CrcComposer(
         polynomial,
         org.apache.hadoop.ozone.client.checksum.CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
@@ -117,13 +113,10 @@ public class CrcComposer {
    * @param offset offset.
    * @param length must be a multiple of the expected byte-size of a CRC.
    * @param bytesPerCrc bytesPerCrc.
-   * @throws IOException raised on errors performing I/O.
    */
-  public void update(
-      byte[] crcBuffer, int offset, int length, long bytesPerCrc)
-      throws IOException {
+  public void update(byte[] crcBuffer, int offset, int length, long bytesPerCrc) {
     if (length % CRC_SIZE_BYTES != 0) {
-      throw new IOException(String.format(
+      throw new IllegalArgumentException(String.format(
           "Trying to update CRC from byte array with length '%d' at offset "
           + "'%d' which is not a multiple of %d!",
           length, offset, CRC_SIZE_BYTES));
@@ -161,9 +154,8 @@ public class CrcComposer {
    *
    * @param crcB crcB.
    * @param bytesPerCrc bytesPerCrc.
-   * @throws IOException raised on errors performing I/O.
    */
-  public void update(int crcB, long bytesPerCrc) throws IOException {
+  public void update(int crcB, long bytesPerCrc) {
     if (curCompositeCrc == 0) {
       curCompositeCrc = crcB;
     } else if (bytesPerCrc == bytesPerCrcHint) {
@@ -177,7 +169,7 @@ public class CrcComposer {
     curPositionInStripe += bytesPerCrc;
 
     if (curPositionInStripe > stripeLength) {
-      throw new IOException(String.format(
+      throw new IllegalStateException(String.format(
           "Current position in stripe '%d' after advancing by bytesPerCrc '%d' "
           + "exceeds stripeLength '%d' without stripe alignment.",
           curPositionInStripe, bytesPerCrc, stripeLength));
