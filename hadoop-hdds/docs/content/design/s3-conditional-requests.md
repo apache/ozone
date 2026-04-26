@@ -85,7 +85,7 @@ conditions. This includes:
 |---|---|---|
 |**Header**|**Meaning**|**Failure result**|
 |`If-None-Match: "*"`|Write succeeds only if the object does not exist (put-if-absent semantics).|`412 Precondition Failed` if the object already exists.|
-|`If-Match: "<etag>"`|Write succeeds only if the object exists and its ETag matches (atomic update / compare-and-swap).|`412 Precondition Failed` if the object does not exist or the ETag does not match.|
+|`If-Match: "<etag>" or "*"`|Write succeeds only if the object exists and its ETag matches (atomic update / compare-and-swap).|`412 Precondition Failed` if the object does not exist or the ETag does not match.|
 
 #### Restrictions
 
