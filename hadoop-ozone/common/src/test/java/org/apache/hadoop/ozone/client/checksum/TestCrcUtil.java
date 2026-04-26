@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.checksum;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -26,6 +27,11 @@ import org.junit.jupiter.api.Timeout;
 /** Test {@link CrcUtil}. */
 @Timeout(10)
 public class TestCrcUtil {
+  /** Assert that the given throwable contains the given message. */
+  public static void assertContains(Throwable t, String message) {
+    assertTrue(t.getMessage().contains(message), () -> "Message \"" + message + "\" not found: " + t);
+  }
+
   @Test
   public void testIntSerialization() {
     byte[] bytes = CrcUtil.intToBytes(0xCAFEBEEF);
@@ -43,9 +49,9 @@ public class TestCrcUtil {
 
   @Test
   public void testToSingleCrcStringBadLength() {
-    assertThrows(IllegalArgumentException.class,
-        () -> CrcUtil.toSingleCrcString(new byte[8]),
-        "length");
+    final IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> CrcUtil.toSingleCrcString(new byte[8]));
+    assertContains(e, "length");
   }
 
   @Test
@@ -56,9 +62,9 @@ public class TestCrcUtil {
 
   @Test
   public void testToMultiCrcStringBadLength() {
-    assertThrows(IllegalArgumentException.class,
-        () -> CrcUtil.toMultiCrcString(new byte[6]),
-        "length");
+    final IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> CrcUtil.toMultiCrcString(new byte[6]));
+    assertContains(e, "length");
   }
 
   @Test

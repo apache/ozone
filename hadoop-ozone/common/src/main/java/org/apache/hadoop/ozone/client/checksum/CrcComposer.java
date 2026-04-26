@@ -55,8 +55,7 @@ public class CrcComposer {
    * @param bytesPerCrcHint bytesPerCrcHint.
    * @return a CrcComposer which will collapse all ingested CRCs into a single value.
    */
-  public static CrcComposer newCrcComposer(
-      DataChecksum.Type type, long bytesPerCrcHint) {
+  public static CrcComposer newCrcComposer(DataChecksum.Type type, long bytesPerCrcHint) {
     return newStripedCrcComposer(type, bytesPerCrcHint, Long.MAX_VALUE);
   }
 
@@ -76,12 +75,11 @@ public class CrcComposer {
    * @return a CrcComposer which will collapse CRCs for every combined.
    * underlying data size which aligns with the specified stripe boundary.
    */
-  public static CrcComposer newStripedCrcComposer(
-      DataChecksum.Type type, long bytesPerCrcHint, long stripeLength) {
-    int polynomial = CrcUtil.getCrcPolynomialForType(type);
+  public static CrcComposer newStripedCrcComposer(DataChecksum.Type type, long bytesPerCrcHint, long stripeLength) {
+    final int polynomial = CrcUtil.getCrcPolynomialForType(type);
     return new CrcComposer(
         polynomial,
-        org.apache.hadoop.ozone.client.checksum.CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
+        CrcUtil.getMonomial(bytesPerCrcHint, polynomial),
         bytesPerCrcHint,
         stripeLength);
   }
@@ -123,7 +121,7 @@ public class CrcComposer {
     }
     int limit = offset + length;
     while (offset < limit) {
-      int crcB = org.apache.hadoop.ozone.client.checksum.CrcUtil.readInt(crcBuffer, offset);
+      final int crcB = CrcUtil.readInt(crcBuffer, offset);
       update(crcB, bytesPerCrc);
       offset += CRC_SIZE_BYTES;
     }
@@ -159,11 +157,9 @@ public class CrcComposer {
     if (curCompositeCrc == 0) {
       curCompositeCrc = crcB;
     } else if (bytesPerCrc == bytesPerCrcHint) {
-      curCompositeCrc = org.apache.hadoop.ozone.client.checksum.CrcUtil.composeWithMonomial(
-          curCompositeCrc, crcB, precomputedMonomialForHint, crcPolynomial);
+      curCompositeCrc = CrcUtil.composeWithMonomial(curCompositeCrc, crcB, precomputedMonomialForHint, crcPolynomial);
     } else {
-      curCompositeCrc = org.apache.hadoop.ozone.client.checksum.CrcUtil.compose(
-          curCompositeCrc, crcB, bytesPerCrc, crcPolynomial);
+      curCompositeCrc = CrcUtil.compose(curCompositeCrc, crcB, bytesPerCrc, crcPolynomial);
     }
 
     curPositionInStripe += bytesPerCrc;
@@ -176,7 +172,7 @@ public class CrcComposer {
     } else if (curPositionInStripe == stripeLength) {
       // Hit a stripe boundary; flush the curCompositeCrc and reset for next
       // stripe.
-      digestOut.write(org.apache.hadoop.ozone.client.checksum.CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
+      digestOut.write(CrcUtil.intToBytes(curCompositeCrc), 0, CRC_SIZE_BYTES);
       curCompositeCrc = 0;
       curPositionInStripe = 0;
     }

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.checksum;
 
+import static org.apache.hadoop.ozone.client.checksum.TestCrcUtil.assertContains;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -25,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.Objects;
 import java.util.Random;
 import org.apache.hadoop.util.DataChecksum;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,8 +42,7 @@ public class TestCrcComposer {
   private final Random rand = new Random(1234);
 
   private final DataChecksum.Type type = DataChecksum.Type.CRC32C;
-  private final DataChecksum checksum = Objects.requireNonNull(
-      DataChecksum.newDataChecksum(type, Integer.MAX_VALUE));
+  private final DataChecksum checksum = DataChecksum.newDataChecksum(type, Integer.MAX_VALUE);
   private final byte[] data = new byte[DATA_SIZE];
 
   private int fullCrc;
@@ -62,16 +61,14 @@ public class TestCrcComposer {
     for (int i = 0; i < 7; ++i) {
       crcsByChunk[i] = getRangeChecksum(data, i * CHUNK_SIZE, CHUNK_SIZE);
     }
-    crcsByChunk[7] = getRangeChecksum(
-        data, (crcsByChunk.length - 1) * CHUNK_SIZE, DATA_SIZE % CHUNK_SIZE);
+    crcsByChunk[7] = getRangeChecksum(data, (crcsByChunk.length - 1) * CHUNK_SIZE, DATA_SIZE % CHUNK_SIZE);
 
     // 3 cells of size cellSize, 1 cell of size (dataSize % cellSize).
     int[] crcsByCell = new int[4];
     for (int i = 0; i < 3; ++i) {
       crcsByCell[i] = getRangeChecksum(data, i * CELL_SIZE, CELL_SIZE);
     }
-    crcsByCell[3] = getRangeChecksum(
-        data, (crcsByCell.length - 1) * CELL_SIZE, DATA_SIZE % CELL_SIZE);
+    crcsByCell[3] = getRangeChecksum(data, (crcsByCell.length - 1) * CELL_SIZE, DATA_SIZE % CELL_SIZE);
 
     crcBytesByChunk = intArrayToByteArray(crcsByChunk);
     crcBytesByCell = intArrayToByteArray(crcsByCell);
@@ -147,11 +144,9 @@ public class TestCrcComposer {
 
   @Test
   public void testStripedByteArray() {
-    CrcComposer digester =
-        CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
+    CrcComposer digester = CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
     digester.update(crcBytesByChunk, 0, crcBytesByChunk.length - 4, CHUNK_SIZE);
-    digester.update(
-        crcBytesByChunk, crcBytesByChunk.length - 4, 4, DATA_SIZE % CHUNK_SIZE);
+    digester.update(crcBytesByChunk, crcBytesByChunk.length - 4, 4, DATA_SIZE % CHUNK_SIZE);
 
     byte[] digest = digester.digest();
     assertArrayEquals(crcBytesByCell, digest);
@@ -159,10 +154,8 @@ public class TestCrcComposer {
 
   @Test
   public void testStripedDataInputStream() throws IOException {
-    CrcComposer digester =
-        CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
-    DataInputStream input =
-        new DataInputStream(new ByteArrayInputStream(crcBytesByChunk));
+    CrcComposer digester = CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
+    DataInputStream input = new DataInputStream(new ByteArrayInputStream(crcBytesByChunk));
     digester.update(input, crcsByChunk.length - 1, CHUNK_SIZE);
     digester.update(input, 1, DATA_SIZE % CHUNK_SIZE);
 
@@ -172,8 +165,7 @@ public class TestCrcComposer {
 
   @Test
   public void testStripedSingleCrcs() {
-    CrcComposer digester =
-        CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
+    CrcComposer digester = CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
     for (int i = 0; i < crcsByChunk.length - 1; ++i) {
       digester.update(crcsByChunk[i], CHUNK_SIZE);
     }
@@ -185,19 +177,16 @@ public class TestCrcComposer {
 
   @Test
   public void testMultiStageMixed() throws IOException {
-    CrcComposer digester =
-        CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
+    CrcComposer digester = CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
 
     // First combine chunks into cells.
-    DataInputStream input =
-        new DataInputStream(new ByteArrayInputStream(crcBytesByChunk));
+    DataInputStream input = new DataInputStream(new ByteArrayInputStream(crcBytesByChunk));
     digester.update(input, crcsByChunk.length - 1, CHUNK_SIZE);
     digester.update(input, 1, DATA_SIZE % CHUNK_SIZE);
     byte[] digest = digester.digest();
 
     // Second, individually combine cells into full crc.
-    digester =
-        CrcComposer.newCrcComposer(type, CELL_SIZE);
+    digester = CrcComposer.newCrcComposer(type, CELL_SIZE);
     for (int i = 0; i < digest.length - 4; i += 4) {
       int cellCrc = CrcUtil.readInt(digest, i);
       digester.update(cellCrc, CELL_SIZE);
@@ -211,25 +200,23 @@ public class TestCrcComposer {
 
   @Test
   public void testUpdateMismatchesStripe() {
-    CrcComposer digester =
-        CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
-
+    CrcComposer digester = CrcComposer.newStripedCrcComposer(type, CHUNK_SIZE, CELL_SIZE);
     digester.update(crcsByChunk[0], CHUNK_SIZE);
 
     // Going from chunkSize to chunkSize + cellSize will cross a cellSize
     // boundary in a single CRC, which is not allowed, since we'd lack a
     // CRC corresponding to the actual cellSize boundary.
-    assertThrows(IllegalStateException.class,
-        () -> digester.update(crcsByChunk[1], CELL_SIZE),
-        "stripe");
+    final IllegalStateException e = assertThrows(IllegalStateException.class,
+        () -> digester.update(crcsByChunk[1], CELL_SIZE));
+    assertContains(e, "stripe");
   }
 
   @Test
   public void testUpdateByteArrayLengthUnalignedWithCrcSize() {
     CrcComposer digester = CrcComposer.newCrcComposer(type, CHUNK_SIZE);
 
-    assertThrows(IllegalArgumentException.class,
-        () -> digester.update(crcBytesByChunk, 0, 6, CHUNK_SIZE),
-        "length");
+    final IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> digester.update(crcBytesByChunk, 0, 6, CHUNK_SIZE));
+    assertContains(e, "length");
   }
 }
