@@ -557,4 +557,16 @@ public final class PureJavaCrc32CByteBuffer extends ChecksumByteBuffer.CrcIntTab
   int[] getTable() {
     return T;
   }
+
+  /**
+   * Compute x mod p, where p is the CRC32C polynomial.
+   * @param x the input value
+   * @return x mod p
+   */
+  public static int mod(long x) {
+    final int y = (int)(x);
+    return (int)(x >> 32)
+        ^ ((T[((y << 24) >>> 24) + 0x300] ^ T[((y << 16) >>> 24) + 0x200])
+        ^  (T[((y <<  8) >>> 24) + 0x100] ^ T[((y /* */) >>> 24) /*   */]));
+  }
 }
