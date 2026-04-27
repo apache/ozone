@@ -306,7 +306,7 @@ public class HddsVolume extends StorageVolume {
 
   @VisibleForTesting
   public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
-    if (!(getDiskCheckEnabled() && getDatanodeConfig().isRocksDbDiskCheckEnabled())) {
+    if (!getDiskCheckEnabled()) {
       return VolumeCheckResult.HEALTHY;
     }
 
