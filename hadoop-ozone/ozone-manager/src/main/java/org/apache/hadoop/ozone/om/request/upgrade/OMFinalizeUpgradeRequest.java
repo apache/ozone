@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.FinalizeUpgrade;
 
 import java.io.IOException;
@@ -91,10 +91,10 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
               .build();
 
       OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-      int lV = ozoneManager.getVersionManager().getApparentVersion().serialize();
+      int apparentVersion = ozoneManager.getVersionManager().getApparentVersion().serialize();
       omMetadataManager.getMetaTable().addCacheEntry(
-          new CacheKey<>(LAYOUT_VERSION_KEY),
-          CacheValue.get(context.getIndex(), String.valueOf(lV)));
+          new CacheKey<>(APPARENT_VERSION_KEY),
+          CacheValue.get(context.getIndex(), String.valueOf(apparentVersion)));
 
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()

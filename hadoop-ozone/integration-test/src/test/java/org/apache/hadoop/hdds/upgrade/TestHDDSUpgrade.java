@@ -147,7 +147,7 @@ public class TestHDDSUpgrade {
     // allow only one FACTOR THREE pipeline.
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, NUM_DATA_NODES + 1);
     conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 500, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 500, TimeUnit.MILLISECONDS);
 

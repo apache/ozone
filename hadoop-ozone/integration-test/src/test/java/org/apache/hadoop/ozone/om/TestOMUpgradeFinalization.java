@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.assertClusterPrepared;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -33,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
@@ -43,6 +45,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -73,6 +76,12 @@ class TestOMUpgradeFinalization {
 
       try (OzoneClient client = cluster.newClient()) {
         List<OzoneManager> runningOms = cluster.getOzoneManagersList();
+        for (OzoneManager om : runningOms) {
+          assertEquals(INITIAL_VERSION, om.getVersionManager().getApparentVersion());
+          // The OMs have not been finalized yet, so no version has been written to the DB.
+          Assertions.assertNull(om.getMetadataManager().getMetaTable().get(APPARENT_VERSION_KEY));
+        }
+
         final int shutdownOMIndex = 2;
         OzoneManager downedOM = cluster.getOzoneManager(shutdownOMIndex);
         cluster.stopOzoneManager(shutdownOMIndex);
@@ -110,20 +119,17 @@ class TestOMUpgradeFinalization {
         waitFor(() -> !omStateMachine.getLifeCycle().getCurrentState()
             .isPausingOrPaused(), 1000, 60000);
 
-        int expectedSerialized = OzoneManagerVersion.SOFTWARE_VERSION.serialize();
-        assertEquals(expectedSerialized,
-            downedOM.getVersionManager().getApparentVersion().serialize());
-        String lvString = downedOM.getMetadataManager().getMetaTable()
-            .get(LAYOUT_VERSION_KEY);
-        assertNotNull(lvString);
-        assertEquals(expectedSerialized, Integer.parseInt(lvString));
+        assertEquals(OzoneManagerVersion.SOFTWARE_VERSION, downedOM.getVersionManager().getApparentVersion());
+        String dbVersionString = downedOM.getMetadataManager().getMetaTable().get(APPARENT_VERSION_KEY);
+        assertNotNull(dbVersionString);
+        assertEquals(OzoneManagerVersion.SOFTWARE_VERSION.serialize(), Integer.parseInt(dbVersionString));
       }
     }
   }
 
   private static MiniOzoneHAClusterImpl newCluster(OzoneConfiguration conf)
       throws IOException {
-    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, INITIAL_VERSION.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.serialize());
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(UUID.randomUUID().toString())
         .setNumOfOzoneManagers(3)

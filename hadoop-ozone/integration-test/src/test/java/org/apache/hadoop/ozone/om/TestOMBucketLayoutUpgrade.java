@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
@@ -88,7 +88,7 @@ class TestOMBucketLayoutUpgrade {
   @BeforeAll
   void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, fromVersion.serialize());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, fromVersion.serialize());
     String omServiceId = UUID.randomUUID().toString();
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
@@ -124,7 +124,7 @@ class TestOMBucketLayoutUpgrade {
     assertEquals(fromVersion,
         ozoneManager.getVersionManager().getApparentVersion());
     assertNull(ozoneManager.getMetadataManager().getMetaTable()
-        .get(LAYOUT_VERSION_KEY));
+        .get(APPARENT_VERSION_KEY));
   }
 
   /**
@@ -163,7 +163,7 @@ class TestOMBucketLayoutUpgrade {
     LambdaTestUtils.await(30000, 3000,
         () -> expectedVersion.equals(
             ozoneManager.getMetadataManager().getMetaTable()
-                .get(LAYOUT_VERSION_KEY)));
+                .get(APPARENT_VERSION_KEY)));
   }
 
   @Order(POST_UPGRADE)

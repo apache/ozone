@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.common.Storage;
  */
 public class OMStorage extends Storage {
 
-  public static final String TESTING_INIT_LAYOUT_VERSION_KEY = "testing.ozone.om.init.layout.version";
+  public static final String TESTING_INIT_APPARENT_VERSION_KEY = "testing.ozone.om.init.apparent.version";
 
   static final String ERROR_OM_IS_ALREADY_INITIALIZED =
       "OM is already initialized.";
@@ -91,7 +91,7 @@ public class OMStorage extends Storage {
    */
   public OMStorage(OzoneConfiguration conf) throws IOException {
     super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR,
-        getInitApparentVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
+        getInitApparentVersion(conf, TESTING_INIT_APPARENT_VERSION_KEY,
             OzoneManagerVersion.SOFTWARE_VERSION::serialize));
   }
 
