@@ -92,6 +92,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -1153,13 +1154,20 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(getRemoteUser(), true);
 
-      // Returning a placeholder for now.
+      boolean scmFinalized = !scm.getLayoutVersionManager().needsFinalization();
+      NodeManager.DatanodeFinalizationCounts datanodeFinalizationCounts =
+          scm.getScmNodeManager().getDatanodeFinalizationCounts();
+      int finalizedDatanodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
+      int healthyDatanodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
+      boolean shouldFinalize = scmFinalized && datanodeFinalizationCounts.allNodesFinalized();
+
       HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
-          .setScmFinalized(true)
-          .setNumDatanodesFinalized(10)
-          .setNumDatanodesTotal(10)
-          .setShouldFinalize(true)
+          .setScmFinalized(scmFinalized)
+          .setNumDatanodesFinalized(finalizedDatanodes)
+          .setNumDatanodesTotal(healthyDatanodes)
+          .setShouldFinalize(shouldFinalize)
           .build();
+
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, null));
       return result;
     } catch (IOException ex) {
