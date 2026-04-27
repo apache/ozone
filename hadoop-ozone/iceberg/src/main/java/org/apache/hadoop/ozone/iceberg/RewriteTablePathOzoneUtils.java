@@ -25,8 +25,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.RewriteTablePathUtil;
+import org.apache.iceberg.StaticTableOperations;
 import org.apache.iceberg.StatisticsFile;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.exceptions.RuntimeIOException;
@@ -112,5 +114,10 @@ final class RewriteTablePathOzoneUtils {
       LOG.error("Failed to write CSV to {}", outputFile.location(), e);
       throw new RuntimeIOException(e);
     }
+  }
+
+  static Table newStaticTable(String metadataFileLocation, FileIO io) {
+    StaticTableOperations ops = new StaticTableOperations(metadataFileLocation, io);
+    return new BaseTable(ops, metadataFileLocation);
   }
 }
