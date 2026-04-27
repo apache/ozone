@@ -876,8 +876,8 @@ public class TestOMRatisSnapshots {
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
-    cluster.startInactiveOM(followerNodeId);
     OzoneManager.setTestInstallSnapshot(true);
+    cluster.startInactiveOM(followerNodeId);
     LogCapturer logCapture = LogCapturer.captureLogs(OzoneManager.class);
     assertLogCapture(logCapture, "OzoneManager is not in running state");
     assertLogCapture(logCapture, "Abort install snapshot from Leader");
