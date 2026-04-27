@@ -21,7 +21,6 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
