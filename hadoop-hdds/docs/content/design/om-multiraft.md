@@ -1,3 +1,11 @@
+---
+title: OM Multiraft Design Document
+summary: Design for the OM multi-raft architecture to improve write throughput and scalability by distributing bucket write requests across multiple independent RAFT groups.
+date: 2026-04-21
+jira: HDDS-15069
+status: in review
+author: Slava Tutrinov
+---
 # Ozone Multi-Raft Design Document
 
 ## Abstract
