@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.UUID;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -226,7 +225,7 @@ public class TestStorageDistributionEndpoint {
           .build();
       pendingDeletionMetrics.add(new DatanodePendingDeletionMetrics(hostName,
           uuid.toString(), PENDING_DELETION_SIZE));
-      dataNodes.add(new DatanodeInfo(datanode, NodeStatus.inServiceHealthy(), null, new OzoneConfiguration()));
+      dataNodes.add(new DatanodeInfo(datanode, NodeStatus.inServiceHealthy(), null, 5 * 60 * 1000));
       when(nodeManager.getNodeStat(datanode))
           .thenReturn(new SCMNodeMetric(OZONE_CAPACITY, OZONE_USED, OZONE_REMAINING, COMMITTED,
               MIN_FREE_SPACE, RESERVED));

@@ -17,29 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker.TwoWindowBucket;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +54,7 @@ public class DatanodeInfo extends DatanodeDetails {
   /**
    * Two-window tumbling bucket for tracking pending container allocations on this datanode.
    */
-  private final TwoWindowBucket twoWindowBucket;
+  private final TwoWindowBucket pendingContainerAllocations;
 
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
@@ -74,12 +67,10 @@ public class DatanodeInfo extends DatanodeDetails {
    * Constructs DatanodeInfo from DatanodeDetails.
    *
    * @param datanodeDetails Details about the datanode
-   * @param nodeStatus initial node status
    * @param layoutInfo Details about the LayoutVersionProto
-   * @param conf configuration source
    */
   public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
-      LayoutVersionProto layoutInfo, ConfigurationSource conf) {
+       LayoutVersionProto layoutInfo, long containerRollIntervalMs) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
@@ -90,10 +81,7 @@ public class DatanodeInfo extends DatanodeDetails {
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
     this.commandCounts = new HashMap<>();
-    this.twoWindowBucket = new TwoWindowBucket(this.getID(), conf.getTimeDuration(
-        OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL,
-        OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS));
+    this.pendingContainerAllocations = new TwoWindowBucket(this.getID(), containerRollIntervalMs);
   }
 
   /**
@@ -375,8 +363,9 @@ public class DatanodeInfo extends DatanodeDetails {
   /**
    * Returns the {@link TwoWindowBucket} for this datanode.
    */
-  public TwoWindowBucket getTwoWindowBucket() {
-    return twoWindowBucket;
+  public TwoWindowBucket getPendingContainerAllocations() {
+    pendingContainerAllocations.rollIfNeeded();
+    return pendingContainerAllocations;
   }
 
   @Override
@@ -387,83 +376,5 @@ public class DatanodeInfo extends DatanodeDetails {
   @Override
   public boolean equals(Object obj) {
     return super.equals(obj);
-  }
-
-  /**
-   * Two-window tumbling bucket for a single DataNode.
-   *
-   * <p>New allocations go into {@code currentWindow}. Every {@code rollIntervalMs}, the current
-   * window shifts to {@code previousWindow} and a fresh empty set becomes current. After two
-   * intervals without confirmation a container ID is automatically discarded (aged out).
-   * Pending count is the <em>union</em> of both windows.
-   */
-  static class TwoWindowBucket {
-    private Set<ContainerID> currentWindow = new HashSet<>();
-    private Set<ContainerID> previousWindow = new HashSet<>();
-    private long lastRollTime = Time.monotonicNow();
-    private final long rollIntervalMs;
-    private final DatanodeID datanodeID;
-
-    TwoWindowBucket(DatanodeID datanodeID, long rollIntervalMs) {
-      this.datanodeID = datanodeID;
-      this.rollIntervalMs = rollIntervalMs;
-    }
-
-    /**
-     * Roll one or both windows based on elapsed time.
-     */
-    synchronized void rollIfNeeded() {
-      long now = Time.monotonicNow();
-      long elapsed = now - lastRollTime;
-
-      if (elapsed >= 2 * rollIntervalMs) {
-        int dropped = getCount();
-        previousWindow.clear();
-        currentWindow.clear();
-        lastRollTime = now;
-        LOG.debug("Double roll interval elapsed ({}ms): dropped {} pending containers", elapsed, dropped);
-      } else if (elapsed >= rollIntervalMs) {
-        previousWindow.clear();
-        final Set<ContainerID> tmp = previousWindow;
-        previousWindow = currentWindow;
-        currentWindow = tmp;
-        lastRollTime = now;
-        LOG.debug("Rolled window. Previous window size: {} elapsed: ({}ms), Current window reset to empty",
-            previousWindow.size(), elapsed);
-      }
-    }
-
-    synchronized boolean contains(ContainerID containerID) {
-      return currentWindow.contains(containerID) || previousWindow.contains(containerID);
-    }
-
-    /**
-     * Add container to current window.
-     */
-    synchronized boolean add(ContainerID containerID) {
-      boolean added = currentWindow.add(containerID);
-      LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
-          containerID, datanodeID, added, getCount());
-      return added;
-    }
-
-    /**
-     * Remove container from both windows.
-     */
-    synchronized boolean remove(ContainerID containerID) {
-      boolean removedFromCurrent = currentWindow.remove(containerID);
-      boolean removedFromPrevious = previousWindow.remove(containerID);
-      boolean removed = removedFromCurrent || removedFromPrevious;
-      LOG.debug("Removed pending container {} from DataNode {}. Removed={}, Remaining={}",
-          containerID, datanodeID, removed, getCount());
-      return removed;
-    }
-
-    /**
-     * Count of pending containers in both windows.
-     */
-    synchronized int getCount() {
-      return currentWindow.size() + previousWindow.size();
-    }
   }
 }

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -45,7 +43,6 @@ public class TestPendingContainerTracker {
   private List<DatanodeInfo> datanodes;
   private List<ContainerID> containers;
 
-  private final OzoneConfiguration conf = new OzoneConfiguration();
   private PendingContainerTracker tracker;
   private DatanodeInfo dn1;
   private DatanodeInfo dn2;
@@ -56,13 +53,13 @@ public class TestPendingContainerTracker {
 
   @BeforeEach
   public void setUp() throws IOException {
-    tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, null);
+    tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null, null);
 
     datanodes = new ArrayList<>(NUM_DATANODES);
     for (int i = 0; i < NUM_DATANODES; i++) {
       datanodes.add(new DatanodeInfo(
           MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
-          conf));
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
     }
 
     containers = new ArrayList<>(NUM_CONTAINERS);
@@ -86,14 +83,14 @@ public class TestPendingContainerTracker {
 
     // Each of the first 100 DNs should have 1 pending container
     for (int i = 0; i < 100; i++) {
-      assertEquals(1, tracker.getPendingContainerCount(datanodes.get(i)));
+      assertEquals(1, datanodes.get(i).getPendingContainerAllocations().getCount());
       assertEquals(MAX_CONTAINER_SIZE,
-          tracker.getPendingContainerCount(datanodes.get(i)) * MAX_CONTAINER_SIZE);
+          datanodes.get(i).getPendingContainerAllocations().getCount() * MAX_CONTAINER_SIZE);
     }
 
     // DNs beyond index 100 should have 0 pending
-    assertEquals(0, tracker.getPendingContainerCount(datanodes.get(500)));
-    assertEquals(0, tracker.getPendingContainerCount(datanodes.get(999)));
+    assertEquals(0, datanodes.get(500).getPendingContainerAllocations().getCount());
+    assertEquals(0, datanodes.get(999).getPendingContainerAllocations().getCount());
   }
 
   @Test
@@ -105,17 +102,17 @@ public class TestPendingContainerTracker {
 
     // Remove from first 50 DNs
     for (int i = 0; i < 50; i++) {
-      tracker.removePendingAllocation(datanodes.get(i), containers.get(i));
+      tracker.removePendingAllocation(datanodes.get(i).getPendingContainerAllocations(), containers.get(i));
     }
 
     // First 50 DNs should have 0 pending
     for (int i = 0; i < 50; i++) {
-      assertEquals(0, tracker.getPendingContainerCount(datanodes.get(i)));
+      assertEquals(0, datanodes.get(i).getPendingContainerAllocations().getCount());
     }
 
     // DNs 50-99 should still have 1 pending
     for (int i = 50; i < 100; i++) {
-      assertEquals(1, tracker.getPendingContainerCount(datanodes.get(i)));
+      assertEquals(1, datanodes.get(i).getPendingContainerAllocations().getCount());
     }
   }
 
@@ -128,29 +125,27 @@ public class TestPendingContainerTracker {
   @Timeout(30)
   public void testTwoWindowRollAgesOutContainerAfterTwoIntervals() throws InterruptedException {
     long rollMs = 200L;
-    OzoneConfiguration shortConf = new OzoneConfiguration();
-    shortConf.set(OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL, rollMs + "ms");
     DatanodeInfo shortDn = new DatanodeInfo(
         MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
-        shortConf);
+        rollMs);
 
-    PendingContainerTracker shortRollTracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, null);
+    PendingContainerTracker shortRollTracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, rollMs, null, null);
 
     shortRollTracker.recordPendingAllocationForDatanode(shortDn, container1);
-    assertEquals(1, shortRollTracker.getPendingContainerCount(shortDn));
-    assertTrue(shortRollTracker.containsPendingContainer(shortDn, container1));
+    assertEquals(1, shortDn.getPendingContainerAllocations().getCount());
+    assertTrue(shortDn.getPendingContainerAllocations().contains(container1));
 
     // First roll: C1 moves from currentWindow to previousWindow; union still includes C1
     Thread.sleep(rollMs + 80);
-    shortRollTracker.rollWindowsIfNeeded(shortDn);
-    assertEquals(1, shortRollTracker.getPendingContainerCount(shortDn));
-    assertTrue(shortRollTracker.containsPendingContainer(shortDn, container1));
+    shortDn.getPendingContainerAllocations(); // triggers rollIfNeeded
+    assertEquals(1, shortDn.getPendingContainerAllocations().getCount());
+    assertTrue(shortDn.getPendingContainerAllocations().contains(container1));
 
     // Second roll: prior previousWindow (holding C1) is dropped; C1 is no longer pending
     Thread.sleep(rollMs + 80);
-    shortRollTracker.rollWindowsIfNeeded(shortDn);
-    assertEquals(0, shortRollTracker.getPendingContainerCount(shortDn));
-    assertEquals(0L, shortRollTracker.getPendingContainerCount(shortDn) * MAX_CONTAINER_SIZE);
+    shortDn.getPendingContainerAllocations(); // triggers rollIfNeeded
+    assertEquals(0, shortDn.getPendingContainerAllocations().getCount());
+    assertEquals(0L, shortDn.getPendingContainerAllocations().getCount() * MAX_CONTAINER_SIZE);
   }
 
   @Test
@@ -158,18 +153,18 @@ public class TestPendingContainerTracker {
     datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, container1));
 
     // Remove a container that was never added - should not throw exception
-    tracker.removePendingAllocation(dn1, container2);
+    tracker.removePendingAllocation(dn1.getPendingContainerAllocations(), container2);
 
     // DN1 should still have container1
-    assertEquals(1, tracker.getPendingContainerCount(dn1));
+    assertEquals(1, dn1.getPendingContainerAllocations().getCount());
   }
 
   @Test
   public void testUnknownDatanodeHasZeroPendingCount() {
     DatanodeInfo unknownDN = new DatanodeInfo(
         MockDatanodeDetails.randomDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
-        conf);
-    assertEquals(0, tracker.getPendingContainerCount(unknownDN));
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    assertEquals(0, unknownDN.getPendingContainerAllocations().getCount());
   }
 
   @Test
@@ -188,7 +183,7 @@ public class TestPendingContainerTracker {
           datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, cid));
 
           if (j % 2 == 0) {
-            tracker.removePendingAllocation(dn1, cid);
+            tracker.removePendingAllocation(dn1.getPendingContainerAllocations(), cid);
           }
         }
       });
@@ -209,17 +204,17 @@ public class TestPendingContainerTracker {
   public void testBucketsRetainedWhenEmpty() {
     datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, container1));
 
-    assertEquals(1, tracker.getPendingContainerCount(dn1));
+    assertEquals(1, dn1.getPendingContainerAllocations().getCount());
 
     // Remove the only pending container from DN1
-    tracker.removePendingAllocation(dn1, container1);
+    tracker.removePendingAllocation(dn1.getPendingContainerAllocations(), container1);
 
-    assertEquals(0, tracker.getPendingContainerCount(dn1));
-    assertEquals(1, tracker.getPendingContainerCount(dn2));
+    assertEquals(0, dn1.getPendingContainerAllocations().getCount());
+    assertEquals(1, dn2.getPendingContainerAllocations().getCount());
 
     // Empty bucket for DN1 is still usable for new allocations
     tracker.recordPendingAllocationForDatanode(dn1, container2);
-    assertEquals(1, tracker.getPendingContainerCount(dn1));
+    assertEquals(1, dn1.getPendingContainerAllocations().getCount());
   }
 
   @Test
@@ -231,15 +226,15 @@ public class TestPendingContainerTracker {
     datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, container1));
     datanodes.subList(0, 3).forEach(dn -> tracker.recordPendingAllocationForDatanode(dn, container2));
 
-    assertEquals(2, tracker.getPendingContainerCount(dn1));
+    assertEquals(2, dn1.getPendingContainerAllocations().getCount());
 
     // Remove container1 - should work regardless of which window it's in
-    tracker.removePendingAllocation(dn1, container1);
+    tracker.removePendingAllocation(dn1.getPendingContainerAllocations(), container1);
 
-    assertEquals(1, tracker.getPendingContainerCount(dn1));
+    assertEquals(1, dn1.getPendingContainerAllocations().getCount());
 
-    assertFalse(tracker.containsPendingContainer(dn1, container1));
-    assertTrue(tracker.containsPendingContainer(dn1, container2));
+    assertFalse(dn1.getPendingContainerAllocations().contains(container1));
+    assertTrue(dn1.getPendingContainerAllocations().contains(container2));
   }
 
   @Test
@@ -250,22 +245,22 @@ public class TestPendingContainerTracker {
       tracker.recordPendingAllocationForDatanode(dn, containers.get(i));
     }
 
-    assertEquals(1000, tracker.getPendingContainerCount(dn));
-    assertEquals(1000 * MAX_CONTAINER_SIZE, tracker.getPendingContainerCount(dn) * MAX_CONTAINER_SIZE);
+    assertEquals(1000, dn.getPendingContainerAllocations().getCount());
+    assertEquals(1000 * MAX_CONTAINER_SIZE, dn.getPendingContainerAllocations().getCount() * MAX_CONTAINER_SIZE);
 
     // Verify specific containers are present
-    assertTrue(tracker.containsPendingContainer(dn, containers.get(0)));
-    assertTrue(tracker.containsPendingContainer(dn, containers.get(500)));
-    assertTrue(tracker.containsPendingContainer(dn, containers.get(999)));
+    assertTrue(dn.getPendingContainerAllocations().contains(containers.get(0)));
+    assertTrue(dn.getPendingContainerAllocations().contains(containers.get(500)));
+    assertTrue(dn.getPendingContainerAllocations().contains(containers.get(999)));
 
     // Remove half of them
     for (int i = 0; i < 500; i++) {
-      tracker.removePendingAllocation(dn, containers.get(i));
+      tracker.removePendingAllocation(dn.getPendingContainerAllocations(), containers.get(i));
     }
 
-    assertEquals(500, tracker.getPendingContainerCount(dn));
-    assertFalse(tracker.containsPendingContainer(dn, containers.get(0)));
-    assertTrue(tracker.containsPendingContainer(dn, containers.get(999)));
+    assertEquals(500, dn.getPendingContainerAllocations().getCount());
+    assertFalse(dn.getPendingContainerAllocations().contains(containers.get(0)));
+    assertTrue(dn.getPendingContainerAllocations().contains(containers.get(999)));
   }
 
   @Test
@@ -281,9 +276,9 @@ public class TestPendingContainerTracker {
 
     // Each DN should have 10 pending containers
     for (int i = 0; i < NUM_DATANODES; i++) {
-      assertEquals(10, tracker.getPendingContainerCount(datanodes.get(i)));
+      assertEquals(10, datanodes.get(i).getPendingContainerAllocations().getCount());
       assertEquals(10 * MAX_CONTAINER_SIZE,
-          tracker.getPendingContainerCount(datanodes.get(i)) * MAX_CONTAINER_SIZE);
+          datanodes.get(i).getPendingContainerAllocations().getCount() * MAX_CONTAINER_SIZE);
     }
 
     // Remove all containers from every 10th DN
@@ -291,19 +286,19 @@ public class TestPendingContainerTracker {
       DatanodeInfo dn = datanodes.get(dnIdx);
       for (int cIdx = 0; cIdx < 10; cIdx++) {
         int containerIdx = dnIdx * 10 + cIdx;
-        tracker.removePendingAllocation(dn, containers.get(containerIdx));
+        tracker.removePendingAllocation(dn.getPendingContainerAllocations(), containers.get(containerIdx));
       }
     }
 
     // Every 10th DN should have 0 pending
     for (int i = 0; i < NUM_DATANODES; i += 10) {
-      assertEquals(0, tracker.getPendingContainerCount(datanodes.get(i)));
+      assertEquals(0, datanodes.get(i).getPendingContainerAllocations().getCount());
     }
 
     // Other DNs should still have 10 pending
-    assertEquals(10, tracker.getPendingContainerCount(datanodes.get(1)));
-    assertEquals(10, tracker.getPendingContainerCount(datanodes.get(15)));
-    assertEquals(10, tracker.getPendingContainerCount(datanodes.get(999)));
+    assertEquals(10, datanodes.get(1).getPendingContainerAllocations().getCount());
+    assertEquals(10, datanodes.get(15).getPendingContainerAllocations().getCount());
+    assertEquals(10, datanodes.get(999).getPendingContainerAllocations().getCount());
   }
 
   @Test
@@ -318,7 +313,7 @@ public class TestPendingContainerTracker {
     }
 
     // Should still only have 100 containers
-    assertEquals(100, tracker.getPendingContainerCount(dn));
+    assertEquals(100, dn.getPendingContainerAllocations().getCount());
   }
 
   @Test

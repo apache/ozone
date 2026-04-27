@@ -127,7 +127,8 @@ public class MockNodeManager implements NodeManager {
     this.dnsToUuidMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
     this.clusterMap = new NetworkTopologyImpl(conf);
-    this.pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024, null);
+    this.pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024,
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null, null);
   }
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
@@ -267,7 +268,7 @@ public class MockNodeManager implements NodeManager {
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
         DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-            UpgradeUtils.defaultLayoutVersionProto(), conf);
+            UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();
@@ -346,7 +347,7 @@ public class MockNodeManager implements NodeManager {
         nodeStatus = NodeStatus.inServiceDead();
       }
       DatanodeInfo di = new DatanodeInfo(entry.getKey(), nodeStatus,
-          UpgradeUtils.defaultLayoutVersionProto(), conf);
+          UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       long capacity = entry.getValue().getCapacity().get();
       long used = entry.getValue().getScmUsed().get();
@@ -435,7 +436,7 @@ public class MockNodeManager implements NodeManager {
     }
 
     DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-        UpgradeUtils.defaultLayoutVersionProto(), conf);
+        UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     long capacity = nodeMetricMap.get(dd).getCapacity().get();
     long used = nodeMetricMap.get(dd).getScmUsed().get();
     long remaining = nodeMetricMap.get(dd).getRemaining().get();
@@ -764,7 +765,7 @@ public class MockNodeManager implements NodeManager {
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
     final DatanodeInfo info = new DatanodeInfo(datanodeDetails,
-        NodeStatus.inServiceHealthy(), layoutInfo, conf);
+        NodeStatus.inServiceHealthy(), layoutInfo, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     try {
       node2ContainerMap.addNode(info);
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),

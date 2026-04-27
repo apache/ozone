@@ -192,7 +192,8 @@ public class SCMNodeManager implements NodeManager {
     this.pendingContainerTracker = new PendingContainerTracker(
         (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES),
-        this.metrics);
+        5 * 60 * 1000, // TODO
+        this.metrics, this::getNode);
     this.clusterMap = networkTopology;
     this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(

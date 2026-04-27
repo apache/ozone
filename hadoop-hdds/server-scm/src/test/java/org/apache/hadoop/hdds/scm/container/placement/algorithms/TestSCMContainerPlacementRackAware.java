@@ -113,7 +113,7 @@ public class TestSCMContainerPlacementRackAware {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto(),
-          conf);
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
@@ -457,7 +457,7 @@ public class TestSCMContainerPlacementRackAware {
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto(),
-          conf);
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           dnInfo.getID(), "/data1-" + dnInfo.getID(),

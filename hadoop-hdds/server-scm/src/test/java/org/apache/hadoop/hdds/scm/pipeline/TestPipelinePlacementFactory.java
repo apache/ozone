@@ -104,7 +104,7 @@ public class TestPipelinePlacementFactory {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
           UpgradeUtils.defaultLayoutVersionProto(),
-          conf);
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageContainerDatanodeProtocolProtos.StorageReportProto storage1 =
           HddsTestUtils.createStorageReport(

@@ -124,6 +124,8 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private final long deadNodeIntervalMs;
 
+  private final long containerRollIntervalMs = 5 * 60 * 1000;  //TODO
+
   /**
    * The future is used to pause/unpause the scheduled checks.
    */
@@ -133,8 +135,6 @@ public class NodeStateManager implements Runnable, Closeable {
    * Test utility - tracks if health check has been paused (unit tests).
    */
   private boolean checkPaused;
-
-  private final ConfigurationSource conf;
 
   /**
    * timestamp of the latest heartbeat check process.
@@ -176,7 +176,6 @@ public class NodeStateManager implements Runnable, Closeable {
     this.nodeHealthSM = new StateMachine<>(NodeState.HEALTHY,
         finalStates);
     initializeStateMachines();
-    this.conf = conf;
     heartbeatCheckerIntervalMs = HddsServerUtil
         .getScmheartbeatCheckerInterval(conf);
     staleNodeIntervalMs = HddsServerUtil.getStaleNodeInterval(conf);
@@ -313,7 +312,7 @@ public class NodeStateManager implements Runnable, Closeable {
 
   private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, LayoutVersionProto layout) {
     final NodeStatus status = newNodeStatus(datanode, layout);
-    return new DatanodeInfo(datanode, status, layout, conf);
+    return new DatanodeInfo(datanode, status, layout, containerRollIntervalMs);
   }
 
   /**
