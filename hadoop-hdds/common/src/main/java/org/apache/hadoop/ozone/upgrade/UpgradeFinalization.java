@@ -49,10 +49,17 @@ public final class UpgradeFinalization {
   );
 
   /**
-   * Default message to provide when the service is in ALREADY_FINALIZED state.
+   * Returned from finalize upgrade commands when finalization is not required.
    */
   public static final StatusAndMessages FINALIZED_MSG = new StatusAndMessages(
       Status.ALREADY_FINALIZED, Collections.emptyList()
+  );
+
+  /**
+   * Returned from progress/status queries when finalization is not required.
+   */
+  public static final StatusAndMessages FINALIZATION_DONE_MSG = new StatusAndMessages(
+      Status.FINALIZATION_DONE, Collections.emptyList()
   );
 
   /**

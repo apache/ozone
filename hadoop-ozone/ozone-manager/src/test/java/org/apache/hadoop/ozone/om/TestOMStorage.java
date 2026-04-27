@@ -282,7 +282,7 @@ public class TestOMStorage {
       OzoneConfiguration conf, String nodeId) throws IOException {
     OMStorage storage = new OMStorage(conf);
     storage.setClusterId("clusterId");
-    storage.setLayoutVersion(OMLayoutVersionManager.maxLayoutVersion());
+    storage.setApparentVersion(OMLayoutVersionManager.maxLayoutVersion());
     storage.setOmId(OM_ID_STR);
     if (nodeId != null) {
       storage.setOmNodeId(nodeId);

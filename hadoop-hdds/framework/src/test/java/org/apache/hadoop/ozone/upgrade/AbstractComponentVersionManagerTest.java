@@ -23,27 +23,33 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.common.Storage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 /**
  * Shared tests for concrete {@link ComponentVersionManager} implementations.
+ *
+ * <p>Each subclass {@linkplain #createManager(int) builds} the version manager with a real {@link Storage}
+ * instance rooted under a JUnit temporary directory (see for example {@code TestOMStorage} in ozone-manager).
+ * Assertions use {@link ComponentVersionManager#getStorageForTesting()} and {@link Storage#getApparentVersion()}
+ * to confirm what was persisted, instead of Mockito interaction verification.
  */
 public abstract class AbstractComponentVersionManagerTest {
 
+  /**
+   * Creates a new manager for {@code serializedApparentVersion}. The implementation must initialize real
+   * {@link Storage} on disk with that apparent version (and return a manager whose
+   * {@link ComponentVersionManager#getStorageForTesting()} is that instance).
+   */
   protected abstract ComponentVersionManager createManager(int serializedApparentVersion) throws IOException;
 
   protected abstract List<ComponentVersion> allVersionsInOrder();
@@ -71,32 +77,32 @@ public abstract class AbstractComponentVersionManagerTest {
   }
 
   @ParameterizedTest
-  // Child classes must implement this as a static method to provide the versions to start finalization from.
   @MethodSource("preFinalizedVersionArgs")
   public void testFinalizationFromEarlierVersions(ComponentVersion apparentVersion) throws Exception {
     List<ComponentVersion> allVersions = allVersionsInOrder();
     int apparentVersionIndex = allVersions.indexOf(apparentVersion);
     assertTrue(apparentVersionIndex >= 0, "Apparent version " + apparentVersion + " must exist");
-    Iterator<ComponentVersion> expectedVersions = allVersions.subList(apparentVersionIndex + 1, allVersions.size())
-        .iterator();
+    List<ComponentVersion> expectedChain = allVersions.subList(apparentVersionIndex + 1, allVersions.size());
 
     try (ComponentVersionManager versionManager = createManager(apparentVersion.serialize())) {
       assertApparentVersion(versionManager, apparentVersion);
 
-      for (ComponentVersion versionToFinalize : versionManager.getUnfinalizedVersions()) {
+      if (!expectedChain.isEmpty()) {
         assertTrue(versionManager.needsFinalization());
-        assertFalse(versionManager.isAllowed(versionToFinalize),
-            "Unfinalized version " + versionToFinalize + " should not be allowed by apparent version "
-                + versionManager.getApparentVersion());
-        assertTrue(expectedVersions.hasNext());
-        assertEquals(expectedVersions.next(), versionToFinalize);
-
-        versionManager.markFinalized(versionToFinalize);
-        assertApparentVersion(versionManager, versionToFinalize);
+        for (ComponentVersion v : expectedChain) {
+          assertFalse(versionManager.isAllowed(v),
+              "Version " + v + " should not be allowed before finalization");
+        }
       }
 
-      assertFalse(expectedVersions.hasNext());
-      assertThrows(NoSuchElementException.class, expectedVersions::next);
+      versionManager.finalizeUpgrade();
+
+      assertApparentVersion(versionManager, expectedSoftwareVersion());
+      assertFalse(versionManager.needsFinalization());
+
+      Storage storage = versionManager.getStorageForTesting();
+      assertEquals(expectedSoftwareVersion().serialize(), storage.getApparentVersion(),
+          "Storage apparent version should match software version after finalization");
     }
   }
 
@@ -105,31 +111,15 @@ public abstract class AbstractComponentVersionManagerTest {
     try (ComponentVersionManager versionManager = createManager(expectedSoftwareVersion().serialize())) {
       assertApparentVersion(versionManager, expectedSoftwareVersion());
       assertFalse(versionManager.needsFinalization());
-      assertFalse(versionManager.getUnfinalizedVersions().iterator().hasNext());
 
-      versionManager.markFinalized(expectedSoftwareVersion());
+      Storage storage = versionManager.getStorageForTesting();
+      int apparentOnStorageBefore = storage.getApparentVersion();
+      versionManager.finalizeUpgrade();
 
       assertApparentVersion(versionManager, expectedSoftwareVersion());
       assertFalse(versionManager.needsFinalization());
-      assertFalse(versionManager.getUnfinalizedVersions().iterator().hasNext());
-    }
-  }
-
-  @Test
-  public void testFinalizationOfNonExistentVersion() throws Exception {
-    try (ComponentVersionManager versionManager = createManager(expectedSoftwareVersion().serialize())) {
-      assertApparentVersion(versionManager, expectedSoftwareVersion());
-      assertFalse(versionManager.needsFinalization());
-      assertFalse(versionManager.getUnfinalizedVersions().iterator().hasNext());
-
-      ComponentVersion mockVersion = Mockito.mock(ComponentVersion.class);
-      when(mockVersion.isSupportedBy(any())).thenReturn(false);
-
-      assertThrows(IllegalArgumentException.class, () -> versionManager.markFinalized(mockVersion));
-      // The failed finalization call should not have changed the version manager's state.
-      assertApparentVersion(versionManager, expectedSoftwareVersion());
-      assertFalse(versionManager.needsFinalization());
-      assertFalse(versionManager.getUnfinalizedVersions().iterator().hasNext());
+      assertEquals(apparentOnStorageBefore, storage.getApparentVersion(),
+          "No-op finalize should not change the persisted apparent version");
     }
   }
 

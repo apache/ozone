@@ -91,7 +91,7 @@ public class OMStorage extends Storage {
    */
   public OMStorage(OzoneConfiguration conf) throws IOException {
     super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR,
-        getInitLayoutVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
+        getInitApparentVersion(conf, TESTING_INIT_LAYOUT_VERSION_KEY,
             OMLayoutVersionManager::maxLayoutVersion));
   }
 

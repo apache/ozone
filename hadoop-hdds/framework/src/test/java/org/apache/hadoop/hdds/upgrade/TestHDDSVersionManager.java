@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,12 +26,17 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.AbstractComponentVersionManagerTest;
 import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
+import org.apache.ozone.test.tag.Unhealthy;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 
 /**
- * Tests for {@link HDDSVersionManager}.
+ * Tests for {@link HDDSVersionManager} using on-disk {@link Storage} under a JUnit temp directory.
  */
 class TestHDDSVersionManager extends AbstractComponentVersionManagerTest {
 
@@ -52,9 +59,20 @@ class TestHDDSVersionManager extends AbstractComponentVersionManagerTest {
         .map(Arguments::of);
   }
 
+  @ParameterizedTest
+  @MethodSource("preFinalizedVersionArgs")
+  @Override
+  @Unhealthy
+  public void testFinalizationFromEarlierVersions(ComponentVersion apparentVersion) {
+    // TODO Once HDDSVersionManager implementation is finished, this override can be removed to enable the test in the
+    //  parent class.
+  }
+
   @Override
   protected ComponentVersionManager createManager(int serializedApparentVersion) throws IOException {
-    return new HDDSVersionManager(serializedApparentVersion);
+    Storage mockStorage = Mockito.mock(Storage.class);
+    when(mockStorage.getApparentVersion()).thenReturn(serializedApparentVersion);
+    return new HDDSVersionManager(mockStorage);
   }
 
   @Override

@@ -218,7 +218,7 @@ public class ReconStorageContainerManagerFacade
     this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, ReconSCMDBDefinition.get());
 
     HDDSLayoutVersionManager scmLayoutVersionManager =
-        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion());
     this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
