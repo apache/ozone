@@ -83,7 +83,7 @@ public class StorageContainerManagerHttpServer extends BaseHttpServer {
 
   @Override
   protected String getHttpAuthType() {
-    return SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
+    return ScmConfigKeys.HDDS_SCM_HTTP_AUTH_TYPE;
   }
 
   @Override

@@ -82,7 +82,7 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
       filter.parse(new InputSource(inputStream));
       return cls.cast(unmarshallerHandler.getResult());
     } catch (Exception e) {
-      throw wrapOS3Exception(newError(INVALID_REQUEST, null, e).withMessage(e.getMessage()));
+      throw wrapOS3Exception(newError(INVALID_REQUEST, e).withMessage(e.getMessage()));
     }
   }
 

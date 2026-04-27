@@ -110,6 +110,7 @@ import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -252,7 +253,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         cacheCleanupServiceInterval, compactNonSnapshotDiffTables, ozoneManager.getMetadataManager().getLock());
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb,
-        ozoneManager, snapDiffJobCf, snapDiffReportCf,
+        ozoneManager, snapDiffJobCf, snapDiffReportCf, snapDiffPurgedJobCf,
         columnFamilyOptions, codecRegistry);
 
     diffCleanupServiceInterval = ozoneManager.getConfiguration()
@@ -825,6 +826,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   @SuppressWarnings("parameternumber")
+  @Deprecated
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
                                                     final String bucket,
                                                     final String fromSnapshot,
@@ -855,15 +857,56 @@ public final class OmSnapshotManager implements AutoCloseable {
             fromSnapshot, toSnapshot, index, pageSize, forceFullDiff,
             disableNativeDiff);
 
-    // Check again to make sure that from and to snapshots are still active and
-    // were not deleted in between response generation.
-    // Ideally, snapshot diff and snapshot deletion should take an explicit lock
-    // to achieve the synchronization, but it would be complex and expensive.
-    // To avoid the complexity, we just check that snapshots are active
-    // before returning the response. It is like an optimistic lock to achieve
-    // similar behaviour and make sure client gets consistent response.
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffReport;
+  }
+
+  public SnapshotDiffResponse getSnapshotDiffResponse(final String volume,
+                                                      final String bucket,
+                                                      final String fromSnapshot,
+                                                      final String toSnapshot,
+                                                      final String token,
+                                                      int pageSize)
+      throws IOException {
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+
+    // Check if fromSnapshot and toSnapshot are equal.
+    if (Objects.equals(fromSnapshot, toSnapshot)) {
+      SnapshotDiffReportOzone diffReport = new SnapshotDiffReportOzone(
+          getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
+          fromSnapshot, toSnapshot, Collections.emptyList(), null);
+      return new SnapshotDiffResponse(diffReport, DONE, 0L);
+    }
+
+    String index = validateToken(token);
+    if (pageSize <= 0 || pageSize > maxPageSize) {
+      pageSize = maxPageSize;
+    }
+
+    return snapshotDiffManager.getSnapshotDiffReport(volume, bucket,
+            fromSnapshot, toSnapshot, index, pageSize);
+  }
+
+  public SubmitSnapshotDiffResponse submitSnapshotDiff(final String volume,
+                                                       final String bucket,
+                                                       final String fromSnapshot,
+                                                       final String toSnapshot,
+                                                       boolean forceFullDiff,
+                                                       boolean disableNativeDiff)
+      throws IOException {
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+
+    // Check if fromSnapshot and toSnapshot are equal.
+    if (Objects.equals(fromSnapshot, toSnapshot)) {
+      return new SubmitSnapshotDiffResponse("Cannot submit diff between same snapshots.");
+    }
+
+    SubmitSnapshotDiffResponse snapshotDiffResponse =
+        snapshotDiffManager.submitSnapshotDiff(volume, bucket,
+            fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+    return snapshotDiffResponse;
   }
 
   public ListSnapshotDiffJobResponse getSnapshotDiffList(

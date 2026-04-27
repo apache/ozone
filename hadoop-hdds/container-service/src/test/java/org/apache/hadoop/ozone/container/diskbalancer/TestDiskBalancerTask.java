@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -266,7 +265,6 @@ public class TestDiskBalancerTask {
     kvFaultInjector.reset();
     KeyValueContainer.setInjector(null);
     DiskBalancerService.setInjector(null);
-    DefaultContainerChoosingPolicy.setTest(false);
   }
 
   @ParameterizedTest
@@ -289,9 +287,6 @@ public class TestDiskBalancerTask {
     assertFalse(containerIterator.hasNext());
 
     String oldContainerPath = container.getContainerData().getContainerPath();
-    if (containerState == State.QUASI_CLOSED) {
-      DefaultContainerChoosingPolicy.setTest(true);
-    }
     DiskBalancerService.DiskBalancerTask task = getTask();
     task.call();
     assertEquals(State.DELETED, container.getContainerState());
@@ -459,7 +454,6 @@ public class TestDiskBalancerTask {
         .when(spyContainerSet).updateContainer(any(Container.class));
     when(ozoneContainer.getContainerSet()).thenReturn(spyContainerSet);
 
-    DefaultContainerChoosingPolicy.setTest(true);
     DiskBalancerService.DiskBalancerTask task = getTask();
     CompletableFuture completableFuture = CompletableFuture.runAsync(() -> task.call());
 
@@ -612,12 +606,10 @@ public class TestDiskBalancerTask {
   }
 
   /**
-   * Testing that invalid states (including QUASI_CLOSED in production mode) are correctly rejected.
-   * Here, with QUASI_CLOSED state, we ensure that the test runs in production mode
-   * where QUASI_CLOSED is not allowed for move.
+   * Testing that invalid states are correctly rejected.
    */
   @ParameterizedTest
-  @EnumSource(names = {"OPEN", "CLOSING", "QUASI_CLOSED", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
+  @EnumSource(names = {"OPEN", "CLOSING", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
   public void testMoveSkippedWhenContainerStateChanged(State invalidState)
       throws IOException, InterruptedException, TimeoutException {
     LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);

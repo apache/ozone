@@ -51,12 +51,12 @@ public class CompleteMultipartUploadRequestUnmarshaller
       InputStream inputStream) throws WebApplicationException {
     try {
       if (inputStream.available() == 0) {
-        throw wrapOS3Exception(newError(INVALID_REQUEST, null, null)
+        throw wrapOS3Exception(newError(INVALID_REQUEST)
             .withMessage("You must specify at least one part"));
       }
       return super.readFrom(aClass, type, annotations, mediaType, multivaluedMap, inputStream);
     } catch (IOException e) {
-      throw wrapOS3Exception(newError(INVALID_REQUEST, null, e)
+      throw wrapOS3Exception(newError(INVALID_REQUEST, e)
           .withMessage(e.getMessage()));
     }
   }
