@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -330,8 +331,9 @@ public final class DiskBalancerConfiguration {
       if (name.isEmpty()) {
         continue;
       }
+      State state;
       try {
-        states.add(State.valueOf(name));
+        state = State.valueOf(name);
       } catch (IllegalArgumentException ex) {
         if (wouldMatchContainerStateIfUppercased(name)) {
           throw new IllegalArgumentException(
@@ -345,6 +347,10 @@ public final class DiskBalancerConfiguration {
                 + "Valid names are: " + Arrays.toString(State.values()),
             ex);
       }
+      if (HddsUtils.isOpenToWriteState(state) || state == State.DELETED) {
+        throw new IllegalArgumentException("State " + name + " is not movable.");
+      }
+      states.add(State.valueOf(name));
     }
     if (states.isEmpty()) {
       throw new IllegalArgumentException(

@@ -520,8 +520,8 @@ public class TestDiskBalancerService {
             new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
         Arguments.of("  QUASI_CLOSED  ", true,
             new HashSet<>(Arrays.asList(State.QUASI_CLOSED)), null),
-        Arguments.of("OPEN,CLOSED", true,
-            new HashSet<>(Arrays.asList(State.OPEN, State.CLOSED)), null),
+        Arguments.of("CLOSING,CLOSED", true,
+            new HashSet<>(Arrays.asList(State.CLOSING, State.CLOSED)), null),
         Arguments.of("  QUASI_CLOSED,CLOSED ", true,
             new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
         Arguments.of("  QUASI_CLOSED , CLOSED ", true,
@@ -531,7 +531,10 @@ public class TestDiskBalancerService {
         Arguments.of("   ", false, null, "must not be empty"),
         Arguments.of(",,,", false, null, "at least one valid"),
         Arguments.of("closed", false, null, "uppercase"),
-        Arguments.of("NOT_A_STATE", false, null, "Invalid container state")
+        Arguments.of("NOT_A_STATE", false, null, "Invalid container state"),
+        Arguments.of("OPEN", false, null, "State OPEN is not movable"),
+        Arguments.of("RECOVERING", false, null, "State RECOVERING is not movable"),
+        Arguments.of("DELETED", false, null, "State DELETED is not movable")
     );
   }
 

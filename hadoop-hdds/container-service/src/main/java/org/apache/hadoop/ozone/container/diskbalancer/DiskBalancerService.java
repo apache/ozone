@@ -157,7 +157,7 @@ public class DiskBalancerService extends BackgroundService {
 
     DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
     replicaDeletionDelay = diskBalancerConfiguration.getReplicaDeletionDelay();
-    setContainerStates(diskBalancerConfiguration.getContainerStates());
+    setContainerStates(diskBalancerConfiguration.getMovableContainerStates());
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
@@ -243,6 +243,9 @@ public class DiskBalancerService extends BackgroundService {
 
   private void applyDiskBalancerInfo(DiskBalancerInfo diskBalancerInfo)
       throws IOException {
+    // verify ContainerStates first
+    DiskBalancerConfiguration validated = new DiskBalancerConfiguration();
+    validated.setContainerStates(diskBalancerInfo.getContainerStates());
     // First store in local file, then update in memory variables
     writeDiskBalancerInfoTo(diskBalancerInfo, diskBalancerInfoFile);
 
@@ -253,7 +256,7 @@ public class DiskBalancerService extends BackgroundService {
     setParallelThread(diskBalancerInfo.getParallelThread());
     setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
-    setContainerStates(diskBalancerInfo.getContainerStates());
+    setContainerStates(validated.getMovableContainerStates());
 
     // Default executorService is ScheduledThreadPoolExecutor, so we can
     // update the poll size by setting corePoolSize.
@@ -365,16 +368,14 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   /**
-   * Validates and applies container-state configuration.
+   * Applies container-state configuration.
    * <p>
    * Only the parsed set of {@link State} values is stored in memory. Status and YAML use a
    * canonical comma-separated list (enum names sorted lexically), which may differ from the
    * original input string.
    */
-  public void setContainerStates(String containerStates) {
-    DiskBalancerConfiguration validated = new DiskBalancerConfiguration();
-    validated.setContainerStates(containerStates);
-    this.movableContainerStates = validated.getMovableContainerStates();
+  public void setContainerStates(Set<State> containerStateSet) {
+    this.movableContainerStates = containerStateSet;
   }
 
   /**
