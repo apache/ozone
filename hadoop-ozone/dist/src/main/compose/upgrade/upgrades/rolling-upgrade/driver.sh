@@ -116,7 +116,9 @@ done
 # so new client APIs can be exercised against pre-finalized servers.
 echo "--- UPGRADING CLIENT TO $OZONE_UPGRADE_TO ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-client"
-rolling_restart_service "$CLIENT" "$OZONE_UPGRADE_TO"
+stop_containers "$CLIENT"
+prepare_for_image "${OZONE_UPGRADE_TO}"
+create_containers "$CLIENT"
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-finalized"
