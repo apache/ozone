@@ -86,12 +86,6 @@ public class SCMUpgradeFinalizer extends
         context.getStorage());
   }
 
-  @Override
-  public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context) throws IOException {
-    waitForDatanodesToFinalize(context);
-    super.postFinalizeUpgrade(context);
-  }
-
   /**
    * Wait for all HEALTHY datanodes to complete finalization before finishing
    * SCM finalization. This ensures that when the client receives a

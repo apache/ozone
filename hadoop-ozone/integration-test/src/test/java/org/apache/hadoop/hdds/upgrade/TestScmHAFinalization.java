@@ -19,13 +19,9 @@ package org.apache.hadoop.hdds.upgrade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -53,7 +49,6 @@ import org.slf4j.LoggerFactory;
  * HA.
  */
 public class TestScmHAFinalization {
-  private static final String CLIENT_ID = UUID.randomUUID().toString();
   private static final Logger LOG =
       LoggerFactory.getLogger(TestScmHAFinalization.class);
 
@@ -61,7 +56,6 @@ public class TestScmHAFinalization {
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
-  private Future<?> finalizationFuture;
 
   public void init(OzoneConfiguration conf,
       UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
@@ -88,20 +82,6 @@ public class TestScmHAFinalization {
 
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
-
-    // Launch finalization from the client. In the current implementation,
-    // this call will block until finalization completes. If the test
-    // involves restarts or leader changes the client may be disconnected,
-    // but finalization should still proceed.
-    finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeUpgrade();
-          } catch (IOException ex) {
-            LOG.info("finalization client failed. This may be expected if the" +
-                " test injected failures.", ex);
-          }
-        });
   }
 
   @AfterEach
@@ -115,8 +95,8 @@ public class TestScmHAFinalization {
   public void testFinalization() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     init(conf, new DefaultUpgradeFinalizationExecutor<>(), 0);
-    finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmClient.finalizeUpgrade();
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
     // Ensure all SCMs finalize, indicating the message has been propagated across them all
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
@@ -153,8 +133,8 @@ public class TestScmHAFinalization {
     }
 
     // Wait for finalization from the client perspective.
-    finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmClient.finalizeUpgrade();
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
     // Wait for two running SCMs to finish finalization.
     waitForScmsToFinalize(activeScms);
 

@@ -24,12 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -55,17 +52,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests upgrade finalization failure scenarios and corner cases specific to DN data distribution feature.
  */
 public class TestDNDataDistributionFinalization {
-  private static final String CLIENT_ID = UUID.randomUUID().toString();
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestDNDataDistributionFinalization.class);
-
   private StorageContainerLocationProtocol scmClient;
   private MiniOzoneHAClusterImpl cluster;
 
@@ -167,20 +158,9 @@ public class TestDNDataDistributionFinalization {
     // Validate pre-finalization state
     validatePreDataDistributionFeatureState();
 
-    // Now trigger finalization
-    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (IOException ex) {
-            LOG.info("finalization client failed. This may be expected if the" +
-                " test injected failures.", ex);
-          }
-        });
-
     // Wait for finalization to complete
-    finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmClient.finalizeUpgrade();
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
 
     // Verify finalization completed
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
@@ -215,18 +195,8 @@ public class TestDNDataDistributionFinalization {
       out.write(data);
     }
     bucket.deleteKey(keyName);
-    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (IOException ex) {
-            LOG.info("finalization client failed. This may be expected if the" +
-                " test injected failures.", ex);
-          }
-        });
-    // Wait for finalization
-    finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmClient.finalizeUpgrade();
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
 
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
