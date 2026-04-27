@@ -66,7 +66,6 @@ public enum OMLayoutFeature implements LayoutFeature {
 
   private final int layoutVersion;
   private final String description;
-  private OmUpgradeAction action;
 
   OMLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
@@ -98,18 +97,6 @@ public enum OMLayoutFeature implements LayoutFeature {
   }
 
   /**
-   * Associates a given upgrade action with this feature. Only the first upgrade action registered will be used.
-   *
-   * @param upgradeAction The upgrade action to associate with this feature.
-   */
-  public void addAction(OmUpgradeAction upgradeAction) {
-    // Required by SpotBugs since this setter exists in an enum.
-    if (this.action == null) {
-      this.action = upgradeAction;
-    }
-  }
-
-  /**
    * @return The next version immediately following this one. If there is no next version found in this enum,
    *    the next version is {@link OzoneManagerVersion#ZDU}, since all OM versioning has been migrated to
    *    {@link OzoneManagerVersion} as part of the ZDU feature.
@@ -122,10 +109,5 @@ public enum OMLayoutFeature implements LayoutFeature {
     } else {
       return nextFeature;
     }
-  }
-
-  @Override
-  public Optional<OmUpgradeAction> action() {
-    return Optional.ofNullable(action);
   }
 }
