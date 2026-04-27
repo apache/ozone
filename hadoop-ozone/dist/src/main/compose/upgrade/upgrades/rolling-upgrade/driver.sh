@@ -27,6 +27,7 @@ set -u
 : "${OZONE_UPGRADE_TO}"
 : "${TEST_DIR}"
 : "${SCM}"
+: "${CLIENT}"
 : "${OZONE_CURRENT_VERSION}"
 set +u
 
@@ -43,31 +44,13 @@ rolling_restart_service() {
   # Stop service
   stop_containers "${SERVICE}"
 
-  # Check if this SCM container is running, as during a rolling upgrade it does stop-start one-by-one and
-  # we want to run write/read tests while one service is unavailable. Choose SCM (the container where the generate and
-  # validate robot tests are running) considering availability.
-  if [[ "$(docker inspect -f '{{.State.Running}}' "ha-${SCM}-1" 2>/dev/null)" != "true" ]]; then
-    local fallback_scm
-    fallback_scm="$(docker-compose --project-directory="$TEST_DIR/compose/ha" config --services | grep scm | grep -v "^${SCM}$" | head -n1)"
-    if [[ -n "$fallback_scm" ]]; then
-      export SCM="$fallback_scm"
-    fi
-  fi
-
-  # The data generation/validation is doing S3 API tests, so skip it in case the S3 gateway is updated
-  # TODO find a better solution
-  if [[ ${SERVICE} != "s3g" ]]; then
-    callback before_service_restart
-  fi
+  callback before_service_restart
 
   # Restart service with new image.
   prepare_for_image "${OZONE_UPGRADE_TO}"
   create_containers "${SERVICE}"
 
-  # The data generation/validation is doing S3 API tests, so skip it in case the S3 gateway is updated
-  if [[ ${SERVICE} != "s3g" ]]; then
-    callback after_service_restart
-  fi
+  callback after_service_restart
 
   # Service-specific readiness checks.
   case "${SERVICE}" in
@@ -80,6 +63,9 @@ rolling_restart_service() {
       ;;
     dn*)
       wait_for_port "${SERVICE}" 9882 120
+      ;;
+    s3g*)
+      wait_for_port "${SERVICE}" 9878 120
       ;;
   esac
 }
@@ -112,16 +98,27 @@ for s in dn1 dn2 dn3 dn4 dn5; do
   rolling_restart_service "$s" "$OZONE_UPGRADE_TO"
 done
 
+# OMs
 for s in om1 om2 om3; do
   OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-${s}"
   rolling_restart_service "$s" "$OZONE_UPGRADE_TO"
 done
 
-# S3 Gateway
-OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-s3g"
-rolling_restart_service "s3g" "$OZONE_UPGRADE_TO"
+# S3 Gateways (s3g is HAProxy and does not need to be upgraded)
+for s in s3g1 s3g2 s3g3; do
+  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-${s}"
+  rolling_restart_service "$s" "$OZONE_UPGRADE_TO"
+done
 
 # TODO Add downgrade scenario
+
+# Upgrade client after all server components are upgraded but before finalization,
+# so new client APIs can be exercised against pre-finalized servers.
+echo "--- UPGRADING CLIENT TO $OZONE_UPGRADE_TO ---"
+OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-client"
+stop_containers "$CLIENT"
+prepare_for_image "${OZONE_UPGRADE_TO}"
+create_containers "$CLIENT"
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-finalized"
@@ -129,4 +126,4 @@ OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-finalized"
 # TODO Add validation for pre-finalized state
 
 # Sends commands to finalize OM and SCM.
-execute_robot_test "$SCM" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot
+execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot

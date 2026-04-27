@@ -737,6 +737,146 @@ public class TestSCMNodeManager {
     testProcessLayoutVersionReportHigherMlv();
   }
 
+  @Test
+  public void testDatanodeFinalizedCounterTracksLayoutVersionReports()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails node =
+          HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
+              .getNumFinalizedDatanodes(),
+          "Initial datanode should be counted as finalized");
+
+      int softwareVersion =
+          nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
+      int metadataVersion =
+          nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
+      nodeManager.processLayoutVersionReport(node,
+          LayoutVersionProto.newBuilder()
+              .setMetadataLayoutVersion(metadataVersion - 1)
+              .setSoftwareLayoutVersion(softwareVersion)
+              .build());
+      assertEquals(0, nodeManager.getDatanodeFinalizationCounts()
+              .getNumFinalizedDatanodes(),
+          "Lower metadata layout version should decrement finalized count");
+
+      nodeManager.processLayoutVersionReport(node,
+          LayoutVersionProto.newBuilder()
+              .setMetadataLayoutVersion(metadataVersion)
+              .setSoftwareLayoutVersion(softwareVersion)
+              .build());
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
+              .getNumFinalizedDatanodes(),
+          "Restored metadata layout version should restore finalized count");
+    }
+  }
+
+  @Test
+  public void testDatanodeFinalizedCounterTracksRegistrationAndRemoveNode()
+      throws IOException, AuthenticationException, NodeNotFoundException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails finalizedNode =
+          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
+              .getNumFinalizedDatanodes(),
+          "Finalized registration should increment finalized count");
+
+      DatanodeDetails nonFinalizedNode =
+          registerWithCapacity(nodeManager, SMALLER_MLV_LAYOUT_PROTO, success);
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
+              .getNumFinalizedDatanodes(),
+          "Non-finalized registration should not increment finalized count");
+
+      nonFinalizedNode.setPersistedOpState(
+          HddsProtos.NodeOperationalState.DECOMMISSIONED);
+      nodeManager.removeNode(nonFinalizedNode);
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
+              .getNumFinalizedDatanodes(),
+          "Removing a non-finalized node should not change finalized count");
+
+      finalizedNode.setPersistedOpState(
+          HddsProtos.NodeOperationalState.DECOMMISSIONED);
+      nodeManager.removeNode(finalizedNode);
+      assertEquals(0, nodeManager.getDatanodeFinalizationCounts().getNumFinalizedDatanodes(),
+          "Removing a finalized node should decrement finalized count");
+    }
+  }
+
+  private static Stream<Arguments> ineligibleHealthStates() {
+    return Stream.of(
+        Arguments.of(NodeStatus.inServiceStale()),
+        Arguments.of(NodeStatus.inServiceDead())
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("ineligibleHealthStates")
+  public void testDatanodeFinalizedCounterExcludesNonHealthyNodes(NodeStatus expectedStatus)
+      throws IOException, AuthenticationException, NodeNotFoundException, InterruptedException {
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, MILLISECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
+
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      // transitionNode stops heartbeating and will become STALE or DEAD
+      DatanodeDetails transitionNode =
+          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+      // heartbeatingNode keeps heartbeating as a healthy baseline
+      DatanodeDetails heartbeatingNode =
+          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+
+      nodeManager.processHeartbeat(transitionNode);
+      nodeManager.processHeartbeat(heartbeatingNode);
+
+      assertEquals(2, nodeManager.getDatanodeFinalizationCounts().getTotalHealthyDatanodes(),
+          "Both nodes should start as healthy");
+
+      // Only heartbeat the baseline node until transitionNode reaches the expected state.
+      // STALE requires > 3s (wait 4s), DEAD requires > 6s (wait 7s total).
+      boolean waitForDead = expectedStatus.equals(NodeStatus.inServiceDead());
+      Thread.sleep(2000);
+      nodeManager.processHeartbeat(heartbeatingNode);
+      Thread.sleep(2000);
+      if (waitForDead) {
+        nodeManager.processHeartbeat(heartbeatingNode);
+        Thread.sleep(3000);
+      }
+
+      assertEquals(expectedStatus, nodeManager.getNodeStatus(transitionNode),
+          "Node should have transitioned to " + expectedStatus);
+
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts().getTotalHealthyDatanodes(),
+          expectedStatus + " node should be excluded from total count");
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts().getNumFinalizedDatanodes(),
+          expectedStatus + " node should be excluded from finalized count");
+    }
+  }
+
+  private static Stream<Arguments> allOperationalStates() {
+    return Stream.of(HddsProtos.NodeOperationalState.values())
+        .map(Arguments::of);
+  }
+
+  @ParameterizedTest
+  @MethodSource("allOperationalStates")
+  public void testDatanodeFinalizedCounterIncludesAllHealthyOpStates(
+      HddsProtos.NodeOperationalState opState)
+      throws IOException, AuthenticationException, NodeNotFoundException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails node =
+          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+      nodeManager.setNodeOperationalState(node, opState);
+
+      // All HEALTHY nodes should be counted regardless of operational state
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts().getTotalHealthyDatanodes(),
+          "HEALTHY node with op state " + opState + " should be counted in total");
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts().getNumFinalizedDatanodes(),
+          "HEALTHY finalized node with op state " + opState + " should be counted as finalized");
+    }
+  }
+
   // Currently invoked by testProcessLayoutVersion.
   public void testProcessLayoutVersionReportHigherMlv()
       throws IOException {
