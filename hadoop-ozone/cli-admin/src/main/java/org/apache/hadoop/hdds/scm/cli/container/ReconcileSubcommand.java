@@ -99,11 +99,13 @@ public class ReconcileSubcommand extends ScmSubcommand {
       ContainerInfo containerInfo = scmClient.getContainer(containerID);
       if (containerInfo.isOpen()) {
         errorBuilder.append("Cannot get status of container ").append(containerID)
-            .append(". Reconciliation is not supported for open containers\n");
+            .append(". Reconciliation is not supported for open containers")
+            .append(System.lineSeparator());
         return false;
       } else if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
         errorBuilder.append("Cannot get status of container ").append(containerID)
-            .append(". Reconciliation is only supported for Ratis replicated containers\n");
+            .append(". Reconciliation is only supported for Ratis replicated containers")
+            .append(System.lineSeparator());
         return false;
       }
       List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(containerID);
@@ -111,7 +113,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
       arrayWriter.flush();
     } catch (Exception ex) {
       errorBuilder.append("Failed to get reconciliation status of container ")
-          .append(containerID).append(": ").append(getExceptionMessage(ex)).append('\n');
+          .append(containerID).append(": ").append(getExceptionMessage(ex)).append(System.lineSeparator());
       return false;
     }
     return true;
@@ -133,7 +135,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
     }
 
     if (successCount > 0) {
-      System.out.println("\nUse \"ozone admin container reconcile --status\" to see the checksums of each container " +
+      System.out.println();
+      System.out.println("Use \"ozone admin container reconcile --status\" to see the checksums of each container " +
           "replica");
     }
     if (failureCount > 0) {

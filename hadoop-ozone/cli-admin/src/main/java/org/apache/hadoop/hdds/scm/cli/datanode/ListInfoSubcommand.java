@@ -200,8 +200,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
       List<Pipeline> relatedPipelines = pipelines.stream().filter(
           p -> p.getNodes().contains(datanode)).collect(Collectors.toList());
       if (relatedPipelines.isEmpty()) {
-        pipelineListInfo.append("No related pipelines" +
-            " or the node is not in Healthy state.\n");
+        pipelineListInfo.append("No related pipelines or the node is not in Healthy state.")
+            .append(System.lineSeparator());
       } else {
         relatedPipelineNum = relatedPipelines.size();
         relatedPipelines.forEach(
@@ -211,12 +211,12 @@ public class ListInfoSubcommand extends ScmSubcommand {
                 .append('/').append(p.getPipelineState().toString()).append('/')
                 .append(datanode.getID().equals(p.getLeaderId()) ?
                     "Leader" : "Follower")
-                .append('\n'));
+                .append(System.lineSeparator()));
       }
     } else {
       pipelineListInfo
           .append("No pipelines in cluster.")
-          .append('\n');
+          .append(System.lineSeparator());
     }
     System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
@@ -225,8 +225,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Operational State: " + dn.getOpState());
     System.out.println("Health State: " + dn.getHealthState());
     if (dn.getTotalVolumeCount() != null && dn.getHealthyVolumeCount() != null) {
-      System.out.println("Total volume count: " + dn.getTotalVolumeCount() + "\n" +
-          "Healthy volume count: " + dn.getHealthyVolumeCount());
+      System.out.println("Total volume count: " + dn.getTotalVolumeCount());
+      System.out.println("Healthy volume count: " + dn.getHealthyVolumeCount());
     }
     if (dn.getFailedVolumes() != null && !dn.getFailedVolumes().isEmpty()) {
       System.out.println("Failed volumes:");
@@ -234,7 +234,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
         System.out.println("  " + vol);
       }
     }
-    System.out.println("Related pipelines:\n" + pipelineListInfo);
+    System.out.println("Related pipelines:");
+    System.out.println(pipelineListInfo);
 
     if (dn.getUsed() != null && dn.getCapacity() != null && dn.getUsed() >= 0 && dn.getCapacity() > 0) {
       System.out.println("Capacity: " + dn.getCapacity());

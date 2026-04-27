@@ -128,7 +128,7 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
     if (executorService != null) {
       executorService.shutdown();
       try {
-        if (executorService.awaitTermination(1, TimeUnit.MINUTES)) {
+        if (!executorService.awaitTermination(1, TimeUnit.MINUTES)) {
           executorService.shutdownNow();
         }
       } catch (InterruptedException e) {

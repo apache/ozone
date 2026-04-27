@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -79,6 +80,8 @@ public class TestDefaultContainerChoosingPolicy {
   private Path baseDir;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final Set<State> DEFAULT_MOVABLE_STATES =
+      CONF.getObject(DiskBalancerConfiguration.class).getMovableContainerStates();
   private static final long MB = 1024L * 1024L;
   private static final long VOLUME_CAPACITY = 2500L * MB; // 2500MB
   private static final long DEFAULT_CONTAINER_SIZE = 100L * MB; // 100MB
@@ -295,13 +298,18 @@ public class TestDefaultContainerChoosingPolicy {
 
   private void createContainer(long id, long usedBytes, HddsVolume vol, ContainerSet targetSet)
       throws IOException {
+    createContainer(id, usedBytes, vol, targetSet, ContainerDataProto.State.CLOSED);
+  }
+
+  private void createContainer(long id, long usedBytes, HddsVolume vol, ContainerSet targetSet,
+      ContainerDataProto.State state) throws IOException {
     long maxSize = usedBytes > 0 ? usedBytes : (long) CONF.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     KeyValueContainerData containerData = new KeyValueContainerData(id,
         ContainerLayoutVersion.FILE_PER_BLOCK, maxSize,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
-    containerData.setState(ContainerDataProto.State.CLOSED);
+    containerData.setState(state);
     containerData.setVolume(vol);
     containerData.getStatistics().setBlockBytesForTesting(usedBytes);
     KeyValueContainer container = new KeyValueContainer(containerData, CONF);
@@ -343,11 +351,14 @@ public class TestDefaultContainerChoosingPolicy {
         inProgressContainerIDs.add(ContainerID.valueOf(id));
       }
     }
+    mockContainerSet(containerSet);
+  }
 
+  private void mockContainerSet(ContainerSet cs) {
     ozoneContainer = mock(OzoneContainer.class);
-    ContainerController controller = new ContainerController(containerSet, null);
+    ContainerController controller = new ContainerController(cs, null);
     when(ozoneContainer.getController()).thenReturn(controller);
-    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    when(ozoneContainer.getContainerSet()).thenReturn(cs);
   }
 
   private MutableVolumeSet createVolumeSetForUsages(List<HddsVolume> volumes) throws IOException {
@@ -361,6 +372,68 @@ public class TestDefaultContainerChoosingPolicy {
     }
     vs.setVolumeMapForTesting(volumeMap);
     return vs;
+  }
+
+  /**
+   * When {@link DiskBalancerConfiguration#getContainerStates()} lists QUASI_CLOSED, the smallest
+   * movable quasi-closed container may be chosen; with CLOSED only, only CLOSED replicas are
+   * eligible.
+   */
+  @ParameterizedTest(name = "containerStates={0}")
+  @MethodSource("quasiClosedEligibilityParams")
+  public void testQuasiClosedEligibilityDependsOnContainerStates(String containerStates,
+      long expectedContainerId)
+      throws IOException {
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    DiskBalancerConfiguration dbc = testConf.getObject(DiskBalancerConfiguration.class);
+    dbc.setContainerStates(containerStates);
+    testConf.setFromObject(dbc);
+    ContainerChoosingPolicy policyUnderTest = new DefaultContainerChoosingPolicy(
+        new ReentrantLock());
+
+    inProgressContainerIDs.clear();
+    deltaMap.clear();
+
+    List<VolumeTestConfig> configs = Arrays.asList(
+        new VolumeTestConfig("disk3", 0.15),
+        new VolumeTestConfig("disk2", 0.85),
+        new VolumeTestConfig("disk1", 0.90)
+    );
+    List<HddsVolume> volumes = createVolumes(configs);
+    volumeSet = createVolumeSetForUsages(volumes);
+    List<VolumeFixedUsage> sortedUsages = getVolumeUsages(volumeSet, deltaMap);
+    sortedUsages.sort(Comparator.comparingDouble(VolumeFixedUsage::getUtilization));
+    HddsVolume sourceVolume = sortedUsages.get(sortedUsages.size() - 1).getVolume();
+    HddsVolume destVolume = sortedUsages.get(0).getVolume();
+
+    containerSet = newContainerSet();
+    createContainer(1L, 1500L * MB, sourceVolume, containerSet, ContainerDataProto.State.CLOSED);
+    createContainer(2L, 50L * MB, sourceVolume, containerSet, ContainerDataProto.State.QUASI_CLOSED);
+    createContainer(3L, 200L * MB, sourceVolume, containerSet, ContainerDataProto.State.CLOSED);
+
+    mockContainerSet(containerSet);
+
+    Set<State> movable = testConf.getObject(DiskBalancerConfiguration.class)
+        .getMovableContainerStates();
+    ContainerCandidate candidate = policyUnderTest.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, movable);
+
+    assertNotNull(candidate);
+    assertEquals(sourceVolume, candidate.getSourceVolume());
+    assertEquals(destVolume, candidate.getDestVolume());
+    assertEquals(expectedContainerId, candidate.getContainerData().getContainerID());
+    if (expectedContainerId == 2L) {
+      assertTrue(candidate.getContainerData().isQuasiClosed());
+    } else {
+      assertTrue(candidate.getContainerData().isClosed());
+    }
+  }
+
+  private static Stream<Arguments> quasiClosedEligibilityParams() {
+    return Stream.of(
+        Arguments.arguments(DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, 2L),
+        Arguments.arguments("CLOSED", 3L)
+    );
   }
 
   /**
@@ -392,7 +465,8 @@ public class TestDefaultContainerChoosingPolicy {
     List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, deltaMap);
 
     ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
-        volumeSet, deltaMap, inProgressContainerIDs, scenario.getThresholdPercentage());
+        volumeSet, deltaMap, inProgressContainerIDs, scenario.getThresholdPercentage(),
+        DEFAULT_MOVABLE_STATES);
 
     if (scenario.shouldFindPair()) {
       assertNotNull(result);
