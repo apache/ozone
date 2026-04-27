@@ -1152,6 +1152,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
+    StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto req =
+        StorageContainerLocationProtocolProtos.QueryUpgradeStatusRequestProto
+            .newBuilder()
+            .build();
+
+    StorageContainerLocationProtocolProtos.QueryUpgradeStatusResponseProto response =
+        submitRequest(Type.QueryUpgradeStatus, builder -> builder.setQueryUpgradeStatusRequest(req))
+            .getQueryUpgradeStatusResponse();
+    return response.getStatus();
+  }
+
+  @Override
   public Token<?> getContainerToken(
       ContainerID containerID) throws IOException {
     GetContainerTokenRequestProto request =
