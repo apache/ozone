@@ -72,7 +72,7 @@ public class TarExtractor {
   public TarExtractor(int threadPoolSize, String threadNamePrefix) {
     this.threadPoolSize = threadPoolSize;
     this.threadFactory =
-        new ThreadFactoryBuilder().setNameFormat("FetchOMDBTar-%d" + threadNamePrefix)
+        new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "FetchOMDBTar-%d")
             .build();
   }
 
