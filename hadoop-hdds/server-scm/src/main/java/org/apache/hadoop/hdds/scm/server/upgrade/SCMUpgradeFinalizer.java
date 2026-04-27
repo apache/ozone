@@ -18,15 +18,12 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
@@ -84,54 +81,5 @@ public class SCMUpgradeFinalizer extends
     super.finalizeLayoutFeature(lf,
         lf.scmAction(),
         context.getStorage());
-  }
-
-  /**
-   * Wait for all HEALTHY datanodes to complete finalization before finishing
-   * SCM finalization. This ensures that when the client receives a
-   * FINALIZATION_DONE status, all healthy datanodes have also finalized.
-   *
-   * A datanode is considered finalized when its metadata layout version (MLV)
-   * equals its software layout version (SLV), indicating it has completed
-   * processing all layout features.
-   *
-   * @param context The finalization context containing node manager reference
-   * @throws SCMException if waiting is interrupted or SCM loses leadership
-   * @throws NotLeaderException if SCM is no longer the leader
-   */
-  private void waitForDatanodesToFinalize(SCMUpgradeFinalizationContext context)
-      throws SCMException, NotLeaderException {
-    NodeManager nodeManager = context.getNodeManager();
-
-    LOG.info("Waiting for all HEALTHY datanodes to complete finalization before finishing SCM finalization.");
-
-    boolean allDatanodesFinalized = false;
-    while (!allDatanodesFinalized) {
-      // Break out of the wait and step down from driving finalization if this
-      // SCM is no longer the leader by throwing NotLeaderException.
-      context.getSCMContext().getTermOfLeader();
-
-      NodeManager.DatanodeFinalizationCounts datanodeFinalizationCounts = nodeManager.getDatanodeFinalizationCounts();
-      int finalizedNodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
-      int totalHealthyNodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
-      allDatanodesFinalized = datanodeFinalizationCounts.allNodesFinalized();
-
-      if (!allDatanodesFinalized) {
-        int unfinalizedNodes = totalHealthyNodes - finalizedNodes;
-        LOG.info("Waiting for datanodes to finalize. Status: {}/{} healthy " +
-                "datanodes have finalized ({} remaining).",
-            finalizedNodes, totalHealthyNodes, unfinalizedNodes);
-        try {
-          Thread.sleep(5000);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new SCMException("Interrupted while waiting for datanodes to " +
-              "finalize.", SCMException.ResultCodes.INTERNAL_ERROR);
-        }
-      } else {
-        LOG.info("All {} HEALTHY datanodes have completed finalization.",
-            totalHealthyNodes);
-      }
-    }
   }
 }
