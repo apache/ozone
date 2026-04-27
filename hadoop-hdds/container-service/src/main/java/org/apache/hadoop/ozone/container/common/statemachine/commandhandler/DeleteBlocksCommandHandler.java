@@ -648,17 +648,18 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       // Update pending deletion blocks count, blocks bytes and delete transaction ID in in-memory container status.
       // Persist pending bytes only if the feature is finalized.
+      long perReplicaPendingBytes = delTX.getTotalSizePerReplica();
       if (VersionedDatanodeFeatures.isFinalized(
-          HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) && delTX.hasTotalBlockSize()) {
+          HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
         long pendingBytes = containerData.getBlockPendingDeletionBytes();
-        pendingBytes += delTX.getTotalBlockSize();
+        pendingBytes += perReplicaPendingBytes;
         metadataTable
             .putWithBatch(batchOperation,
                 containerData.getPendingDeleteBlockBytesKey(),
                 pendingBytes);
       }
       containerData.incrPendingDeletionBlocks(newDeletionBlocks,
-          delTX.hasTotalBlockSize() ? delTX.getTotalBlockSize() : 0);
+          perReplicaPendingBytes);
       containerData.updateDeleteTransactionId(delTX.getTxID());
     }
   }

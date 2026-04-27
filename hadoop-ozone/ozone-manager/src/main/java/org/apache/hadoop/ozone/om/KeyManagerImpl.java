@@ -851,10 +851,10 @@ public class KeyManagerImpl implements KeyManager {
               List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
                       .map(b -> new DeletedBlock(
-                          new BlockID(b.getContainerID(),
-                            b.getLocalID()),
-                            b.getLength(),
-                            QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig())
+                          new BlockID(b.getContainerID(), b.getLocalID()),
+                          b.getLength(),
+                          QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()),
+                          QuotaUtil.getSizePerReplica(b.getLength(), info.getReplicationConfig())
                       ))).collect(Collectors.toList());
               String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
 
