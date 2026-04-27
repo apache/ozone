@@ -53,7 +53,7 @@ public class TestPendingContainerTracker {
 
   @BeforeEach
   public void setUp() throws IOException {
-    tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null, null);
+    tracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null);
 
     datanodes = new ArrayList<>(NUM_DATANODES);
     for (int i = 0; i < NUM_DATANODES; i++) {
@@ -129,7 +129,7 @@ public class TestPendingContainerTracker {
         MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
         rollMs);
 
-    PendingContainerTracker shortRollTracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, rollMs, null, null);
+    PendingContainerTracker shortRollTracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, rollMs, null);
 
     shortRollTracker.recordPendingAllocationForDatanode(shortDn, container1);
     assertEquals(1, shortDn.getPendingContainerAllocations().getCount());

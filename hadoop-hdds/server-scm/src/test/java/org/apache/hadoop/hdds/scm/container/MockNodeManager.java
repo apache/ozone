@@ -128,7 +128,7 @@ public class MockNodeManager implements NodeManager {
     this.aggregateStat = new SCMNodeStat();
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024,
-        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null, null);
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null);
   }
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,

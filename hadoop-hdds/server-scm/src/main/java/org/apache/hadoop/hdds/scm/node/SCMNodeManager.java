@@ -193,7 +193,7 @@ public class SCMNodeManager implements NodeManager {
         (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES),
         5 * 60 * 1000, // TODO
-        this.metrics, this::getNode);
+        this.metrics);
     this.clusterMap = networkTopology;
     this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(
