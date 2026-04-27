@@ -339,7 +339,7 @@ services:
     hostname: scm
     networks:
       net:
-        ipv4_address: 10.9.0.24
+        ipv4_address: 10.9.0.27
     volumes:
       - *keytabs
       - *krb5conf
