@@ -26,12 +26,6 @@ summary: Reduce the disk usage occupied by Ozone Snapshot metadata.
 
 [HDDS-13003](https://issues.apache.org/jira/browse/HDDS-13003)
 
-This is a revised design doc for HDDS-13003. It keeps the original proposal
-structure and calls out where the implemented behavior differs from the initial
-proposal. For the current user-facing behavior, configuration, and on-disk
-layout, see
-[Snapshot Defragmentation]({{< ref "feature/Snapshot-Defragmentation.md" >}}).
-
 # Problem Statement
 
 In Apache Ozone, snapshots currently take a checkpoint of the Active Object Store (AOS) RocksDB each time a snapshot is created and track the compaction of SST files over time. This model works efficiently when snapshots are short-lived, as they merely serve as hard links to the AOS RocksDB. However, over time, if an older snapshot persists while significant churn occurs in the AOS RocksDB (due to compactions and writes), the snapshot RocksDB may diverge significantly from both the AOS RocksDB and other snapshot RocksDB instances. This divergence increases storage requirements linearly with the number of snapshots.
