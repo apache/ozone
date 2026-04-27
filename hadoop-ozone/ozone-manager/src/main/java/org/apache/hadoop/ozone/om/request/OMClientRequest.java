@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -83,13 +82,14 @@ public abstract class OMClientRequest implements RequestAuditor {
   private final OMLockDetails omLockDetails = new OMLockDetails();
   private final OMAuditLogger.Builder auditBuilder = OMAuditLogger.newBuilder();
 
+  private String writeBucketName;
+  private String writeVolumeName;
+  private RaftGroupId writeRaftGroup;
+
   public OMAuditLogger.Builder getAuditBuilder() {
     return auditBuilder;
   }
 
-  private String writeBucketName;
-  private String writeVolumeName;
-  private RaftGroupId writeRaftGroup;
   /**
    * Stores the result of request execution in
    * OMClientRequest#validateAndUpdateCache.
@@ -102,7 +102,6 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   public OMClientRequest(OMRequest omRequest) {
     this.omRequest = Objects.requireNonNull(omRequest);
-    Preconditions.checkNotNull(omRequest);
     if (omRequest.hasRaftGroupId()) {
       HddsProtos.UUID uuid = omRequest.getRaftGroupId();
       RaftGroupId raftGroupId = RaftGroupId.valueOf(new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));

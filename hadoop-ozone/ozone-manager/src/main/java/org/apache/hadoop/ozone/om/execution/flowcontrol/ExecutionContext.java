@@ -17,9 +17,8 @@
 
 package org.apache.hadoop.ozone.om.execution.flowcontrol;
 
-import org.apache.ratis.server.protocol.TermIndex;
-
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.ratis.server.protocol.TermIndex;
 
 /**
  * Context required for execution of a request.

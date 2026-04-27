@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -428,8 +427,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private long snapshotUsedBytes;
     private long snapshotUsedNamespace;
     private UUID raftGroup;
-    private boolean isMultiRaftEnabled;
-    private long multiRaftTerm;
 
     public Builder() {
       acls = AclListBuilder.empty();
@@ -581,13 +578,15 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
+    @Override
     public Builder setMultiRaftEnabled(boolean multiRaftEnabled) {
-      isMultiRaftEnabled = multiRaftEnabled;
+      super.setMultiRaftEnabled(multiRaftEnabled);
       return this;
     }
 
+    @Override
     public Builder setMultiRaftTerm(long multiRaftTerm) {
-      this.multiRaftTerm = multiRaftTerm;
+      super.setMultiRaftTerm(multiRaftTerm);
       return this;
     }
 

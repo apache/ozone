@@ -147,7 +147,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who

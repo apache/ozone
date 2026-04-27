@@ -252,9 +252,35 @@ public abstract class OMKeyRequest extends OMClientRequest {
   public void validateBucketAndVolume(OMMetadataManager omMetadataManager,
       String volumeName, String bucketName)
       throws IOException {
+    validateBucketAndVolume(omMetadataManager, volumeName, bucketName, null);
+  }
+
+  public void validateBucketAndVolume(OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, OzoneManager ozoneManager)
+      throws IOException {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     // Check if bucket exists
     if (!omMetadataManager.getBucketTable().isExist(bucketKey)) {
+      // In multi-raft mode, the bucket may have been created through the
+      // main raft group but not yet applied on this follower OM.  Wait
+      // for the main state machine to catch up before throwing
+      // BUCKET_NOT_FOUND.  This adds zero overhead to the normal path
+      // — the loop only triggers on the actual miss.
+      if (ozoneManager != null && ozoneManager.isMultiRaftEnabled()) {
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (System.currentTimeMillis() < deadline) {
+          try {
+            Thread.sleep(50);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            break;
+          }
+          if (omMetadataManager.getBucketTable().isExist(bucketKey)) {
+            return;
+          }
+        }
+      }
+
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       // If the volume also does not exist, we should throw volume not found
       // exception

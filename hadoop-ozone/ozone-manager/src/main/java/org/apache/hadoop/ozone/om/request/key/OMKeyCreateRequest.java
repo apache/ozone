@@ -245,7 +245,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           ozoneLockStrategy.acquireWriteLock(omMetadataManager, volumeName,
               bucketName, keyName));
       acquireLock = getOmLockDetails().isLockAcquired();
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
       //TODO: We can optimize this get here, if getKmsProvider is null, then
       // bucket encryptionInfo will be not set. If this assumption holds
       // true, we can avoid get from bucket table.

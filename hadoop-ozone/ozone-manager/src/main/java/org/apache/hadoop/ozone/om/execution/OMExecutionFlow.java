@@ -86,17 +86,18 @@ public class OMExecutionFlow {
     }
 
     OMResponse response;
-    if (omClientRequest.getWriteReqBucketName() != null && ozoneManager.isMultiRaftEnabled()) {
+    boolean isBucketGroupWrite = isWrite && ozoneManager.isMultiRaftEnabled()
+        && omClientRequest != null && omClientRequest.getWriteReqBucketName() != null;
+    if (isBucketGroupWrite) {
       try {
         ozoneManager.getSafeModeManager().checkSafeMode();
       } catch (OMInSafeModeException ex) {
         LOG.error("OM is in safe mode, cannot process request: {}", request.getCmdType(), ex);
         throw new ServiceException(ex);
       }
-      response = ozoneManager.getOmRatisServer().submitBucketWriteRequest(requestToSubmit, raftGroupId);
-    } else {
-      response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit, isWrite);
     }
+    response = ozoneManager.getOmRatisServer()
+        .commonSubmitRequest(requestToSubmit, raftGroupId, isWrite);
 
     if (!response.getSuccess() && omClientRequest != null) {
       omClientRequest.handleRequestFailure(ozoneManager);

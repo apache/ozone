@@ -108,7 +108,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       // Check if fromKey exists
       OzoneFileStatus fromKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(

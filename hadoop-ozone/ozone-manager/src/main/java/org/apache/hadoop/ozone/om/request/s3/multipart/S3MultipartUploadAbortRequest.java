@@ -129,7 +129,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
               bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       multipartKey = omMetadataManager.getMultipartKey(
           volumeName, bucketName, keyName, keyArgs.getMultipartUploadID());

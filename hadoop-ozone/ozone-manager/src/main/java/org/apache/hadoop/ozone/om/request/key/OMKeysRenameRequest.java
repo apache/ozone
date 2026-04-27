@@ -124,7 +124,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
       for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
 

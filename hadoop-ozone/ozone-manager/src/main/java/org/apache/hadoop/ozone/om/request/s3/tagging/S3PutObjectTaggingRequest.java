@@ -116,7 +116,7 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
       );
       acquiredLock = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       String dbOzoneKey =
           omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);

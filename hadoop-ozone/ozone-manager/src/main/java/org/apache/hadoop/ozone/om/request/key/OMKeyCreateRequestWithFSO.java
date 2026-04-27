@@ -99,7 +99,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquireLock = getOmLockDetails().isLockAcquired();
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       final long volumeId = omMetadataManager.getVolumeTable()
               .get(omMetadataManager.getVolumeKey(volumeName)).getObjectID();

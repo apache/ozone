@@ -41,24 +41,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
-import org.apache.hadoop.util.Time;
-
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.util.OzoneMultiRaftUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.RaftGroupId;
-
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 /**
  * OM Request used to flush all transactions to disk, take a DB snapshot, and
@@ -77,7 +68,10 @@ public class OMPrepareRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    // Use the Ratis log index (per raft group), not the process-wide cache
+    // epoch. Prepare passes this value to waitForLogIndex and
+    // takeSnapshotAndPurgeLogs, both of which expect a real Ratis index.
+    final long transactionLogIndex = context.getIndex();
 
     LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), context.getTermIndex());
 

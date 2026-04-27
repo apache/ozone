@@ -64,6 +64,8 @@ public final class OMFileRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFileRequest.class);
 
+  private static volatile OzoneManager ozoneManagerRef;
+
   private OMFileRequest() {
   }
 
@@ -1079,6 +1081,19 @@ public final class OMFileRequest {
    * @param bucketName
    * @throws IOException
    */
+  /**
+   * Set by OzoneManager during startup so that static helpers like
+   * {@link #validateBucket} can access the ratis server for
+   * cross-raft-group consistency waits.
+   */
+  public static void setOzoneManager(OzoneManager om) {
+    ozoneManagerRef = om;
+  }
+
+  public static OzoneManager getOzoneManager() {
+    return ozoneManagerRef;
+  }
+
   public static void validateBucket(OMMetadataManager metadataManager,
       String volumeName, String bucketName)
       throws IOException {
@@ -1086,17 +1101,33 @@ public final class OMFileRequest {
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
     // Check if bucket exists
     if (metadataManager.getBucketTable().get(bucketKey) == null) {
+      // In multi-raft mode, the bucket may have been created through the
+      // main raft group but not yet applied on this OM.  Wait for the
+      // local state machine to catch up before failing.  Zero overhead
+      // on the happy path — the loop only fires on the actual miss.
+      OzoneManager om = ozoneManagerRef;
+      if (om != null && om.isMultiRaftEnabled()) {
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (System.currentTimeMillis() < deadline) {
+          try {
+            Thread.sleep(50);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            break;
+          }
+          if (metadataManager.getBucketTable().get(bucketKey) != null) {
+            return;
+          }
+        }
+      }
+
       String volumeKey = metadataManager.getVolumeKey(volumeName);
-      // If the volume also does not exist, we should throw volume not found
-      // exception
       if (metadataManager.getVolumeTable().get(volumeKey) == null) {
         LOG.error("volume not found: {}", volumeName);
         throw new OMException("Volume not found",
             VOLUME_NOT_FOUND);
       }
 
-      // if the volume exists but bucket does not exist, throw bucket not found
-      // exception
       LOG.error("bucket not found: {}/{} ", volumeName, bucketName);
       throw new OMException("Bucket not found",
           BUCKET_NOT_FOUND);

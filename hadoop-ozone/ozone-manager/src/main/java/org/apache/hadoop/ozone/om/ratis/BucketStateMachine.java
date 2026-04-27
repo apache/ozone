@@ -1,7 +1,40 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.om.ratis;
+
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -17,6 +50,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.Message;
@@ -35,23 +69,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
 /**
  * The StateMachine for group of buckets . It is
@@ -77,6 +94,8 @@ public class BucketStateMachine extends BaseStateMachine {
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
 
   private final ExecutorService installSnapshotExecutor;
+
+  private final long crossGroupSyncTimeoutMs;
 
   private ConcurrentMap<Long, Long> applyTransactionMap =
       new ConcurrentSkipListMap<>();
@@ -105,6 +124,9 @@ public class BucketStateMachine extends BaseStateMachine {
         .setNameFormat(threadNamePrefix + "-OmBucketInstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
+    this.crossGroupSyncTimeoutMs = om.getConfiguration().getLong(
+        OMConfigKeys.OZONE_OM_MULTI_RAFT_CROSS_GROUP_SYNC_TIMEOUT,
+        OMConfigKeys.OZONE_OM_MULTI_RAFT_CROSS_GROUP_SYNC_TIMEOUT_DEFAULT);
   }
 
   @Override
@@ -134,6 +156,23 @@ public class BucketStateMachine extends BaseStateMachine {
       storage.init(raftStorage);
       LOG.info("{}: initialize {} with {}", getId(), raftGroupId, getLastAppliedTermIndex());
     });
+  }
+
+  /**
+   * Serve a linearizable read on this state machine. Ratis runs ReadIndex
+   * before invoking this method, guaranteeing the local state machine has
+   * applied everything committed before the read started — exactly the
+   * read-after-write barrier needed for multi-raft bucket reads.
+   */
+  @Override
+  public CompletableFuture<Message> query(Message request) {
+    try {
+      OzoneManagerProtocolProtos.OMRequest omRequest = OMRatisHelper.convertByteStringToOMRequest(request.getContent());
+      OzoneManagerProtocolProtos.OMResponse response = handler.handleReadRequest(omRequest);
+      return CompletableFuture.completedFuture(OMRatisHelper.convertResponseToMessage(response));
+    } catch (IOException e) {
+      return completeExceptionally(e);
+    }
   }
 
 /*
@@ -233,6 +272,7 @@ public class BucketStateMachine extends BaseStateMachine {
       TermIndex termIndex
   ) {
     try {
+      waitForMainStateMachineCatchUp();
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, getGroupId(), ozoneManagerDoubleBuffer);
@@ -253,6 +293,54 @@ public class BucketStateMachine extends BaseStateMachine {
       ExitUtils.terminate(1, errorMessage, e, LOG);
     }
     return null;
+  }
+
+  /**
+   * Ensures the main OM state machine has applied all its committed entries
+   * before the bucket raft group processes a request. This prevents
+   * cross-raft-group consistency issues where metadata created through the
+   * main raft group (e.g. buckets, volumes) is not yet visible on this OM
+   * because the follower hasn't applied the entry yet.
+   *
+   * <p>Compares {@code lastApplyTransactionIndex} (the highest log index
+   * received by the main SM's {@code applyTransaction} — set immediately
+   * when Ratis delivers the entry) with {@code lastAppliedTermIndex}
+   * (updated only after the double buffer flushes the entry to RocksDB).
+   * A gap means there are entries queued in the main SM's executor that
+   * haven't been written to the shared metadata store yet.
+   */
+  private void waitForMainStateMachineCatchUp() throws IOException {
+    OzoneManagerRatisServer ratisServer = ozoneManager.getOmRatisServer();
+    if (ratisServer == null) {
+      return;
+    }
+    OzoneManagerStateMachine mainSM = ratisServer.getOmStateMachine();
+    long received = mainSM.getLastApplyTransactionIndex();
+    long applied = mainSM.getLastAppliedTermIndex().getIndex();
+    if (applied >= received) {
+      return;
+    }
+
+    LOG.debug("Bucket raft group {} waiting for main SM to catch up:"
+        + " applied={}, received={}", currentRaftGroupId, applied, received);
+    long deadline = Time.monotonicNow() + crossGroupSyncTimeoutMs;
+    while (applied < received) {
+      if (Time.monotonicNow() >= deadline) {
+        LOG.warn("Timed out ({}ms) waiting for main OM state machine"
+                + " to catch up. applied={}, received={}, raftGroup={}",
+            crossGroupSyncTimeoutMs, applied, received, currentRaftGroupId);
+        return;
+      }
+      try {
+        mainSM.awaitDoubleBufferFlush();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(
+            "Interrupted waiting for main OM state machine catch-up", e);
+      }
+      applied = mainSM.getLastAppliedTermIndex().getIndex();
+      received = mainSM.getLastApplyTransactionIndex();
+    }
   }
 
   private OzoneManagerProtocolProtos.OMResponse createErrorResponse(
@@ -308,7 +396,7 @@ public class BucketStateMachine extends BaseStateMachine {
    * @param flushedEpochs
    */
   public void updateLastAppliedIndex(List<Long> flushedEpochs) {
-    Preconditions.checkArgument(flushedEpochs.size() > 0);
+    Preconditions.checkArgument(!flushedEpochs.isEmpty());
     computeAndUpdateLastAppliedIndex(
         flushedEpochs.get(flushedEpochs.size() - 1), -1L, flushedEpochs, true);
   }
@@ -487,6 +575,7 @@ public class BucketStateMachine extends BaseStateMachine {
   }
 
   /** Assert if the given {@link TermIndex} is updated increasingly. */
+  @SuppressWarnings("PMD.UnusedPrivateMethod")
   private TermIndex assertUpdateIncreasingly(String name, TermIndex oldTermIndex, TermIndex newTermIndex) {
     Preconditions.checkArgument(newTermIndex.compareTo(oldTermIndex) >= 0,
         "%s: newTermIndex = %s < oldTermIndex = %s", name, newTermIndex, oldTermIndex);

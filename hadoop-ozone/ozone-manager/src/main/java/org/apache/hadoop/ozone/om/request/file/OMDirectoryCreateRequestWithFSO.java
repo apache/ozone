@@ -110,7 +110,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
               bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       Path keyPath = Paths.get(keyName);
 

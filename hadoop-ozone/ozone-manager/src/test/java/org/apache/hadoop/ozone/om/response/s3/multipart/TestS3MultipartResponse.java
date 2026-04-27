@@ -35,9 +35,9 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -294,7 +294,7 @@ public class TestS3MultipartResponse {
 
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
         multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
-        openPartKeyInfoToBeDeleted, omBucketInfo,omBucketInfo.getObjectID(),
+        openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
         getBucketLayout(), ozoneManager.isMultiRaftEnabled(), 0);
   }
 

@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.UUID;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -24,10 +27,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRaftGroupAssignResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRaftGroupsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetRaftGroupHealthStateResponse;
-
-import java.io.IOException;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * OzoneManagerClientProtocol defines interfaces needed on the client side

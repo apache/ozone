@@ -562,6 +562,7 @@ public final class OzoneManagerRatisUtils {
     }
     return omResponse.build();
   }
+
   public static OzoneManagerProtocolProtos.OMResponse submitWriteRequest(
       OzoneManager om, OMRequest omRequest, ClientId clientId, long callId, String volumeName, String bucketName)
       throws ServiceException {

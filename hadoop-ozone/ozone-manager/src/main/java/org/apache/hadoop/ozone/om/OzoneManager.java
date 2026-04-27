@@ -233,9 +233,9 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -304,6 +304,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
@@ -529,14 +530,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private AtomicLong multiRaftTerm;
   private BiFunction<RaftPeer, GrpcTlsConfig, RaftClient> raftClientProvider;
 
-  public long getCurrentMultiRaftTerm() {
-    return multiRaftTerm.get();
-  }
-
-  public void setCurrentMultiRaftTerm(long multiRaftUpdateIndex) {
-    this.multiRaftTerm.set(multiRaftUpdateIndex);
-  }
-
   // Used in MiniOzoneCluster testing
   private State omState;
   private Thread emptier;
@@ -561,6 +554,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Map<RaftGroupId, String> tmpLeadersMap = new HashMap<>();
   private BucketRaftGroupsReconciler bucketRaftGroupsReconciler;
   private List<String> listOfRaftGroupToReset;
+
+  public long getCurrentMultiRaftTerm() {
+    return multiRaftTerm.get();
+  }
+
+  public void setCurrentMultiRaftTerm(long multiRaftUpdateIndex) {
+    this.multiRaftTerm.set(multiRaftUpdateIndex);
+  }
+
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
       throws IOException, AuthenticationException {
@@ -650,6 +652,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             OZONE_OM_MULTI_RAFT_BUCKET_ENABLED,
             OZONE_OM_MULTI_RAFT_BUCKET_ENABLED_DEFAULT
     );
+    OMFileRequest.setOzoneManager(this);
 
     bucketNumbersFromConfig = configuration.getPositiveIntOrDefault(OZONE_OM_MULTI_RAFT_BUCKET_GROUPS,
         OZONE_OM_MULTI_RAFT_BUCKET_GROUPS_DEFAULT);
@@ -708,7 +711,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
-        org.apache.hadoop.ipc_.ProtobufRpcEngine.class);
+        ProtobufRpcEngine.class);
 
     secConfig = new SecurityConfig(configuration);
     // Create the KMS Key Provider
@@ -778,8 +781,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     initializeRatisDirs(conf);
-    listOfRaftGroupToReset = cleanUpRaftGroups(OzoneManagerRatisUtils.getOMRatisDirectory(configuration),
-        omRaftGroupName());
+//    listOfRaftGroupToReset = cleanUpRaftGroups(OzoneManagerRatisUtils.getOMRatisDirectory(configuration),
+//        omRaftGroupName());
     initializeRatisServer(isBootstrapping || isForcedBootstrapping);
 
     omClientProtocolMetrics = ProtocolMessageMetrics
@@ -1082,7 +1085,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     bucketManager = new BucketManagerImpl(this, metadataManager);
 
-    omRaftGroupManager = new OmRaftGroupManager(this, configuration, isMultiRaftEnabled, getOMServiceId(), metadataManager);
+    omRaftGroupManager = new OmRaftGroupManager(
+        this, configuration, isMultiRaftEnabled, getOMServiceId(), metadataManager);
 
     Class<? extends S3SecretStoreProvider> storeProviderClass =
         configuration.getClass(
@@ -1213,7 +1217,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     return responseBuilder.build();
   }
-
 
   /**
    * Return scmClient.
@@ -1863,6 +1866,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @SuppressWarnings("PMD.UnusedPrivateMethod")
   private List<String> cleanUpRaftGroups(String ratisDir, RaftGroupId exceptRaftGroupDir) {
     File ratisMetadataDir = new File(ratisDir);
     List<String> listOfRaftGroupsToReset = new ArrayList<>();
@@ -1893,6 +1897,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return listOfRaftGroupsToReset;
   }
 
+  @SuppressWarnings("PMD.UnusedPrivateMethod")
   private void cleanUpRaftGroupsTransactions() {
     for (String s : listOfRaftGroupToReset) {
       try {
@@ -2059,7 +2064,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.start(configuration);
 
     startSecretManagerIfNecessary();
-    cleanUpRaftGroupsTransactions();
+//    cleanUpRaftGroupsTransactions();
     // Start Ratis services
     if (omRatisServer != null) {
       omRatisServer.start();
@@ -2261,9 +2266,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     bucketRaftGroupsReconciler = new BucketRaftGroupsReconciler(this);
     bucketRaftGroupsReconciler.start();
-    listOfRaftGroupToReset = cleanUpRaftGroups(OzoneManagerRatisUtils.getOMRatisDirectory(configuration),
-        omRaftGroupName());
-    cleanUpRaftGroupsTransactions();
+//    listOfRaftGroupToReset = cleanUpRaftGroups(OzoneManagerRatisUtils.getOMRatisDirectory(configuration),
+//        omRaftGroupName());
+//    cleanUpRaftGroupsTransactions();
   }
 
   /**
@@ -5191,15 +5196,49 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     String volumeName = volumeAndBucket.getLeft();
     String bucketName = volumeAndBucket.getRight();
-    OmBucketInfo info;
+    OmBucketInfo info = null;
     try {
       info = bucketManager.getBucketInfo(volumeName, bucketName);
     } catch (OMException e) {
-      LOG.warn("Bucket {} not found in volume {}", bucketName, volumeName);
-      if (allowDanglingBuckets) {
-        return null;
+      // In multi-raft mode, the bucket may have been created via the
+      // main raft group but not yet applied on this follower OM.
+      // Wait for the local state machine to catch up and retry.
+      if (e.getResult() == ResultCodes.BUCKET_NOT_FOUND
+          && isMultiRaftEnabled()) {
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (System.currentTimeMillis() < deadline) {
+          try {
+            Thread.sleep(50);
+          } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            break;
+          }
+          try {
+            info = bucketManager.getBucketInfo(volumeName, bucketName);
+            // found after waiting — continue normal flow
+            break;
+          } catch (OMException retryEx) {
+            if (retryEx.getResult() != ResultCodes.BUCKET_NOT_FOUND) {
+              throw retryEx;
+            }
+            // still not found, loop again
+          }
+        }
+        if (info == null) {
+          LOG.warn("Bucket {} not found in volume {}", bucketName, volumeName);
+          if (allowDanglingBuckets) {
+            return null;
+          }
+          throw e;
+        }
+        // otherwise fall through to the rest of the method
+      } else {
+        LOG.warn("Bucket {} not found in volume {}", bucketName, volumeName);
+        if (allowDanglingBuckets) {
+          return null;
+        }
+        throw e;
       }
-      throw e;
     }
     if (!info.isLink()) {
       return info;

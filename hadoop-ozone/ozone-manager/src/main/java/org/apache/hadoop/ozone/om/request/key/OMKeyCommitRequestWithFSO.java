@@ -128,7 +128,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       String errMsg = "Cannot create file : " + keyName

@@ -41,8 +41,6 @@ import org.apache.hadoop.ozone.om.request.invocation.OzoneRetryInvocationHandler
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Full-featured Hadoop RPC implementation with failover support.
@@ -53,9 +51,6 @@ public class Hadoop3OmTransport implements OmTransport {
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(Hadoop3OmTransport.class);
 
   private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
   private final HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
@@ -109,7 +104,7 @@ public class Hadoop3OmTransport implements OmTransport {
       OMResponse omResponse =
           rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
 
-      if (omResponse.hasLeaderOMNodeId() && omFailoverProxyProvider != null) {
+      if (omResponse.hasLeaderOMNodeId()) {
         String leaderOmId = omResponse.getLeaderOMNodeId();
 
         // Failover to the OM node returned by OMResponse leaderOMNodeId if

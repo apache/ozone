@@ -190,6 +190,21 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
       if (OmUtils.isReadOnly(request)) {
         bucketRaftGroupId = ozoneManager.omRaftGroupName();
+        if (ozoneManager.isMultiRaftEnabled()) {
+          String readBucketPath = OmUtils.getReadRequestBucketPath(request);
+          if (readBucketPath != null) {
+            int slash = readBucketPath.indexOf('/');
+            if (slash > 0) {
+              RaftGroupId bucketGroup = ozoneManager.getOmRaftGroupManager()
+                  .lookupRaftGroupForBucket(
+                      readBucketPath.substring(0, slash),
+                      readBucketPath.substring(slash + 1));
+              if (bucketGroup != null) {
+                bucketRaftGroupId = bucketGroup;
+              }
+            }
+          }
+        }
       } else {
         omClientRequest = createClientRequest(request, ozoneManager);
         // check retry cache
@@ -222,7 +237,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
 
       if (OmUtils.isReadOnly(request)) {
-        return submitReadRequestToOM(request);
+        return submitReadRequestToOM(request, bucketRaftGroupId);
       }
 
       // To validate credentials we have already verified leader status.
@@ -240,9 +255,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       this.lastRequestToSubmit = request;
       return ozoneManager.getOmExecutionFlow().submit(request, omClientRequest, bucketRaftGroupId, true);
     } catch (IOException ex) {
-      if (omClientRequest != null) {
-        omClientRequest.handleRequestFailure(ozoneManager);
-      }
+      // omClientRequest is null on every IOException-throwing path here:
+      // it is only assigned for write requests, and IOException above that
+      // assignment leaves it null, while later steps either return early or
+      // throw ServiceException rather than IOException.
       return createErrorResponse(request, ex);
     } finally {
       OzoneManager.setS3Auth(null);
@@ -254,13 +270,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     return lastRequestToSubmit;
   }
 
-  private OMRequest preExecute(OMClientRequest finalOmClientRequest)
-      throws IOException {
-    return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
-        () -> finalOmClientRequest.preExecute(ozoneManager));
-  }
-
-  private OMResponse submitReadRequestToOM(OMRequest request)
+  private OMResponse submitReadRequestToOM(OMRequest request, RaftGroupId raftGroupId)
       throws ServiceException {
     if (request.getCmdType().equals(PrepareStatus)
         || request.getCmdType().equals(GetRaftGroupHealthState)) {
@@ -272,6 +282,17 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       //   leadership is validated inside the handler itself
       //   (OzoneManager.getRaftGroupHealthState).
       return handler.handleReadRequest(request);
+    }
+
+    // Bucket-scoped read on a multi-raft bucket: always submit through the
+    // bucket group's state machine query so the ReadIndex barrier waits
+    // for the bucket group's latest commit. Local-leader-read on a different
+    // node is unsafe in multi-raft because the OM that received the RPC may
+    // be the main-group leader but a bucket-group follower.
+    if (raftGroupId != null
+        && !raftGroupId.equals(omRatisServer.getCurrentRaftGroupId())) {
+      ozoneManager.getMetrics().incNumLinearizableRead();
+      return ozoneManager.getOmExecutionFlow().submit(request, null, raftGroupId, false);
     }
 
     if (!OmUtils.specifiedReadConsistency(request)) {

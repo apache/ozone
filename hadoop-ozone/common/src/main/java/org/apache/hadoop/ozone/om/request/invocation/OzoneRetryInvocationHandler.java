@@ -1,6 +1,31 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.om.request.invocation;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client;
@@ -10,25 +35,9 @@ import org.apache.hadoop.ipc.RpcConstants;
 import org.apache.hadoop.ipc.RpcInvocationHandler;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
-import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * An InvocationHandler that handles retries and failovers for OzoneManager.
@@ -36,8 +45,6 @@ import java.util.UUID;
 public class OzoneRetryInvocationHandler<T> implements RpcInvocationHandler {
 
   public static final Logger LOG = LoggerFactory.getLogger(OzoneRetryInvocationHandler.class);
-
-  private ThreadLocal<OMRequest> omRequest;
 
   private final ProxyDescriptor<T> proxyDescriptor;
 
@@ -176,9 +183,9 @@ public class OzoneRetryInvocationHandler<T> implements RpcInvocationHandler {
     if (failovers > 0) {
       b.append(" after ").append(failovers).append(" failover attempts");
     }
-    b.append(isFailover ? ". Trying to failover " : ". Retrying ");
-    b.append(delay > 0 ? "after sleeping for " + delay + "ms." : "immediately.");
-    b.append(" Current retry count: ").append(retries).append(".");
+    b.append(isFailover ? ". Trying to failover " : ". Retrying ")
+        .append(delay > 0 ? "after sleeping for " + delay + "ms." : "immediately.")
+        .append(" Current retry count: ").append(retries).append('.');
 
     if (info) {
       LOG.info(b.toString());
@@ -192,25 +199,53 @@ public class OzoneRetryInvocationHandler<T> implements RpcInvocationHandler {
       if (!method.isAccessible()) {
         method.setAccessible(true);
       }
-      T proxy = null;
-      if (args.length == 2 && args[1] instanceof OMRequest && omFailoverProxyProvider != null) {
-        String bucketPath = omFailoverProxyProvider
-            .getWriteRequestBucketPath((OMRequest) args[1]);
-        if (bucketPath != null) {
-          proxy = (T) omFailoverProxyProvider.selectProxyInfo(bucketPath);
-        }
-        if (proxy == null) {
-          proxy = proxyDescriptor.getProxy();
-        }
-      } else {
-        proxy = proxyDescriptor.getProxy();
-      }
-      final Object r = method.invoke(proxy, args);
+      final Object r = method.invoke(selectProxy(args), args);
       hasSuccessfulCall = true;
       return r;
     } catch (InvocationTargetException e) {
       throw e.getCause();
     }
+  }
+
+  /**
+   * Returns true if the per-bucket proxy mapping already covers the
+   * request in {@code args}, meaning the global proxyDescriptor failover
+   * can be skipped to avoid cross-thread contention.
+   */
+  boolean hasBucketProxyMapping(Object[] args) {
+    if (omFailoverProxyProvider != null
+        && args.length == 2 && args[1] instanceof OMRequest) {
+      String bucketPath = omFailoverProxyProvider
+          .getWriteRequestBucketPath((OMRequest) args[1]);
+      if (bucketPath != null) {
+        return omFailoverProxyProvider.selectProxyInfo(bucketPath) != null;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Select the proxy to use for this invocation. For bucket-aware write
+   * requests in multi-raft mode, uses the per-bucket proxy mapping
+   * ({@code bucketToProxyMap}) to route directly to the OM that leads
+   * the bucket's raft group.  This avoids contention on the shared
+   * {@link ProxyDescriptor} which serializes all 300+ freon threads
+   * through a single {@code synchronized failover()} method and causes
+   * cascading wrong-OM retries with 2-second sleeps.
+   */
+  private T selectProxy(Object[] args) {
+    if (omFailoverProxyProvider != null
+        && args.length == 2 && args[1] instanceof OMRequest) {
+      String bucketPath = omFailoverProxyProvider
+          .getWriteRequestBucketPath((OMRequest) args[1]);
+      if (bucketPath != null) {
+        T proxy = (T) omFailoverProxyProvider.selectProxyInfo(bucketPath);
+        if (proxy != null) {
+          return proxy;
+        }
+      }
+    }
+    return proxyDescriptor.getProxy();
   }
 
   @VisibleForTesting

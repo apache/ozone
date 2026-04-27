@@ -1,23 +1,40 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.om.request.invocation;
 
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.ipc.Client;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.util.Daemon;
-import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.concurrent.AsyncGet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.lang.reflect.Method;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.Time;
+import org.apache.hadoop.util.concurrent.AsyncGet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A handler for async calls.
@@ -29,6 +46,9 @@ public class AsyncCallHandler {
       LOWER_LAYER_ASYNC_RETURN = new ThreadLocal<>();
   private static final ThreadLocal<AsyncGet<Object, Throwable>>
       ASYNC_RETURN = new ThreadLocal<>();
+
+  private final AsyncCallQueue asyncCalls = new AsyncCallQueue();
+  private volatile boolean hasSuccessfulCall = false;
 
   /**
    * @return the async return value from {@link org.apache.hadoop.io.retry.AsyncCallHandler}.
@@ -59,7 +79,7 @@ public class AsyncCallHandler {
 
   private static AsyncGet<?, Exception> getLowerLayerAsyncReturn() {
     final AsyncGet<?, Exception> asyncGet = LOWER_LAYER_ASYNC_RETURN.get();
-    Preconditions.checkNotNull(asyncGet);
+    Objects.requireNonNull(asyncGet);
     LOWER_LAYER_ASYNC_RETURN.set(null);
     return asyncGet;
   }
@@ -199,7 +219,7 @@ public class AsyncCallHandler {
     }
 
     synchronized void set(V v) {
-      Preconditions.checkNotNull(v);
+      Objects.requireNonNull(v);
       Preconditions.checkState(value == null);
       value = v;
       notify();
@@ -297,9 +317,6 @@ public class AsyncCallHandler {
       }
     }
   }
-
-  private final AsyncCallQueue asyncCalls = new AsyncCallQueue();
-  private volatile boolean hasSuccessfulCall = false;
 
   AsyncCall newAsyncCall(Method method, Object[] args, boolean isRpc,
                                                                      int callId,

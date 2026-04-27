@@ -699,6 +699,11 @@ public final class OMConfigKeys {
           "ozone.om.multi.raft.bucket.enabled";
   public static final boolean OZONE_OM_MULTI_RAFT_BUCKET_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_OM_MULTI_RAFT_CROSS_GROUP_SYNC_TIMEOUT =
+          "ozone.om.multi.raft.cross.group.sync.timeout";
+  public static final long OZONE_OM_MULTI_RAFT_CROSS_GROUP_SYNC_TIMEOUT_DEFAULT =
+          30_000; // 30 seconds
+
   public static final String OZONE_OM_SAFE_MODE_ENABLED = "ozone.om.safemode.enabled";
 
   public static final boolean OZONE_OM_SAFE_MODE_ENABLED_DEFAULT = true;

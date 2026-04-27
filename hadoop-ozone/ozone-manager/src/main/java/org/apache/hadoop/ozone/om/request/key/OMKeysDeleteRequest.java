@@ -146,7 +146,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
       // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {

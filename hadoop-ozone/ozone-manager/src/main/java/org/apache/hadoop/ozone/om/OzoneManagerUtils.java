@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -67,9 +68,41 @@ public final class OzoneManagerUtils {
     String buckKey = metaMgr.getBucketKey(volName, buckName);
     OmBucketInfo bucketInfo = metaMgr.getBucketTable().get(buckKey);
     if (bucketInfo == null) {
-      reportNotFound(metaMgr, volName, buckName);
+      // In multi-raft mode, the bucket may have been created through the
+      // main raft group but not yet applied on this follower OM.
+      // Poll briefly before reporting not-found.
+      bucketInfo = waitForBucketIfMultiRaft(metaMgr, buckKey);
+      if (bucketInfo == null) {
+        reportNotFound(metaMgr, volName, buckName);
+      }
     }
     return bucketInfo;
+  }
+
+  private static OmBucketInfo waitForBucketIfMultiRaft(
+      OMMetadataManager metaMgr, String buckKey) {
+    OzoneManager om = OMFileRequest.getOzoneManager();
+    if (om == null || !om.isMultiRaftEnabled()) {
+      return null;
+    }
+    long deadline = System.currentTimeMillis() + 5_000;
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        Thread.sleep(50);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return null;
+      }
+      try {
+        OmBucketInfo info = metaMgr.getBucketTable().get(buckKey);
+        if (info != null) {
+          return info;
+        }
+      } catch (IOException ignored) {
+        // retry
+      }
+    }
+    return null;
   }
 
   private static void reportNotFound(OMMetadataManager metaMgr,

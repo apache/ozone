@@ -204,6 +204,52 @@ public final class OmUtils {
   }
 
   /**
+   * For a bucket-scoped read request, return its {@code volume/bucket} path so
+   * the caller can route the read to that bucket's raft group. Returns
+   * {@code null} for volume-scoped, global, or unrecognized read types — those
+   * stay on the main raft group.
+   *
+   * <p>Mirrors {@link org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase#getWriteRequestBucketPath}
+   * but for read commands.
+   */
+  public static String getReadRequestBucketPath(OMRequest request) {
+    switch (request.getCmdType()) {
+    case InfoBucket:
+      return request.getInfoBucketRequest().getVolumeName()
+          + "/" + request.getInfoBucketRequest().getBucketName();
+    case LookupKey:
+      return pathFromKeyArgs(request.getLookupKeyRequest().getKeyArgs());
+    case GetKeyInfo:
+      return pathFromKeyArgs(request.getGetKeyInfoRequest().getKeyArgs());
+    case GetFileStatus:
+      return pathFromKeyArgs(request.getGetFileStatusRequest().getKeyArgs());
+    case LookupFile:
+      return pathFromKeyArgs(request.getLookupFileRequest().getKeyArgs());
+    case ListStatus:
+    case ListStatusLight:
+      return pathFromKeyArgs(request.getListStatusRequest().getKeyArgs());
+    case ListKeys:
+    case ListKeysLight:
+      return request.getListKeysRequest().getVolumeName()
+          + "/" + request.getListKeysRequest().getBucketName();
+    case ListMultiPartUploadParts:
+      return request.getListMultipartUploadPartsRequest().getVolume()
+          + "/" + request.getListMultipartUploadPartsRequest().getBucket();
+    case ListMultipartUploads:
+      return request.getListMultipartUploadsRequest().getVolume()
+          + "/" + request.getListMultipartUploadsRequest().getBucket();
+    case GetObjectTagging:
+      return pathFromKeyArgs(request.getGetObjectTaggingRequest().getKeyArgs());
+    default:
+      return null;
+    }
+  }
+
+  private static String pathFromKeyArgs(OzoneManagerProtocolProtos.KeyArgs keyArgs) {
+    return keyArgs.getVolumeName() + "/" + keyArgs.getBucketName();
+  }
+
+  /**
    * Checks if the OM request is read only or not.
    * @param omRequest OMRequest proto
    * @return True if its readOnly, false otherwise.

@@ -90,7 +90,7 @@ public class S3DeleteObjectTaggingRequestWithFSO extends S3DeleteObjectTaggingRe
       );
       acquiredLock = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
           omMetadataManager, volumeName, bucketName, keyName, 0,

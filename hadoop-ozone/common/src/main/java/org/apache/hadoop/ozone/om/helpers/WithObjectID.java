@@ -17,22 +17,20 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 
-import net.jcip.annotations.Immutable;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Mixin class to handle ObjectID and UpdateID.
  */
-@Immutable
 public abstract class WithObjectID extends WithMetadata {
 
   private /*final*/ long objectID;
   private /*final*/ long updateID;
+
+  private boolean multiRaftEnabled;
+  private long multiRaftTerm;
 
   protected WithObjectID() {
     super();
@@ -44,15 +42,25 @@ public abstract class WithObjectID extends WithMetadata {
     super(b);
     objectID = b.objectID;
     updateID = b.updateID;
+    multiRaftEnabled = b.multiRaftEnabled;
+    multiRaftTerm = b.multiRaftTerm;
   }
 
   protected WithObjectID(WithObjectID other) {
     super(other);
     objectID = other.objectID;
     updateID = other.updateID;
+    multiRaftEnabled = other.multiRaftEnabled;
+    multiRaftTerm = other.multiRaftTerm;
   }
 
-  private long multiRaftTerm;
+  public boolean isMultiRaftEnabled() {
+    return multiRaftEnabled;
+  }
+
+  public long getMultiRaftTerm() {
+    return multiRaftTerm;
+  }
 
   /**
    * Returns objectID.

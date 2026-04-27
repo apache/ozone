@@ -111,7 +111,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
     try {
       validateBucketAndVolume(omMetadataManager, volumeName,
-          bucketName);
+          bucketName, ozoneManager);
 
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion. With this approach, it

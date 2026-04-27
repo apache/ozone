@@ -81,10 +81,6 @@ import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-
 /**
  * The OM StateMachine is the state machine for OM Ratis server. It is
  * responsible for applying ratis committed transactions to
@@ -112,6 +108,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
   /** The last index skipped by {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
+  /** The highest log index received by {@link #applyTransaction}. Used by
+   *  bucket raft groups to detect a commit-apply gap in the main state machine. */
+  private volatile long lastApplyTransactionIndex = RaftLog.INVALID_LOG_INDEX;
 
   private final NettyMetrics nettyMetrics;
 
@@ -235,6 +234,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   public TermIndex getLastNotifiedTermIndex() {
     return lastNotifiedTermIndex;
+  }
+
+  /**
+   * @return the highest log index received by {@link #applyTransaction}.
+   *         Used by bucket raft groups to detect when the main state machine
+   *         has pending (queued but not yet applied) transactions.
+   */
+  public long getLastApplyTransactionIndex() {
+    return lastApplyTransactionIndex;
   }
 
   @Override
@@ -407,7 +415,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
-    LOG.trace("Apply transaction {} {}", raftGroupId, trx.getLogEntry().getIndex());
+    final long trxIndex = trx.getLogEntry().getIndex();
+    LOG.trace("Apply transaction {} {}", raftGroupId, trxIndex);
+    lastApplyTransactionIndex = trxIndex;
     try {
       // For the Leader, the OMRequest is set in trx in startTransaction.
       // For Followers, the OMRequest hast to be converted from the log entry.
@@ -564,6 +574,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     long startTime = Time.monotonicNow();
     final TransactionInfo transactionInfo = TransactionInfo.valueOf(snapshot);
     ozoneManager.setTransactionInfo(transactionInfo);
+    // Also update the per-raft-group map so getLatestSnapshot() reports the
+    // new index. Without this, Ratis still sees the snapshot as DEFAULT_VALUE
+    // (0,0) after a Prepare snapshot+purge, and the leader sends AppendEntries
+    // with previous=null for entries beyond the purged range, which followers
+    // reject.
+    ozoneManager.setTransactionInfo(raftGroupId, transactionInfo);
     ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
     ozoneManager.getMetadataManager().getStore().flushDB();
     LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
@@ -675,6 +691,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final TermIndex ti =  transactionInfo.getTermIndex();
       setLastAppliedTermIndex(ti);
       ozoneManager.setTransactionInfo(transactionInfo);
+      // Populate the per-raft-group map too so getLatestSnapshot() reports
+      // the on-disk snapshot index immediately after startup. Without this,
+      // Ratis sees DEFAULT_VALUE (0,0) until a fresh snapshot is taken.
+      ozoneManager.setTransactionInfo(raftGroupId, transactionInfo);
       LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}", ti);
     } else {
       LOG.info("TransactionInfo not found in OM DB.");

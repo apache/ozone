@@ -833,12 +833,10 @@ public final class OzoneManagerRatisServer {
     );
   }
 
-
   @VisibleForTesting
   public RaftServer getServer() {
     return server;
   }
-
 
   @VisibleForTesting
   public OzoneManagerStateMachine getOmStateMachine() {

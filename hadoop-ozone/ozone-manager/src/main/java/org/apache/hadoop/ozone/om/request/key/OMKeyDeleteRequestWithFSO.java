@@ -107,7 +107,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
           omMetadataManager, volumeName, bucketName, keyName, 0,

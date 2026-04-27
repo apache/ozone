@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.admin.om;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
+import java.io.IOException;
+import java.util.Collection;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -30,6 +32,8 @@ import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.admin.om.lease.LeaseSubCommand;
 import org.apache.hadoop.ozone.admin.om.snapshot.SnapshotSubCommand;
 import org.apache.hadoop.ozone.client.OzoneClientException;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
@@ -38,11 +42,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.ClientId;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
-
-import java.io.IOException;
-import java.util.Collection;
 
 /**
  * Subcommand for admin operations related to OM.
@@ -89,7 +88,6 @@ public class OMAdmin implements AdminSubcommand {
             conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + System.lineSeparator());
     }
   }
-
 
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
       String omServiceID,

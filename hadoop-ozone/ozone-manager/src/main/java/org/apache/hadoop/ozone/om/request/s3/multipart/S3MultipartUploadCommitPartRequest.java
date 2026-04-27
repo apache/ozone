@@ -139,7 +139,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
       bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
       String uploadID = keyArgs.getMultipartUploadID();
       multipartKey = getMultipartKey(volumeName, bucketName, keyName,
@@ -318,8 +318,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     return new S3MultipartUploadCommitPartResponse(build, multipartKey, openKey,
         multipartKeyInfo, keyToDeleteMap, omKeyInfo,
-        omBucketInfo, bucketId, getBucketLayout(),ozoneManager.isMultiRaftEnabled(),
-            ozoneManager.getCurrentMultiRaftTerm());
+        omBucketInfo, bucketId, getBucketLayout(), ozoneManager.isMultiRaftEnabled(),
+        ozoneManager.getCurrentMultiRaftTerm());
   }
 
   protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,

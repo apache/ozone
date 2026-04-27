@@ -296,6 +296,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public static final int BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS = 1000;
   private final ConfigurationSource conf;
   private final boolean isMultiRaftEnabled;
+
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
                                                     String clientId,
                                                     ConfigurationSource conf,

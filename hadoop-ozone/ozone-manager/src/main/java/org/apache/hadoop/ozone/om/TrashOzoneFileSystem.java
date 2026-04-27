@@ -59,21 +59,6 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
 
 /**
  * FileSystem to be used by the Trash Emptier.

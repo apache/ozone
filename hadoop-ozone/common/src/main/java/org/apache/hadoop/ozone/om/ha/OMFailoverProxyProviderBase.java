@@ -91,7 +91,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   private final long waitBetweenRetries;
   private final Set<String> accessControlExceptionOMs = new HashSet<>();
   private boolean performFailoverDone;
-  private ThreadLocal<OMRequest> omRequest;
+  private final ThreadLocal<OMRequest> omRequest = new ThreadLocal<>();
   private ConcurrentMap<String, ProxyInfo<T>> bucketToProxyMap = new ConcurrentHashMap<>();
 
   private final UserGroupInformation ugi;
@@ -125,9 +125,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
       throws IOException;
 
   public void setOmRequest(OMRequest request) {
-    if (omRequest == null) {
-      omRequest = new ThreadLocal<>();
-    }
     omRequest.set(request);
   }
 
@@ -237,20 +234,23 @@ public abstract class OMFailoverProxyProviderBase<T> implements
                 notLeaderException.getSuggestedLeaderNodeId();
             if (suggestedLeaderAddress != null &&
                 suggestedNodeId != null &&
-              omProxies.containsKey(suggestedNodeId)) {
+                omProxies.containsKey(suggestedNodeId)) {
 
-              String bucketWriteRequestPath = getWriteRequestBucketPath(omRequest.get());
-              if (bucketWriteRequestPath != null) {
-                setOmNodeToHandleRequestThroughRaftGroup(bucketWriteRequestPath, suggestedNodeId);
+              OMRequest currentRequest = omRequest.get();
+              if (currentRequest != null) {
+                String bucketWriteRequestPath = getWriteRequestBucketPath(currentRequest);
+                if (bucketWriteRequestPath != null) {
+                  setOmNodeToHandleRequestThroughRaftGroup(bucketWriteRequestPath, suggestedNodeId);
+                }
+                UUID uuid = notLeaderException.getRaftGroupId().getUuid();
+                OMRequest updatedRequest = currentRequest.toBuilder().setRaftGroupId(
+                    HddsProtos.UUID.newBuilder()
+                        .setMostSigBits(uuid.getMostSignificantBits())
+                        .setLeastSigBits(uuid.getLeastSignificantBits())
+                        .build()).build();
+                omRequest.set(updatedRequest);
               }
               setNextOmProxy(suggestedNodeId);
-              UUID uuid = notLeaderException.getRaftGroupId().getUuid();
-              OMRequest request = omRequest.get().toBuilder().setRaftGroupId(
-                  HddsProtos.UUID.newBuilder()
-                      .setMostSigBits(uuid.getMostSignificantBits())
-                      .setLeastSigBits(uuid.getLeastSignificantBits())
-                      .build()).build();
-              omRequest.set(request);
               return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
                   failovers);
             }
@@ -408,56 +408,64 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   public String getWriteRequestBucketPath(OMRequest request) {
     String bucketPath = null;
     switch (request.getCmdType()) {
-      case RecoverLease:
-        bucketPath = request.getRecoverLeaseRequest().getVolumeName() + "/" +
-            request.getRecoverLeaseRequest().getBucketName();
-        break;
-      case CreateDirectory:
-        OzoneManagerProtocolProtos.KeyArgs keyArgs = request.getCreateDirectoryRequest().getKeyArgs();
-        return keyArgs.getVolumeName() + "/" + keyArgs.getBucketName();
-      case CreateFile:
-        OzoneManagerProtocolProtos.KeyArgs omKeyArgs = request.getCreateFileRequest().getKeyArgs();
-        return omKeyArgs.getVolumeName() + "/" + omKeyArgs.getBucketName();
-      case CreateKey:
-        OzoneManagerProtocolProtos.KeyArgs createKeyArgs = request.getCreateKeyRequest().getKeyArgs();
-        return createKeyArgs.getVolumeName() + "/" + createKeyArgs.getBucketName();
-      case AllocateBlock:
-        OzoneManagerProtocolProtos.KeyArgs allocateBlockKeyArgs = request.getAllocateBlockRequest().getKeyArgs();
-        return allocateBlockKeyArgs.getVolumeName() + "/" + allocateBlockKeyArgs.getBucketName();
-      case CommitKey:
-        OzoneManagerProtocolProtos.KeyArgs commitKeyArgs = request.getCommitKeyRequest().getKeyArgs();
-        return commitKeyArgs.getVolumeName() + "/" + commitKeyArgs.getBucketName();
-      case DeleteKey:
-        OzoneManagerProtocolProtos.KeyArgs deleteKeyArgs = request.getDeleteKeyRequest().getKeyArgs();
-        return deleteKeyArgs.getVolumeName() + "/" + deleteKeyArgs.getBucketName();
-      case RenameKey:
-        OzoneManagerProtocolProtos.KeyArgs renameKeyArgs = request.getRenameKeyRequest().getKeyArgs();
-        return renameKeyArgs.getVolumeName() + "/" + renameKeyArgs.getBucketName();
-      case InitiateMultiPartUpload:
-        OzoneManagerProtocolProtos.KeyArgs initMPUKeyArgs = request.getInitiateMultiPartUploadRequest().getKeyArgs();
-        return initMPUKeyArgs.getVolumeName() + "/" + initMPUKeyArgs.getBucketName();
-      case CommitMultiPartUpload:
-        OzoneManagerProtocolProtos.KeyArgs commitMPUKeyArgs = request.getCommitMultiPartUploadRequest().getKeyArgs();
-        return commitMPUKeyArgs.getVolumeName() + "/" + commitMPUKeyArgs.getBucketName();
-      case AbortMultiPartUpload:
-        OzoneManagerProtocolProtos.KeyArgs abortMPUKeyArgs = request.getAbortMultiPartUploadRequest().getKeyArgs();
-        return abortMPUKeyArgs.getVolumeName() + "/" + abortMPUKeyArgs.getBucketName();
-      case CompleteMultiPartUpload:
-        OzoneManagerProtocolProtos.KeyArgs completeMPUKeyArgs = request.getCompleteMultiPartUploadRequest().getKeyArgs();
-        return completeMPUKeyArgs.getVolumeName() + "/" + completeMPUKeyArgs.getBucketName();
-      case SetTimes:
-        OzoneManagerProtocolProtos.KeyArgs setTimesKeyArgs = request.getSetTimesRequest().getKeyArgs();
-        return setTimesKeyArgs.getVolumeName() + "/" + setTimesKeyArgs.getBucketName();
-      case RenameKeys:
-        OzoneManagerProtocolProtos.RenameKeysArgs renameKeysArgs = request.getRenameKeysRequest().getRenameKeysArgs();
-        bucketPath = renameKeysArgs.getVolumeName() + "/" +
-            renameKeysArgs.getBucketName();
-        break;
-      case DeleteKeys:
-        OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeysArgs = request.getDeleteKeysRequest().getDeleteKeys();
-        bucketPath = deleteKeysArgs.getVolumeName() + "/" +
-            deleteKeysArgs.getBucketName();
-        break;
+    case RecoverLease:
+      bucketPath = request.getRecoverLeaseRequest().getVolumeName() + "/" +
+        request.getRecoverLeaseRequest().getBucketName();
+      return bucketPath;
+    case CreateDirectory:
+      OzoneManagerProtocolProtos.KeyArgs keyArgs = request.getCreateDirectoryRequest().getKeyArgs();
+      return keyArgs.getVolumeName() + "/" + keyArgs.getBucketName();
+    case CreateFile:
+      OzoneManagerProtocolProtos.KeyArgs omKeyArgs = request.getCreateFileRequest().getKeyArgs();
+      return omKeyArgs.getVolumeName() + "/" + omKeyArgs.getBucketName();
+    case CreateKey:
+      OzoneManagerProtocolProtos.KeyArgs createKeyArgs = request.getCreateKeyRequest().getKeyArgs();
+      return createKeyArgs.getVolumeName() + "/" + createKeyArgs.getBucketName();
+    case AllocateBlock:
+      OzoneManagerProtocolProtos.KeyArgs allocateBlockKeyArgs = request.getAllocateBlockRequest().getKeyArgs();
+      return allocateBlockKeyArgs.getVolumeName() + "/" + allocateBlockKeyArgs.getBucketName();
+    case CommitKey:
+      OzoneManagerProtocolProtos.KeyArgs commitKeyArgs = request.getCommitKeyRequest().getKeyArgs();
+      return commitKeyArgs.getVolumeName() + "/" + commitKeyArgs.getBucketName();
+    case DeleteKey:
+      OzoneManagerProtocolProtos.KeyArgs deleteKeyArgs = request.getDeleteKeyRequest().getKeyArgs();
+      return deleteKeyArgs.getVolumeName() + "/" + deleteKeyArgs.getBucketName();
+    case RenameKey:
+      OzoneManagerProtocolProtos.KeyArgs renameKeyArgs = request.getRenameKeyRequest().getKeyArgs();
+      return renameKeyArgs.getVolumeName() + "/" + renameKeyArgs.getBucketName();
+    case InitiateMultiPartUpload:
+      OzoneManagerProtocolProtos.KeyArgs initMPUKeyArgs = request.getInitiateMultiPartUploadRequest().getKeyArgs();
+      return initMPUKeyArgs.getVolumeName() + "/" + initMPUKeyArgs.getBucketName();
+    case CommitMultiPartUpload:
+      OzoneManagerProtocolProtos.KeyArgs commitMPUKeyArgs = request.getCommitMultiPartUploadRequest().getKeyArgs();
+      return commitMPUKeyArgs.getVolumeName() + "/" + commitMPUKeyArgs.getBucketName();
+    case AbortMultiPartUpload:
+      OzoneManagerProtocolProtos.KeyArgs abortMPUKeyArgs = request.getAbortMultiPartUploadRequest().getKeyArgs();
+      return abortMPUKeyArgs.getVolumeName() + "/" + abortMPUKeyArgs.getBucketName();
+    case CompleteMultiPartUpload:
+      OzoneManagerProtocolProtos.KeyArgs completeMPUKeyArgs = request.getCompleteMultiPartUploadRequest().getKeyArgs();
+      return completeMPUKeyArgs.getVolumeName() + "/" + completeMPUKeyArgs.getBucketName();
+    case SetTimes:
+      OzoneManagerProtocolProtos.KeyArgs setTimesKeyArgs = request.getSetTimesRequest().getKeyArgs();
+      return setTimesKeyArgs.getVolumeName() + "/" + setTimesKeyArgs.getBucketName();
+    case PutObjectTagging:
+      OzoneManagerProtocolProtos.KeyArgs putTagKeyArgs = request.getPutObjectTaggingRequest().getKeyArgs();
+      return putTagKeyArgs.getVolumeName() + "/" + putTagKeyArgs.getBucketName();
+    case DeleteObjectTagging:
+      OzoneManagerProtocolProtos.KeyArgs deleteTagKeyArgs = request.getDeleteObjectTaggingRequest().getKeyArgs();
+      return deleteTagKeyArgs.getVolumeName() + "/" + deleteTagKeyArgs.getBucketName();
+    case RenameKeys:
+      OzoneManagerProtocolProtos.RenameKeysArgs renameKeysArgs = request.getRenameKeysRequest().getRenameKeysArgs();
+      bucketPath = renameKeysArgs.getVolumeName() + "/" +
+        renameKeysArgs.getBucketName();
+      break;
+    case DeleteKeys:
+      OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeysArgs = request.getDeleteKeysRequest().getDeleteKeys();
+      bucketPath = deleteKeysArgs.getVolumeName() + "/" +
+          deleteKeysArgs.getBucketName();
+      break;
+    default:
+      break;
     }
     return bucketPath;
   }

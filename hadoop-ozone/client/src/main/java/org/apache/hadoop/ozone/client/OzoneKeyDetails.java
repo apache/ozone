@@ -60,7 +60,7 @@ public class OzoneKeyDetails extends OzoneKey {
       CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
       boolean isFile, String owner, Map<String, String> tags, Long generation, long updateId) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, metadata, isFile, owner, tags,updateId);
+        modificationTime, replicationConfig, metadata, isFile, owner, tags, updateId);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;

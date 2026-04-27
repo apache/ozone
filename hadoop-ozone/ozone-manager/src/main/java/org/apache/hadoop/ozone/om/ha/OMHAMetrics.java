@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -28,9 +30,6 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.protocol.RaftGroupId;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Class to maintain metrics and info related to OM HA.
@@ -44,6 +43,9 @@ public final class OMHAMetrics implements MetricsSource {
 
   private String currNodeId;
   private String leaderId;
+
+  private Map<RaftGroupId, String> raftGroupsLeaders = new HashMap<>();
+  private RaftGroupId mainRaftGroupId;
 
   /**
    * Private nested class to hold the values
@@ -85,9 +87,6 @@ public final class OMHAMetrics implements MetricsSource {
       this.nodeId = nodeId;
     }
   }
-
-  private Map<RaftGroupId, String> raftGroupsLeaders = new HashMap<>();
-  private RaftGroupId mainRaftGroupId;
 
   private OMHAMetrics(String currNodeId, String leaderId, RaftGroupId raftGroupId) {
     this.currNodeId = currNodeId;

@@ -105,7 +105,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
               bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName, ozoneManager);
 
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO = OMFileRequest
           .verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName,

@@ -1,30 +1,31 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.om;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTI_RAFT_BUCKET_GROUPS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTI_RAFT_BUCKET_GROUPS_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
-import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.RaftGroupId;
-import org.apache.ratis.protocol.RaftPeerId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,9 +36,20 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTI_RAFT_BUCKET_GROUPS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTI_RAFT_BUCKET_GROUPS_DEFAULT;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides a proper raft group id for the provided bucket name.
@@ -56,13 +68,9 @@ public class OmRaftGroupManager {
   private final ConcurrentMap<String, Object> bucketAssignmentLocks = new ConcurrentHashMap<>();
 
   private final ReentrantReadWriteLock bucketRaftGroupLock = new ReentrantReadWriteLock();
-  private final ReentrantReadWriteLock.ReadLock bucketRaftGroupReadLock = bucketRaftGroupLock.readLock();
   private final ReentrantReadWriteLock.WriteLock bucketRaftGroupWriteLock = bucketRaftGroupLock.writeLock();
 
   private final AtomicBoolean bucketRaftGroupAssignmentInProgress = new AtomicBoolean(false);
-
-  private final ConcurrentMap<String, org.apache.hadoop.ozone.client.OzoneClient> omClientCache = new ConcurrentHashMap<>();
-  private final ConcurrentMap<String, Object> omClientInitLocks = new ConcurrentHashMap<>();
 
   private final ConcurrentMap<String, OmTransport> omTransportCache = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Object> omTransportInitLocks = new ConcurrentHashMap<>();
@@ -104,27 +112,14 @@ public class OmRaftGroupManager {
   public void defineAndGetRaftGroupForBucket(String bucketPath, UUID raftGroupUUID) {
     bucketRaftGroupWriteLock.lock();
     try {
-      bucketRaftGroups.putIfAbsent(bucketPath, raftGroupUUID);
-      incrRaftGroupUsageCounter(RaftGroupId.valueOf(raftGroupUUID));
+      UUID previous = bucketRaftGroups.putIfAbsent(bucketPath, raftGroupUUID);
+      if (previous == null) {
+        // Only increment when the bucket is actually newly assigned,
+        // making this method idempotent for repeated raft applies.
+        incrRaftGroupUsageCounter(RaftGroupId.valueOf(raftGroupUUID));
+      }
     } finally {
       bucketRaftGroupWriteLock.unlock();
-    }
-  }
-
-  private void initBucketMap() {
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> bucketIterator =
-            metadataManager.getBucketIterator();
-    while (bucketIterator.hasNext()) {
-      Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry = bucketIterator.next();
-      OmBucketInfo bucketInfo = entry.getValue().getCacheValue();
-      if (bucketInfo != null) {
-        UUID raftGroup = bucketInfo.getRaftGroup();
-        if (raftGroup != null) {
-          String key = metadataManager.getBucketKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName());
-          bucketRaftGroups.put(key, raftGroup);
-          bucketsPerRaftGroupCounter.compute(raftGroup, (k, v) -> v == null ? 1 : v + 1);
-        }
-      }
     }
   }
 
@@ -142,6 +137,21 @@ public class OmRaftGroupManager {
     return getRaftGroupToHandleBucketWriteRequest(bucketKey);
   }
 
+  /**
+   * Non-allocating lookup of the raft group assigned to a bucket. Returns
+   * {@code null} when multi-raft is disabled or the bucket has no assignment
+   * in the local cache. Reads use this to avoid the side-effect of allocating
+   * a raft group from a read path.
+   */
+  public RaftGroupId lookupRaftGroupForBucket(String volumeName, String bucketName) {
+    if (bucketName == null || !multiRaftEnabled) {
+      return null;
+    }
+    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+    UUID assigned = bucketRaftGroups.get(bucketKey);
+    return assigned == null ? null : RaftGroupId.valueOf(assigned);
+  }
+
   private RaftGroupId getRaftGroupToHandleBucketWriteRequest(String bucketPath) {
     if (!bucketRaftGroups.containsKey(bucketPath)) {
       return trySetAndGetRaftGroupToHandleBucketWriteRequest(bucketPath);
@@ -153,7 +163,9 @@ public class OmRaftGroupManager {
 
   private RaftGroupId trySetAndGetRaftGroupToHandleBucketWriteRequest(String bucketPath) {
     UUID existing = bucketRaftGroups.get(bucketPath);
-    if (existing != null) return RaftGroupId.valueOf(existing);
+    if (existing != null) {
+      return RaftGroupId.valueOf(existing);
+    }
 
     Object myLock = new Object();
     Object activeLock = bucketAssignmentLocks.putIfAbsent(bucketPath, myLock);
@@ -192,6 +204,13 @@ public class OmRaftGroupManager {
 
       UUID selected = selectLessLoadedRaftGroup();
       assignRaftGroupToBucket(bucketPath, selected);
+      // Wait for the assignment raft entry to be applied locally before
+      // releasing the lock.  This ensures the next lock holder (possibly
+      // on a different OM) sees the updated bucketsPerRaftGroupCounter
+      // and picks a different raft group.  Without this wait, the lock
+      // release races ahead of the apply, and concurrent assignments
+      // all land on the same group.
+      waitForAssignmentApplied(bucketPath);
       releaseBucketRaftGroupAssignmentWriteLockByRaft();
 
       return RaftGroupId.valueOf(selected);
@@ -211,7 +230,7 @@ public class OmRaftGroupManager {
     RaftPeerId mainRaftGroupLeaderPeerId = omRatisServer.getServerDivision(omRatisServer.getCurrentRaftGroupId())
         .getInfo().getLeaderId();
 
-    String omServiceId = OmUtils.getOzoneManagerServiceId(ozoneManager.getConfiguration());
+    
     OMNodeDetails omNode = OmUtils.getAllOMHAAddresses(ozoneManager.getConfiguration(), omServiceId, true).stream()
         .filter(omNodeDetails -> omNodeDetails.getNodeId().equals(mainRaftGroupLeaderPeerId.toString()))
         .findFirst().get();
@@ -230,7 +249,7 @@ public class OmRaftGroupManager {
     RaftPeerId mainRaftGroupLeaderPeerId = omRatisServer.getServerDivision(omRatisServer.getCurrentRaftGroupId())
         .getInfo().getLeaderId();
 
-    String omServiceId = OmUtils.getOzoneManagerServiceId(ozoneManager.getConfiguration());
+    
     OMNodeDetails omNode = OmUtils.getAllOMHAAddresses(ozoneManager.getConfiguration(), omServiceId, true).stream()
         .filter(omNodeDetails -> omNodeDetails.getNodeId().equals(mainRaftGroupLeaderPeerId.toString()))
         .findFirst().get();
@@ -310,6 +329,7 @@ public class OmRaftGroupManager {
       return transport;
     }
   }
+
   /**
    * Assign raft group to bucket through Ratis consensus.
    * This ensures all OM instances agree on the mapping.
@@ -333,13 +353,13 @@ public class OmRaftGroupManager {
     RaftPeerId mainRaftGroupLeaderPeerId = omRatisServer.getServerDivision(omRatisServer.getCurrentRaftGroupId())
         .getInfo().getLeaderId();
 
-    String omServiceId = OmUtils.getOzoneManagerServiceId(ozoneManager.getConfiguration());
     OMNodeDetails omNode = OmUtils.getAllOMHAAddresses(ozoneManager.getConfiguration(), omServiceId, true).stream()
         .filter(omNodeDetails -> omNodeDetails.getNodeId().equals(mainRaftGroupLeaderPeerId.toString()))
         .findFirst().get();
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
-        OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.BucketRaftGroupAssign)
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.BucketRaftGroupAssign)
             .setBucketRaftGroupAssignRequest(assignRequest)
             .setClientId(omRatisServer.getCurrentClientId().toString())
             .build();
@@ -358,6 +378,32 @@ public class OmRaftGroupManager {
         wait(1000);
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
+      }
+    }
+  }
+
+  /**
+   * Wait until the bucket-to-raft-group assignment is applied locally
+   * (i.e. visible in {@link #bucketRaftGroups}).  The raft entry was
+   * already committed by {@link #assignRaftGroupToBucket}, but the
+   * local state machine may not have applied it yet.
+   */
+  private void waitForAssignmentApplied(String bucketPath) {
+    long deadline = System.currentTimeMillis() + 30_000;
+    while (!bucketRaftGroups.containsKey(bucketPath)) {
+      if (System.currentTimeMillis() >= deadline) {
+        LOG.warn("Timed out waiting for raft group assignment"
+            + " to be applied for {}", bucketPath);
+        return;
+      }
+      try {
+        OzoneManagerRatisServer ratisServer = ozoneManager.getOmRatisServer();
+        if (ratisServer != null) {
+          ratisServer.getOmStateMachine().awaitDoubleBufferFlush();
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
       }
     }
   }
