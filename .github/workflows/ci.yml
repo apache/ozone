@@ -30,6 +30,9 @@ on:
       DEVELOCITY_ACCESS_KEY:
         description: 'Token for submitting build scan to Develocity'
         required: false
+      OZONE_WEBSITE_BUILD:
+        description: 'Token for publishing to apache/ozone-site'
+        required: false
       SONARCLOUD_TOKEN:
         description: 'Token for submitting coverage data to SonarCloud'
         required: false
@@ -156,6 +159,8 @@ jobs:
     uses: ./.github/workflows/update-ozone-site-config-doc.yml
     permissions:
       contents: read
+    secrets:
+      OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
 
   compile:
     needs:

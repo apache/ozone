@@ -30,4 +30,5 @@ jobs:
     uses: ./.github/workflows/ci.yml
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+      OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
