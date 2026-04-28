@@ -3937,6 +3937,16 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.rename.allowed</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Allows the Ozone snapshot rename operation if set to true on the OM side.
+      Blocks it otherwise.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.snapshot.deleting.service.timeout</name>
     <value>300s</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
