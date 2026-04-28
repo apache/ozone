@@ -54,15 +54,59 @@ public class TestOMEventListenerPluginManager {
 
   }
 
+  /**
+   * A dummy plugin implementation for testing.
+   */
+  public static class FooPlugin implements OMEventListener {
+
+    private boolean initialized = false;
+    private boolean started = false;
+    private boolean shutdown = false;
+
+    @Override
+    public void initialize(OzoneConfiguration conf,
+                           OMEventListenerPluginContext pluginContext) {
+      initialized = true;
+    }
+
+    @Override
+    public void start() {
+      started = true;
+    }
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    public boolean isInitialized() {
+      return initialized;
+    }
+
+    public boolean isStarted() {
+      return started;
+    }
+
+    public boolean isShutdown() {
+      return shutdown;
+    }
+  }
+
+  /**
+   * Another dummy plugin implementation for testing.
+   */
+  public static class BarPlugin extends FooPlugin {
+  }
+
   @Test
   public void testLoadSinglePlugin() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.om.plugin.destination.foo", "enabled");
-    conf.set("ozone.om.plugin.destination.foo.classname", "org.apache.hadoop.ozone.om.eventlistener.FooPlugin");
+    conf.set("ozone.om.plugin.destination.foo.classname", FooPlugin.class.getName());
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
-    Assertions.assertEquals(Arrays.asList("org.apache.hadoop.ozone.om.eventlistener.FooPlugin"),
+    Assertions.assertEquals(Arrays.asList(FooPlugin.class.getName()),
                             getLoadedPlugins(pluginManager));
   }
 
@@ -70,15 +114,14 @@ public class TestOMEventListenerPluginManager {
   public void testLoadMultiplePlugins() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.om.plugin.destination.foo", "enabled");
-    conf.set("ozone.om.plugin.destination.foo.classname", "org.apache.hadoop.ozone.om.eventlistener.FooPlugin");
+    conf.set("ozone.om.plugin.destination.foo.classname", FooPlugin.class.getName());
     conf.set("ozone.om.plugin.destination.bar", "enabled");
-    conf.set("ozone.om.plugin.destination.bar.classname", "org.apache.hadoop.ozone.om.eventlistener.BarPlugin");
+    conf.set("ozone.om.plugin.destination.bar.classname", BarPlugin.class.getName());
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
-    Assertions.assertEquals(Arrays.asList("org.apache.hadoop.ozone.om.eventlistener.BarPlugin",
-                                          "org.apache.hadoop.ozone.om.eventlistener.FooPlugin"),
-
+    Assertions.assertEquals(Arrays.asList(BarPlugin.class.getName(),
+                                          FooPlugin.class.getName()),
                             getLoadedPlugins(pluginManager));
   }
 
