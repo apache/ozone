@@ -54,8 +54,6 @@ import org.apache.ratis.util.TimeDuration;
  */
 public final class RatisUtil {
 
-  public static final long SCM_RAFT_SNAPSHOT_GAP = 1L;
-
   private RatisUtil() {
   }
 
@@ -233,7 +231,6 @@ public final class RatisUtil {
     Snapshot.setAutoTriggerThreshold(properties,
         ozoneConf.getLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
                 ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT));
-    Snapshot.setCreationGap(properties, SCM_RAFT_SNAPSHOT_GAP);
   }
 
   public static void checkRatisException(IOException e, String port,
