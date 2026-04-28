@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,6 +103,7 @@ class ReconStorageContainerSyncHelper {
   private final StorageContainerServiceProvider scmServiceProvider;
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconContainerManager containerManager;
+  private final ReconScmContainerSyncMetrics metrics;
 
   /**
    * Describes the action that the periodic scheduler should take based on the
@@ -132,9 +134,17 @@ class ReconStorageContainerSyncHelper {
   ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
                                   OzoneConfiguration ozoneConfiguration,
                                   ReconContainerManager containerManager) {
+    this(scmServiceProvider, ozoneConfiguration, containerManager, null);
+  }
+
+  ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
+                                  OzoneConfiguration ozoneConfiguration,
+                                  ReconContainerManager containerManager,
+                                  ReconScmContainerSyncMetrics metrics) {
     this.scmServiceProvider = scmServiceProvider;
     this.ozoneConfiguration = ozoneConfiguration;
     this.containerManager = containerManager;
+    this.metrics = metrics;
   }
 
   /**
@@ -144,7 +154,7 @@ class ReconStorageContainerSyncHelper {
    * <p>Decision logic:
    * <ol>
    *   <li>If {@code |(SCM_total - SCM_open) - (Recon_total - Recon_open)| >
-   *       ozone.recon.scm.container.threshold} (default 10,000): return
+   *       ozone.recon.scm.container.threshold} (default 100,000): return
    *       {@link SyncAction#FULL_SNAPSHOT}. Large drift in non-OPEN containers
    *       means Recon is badly behind on stable SCM state and a full checkpoint
    *       replacement is cheaper and more reliable at that scale.</li>
@@ -200,6 +210,9 @@ class ReconStorageContainerSyncHelper {
               + "(SCM_non_OPEN={}, Recon_non_OPEN={}, SCM_total={}, Recon_total={}). "
               + "Triggering full snapshot.",
           nonOpenDrift, largeThreshold, scmNonOpen, reconNonOpen, scmTotal, reconTotal);
+      if (metrics != null) {
+        metrics.recordFullSnapshotDownloadEvent(nonOpenDrift);
+      }
       return SyncAction.FULL_SNAPSHOT;
     }
     if (totalDrift > 0) {
@@ -235,12 +248,32 @@ class ReconStorageContainerSyncHelper {
         LOG.info("Per-state {} drift {} detected (SCM_{}={}, Recon_{}={}, threshold={}). "
                 + "Total counts are equal — targeted sync will correct stale states.",
             state, drift, state, scmCount, state, reconCount, perStateDriftThreshold);
+        if (metrics != null) {
+          recordPerStateDriftMetric(state, drift);
+        }
         return SyncAction.TARGETED_SYNC;
       }
     }
 
     LOG.info("No significant drift detected (total drift={}). No sync needed.", totalDrift);
     return SyncAction.NO_ACTION;
+  }
+
+  private void recordPerStateDriftMetric(HddsProtos.LifeCycleState state,
+                                         long drift) {
+    switch (state) {
+    case OPEN:
+      metrics.recordOpenContainerDrift(drift);
+      break;
+    case QUASI_CLOSED:
+      metrics.recordQuasiClosedContainerDrift(drift);
+      break;
+    case CLOSED:
+      metrics.recordClosedContainerDrift(drift);
+      break;
+    default:
+      break;
+    }
   }
 
   /**

@@ -34,10 +34,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SC
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -118,12 +114,14 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.fsck.ReconReplicationManager;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
+import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ratis.util.ExitUtils;
@@ -172,6 +170,7 @@ public class ReconStorageContainerManagerFacade
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
   private final ReconStorageContainerSyncHelper containerSyncHelper;
+  private final ReconScmContainerSyncMetrics containerSyncMetrics;
 
   // To Do :- Refactor the constructor in a separate JIRA
   @Inject
@@ -385,10 +384,12 @@ public class ReconStorageContainerManagerFacade
         containerManager, nodeManager, safeModeManager,
         reconTaskConfig, ozoneConfiguration);
 
+    containerSyncMetrics = ReconScmContainerSyncMetrics.create();
     containerSyncHelper = new ReconStorageContainerSyncHelper(
         scmServiceProvider,
         ozoneConfiguration,
-        containerManager
+        containerManager,
+        containerSyncMetrics
     );
   }
 
@@ -423,9 +424,7 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    // Two threads: one for the periodic full-snapshot task and one for the
-    // incremental-sync/decideSyncAction task so they never block each other.
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2,
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix +
                                                      "SyncSCMContainerInfo-%d")
             .build());
@@ -439,33 +438,12 @@ public class ReconStorageContainerManagerFacade
       initializePipelinesFromScm();
     }
     // -----------------------------------------------------------------------
-    // Scheduler 1 (full snapshot): runs every 24h (default).
-    // Unconditionally replaces Recon's recon-scm.db with a fresh SCM
-    // checkpoint.  This is the safety net that keeps the two databases
-    // structurally in sync even if incremental sync misses an edge case.
-    // -----------------------------------------------------------------------
-    long snapshotInterval = ozoneConfiguration.getTimeDuration(
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY,
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
-    long snapshotInitialDelay = ozoneConfiguration.getTimeDuration(
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY,
-        OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    scheduler.scheduleWithFixedDelay(() -> {
-      try {
-        updateReconSCMDBWithNewSnapshot();
-      } catch (IOException e) {
-        LOG.error("Failed to refresh Recon SCM DB snapshot.", e);
-      }
-    }, snapshotInitialDelay, snapshotInterval, TimeUnit.MILLISECONDS);
-
-    // -----------------------------------------------------------------------
-    // Scheduler 2 (incremental/targeted sync): runs every 1h (default).
+    // Scheduler (incremental/targeted sync): runs every 1h (default).
     //
     // Each cycle calls decideSyncAction() — two lightweight count RPCs to SCM
     // — and then:
     //
-    //   |total drift| > threshold (default 10,000)
+    //   |total drift| > threshold (default 100,000)
     //       → full snapshot: replace Recon's entire SCM DB from SCM checkpoint
     //
     //   0 < |total drift| <= threshold
@@ -477,9 +455,8 @@ public class ReconStorageContainerManagerFacade
     //   no drift detected
     //       → no action this cycle
     //
-    // Running this on a 1h cadence (vs the old 24h) means container state
-    // discrepancies are detected and corrected within an hour without waiting
-    // for the next full snapshot.
+    // Running this on a 1h cadence means container state discrepancies are
+    // detected and corrected without an unconditional periodic full snapshot.
     // -----------------------------------------------------------------------
     long syncInterval = ozoneConfiguration.getTimeDuration(
         OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY,
@@ -509,7 +486,7 @@ public class ReconStorageContainerManagerFacade
           return;   // finally block below will not double-release
         case TARGETED_SYNC:
           LOG.info("Tiered sync decision: TARGETED_SYNC. Running 4-pass incremental sync.");
-          boolean success = containerSyncHelper.syncWithSCMContainerInfo();
+          boolean success = runTargetedSyncWithMetrics();
           if (!success) {
             LOG.warn("Targeted sync completed with one or more pass failures. "
                 + "Check logs above for details.");
@@ -569,6 +546,7 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
+    containerSyncMetrics.unRegister();
     IOUtils.close(LOG, dbStore);
   }
 
@@ -656,13 +634,33 @@ public class ReconStorageContainerManagerFacade
   public boolean syncWithSCMContainerInfo() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
       try {
-        return containerSyncHelper.syncWithSCMContainerInfo();
+        return runTargetedSyncWithMetrics();
       } finally {
         isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
     } else {
       LOG.debug("SCM DB sync is already running.");
       return false;
+    }
+  }
+
+  private boolean runTargetedSyncWithMetrics() {
+    long startTime = Time.monotonicNow();
+    containerSyncMetrics.setTargetedSyncStatus(
+        ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_IN_PROGRESS);
+    try {
+      boolean success = containerSyncHelper.syncWithSCMContainerInfo();
+      containerSyncMetrics.setTargetedSyncStatus(success
+          ? ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_SUCCESS
+          : ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_FAILURE);
+      return success;
+    } catch (RuntimeException | Error e) {
+      containerSyncMetrics.setTargetedSyncStatus(
+          ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_FAILURE);
+      throw e;
+    } finally {
+      containerSyncMetrics.setLastTargetedSyncDurationMs(
+          Time.monotonicNow() - startTime);
     }
   }
 

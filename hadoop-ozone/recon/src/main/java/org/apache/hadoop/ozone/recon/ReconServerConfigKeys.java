@@ -145,17 +145,13 @@ public final class  ReconServerConfigKeys {
    * SCM DB. For drift at or below this value the incremental sync corrects the
    * gap without replacing the entire database.
    *
-   * <p>Note: a full snapshot is also scheduled unconditionally every 24h
-   * (configurable via {@code ozone.recon.scm.snapshot.task.interval.delay})
-   * as a structural safety net, independent of this threshold.
-   *
-   * <p>Default: 10,000. In large clusters (millions of containers) operators
+   * <p>Default: 100,000. In large clusters (millions of containers) operators
    * may raise this further since the targeted sync handles per-state
    * corrections efficiently even at higher drift levels.
    */
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
-  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 10_000;
+  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 100_000;
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_ENABLED =
       "ozone.recon.scm.snapshot.enabled";
