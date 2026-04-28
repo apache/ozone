@@ -22,7 +22,9 @@ on:
   schedule:
     - cron: '*/5 * * * *'
 
-permissions: { }
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   label:
