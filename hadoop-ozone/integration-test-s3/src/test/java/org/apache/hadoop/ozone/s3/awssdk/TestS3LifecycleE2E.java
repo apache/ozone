@@ -122,8 +122,7 @@ class TestS3LifecycleE2E extends ClusterForTests<MiniOzoneCluster> {
 
     // MPU 3: matches prefix "temp/" with recent creation time - should remain
     String matchingRecentKey = "temp/recent-file.txt";
-    CreateMultipartUploadResponse mpu3 = s3Client.createMultipartUpload(
-        b -> b.bucket(bucketName).key(matchingRecentKey));
+    s3Client.createMultipartUpload(b -> b.bucket(bucketName).key(matchingRecentKey));
 
     // Verify all three MPUs exist
     ListMultipartUploadsResponse listBefore =
