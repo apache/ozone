@@ -199,6 +199,17 @@ public abstract class Handler {
       throws IOException;
 
   /**
+   * Marks the container Healthy after successful scan.
+   * For RATIS containers, moves the container from UNHEALTHY to QUASI_CLOSED state.
+   * For EC containers, moves the container from UNHEALTHY to CLOSED state.
+   *
+   * @param container container to update
+   * @throws IOException in case of exception
+   */
+  public abstract boolean markContainerHealthy(Container container)
+      throws IOException;
+
+  /**
    * Moves the Container to QUASI_CLOSED state.
    *
    * @param container container to be quasi closed

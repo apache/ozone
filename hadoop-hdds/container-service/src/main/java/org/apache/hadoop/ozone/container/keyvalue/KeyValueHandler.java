@@ -683,6 +683,7 @@ public class KeyValueHandler extends Handler {
 
       final long numBytes = blockDataProto.getSerializedSize();
       metrics.incContainerBytesStats(Type.PutBlock, numBytes);
+
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -1541,6 +1542,45 @@ public class KeyValueHandler extends Handler {
     // SCM. Write a corresponding entry to the container log as well.
     ContainerLogger.logUnhealthy(container.getContainerData(), reason);
     sendICR(container);
+  }
+
+  @Override
+  public boolean markContainerHealthy(Container container)
+      throws IOException {
+    boolean transitionedToHealthy = false;
+    container.writeLock();
+    long containerID = container.getContainerData().getContainerID();
+    try {
+      if (container.getContainerState() != State.UNHEALTHY) {
+        LOG.debug("Call to mark non-unhealthy container {} as healthy (state={})",
+            containerID, container.getContainerState());
+        return false;
+      }
+      // If the volume is unhealthy, no action is needed. Container cannot be restored.
+      HddsVolume containerVolume = container.getContainerData().getVolume();
+      if (containerVolume.isFailed()) {
+        LOG.debug("Ignoring healthy container {} detected on an " +
+            "already failed volume {}", containerID, containerVolume);
+        return false;
+      }
+      transitionedToHealthy = container.markContainerHealthy();
+    } catch (StorageContainerException ex) {
+      LOG.warn("Unexpected error while marking container {} healthy",
+          containerID, ex);
+      return false;
+    } finally {
+      container.writeUnlock();
+    }
+    if (!transitionedToHealthy) {
+      return false;
+    }
+    updateContainerChecksumFromMetadataIfNeeded(container);
+    // Determine the new state for logging
+    State newState = container.getContainerState();
+    String stateStr = (newState == QUASI_CLOSED) ? "QUASI_CLOSED" : "CLOSED";
+    ContainerLogger.logHealthy(container.getContainerData(), stateStr);
+    sendICR(container);
+    return true;
   }
 
   @Override

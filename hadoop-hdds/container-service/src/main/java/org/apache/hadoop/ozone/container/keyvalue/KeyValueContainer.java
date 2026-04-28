@@ -400,6 +400,34 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
+  public boolean markContainerHealthy() throws StorageContainerException {
+    writeLock();
+    final State prevState = containerData.getState();
+    try {
+      if (prevState != UNHEALTHY) {
+        LOG.debug("Container {} is not UNHEALTHY (state={}), cannot mark healthy", 
+            containerData.getContainerID(), prevState);
+        return false;
+      }
+      final int replicaIndex = containerData.getReplicaIndex();
+      if (replicaIndex < 0) {
+        throw new StorageContainerException(
+            "Invalid replicaIndex=" + replicaIndex + " for container "
+                + containerData.getContainerID(),
+            INVALID_CONTAINER_STATE);
+      }
+      // replicaIndex == 0 is RATIS, > 0 is EC.
+      final State newState = replicaIndex == 0 ? QUASI_CLOSED : CLOSED;
+      updateContainerState(newState);
+      LOG.info("Marked container {} from UNHEALTHY to {} (replicaIndex={}): {}",
+          containerData.getContainerID(), newState, replicaIndex, containerData);
+      return true;
+    } finally {
+      writeUnlock();
+    }
+  }
+
+  @Override
   public void markContainerForDelete() {
     writeLock();
     final State prevState = containerData.getState();

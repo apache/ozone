@@ -128,6 +128,29 @@ public class ContainerController {
   }
 
   /**
+   * Marks the container as HEALTHY after successful scan.
+   * For RATIS containers, moves from UNHEALTHY to QUASI_CLOSED state.
+   * For EC containers, moves from UNHEALTHY to CLOSED state.
+   *
+   * @param containerId Id of the container to update
+   * @throws IOException in case of exception
+   */
+  public boolean markContainerHealthy(final long containerId)
+          throws IOException {
+    Container container = getContainer(containerId);
+    if (container == null) {
+      LOG.warn("Container {} not found, may be deleted, skip marking HEALTHY", containerId);
+      return false;
+    } else if (container.getContainerState() != State.UNHEALTHY) {
+      LOG.debug("Container {} is not UNHEALTHY (state={}), skip marking HEALTHY", 
+          containerId, container.getContainerState());
+      return false;
+    } else {
+      return getHandler(container).markContainerHealthy(container);
+    }
+  }
+
+  /**
    * Updates the container checksum information on disk and in memory.
    *
    * @param containerId The ID of the container to update

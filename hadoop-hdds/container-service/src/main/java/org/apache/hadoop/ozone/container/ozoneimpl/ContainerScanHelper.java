@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -64,6 +66,7 @@ public final class ContainerScanHelper {
     }
     ContainerData containerData = container.getContainerData();
     long containerId = containerData.getContainerID();
+    boolean wasUnhealthy = containerData.isUnhealthy();
     logScanStart(containerData, "data");
     DataScanResult result = container.scanData(throttler, canceler);
 
@@ -77,6 +80,13 @@ public final class ContainerScanHelper {
       }
       if (result.hasErrors()) {
         handleUnhealthyScanResult(containerData, result);
+      } else if (wasUnhealthy) {
+        if (container.getContainerState() == UNHEALTHY) {
+          handleHealthyScanResult(containerData);
+        } else {
+          log.debug("Container [{}] no longer UNHEALTHY after scan (state={}), skipping recovery call.",
+              containerId, container.getContainerState());
+        }
       }
       metrics.incNumContainersScanned();
     }
@@ -133,6 +143,15 @@ public final class ContainerScanHelper {
       metrics.incNumUnHealthyContainers();
       // triggering a volume scan for the unhealthy container
       triggerVolumeScan(containerData);
+    }
+  }
+
+  public void handleHealthyScanResult(ContainerData containerData) throws IOException {
+    long containerID = containerData.getContainerID();
+    log.info("Container [{}] passed scan. Recovering from UNHEALTHY to healthy state.", containerID);
+    boolean containerMarkedHealthy = controller.markContainerHealthy(containerID);
+    if (containerMarkedHealthy) {
+      log.info("Container [{}] successfully recovered from UNHEALTHY to healthy state.", containerID);
     }
   }
 

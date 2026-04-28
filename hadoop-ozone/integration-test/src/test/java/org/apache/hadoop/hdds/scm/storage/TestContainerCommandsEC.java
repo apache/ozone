@@ -107,6 +107,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECContainerOperationClient;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionMetrics;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.token.Token;
@@ -179,6 +180,10 @@ public class TestContainerCommandsEC {
         DatanodeConfiguration.class);
     dnConf.setBlockDeletionInterval(Duration.ofSeconds(1));
     config.setFromObject(dnConf);
+    ContainerScannerConfiguration scannerConf =
+        config.getObject(ContainerScannerConfiguration.class);
+    scannerConf.setEnabled(false);
+    config.setFromObject(scannerConf);
     startCluster(config);
     prepareData(KEY_SIZE_RANGES);
   }

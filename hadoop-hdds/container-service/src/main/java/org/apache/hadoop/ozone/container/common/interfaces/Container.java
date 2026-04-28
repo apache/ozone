@@ -102,6 +102,13 @@ public interface Container<CONTAINERDATA extends ContainerData> {
   void markContainerUnhealthy() throws StorageContainerException;
 
   /**
+   * Marks the container replica as healthy after successful scan.
+   * For RATIS containers, restores the container from UNHEALTHY to QUASI_CLOSED state.
+   * For EC containers, restores the container from UNHEALTHY to CLOSED state.
+   */
+  boolean markContainerHealthy() throws StorageContainerException;
+
+  /**
    * Marks the container replica as deleted.
    */
   void markContainerForDelete();

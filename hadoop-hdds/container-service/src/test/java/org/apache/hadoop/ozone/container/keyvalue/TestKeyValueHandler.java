@@ -1086,4 +1086,220 @@ public class TestKeyValueHandler {
       ContainerMetrics.remove();
     }
   }
+
+  @Test
+  public void testMarkContainerHealthyReturnsTrue() throws Exception {
+    final long containerID = 1L;
+    final String datanodeId = UUID.randomUUID().toString();
+    final String clusterId = UUID.randomUUID().toString();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString())
+        .conf(conf).clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet).build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+    hddsVolume.createTmpDirs(clusterId);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
+
+    final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet, mock(ContainerMetrics.class),
+        c -> { }, new ContainerChecksumTreeManager(conf));
+    kvHandler.setClusterID(clusterId);
+
+    KeyValueContainerData containerData = new KeyValueContainerData(containerID,
+        ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        datanodeId);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterId);
+    containerSet.addContainer(container);
+
+    // Mark container as UNHEALTHY
+    container.markContainerUnhealthy();
+    assertEquals(UNHEALTHY, container.getContainerState());
+
+    // Mark container healthy should return true
+    boolean result = kvHandler.markContainerHealthy(container);
+    assertTrue(result);
+    assertEquals(QUASI_CLOSED, container.getContainerState());
+  }
+
+  @Test
+  public void testMarkContainerHealthyReturnsFalseWhenNotUnhealthy()
+      throws Exception {
+    final long containerID = 1L;
+    final String datanodeId = UUID.randomUUID().toString();
+    final String clusterId = UUID.randomUUID().toString();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString())
+        .conf(conf).clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet).build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
+
+    final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet, mock(ContainerMetrics.class),
+        c -> { }, new ContainerChecksumTreeManager(conf));
+    kvHandler.setClusterID(clusterId);
+
+    KeyValueContainerData containerData = new KeyValueContainerData(containerID,
+        ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        datanodeId);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterId);
+    containerSet.addContainer(container);
+
+    // Container is in OPEN state
+    assertEquals(State.OPEN, container.getContainerState());
+
+    // Mark container healthy should return false
+    boolean result = kvHandler.markContainerHealthy(container);
+    assertFalse(result);
+    assertEquals(State.OPEN, container.getContainerState());
+  }
+
+  @Test
+  public void testMarkContainerHealthyReturnsFalseWhenVolumeFailed()
+      throws Exception {
+    final long containerID = 1L;
+    final String datanodeId = UUID.randomUUID().toString();
+    final String clusterId = UUID.randomUUID().toString();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString())
+        .conf(conf).clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet).build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
+
+    final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet, mock(ContainerMetrics.class),
+        c -> { }, new ContainerChecksumTreeManager(conf));
+    kvHandler.setClusterID(clusterId);
+
+    KeyValueContainerData containerData = new KeyValueContainerData(containerID,
+        ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        datanodeId);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterId);
+    containerSet.addContainer(container);
+
+    // Mark container as UNHEALTHY
+    container.markContainerUnhealthy();
+    assertEquals(UNHEALTHY, container.getContainerState());
+
+    // Fail the volume
+    hddsVolume.failVolume();
+
+    // Should return false due to failed volume
+    boolean result = kvHandler.markContainerHealthy(container);
+    assertFalse(result);
+    assertEquals(UNHEALTHY, container.getContainerState());
+  }
+
+  @Test
+  public void testMarkContainerHealthyWithECContainer() throws Exception {
+    final long containerID = 1L;
+    final String datanodeId = UUID.randomUUID().toString();
+    final String clusterId = UUID.randomUUID().toString();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString())
+        .conf(conf).clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet).build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
+
+    final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet, mock(ContainerMetrics.class),
+        c -> { }, new ContainerChecksumTreeManager(conf));
+    kvHandler.setClusterID(clusterId);
+
+    KeyValueContainerData containerData = new KeyValueContainerData(containerID,
+        ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        datanodeId);
+    // Set replicaIndex > 0 for EC container
+    containerData.setReplicaIndex(2);
+
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterId);
+    containerSet.addContainer(container);
+
+    // Mark as UNHEALTHY
+    container.markContainerUnhealthy();
+    assertEquals(UNHEALTHY, container.getContainerState());
+
+    // EC container should transition to CLOSED
+    boolean result = kvHandler.markContainerHealthy(container);
+    assertTrue(result);
+    assertEquals(CLOSED, container.getContainerState());
+  }
+
+  @Test
+  public void testMarkContainerHealthyHandlesException() throws Exception {
+    final long containerID = 1L;
+    final String datanodeId = UUID.randomUUID().toString();
+    final String clusterId = UUID.randomUUID().toString();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString())
+        .conf(conf).clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet).build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
+
+    final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet, mock(ContainerMetrics.class),
+        c -> { }, new ContainerChecksumTreeManager(conf));
+    kvHandler.setClusterID(clusterId);
+
+    KeyValueContainerData containerData = new KeyValueContainerData(containerID,
+        ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        datanodeId);
+    // Set invalid replicaIndex to trigger exception
+    containerData.setReplicaIndex(-1);
+
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+        clusterId);
+    containerSet.addContainer(container);
+
+    // Mark as UNHEALTHY
+    container.markContainerUnhealthy();
+    assertEquals(UNHEALTHY, container.getContainerState());
+
+    // Should return false when exception occurs
+    boolean result = kvHandler.markContainerHealthy(container);
+    assertFalse(result);
+    assertEquals(UNHEALTHY, container.getContainerState());
+  }
 }

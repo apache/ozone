@@ -98,6 +98,17 @@ public final class ContainerLogger {
   }
 
   /**
+   * Logged when a container is recovered from unhealthy state after successful scan.
+   *
+   * @param containerData The container that was marked healthy.
+   * @param newState The new state (QUASI_CLOSED for RATIS, CLOSED for EC).
+   */
+  public static void logHealthy(ContainerData containerData, String newState) {
+    LOG.info(getMessage(containerData, 
+        "Container recovered from UNHEALTHY to " + newState + " after successful scan"));
+  }
+
+  /**
    * Logged when a container is lost from this datanode. Currently this would
    * only happen on volume failure. Container deletes do not count as lost
    * containers.

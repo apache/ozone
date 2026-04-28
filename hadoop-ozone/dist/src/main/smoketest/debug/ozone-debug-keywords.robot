@@ -36,15 +36,15 @@ Execute replicas verify container state debug tool
 
 Parse replicas verify JSON output
     [Arguments]    ${output}
-    ${json_split} =  Evaluate  '''${output}'''.split('***')[0].strip()
-    ${json} =      Evaluate  json.loads('''${json_split}''')  json
+    # Split on the banner printed to stderr after JSON (stderr is merged with stdout in tests via 2>&1).
+    # Use $output in Evaluate so the value is not triple-embedded (avoids parse errors on quotes / ''' in text).
+    ${json} =    Evaluate    json.loads($output.partition('***************************************************')[0].strip())    json
     [Return]       ${json}
 
 Check to Verify Replicas
     [Arguments]    ${json}  ${check_type}  ${faulty_datanode}  ${expected_message}
     ${replicas} =    Get From Dictionary    ${json['keys'][0]['blocks'][0]}    replicas
-    Run Keyword If    '${check_type}' == 'containerState'    Check Container State Replicas    ${replicas}  ${faulty_datanode}  ${expected_message}
-    ...    ELSE    Check Standard Replicas    ${replicas}  ${check_type}  ${faulty_datanode}  ${expected_message}
+    Check Standard Replicas    ${replicas}  ${check_type}  ${faulty_datanode}  ${expected_message}
 
 Check Standard Replicas
     [Arguments]    ${replicas}  ${check_type}  ${faulty_datanode}  ${expected_message}
@@ -53,21 +53,6 @@ Check Standard Replicas
         ${hostname} =     Get From Dictionary    ${datanode}   hostname
         Run Keyword If    '${hostname}' == '${faulty_datanode}'    Check Replica Failed    ${replica}  ${check_type}  ${expected_message}
         Run Keyword If    '${hostname}' != '${faulty_datanode}'    Check Replica Passed    ${replica}  ${check_type}
-    END
-
-Check Container State Replicas
-    [Arguments]    ${replicas}  ${faulty_datanode}  ${expected_message}
-    FOR    ${replica}    IN    @{replicas}
-        ${datanode} =     Get From Dictionary    ${replica}    datanode
-        ${hostname} =     Get From Dictionary    ${datanode}   hostname
-        ${checks} =       Get From Dictionary    ${replica}    checks
-        ${check} =        Get From List          ${checks}     0
-        Should Be Equal    ${check['type']}    containerState
-        Should Be Equal    ${check['pass']}    ${False}
-        ${actual_message} =    Set Variable    ${check['failures'][0]['message']}
-
-        Run Keyword If    '${hostname}' == '${faulty_datanode}'    Should Contain    ${actual_message}    ${expected_message}
-        ...    ELSE    Should Match Regexp    ${actual_message}    Replica state is (OPEN|CLOSING|QUASI_CLOSED|CLOSED)
     END
 
 Check Replica Failed

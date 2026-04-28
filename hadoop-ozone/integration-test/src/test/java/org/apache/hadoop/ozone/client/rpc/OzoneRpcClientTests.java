@@ -2646,8 +2646,10 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     GenericTestUtils.waitFor(() -> {
       try {
         ContainerInfo containerInfo = scm.getContainerInfo(containerID);
-        System.out.println("state " + containerInfo.getState());
-        return containerInfo.getState() == HddsProtos.LifeCycleState.CLOSING;
+        HddsProtos.LifeCycleState state = containerInfo.getState();
+        System.out.println("state " + state);
+        return state == HddsProtos.LifeCycleState.CLOSING
+            || state == HddsProtos.LifeCycleState.QUASI_CLOSED;
       } catch (IOException e) {
         fail("Failed to get container info for " + e.getMessage());
         return false;

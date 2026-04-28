@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -101,6 +102,10 @@ public class TestECContainerRecovery {
     datanodeConfiguration.setRecoveringContainerScrubInterval(
             Duration.of(10, ChronoUnit.SECONDS));
     conf.setFromObject(datanodeConfiguration);
+    ContainerScannerConfiguration scannerConf =
+            conf.getObject(ContainerScannerConfiguration.class);
+    scannerConf.setEnabled(false);
+    conf.setFromObject(scannerConf);
     ReplicationManager.ReplicationManagerConfiguration rmConfig = conf
             .getObject(
                     ReplicationManager.ReplicationManagerConfiguration.class);

@@ -1185,4 +1185,96 @@ public class TestKeyValueContainer {
     verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong()); // this would reserve commit space
     assertTrue(keyValueContainerData.isCommittedSpace());
   }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkContainerHealthyReturnsTrue(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    createContainer();
+
+    // Mark container as UNHEALTHY first
+    keyValueContainer.markContainerUnhealthy();
+    assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        keyValueContainer.getContainerState());
+
+    // markContainerHealthy should return true for RATIS containers
+    boolean result = keyValueContainer.markContainerHealthy();
+    assertTrue(result);
+    assertEquals(ContainerProtos.ContainerDataProto.State.QUASI_CLOSED,
+        keyValueContainer.getContainerState());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkContainerHealthyReturnsFalseWhenNotUnhealthy(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    createContainer();
+
+    // Container is OPEN, not UNHEALTHY
+    assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+        keyValueContainer.getContainerState());
+
+    // markContainerHealthy should return false
+    boolean result = keyValueContainer.markContainerHealthy();
+    assertFalse(result);
+    // State should remain unchanged
+    assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+        keyValueContainer.getContainerState());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkContainerHealthyReturnsFalseWhenClosed(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    createContainer();
+
+    // Mark container as CLOSED
+    keyValueContainerData.setState(
+        ContainerProtos.ContainerDataProto.State.CLOSED);
+    keyValueContainer.update(keyValueContainerData.getMetadata(), true);
+
+    // markContainerHealthy should return false for CLOSED containers
+    boolean result = keyValueContainer.markContainerHealthy();
+    assertFalse(result);
+    assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+        keyValueContainer.getContainerState());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkContainerHealthyWithECContainer(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    // Set replicaIndex > 0 to simulate EC container
+    keyValueContainerData.setReplicaIndex(1);
+    createContainer();
+
+    // Mark as UNHEALTHY
+    keyValueContainer.markContainerUnhealthy();
+    assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        keyValueContainer.getContainerState());
+
+    // EC containers should transition to CLOSED
+    boolean result = keyValueContainer.markContainerHealthy();
+    assertTrue(result);
+    assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+        keyValueContainer.getContainerState());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkContainerHealthyThrowsExceptionForNegativeReplicaIndex(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    // Set invalid replicaIndex
+    keyValueContainerData.setReplicaIndex(-1);
+    createContainer();
+
+    // Mark as UNHEALTHY
+    keyValueContainer.markContainerUnhealthy();
+
+    // Should throw exception for negative replicaIndex
+    StorageContainerException exception = assertThrows(
+        StorageContainerException.class,
+        () -> keyValueContainer.markContainerHealthy());
+    assertTrue(exception.getMessage().contains("Invalid replicaIndex"));
+  }
 }

@@ -37,6 +37,7 @@ Create Container State Rule
 
 Verify Container State with Rule
     [Arguments]          ${expected_state}
+    Remove All Byteman Rules    ${FAULT_INJ_DATANODE}
     ${rule_file} =       Create Container State Rule    ${expected_state}
     Add Byteman Rule     ${FAULT_INJ_DATANODE}    ${rule_file}
     List Byteman Rules   ${FAULT_INJ_DATANODE}
