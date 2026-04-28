@@ -28,13 +28,19 @@ import static org.mockito.Mockito.mockStatic;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -238,6 +244,56 @@ public class TestDirectoryDeletingService {
     } finally {
       ozoneManager.stop();
     }
+  }
+
+  @Test
+  @DisplayName("DirectoryDeletingService uses configured number of worker threads")
+  public void testDirectoryDeletionWorkerPoolUsesConfiguredThreadCount() throws Exception {
+    int threadCount = 10;
+    OzoneConfiguration conf = createConfAndInitValues(threadCount);
+    OmTestManagers omTestManagers = new OmTestManagers(conf);
+    OzoneManager ozoneManager = omTestManagers.getOzoneManager();
+    try {
+      DirectoryDeletingService service =
+          (DirectoryDeletingService) ozoneManager.getKeyManager().getDirDeletingService();
+      ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) getPrivateField(service, "deletionThreadPool");
+
+      assertThat(threadPoolExecutor.getCorePoolSize()).as(
+          "core pool size should match configured directory deletion threads").isEqualTo(threadCount);
+
+      CountDownLatch tasksStarted = new CountDownLatch(threadCount);
+      CountDownLatch releaseTasks = new CountDownLatch(1);
+      Set<String> workerThreads = Collections.synchronizedSet(new HashSet<>());
+      List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+      for (int i = 0; i < threadCount; i++) {
+        futures.add(CompletableFuture.runAsync(() -> {
+          workerThreads.add(Thread.currentThread().getName());
+          tasksStarted.countDown();
+          try {
+            assertTrue(releaseTasks.await(10, TimeUnit.SECONDS));
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for release latch", e);
+          }
+        }, threadPoolExecutor));
+      }
+
+      assertTrue(tasksStarted.await(10, TimeUnit.SECONDS), "Expected all submitted tasks to start");
+      assertThat(workerThreads).as("Expected tasks to run in parallel using configured workers").hasSize(threadCount);
+
+      releaseTasks.countDown();
+      CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(10, TimeUnit.SECONDS);
+    } finally {
+      ozoneManager.stop();
+    }
+  }
+
+  private static Object getPrivateField(Object target, String fieldName)
+      throws NoSuchFieldException, IllegalAccessException {
+    Field field = target.getClass().getDeclaredField(fieldName);
+    field.setAccessible(true);
+    return field.get(target);
   }
 
   @Test
