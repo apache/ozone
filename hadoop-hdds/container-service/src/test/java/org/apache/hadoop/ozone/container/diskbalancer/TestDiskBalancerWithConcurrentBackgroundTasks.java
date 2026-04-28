@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -82,15 +82,9 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * The balancer thread holds a <em>read</em> lock on the old replica while it copies the
  * container and then calls {@link ContainerSet#updateContainer} so the map points at the new
- * replica on another disk. Another thread may already be waiting for a <em>write</em> lock on the
- * old container (say, RM or BlockDeletingTask container delete) or may still be using a queued
- * {@link KeyValueContainerData} from before the swap (block deletion).
- *
- * In this we are testing the scenario if there is stale container references then after acquiring write lock,
- * the delete operation should be aborted and pending delete blocks should not be removed from the new replica.
- *
- * Above scenario is applicable to any rea/write lock contention by other background tasks
- * like RM delete, block deletion, etc. Testing here changes with diskBalancer as parallel run.
+ * replica on another disk. Concurrent delete / block-deletion paths resolve the live
+ * container by id via {@link ContainerSet#acquireContainerLock} and then operate on
+ * that instance (paths/DB match the destination replica) {@link KeyValueContainerData} from before the swap.
  */
 @Timeout(60)
 class TestDiskBalancerWithConcurrentBackgroundTasks {
@@ -230,8 +224,9 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
   }
 
   /**
-   * SCM/RM container try to delete using stale container handle must not
-   * remove the replica that disk balancer already marked as DELETED for old container.
+   * Force-delete with a stale {@link Container} handle still targets the container id; after a
+   * DiskBalancer swap, {@code deleteInternal} locks the live map entry (destination replica) and
+   * applies deletion there — not on the old source object passed in from the RPC.
    */
   @ContainerTestVersionInfo.ContainerTest
   void containerDeleteStaleRefKeepsSwappedReplica(ContainerTestVersionInfo versionInfo)
@@ -270,7 +265,11 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
     assertEquals(coldVolume, currentContainerRef.getContainerData().getVolume(),
         "Replica should already be on the destination volume");
 
-    // Start RM-style delete using the stale Container handle; it blocks on writeLock until readUnlock.
+    String destinationPathBeforeDelete =
+        currentContainerRef.getContainerData().getContainerPath();
+
+    // Start RM-style force delete using the stale Container handle; deleteInternal resolves id 42,
+    // acquires writeLock on the live map entry (destination replica), not on the stale source handle.
     CountDownLatch deleteThreadPastSchedule = new CountDownLatch(1);
     CompletableFuture<Void> deleteDone = CompletableFuture.runAsync(() -> {
       deleteThreadPastSchedule.countDown();
@@ -281,33 +280,21 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
       }
     });
     assertThat(deleteThreadPastSchedule.await(10, TimeUnit.SECONDS)).isTrue();
-    // Give delete time to reach the lock queue while balancer is still paused at the hook.
     Thread.sleep(200);
 
-    // Let balancer readUnlock and finish; delete then runs with stale ref and must no-op safely.
     raceInjector.continueBalancer();
 
     CompletableFuture.allOf(balancerDone, deleteDone).get(60, TimeUnit.SECONDS);
 
-    // Stale RM delete must abort inside deleteInternal before mark/remove/sendICR and delete of stale container ref.
-    GenericTestUtils.waitFor(
-        () -> kvLogs.getOutput().contains("reference is stale")
-            && kvLogs.getOutput().contains("Aborting delete"),
-        100, 10_000);
-    assertThat(kvLogs.getOutput()).as("Stale-abort log should name the container id")
-        .contains(String.valueOf(CONTAINER_ID));
+    assertThat(kvLogs.getOutput()).doesNotContain("reference is stale");
 
-    // Old replica: disk balancer marks it DELETED after the move; RM path must not drive that state.
+    // Old replica: disk balancer marks it DELETED after the move.
     assertEquals(State.DELETED, staleContainerRef.getContainerState());
     assertEquals(hotVolume, staleContainerRef.getContainerData().getVolume());
 
-    // New replica: same Container object as at swap point; still CLOSED; on destination disk.
-    Container<?> after = containerSet.getContainer(CONTAINER_ID);
-    assertNotNull(after);
-    assertSame(currentContainerRef, after);
-    assertEquals(State.CLOSED, after.getContainerState());
-    assertEquals(coldVolume, after.getContainerData().getVolume());
-    assertThat(new File(after.getContainerData().getContainerPath())).exists();
+    // Live map entry was removed by force-delete on the destination replica.
+    assertNull(containerSet.getContainer(CONTAINER_ID));
+    assertThat(new File(destinationPathBeforeDelete)).doesNotExist();
 
     // Disk balancer delayed cleanup removes the old replica from the source path — not RM delete.
     assertThat(new File(oldReplicaPathOnHot)).doesNotExist();
@@ -318,8 +305,9 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
   }
 
   /**
-   * {@link BlockDeletingTask} queued with old {@link KeyValueContainerData} must abort
-   * and leave pending-delete metadata on the destination replica untouched.
+   * BlockDeletingTask queued with stale ref of KeyValueContainerData still resolves
+   * the live replica by id; after {@code acquireContainerLock}, it uses the destination
+   * replica's DB and paths (updated {@code containerData} field).
    */
   @ContainerTestVersionInfo.ContainerTest
   void blockTaskStaleDataKeepsPendingOnDestination(ContainerTestVersionInfo versionInfo)
@@ -363,7 +351,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
     BlockDeletingTask blockDeletingTask =
         new BlockDeletingTask(blockDeletingService, blockInfo, checksumTreeManager, 1);
 
-    // Run block deletion concurrently; it should block on writeLock until balancer releases readLock.
+    // Run block deletion concurrently; acquireContainerLock targets the live map entry on the destination.
     CountDownLatch blockThreadStarted = new CountDownLatch(1);
     CompletableFuture<Void> blockDone = CompletableFuture.runAsync(() -> {
       blockThreadStarted.countDown();
@@ -379,13 +367,12 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
     raceInjector.continueBalancer();
     CompletableFuture.allOf(balancerDone, blockDone).get(60, TimeUnit.SECONDS);
 
-    // Must log abort; must not apply deletes against wrong paths / wrong DB.
-    assertThat(logs.getOutput()).contains("Container 42 reference is stale. Aborting delete.");
+    assertThat(logs.getOutput()).doesNotContain("reference is stale");
 
-    // Pending-delete metadata on the destination replica must be unchanged.
     KeyValueContainerData newContainerData =
         (KeyValueContainerData) containerSet.getContainer(CONTAINER_ID).getContainerData();
-    assertEquals(pendingBefore, readPendingDeleteBlockCount(newContainerData));
+    assertNotNull(newContainerData);
+    assertThat(readPendingDeleteBlockCount(newContainerData)).isLessThanOrEqualTo(pendingBefore);
     assertThat(new File(newContainerData.getChunksPath())).exists();
     // Disk balancer delayed cleanup removes the old replica from the source path — not RM delete.
     assertThat(new File(staleReplicaData.getContainerPath())).doesNotExist();

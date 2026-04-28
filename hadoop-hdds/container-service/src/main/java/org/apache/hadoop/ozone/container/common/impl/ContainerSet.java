@@ -63,6 +63,12 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
 
+  /**
+   * Max attempts to acquire {@link Container#writeLock()} while verifying this set's id → container mapping
+   * is same (e.g. another thread may {@link #updateContainer} / DiskBalancer swap the instance).
+   */
+  private static final int MAX_CONTAINER_MAP_SWAP_RETRIES = 10;
+
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
@@ -277,6 +283,49 @@ public class ContainerSet implements Iterable<Container<?>> {
   public Container<?> getContainer(long containerId) {
     Preconditions.checkState(containerId >= 0, "Container Id cannot be negative.");
     return containerMap.get(containerId);
+  }
+
+  /**
+   * Returns the max retry for a container map swap while acquiring container lock.
+   * @return max retry count
+   */
+  public static int maxContainerMapSwapRetries() {
+    return MAX_CONTAINER_MAP_SWAP_RETRIES;
+  }
+
+  /**
+   * Locks the container mapped to {@code containerId} for write, and verifies that the instance locked is still
+   * the one stored in this set. If the mapping is swapped or the container no longer exists, unlocks and retries up to
+   * {@link #maxContainerMapSwapRetries()} times, then returns {@code null}.
+   *
+   * @return the locked container, or {@code null} if none mapped, or mapping could not be stabilized
+   */
+  @Nullable
+  public Container<?> acquireContainerLock(long containerId) {
+    for (int retry = 0; retry < MAX_CONTAINER_MAP_SWAP_RETRIES; retry++) {
+      Container<?> candidate = getContainer(containerId);
+      if (candidate == null) {
+        LOG.info("Container {} no longer present in ContainerSet, skipping.", containerId);
+        return null;
+      }
+      candidate.writeLock();
+      Container<?> current = getContainer(containerId);
+      if (current == null) {
+        candidate.writeUnlock();
+        LOG.info("Container {} no longer exists in ContainerSet while acquiring lock.", containerId);
+        return null;
+      }
+      if (current != candidate) {
+        candidate.writeUnlock();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Container {} mapping changed during lock acquisition (attempt {}); retrying.",
+              containerId, retry);
+        }
+        continue;
+      }
+      return candidate;
+    }
+    return null;
   }
 
   /**

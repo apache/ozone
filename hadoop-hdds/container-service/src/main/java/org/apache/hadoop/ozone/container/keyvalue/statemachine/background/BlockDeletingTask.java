@@ -68,7 +68,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
   private final BlockDeletingServiceMetrics metrics;
   private final int priority;
-  private final KeyValueContainerData containerData;
+  private KeyValueContainerData containerData;
   private long blocksToDelete;
   private final OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
@@ -141,19 +141,17 @@ public class BlockDeletingTask implements BackgroundTask {
   private ContainerBackgroundTaskResult handleDeleteTask() throws Exception {
     ContainerBackgroundTaskResult crr;
     ContainerSet cs = ozoneContainer.getContainerSet();
-    final Container container = cs.getContainer(containerData.getContainerID());
+    final long containerId = containerData.getContainerID();
+
+    Container<?> container = cs.acquireContainerLock(containerId);
     if (container == null) {
+      LOG.warn("Exceeded {} attempts locking live container {}; giving up.", ContainerSet.maxContainerMapSwapRetries(),
+          containerId);
       return new ContainerBackgroundTaskResult();
     }
-    container.writeLock();
     try {
-      // Re-fetch AFTER lock to verify the container is not having stale references while waiting for lock.
-      Container<?> current = cs.getContainer(containerData.getContainerID());
-      if (current == null || current.getContainerData() != containerData) {
-        LOG.warn("Container {} reference is stale. Aborting delete. SCM will retry with" +
-            " the current replica.", containerData.getContainerID());
-        return new ContainerBackgroundTaskResult();
-      }
+      // Always use ContainerData from the locked live Container so paths / RocksDB locations match deleteViaSchema*.
+      containerData = (KeyValueContainerData) container.getContainerData();
 
       File dataDir = new File(containerData.getChunksPath());
       long startTime = Time.monotonicNow();
