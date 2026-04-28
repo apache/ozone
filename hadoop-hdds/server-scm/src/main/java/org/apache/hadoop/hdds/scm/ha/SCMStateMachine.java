@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -78,6 +79,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   private StorageContainerManager scm;
   private Map<RequestType, Object> handlers;
+  private Map<RequestType, ScmInvoker<?>> invokers;
   private SCMHADBTransactionBuffer transactionBuffer;
   private final SCMMetrics metrics;
   private final SimpleStateMachineStorage storage =
@@ -95,6 +97,7 @@ public class SCMStateMachine extends BaseStateMachine {
       SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
     this.handlers = new EnumMap<>(RequestType.class);
+    this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     this.metrics = scm.getMetrics();
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
@@ -125,6 +128,11 @@ public class SCMStateMachine extends BaseStateMachine {
     if (metrics != null) {
       metrics.addRatisEvent(message);
     }
+  }
+
+  public void registerInvoker(RequestType type,
+      ScmInvoker<?> invoker) {
+    invokers.put(type, invoker);
   }
 
   @Override
@@ -189,6 +197,10 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   private Message process(final SCMRatisRequest request) throws Exception {
+    final ScmInvoker<?> invoker = invokers.get(request.getType());
+    if (invoker != null) {
+      return invoker.invokeLocal(request.getOperation(), request.getArguments());
+    }
     return process(request, handlers.get(request.getType()));
   }
 

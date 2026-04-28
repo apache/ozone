@@ -31,11 +31,13 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import picocli.CommandLine;
 
 /**
@@ -82,6 +84,12 @@ public class SnapshotDiffHandler extends Handler {
       defaultValue = "false")
   private boolean cancel;
 
+  @CommandLine.Option(names = {"-r", "--get-report"},
+      description = "Get the snapshot diff report if available; " +
+          "does not submit a diff job if there is no job in progress.",
+      defaultValue = "false")
+  private boolean getReport;
+
   @CommandLine.Option(names = {"--dnld", "--disable-native-libs-diff"},
       description = "perform diff of snapshot without using" +
           " native libs (optional)",
@@ -109,15 +117,44 @@ public class SnapshotDiffHandler extends Handler {
 
     if (cancel) {
       cancelSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
-    } else {
+    } else if (getReport) {
       getSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+    } else {
+      submitSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+    }
+  }
+
+  private void submitSnapshotDiff(ObjectStore store, String volumeName,
+                               String bucketName) throws IOException {
+    SubmitSnapshotDiffResponse response;
+    try {
+      response = store.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+          forceFullDiff, diffDisableNativeLibs);
+    } catch (OMException ex) {
+      // submit snapshot diff falls back to legacy snapshotDiff is server does not support it.
+      if (ex.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+        SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+            token, pageSize, forceFullDiff, diffDisableNativeLibs);
+        try (PrintWriter writer = out()) {
+          if (json) {
+            writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
+          } else {
+            writer.println(diffResponse);
+          }
+        }
+        return;
+      }
+      throw ex;
+    }
+    try (PrintWriter writer = out()) {
+      writer.println(response);
     }
   }
 
   private void getSnapshotDiff(ObjectStore store, String volumeName,
                                String bucketName) throws IOException {
     SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff, diffDisableNativeLibs);
+        token, pageSize);
     try (PrintWriter writer = out()) {
       if (json) {
         writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));

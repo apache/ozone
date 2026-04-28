@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.slf4j.Logger;
@@ -75,12 +76,17 @@ public final class DiskBalancerYaml {
         throw new IOException("Unable to parse yaml file.", e);
       }
 
+      // getContainerStates() may be null if the key is absent; isNotBlank(null) is false.
+      String cs = diskBalancerInfoYaml.getContainerStates();
+      String containerStates = StringUtils.isNotBlank(cs)
+          ? cs.trim() : DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES;
       diskBalancerInfo = new DiskBalancerInfo(
           diskBalancerInfoYaml.operationalState,
           diskBalancerInfoYaml.getThreshold(),
           diskBalancerInfoYaml.getBandwidthInMB(),
           diskBalancerInfoYaml.getParallelThread(),
           diskBalancerInfoYaml.isStopAfterDiskEven(),
+          containerStates,
           DiskBalancerVersion.getDiskBalancerVersion(
               diskBalancerInfoYaml.version));
     }
@@ -97,6 +103,7 @@ public final class DiskBalancerYaml {
     private long bandwidthInMB;
     private int parallelThread;
     private boolean stopAfterDiskEven;
+    private String containerStates;
 
     private int version;
 
@@ -105,12 +112,14 @@ public final class DiskBalancerYaml {
     }
 
     private DiskBalancerInfoYaml(DiskBalancerRunningStatus operationalState, double threshold,
-        long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, int version) {
+        long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, String containerStates,
+        int version) {
       this.operationalState = operationalState;
       this.threshold = threshold;
       this.bandwidthInMB = bandwidthInMB;
       this.parallelThread = parallelThread;
       this.stopAfterDiskEven = stopAfterDiskEven;
+      this.containerStates = containerStates;
       this.version = version;
     }
 
@@ -161,6 +170,14 @@ public final class DiskBalancerYaml {
     public int getVersion() {
       return this.version;
     }
+
+    public String getContainerStates() {
+      return containerStates;
+    }
+
+    public void setContainerStates(String containerStates) {
+      this.containerStates = containerStates;
+    }
   }
 
   private static DiskBalancerInfoYaml getDiskBalancerInfoYaml(
@@ -172,6 +189,7 @@ public final class DiskBalancerYaml {
         diskBalancerInfo.getBandwidthInMB(),
         diskBalancerInfo.getParallelThread(),
         diskBalancerInfo.isStopAfterDiskEven(),
+        diskBalancerInfo.getContainerStates(),
         diskBalancerInfo.getVersion().getVersion());
   }
 }

@@ -21,9 +21,7 @@ import java.util.Arrays;
 import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -45,9 +43,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
             S3SecretConfigKeys.class,
-            SCMHTTPServerConfig.class,
-            SCMHTTPServerConfig.ConfigStrings.class,
-            ScmConfig.ConfigStrings.class
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;

@@ -50,9 +50,11 @@ import org.apache.hadoop.ozone.ClientVersion;
 public class MockPipelineManager implements PipelineManager {
 
   private final PipelineStateManager stateManager;
+  private final NodeManager nodeManager;
 
   public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager, NodeManager nodeManager)
       throws RocksDatabaseException, CodecException, DuplicatedPipelineIdException {
+    this.nodeManager = nodeManager;
     stateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(nodeManager)
         .setRatisServer(scmhaManager.getRatisServer())
@@ -332,8 +334,15 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
+  public boolean hasEnoughSpace(Pipeline pipeline) {
     return false;
+  }
+
+  @Override
+  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
+    }
   }
 
   @Override

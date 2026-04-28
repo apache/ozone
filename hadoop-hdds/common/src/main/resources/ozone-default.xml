@@ -801,16 +801,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
-    <value>8</value>
-    <tag>OZONE, SCM</tag>
-    <description>
-      Factor with which number of delete blocks sent to each datanode in every interval.
-      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
-      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
-    </description>
-  </property>
-  <property>
     <name>ozone.scm.block.size</name>
     <value>256MB</value>
     <tag>OZONE, SCM</tag>
@@ -1823,37 +1813,6 @@
   </property>
 
   <property>
-    <name>hdds.scm.kerberos.keytab.file</name>
-    <value>/etc/security/keytabs/SCM.keytab</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description> The keytab file used by SCM daemon to login as its service principal.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.kerberos.principal</name>
-    <value>SCM/_HOST@REALM</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>The SCM service principal. e.g. scm/_HOST@REALM.COM</description>
-  </property>
-  <property>
-    <name>hdds.scm.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@REALM</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>
-      SCM http server service principal if SPNEGO is enabled for SCM http server.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.http.auth.kerberos.keytab</name>
-    <value>/etc/security/keytabs/HTTP.keytab</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>
-      The keytab file used by SCM http server to login as its service
-      principal if SPNEGO is enabled for SCM http server.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.s3.administrators</name>
     <value/>
     <tag>OZONE, SECURITY</tag>
@@ -2586,6 +2545,24 @@
     <value>false</value>
     <tag>OZONE, HDDS, SECURITY, TLS</tag>
     <description>If HDDS GRPC server TLS is enabled.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.protocols</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS protocol versions for gRPC
+      server endpoints (e.g. "TLSv1.3" or "TLSv1.2,TLSv1.3"). When empty,
+      the TLS provider's defaults are used. Applies to server endpoints
+      only; clients are not restricted.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.ciphers</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS cipher suites for gRPC server
+      endpoints (e.g. "TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256").
+      When empty, the TLS provider's defaults are used. Applies to server
+      endpoints only; clients are not restricted.</description>
   </property>
   <property>
     <name>hdds.x509.default.duration</name>
@@ -3748,6 +3725,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.ssl.enabled.protocols</name>
+    <tag>OZONE,SECURITY,CRYPTO_COMPLIANCE</tag>
+    <value/>
+    <description>
+      The supported SSL protocols used to restrict connections towards the WebUI of different components,
+      and the S3 GateWay.
+    </description>
+  </property>
+  <property>
     <name>ssl.server.keystore.location</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value/>
@@ -4226,7 +4212,7 @@
     <value>60000</value>
     <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
     <description>
-      OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
+      Ozone HTTP server connection timeout in milliseconds.
     </description>
   </property>
 
@@ -4287,18 +4273,6 @@
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.client.max.ec.stripe.write.retries</name>
-    <value>10</value>
-    <tag>CLIENT</tag>
-    <description>
-      When EC stripe write failed, client will request to allocate new block group and write the failed stripe into new
-      block group. If the same stripe failure continued in newly acquired block group also, then it will retry by
-      requesting to allocate new block group again. This configuration is used to limit these number of retries. By
-      default the number of retries are 10.
     </description>
   </property>
 
@@ -4382,18 +4356,6 @@
   </property>
 
   <property>
-    <name>ozone.client.fs.default.bucket.layout</name>
-    <value>FILE_SYSTEM_OPTIMIZED</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      Default bucket layout value used when buckets are created using OFS.
-      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
-      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
-      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
-      will create intermediate directories.
-    </description>
-  </property>
-    <property>
     <name>ozone.om.namespace.s3.strict</name>
     <value>true</value>
     <tag>OZONE, OM</tag>
