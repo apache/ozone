@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProt
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.Span;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -225,19 +226,19 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         wrappedResponse.getAllocateScmBlockResponse();
 
     List<AllocatedBlock> blocks = new ArrayList<>(response.getBlocksCount());
+    Span traceSpan = TracingUtil.getActiveSpan();
+    int blockIndex = 0;
     for (AllocateBlockResponse resp : response.getBlocksList()) {
+      if (traceSpan.isRecording()) {
+        traceSpan.setAttribute("blockAllocated" + blockIndex,
+            resp.getContainerBlockID().toString());
+      }
+      blockIndex++;
       AllocatedBlock.Builder builder = new AllocatedBlock.Builder()
           .setContainerBlockID(
               ContainerBlockID.getFromProtobuf(resp.getContainerBlockID()))
           .setPipeline(Pipeline.getFromProtobuf(resp.getPipeline()));
       blocks.add(builder.build());
-    }
-
-    if (!blocks.isEmpty()) {
-      String blockIds = blocks.stream()
-          .map(b -> b.getBlockID().toString())
-          .collect(Collectors.joining(", "));
-      TracingUtil.getActiveSpan().addEvent("SCM allocated block(s): " + blockIds);
     }
 
     return blocks;
