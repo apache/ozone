@@ -239,8 +239,13 @@ public final class ContainerStateManagerImpl
         final ContainerInfo container = iterator.next();
         Objects.requireNonNull(container, "container == null");
         containers.addContainer(container);
-        if (container.getState() == LifeCycleState.OPEN
-            && container.getPipelineID() != null) {
+        if (container.getState() == LifeCycleState.OPEN) {
+          if (container.getPipelineID() == null) {
+            LOG.warn("Found container {} which is in OPEN state without a "
+                + "pipeline ID. Skipping pipeline registration during SCM "
+                + "start.", container);
+            continue;
+          }
           try {
             pipelineManager.addContainerToPipelineSCMStart(
                 container.getPipelineID(), container.containerID());
@@ -344,9 +349,16 @@ public final class ContainerStateManagerImpl
           } else if (containerInfo.getState().
               equals(LifeCycleState.OPEN)) {
             if (pipelineID != null) {
-              // OPEN containers normally require a live pipeline reference.
+              // The container names a pipeline, but that pipeline is not in
+              // the pipeline manager. Preserve the existing failure path for
+              // this inconsistent OPEN container state.
               throw new PipelineNotFoundException();
             }
+            // There is no pipeline ID to look up or register. This can happen
+            // on Recon sync paths when SCM returns an OPEN container after its
+            // pipeline metadata has already been cleaned up. Keep the
+            // container record so Recon does not miss it permanently, but skip
+            // pipeline tracking until later reports/syncs advance the state.
             LOG.warn("Adding OPEN container {} without pipeline tracking "
                     + "because its pipeline ID is null.", containerID);
           }

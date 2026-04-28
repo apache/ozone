@@ -415,21 +415,13 @@ public class SCMClientProtocolServer implements
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
       } catch (IOException ex) {
-        // Pipeline lookup failed (e.g., QUASI_CLOSED container whose pipeline
-        // has already been cleaned up). Return the container metadata without a
-        // pipeline so that callers (e.g., Recon's sync) can still record the
-        // container rather than losing it silently.
-        LOG.warn("Pipeline lookup failed for container {}; returning container "
-            + "without pipeline. Cause: {}", containerID, ex.getMessage());
-        try {
-          ContainerInfo info = scm.getContainerManager()
-              .getContainer(ContainerID.valueOf(containerID));
-          cpList.add(new ContainerWithPipeline(info, null));
-        } catch (ContainerNotFoundException notFound) {
-          // Container truly does not exist in SCM — exclude it from the result.
-          LOG.error("Container {} not found in SCM and will not be returned "
-              + "to caller.", containerID, notFound);
-        }
+        // ContainerWithPipeline.pipeline is required in the protobuf response,
+        // so this RPC cannot return container metadata with a null pipeline.
+        // Keep the "exist" semantics by excluding only this container from the
+        // batch result instead of failing the entire request.
+        LOG.warn("Container {} exists but its pipeline could not be resolved; "
+            + "excluding it from getExistContainerWithPipelinesInBatch result. "
+            + "Cause: {}", containerID, ex.getMessage());
       }
     }
     return cpList;
