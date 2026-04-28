@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -73,7 +74,7 @@ class TestLocalOzoneCluster {
     OzoneConfiguration baseConf = cluster.prepareBaseConfiguration();
 
     String metadataDir = baseConf.get(OZONE_METADATA_DIRS);
-    assertTrue(Files.exists(Path.of(metadataDir)),
+    assertTrue(Files.exists(Paths.get(metadataDir)),
         "Metadata directory should be created");
     assertTrue(metadataDir.contains("metadata"),
         "Metadata dir path should contain 'metadata'");
