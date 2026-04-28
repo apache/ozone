@@ -534,7 +534,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     return this.tmpDir;
   }
 
-  @VisibleForTesting
   public File getDiskCheckDir() {
     return this.diskCheckDir;
   }

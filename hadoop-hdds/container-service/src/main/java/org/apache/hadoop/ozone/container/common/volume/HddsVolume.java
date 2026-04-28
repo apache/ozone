@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -310,9 +311,10 @@ public class HddsVolume extends StorageVolume {
       return VolumeCheckResult.HEALTHY;
     }
 
+    File secondaryDir = getDiskCheckDir();
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedRocksDB ignored =
-             ManagedRocksDB.openAsSecondary(managedOptions, dbFile.toString(), getTmpDir().getPath())) {
+             ManagedRocksDB.openAsSecondary(managedOptions, dbFile.toString(), secondaryDir.getPath())) {
       // Do nothing. Only check if rocksdb is accessible.
       LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}.", dbFile, getStorageDir());
     } catch (Exception e) {
@@ -322,6 +324,12 @@ public class HddsVolume extends StorageVolume {
 
       LOG.error("Could not open Volume DB located at {}", dbFile, e);
       getIoTestSlidingWindow().add();
+    } finally {
+      // RocksDB writes its info LOG into the secondary path on every open and
+      // rotates the prior one to LOG.old.<ts>. They are never referenced again
+      // after the secondary closes, so reap them here to keep the disk-check
+      // dir clean across periodic checks.
+      deleteSecondaryInstanceLogs(secondaryDir);
     }
 
 
@@ -336,6 +344,20 @@ public class HddsVolume extends StorageVolume {
             "encountered {} out of {} tolerated failures",
         dbFile, this, getIoTestSlidingWindow().getNumEventsInWindow(), getIoTestSlidingWindow().getWindowSize());
     return VolumeCheckResult.HEALTHY;
+  }
+
+  private void deleteSecondaryInstanceLogs(File secondaryDir) {
+    File[] logs = secondaryDir.listFiles((dir, name) -> "LOG".equals(name) || name.startsWith("LOG.old."));
+    if (logs == null) {
+      return;
+    }
+    for (File log : logs) {
+      try {
+        Files.deleteIfExists(log.toPath());
+      } catch (IOException e) {
+        LOG.warn("Failed to delete RocksDB secondary instance info log {}", log, e);
+      }
+    }
   }
 
   void checkVolumeUsages() {
