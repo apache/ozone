@@ -36,13 +36,11 @@ Downgrade to a lower version is allowed from the pre-finalized state. This invol
     org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature
 Class to add  a new layout feature being brought in. Layout version is typically 1 + last layout feature in that catalog. 
 
-## LayoutVersionManager
-    org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager
-    org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager
-Every component carries an instance of this interface, which provides APIs to get runtime layout version, and if a feature is allowed based on that or not.
+## Version management (OM vs HDDS)
 
-The LayoutVersionManager interface carries an API that can be used to check if a feature is allowed in the current layout version.
-     org.apache.hadoop.ozone.upgrade.LayoutVersionManager#isAllowed(org.apache.hadoop.ozone.upgrade.LayoutFeature)
+**Ozone Manager** uses [`org.apache.hadoop.ozone.om.upgrade.OMVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/upgrade/OMVersionManager.java) ([`org.apache.hadoop.ozone.upgrade.ComponentVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/framework/src/main/java/org/apache/hadoop/ozone/upgrade/ComponentVersionManager.java)), with upgrade actions discovered via [`org.apache.hadoop.ozone.om.upgrade.OMUpgradeActionProvider`](https://github.com/apache/ozone/blob/master/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/upgrade/OMUpgradeActionProvider.java). It exposes apparent/software `ComponentVersion` and `isAllowed(ComponentVersion)` for gating.
+
+**SCM / DataNode** continue to use [`org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/framework/src/main/java/org/apache/hadoop/hdds/upgrade/HDDSLayoutVersionManager.java) ([`org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/framework/src/main/java/org/apache/hadoop/ozone/upgrade/AbstractLayoutVersionManager.java)), which provides metadata/software layout integers and `isAllowed(LayoutFeature)`.
 
 ## @DisallowedUntilLayoutVersion Annotation
 Method level annotation used to "disallow" an API if current layout version does not include the associated layout feature. Currently it is added only to the OM module, but can easily be moved down to a common module based on need on the HDDS layer.

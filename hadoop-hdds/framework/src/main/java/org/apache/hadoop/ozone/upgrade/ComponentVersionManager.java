@@ -17,11 +17,15 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.APPARENT_VERSION_UPDATE_FAILED;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.common.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,21 +55,15 @@ public abstract class ComponentVersionManager implements Closeable {
   // Software version will never change.
   private final ComponentVersion softwareVersion;
   private final ComponentVersionManagerMetrics metrics;
+  private final Storage storage;
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ComponentVersionManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ComponentVersionManager.class);
 
-  protected ComponentVersionManager(ComponentVersion apparentVersion, ComponentVersion softwareVersion)
-      throws IOException {
+  protected ComponentVersionManager(Storage storage, ComponentVersion apparentVersion,
+      ComponentVersion softwareVersion) {
+    this.storage = storage;
     this.apparentVersion = apparentVersion;
     this.softwareVersion = softwareVersion;
-
-    if (!apparentVersion.isSupportedBy(softwareVersion)) {
-      throw new IOException(
-          "Cannot initialize ComponentVersionManager. Apparent version "
-              + apparentVersion + " is larger than software version "
-              + softwareVersion);
-    }
 
     LOG.info("Initializing version manager with apparent version {} and software version {}",
         apparentVersion, softwareVersion);
@@ -89,10 +87,29 @@ public abstract class ComponentVersionManager implements Closeable {
   }
 
   /**
+   * Test-only accessor for the {@link Storage} instance supplied to the constructor.
+   */
+  @VisibleForTesting
+  protected Storage getStorageForTesting() {
+    return storage;
+  }
+
+  public void finalizeUpgrade() throws UpgradeException {
+    for (ComponentVersion version : getUnfinalizedVersions()) {
+      validateForFinalization(version);
+      runUpgradeAction(version);
+      persistApparentVersion(version);
+
+      LOG.info("Version {} has been finalized.", version);
+    }
+    LOG.info("Finalization is complete.");
+  }
+
+  /**
    * @return An Iterable of all versions after the current apparent version which still need to be finalized. If this
    *    component is already finalized, the Iterable will be empty.
    */
-  public Iterable<ComponentVersion> getUnfinalizedVersions() {
+  private Iterable<ComponentVersion> getUnfinalizedVersions() {
     return () -> new Iterator<ComponentVersion>() {
       private ComponentVersion currentVersion = apparentVersion;
 
@@ -118,7 +135,7 @@ public abstract class ComponentVersionManager implements Closeable {
    *
    * @param newApparentVersion The version to mark as finalized.
    */
-  public void markFinalized(ComponentVersion newApparentVersion) {
+  private void validateForFinalization(ComponentVersion newApparentVersion) {
     String versionMsg = "Software version: " + softwareVersion
         + ", apparent version: " + apparentVersion
         + ", provided version: " + newApparentVersion
@@ -131,18 +148,33 @@ public abstract class ComponentVersionManager implements Closeable {
       ComponentVersion nextVersion = apparentVersion.nextVersion();
       if (nextVersion == null) {
         throw new IllegalArgumentException("Attempt to finalize when no future versions exist." + versionMsg);
-      } else if (nextVersion.equals(newApparentVersion)) {
-        apparentVersion = newApparentVersion;
-        LOG.info("Version {} has been finalized.", apparentVersion);
-        if (!needsFinalization()) {
-          LOG.info("Finalization is complete.");
-        }
-      } else {
+      } else if (newApparentVersion != nextVersion) {
         throw new IllegalArgumentException(
-            "Finalize attempt on a version that is newer than the next feature to be finalized. " + versionMsg);
+            "Finalize attempt on a version that is not the next feature to be finalized. " + versionMsg);
       }
     }
   }
+
+  private void persistApparentVersion(ComponentVersion version) throws UpgradeException {
+    int prevVersion = storage.getApparentVersion();
+
+    storage.setApparentVersion(version.serialize());
+    try {
+      storage.persistCurrentState();
+    } catch (IOException e) {
+      storage.setApparentVersion(prevVersion);
+      logAndThrow(e, "Updating version in the VERSION file from " + prevVersion + " to " + version +
+          " failed.", APPARENT_VERSION_UPDATE_FAILED);
+    }
+    apparentVersion = version;
+  }
+
+  protected void logAndThrow(Exception e, String msg, UpgradeException.ResultCodes resultCode) throws UpgradeException {
+    LOG.error(msg, e);
+    throw new UpgradeException(msg, e, resultCode);
+  }
+
+  protected abstract void runUpgradeAction(ComponentVersion componentVersion) throws UpgradeException;
 
   @Override
   public void close() {

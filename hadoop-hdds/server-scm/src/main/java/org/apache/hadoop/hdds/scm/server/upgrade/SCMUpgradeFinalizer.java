@@ -18,12 +18,8 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
@@ -70,7 +66,7 @@ public class SCMUpgradeFinalizer extends
         LOG.info("No layout features to finalize.");
       }
     } catch (IOException ex) {
-      throw new UpgradeException(ex, UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+      throw new UpgradeException(ex, UpgradeException.ResultCodes.UPGRADE_FINALIZATION_FAILED);
     }
   }
 
@@ -121,46 +117,13 @@ public class SCMUpgradeFinalizer extends
       // SCM is no longer the leader by throwing NotLeaderException.
       context.getSCMContext().getTermOfLeader();
 
-      allDatanodesFinalized = true;
-      int totalHealthyNodes = 0;
-      int finalizedNodes = 0;
-      int unfinalizedNodes = 0;
-
-      for (DatanodeDetails dn : nodeManager.getAllNodes()) {
-        try {
-          // Only check HEALTHY nodes. STALE/DEAD nodes will be told to
-          // finalize when they recover.
-          if (nodeManager.getNodeStatus(dn).isHealthy()) {
-            totalHealthyNodes++;
-            DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(dn);
-            if (datanodeInfo == null) {
-              LOG.warn("Could not get DatanodeInfo for {}, skipping in " +
-                  "finalization wait.", dn.getHostName());
-              continue;
-            }
-
-            LayoutVersionProto dnLayout = datanodeInfo.getLastKnownLayoutVersion();
-            int dnMlv = dnLayout.getMetadataLayoutVersion();
-            int dnSlv = dnLayout.getSoftwareLayoutVersion();
-
-            if (dnMlv < dnSlv) {
-              // Datanode has not yet finalized
-              allDatanodesFinalized = false;
-              unfinalizedNodes++;
-              LOG.debug("Datanode {} has not yet finalized: MLV={}, SLV={}",
-                  dn.getHostName(), dnMlv, dnSlv);
-            } else {
-              finalizedNodes++;
-            }
-          }
-        } catch (NodeNotFoundException e) {
-          // Node was removed while we were iterating. This is OK, skip it.
-          LOG.debug("Node {} not found while waiting for finalization, " +
-              "skipping.", dn);
-        }
-      }
+      NodeManager.DatanodeFinalizationCounts datanodeFinalizationCounts = nodeManager.getDatanodeFinalizationCounts();
+      int finalizedNodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
+      int totalHealthyNodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
+      allDatanodesFinalized = datanodeFinalizationCounts.allNodesFinalized();
 
       if (!allDatanodesFinalized) {
+        int unfinalizedNodes = totalHealthyNodes - finalizedNodes;
         LOG.info("Waiting for datanodes to finalize. Status: {}/{} healthy " +
                 "datanodes have finalized ({} remaining).",
             finalizedNodes, totalHealthyNodes, unfinalizedNodes);

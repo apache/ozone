@@ -27,6 +27,7 @@ set -u
 : "${OZONE_UPGRADE_TO}"
 : "${TEST_DIR}"
 : "${SCM}"
+: "${CLIENT}"
 : "${OZONE_CURRENT_VERSION}"
 set +u
 
@@ -43,17 +44,6 @@ rolling_restart_service() {
 
   # Stop service
   stop_containers "${SERVICE}"
-
-  # Check if this SCM container is running, as during a rolling upgrade it does stop-start one-by-one and
-  # we want to run write/read tests while one service is unavailable. Choose SCM (the container where the generate and
-  # validate robot tests are running) considering availability.
-  if [[ "$(docker inspect -f '{{.State.Running}}' "ha-${SCM}-1" 2>/dev/null)" != "true" ]]; then
-    local fallback_scm
-    fallback_scm="$(docker-compose --project-directory="$TEST_DIR/compose/ha" config --services | grep scm | grep -v "^${SCM}$" | head -n1)"
-    if [[ -n "$fallback_scm" ]]; then
-      export SCM="$fallback_scm"
-    fi
-  fi
 
   callback before_service_restart
 
@@ -139,9 +129,17 @@ callback with_old_version_downgraded
 echo "--- ROLLING UPGRADE TO $OZONE_UPGRADE_TO ---"
 rolling_restart_all_services "4-upgrade" "$OZONE_UPGRADE_TO"
 
+# Upgrade client after all server components are upgraded but before finalization,
+# so new client APIs can be exercised against pre-finalized servers.
+echo "--- UPGRADING CLIENT TO $OZONE_UPGRADE_TO ---"
+OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-client"
+stop_containers "$CLIENT"
+prepare_for_image "${OZONE_UPGRADE_TO}"
+create_containers "$CLIENT"
+
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-5-finalized"
 
 # Sends commands to finalize OM and SCM.
-execute_robot_test "$SCM" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot
+execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-finalize" upgrade/finalize.robot
 callback with_this_version_finalized

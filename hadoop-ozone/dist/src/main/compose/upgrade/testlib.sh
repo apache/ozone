@@ -117,16 +117,18 @@ run_test() {
 
 ## @description Generates data on the cluster.
 ## @param The prefix to use for data generated.
-## @param All parameters after the first one are passed directly to the robot command,
+## @param The container to run the robot test in.
+## @param All remaining parameters are passed directly to the robot command,
 ##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
 generate() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-generate-${1}" -v PREFIX:"$1" ${@:2} upgrade/generate.robot
+  execute_robot_test "${2}" -N "${OUTPUT_NAME}-generate-${1}" -v PREFIX:"$1" ${@:3} upgrade/generate.robot
 }
 
 ## @description Validates that data exists on the cluster.
 ## @param The prefix of the data to be validated.
-## @param All parameters after the first one are passed directly to the robot command,
+## @param The container to run the robot test in.
+## @param All remaining parameters are passed directly to the robot command,
 ##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
 validate() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-validate-${1}" -v PREFIX:"$1" ${@:2} upgrade/validate.robot
+  execute_robot_test "${2}" -N "${OUTPUT_NAME}-validate-${1}" -v PREFIX:"$1" ${@:3} upgrade/validate.robot
 }

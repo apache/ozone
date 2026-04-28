@@ -168,7 +168,7 @@ public class DatanodeStateMachine implements Closeable {
         datanodeDetails.getUuidString());
 
     layoutVersionManager = new HDDSLayoutVersionManager(
-        layoutStorage.getLayoutVersion());
+        layoutStorage.getApparentVersion());
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager);
     VersionedDatanodeFeatures.initialize(layoutVersionManager);
 

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.upgrade;
 
+import static org.apache.hadoop.hdds.HDDSVersion.SOFTWARE_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_HA;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,61 +34,61 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Tests that SCM will throw an exception on creation when it reads in a
- * VERSION file indicating a metadata layout version larger than its
- * software layout version.
+ * Ensures SCM does not start when the VERSION file records an apparent version (still persisted as the layout-version
+ * integer) that is not supported by the layout version manager for this build
+ * ({@link HDDSLayoutVersionManager} / {@link HDDSLayoutFeature}).
  */
-public class TestScmStartupSlvLessThanMlv {
+public class TestScmStartupInvalidApparentVersion {
+
+  @TempDir
+  private Path folder;
 
   @Test
-  public void testStartupSlvLessThanMlv(@TempDir Path tempDir)
+  public void testStartupFailsWhenApparentVersionBetweenLastLayoutFeatureAndZdu() throws Exception {
+    assertStartupFailsWithComponentVersionMessage(
+        HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion() + 1);
+  }
+
+  @Test
+  public void testStartupFailsWhenApparentVersionBeyondLastKnownComponentVersion() throws Exception {
+    assertStartupFailsWithComponentVersionMessage(SOFTWARE_VERSION.serialize() + 1);
+  }
+
+  private void assertStartupFailsWithComponentVersionMessage(int serializedApparentVersion)
       throws Exception {
-    // Add subdirectories under the temporary folder where the version file
-    // will be placed.
-    File scmSubdir = tempDir.resolve("scm").resolve("current").toFile();
+    File scmSubdir = folder.resolve("scm").resolve("current").toFile();
     assertTrue(scmSubdir.mkdirs());
 
-    // Create Ratis directories to simulate a realistic downgrade scenario
-    // where SCM was previously running with a newer version
-    File ratisDir = tempDir.resolve("scm.ratis").toFile();
-    File snapshotDir = tempDir.resolve("scm.ratis.snapshot").toFile();
+    File ratisDir = folder.resolve("scm.ratis").toFile();
+    File snapshotDir = folder.resolve("scm.ratis.snapshot").toFile();
     assertTrue(ratisDir.mkdirs());
     assertTrue(snapshotDir.mkdirs());
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
-        tempDir.toAbsolutePath().toString());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempDir.toAbsolutePath().toString());
+    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, folder.toAbsolutePath().toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toAbsolutePath().toString());
 
-    // Set metadata layout version larger then software layout version.
-    int largestSlv = 0;
-    for (LayoutFeature f: HDDSLayoutFeature.values()) {
-      largestSlv = Math.max(largestSlv, f.layoutVersion());
-    }
-    int mlv = largestSlv + 1;
+    int softwareLayoutVersion = HDDSLayoutVersionManager.maxLayoutVersion();
 
     Properties properties = new Properties();
     properties.setProperty(SCM_ID, "scm");
     properties.setProperty(SCM_HA, "true");
 
-    // Create version file with MLV > SLV, which should fail the SCM
-    // construction.
-    UpgradeTestUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, mlv,
-        properties);
+    UpgradeTestUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, serializedApparentVersion, properties);
 
+    // TODO update this message when SCM migrated to using HDDSVersionManager.
+    String expectedMessage = String.format(
+        "Cannot initialize VersionManager. Metadata layout version (%s) > software layout version (%s)",
+        serializedApparentVersion, softwareLayoutVersion);
 
-    Throwable t = assertThrows(IOException.class,
-        () -> new StorageContainerManager(conf));
-    String expectedMessage = String.format("Cannot initialize VersionManager." +
-            " Metadata layout version (%s) > software layout version (%s)",
-        mlv, largestSlv);
-    assertEquals(expectedMessage, t.getMessage());
+    IOException ioException =
+        assertThrows(IOException.class, () -> new StorageContainerManager(conf));
+    assertEquals(expectedMessage, ioException.getMessage());
   }
 }

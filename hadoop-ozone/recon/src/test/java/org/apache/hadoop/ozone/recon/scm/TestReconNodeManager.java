@@ -82,7 +82,7 @@ public class TestReconNodeManager {
     ReconUtils reconUtils = new ReconUtils();
     ReconStorageConfig reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
     versionManager = new HDDSLayoutVersionManager(
-        reconStorageConfig.getLayoutVersion());
+        reconStorageConfig.getApparentVersion());
     store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
     reconContext = new ReconContext(conf, reconUtils);
   }

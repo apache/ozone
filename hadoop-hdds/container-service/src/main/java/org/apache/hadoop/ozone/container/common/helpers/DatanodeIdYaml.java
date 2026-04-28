@@ -261,7 +261,7 @@ public final class DatanodeIdYaml {
           HDDSLayoutFeature layoutFeature
               = f.getAnnotation(BelongsToHDDSLayoutVersion.class).value();
           if (layoutFeature.layoutVersion() >
-              datanodeLayoutStorage.getLayoutVersion()) {
+              datanodeLayoutStorage.getApparentVersion()) {
             continue;
           }
         }

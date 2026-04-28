@@ -445,7 +445,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
         UUID.randomUUID().toString());
 
     HDDSLayoutVersionManager layoutVersionManager =
-        new HDDSLayoutVersionManager(layoutStorage.getLayoutVersion());
+        new HDDSLayoutVersionManager(layoutStorage.getApparentVersion());
 
     return LayoutVersionProto.newBuilder()
         .setMetadataLayoutVersion(

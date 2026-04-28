@@ -100,6 +100,7 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
   - `SCM`: The name of the SCM container to run robot tests from.
     - This can be passed as the first argument to `execute_robot_test`.
     - This allows the same tests to work with and without SCM HA.
+  - `CLIENT`: The dedicated client container used to run Robot tests in rolling-upgrade HA.
 
 ### Testing New Versions
 

@@ -155,6 +155,18 @@ public class TestSCMClientProtocolServer {
     return storageContainerManager;
   }
 
+  @Test
+  public void testQueryUpgradeStatus() throws Exception {
+    HddsProtos.UpgradeStatus status = server.queryUpgradeStatus();
+
+    // SCM starts already finalized in tests
+    assertTrue(status.getScmFinalized());
+    // No datanodes registered
+    assertEquals(0, status.getNumDatanodesFinalized());
+    assertEquals(0, status.getNumDatanodesTotal());
+    assertTrue(status.getShouldFinalize());
+  }
+
   private ContainerInfo newContainerInfoForTest() {
     return new ContainerInfo.Builder()
         .setContainerID(1)

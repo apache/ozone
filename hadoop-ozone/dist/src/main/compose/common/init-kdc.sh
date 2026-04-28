@@ -31,6 +31,7 @@ export_keytab HTTP/scm scm
 export_keytab testuser/scm scm
 export_keytab testuser2/scm scm
 
+export_keytab testuser/client testuser
 export_keytab testuser/dn testuser
 export_keytab testuser/httpfs testuser
 export_keytab testuser/om testuser
@@ -38,6 +39,7 @@ export_keytab testuser/recon testuser
 export_keytab testuser/s3g testuser
 export_keytab testuser/scm testuser
 
+export_keytab testuser2/client testuser2
 export_keytab testuser2/dn testuser2
 export_keytab testuser2/httpfs testuser2
 export_keytab testuser2/om testuser2

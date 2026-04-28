@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPGRADE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_REQUIRED;
@@ -163,13 +163,13 @@ public class TestOMUpgradeFinalizer {
     // the first feature has an upgrade action, and the action execution is
     // checked by verifying on om.getVersion
     verify(om.getOmStorage(), once())
-        .setLayoutVersion(f.layoutVersion());
+        .setApparentVersion(f.layoutVersion());
     verify(om, once()).getVersion();
 
     // The second feature has a NOOP, but should update the layout version.
     f = it.next();
     verify(om.getOmStorage(), once())
-        .setLayoutVersion(f.layoutVersion());
+        .setApparentVersion(f.layoutVersion());
 
     if (finalizer.isFinalizationDone()) {
       when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
@@ -195,7 +195,7 @@ public class TestOMUpgradeFinalizer {
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
     UpgradeException e = assertThrows(UpgradeException.class, () -> finalizer.finalize(CLIENT_ID, om));
     assertThat(e.getMessage()).contains(lfs.iterator().next().toString());
-    assertEquals(e.getResult(), LAYOUT_FEATURE_FINALIZATION_FAILED);
+    assertEquals(e.getResult(), UPGRADE_FINALIZATION_FAILED);
     if (finalizer.isFinalizationDone()) {
       when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
     }
@@ -204,12 +204,12 @@ public class TestOMUpgradeFinalizer {
     Iterator<OMLayoutFeature> it = lfs.iterator();
     OMLayoutFeature f = it.next();
     verify(om.getOmStorage(), never())
-        .setLayoutVersion(f.layoutVersion());
+        .setApparentVersion(f.layoutVersion());
 
     // Verify that we never got to the second feature.
     f = it.next();
     verify(om.getOmStorage(), never())
-        .setLayoutVersion(f.layoutVersion());
+        .setApparentVersion(f.layoutVersion());
 
     StatusAndMessages status = finalizer.reportStatus(CLIENT_ID, false);
     assertEquals(FINALIZATION_DONE, status.status());
@@ -262,9 +262,9 @@ public class TestOMUpgradeFinalizer {
         (Answer<Void>) inv -> {
           storedLayoutVersion = inv.getArgument(0, Integer.class);
           return null;
-        }).when(st).setLayoutVersion(anyInt());
+        }).when(st).setApparentVersion(anyInt());
 
-    lenient().when(st.getLayoutVersion())
+    lenient().when(st.getApparentVersion())
         .thenAnswer((Answer<Integer>) ignore -> storedLayoutVersion);
 
     when(mock.getOmStorage()).thenReturn(st);
