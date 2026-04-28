@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
@@ -71,6 +72,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -97,6 +99,8 @@ import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleRuleAndOperator;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -1620,54 +1624,28 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       String owner = UserGroupInformation.getCurrentUser().getShortUserName();
 
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+
       // Create multipart uploads with different prefixes
-      // MPU 1: prefix "uploads/file1" (should match "uploads/" prefix rule)
-      OmKeyArgs keyArgs1 = new OmKeyArgs.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName("uploads/file1")
-          .setAcls(Collections.emptyList())
-          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-          .setLocationInfoList(new ArrayList<>())
-          .setOwnerName(owner)
-          .build();
-      writeClient.initiateMultipartUpload(keyArgs1);
+      OmMultipartInfo mpuInfo1 = createTestMultipartUpload(volumeName, bucketName,
+          "uploads/file1", owner);  // should match "uploads/" prefix rule
+      OmMultipartInfo mpuInfo2 = createTestMultipartUpload(volumeName, bucketName,
+          "uploads/file2", owner);  // should match "uploads/" prefix rule
+      OmMultipartInfo mpuInfo3 = createTestMultipartUpload(volumeName, bucketName,
+          "temp/file3", owner);     // should match "temp/" prefix rule
+      OmMultipartInfo mpuInfo4 = createTestMultipartUpload(volumeName, bucketName,
+          "keep/file4", owner);     // should NOT match any rule
 
-      // MPU 2: prefix "uploads/file2" (should match "uploads/" prefix rule)
-      OmKeyArgs keyArgs2 = new OmKeyArgs.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName("uploads/file2")
-          .setAcls(Collections.emptyList())
-          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-          .setLocationInfoList(new ArrayList<>())
-          .setOwnerName(owner)
-          .build();
-      writeClient.initiateMultipartUpload(keyArgs2);
-
-      // MPU 3: prefix "temp/file3" (should match "temp/" prefix rule)
-      OmKeyArgs keyArgs3 = new OmKeyArgs.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName("temp/file3")
-          .setAcls(Collections.emptyList())
-          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-          .setLocationInfoList(new ArrayList<>())
-          .setOwnerName(owner)
-          .build();
-      writeClient.initiateMultipartUpload(keyArgs3);
-
-      // MPU 4: prefix "keep/file4" (should NOT match any rule)
-      OmKeyArgs keyArgs4 = new OmKeyArgs.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName("keep/file4")
-          .setAcls(Collections.emptyList())
-          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-          .setLocationInfoList(new ArrayList<>())
-          .setOwnerName(owner)
-          .build();
-      writeClient.initiateMultipartUpload(keyArgs4);
+      // Update creation time to be 2 days ago for all MPUs so they are eligible for abort
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "uploads/file1",
+          mpuInfo1.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "uploads/file2",
+          mpuInfo2.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "temp/file3",
+          mpuInfo3.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "keep/file4",
+          mpuInfo4.getUploadID(), oldCreationTime);
 
       List<OmLCRule> rules = new ArrayList<>();
 
@@ -1723,21 +1701,168 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // Verify the lifecycle configuration is valid
       storedConfig.valid();
 
-      // Verify MPUs were created successfully (at least 4 in total across all buckets)
-      long mpuCount = metadataManager.getMultipartInfoTable().getEstimatedKeyCount();
-      assertTrue(mpuCount >= 4, "Expected at least 4 MPUs, but got " + mpuCount);
+      // Wait for lifecycle service to abort the matching MPUs
+      // 3 MPUs should be aborted (uploads/file1, uploads/file2, temp/file3)
+      // 1 MPU should remain (keep/file4)
+      GenericTestUtils.waitFor(() ->
+          getMultipartUploadCount(volumeName, bucketName) - initialMpuCount == 1,
+          WAIT_CHECK_INTERVAL, 10000);
 
-      // Verify rules can filter correctly
-      // Rule with prefix "uploads/" should match keys starting with "uploads/"
-      assertNotNull(rule1.getFilter());
-      assertEquals("uploads/", rule1.getFilter().getPrefix());
+      // Verify only the non-matching MPU remains
+      String keepMpuKey = metadataManager.getMultipartKey(volumeName, bucketName,
+          "keep/file4", mpuInfo4.getUploadID());
+      assertNotNull(metadataManager.getMultipartInfoTable().get(keepMpuKey),
+          "MPU with prefix 'keep/' should NOT be aborted");
 
-      // Rule with prefix "temp/" should match keys starting with "temp/"
-      assertNotNull(rule2.getFilter());
-      assertEquals("temp/", rule2.getFilter().getPrefix());
+      // Verify matching MPUs are aborted
+      String abortedKey1 = metadataManager.getMultipartKey(volumeName, bucketName,
+          "uploads/file1", mpuInfo1.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(abortedKey1),
+          "MPU with prefix 'uploads/' should be aborted");
+
+      String abortedKey2 = metadataManager.getMultipartKey(volumeName, bucketName,
+          "uploads/file2", mpuInfo2.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(abortedKey2),
+          "MPU with prefix 'uploads/' should be aborted");
+
+      String abortedKey3 = metadataManager.getMultipartKey(volumeName, bucketName,
+          "temp/file3", mpuInfo3.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(abortedKey3),
+          "MPU with prefix 'temp/' should be aborted");
 
       deleteLifecyclePolicy(volumeName, bucketName);
     }
+
+    @Test
+    void testAbortIncompleteMultipartUploadWithTagFilter() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      // Create volume and bucket
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+
+      // Record initial MPU count for this bucket
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+
+      // Create multipart uploads with different tags
+      // MPU 1: has matching tag (environment=test) - should be aborted
+      OmKeyArgs keyArgs1 = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName("file1.txt")
+          .setAcls(Collections.emptyList())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+          .setLocationInfoList(new ArrayList<>())
+          .setOwnerName(owner)
+          .addTag("environment", "test")
+          .build();
+      OmMultipartInfo mpuInfo1 = writeClient.initiateMultipartUpload(keyArgs1);
+
+      // MPU 2: has matching tag (environment=test) - should be aborted
+      OmKeyArgs keyArgs2 = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName("file2.txt")
+          .setAcls(Collections.emptyList())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+          .setLocationInfoList(new ArrayList<>())
+          .setOwnerName(owner)
+          .addTag("environment", "test")
+          .build();
+      OmMultipartInfo mpuInfo2 = writeClient.initiateMultipartUpload(keyArgs2);
+
+      // MPU 3: has non-matching tag value (environment=prod) - should NOT be aborted
+      OmKeyArgs keyArgs3 = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName("file3.txt")
+          .setAcls(Collections.emptyList())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+          .setLocationInfoList(new ArrayList<>())
+          .setOwnerName(owner)
+          .addTag("environment", "prod")
+          .build();
+      OmMultipartInfo mpuInfo3 = writeClient.initiateMultipartUpload(keyArgs3);
+
+      // MPU 4: has no tags - should NOT be aborted
+      OmKeyArgs keyArgs4 = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName("file4.txt")
+          .setAcls(Collections.emptyList())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+          .setLocationInfoList(new ArrayList<>())
+          .setOwnerName(owner)
+          .build();
+      OmMultipartInfo mpuInfo4 = writeClient.initiateMultipartUpload(keyArgs4);
+
+      // Update creation time to be 2 days ago for all MPUs so they are eligible for abort
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "file1.txt",
+          mpuInfo1.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "file2.txt",
+          mpuInfo2.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "file3.txt",
+          mpuInfo3.getUploadID(), oldCreationTime);
+      updateMultipartUploadCreationTime(volumeName, bucketName, "file4.txt",
+          mpuInfo4.getUploadID(), oldCreationTime);
+
+      List<OmLCRule> rules = new ArrayList<>();
+
+      // Rule: Abort MPUs with tag environment=test after 1 day
+      OmLCRule rule = new OmLCRule.Builder()
+          .setId("abort-mpu-test-env")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder()
+              .setTag("environment", "test")
+              .build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder()
+              .setDaysAfterInitiation(1)
+              .build())
+          .build();
+      rules.add(rule);
+
+      // Validate the rule has AbortIncompleteMultipartUpload action
+      assertNotNull(rule.getAbortIncompleteMultipartUpload(),
+          "Rule should have AbortIncompleteMultipartUpload action");
+
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, rules);
+
+      // Wait for lifecycle service to abort the matching MPUs
+      // 2 MPUs should be aborted (file1.txt and file2.txt with environment=test)
+      // 2 MPUs should remain (file3.txt with environment=prod and file4.txt with no tags)
+      GenericTestUtils.waitFor(() ->
+          getMultipartUploadCount(volumeName, bucketName) - initialMpuCount == 2,
+          WAIT_CHECK_INTERVAL, 10000);
+
+      // Verify non-matching MPUs remain
+      String remainKey3 = metadataManager.getMultipartKey(volumeName, bucketName,
+          "file3.txt", mpuInfo3.getUploadID());
+      assertNotNull(metadataManager.getMultipartInfoTable().get(remainKey3),
+          "MPU with tag 'environment=prod' should NOT be aborted");
+
+      String remainKey4 = metadataManager.getMultipartKey(volumeName, bucketName,
+          "file4.txt", mpuInfo4.getUploadID());
+      assertNotNull(metadataManager.getMultipartInfoTable().get(remainKey4),
+          "MPU without tags should NOT be aborted");
+
+      // Verify matching MPUs are aborted
+      String abortedKey1 = metadataManager.getMultipartKey(volumeName, bucketName,
+          "file1.txt", mpuInfo1.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(abortedKey1),
+          "MPU with tag 'environment=test' should be aborted");
+
+      String abortedKey2 = metadataManager.getMultipartKey(volumeName, bucketName,
+          "file2.txt", mpuInfo2.getUploadID());
+      assertNull(metadataManager.getMultipartInfoTable().get(abortedKey2),
+          "MPU with tag 'environment=test' should be aborted");
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
   }
 
   /**
@@ -2184,6 +2309,68 @@ class TestKeyLifecycleService extends OzoneTestBase {
       fail("Failed to count key" + e.getMessage());
       return -1;
     }
+  }
+
+  private long getMultipartUploadCount(String volumeName, String bucketName) {
+    String prefix = metadataManager.getBucketKeyPrefix(volumeName, bucketName);
+    long count = 0;
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> iter =
+             metadataManager.getMultipartInfoTable().iterator(prefix)) {
+      while (iter.hasNext()) {
+        Table.KeyValue<String, OmMultipartKeyInfo> entry = iter.next();
+        // Check if the key starts with the prefix (belongs to this bucket)
+        if (entry.getKey().startsWith(prefix)) {
+          count++;
+        } else {
+          break;  // Iterator went past our prefix
+        }
+      }
+    } catch (IOException e) {
+      fail("Failed to count multipart uploads: " + e.getMessage());
+      return -1;
+    }
+    return count;
+  }
+
+  private void updateMultipartUploadCreationTime(String volumeName, String bucketName,
+      String keyName, String uploadId, long newCreationTime) throws IOException {
+    String dbKey = metadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
+    OmMultipartKeyInfo existingInfo = metadataManager.getMultipartInfoTable().get(dbKey);
+    if (existingInfo == null) {
+      fail("Multipart upload not found: " + dbKey);
+      return;
+    }
+
+    // Create a new OmMultipartKeyInfo with the updated creation time
+    OmMultipartKeyInfo updatedInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(existingInfo.getUploadID())
+        .setCreationTime(newCreationTime)
+        .setReplicationConfig(existingInfo.getReplicationConfig())
+        .setObjectID(existingInfo.getObjectID())
+        .setUpdateID(existingInfo.getUpdateID())
+        .setParentID(existingInfo.getParentID())
+        .build();
+
+    // Copy part key infos
+    for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo : existingInfo.getPartKeyInfoMap()) {
+      updatedInfo.addPartKeyInfo(partKeyInfo);
+    }
+
+    metadataManager.getMultipartInfoTable().put(dbKey, updatedInfo);
+  }
+
+  private OmMultipartInfo createTestMultipartUpload(String volumeName, String bucketName,
+      String keyName, String owner) throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setAcls(Collections.emptyList())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setLocationInfoList(new ArrayList<>())
+        .setOwnerName(owner)
+        .build();
+    return writeClient.initiateMultipartUpload(keyArgs);
   }
 
   public static String uniqueObjectName(String prefix) {

@@ -28,6 +28,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVIC
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -78,6 +80,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -112,6 +115,7 @@ public class KeyLifecycleService extends BackgroundService {
   private final OzoneManager ozoneManager;
   private int keyDeleteBatchSize;
   private int listMaxSize;
+  private int mpuAbortLimitPerTask;
   private long cachedDirMaxCount;
   private final AtomicBoolean suspended;
   private final AtomicBoolean isServiceEnabled;
@@ -138,6 +142,10 @@ public class KeyLifecycleService extends BackgroundService {
     Preconditions.checkArgument(keyDeleteBatchSize > 0,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " should be a positive value.");
     this.listMaxSize = keyDeleteBatchSize >= 10000 ? keyDeleteBatchSize : 10000;
+    this.mpuAbortLimitPerTask = conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK,
+        OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT);
+    Preconditions.checkArgument(mpuAbortLimitPerTask > 0,
+        OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK + " should be a positive value.");
     this.cachedDirMaxCount = conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT);
     this.suspended = new AtomicBoolean(false);
@@ -356,21 +364,19 @@ public class KeyLifecycleService extends BackgroundService {
 
         if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
           LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
-          onSuccess(bucketKey);
-          return result;
-        }
-
-        LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
-            expiredKeyList.size(), expiredDirList.size(), bucketKey);
-
-        // If trash is enabled, move files to trash, instead of send delete requests.
-        // OBS bucket doesn't support trash.
-        if (bucket.getBucketLayout() == OBJECT_STORE) {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
         } else {
-          // handle keys first, then directories
-          handleAndClearFullList(bucket, expiredKeyList, false);
-          handleAndClearFullList(bucket, expiredDirList, true);
+          LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
+              expiredKeyList.size(), expiredDirList.size(), bucketKey);
+
+          // If trash is enabled, move files to trash, instead of send delete requests.
+          // OBS bucket doesn't support trash.
+          if (bucket.getBucketLayout() == OBJECT_STORE) {
+            sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
+          } else {
+            // handle keys first, then directories
+            handleAndClearFullList(bucket, expiredKeyList, false);
+            handleAndClearFullList(bucket, expiredDirList, true);
+          }
         }
 
         // Process AbortIncompleteMultipartUpload actions
@@ -773,12 +779,11 @@ public class KeyLifecycleService extends BackgroundService {
 
       String volumeName = bucketInfo.getVolumeName();
       String bucketName = bucketInfo.getBucketName();
-      String bucketPrefix = omMetadataManager.getMultipartKey(volumeName, bucketName, "", "");
+      String bucketPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
 
       LOG.debug("Processing AbortIncompleteMultipartUpload actions for bucket {}/{}", volumeName, bucketName);
 
-      LimitedSizeList<OmMultipartUpload> expiredUploads = new LimitedSizeList<>(listMaxSize);
-
+      PartCountLimitedList expiredUploads = new PartCountLimitedList(mpuAbortLimitPerTask);
       try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
                omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
         while (mpuIterator.hasNext()) {
@@ -792,7 +797,6 @@ public class KeyLifecycleService extends BackgroundService {
           OmMultipartKeyInfo mpuKeyInfo = entry.getValue();
           numMultipartUploadIterated++;
 
-          // Extract multipart upload information from the key
           OmMultipartUpload upload;
           try {
             upload = OmMultipartUpload.from(entry.getKey());
@@ -805,7 +809,6 @@ public class KeyLifecycleService extends BackgroundService {
           upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
           String keyName = upload.getKeyName();
 
-          // Get the open key to access tags
           String multipartOpenKey;
           try {
             multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
@@ -825,19 +828,22 @@ public class KeyLifecycleService extends BackgroundService {
             continue;
           }
 
-          // Check each rule to see if this upload should be aborted
           for (OmLCRule rule : mpuRules) {
             if (shouldAbortUpload(openKeyInfo, upload, keyName, rule)) {
               if (expiredUploads.isFull()) {
-                LOG.info("Multipart upload list reached batch size {}, aborting current batch for bucket {}/{}",
-                    listMaxSize, volumeName, bucketName);
+                LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
+                    "({} uploads, {} parts) for bucket {}/{}",
+                    mpuAbortLimitPerTask, expiredUploads.size(), expiredUploads.getPartCount(),
+                    volumeName, bucketName);
                 abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
               }
 
-              expiredUploads.add(upload);
-              LOG.debug("Multipart upload {}/{}/{} with uploadId {} will be aborted",
-                  volumeName, bucketName, keyName, upload.getUploadId());
-              break;  // One rule match is enough
+              // Get part count for this MPU (at least 1 even if no parts uploaded yet)
+              int partCount = Math.max(1, mpuKeyInfo.getPartKeyInfoMap().size());
+              expiredUploads.add(upload, partCount);
+              LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
+                  volumeName, bucketName, keyName, upload.getUploadId(), partCount);
+              break;
             }
           }
         }
@@ -847,8 +853,8 @@ public class KeyLifecycleService extends BackgroundService {
       }
 
       if (!expiredUploads.isEmpty()) {
-        LOG.info("{} expired multipart uploads remaining for bucket {}/{}",
-            expiredUploads.size(), volumeName, bucketName);
+        LOG.info("{} expired multipart uploads ({} parts) remaining for bucket {}/{}",
+            expiredUploads.size(), expiredUploads.getPartCount(), volumeName, bucketName);
         abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
       }
     }
@@ -864,16 +870,20 @@ public class KeyLifecycleService extends BackgroundService {
      */
     private boolean shouldAbortUpload(OmKeyInfo openKeyInfo, OmMultipartUpload upload,
                                       String keyName, OmLCRule rule) {
-      // Check if upload age exceeds the threshold
+
       if (!rule.getAbortIncompleteMultipartUpload().shouldAbort(
           upload.getCreationTime().toEpochMilli())) {
         return false;
       }
 
-      // Check prefix and tag filtering using the existing rule.match() logic
-      // The rule.match() method handles both prefix and tag filtering
-      if (!rule.match(openKeyInfo, keyName)) {
-        return false;  // Prefix or tag doesn't match
+      String effectivePrefix = rule.getEffectivePrefix();
+      if (effectivePrefix != null && !keyName.startsWith(effectivePrefix)) {
+        return false;
+      }
+
+      OmLCFilter filter = rule.getFilter();
+      if (filter != null && !filter.match(openKeyInfo, keyName)) {
+        return false;
       }
 
       return true;
@@ -941,17 +951,12 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     private void abortExpiredMultipartUploadsAndClear(OmBucketInfo bucketInfo,
-                                                      LimitedSizeList<OmMultipartUpload> expiredUploads) {
+                                                      PartCountLimitedList expiredUploads) {
       if (expiredUploads.isEmpty()) {
         return;
       }
 
-      List<OmMultipartUpload> uploadList = new ArrayList<>();
-      for (int i = 0; i < expiredUploads.size(); i++) {
-        uploadList.add(expiredUploads.get(i));
-      }
-
-      abortExpiredMultipartUploads(bucketInfo, uploadList);
+      abortExpiredMultipartUploads(bucketInfo, expiredUploads.getUploads());
       expiredUploads.clear();
     }
 
@@ -1284,6 +1289,11 @@ public class KeyLifecycleService extends BackgroundService {
   }
 
   @VisibleForTesting
+  public void setMpuAbortLimitPerTask(int limit) {
+    this.mpuAbortLimitPerTask = limit;
+  }
+
+  @VisibleForTesting
   public void setOzoneTrash(OzoneTrash ozoneTrash) {
     this.ozoneTrash = ozoneTrash;
   }
@@ -1411,6 +1421,61 @@ public class KeyLifecycleService extends BackgroundService {
 
     public void clear() {
       internalList.clear();
+    }
+  }
+
+  /**
+   * A list that tracks the total part count of multipart uploads.
+   * The list is considered "full" when the total part count reaches the limit.
+   * This is used because some MPUs might have 1 part while others might have 10,000 parts.
+   */
+  public static class PartCountLimitedList {
+    private final List<OmMultipartUpload> uploads;
+    private final int maxPartCount;
+    private int currentPartCount;
+
+    public PartCountLimitedList(int maxPartCount) {
+      this.maxPartCount = maxPartCount;
+      this.uploads = new ArrayList<>();
+      this.currentPartCount = 0;
+    }
+
+    /**
+     * Add a multipart upload with its part count.
+     * Caller should check isFull() before calling this method.
+     */
+    public void add(OmMultipartUpload upload, int partCount) {
+      uploads.add(upload);
+      currentPartCount += partCount;
+    }
+
+    public List<OmMultipartUpload> getUploads() {
+      return uploads;
+    }
+
+    public int size() {
+      return uploads.size();
+    }
+
+    public int getPartCount() {
+      return currentPartCount;
+    }
+
+    public boolean isEmpty() {
+      return uploads.isEmpty();
+    }
+
+    public boolean isFull() {
+      boolean full = currentPartCount >= maxPartCount;
+      if (full) {
+        LOG.debug("PartCountLimitedList has reached maximum part count {}", maxPartCount);
+      }
+      return full;
+    }
+
+    public void clear() {
+      uploads.clear();
+      currentPartCount = 0;
     }
   }
 
