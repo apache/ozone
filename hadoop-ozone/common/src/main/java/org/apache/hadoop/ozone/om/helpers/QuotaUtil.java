@@ -77,6 +77,9 @@ public final class QuotaUtil {
    * @return bytes stored on a single DN for this block
    */
   public static long getSizePerReplica(long dataSize, ReplicationConfig repConfig) {
+    if (repConfig.getReplicationType() == RATIS) {
+      return dataSize;
+    }
     int requiredNodes = repConfig.getRequiredNodes();
     if (requiredNodes <= 0) {
       return dataSize;
