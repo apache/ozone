@@ -64,8 +64,7 @@ public class TestOMEventListenerPluginManager {
     private boolean shutdown = false;
 
     @Override
-    public void initialize(OzoneConfiguration conf,
-                           OMEventListenerPluginContext pluginContext) {
+    public void initialize(OzoneConfiguration conf, OMEventListenerPluginContext pluginContext) {
       initialized = true;
     }
 
@@ -106,8 +105,9 @@ public class TestOMEventListenerPluginManager {
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
-    Assertions.assertEquals(Arrays.asList(FooPlugin.class.getName()),
-                            getLoadedPlugins(pluginManager));
+    Assertions.assertEquals(
+        Arrays.asList(FooPlugin.class.getName()),
+        getLoadedPlugins(pluginManager));
   }
 
   @Test
@@ -120,9 +120,9 @@ public class TestOMEventListenerPluginManager {
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
-    Assertions.assertEquals(Arrays.asList(BarPlugin.class.getName(),
-                                          FooPlugin.class.getName()),
-                            getLoadedPlugins(pluginManager));
+    Assertions.assertEquals(
+        Arrays.asList(BarPlugin.class.getName(), FooPlugin.class.getName()),
+        getLoadedPlugins(pluginManager));
   }
 
   @Test
@@ -132,8 +132,9 @@ public class TestOMEventListenerPluginManager {
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
-    Assertions.assertEquals(Arrays.asList(),
-                            getLoadedPlugins(pluginManager));
+    Assertions.assertEquals(
+        Arrays.asList(),
+        getLoadedPlugins(pluginManager));
   }
 
   @Test
@@ -144,8 +145,9 @@ public class TestOMEventListenerPluginManager {
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
-    Assertions.assertEquals(Arrays.asList(),
-                            getLoadedPlugins(pluginManager));
+    Assertions.assertEquals(
+        Arrays.asList(),
+        getLoadedPlugins(pluginManager));
   }
 
   @Test
@@ -156,7 +158,8 @@ public class TestOMEventListenerPluginManager {
 
     OMEventListenerPluginManager pluginManager = new OMEventListenerPluginManager(ozoneManager, conf);
 
-    Assertions.assertEquals(Arrays.asList(),
-                            getLoadedPlugins(pluginManager));
+    Assertions.assertEquals(
+        Arrays.asList(),
+        getLoadedPlugins(pluginManager));
   }
 }

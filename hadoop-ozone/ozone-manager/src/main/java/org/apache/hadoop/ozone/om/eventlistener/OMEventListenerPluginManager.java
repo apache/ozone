@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +86,7 @@ public class OMEventListenerPluginManager {
       String value = entry.getValue();
       LOG.info("Found event listener plugin with name={} and value={}", destName, value);
 
-      if (value.equalsIgnoreCase("enable") || value.equalsIgnoreCase("enabled") || value.equalsIgnoreCase("true")) {
+      if (value.equalsIgnoreCase("enabled")) {
         destNameList.add(destName);
         LOG.info("Event listener plugin {}{} is set to {}", PLUGIN_DEST_BASE, destName, value);
       }
@@ -118,7 +119,7 @@ public class OMEventListenerPluginManager {
     LOG.info("Getting classname for {} with property {}", destName, classnameProp);
     Class<? extends OMEventListener> cls = conf.getClass(classnameProp, null, OMEventListener.class);
     if (null == cls) {
-      throw new RuntimeException(String.format(
+      throw new OzoneIllegalArgumentException(String.format(
           "Unable to load plugin %s, classname property %s is missing or does not implement OMEventListener",
           destName, classnameProp));
     }
