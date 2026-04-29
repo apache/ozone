@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.time.Clock;
@@ -199,47 +200,25 @@ public class BackgroundPipelineCreator implements SCMService {
       // used.
       return ((StandaloneReplicationConfig) replicationConfig)
           .getReplicationFactor() != ReplicationFactor.ONE;
+    } else if (replicationConfig.getReplicationType().equals(EC)) {
+      return false;
     }
     return true;
   }
 
   private void createPipelines() throws RuntimeException {
-    // TODO: #CLUTIL Different replication factor may need to be supported
-    HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
-        conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-            OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
-    boolean autoCreateFactorOne = conf.getBoolean(
-        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+    boolean autoCreateFactorOne = conf.getBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
-    List<ReplicationConfig> list =
-        new ArrayList<>();
-    for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
-        .values()) {
-      if (factor == ReplicationFactor.ZERO) {
-        continue; // Ignore it.
-      }
-      final ReplicationConfig replicationConfig;
-      if (type != EC) {
-        replicationConfig =
-            ReplicationConfig.fromProtoTypeAndFactor(type, factor);
-      } else if (factor == ReplicationFactor.ONE) {
-        replicationConfig =
-            ReplicationConfig.fromProtoTypeAndFactor(RATIS, factor);
-      } else {
-        continue;
-      }
-      if (skipCreation(replicationConfig, autoCreateFactorOne)) {
-        // Skip this iteration for creating pipeline
-        continue;
-      }
-      list.add(replicationConfig);
+    List<ReplicationConfig> list = getReplicationConfigs(autoCreateFactorOne);
+    if (list.isEmpty()) {
+      LOG.debug("No replication configs selected for background pipeline creation.");
+      return;
     }
 
     LoopingIterator it = new LoopingIterator(list);
     while (it.hasNext()) {
-      ReplicationConfig replicationConfig =
-          (ReplicationConfig) it.next();
+      ReplicationConfig replicationConfig = (ReplicationConfig) it.next();
 
       try {
         Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
@@ -253,6 +232,49 @@ public class BackgroundPipelineCreator implements SCMService {
     }
 
     LOG.debug("BackgroundPipelineCreator createPipelines finished.");
+  }
+
+  @VisibleForTesting
+  List<ReplicationConfig> getReplicationConfigs(boolean autoCreateFactorOne) {
+    List<ReplicationConfig> list = new ArrayList<>();
+    // TODO: #CLUTIL Different replication factor may need to be supported
+    HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
+        conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE, OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
+    if (type == EC) {
+      try {
+        ReplicationConfig defaultConfig = ReplicationConfig.getDefault(conf);
+        if (defaultConfig.getReplicationType() == EC) {
+          list.add(defaultConfig);
+        }
+      } catch (IllegalArgumentException e) {
+        LOG.warn(
+            "Skipping EC pipeline creation due to invalid default EC " + "replication config. type={}, replication={}",
+            conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE, OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT),
+            conf.get(OzoneConfigKeys.OZONE_REPLICATION, OzoneConfigKeys.OZONE_REPLICATION_DEFAULT), e);
+      }
+    }
+
+    for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor.values()) {
+      if (factor == ReplicationFactor.ZERO) {
+        continue; // Ignore it.
+      }
+      final ReplicationConfig replicationConfig;
+      if (type != EC) {
+        replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(type, factor);
+      } else if (factor == ReplicationFactor.ONE) {
+        replicationConfig = ReplicationConfig.fromProtoTypeAndFactor(RATIS, factor);
+      } else {
+        continue;
+      }
+      if (skipCreation(replicationConfig, autoCreateFactorOne)) {
+        // Skip this iteration for creating pipeline
+        continue;
+      }
+      if (!list.contains(replicationConfig)) {
+        list.add(replicationConfig);
+      }
+    }
+    return list;
   }
 
   @Override
