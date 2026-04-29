@@ -49,16 +49,13 @@ public class TracingFilter implements ContainerRequestFilter,
   public void filter(ContainerRequestContext requestContext) {
     finishAndCloseActiveSpan();
 
-    String traceparent = requestContext.getHeaderString("traceparent");
-    String tracestate  = requestContext.getHeaderString("tracestate");
-    String encodedParent = TracingUtil.buildTraceContextCarrier(traceparent, tracestate);
-
     String spanName = resourceInfo.getResourceClass().getSimpleName() + "." +
         resourceInfo.getResourceMethod().getName();
 
     TracingUtil.TraceCloseable traceCloseable =
-        TracingUtil.createActivatedSpanWithParent(spanName, encodedParent);
-
+        TracingUtil.createActivatedSpanFromW3cHttpHeaders(
+            spanName, requestContext::getHeaderString,
+            OzoneConfigurationHolder.configuration());
     requestContext.setProperty(TRACING_SPAN_CLOSABLE, traceCloseable);
   }
 

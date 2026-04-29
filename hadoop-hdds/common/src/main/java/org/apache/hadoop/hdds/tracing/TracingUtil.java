@@ -26,6 +26,7 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
@@ -33,9 +34,11 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.lang.reflect.Proxy;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -290,42 +293,8 @@ public final class TracingUtil {
     };
   }
 
-  /**
-   * Create an active span whose parent is decoded from an encoded W3C
-   * traceparent string (produced by {@link #exportCurrentSpan()}).
-   * If {@code encodedParent} is null or empty, a root span is created.
-   * Scope and span are both closed when the returned TraceCloseable is closed.
-   */
-  public static TraceCloseable createActivatedSpanWithParent(
-      String spanName, String encodedParent) {
-    Span span = importAndCreateSpan(spanName, encodedParent);
-    Scope scope = span.makeCurrent();
-    return () -> {
-      scope.close();
-      span.end();
-    };
-  }
-
   public static Span getActiveSpan() {
     return Span.current();
-  }
-
-  /**
-   * Helper to build the tracing carrier string from W3C headers.
-   * @param traceparent raw traceparent header
-   * @param tracestate raw tracestate header
-   * @return formatted carrier string for TextExtractor
-   */
-  public static String buildTraceContextCarrier(String traceparent, String tracestate) {
-    if (traceparent == null || traceparent.isEmpty()) {
-      return "";
-    }
-    StringBuilder sb = new StringBuilder("traceparent=")
-        .append(traceparent.trim());
-    if (tracestate != null && !tracestate.isEmpty()) {
-      sb.append(";tracestate=").append(tracestate.trim());
-    }
-    return sb.toString();
   }
 
   /**
@@ -385,5 +354,51 @@ public final class TracingUtil {
     } else {
       return tracer.spanBuilder(spanName).setNoParent().startSpan();
     }
+  }
+
+  public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
+      String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
+    if (conf == null || !isTracingEnabled(conf)) {
+      return () -> {
+      };
+    }
+
+    final class HeaderCarrier {
+      private final Function<String, String> fn;
+
+      private HeaderCarrier(Function<String, String> fn) {
+        this.fn = fn;
+      }
+    }
+
+    HeaderCarrier carrier = new HeaderCarrier(getHeader);
+    TextMapGetter<HeaderCarrier> getter = new TextMapGetter<HeaderCarrier>() {
+      @Override
+      public Iterable<String> keys(HeaderCarrier c) {
+        return Arrays.asList("traceparent", "tracestate");
+      }
+
+      @Override
+      public String get(HeaderCarrier c, String key) {
+        if (c == null) {
+          return null;
+        }
+        return c.fn.apply(key);
+      }
+    };
+
+    W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
+    Context remote = propagator.extract(Context.current(), carrier, getter);
+    Span parentSpan = Span.fromContext(remote);
+    if (!parentSpan.getSpanContext().isValid()) {
+      return () -> {
+      };
+    }
+    Span span = tracer.spanBuilder(spanName).setParent(remote).startSpan();
+    Scope scope = span.makeCurrent();
+    return () -> {
+      scope.close();
+      span.end();
+    };
   }
 }
