@@ -37,7 +37,7 @@ public class FinalizeSubCommand extends ScmSubcommand {
   public void execute(ScmClient client) throws IOException {
     client.finalizeUpgrade();
 
-    out().println("Cluster finalize has been started. Monitor progress with the ozone admin upgrade status command");
+    out().println("Cluster finalization has been started. Monitor progress with `ozone admin upgrade status`");
   }
 }
 
