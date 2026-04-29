@@ -128,7 +128,7 @@ public abstract class BasicUpgradeFinalizer
     } catch (NotLeaderException e) {
       LOG.info("Leader change encountered during finalization. This component will continue finalization as " +
           "directed by the new leader.", e);
-      // TODO - should we throw here?
+      throw e;
     }
   }
 
