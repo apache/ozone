@@ -1744,6 +1744,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   void verifyRenameFile(Path workDir, Path expectedDest) throws IOException {
     FileStatus[] fStatus = getFs().listStatus(workDir);
     assertEquals(1, fStatus.length, "Renamed failed");
+    assertEquals(expectedDest.toString(), fStatus[0].getPath().toUri().getPath(), "Wrong path name!");
   }
 
   /**
@@ -1757,8 +1758,8 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Override
-  Path pathUnderFsRoot(String p) {
-    return new Path(getBucketPath() + p);
+  Path pathUnderFsRoot(String relativePath) {
+    return new Path(getBucketPath() + relativePath);
   }
 
   /**

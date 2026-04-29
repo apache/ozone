@@ -1119,8 +1119,8 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   }
 
   @Override
-  protected Path pathUnderFsRoot(String p) {
-    return new Path(getFs().getUri().toString() + p);
+  protected Path pathUnderFsRoot(String relativePath) {
+    return new Path(getFs().getUri().toString() + relativePath);
   }
 
   @Test

@@ -532,7 +532,7 @@ public abstract class OzoneFileSystemTestBase {
     assertTrue(fs.exists(expectedFilePathAfterRename), "Rename failed");
   }
 
-  public void renameDirToItsOwnSubDir() throws Exception {
+  void renameDirToItsOwnSubDir() throws Exception {
     final String root = "/root";
     final String dir1 = root + "/dir1";
     FileSystem fs = getFs();
@@ -558,24 +558,25 @@ public abstract class OzoneFileSystemTestBase {
     final String dir1 = root + "/dir1";
     final String dir2 = dir1 + "/dir2";
     final Path dir2SourcePath = pathUnderFsRoot(dir2);
-    getFs().mkdirs(dir2SourcePath);
+    FileSystem fs = getFs();
+    fs.mkdirs(dir2SourcePath);
     // (a) parent of dst does not exist.  /root_dir/b/c
     final Path destinPath = pathUnderFsRoot(root + "/b/c");
 
     // rename should throw exception
     try {
-      getFs().rename(dir2SourcePath, destinPath);
+      fs.rename(dir2SourcePath, destinPath);
       fail("Should fail as parent of dst does not exist!");
     } catch (FileNotFoundException fnfe) {
       //expected
     }
     // (b) parent of dst is a file. /root_dir/file1/c
     Path filePath = pathUnderFsRoot(root + "/file1");
-    ContractTestUtils.touch(getFs(), filePath);
+    ContractTestUtils.touch(fs, filePath);
     Path newDestinPath = new Path(filePath, "c");
-    // rename shouldthrow exception
+    // rename should throw exception
     try {
-      getFs().rename(dir2SourcePath, newDestinPath);
+      fs.rename(dir2SourcePath, newDestinPath);
       fail("Should fail as parent of dst is a file!");
     } catch (IOException e) {
       //expected
@@ -584,7 +585,7 @@ public abstract class OzoneFileSystemTestBase {
 
   abstract void verifyRenameFile(Path workDir, Path expectedDest) throws IOException;
 
-  abstract Path pathUnderFsRoot(String pathUnderFsRoot) throws IOException;
+  abstract Path pathUnderFsRoot(String relativePath);
 
   abstract void verifyDeleteCreatesFakeParentDir(Path parent) throws IOException;
 
