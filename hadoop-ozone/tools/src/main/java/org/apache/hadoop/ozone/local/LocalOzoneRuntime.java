@@ -18,38 +18,22 @@
 package org.apache.hadoop.ozone.local;
 
 /**
- * Runtime contract for {@code ozone local run}.
- *
- * <p>Implementations manage the lifecycle of a local Ozone cluster,
- * including starting services, waiting for readiness, and shutdown.</p>
+ * Runtime contract for local single-node Ozone commands.
  */
 public interface LocalOzoneRuntime extends AutoCloseable {
 
-  /**
-   * Starts the local Ozone cluster.
-   *
-   * <p>This method blocks until all services are started and the
-   * cluster is ready to accept requests.</p>
-   *
-   * @throws Exception if startup fails
-   */
   void start() throws Exception;
 
-  /**
-   * Returns the display host for service endpoints.
-   */
   String getDisplayHost();
 
-  /**
-   * Returns the number of running datanodes.
-   */
-  int getDatanodeCount();
+  int getScmPort();
 
-  /**
-   * Shuts down the local Ozone cluster.
-   *
-   * @throws Exception if shutdown fails
-   */
+  int getOmPort();
+
+  int getS3gPort();
+
+  String getS3Endpoint();
+
   @Override
   void close() throws Exception;
 }

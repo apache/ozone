@@ -107,9 +107,35 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
         : config.getHost();
   }
 
-  @Override
+  /**
+   * Returns the number of running datanodes.
+   */
   public int getDatanodeCount() {
     return datanodes.size();
+  }
+
+  @Override
+  public int getScmPort() {
+    // TODO: Return actual SCM port when SCM is implemented
+    return -1;
+  }
+
+  @Override
+  public int getOmPort() {
+    // TODO: Return actual OM port when OM is implemented
+    return -1;
+  }
+
+  @Override
+  public int getS3gPort() {
+    // TODO: Return actual S3G port when S3G is implemented
+    return -1;
+  }
+
+  @Override
+  public String getS3Endpoint() {
+    // TODO: Return actual S3 endpoint when S3G is implemented
+    return "";
   }
 
   @Override

@@ -225,7 +225,7 @@ public class TestStorageDistributionEndpoint {
           .build();
       pendingDeletionMetrics.add(new DatanodePendingDeletionMetrics(hostName,
           uuid.toString(), PENDING_DELETION_SIZE));
-      dataNodes.add(new DatanodeInfo(datanode, NodeStatus.inServiceHealthy(), null));
+      dataNodes.add(new DatanodeInfo(datanode, NodeStatus.inServiceHealthy(), null, 5 * 60 * 1000));
       when(nodeManager.getNodeStat(datanode))
           .thenReturn(new SCMNodeMetric(OZONE_CAPACITY, OZONE_USED, OZONE_REMAINING, COMMITTED,
               MIN_FREE_SPACE, RESERVED));

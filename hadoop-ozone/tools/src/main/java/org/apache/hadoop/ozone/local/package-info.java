@@ -16,6 +16,6 @@
  */
 
 /**
- * Local single-node Ozone runtime for development and testing.
+ * Internal local single-node Ozone runtime support.
  */
 package org.apache.hadoop.ozone.local;

@@ -16,6 +16,10 @@
 name: update-ozone-site-config-doc
 on:
   workflow_call:
+    secrets:
+      OZONE_WEBSITE_BUILD:
+        description: 'Token for publishing to apache/ozone-site'
+        required: false
 
 env:
   BRANCH_NAME: automated-config-doc-update
