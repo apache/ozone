@@ -23,9 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -42,6 +45,7 @@ import org.apache.hadoop.ozone.recon.api.ContainerEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperHelper;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
@@ -84,9 +88,7 @@ public class TestReconContainerEndpoint {
   @AfterEach
   public void shutdown() throws IOException {
     try {
-      if (client != null) {
-        client.close();
-      }
+      IOUtils.closeQuietly(client);
       if (cluster != null) {
         cluster.shutdown();
       }
@@ -128,8 +130,8 @@ public class TestReconContainerEndpoint {
         omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
     completableFuture.join();
-    // The buffer can be empty while tasks still finish processing a dequeued batch.
-    Thread.sleep(2000);
+    waitUntilReconIndexesKeysForPaths(volName, bucketName,
+        nestedDirKey, singleFileKey);
 
     //Search for the bucket from the bucket table and verify its FSO
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volName, bucketName);
@@ -137,8 +139,7 @@ public class TestReconContainerEndpoint {
     assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         bucketInfo.getBucketLayout());
 
-    // Assuming a known container ID that these keys have been written into
-    long testContainerID = 1L;
+    long testContainerID = getContainerIdForKey(volName, bucketName, nestedDirKey);
 
     // Query the ContainerEndpoint for the keys in the specified container
     Response response = getContainerEndpointResponse(testContainerID);
@@ -158,7 +159,7 @@ public class TestReconContainerEndpoint {
     assertEquals("file1", keyMetadata.getKey());
     assertEquals("testvol/fsobucket/dir1/dir2/dir3/file1", keyMetadata.getCompletePath());
 
-    testContainerID = 2L;
+    testContainerID = getContainerIdForKey(volName, bucketName, singleFileKey);
     response = getContainerEndpointResponse(testContainerID);
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
@@ -200,7 +201,7 @@ public class TestReconContainerEndpoint {
         omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
     completableFuture.join();
-    Thread.sleep(2000);
+    waitUntilReconIndexesKeysForPaths(volumeName, obsBucketName, obsSingleFileKey);
 
     // Search for the bucket from the bucket table and verify its OBS
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volumeName, obsBucketName);
@@ -240,6 +241,24 @@ public class TestReconContainerEndpoint {
             recon.getReconServer().getReconContainerMetadataManager(),
             omMetadataManagerInstance);
     return containerEndpoint.getKeysForContainer(containerId, 10, "");
+  }
+
+  /**
+   * Wait until Recon's container-key index reflects all written keys (by container id).
+   * The OM event queue can be empty while a batch is still being processed.
+   */
+  private void waitUntilReconIndexesKeysForPaths(String volumeName,
+      String bucketName, String... keyPaths)
+      throws Exception {
+    Map<Long, Integer> requiredCountByContainer = new HashMap<>();
+    for (String keyPath : keyPaths) {
+      long containerId =
+          getContainerIdForKey(volumeName, bucketName, keyPath);
+      requiredCountByContainer.merge(containerId, 1, Integer::sum);
+    }
+    ReconContainerMetadataManager mgr =
+        recon.getReconServer().getReconContainerMetadataManager();
+    TestReconOmMetaManagerUtils.waitUntilReconKeyCounts(mgr, requiredCountByContainer);
   }
 
   private long getContainerIdForKey(String volumeName, String bucketName,

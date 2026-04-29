@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBuffer;
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -42,5 +45,30 @@ public class TestReconOmMetaManagerUtils {
         throw new RuntimeException("Error waiting for event buffer to empty", e);
       }
     });
+  }
+
+  /**
+   * Waits until Recon's container-key index reports at least the given number of keys
+   * per container id. Use after OM sync when the event buffer can be empty while a
+   * dequeued batch is still being processed.
+   *
+   * @param mgr                      Recon container metadata manager
+   * @param minimumCountPerContainer map of container ID to minimum inclusive key count
+   * @throws Exception               if the condition is not met within the timeout or on interrupt
+   */
+  public static void waitUntilReconKeyCounts(ReconContainerMetadataManager mgr,
+      Map<Long, Integer> minimumCountPerContainer) throws Exception {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        for (Map.Entry<Long, Integer> e : minimumCountPerContainer.entrySet()) {
+          if (mgr.getKeyCountForContainer(e.getKey()) < e.getValue()) {
+            return false;
+          }
+        }
+        return true;
+      } catch (IOException ex) {
+        throw new RuntimeException(ex);
+      }
+    }, 500, 45000);
   }
 }
