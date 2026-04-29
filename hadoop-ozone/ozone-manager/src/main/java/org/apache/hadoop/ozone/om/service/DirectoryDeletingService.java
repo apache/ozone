@@ -159,7 +159,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private final SnapshotChainManager snapshotChainManager;
   private final boolean deepCleanSnapshots;
   private ExecutorService deletionThreadPool;
-  private int numberOfParallelThreadsPerStore;
+  private final AtomicInteger numberOfParallelThreadsPerStore;
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
   private final AtomicLong movedFilesCount;
@@ -174,8 +174,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
-    this.numberOfParallelThreadsPerStore = dirDeletingServiceCorePoolSize;
-    this.deletionThreadPool = createDeletionThreadPool(numberOfParallelThreadsPerStore);
+    this.numberOfParallelThreadsPerStore = new AtomicInteger(dirDeletingServiceCorePoolSize);
+    this.deletionThreadPool = createDeletionThreadPool(numberOfParallelThreadsPerStore.get());
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
     registerReconfigCallbacks(ozoneManager.getReconfigurationHandler());
@@ -208,7 +208,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     shutdown();
     setInterval(newInterval, TimeUnit.SECONDS);
     setPoolSize(newCorePoolSize);
-    this.numberOfParallelThreadsPerStore = newCorePoolSize;
+    this.numberOfParallelThreadsPerStore.set(newCorePoolSize);
     start();
   }
 
@@ -251,7 +251,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   @Override
   public synchronized void start() {
     if (deletionThreadPool == null || deletionThreadPool.isShutdown() || deletionThreadPool.isTerminated()) {
-      this.deletionThreadPool = createDeletionThreadPool(numberOfParallelThreadsPerStore);
+      this.deletionThreadPool = createDeletionThreadPool(numberOfParallelThreadsPerStore.get());
     }
     super.start();
   }
@@ -269,10 +269,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   private boolean isThreadPoolActive(ExecutorService threadPoolExecutor) {
     return threadPoolExecutor != null && !threadPoolExecutor.isShutdown() && !threadPoolExecutor.isTerminated();
-  }
-
-  private synchronized int getNumberOfParallelThreadsPerStore() {
-    return numberOfParallelThreadsPerStore;
   }
 
   @VisibleForTesting
@@ -621,7 +617,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         Map<UUID, Pair<Long, Long>> exclusiveSizeMap = Maps.newConcurrentMap();
 
         CompletableFuture<Boolean> processedAllDeletedDirs = CompletableFuture.completedFuture(true);
-        final int parallelThreads = getNumberOfParallelThreadsPerStore();
+        final int parallelThreads = numberOfParallelThreadsPerStore.get();
         for (int i = 0; i < parallelThreads; i++) {
           CompletableFuture<Boolean> future = CompletableFuture.supplyAsync(() -> {
             try {
