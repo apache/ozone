@@ -125,7 +125,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private final long deadNodeIntervalMs;
 
-  private final long containerRollIntervalMs;  //TODO
+  private final long containerRollIntervalMs;
 
   /**
    * The future is used to pause/unpause the scheduled checks.
