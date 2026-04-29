@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.admin.upgrade.UpgradeUtil;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
@@ -49,16 +50,11 @@ public final class TestHddsUpgradeUtils {
 
   private TestHddsUpgradeUtils() { }
 
-  // This is currently testing that the SCM and datanode side finalization is complete.
-  // TODO - should this test for SCM and DNs and OM?
-  public static void waitForFinalizationFromClient(
-      StorageContainerLocationProtocol scmClient)
-      throws Exception {
+  public static void waitForFinalizationFromClient(StorageContainerLocationProtocol scmClient) throws Exception {
     LambdaTestUtils.await(60_000, 1_000, () -> {
-      HddsProtos.UpgradeStatus status =  scmClient.queryUpgradeStatus();
-      LOG.info("Waiting for upgrade finalization to complete from client.Current status is {}.",
-          status.getShouldFinalize());
-      return status.getShouldFinalize();
+      boolean isComplete = UpgradeUtil.isFinalizationComplete(scmClient);
+      LOG.info("Waiting for upgrade finalization to complete from client.Current status is {}.", isComplete);
+      return isComplete;
     });
   }
 
