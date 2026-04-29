@@ -488,6 +488,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
   private static UserGroupInformation testUgi;
+  private static boolean testInstallSnapshot = false;
 
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
@@ -4063,6 +4064,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException if download or cleanup fails
    */
   public synchronized TermIndex installSnapshotFromLeader(String leaderId) throws IOException {
+    if (!isRunning() || testInstallSnapshot) {
+      LOG.warn("OzoneManager is not in running state, state {}. Abort install snapshot from Leader.",
+          omState);
+      return null;
+    }
+
     if (omRatisSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
@@ -4509,6 +4516,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public static void setTestReloadConfigFlag(boolean testReloadConfigFlag) {
     OzoneManager.testReloadConfigFlag = testReloadConfigFlag;
+  }
+
+  public static void setTestInstallSnapshot(boolean testInstallSnapshot) {
+    OzoneManager.testInstallSnapshot = testInstallSnapshot;
   }
 
   public static void setTestSecureOmFlag(boolean testSecureOmFlag) {

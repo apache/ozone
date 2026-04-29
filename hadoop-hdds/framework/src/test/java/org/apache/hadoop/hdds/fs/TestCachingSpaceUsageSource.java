@@ -182,6 +182,41 @@ class TestCachingSpaceUsageSource {
     assertSnapshotIsUpToDate(subject);
   }
 
+  // If negative values are passed, check that the state is unchanged
+  @Test
+  void incrementUsedSpaceIgnoresNegativeValue() {
+    SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(50))
+        .withRefresh(Duration.ZERO)
+        .build();
+    CachingSpaceUsageSource subject = new CachingSpaceUsageSource(params);
+    SpaceUsageSource original = subject.snapshot();
+
+    subject.incrementUsedSpace(-1L);
+
+    // negative value should be ignored, leaving cached state unchanged
+    assertEquals(original.getUsedSpace(), subject.getUsedSpace());
+    assertEquals(original.getAvailable(), subject.getAvailable());
+    assertEquals(original.getCapacity(), subject.getCapacity());
+    assertSnapshotIsUpToDate(subject);
+  }
+
+  @Test
+  void decrementUsedSpaceIgnoresNegativeValue() {
+    SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(50))
+        .withRefresh(Duration.ZERO)
+        .build();
+    CachingSpaceUsageSource subject = new CachingSpaceUsageSource(params);
+    SpaceUsageSource original = subject.snapshot();
+
+    subject.decrementUsedSpace(-1L);
+
+    // negative value should be ignored, leaving cached state unchanged
+    assertEquals(original.getUsedSpace(), subject.getUsedSpace());
+    assertEquals(original.getAvailable(), subject.getAvailable());
+    assertEquals(original.getCapacity(), subject.getCapacity());
+    assertSnapshotIsUpToDate(subject);
+  }
+
   private static void assertSnapshotIsUpToDate(SpaceUsageSource subject) {
     SpaceUsageSource snapshot = subject.snapshot();
     assertEquals(subject.getCapacity(), snapshot.getCapacity());

@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -39,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -79,8 +77,6 @@ public class ContainerManagerImpl implements ContainerManager {
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
-  private final long maxContainerSize;
-
   /**
    *
    */
@@ -105,9 +101,6 @@ public class ContainerManagerImpl implements ContainerManager {
         .setSCMDBTransactionBuffer(scmHaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(containerReplicaPendingOps)
         .build();
-
-    maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
@@ -245,9 +238,8 @@ public class ContainerManagerImpl implements ContainerManager {
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
       throws IOException {
-    if (!pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
-      LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-          pipeline, maxContainerSize);
+    if (!pipelineManager.hasEnoughSpace(pipeline)) {
+      LOG.debug("Cannot allocate a new container because pipeline {} does not have enough space.", pipeline);
       return null;
     }
 

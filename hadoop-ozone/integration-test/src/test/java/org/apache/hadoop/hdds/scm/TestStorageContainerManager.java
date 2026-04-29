@@ -293,9 +293,9 @@ public class TestStorageContainerManager {
       Map<Long, List<DeletedBlock>> deletedBlocks = new HashMap<>();
       List<DeletedBlock> blocks = new ArrayList<>();
       blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
-          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
       blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
-          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -502,11 +502,12 @@ public class TestStorageContainerManager {
           info.getLatestVersionLocations().getLocationList();
       list.forEach(location -> {
         if (containerBlocks.containsKey(location.getContainerID())) {
-          containerBlocks.get(location.getContainerID())
-              .add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          containerBlocks.get(location.getContainerID()).add(new DeletedBlock(location.getBlockID(),
+              SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
         } else {
           List<DeletedBlock> blks = Lists.newArrayList();
-          blks.add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          blks.add(new DeletedBlock(location.getBlockID(),
+              SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
           containerBlocks.put(location.getContainerID(), blks);
         }
       });

@@ -145,6 +145,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
             caClient.getKeyManager());
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslClientContextBuilder, secConf.getGrpcSslProvider());
+        sslContextBuilder.protocols(secConf.getGrpcTlsProtocols());
+        sslContextBuilder.ciphers(secConf.getGrpcTlsCiphers());
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure datanode GRPC endpoint.", ex);

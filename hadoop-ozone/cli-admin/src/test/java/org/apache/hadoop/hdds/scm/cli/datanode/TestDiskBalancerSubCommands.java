@@ -450,6 +450,24 @@ public class TestDiskBalancerSubCommands {
     }
   }
 
+  @Test
+  public void testUpdateWithInvalidContainerStatesReportsError() throws Exception {
+    DiskBalancerUpdateSubcommand cmd = new DiskBalancerUpdateSubcommand();
+    doThrow(new IllegalArgumentException(
+        "Invalid container state 'NOT_A_CONTAINER_STATE' in"))
+        .when(mockProtocol).updateDiskBalancerConfiguration(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-c", "CLOSED,NOT_A_CONTAINER_STATE", "host-1");
+      cmd.call();
+
+      String err = errContent.toString(DEFAULT_ENCODING);
+      assertTrue(err.contains("Error on node"));
+      assertTrue(err.contains("Invalid container state"));
+    }
+  }
+
   // ========== DiskBalancerStatusSubcommand Tests ==========
 
   @Test

@@ -177,10 +177,6 @@ public final class OzoneConfigKeys {
       "ozone.scm.block.size";
   public static final String OZONE_SCM_BLOCK_SIZE_DEFAULT = "256MB";
 
-  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES =
-      "ozone.client.max.ec.stripe.write.retries";
-  public static final String OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_DEFAULT =
-      "10";
   public static final String OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED =
       "ozone.client.ec.grpc.retries.enabled";
   public static final boolean OZONE_CLIENT_EC_GRPC_RETRIES_ENABLED_DEFAULT
@@ -628,11 +624,6 @@ public final class OzoneConfigKeys {
       "FILE_SYSTEM_OPTIMIZED";
   public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
       "OBJECT_STORE";
-
-  public static final String OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT =
-      "ozone.client.fs.default.bucket.layout";
-  public static final String OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT =
-      OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED;
 
   public static final String OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY =
       "ozone.s3g.default.bucket.layout";
