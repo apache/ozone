@@ -116,6 +116,7 @@ public class MockNodeManager implements NodeManager {
   private int numPipelinePerDatanode;
   private PendingContainerTracker pendingContainerTracker;
   private final OzoneConfiguration conf = new OzoneConfiguration();
+
   {
     this.healthyNodes = new LinkedList<>();
     this.staleNodes = new LinkedList<>();
@@ -940,6 +941,11 @@ public class MockNodeManager implements NodeManager {
   @Override
   public int openContainerLimit(List<DatanodeDetails> datanodes) {
     return 9;
+  }
+
+  @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    return pendingContainerTracker;
   }
 
   @Override

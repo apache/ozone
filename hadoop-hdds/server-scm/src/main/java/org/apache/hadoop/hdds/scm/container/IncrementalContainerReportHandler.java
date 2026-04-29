@@ -104,12 +104,8 @@ public class IncrementalContainerReportHandler
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
             processContainerReplica(dd, container, replicaProto, publisher, detailsForLogging);
-
-            PendingContainerTracker tracker =
-                getNodeManager().getPendingContainerTracker();
-            if (tracker != null) {
-              tracker.removePendingAllocation(dd, id);
-            }
+            PendingContainerTracker tracker = getNodeManager().getPendingContainerTracker();
+            tracker.removePendingAllocation(getNodeManager().getDatanodeInfo(dd).getPendingContainerAllocations(), id);
           }
           success = true;
         } catch (ContainerNotFoundException e) {

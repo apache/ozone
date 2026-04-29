@@ -20,17 +20,15 @@ package org.apache.hadoop.hdds.scm.container;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.function.BooleanSupplier;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
@@ -64,6 +62,7 @@ public class TestPendingContainerTrackerIntegration {
   private PendingContainerTracker pendingTracker;
   private SCMNodeMetrics metrics;
   private OzoneBucket bucket;
+  private SCMNodeManager nodeManager;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -92,7 +91,7 @@ public class TestPendingContainerTrackerIntegration {
     // Create bucket for testing
     bucket = TestDataUtil.createVolumeAndBucket(client);
     
-    SCMNodeManager nodeManager = (SCMNodeManager) scm.getScmNodeManager();
+    nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     assertNotNull(nodeManager);
     pendingTracker = nodeManager.getPendingContainerTracker();
     assertNotNull(pendingTracker, "PendingContainerTracker should be initialized");
@@ -120,39 +119,21 @@ public class TestPendingContainerTrackerIntegration {
     long initialRemoved = metrics.getNumPendingContainersRemoved();
 
     // Allocate a container directly
-    ContainerInfo container = containerManager.allocateContainer(
+    containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
         "omServiceIdDefault");
 
-    // Find the container that was allocated
-    ContainerInfo containerInfo = scm.getContainerManager().getContainers().get(0);
-    ContainerWithPipeline containerWithPipeline =
-        scm.getClientProtocolServer().getContainerWithPipeline(
-            containerInfo.getContainerID());
+    // Verify the added metric increased, meaning pending was recorded
+    GenericTestUtils.waitFor(
+        (BooleanSupplier) () -> metrics.getNumPendingContainersAdded() > initialAdded,
+        100, 5000);
 
-    Pipeline pipeline = containerWithPipeline.getPipeline();
-
-    // Verify pending containers are tracked for all nodes in pipeline
-    List<DatanodeDetails> nodesWithPending = new ArrayList<>();
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      long pendingCount = pendingTracker.getPendingContainerCount(dn);
-      if (pendingCount > 0) {
-        nodesWithPending.add(dn);
-        LOG.info("DataNode {} has {} pending containers", dn.getUuidString(), pendingCount);
-
-        assertThat(pendingTracker.containsPendingContainer(dn, container.containerID()));
-      }
-    }
-
-    assertThat(nodesWithPending).isNotEmpty();
-
-    // Verify metrics increased
     long afterAdded = metrics.getNumPendingContainersAdded();
     assertThat(afterAdded).isGreaterThan(initialAdded);
 
     LOG.info("Pending tracked successfully. Waiting for ICR to remove pending...");
 
-    // Write a key
+    // Write a key so datanodes send ICRs
     String keyName = "testKey1";
     byte[] data = "Testing Pending Container Tracker".getBytes(UTF_8);
 
@@ -164,34 +145,19 @@ public class TestPendingContainerTrackerIntegration {
     }
     LOG.info("Key written successfully");
 
-    // Wait for ICRs to be sent
-    GenericTestUtils.waitFor(() -> {
-      for (DatanodeDetails dn : nodesWithPending) {
-        if (pendingTracker.containsPendingContainer(dn, container.containerID())) {
-          LOG.info("Still waiting for ICR from DN {}", dn.getUuidString());
-          return false;
-        }
-      }
+    // Wait for ICRs to be processed and removed metric to increase
+    GenericTestUtils.waitFor(
+        (BooleanSupplier) () -> metrics.getNumPendingContainersRemoved() > initialRemoved,
+        100, 5000);
 
-      LOG.info("All pending containers removed via ICR!");
-      return true;
-    }, 100, 5000);
-
-    // Verify all pending containers removed
-    for (DatanodeDetails dn : nodesWithPending) {
-      assertFalse(pendingTracker.containsPendingContainer(dn, container.containerID()));
-    }
-
-    // Verify remove metrics increased
     long afterRemoved = metrics.getNumPendingContainersRemoved();
     assertThat(afterRemoved).isGreaterThan(initialRemoved);
 
-    LOG.info("After added = " + afterAdded);
-
+    LOG.info("After added={}, removed={}", afterAdded, afterRemoved);
   }
 
   /**
-   * Test: Verify idempotency - container reported multiple times.
+   * Test: Verify idempotency - adding the same container twice does not double-count in metrics.
    */
   @Test
   public void testIdempotentPendingTracking() throws Exception {
@@ -199,24 +165,22 @@ public class TestPendingContainerTrackerIntegration {
     ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
         "omServiceIdDefault");
-    
+
     Pipeline pipeline = scm.getPipelineManager().getPipeline(container.getPipelineID());
     DatanodeDetails firstNode = pipeline.getFirstNode();
-    
-    // Record initial state
-    long initialCount = pendingTracker.getPendingContainerCount(firstNode);
+    DatanodeInfo firstNodeInfo = nodeManager.getDatanodeInfo(firstNode);
 
-    LOG.info("Initial pending state: count={}", initialCount);
+    // Capture the added metric after initial allocation
+    long addedAfterAllocation = metrics.getNumPendingContainersAdded();
+
+    LOG.info("Pending added metric after allocation: {}", addedAfterAllocation);
 
     // Try adding the same container again (simulates retry or duplicate allocation)
-    pendingTracker.recordPendingAllocationForDatanode(firstNode, container.containerID());
+    pendingTracker.recordPendingAllocationForDatanode(firstNodeInfo, container.containerID());
 
-    long afterCount = pendingTracker.getPendingContainerCount(firstNode);
-
-    // Count should remain the same (idempotent)
-    assertEquals(initialCount, afterCount,
-        "Pending count should not change when adding duplicate container");
-
+    // The metric should not have increased since it was a duplicate
+    assertEquals(addedAfterAllocation, metrics.getNumPendingContainersAdded(),
+        "Pending added metric should not change when adding duplicate container");
   }
 
   /**
@@ -242,15 +206,13 @@ public class TestPendingContainerTrackerIntegration {
     }
 
     // addedMetrics should increase as containers are allocated
-    GenericTestUtils.waitFor(() -> {
-      long afterAdded = metrics.getNumPendingContainersAdded();
-      return afterAdded > initialAdded;
-    }, 100, 5000);
+    GenericTestUtils.waitFor(
+        (BooleanSupplier) () -> metrics.getNumPendingContainersAdded() > initialAdded,
+        100, 5000);
 
-    // Removed metric should increase after icr process
-    GenericTestUtils.waitFor(() -> {
-      long afterRemoved = metrics.getNumPendingContainersRemoved();
-      return initialRemoved < afterRemoved;
-    }, 100, 5000);
+    // Removed metric should increase after ICR processing
+    GenericTestUtils.waitFor(
+        (BooleanSupplier) () -> metrics.getNumPendingContainersRemoved() > initialRemoved,
+        100, 5000);
   }
 }

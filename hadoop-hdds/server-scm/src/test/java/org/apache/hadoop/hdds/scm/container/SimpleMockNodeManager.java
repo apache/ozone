@@ -455,10 +455,4 @@ public class SimpleMockNodeManager implements NodeManager {
     }
     return pendingContainerTracker;
   }
-
-  @Override
-  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node) {
-    return true;
-  }
-
 }

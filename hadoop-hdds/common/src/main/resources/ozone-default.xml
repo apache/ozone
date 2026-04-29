@@ -1038,6 +1038,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pending.container.roll.interval</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The interval at which the two-window tumbling bucket for pending
+      container allocations rolls over per DataNode. Pending containers
+      that have not been confirmed within two intervals are automatically
+      aged out. Default is 5 minutes.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.lock.stripes</name>
     <value>512</value>
     <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>

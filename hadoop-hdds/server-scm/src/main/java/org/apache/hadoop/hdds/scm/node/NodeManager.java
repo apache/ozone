@@ -440,23 +440,4 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * SCM-side tracker for container allocations not yet reported by datanodes.
    */
   PendingContainerTracker getPendingContainerTracker();
-
-  /**
-   * True if the node can accept another container of the given size, accounting for
-   * {@link #getPendingContainerTracker()}.
-   */
-  boolean hasSpaceForNewContainerAllocation(DatanodeDetails node);
-
-  /**
-   * Records a pending container allocation for {@code node} so that subsequent
-   * space checks via {@link #hasSpaceForNewContainerAllocation} account for the
-   * in-flight allocation before the datanode sends an ICR.
-   *
-   * @param node        the datanode that will receive the new container replica
-   * @param containerID the container being allocated
-   */
-  default void recordPendingAllocationForDatanode(DatanodeDetails node,
-      ContainerID containerID) {
-    getPendingContainerTracker().recordPendingAllocationForDatanode(node, containerID);
-  }
 }

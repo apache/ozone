@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -221,5 +222,10 @@ public class PendingContainerTracker {
     if (removed && metrics != null) {
       metrics.incNumPendingContainersRemoved();
     }
+  }
+
+  @VisibleForTesting
+  public SCMNodeMetrics getMetrics() {
+    return metrics;
   }
 }

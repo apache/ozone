@@ -69,7 +69,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -146,13 +145,6 @@ public class SCMNodeManager implements NodeManager {
   private final int numContainerPerVolume;
 
   /**
-   * SCM-side pending container allocations per datanode (not yet in container reports).
-   */
-  private final PendingContainerTracker pendingContainerTracker;
-
-  private final long maxContainerSizeBytes;
-
-  /**
    * Lock used to synchronize some operation in Node manager to ensure a
    * consistent view of the node state.
    */
@@ -200,7 +192,10 @@ public class SCMNodeManager implements NodeManager {
     this.pendingContainerTracker = new PendingContainerTracker(
         (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES),
-        5 * 60 * 1000, // TODO
+        conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL,
+            ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS),
         this.metrics);
     this.clusterMap = networkTopology;
     this.nodeResolver = nodeResolver;
@@ -219,14 +214,6 @@ public class SCMNodeManager implements NodeManager {
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
     this.nonWritableNodeFilter = new NonWritableNodeFilter(conf);
-
-    this.maxContainerSizeBytes = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    long rollIntervalMs = scmConfig.getPendingContainerAllocationRollInterval().toMillis();
-    this.pendingContainerTracker = new PendingContainerTracker(
-        maxContainerSizeBytes, rollIntervalMs, this.metrics);
   }
 
   @Override
@@ -250,35 +237,6 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public PendingContainerTracker getPendingContainerTracker() {
     return pendingContainerTracker;
-  }
-
-  /**
-   * Effective space check aligned with container allocation: per-disk slot model minus
-   * SCM pending allocations.
-   */
-  @Override
-  public boolean hasSpaceForNewContainerAllocation(DatanodeDetails node) {
-    Objects.requireNonNull(node, "node==null");
-    try {
-      DatanodeInfo datanodeInfo = getDatanodeInfo(node);
-      if (datanodeInfo == null) {
-        LOG.warn("DatanodeInfo not found for node {}", node.getUuidString());
-        return false;
-      }
-      return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(
-          node, datanodeInfo);
-    } catch (Exception e) {
-      LOG.warn("Error checking allocatable space for node {}", node.getUuidString(), e);
-      return false;
-    }
-  }
-
-  @Override
-  public void recordPendingAllocationForDatanode(DatanodeDetails node,
-      ContainerID containerID) {
-    Objects.requireNonNull(node, "node==null");
-    Objects.requireNonNull(containerID, "containerID==null");
-    pendingContainerTracker.recordPendingAllocationForDatanode(node, containerID);
   }
 
   protected NodeStateManager getNodeStateManager() {
@@ -762,7 +720,6 @@ public class SCMNodeManager implements NodeManager {
         datanodeInfo.updateStorageReports(nodeReport.getStorageReportList());
         datanodeInfo.updateMetaDataStorageReports(nodeReport.
             getMetadataStorageReportList());
-        pendingContainerTracker.rollWindowsIfNeeded(datanodeDetails);
         metrics.incNumNodeReportProcessed();
       }
     } catch (NodeNotFoundException e) {

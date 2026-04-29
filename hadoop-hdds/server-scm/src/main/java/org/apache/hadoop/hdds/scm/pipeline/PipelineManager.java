@@ -232,8 +232,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    */
   boolean hasEnoughSpace(Pipeline pipeline);
 
-  void recordPendingAllocation(Pipeline pipeline, ContainerID containerID);
-
   int openContainerLimit(List<DatanodeDetails> datanodes);
 
   /**
