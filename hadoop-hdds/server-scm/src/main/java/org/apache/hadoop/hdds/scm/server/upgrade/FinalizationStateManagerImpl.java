@@ -84,7 +84,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       upgradeFinalizer.replicatedFinalizationSteps(layoutFeature, upgradeContext);
     }
     transactionBuffer.addToBuffer(finalizationStore,
-        OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutFeature.layoutVersion()));
+        OzoneConsts.APPARENT_VERSION_KEY, String.valueOf(layoutFeature.layoutVersion()));
   }
 
   /**
@@ -132,7 +132,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
    */
   private int getDBLayoutVersion() throws IOException {
     String dbLayoutVersion = finalizationStore.get(
-        OzoneConsts.LAYOUT_VERSION_KEY);
+        OzoneConsts.APPARENT_VERSION_KEY);
     if (dbLayoutVersion == null) {
       return versionManager.getMetadataLayoutVersion();
     } else {

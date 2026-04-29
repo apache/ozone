@@ -20,20 +20,16 @@ package org.apache.hadoop.ozone.om.upgrade;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * 'Aspect' for OM Layout Feature API. All methods annotated with the
@@ -43,50 +39,41 @@ import org.slf4j.LoggerFactory;
 @Aspect
 public class OMLayoutFeatureAspect {
 
-  public static final String GET_VERSION_MANAGER_METHOD_NAME =
-      "getOmVersionManager";
-  private static final Logger LOG = LoggerFactory
-      .getLogger(OMLayoutFeatureAspect.class);
-
   @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
     LayoutFeature layoutFeature = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value();
-    LayoutVersionManager lvm;
+    OMVersionManager versionManager = null;
     final Object[] args = joinPoint.getArgs();
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
       OzoneManager ozoneManager = ((OzoneManagerRequestHandler)
           joinPoint.getTarget()).getOzoneManager();
-      lvm = ozoneManager.getVersionManager();
+      versionManager = ozoneManager.getVersionManager();
     } else if (joinPoint.getTarget() instanceof OMClientRequest &&
         joinPoint.toShortString().endsWith(".preExecute(..))")) {
       // Get OzoneManager instance from preExecute first argument
       OzoneManager ozoneManager = (OzoneManager) args[0];
-      lvm = ozoneManager.getVersionManager();
+      versionManager = ozoneManager.getVersionManager();
     } else {
-      try {
-        Method method = joinPoint.getTarget().getClass()
-            .getMethod(GET_VERSION_MANAGER_METHOD_NAME);
-        lvm = (LayoutVersionManager) method.invoke(joinPoint.getTarget());
-      } catch (Exception ex) {
-        lvm = new OMLayoutVersionManager();
-      }
+      throw new IOException(
+          "Unable to resolve OMVersionManager for layout validation; "
+              + "expected OzoneManagerRequestHandler or OMClientRequest.preExecute: "
+              + joinPoint.toShortString());
     }
-    checkIsAllowed(joinPoint.getSignature().toShortString(), lvm, layoutFeature);
+    // Throws an exception that must be propagated if the request is not allowed.
+    checkIsAllowed(joinPoint.getSignature().toShortString(), versionManager, layoutFeature);
   }
 
   private void checkIsAllowed(String operationName,
-                              LayoutVersionManager lvm,
+                              OMVersionManager omVersionManager,
                               LayoutFeature layoutFeature) throws OMException {
-    if (!lvm.isAllowed(layoutFeature)) {
+    if (!omVersionManager.isAllowed(layoutFeature)) {
       throw new OMException(String.format("Operation %s cannot be invoked " +
-              "before finalization. It belongs to the layout feature %s, " +
-              "whose layout version is %d. Current Layout version is %d",
+              "before finalization. It belongs to version %s. Current apparent version is %s",
           operationName,
-          layoutFeature.toString(),
-          layoutFeature.layoutVersion(),
-          lvm.getMetadataLayoutVersion()),
+          layoutFeature,
+          omVersionManager.getApparentVersion()),
           NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
   }

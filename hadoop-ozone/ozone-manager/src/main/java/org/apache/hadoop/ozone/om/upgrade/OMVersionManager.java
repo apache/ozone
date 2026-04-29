@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -73,7 +73,9 @@ public class OMVersionManager extends ComponentVersionManager {
       LOG.info("New OM snapshot received with higher apparent version {}. "
           + "Attempting to finalize current OM to that version.", apparentVersionInDB);
       finalizeUpgrade();
-      updateApparentVersionInDB(metadataManager);
+      // Update the apparent version in the DB to match the VERSION file.
+      // When finalization is not done with a snapshot, this DB value is updated by OMFinalizeUpgradeRequest.
+      metadataManager.getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(getApparentVersion().serialize()));
     }
   }
 
@@ -97,12 +99,8 @@ public class OMVersionManager extends ComponentVersionManager {
   }
 
   private static ComponentVersion getApparentVersionInDB(OMMetadataManager metadataManager) throws IOException {
-    String apparentVersion = metadataManager.getMetaTable().get(LAYOUT_VERSION_KEY);
+    String apparentVersion = metadataManager.getMetaTable().get(APPARENT_VERSION_KEY);
     return (apparentVersion == null) ? null : computeApparentVersion(Integer.parseInt(apparentVersion));
-  }
-
-  private void updateApparentVersionInDB(OMMetadataManager metadataManager) throws IOException {
-    metadataManager.getMetaTable().put(LAYOUT_VERSION_KEY, String.valueOf(getApparentVersion().serialize()));
   }
 
   /**

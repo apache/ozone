@@ -28,9 +28,8 @@ import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -42,8 +41,9 @@ class TestVersionExtractor {
   @EnumSource(OMLayoutFeature.class)
   void testLayoutVersionExtractor(OMLayoutFeature layoutVersionValue) throws OMException {
     ValidationContext context = mock(ValidationContext.class);
-    LayoutVersionManager layoutVersionManager = new OMLayoutVersionManager(layoutVersionValue.serialize());
-    when(context.versionManager()).thenReturn(layoutVersionManager);
+    OMVersionManager omVm = mock(OMVersionManager.class);
+    when(omVm.getApparentVersion()).thenReturn(layoutVersionValue);
+    when(context.versionManager()).thenReturn(omVm);
     ComponentVersion version =
         VersionExtractor.LAYOUT_VERSION_EXTRACTOR.extractVersion(null, context);
     assertEquals(layoutVersionValue, version);

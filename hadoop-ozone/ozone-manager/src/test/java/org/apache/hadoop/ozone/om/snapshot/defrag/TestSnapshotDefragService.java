@@ -105,8 +105,8 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOm
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -145,9 +145,6 @@ public class TestSnapshotDefragService {
   @Mock
   private IOzoneManagerLock omLock;
 
-  @Mock
-  private OMLayoutVersionManager versionManager;
-
   private DeltaFileComputer deltaFileComputer;
 
   @TempDir
@@ -162,6 +159,7 @@ public class TestSnapshotDefragService {
   public void setup() throws IOException {
     mocks = MockitoAnnotations.openMocks(this);
     configuration = new OzoneConfiguration();
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
 
     // Setup basic mocks
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
@@ -174,7 +172,6 @@ public class TestSnapshotDefragService {
     when(omSnapshotManager.getSnapshotLocalDataManager()).thenReturn(snapshotLocalDataManager);
     when(metadataManager.getLock()).thenReturn(omLock);
     when(metadataManager.getSnapshotParentDir()).thenReturn(tempDir);
-    when(versionManager.isAllowed(any(LayoutFeature.class))).thenReturn(true);
     try (MockedConstruction<CompositeDeltaDiffComputer> compositeDeltaDiffComputer =
              mockConstruction(CompositeDeltaDiffComputer.class)) {
       // Initialize service

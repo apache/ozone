@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("visibilitymodifier")
 public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
-    implements LayoutVersionManager, LayoutVersionManagerMXBean {
+    implements LayoutVersionManagerMXBean {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractLayoutVersionManager.class);
@@ -164,7 +164,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     return softwareLayoutVersion;
   }
 
-  @Override
   public boolean needsFinalization() {
     lock.readLock().lock();
     try {
@@ -174,7 +173,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
   }
 
-  @Override
   public boolean isAllowed(LayoutFeature layoutFeature) {
     lock.readLock().lock();
     try {
@@ -184,12 +182,10 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
   }
 
-  @Override
   public LayoutFeature getFeature(int layoutVersion) {
     return features.get(layoutVersion);
   }
 
-  @Override
   public Iterable<LayoutFeature> unfinalizedFeatures() {
     lock.readLock().lock();
     try {
@@ -201,7 +197,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
   }
 
-  @Override
   public void close() {
     if (mBean != null) {
       MBeans.unregister(mBean);
