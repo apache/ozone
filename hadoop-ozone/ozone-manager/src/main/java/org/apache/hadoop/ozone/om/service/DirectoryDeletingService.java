@@ -275,6 +275,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     return numberOfParallelThreadsPerStore;
   }
 
+  @VisibleForTesting
+  ThreadPoolExecutor getDeletionThreadPool() {
+    return (ThreadPoolExecutor) deletionThreadPool;
+  }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   void optimizeDirDeletesAndSubmitRequest(
       long dirNum, long subDirNum, long subFileNum,
