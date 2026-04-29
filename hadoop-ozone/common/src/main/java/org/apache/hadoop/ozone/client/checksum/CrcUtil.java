@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.client.checksum;
 
 import java.util.Arrays;
-import java.util.function.ToIntFunction;
+import java.util.function.LongToIntFunction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
@@ -41,7 +41,7 @@ public final class CrcUtil {
    * @return a * b (mod p),
    *         where mod p is computed by the given mod function.
    */
-  static int multiplyMod(int a, int b, ToIntFunction<Long> mod) {
+  static int multiplyMod(int a, int b, LongToIntFunction mod) {
     final long left  = ((long)a) << 32;
     final long right = ((long)b) << 32;
 
@@ -94,7 +94,7 @@ public final class CrcUtil {
    * @param mod mod.
    * @return monomial.
    */
-  public static int getMonomial(long lengthBytes, ToIntFunction<Long> mod) {
+  public static int getMonomial(long lengthBytes, LongToIntFunction mod) {
     if (lengthBytes == 0) {
       return MULTIPLICATIVE_IDENTITY;
     } else if (lengthBytes < 0) {
@@ -131,7 +131,7 @@ public final class CrcUtil {
    * @return compose with monomial.
    */
   public static int composeWithMonomial(
-      int crcA, int crcB, int monomial, ToIntFunction<Long> mod) {
+      int crcA, int crcB, int monomial, LongToIntFunction mod) {
     return multiplyMod(crcA, monomial, mod) ^ crcB;
   }
 
@@ -144,7 +144,7 @@ public final class CrcUtil {
    * @param mod mod.
    * @return compose result.
    */
-  public static int compose(int crcA, int crcB, long lengthB, ToIntFunction<Long> mod) {
+  public static int compose(int crcA, int crcB, long lengthB, LongToIntFunction mod) {
     int monomial = getMonomial(lengthB, mod);
     return composeWithMonomial(crcA, crcB, monomial, mod);
   }

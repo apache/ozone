@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
-import java.util.function.ToIntFunction;
+import java.util.function.LongToIntFunction;
 import org.apache.hadoop.util.DataChecksum;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -102,7 +102,7 @@ public class TestCrcUtil {
   private static long[] runTestMultiplyMod(int n, DataChecksum.Type type) {
     System.out.printf("Run %s with %d computations%n", type, n);
     final int polynomial = getCrcPolynomialForType(type);
-    final ToIntFunction<Long> mod = CrcComposer.getModFunction(type);
+    final LongToIntFunction mod = CrcComposer.getModFunction(type);
 
     final int[] p = new int[n];
     final int[] q = new int[n];

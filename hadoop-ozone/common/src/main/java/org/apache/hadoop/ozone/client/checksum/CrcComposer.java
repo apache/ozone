@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client.checksum;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.function.ToIntFunction;
+import java.util.function.LongToIntFunction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.common.PureJavaCrc32ByteBuffer;
@@ -41,7 +41,7 @@ public final class CrcComposer {
   private static final int CRC_SIZE_BYTES = 4;
   private static final Logger LOG = LoggerFactory.getLogger(CrcComposer.class);
 
-  private final ToIntFunction<Long> mod;
+  private final LongToIntFunction mod;
   private final int precomputedMonomialForHint;
   private final long bytesPerCrcHint;
   private final long stripeLength;
@@ -83,7 +83,7 @@ public final class CrcComposer {
   }
 
   /** @return the mod function for the given type. */
-  static ToIntFunction<Long> getModFunction(DataChecksum.Type type) {
+  static LongToIntFunction getModFunction(DataChecksum.Type type) {
     switch (type) {
     case CRC32:
       return PureJavaCrc32ByteBuffer::mod;
