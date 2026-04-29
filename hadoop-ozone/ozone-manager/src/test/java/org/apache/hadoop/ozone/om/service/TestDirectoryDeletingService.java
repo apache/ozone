@@ -225,6 +225,17 @@ public class TestDirectoryDeletingService {
       releaseTasks.countDown();
       CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
           .get(10, TimeUnit.SECONDS);
+
+      // Also exercise the actual DirectoryDeletingService task path.
+      service.suspend();
+      DirectoryDeletingService.DirDeletingTask dirDeletingTask =
+          service.new DirDeletingTask(null);
+      long completedTaskCountBefore = threadPoolExecutor.getCompletedTaskCount();
+      dirDeletingTask.processDeletedDirsForStore(
+          null, ozoneManager.getKeyManager(), 1, 1);
+      assertThat(threadPoolExecutor.getCompletedTaskCount())
+          .as("processDeletedDirsForStore should execute tasks on deletion thread pool")
+          .isGreaterThan(completedTaskCountBefore);
     } finally {
       ozoneManager.stop();
     }
