@@ -38,9 +38,8 @@ source "$TEST_DIR"/testlib.sh
 # Restart one service with the target image.
 rolling_restart_service() {
   SERVICE="$1"
-  local target_image="$2"
 
-  echo "--- RESTARTING ${SERVICE} WITH IMAGE ${target_image} ---"
+  echo "--- RESTARTING ${SERVICE} WITH IMAGE ${TARGET_IMAGE} ---"
 
   # Stop service
   stop_containers "${SERVICE}"
@@ -48,7 +47,7 @@ rolling_restart_service() {
   callback before_service_restart
 
   # Restart service with the requested image.
-  prepare_for_image "${target_image}"
+  prepare_for_image "${TARGET_IMAGE}"
   create_containers "${SERVICE}"
 
   callback after_service_restart
@@ -73,35 +72,35 @@ rolling_restart_service() {
 
 rolling_restart_all_services() {
   STAGE_PREFIX="$1"
-  local target_image="$2"
+  TARGET_IMAGE="$2"
   local s
 
   # SCMs first
   for s in scm2 scm1 scm3; do
-    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
-    rolling_restart_service "$s" "${target_image}"
+    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${STAGE_PREFIX}-${s}"
+    rolling_restart_service "$s"
   done
 
   # Recon
-  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-recon"
-  rolling_restart_service "recon" "${target_image}"
+  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${STAGE_PREFIX}-recon"
+  rolling_restart_service "recon"
 
   # DNs
   for s in dn1 dn2 dn3 dn4 dn5; do
-    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
-    rolling_restart_service "$s" "${target_image}"
+    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${STAGE_PREFIX}-${s}"
+    rolling_restart_service "$s"
   done
 
   # OMs
   for s in om1 om2 om3; do
-    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
-    rolling_restart_service "$s" "${target_image}"
+    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${STAGE_PREFIX}-${s}"
+    rolling_restart_service "$s"
   done
 
   # S3 Gateways (s3g is HAProxy and does not need to be upgraded)
   for s in s3g1 s3g2 s3g3; do
-    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
-    rolling_restart_service "$s" "${target_image}"
+    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${STAGE_PREFIX}-${s}"
+    rolling_restart_service "$s"
   done
 }
 

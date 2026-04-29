@@ -29,34 +29,34 @@ after_service_restart() {
 
 with_old_version() {
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
-  generate old1
-  validate old1
+  generate old1 "$CLIENT"
+  validate old1 "$CLIENT"
 }
 
 with_this_version_pre_finalized() {
   # No check for pre-finalized status here, because the release may not have
   # added layout features to OM or HDDS.
-  validate old1
+  validate old1 "$CLIENT"
 
-  generate new1
-  validate new1
+  generate new1 "$CLIENT"
+  validate new1 "$CLIENT"
 }
 
 with_old_version_downgraded() {
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
-  validate old1
-  validate new1
+  validate old1 "$CLIENT"
+  validate new1 "$CLIENT"
 
-  generate old2
-  validate old2
+  generate old2 "$CLIENT"
+  validate old2 "$CLIENT"
 }
 
 with_this_version_finalized() {
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
-  validate old1
-  validate new1
-  validate old2
+  validate old1 "$CLIENT"
+  validate new1 "$CLIENT"
+  validate old2 "$CLIENT"
 
-  generate new2
-  validate new2
+  generate new2 "$CLIENT"
+  validate new2 "$CLIENT"
 }
