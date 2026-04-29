@@ -1111,6 +1111,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Deprecated
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException {
     FinalizeScmUpgradeRequestProto req = FinalizeScmUpgradeRequestProto.
@@ -1137,6 +1138,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Deprecated
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException {

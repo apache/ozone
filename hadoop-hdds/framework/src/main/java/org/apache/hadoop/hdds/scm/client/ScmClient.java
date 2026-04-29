@@ -443,9 +443,11 @@ public interface ScmClient extends Closeable {
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException;
 
+  @Deprecated
   StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException;
 
+  @Deprecated
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
