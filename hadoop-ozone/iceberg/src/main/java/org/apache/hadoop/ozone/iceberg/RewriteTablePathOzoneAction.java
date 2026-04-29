@@ -224,7 +224,8 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
     RewriteResult<Snapshot> rewriteVersionResult = rewriteVersionFiles(endMetadata);
     Set<Snapshot> deltaSnapshots = deltaSnapshots(startMetadata, rewriteVersionResult.toRewrite());
-    Set<String> manifestsToRewrite = manifestsToRewrite(deltaSnapshots, startMetadata);
+    //TODO: manifestsToRewrite will be used while re-write of manifest-list files.
+    Set<String> manifestsToRewrite = manifestsToRewrite(deltaSnapshots, startMetadata, endMetadata);
 
     Set<Pair<String, String>> copyPlan = new HashSet<>();
     copyPlan.addAll(rewriteVersionResult.copyPlan());
@@ -272,8 +273,8 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     return result;
   }
 
-  private Set<String> manifestsToRewrite(Set<Snapshot> deltaSnapshots, TableMetadata startMetadata) {
-    Table endStaticTable = RewriteTablePathOzoneUtils.newStaticTable(endVersionName, table.io());
+  private Set<String> manifestsToRewrite(Set<Snapshot> deltaSnapshots, TableMetadata startMetadata, 
+      TableMetadata endMetadata) {
 
     final Set<Long> deltaSnapshotIds;
     if (startMetadata != null) {
@@ -292,7 +293,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     int completedTasks = 0;
 
     try {
-      for (Snapshot snapshot : endStaticTable.snapshots()) {
+      for (Snapshot snapshot : endMetadata.snapshots()) {
         semaphore.acquire(); // blocks when maxInFlight tasks are already in-flight
 
         final long snapshotId = snapshot.snapshotId();
