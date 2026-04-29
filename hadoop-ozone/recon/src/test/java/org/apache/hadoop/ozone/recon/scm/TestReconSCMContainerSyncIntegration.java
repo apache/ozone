@@ -223,7 +223,7 @@ public class TestReconSCMContainerSyncIntegration
 
     @Test
     void largeTotalDriftReturnsFullSnapshot() throws Exception {
-      // Recon empty, SCM has 200,000 containers → well above default 10k threshold
+      // Recon empty, SCM has 200,000 containers → above default 100k threshold
       when(mockScm.getContainerCount()).thenReturn(200_000L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
@@ -261,8 +261,8 @@ public class TestReconSCMContainerSyncIntegration
     void largeNonOpenDriftStillReturnsFullSnapshot() throws Exception {
       // Most of SCM's drift is in stable states, so a full snapshot is still
       // the correct escalation path.
-      when(mockScm.getContainerCount()).thenReturn(20_000L);
-      when(mockScm.getContainerCount(OPEN)).thenReturn(5_000L);
+      when(mockScm.getContainerCount()).thenReturn(200_000L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(50_000L);
 
       assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
     }
@@ -1147,28 +1147,29 @@ public class TestReconSCMContainerSyncIntegration
     }
 
     @Test
-    void decideSyncAction100kDriftTriggerFullSnapshot() throws Exception {
-      // SCM has 100k containers, Recon is empty → drift 100k > threshold 10k
+    void decideSyncAction100kDriftAtThresholdTriggersTargetedSync() throws Exception {
+      // SCM has 100k containers, Recon is empty → drift 100k == threshold.
+      // Threshold is exclusive, so this stays on targeted sync.
       when(mockScm.getContainerCount()).thenReturn(100_000L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
-      assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
+      assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
 
     @Test
-    void decideSyncAction50kReconMissingTriggersFullSnapshot() throws Exception {
-      // Recon has 50k CLOSED, SCM has 100k → drift 50k > threshold 10k
+    void decideSyncAction50kReconMissingTriggersTargetedSync() throws Exception {
+      // Recon has 50k CLOSED, SCM has 100k → drift 50k < threshold 100k
       seedRecon(1, 50_000, CLOSED);
 
       when(mockScm.getContainerCount()).thenReturn(100_000L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
-      assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
+      assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
 
     @Test
     void decideSyncAction5kDriftTriggersTargetedSync() throws Exception {
-      // Recon has 95k, SCM has 100k → drift 5k < threshold 10k → TARGETED_SYNC
+      // Recon has 95k, SCM has 100k → drift 5k < threshold 100k → TARGETED_SYNC
       seedRecon(1, 95_000, CLOSED);
 
       when(mockScm.getContainerCount()).thenReturn(100_000L);
@@ -1178,17 +1179,17 @@ public class TestReconSCMContainerSyncIntegration
     }
 
     @Test
-    void decideSyncAction100kOpenToClosedDriftTriggersFullSnapshot() throws Exception {
+    void decideSyncAction100kOpenToClosedDriftTriggersTargetedSync() throws Exception {
       // Total counts match, but SCM has advanced every OPEN container to a
-      // stable non-OPEN state. That creates a large non-OPEN drift and should
-      // escalate to FULL_SNAPSHOT under the new policy.
+      // stable non-OPEN state. Drift is exactly at the default 100k threshold,
+      // so the exclusive threshold check keeps this on targeted sync.
       seedRecon(1, 100_000, OPEN); // all OPEN in Recon
 
       when(mockScm.getContainerCount()).thenReturn(100_000L); // total matches
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);          // SCM has 0 OPEN
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
 
-      assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
+      assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
 
     @Test
