@@ -51,6 +51,10 @@ public class TestReconOmMetaManagerUtils {
    * Waits until Recon's container-key index reports at least the given number of keys
    * per container id. Use after OM sync when the event buffer can be empty while a
    * dequeued batch is still being processed.
+   * <p>
+   * IO failures from {@code mgr} reads (including temporary {@code RocksDatabaseException}
+   * while Recon applies updates) are treated as "not ready yet"; the wait repeats until the
+   * timeout if counts never converge.
    *
    * @param mgr                      Recon container metadata manager
    * @param minimumCountPerContainer map of container ID to minimum inclusive key count
@@ -67,8 +71,9 @@ public class TestReconOmMetaManagerUtils {
         }
         return true;
       } catch (IOException ex) {
-        throw new RuntimeException(ex);
+        // Retry: concurrent Recon indexing can transiently expose a closed Rocks handle.
+        return false;
       }
-    }, 500, 45000);
+    }, 1000, 90000);
   }
 }
