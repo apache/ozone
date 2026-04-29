@@ -384,7 +384,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private boolean isDiskCheckEnabled = true;
 
-  @Config(key = "hdds.datanode.rocksdb.disk.check.io.test.enabled",
+  @Config(key = "hdds.datanode.disk.check.rocksdb.check.io.test.enabled",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = {DATANODE},
