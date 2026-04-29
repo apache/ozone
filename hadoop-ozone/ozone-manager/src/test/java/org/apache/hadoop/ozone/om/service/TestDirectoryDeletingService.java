@@ -66,15 +66,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test Directory Deleting Service.
  */
 public class TestDirectoryDeletingService {
-
-  private static final Logger LOG = LoggerFactory.getLogger(TestDirectoryDeletingService.class);
 
   @TempDir
   private Path folder;
@@ -187,16 +183,14 @@ public class TestDirectoryDeletingService {
   public void testMultithreadedDirectoryDeletion() throws Exception {
     int threadCount = 10;
     OzoneConfiguration conf = createConfAndInitValues(threadCount);
-    OmTestManagers omTestManagers
-        = new OmTestManagers(conf);
+    OmTestManagers omTestManagers = new OmTestManagers(conf);
     OzoneManager ozoneManager = omTestManagers.getOzoneManager();
     try {
       DirectoryDeletingService service =
           (DirectoryDeletingService) ozoneManager.getKeyManager().getDirDeletingService();
       ThreadPoolExecutor threadPoolExecutor = service.getDeletionThreadPool();
-      assertThat(threadPoolExecutor.getCorePoolSize())
-          .as("core pool size should match configured directory deletion threads")
-          .isEqualTo(threadCount);
+      assertThat(threadPoolExecutor.getCorePoolSize()).as(
+          "core pool size should match configured directory deletion threads").isEqualTo(threadCount);
 
       CountDownLatch tasksStarted = new CountDownLatch(threadCount);
       CountDownLatch releaseTasks = new CountDownLatch(1);
@@ -216,26 +210,21 @@ public class TestDirectoryDeletingService {
         }, threadPoolExecutor));
       }
 
-      assertTrue(tasksStarted.await(10, TimeUnit.SECONDS),
-          "Expected all submitted tasks to start");
-      assertThat(workerThreads)
-          .as("Expected tasks to run in parallel using configured workers")
-          .hasSize(threadCount);
+      assertTrue(tasksStarted.await(10, TimeUnit.SECONDS), "Expected all submitted tasks to start");
+      assertThat(workerThreads).as("Expected tasks to run in parallel using configured workers").hasSize(threadCount);
 
       releaseTasks.countDown();
-      CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-          .get(10, TimeUnit.SECONDS);
+      CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(10, TimeUnit.SECONDS);
 
       // Also exercise the actual DirectoryDeletingService task path.
       service.suspend();
-      DirectoryDeletingService.DirDeletingTask dirDeletingTask =
-          service.new DirDeletingTask(null);
+      DirectoryDeletingService.DirDeletingTask dirDeletingTask = service.new DirDeletingTask(null);
+      assertThat(threadPoolExecutor.isShutdown()).as(
+          "deletion thread pool should be active when processing deleted dirs").isFalse();
       long completedTaskCountBefore = threadPoolExecutor.getCompletedTaskCount();
-      dirDeletingTask.processDeletedDirsForStore(
-          null, ozoneManager.getKeyManager(), 1, 1);
-      assertThat(threadPoolExecutor.getCompletedTaskCount())
-          .as("processDeletedDirsForStore should execute tasks on deletion thread pool")
-          .isGreaterThan(completedTaskCountBefore);
+      dirDeletingTask.processDeletedDirsForStore(null, ozoneManager.getKeyManager(), 1, 1);
+      GenericTestUtils.waitFor(
+          () -> threadPoolExecutor.getCompletedTaskCount() >= completedTaskCountBefore + threadCount, 100, 5000);
     } finally {
       ozoneManager.stop();
     }
