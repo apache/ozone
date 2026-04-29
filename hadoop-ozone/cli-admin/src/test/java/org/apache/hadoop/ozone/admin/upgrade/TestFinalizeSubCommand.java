@@ -62,7 +62,7 @@ public class TestFinalizeSubCommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertTrue(output.contains("Cluster finalize has been started"));
+    assertTrue(output.contains("Cluster finalization has been started"));
     verify(scmClient).finalizeUpgrade();
   }
 }
