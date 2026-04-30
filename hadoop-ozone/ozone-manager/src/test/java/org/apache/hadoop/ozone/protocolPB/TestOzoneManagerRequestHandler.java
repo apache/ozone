@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.mockito.ArgumentMatchers.any;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,6 +28,7 @@ import java.util.stream.IntStream;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,7 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.util.Time;
@@ -203,7 +206,7 @@ public class TestOzoneManagerRequestHandler {
         .collect(Collectors.toList());
     OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
     OzoneManager ozoneManager = requestHandler.getOzoneManager();
-    Mockito.when(ozoneManager.listStatus(Mockito.any(OmKeyArgs.class), Mockito.anyBoolean(), Mockito.anyString(),
+    Mockito.when(ozoneManager.listStatus(any(OmKeyArgs.class), Mockito.anyBoolean(), Mockito.anyString(),
         Mockito.anyLong(), Mockito.anyBoolean())).thenAnswer(i -> {
           long maxSize = i.getArgument(3);
           maxSize = Math.max(Math.min(resultSize, maxSize), 0);
@@ -320,8 +323,8 @@ public class TestOzoneManagerRequestHandler {
     OzoneManagerRequestHandler handler = getRequestHandler(10);
     OzoneManager ozoneManager = handler.getOzoneManager();
 
-    OMLayoutVersionManager lvm = Mockito.mock(OMLayoutVersionManager.class);
-    Mockito.when(lvm.isAllowed(Mockito.anyString())).thenReturn(true);
+    OMVersionManager lvm = Mockito.mock(OMVersionManager.class);
+    Mockito.when(lvm.isAllowed(any(ComponentVersion.class))).thenReturn(true);
     Mockito.when(ozoneManager.getVersionManager()).thenReturn(lvm);
 
     Mockito.when(ozoneManager.snapshotDiff(Mockito.anyString(), Mockito.anyString(),
