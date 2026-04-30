@@ -43,8 +43,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -90,7 +88,6 @@ import org.slf4j.LoggerFactory;
  * Tests upgrade finalization failure scenarios and corner cases specific to SCM data distribution feature.
  */
 public class TestScmDataDistributionFinalization {
-  private static final String CLIENT_ID = UUID.randomUUID().toString();
   private static final Logger LOG =
       LoggerFactory.getLogger(TestScmDataDistributionFinalization.class);
 
@@ -98,7 +95,6 @@ public class TestScmDataDistributionFinalization {
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
-  private Future<?> finalizationFuture;
   private final String volumeName = UUID.randomUUID().toString();
   private final String bucketName = UUID.randomUUID().toString();
   private OzoneBucket bucket;
@@ -158,22 +154,6 @@ public class TestScmDataDistributionFinalization {
       volume.createBucket(bucketName, builder.build());
       bucket = volume.getBucket(bucketName);
     }
-
-    // Launch finalization from the client. In the current implementation,
-    // this call will block until finalization completes. If the test
-    // involves restarts or leader changes the client may be disconnected,
-    // but finalization should still proceed.
-    if (doFinalize) {
-      finalizationFuture = Executors.newSingleThreadExecutor().submit(
-          () -> {
-            try {
-              scmClient.finalizeScmUpgrade(CLIENT_ID);
-            } catch (IOException ex) {
-              LOG.info("finalization client failed. This may be expected if the" +
-                  " test injected failures.", ex);
-            }
-          });
-    }
   }
 
   @AfterEach
@@ -192,8 +172,8 @@ public class TestScmDataDistributionFinalization {
     init(new OzoneConfiguration(), null, true);
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
-    finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmClient.finalizeUpgrade();
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
@@ -297,17 +277,8 @@ public class TestScmDataDistributionFinalization {
     flushDBTransactionBuffer(activeSCM);
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
-    finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (IOException ex) {
-            LOG.info("finalization client failed. This may be expected if the" +
-                " test injected failures.", ex);
-          }
-        });
-    finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmClient.finalizeUpgrade();
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
     assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),

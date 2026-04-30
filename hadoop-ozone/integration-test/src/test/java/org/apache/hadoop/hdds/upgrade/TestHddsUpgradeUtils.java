@@ -34,8 +34,8 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.admin.upgrade.UpgradeUtil;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.slf4j.Logger;
@@ -50,16 +50,11 @@ public final class TestHddsUpgradeUtils {
 
   private TestHddsUpgradeUtils() { }
 
-  public static void waitForFinalizationFromClient(
-      StorageContainerLocationProtocol scmClient, String clientID)
-      throws Exception {
+  public static void waitForFinalizationFromClient(StorageContainerLocationProtocol scmClient) throws Exception {
     LambdaTestUtils.await(60_000, 1_000, () -> {
-      UpgradeFinalization.Status status = scmClient
-          .queryUpgradeFinalizationProgress(clientID, true, true)
-          .status();
-      LOG.info("Waiting for upgrade finalization to complete from client." +
-          " Current status is {}.", status);
-      return status == FINALIZATION_DONE || status == ALREADY_FINALIZED;
+      boolean isComplete = UpgradeUtil.isFinalizationComplete(scmClient);
+      LOG.info("Waiting for upgrade finalization to complete from client.Current status is {}.", isComplete);
+      return isComplete;
     });
   }
 

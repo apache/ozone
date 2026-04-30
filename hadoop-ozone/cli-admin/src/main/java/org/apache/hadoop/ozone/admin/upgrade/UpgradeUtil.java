@@ -17,23 +17,25 @@
 
 package org.apache.hadoop.ozone.admin.upgrade;
 
-import org.apache.hadoop.hdds.cli.AdminSubcommand;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine;
+import java.io.IOException;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 
 /**
- * Subcommand to group upgrade related operations.
+ * Static utility methods for upgrade commands.
  */
-@CommandLine.Command(
-    name = "upgrade",
-    description = "Operations related to Ozone cluster upgrade",
-    mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class,
-    subcommands = {
-        FinalizeSubCommand.class,
-        StatusSubCommand.class
-    })
-@MetaInfServices(AdminSubcommand.class)
-public class UpgradeCommands implements AdminSubcommand {
+public final class UpgradeUtil {
+
+  private UpgradeUtil() { }
+
+  /** Utility method to test if the upgrade has completed (finalized) or not.
+   *
+   * @param scmClient
+   * @return True if the cluster has completed the upgrade and is finalized.
+   * @throws IOException
+   */
+  public static boolean isFinalizationComplete(
+      StorageContainerLocationProtocol scmClient) throws IOException {
+    return scmClient.queryUpgradeStatus().getShouldFinalize();
+  }
+
 }

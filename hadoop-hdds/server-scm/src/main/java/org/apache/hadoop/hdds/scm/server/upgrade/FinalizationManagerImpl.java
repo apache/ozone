@@ -91,6 +91,12 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
+  public void finalizeUpgrade() throws IOException {
+    Objects.requireNonNull(context, "Cannot finalize upgrade without first building the upgrade context.");
+    upgradeFinalizer.finalize(context);
+  }
+
+  @Override
   public UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException {

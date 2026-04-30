@@ -34,6 +34,8 @@ public interface FinalizationManager {
   UpgradeFinalization.StatusAndMessages finalizeUpgrade(String upgradeClientID)
       throws IOException;
 
+  void finalizeUpgrade() throws IOException;
+
   UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;

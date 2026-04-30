@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
@@ -32,8 +31,6 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -69,7 +66,6 @@ import org.mockito.ArgumentCaptor;
  * DeletionService test to Pass Usage from OM to SCM.
  */
 public class TestBlockDeletionService {
-  private static final String CLIENT_ID = UUID.randomUUID().toString();
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME = "bucket1";
   private static final int KEY_SIZE = 5 * 1024; // 5 KB
@@ -142,16 +138,8 @@ public class TestBlockDeletionService {
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
 
     // UPGRADE SCM (if specified)
-    // Step 5: wait for finalizing upgrade
-    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(() -> {
-      try {
-        scmClient.finalizeScmUpgrade(CLIENT_ID);
-      } catch (IOException ex) {
-        fail("finalization client failed", ex);
-      }
-    });
-    finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmClient.finalizeUpgrade();
+    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
     assertEquals(STORAGE_SPACE_DISTRIBUTION.ordinal(),
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 

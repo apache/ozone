@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
@@ -1110,6 +1111,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Deprecated
   public StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException {
     FinalizeScmUpgradeRequestProto req = FinalizeScmUpgradeRequestProto.
@@ -1129,6 +1131,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
+  public void finalizeUpgrade() throws IOException {
+    FinalizeUpgradeRequestProto req = FinalizeUpgradeRequestProto.newBuilder()
+        .build();
+    submitRequest(Type.FinalizeUpgrade, builder -> builder.setFinalizeUpgradeRequest(req));
+  }
+
+  @Override
+  @Deprecated
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException {
