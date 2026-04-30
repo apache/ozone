@@ -121,14 +121,8 @@ public abstract class BasicUpgradeFinalizer
     if (isFinalized(status)) {
       return;
     }
-    try {
-      if (status == FINALIZATION_REQUIRED) {
-        finalizationExecutor.execute(service, this);
-      }
-    } catch (NotLeaderException e) {
-      LOG.info("Leader change encountered during finalization. This component will continue finalization as " +
-          "directed by the new leader.", e);
-      throw e;
+    if (status == FINALIZATION_REQUIRED) {
+      finalizationExecutor.execute(service, this);
     }
   }
 
