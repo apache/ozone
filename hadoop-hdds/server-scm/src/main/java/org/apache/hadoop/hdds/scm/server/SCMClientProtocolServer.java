@@ -45,7 +45,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -680,7 +679,7 @@ public class SCMClientProtocolServer implements
       List<HddsProtos.Node> result = new ArrayList<>();
       for (DatanodeDetails node : queryNode(opState, state)) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
+        DatanodeInfo datanodeInfo = node instanceof DatanodeInfo ? (DatanodeInfo) node : null;
         HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.toProto(clientVersion))
             .addNodeStates(ns.getHealth())
@@ -713,7 +712,7 @@ public class SCMClientProtocolServer implements
       DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
       if (node != null) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
+        DatanodeInfo datanodeInfo = node instanceof DatanodeInfo ? (DatanodeInfo) node : null;
         HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.getProtoBufMessage())
             .addNodeStates(ns.getHealth())
@@ -1595,9 +1594,9 @@ public class SCMClientProtocolServer implements
    * @param state - NodeState.
    * @return List of Datanodes.
    */
-  public List<DatanodeDetails> queryNode(
+  public List<? extends DatanodeDetails> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state) {
-    return new ArrayList<>(queryNodeState(opState, state));
+    return queryNodeState(opState, state);
   }
 
   @VisibleForTesting
@@ -1619,15 +1618,9 @@ public class SCMClientProtocolServer implements
    * @param nodeState - NodeState that we are interested in matching.
    * @return Set of Datanodes that match the NodeState.
    */
-  private Set<DatanodeDetails> queryNodeState(
+  private List<? extends DatanodeDetails> queryNodeState(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodeState) {
-    Set<DatanodeDetails> returnSet = new TreeSet<>();
-    List<DatanodeDetails> tmp = scm.getScmNodeManager()
-        .getNodes(opState, nodeState);
-    if ((tmp != null) && (!tmp.isEmpty())) {
-      returnSet.addAll(tmp);
-    }
-    return returnSet;
+    return scm.getScmNodeManager().getNodes(opState, nodeState);
   }
 
   @Override

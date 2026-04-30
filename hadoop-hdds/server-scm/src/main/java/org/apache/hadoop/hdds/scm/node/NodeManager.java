@@ -113,7 +113,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param health - The health of the node
    * @return List of Datanodes that are Heartbeating SCM.
    */
-  List<DatanodeDetails> getNodes(
+  List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health);
 
   /**
@@ -134,10 +134,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   int getNodeCount(
       NodeOperationalState opState, NodeState health);
 
-  /**
-   * @return all datanodes known to SCM.
-   */
-  List<? extends DatanodeDetails> getAllNodes();
+  /** @return a shadow copied list of all datanodes, sorted by {@link DatanodeID}. */
+  List<DatanodeInfo> getAllNodes();
 
   /** @return the number of datanodes. */
   default int getAllNodeCount() {
@@ -174,15 +172,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return DatanodeUsageInfo of the specified datanode
    */
   DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
-
-  /**
-   * Get the datanode info of a specified datanode.
-   *
-   * @param dn the usage of which we want to get
-   * @return DatanodeInfo of the specified datanode
-   */
-  @Nullable
-  DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
 
   /**
    * True if the node can accept another container of the given size.
