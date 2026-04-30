@@ -147,7 +147,8 @@ class TestGrpcReplicationService {
     doAnswer(invocation -> {
       pushContainerId.set((long) invocation.getArguments()[0]);
       return null;
-    }).when(importer).importContainer(anyLong(), any(), any(), any());
+    }).when(importer).importContainerWithVolumeRetry(anyLong(), any(), any(),
+        any(), anyLong());
     doReturn(true).when(importer).isAllowedContainerImport(eq(
         CONTAINER_ID));
     when(importer.chooseNextVolume(anyLong())).thenReturn(new HddsVolume.Builder(
