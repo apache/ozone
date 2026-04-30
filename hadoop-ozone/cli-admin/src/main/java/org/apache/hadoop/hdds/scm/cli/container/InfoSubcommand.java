@@ -112,7 +112,7 @@ public class InfoSubcommand extends ScmSubcommand {
       container = scmClient.getContainerWithPipeline(containerID);
       Objects.requireNonNull(container, "Container cannot be null");
     } catch (IOException e) {
-      printError("Unable to retrieve the container details for " + containerID + e.getMessage());
+      printError("Unable to retrieve the container details for " + containerID + ". " + e.getMessage());
       return;
     }
 
