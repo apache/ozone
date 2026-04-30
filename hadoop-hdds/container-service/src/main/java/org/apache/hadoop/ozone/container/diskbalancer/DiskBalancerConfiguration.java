@@ -21,10 +21,18 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 
 import jakarta.annotation.Nonnull;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +44,12 @@ import org.slf4j.LoggerFactory;
 public final class DiskBalancerConfiguration {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerConfiguration.class);
+
+  /**
+   * Default value for {@code hdds.datanode.disk.balancer.container.states}: {@value}
+   * (CLOSED and QUASI_CLOSED containers may be disk-balanced).
+   */
+  public static final String DEFAULT_CONTAINER_STATES = "CLOSED,QUASI_CLOSED";
 
   @Config(key = "hdds.datanode.disk.balancer.info.dir", type = ConfigType.STRING,
       defaultValue = "", tags = {ConfigTag.DISKBALANCER},
@@ -94,19 +108,15 @@ public final class DiskBalancerConfiguration {
   )
   private long diskBalancerTimeout = Duration.ofSeconds(300).toMillis();
 
-  @Config(key = "hdds.datanode.disk.balancer.volume.choosing.policy", type = ConfigType.CLASS,
-      defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
-          ".DefaultVolumeChoosingPolicy",
-      tags = {ConfigTag.DISKBALANCER},
-      description = "The volume choosing policy of the disk balancer service.")
-  private Class<?> volumeChoosingPolicyClass;
+  public static final String HDDS_DATANODE_DISKBALANCER_CONTAINER_CHOOSING_POLICY =
+      "hdds.datanode.disk.balancer.container.choosing.policy";
 
-  @Config(key = "hdds.datanode.disk.balancer.container.choosing.policy", type = ConfigType.CLASS,
+  @Config(key = HDDS_DATANODE_DISKBALANCER_CONTAINER_CHOOSING_POLICY, type = ConfigType.CLASS,
       defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
           ".DefaultContainerChoosingPolicy",
       tags = {ConfigTag.DISKBALANCER},
-      description = "The container choosing policy of the disk balancer " +
-          "service.")
+      description = "The policy for selecting source/destination volumes and " +
+          "containers to move for disk balancing.")
   private Class<?> containerChoosingPolicyClass;
 
   @Config(key = "hdds.datanode.disk.balancer.stop.after.disk.even",
@@ -115,6 +125,28 @@ public final class DiskBalancerConfiguration {
       tags = {ConfigTag.DISKBALANCER},
       description = "If true, the DiskBalancer will automatically stop once disks are balanced.")
   private boolean stopAfterDiskEven = true;
+
+  @Config(key = "hdds.datanode.disk.balancer.replica.deletion.delay",
+      defaultValue = "5m",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DISKBALANCER },
+      description = "The delay after a container is successfully moved from source volume to " +
+          "destination volume before the source container replica is deleted. " +
+          "Unit could be defined with postfix (ns,ms,s,m,h,d).")
+  private long replicaDeletionDelay = Duration.ofMinutes(5).toMillis();
+
+  private static final String HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES =
+      "hdds.datanode.disk.balancer.container.states";
+
+  @Config(key = HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES,
+      defaultValue = DEFAULT_CONTAINER_STATES,
+      type = ConfigType.STRING,
+      tags = { DATANODE, ConfigTag.DISKBALANCER },
+      description = "Container lifecycle state names (CLOSED, QUASI_CLOSED) that " +
+          "are eligible to be moved between disks on a datanode. " +
+          "Names must match the enum exactly (uppercase). The default includes CLOSED and QUASI_CLOSED; " +
+          "additional states can be enabled by adding the states here.")
+  private String containerStates = DEFAULT_CONTAINER_STATES;
 
   public DiskBalancerConfiguration(Double threshold,
       Long bandwidthInMB,
@@ -165,10 +197,6 @@ public final class DiskBalancerConfiguration {
     this.diskBalancerTimeout = duration.toMillis();
   }
 
-  public Class<?> getVolumeChoosingPolicyClass() {
-    return volumeChoosingPolicyClass;
-  }
-
   public Class<?> getContainerChoosingPolicyClass() {
     return containerChoosingPolicyClass;
   }
@@ -179,6 +207,15 @@ public final class DiskBalancerConfiguration {
   
   public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
     this.stopAfterDiskEven = stopAfterDiskEven;
+  }
+
+  /**
+   * Gets the replica deletion delay in milliseconds.
+   *
+   * @return delay in milliseconds before source replica is deleted after move
+   */
+  public long getReplicaDeletionDelay() {
+    return replicaDeletionDelay;
   }
 
   /**
@@ -252,6 +289,89 @@ public final class DiskBalancerConfiguration {
     this.parallelThread = parallelThread;
   }
 
+  public String getContainerStates() {
+    return containerStates;
+  }
+
+  /**
+   * Sets the comma-separated container state names and validates them immediately.
+   * <p>
+   * Ozone configuration injection may set the raw container-states string without invoking this
+   * setter; {@link #getMovableContainerStates()} still parses the current field value on read.
+   *
+   * @param containerStates comma-separated {@link State} names (case-sensitive, uppercase);
+   *     whitespace allowed around commas and tokens
+   * @throws IllegalArgumentException if blank, empty after parsing tokens, or unknown state
+   */
+  public void setContainerStates(String containerStates) {
+    parseMovableContainerStates(containerStates);
+    this.containerStates = containerStates;
+  }
+
+  /**
+   * Container lifecycle states eligible for disk balancing, derived from {@link #getContainerStates()}:
+   * same rules as {@link #setContainerStates(String)}.
+   *
+   * @return unmodifiable non-empty set
+   */
+  public Set<State> getMovableContainerStates() {
+    return parseMovableContainerStates(this.containerStates);
+  }
+
+  /**
+   * Parses and validates {@code hdds.datanode.disk.balancer.container.states}.
+   */
+  private static Set<State> parseMovableContainerStates(String raw) {
+    if (StringUtils.isBlank(raw)) {
+      throw new IllegalArgumentException(HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + " must not be empty.");
+    }
+    Set<State> states = new HashSet<>();
+    for (String part : raw.split(",")) {
+      String name = part.trim();
+      if (name.isEmpty()) {
+        continue;
+      }
+      State state;
+      try {
+        state = State.valueOf(name);
+      } catch (IllegalArgumentException ex) {
+        if (wouldMatchContainerStateIfUppercased(name)) {
+          throw new IllegalArgumentException(
+              "Invalid container state '" + name + "': use uppercase enum names "
+                  + "(e.g. CLOSED, QUASI_CLOSED). Valid names are: "
+                  + Arrays.toString(State.values()),
+              ex);
+        }
+        throw new IllegalArgumentException(
+            "Invalid container state '" + name + "' in " + HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + ". "
+                + "Valid names are: " + Arrays.toString(State.values()),
+            ex);
+      }
+      if (HddsUtils.isOpenToWriteState(state) || state == State.DELETED) {
+        throw new IllegalArgumentException("State " + name + " is not movable.");
+      }
+      states.add(State.valueOf(name));
+    }
+    if (states.isEmpty()) {
+      throw new IllegalArgumentException(
+          HDDS_DATANODE_DISK_BALANCER_CONTAINER_STATES + " must list at least one valid state.");
+    }
+    return Collections.unmodifiableSet(states);
+  }
+
+  private static boolean wouldMatchContainerStateIfUppercased(String name) {
+    String upper = name.toUpperCase(Locale.ROOT);
+    if (upper.equals(name)) {
+      return false;
+    }
+    try {
+      State.valueOf(upper);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
   @Override
   public String toString() {
     return String.format("Disk Balancer Configuration values:%n" +
@@ -259,10 +379,12 @@ public final class DiskBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
+            "%-50s %s%n" +
             "%-50s %s%n",
             "Key", "Value",
         "Threshold", threshold, "Max disk bandwidth", diskBandwidthInMB,
-        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven);
+        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven,
+        "Container states", containerStates);
   }
 
   public HddsProtos.DiskBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -272,7 +394,8 @@ public final class DiskBalancerConfiguration {
     builder.setThreshold(threshold)
         .setDiskBandwidthInMB(diskBandwidthInMB)
         .setParallelThread(parallelThread)
-        .setStopAfterDiskEven(stopAfterDiskEven);
+        .setStopAfterDiskEven(stopAfterDiskEven)
+        .setContainerStates(containerStates);
     return builder;
   }
 
@@ -298,6 +421,9 @@ public final class DiskBalancerConfiguration {
     }
     if (newConfigProto.hasStopAfterDiskEven()) {
       existingConfig.setStopAfterDiskEven(newConfigProto.getStopAfterDiskEven());
+    }
+    if (newConfigProto.hasContainerStates()) {
+      existingConfig.setContainerStates(newConfigProto.getContainerStates());
     }
     return existingConfig;
   }

@@ -120,6 +120,8 @@ public class ReplicationServer {
 
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
         sslContextBuilder.trustManager(caClient.getTrustManager());
+        sslContextBuilder.protocols(secConf.getGrpcTlsProtocols());
+        sslContextBuilder.ciphers(secConf.getGrpcTlsCiphers());
 
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (IOException ex) {

@@ -19,12 +19,17 @@
 import React from 'react';
 import filesize from 'filesize';
 
-import { Popover, Table } from 'antd';
+import { Button, Popover, Select, Space, Table } from 'antd';
 import {
   ColumnsType,
   TablePaginationConfig
 } from 'antd/es/table';
-import { CheckCircleOutlined, NodeIndexOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  LeftOutlined,
+  NodeIndexOutlined,
+  RightOutlined
+} from '@ant-design/icons';
 
 import {getFormattedTime} from '@/v2/utils/momentUtils';
 import {showDataFetchError} from '@/utils/common';
@@ -35,8 +40,10 @@ import {
   ContainerReplica,
   ContainerTableProps,
   ExpandedRowState,
-  KeyResponse
+  KeyResponse,
 } from '@/v2/types/container.types';
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const size = filesize.partial({ standard: 'iec' });
 
@@ -178,7 +185,13 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
   expandedRow,
   expandedRowSetter,
   searchColumn = 'containerID',
-  searchTerm = ''
+  searchTerm = '',
+  onNextPage,
+  onPrevPage,
+  hasNextPage,
+  hasPrevPage,
+  pageSize,
+  onPageSizeChange,
 }) => {
 
 
@@ -237,26 +250,20 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
     const containerId = record.containerID
     const containerKeys: ExpandedRowState = expandedRow[containerId];
     const dataSource = containerKeys?.dataSource ?? [];
-    const paginationConfig: TablePaginationConfig = {
-      showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} Keys`
-    }
+    const keysPaginationConfig: TablePaginationConfig = {
+      showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} Keys`,
+      showSizeChanger: false,
+    };
 
     return (
       <Table
         loading={containerKeys?.loading ?? true}
         dataSource={dataSource}
         columns={KEY_TABLE_COLUMNS}
-        pagination={paginationConfig}
+        pagination={keysPaginationConfig}
         rowKey={(record: KeyResponse) => record.CompletePath}
         locale={{ filterTitle: '' }} />
     )
-  };
-
-  const paginationConfig: TablePaginationConfig = {
-    showTotal: (total: number, range) => (
-      `${range[0]}-${range[1]} of ${total} Containers`
-    ),
-    showSizeChanger: true
   };
 
   return (
@@ -266,7 +273,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
         dataSource={getFilteredData(data)}
         columns={filterSelectedColumns()}
         loading={loading}
-        pagination={paginationConfig}
+        pagination={false}
         scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
         locale={{ filterTitle: '' }}
         expandable={{
@@ -274,6 +281,38 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
           expandedRowRender: expandedRowRender,
           onExpand: onRowExpandClick
         }} />
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: '16px'
+      }}>
+        <Space>
+          <span style={{ color: 'rgba(0,0,0,0.45)', fontSize: '14px' }}>
+            Rows per page:
+          </span>
+          <Select
+            value={pageSize}
+            onChange={onPageSizeChange}
+            disabled={loading}
+            options={PAGE_SIZE_OPTIONS.map(n => ({ label: `${n}`, value: n }))}
+            style={{ width: 80 }}
+          />
+        </Space>
+        <Space>
+          <Button
+            icon={<LeftOutlined />}
+            disabled={!hasPrevPage || loading}
+            onClick={onPrevPage}>
+            Previous
+          </Button>
+          <Button
+            disabled={!hasNextPage || loading}
+            onClick={onNextPage}>
+            Next <RightOutlined />
+          </Button>
+        </Space>
+      </div>
     </div>
   );
 }

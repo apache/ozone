@@ -18,173 +18,488 @@
 package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
-import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_BAD;
-import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED;
 import static org.apache.ozone.recon.schema.generated.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
 import static org.jooq.impl.DSL.count;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
-import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
+import java.util.stream.Stream;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.recon.schema.generated.tables.records.UnhealthyContainersRecord;
 import org.jooq.Condition;
-import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.OrderField;
 import org.jooq.Record;
 import org.jooq.SelectQuery;
-import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Provide a high level API to access the Container Schema.
+ * Manager for UNHEALTHY_CONTAINERS table used by ContainerHealthTask.
  */
 @Singleton
 public class ContainerHealthSchemaManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthSchemaManager.class);
+  private static final int BATCH_INSERT_CHUNK_SIZE = 1000;
 
-  private final UnhealthyContainersDao unhealthyContainersDao;
+  /**
+   * Maximum number of container IDs to include in a single
+   * {@code DELETE … WHERE container_id IN (…)} statement.
+   *
+   * <p>Derby's SQL compiler translates each prepared statement into a Java
+   * class.  A large IN-predicate generates a deeply nested expression tree
+   * whose compiled bytecode can exceed the JVM hard limit of 65,535 bytes
+   * per method (ERROR XBCM4).  Empirically, 5,000 IDs combined with the
+   * 7-state container_state IN-predicate generates ~148 KB — more than
+   * twice the limit.  1,000 IDs stays well under ~30 KB, providing a safe
+   * 2× margin.</p>
+   */
+  static final int MAX_DELETE_CHUNK_SIZE = 1_000;
+
   private final ContainerSchemaDefinition containerSchemaDefinition;
 
   @Inject
   public ContainerHealthSchemaManager(
-      ContainerSchemaDefinition containerSchemaDefinition,
-      UnhealthyContainersDao unhealthyContainersDao) {
-    this.unhealthyContainersDao = unhealthyContainersDao;
+      ContainerSchemaDefinition containerSchemaDefinition) {
     this.containerSchemaDefinition = containerSchemaDefinition;
   }
 
   /**
-   * Get a batch of unhealthy containers, starting at offset and returning
-   * limit records. If a null value is passed for state, then unhealthy
-   * containers in all states will be returned. Otherwise, only containers
-   * matching the given state will be returned.
-   * @param state Return only containers in this state, or all containers if
-   *              null
-   * @param minContainerId minimum containerId for filter
-   * @param maxContainerId maximum containerId for filter
-   * @param limit The total records to return
-   * @return List of unhealthy containers.
+   * Insert unhealthy container records in UNHEALTHY_CONTAINERS table using
+   * true batch insert.
+   *
+   * <p>In the health-task flow, inserts are preceded by delete in the same
+   * transaction via {@link #replaceUnhealthyContainerRecordsAtomically(List, List)}.
+   * Therefore duplicate-key fallback is not expected and this method fails fast
+   * on any insert error.</p>
    */
-  public List<UnhealthyContainers> getUnhealthyContainers(
-      UnHealthyContainerStates state, Long minContainerId, Optional<Long> maxContainerId, int limit) {
+  @VisibleForTesting
+  public void insertUnhealthyContainerRecords(List<UnhealthyContainerRecord> recs) {
+    if (recs == null || recs.isEmpty()) {
+      return;
+    }
+
+    if (LOG.isDebugEnabled()) {
+      recs.forEach(rec -> LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {}",
+          rec.getContainerId(), rec.getContainerState()));
+    }
+
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+
+    try {
+      dslContext.transaction(configuration ->
+          batchInsertInChunks(configuration.dsl(), recs));
+
+      LOG.debug("Batch inserted {} unhealthy container records", recs.size());
+
+    } catch (Exception e) {
+      LOG.error("Failed to batch insert records into {}", UNHEALTHY_CONTAINERS_TABLE_NAME, e);
+      throw new RuntimeException("Recon failed to insert " + recs.size() +
+          " unhealthy container records.", e);
+    }
+  }
+
+  private void batchInsertInChunks(DSLContext dslContext,
+      List<UnhealthyContainerRecord> recs) {
+    List<UnhealthyContainersRecord> records =
+        new ArrayList<>(BATCH_INSERT_CHUNK_SIZE);
+
+    for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
+      int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
+      records.clear();
+      for (int i = from; i < to; i++) {
+        records.add(toJooqRecord(dslContext, recs.get(i)));
+      }
+      dslContext.batchInsert(records).execute();
+    }
+  }
+
+  private UnhealthyContainersRecord toJooqRecord(DSLContext txContext,
+      UnhealthyContainerRecord rec) {
+    UnhealthyContainersRecord record = txContext.newRecord(UNHEALTHY_CONTAINERS);
+    record.setContainerId(rec.getContainerId());
+    record.setContainerState(rec.getContainerState());
+    record.setInStateSince(rec.getInStateSince());
+    record.setExpectedReplicaCount(rec.getExpectedReplicaCount());
+    record.setActualReplicaCount(rec.getActualReplicaCount());
+    record.setReplicaDelta(rec.getReplicaDelta());
+    record.setReason(rec.getReason());
+    return record;
+  }
+
+  /**
+   * Batch delete all health states for multiple containers.
+   * This deletes all states generated from SCM/Recon health scans:
+   * MISSING, EMPTY_MISSING, UNDER_REPLICATED, OVER_REPLICATED,
+   * MIS_REPLICATED, NEGATIVE_SIZE and REPLICA_MISMATCH for all containers
+   * in the list.
+   *
+   * <p>REPLICA_MISMATCH is included here because it is re-evaluated on every
+   * scan cycle (just like the SCM-sourced states); omitting it would leave
+   * stale REPLICA_MISMATCH records in the table after a mismatch is resolved.
+   *
+   * <p><b>Derby bytecode limit:</b> Derby translates each SQL statement into
+   * a Java class whose methods must each stay under the JVM 64 KB bytecode
+   * limit.  A single {@code IN} predicate with more than ~2,000 values (when
+   * combined with the 7-state container_state filter) overflows this limit
+   * and causes {@code ERROR XBCM4}.  This method automatically partitions
+   * {@code containerIds} into chunks of at most {@value #MAX_DELETE_CHUNK_SIZE}
+   * IDs so callers never need to worry about the limit, regardless of how
+   * many containers a scan cycle processes.
+   *
+   * @param containerIds List of container IDs to delete states for
+   */
+  public void batchDeleteSCMStatesForContainers(List<Long> containerIds) {
+    if (containerIds == null || containerIds.isEmpty()) {
+      return;
+    }
+
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    int totalDeleted = deleteScmStatesForContainers(dslContext, containerIds);
+    LOG.debug("Batch deleted {} health state records for {} containers",
+        totalDeleted, containerIds.size());
+  }
+
+  /**
+   * Atomically replaces unhealthy rows for a given set of containers.
+   * Delete and insert happen in the same DB transaction.
+   */
+  public void replaceUnhealthyContainerRecordsAtomically(
+      List<Long> containerIdsToDelete,
+      List<UnhealthyContainerRecord> recordsToInsert) {
+    if ((containerIdsToDelete == null || containerIdsToDelete.isEmpty())
+        && (recordsToInsert == null || recordsToInsert.isEmpty())) {
+      return;
+    }
+
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    dslContext.transaction(configuration -> {
+      DSLContext txContext = configuration.dsl();
+      if (containerIdsToDelete != null && !containerIdsToDelete.isEmpty()) {
+        deleteScmStatesForContainers(txContext, containerIdsToDelete);
+      }
+      if (recordsToInsert != null && !recordsToInsert.isEmpty()) {
+        batchInsertInChunks(txContext, recordsToInsert);
+      }
+    });
+  }
+
+  private int deleteScmStatesForContainers(DSLContext dslContext,
+      List<Long> containerIds) {
+    int totalDeleted = 0;
+
+    for (int from = 0; from < containerIds.size(); from += MAX_DELETE_CHUNK_SIZE) {
+      int to = Math.min(from + MAX_DELETE_CHUNK_SIZE, containerIds.size());
+      List<Long> chunk = containerIds.subList(from, to);
+
+      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(chunk))
+          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
+              UnHealthyContainerStates.MISSING.toString(),
+              UnHealthyContainerStates.EMPTY_MISSING.toString(),
+              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+              UnHealthyContainerStates.OVER_REPLICATED.toString(),
+              UnHealthyContainerStates.MIS_REPLICATED.toString(),
+              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+          .execute();
+      totalDeleted += deleted;
+    }
+    return totalDeleted;
+  }
+
+  /**
+   * Returns previous in-state-since timestamps for tracked unhealthy states.
+   * The key is a stable containerId + state tuple.
+   */
+  public Map<ContainerStateKey, Long> getExistingInStateSinceByContainerIds(
+      List<Long> containerIds) {
+    if (containerIds == null || containerIds.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    Map<ContainerStateKey, Long> existing = new HashMap<>();
+    try {
+      dslContext.select(
+              UNHEALTHY_CONTAINERS.CONTAINER_ID,
+              UNHEALTHY_CONTAINERS.CONTAINER_STATE,
+              UNHEALTHY_CONTAINERS.IN_STATE_SINCE)
+          .from(UNHEALTHY_CONTAINERS)
+          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(containerIds))
+          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
+              UnHealthyContainerStates.MISSING.toString(),
+              UnHealthyContainerStates.EMPTY_MISSING.toString(),
+              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+              UnHealthyContainerStates.OVER_REPLICATED.toString(),
+              UnHealthyContainerStates.MIS_REPLICATED.toString(),
+              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+          .forEach(record -> existing.put(
+              new ContainerStateKey(record.get(UNHEALTHY_CONTAINERS.CONTAINER_ID),
+                  record.get(UNHEALTHY_CONTAINERS.CONTAINER_STATE)),
+              record.get(UNHEALTHY_CONTAINERS.IN_STATE_SINCE)));
+    } catch (Exception e) {
+      LOG.warn("Failed to load existing inStateSince records. Falling back to current scan time.", e);
+    }
+    return existing;
+  }
+
+  /**
+   * Preserve existing inStateSince values for records that remain in the
+   * same unhealthy state across scan cycles.
+   */
+  public List<UnhealthyContainerRecord> applyExistingInStateSince(
+      List<UnhealthyContainerRecord> records,
+      List<Long> containerIds) {
+    if (records == null || records.isEmpty()
+        || containerIds == null || containerIds.isEmpty()) {
+      return records;
+    }
+
+    Map<ContainerStateKey, Long> existingByContainerAndState =
+        getExistingInStateSinceByContainerIds(containerIds);
+    if (existingByContainerAndState.isEmpty()) {
+      return records;
+    }
+
+    List<UnhealthyContainerRecord> withPreservedInStateSince =
+        new ArrayList<>(records.size());
+    for (UnhealthyContainerRecord record : records) {
+      Long existingInStateSince = existingByContainerAndState.get(
+          new ContainerStateKey(record.getContainerId(),
+              record.getContainerState()));
+      if (existingInStateSince == null) {
+        withPreservedInStateSince.add(record);
+      } else {
+        withPreservedInStateSince.add(new UnhealthyContainerRecord(
+            record.getContainerId(),
+            record.getContainerState(),
+            existingInStateSince,
+            record.getExpectedReplicaCount(),
+            record.getActualReplicaCount(),
+            record.getReplicaDelta(),
+            record.getReason()));
+      }
+    }
+    return withPreservedInStateSince;
+  }
+
+  /**
+   * Get summary of unhealthy containers grouped by state from UNHEALTHY_CONTAINERS table.
+   */
+  public List<UnhealthyContainersSummary> getUnhealthyContainersSummary() {
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    List<UnhealthyContainersSummary> result = new ArrayList<>();
+
+    try {
+      return dslContext
+          .select(UNHEALTHY_CONTAINERS.CONTAINER_STATE.as("containerState"),
+              count().as("cnt"))
+          .from(UNHEALTHY_CONTAINERS)
+          .groupBy(UNHEALTHY_CONTAINERS.CONTAINER_STATE)
+          .fetchInto(UnhealthyContainersSummary.class);
+    } catch (Exception e) {
+      LOG.error("Failed to get summary from UNHEALTHY_CONTAINERS table", e);
+      return result;
+    }
+  }
+
+  /**
+   * Get unhealthy containers from UNHEALTHY_CONTAINERS table.
+   */
+  public List<UnhealthyContainerRecord> getUnhealthyContainers(
+      UnHealthyContainerStates state, long minContainerId, long maxContainerId, int limit) {
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+
     SelectQuery<Record> query = dslContext.selectQuery();
     query.addFrom(UNHEALTHY_CONTAINERS);
+
     Condition containerCondition;
     OrderField[] orderField;
-    if (maxContainerId.isPresent() && maxContainerId.get() > 0) {
-      containerCondition = UNHEALTHY_CONTAINERS.CONTAINER_ID.lessThan(maxContainerId.get());
-      orderField = new OrderField[]{UNHEALTHY_CONTAINERS.CONTAINER_ID.desc(),
-          UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc()};
+
+    if (maxContainerId > 0) {
+      containerCondition = UNHEALTHY_CONTAINERS.CONTAINER_ID.lessThan(maxContainerId);
+      orderField = new OrderField[]{
+          UNHEALTHY_CONTAINERS.CONTAINER_ID.desc(),
+          UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc()
+      };
     } else {
       containerCondition = UNHEALTHY_CONTAINERS.CONTAINER_ID.greaterThan(minContainerId);
-      orderField = new OrderField[]{UNHEALTHY_CONTAINERS.CONTAINER_ID.asc(),
-          UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc()};
+      orderField = new OrderField[]{
+          UNHEALTHY_CONTAINERS.CONTAINER_ID.asc(),
+          UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc()
+      };
     }
+
     if (state != null) {
-      if (state.equals(ALL_REPLICAS_BAD)) {
-        query.addConditions(containerCondition.and(UNHEALTHY_CONTAINERS.CONTAINER_STATE
-            .eq(UNDER_REPLICATED.toString())));
-        query.addConditions(UNHEALTHY_CONTAINERS.ACTUAL_REPLICA_COUNT.eq(0));
-      } else {
-        query.addConditions(containerCondition.and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(state.toString())));
-      }
+      query.addConditions(containerCondition.and(
+          UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(state.toString())));
     } else {
-      // CRITICAL FIX: Apply pagination condition even when state is null
-      // This ensures proper pagination for the "get all unhealthy containers" use case
       query.addConditions(containerCondition);
     }
 
     query.addOrderBy(orderField);
     query.addLimit(limit);
 
-    return query.fetchInto(UnhealthyContainers.class).stream()
-      .sorted(Comparator.comparingLong(UnhealthyContainers::getContainerId))
-      .collect(Collectors.toList());
-  }
+    // Pre-buffer `limit` rows per JDBC round-trip instead of Derby's default of 1 row.
+    query.fetchSize(limit);
 
-  /**
-   * Obtain a count of all containers in each state. If there are no unhealthy
-   * containers an empty list will be returned. If there are unhealthy
-   * containers for a certain state, no entry will be returned for it.
-   * @return Count of unhealthy containers in each state
-   */
-  public List<UnhealthyContainersSummary> getUnhealthyContainersSummary() {
-    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
-    return dslContext
-        .select(UNHEALTHY_CONTAINERS.CONTAINER_STATE.as("containerState"),
-            count().as("cnt"))
-        .from(UNHEALTHY_CONTAINERS)
-        .groupBy(UNHEALTHY_CONTAINERS.CONTAINER_STATE)
-        .fetchInto(UnhealthyContainersSummary.class);
-  }
+    try {
+      Stream<UnhealthyContainersRecord> stream =
+          query.fetchInto(UnhealthyContainersRecord.class).stream();
 
-  public Cursor<UnhealthyContainersRecord> getAllUnhealthyRecordsCursor() {
-    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
-    return dslContext
-        .selectFrom(UNHEALTHY_CONTAINERS)
-        .orderBy(UNHEALTHY_CONTAINERS.CONTAINER_ID.asc())
-        .fetchLazy();
-  }
-
-  public void insertUnhealthyContainerRecords(List<UnhealthyContainers> recs) {
-    if (LOG.isDebugEnabled()) {
-      recs.forEach(rec -> LOG.debug("rec.getContainerId() : {}, rec.getContainerState(): {}",
-          rec.getContainerId(), rec.getContainerState()));
-    }
-
-    try (Connection connection = containerSchemaDefinition.getDataSource().getConnection()) {
-      connection.setAutoCommit(false); // Turn off auto-commit for transactional control
-      try {
-        for (UnhealthyContainers rec : recs) {
-          try {
-            unhealthyContainersDao.insert(rec);
-          } catch (DataAccessException dataAccessException) {
-            // Log the error and update the existing record if ConstraintViolationException occurs
-            unhealthyContainersDao.update(rec);
-            LOG.debug("Error while inserting unhealthy container record: {}", rec, dataAccessException);
-          }
-        }
-        connection.commit(); // Commit all inserted/updated records
-      } catch (Exception innerException) {
-        connection.rollback(); // Rollback transaction if an error occurs inside processing
-        LOG.error("Transaction rolled back due to error", innerException);
-        throw innerException;
-      } finally {
-        connection.setAutoCommit(true); // Reset auto-commit before the connection is auto-closed
+      if (maxContainerId > 0) {
+        // Reverse-pagination path: SQL orders DESC (to get the last `limit` rows before
+        // maxContainerId); re-sort to ASC so callers always see ascending container IDs.
+        stream = stream.sorted(Comparator.comparingLong(UnhealthyContainersRecord::getContainerId));
       }
+      // Forward-pagination path: SQL already orders ASC — no Java re-sort needed.
+
+      return stream.map(record -> new UnhealthyContainerRecord(
+              record.getContainerId(),
+              record.getContainerState(),
+              record.getInStateSince(),
+              record.getExpectedReplicaCount(),
+              record.getActualReplicaCount(),
+              record.getReplicaDelta(),
+              record.getReason()))
+          .collect(Collectors.toList());
     } catch (Exception e) {
-      LOG.error("Failed to insert records into {} ", UNHEALTHY_CONTAINERS_TABLE_NAME, e);
-      throw new RuntimeException("Recon failed to insert " + recs.size() + " unhealthy container records.", e);
+      LOG.error("Failed to query UNHEALTHY_CONTAINERS table", e);
+      return new ArrayList<>();
     }
   }
 
   /**
-   * Clear all unhealthy container records. This is primarily used for testing
-   * to ensure clean state between tests.
+   * Clear all records from UNHEALTHY_CONTAINERS table (for testing).
    */
   @VisibleForTesting
   public void clearAllUnhealthyContainerRecords() {
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
     try {
       dslContext.deleteFrom(UNHEALTHY_CONTAINERS).execute();
-      LOG.info("Cleared all unhealthy container records");
+      LOG.info("Cleared all UNHEALTHY_CONTAINERS table's unhealthy container records");
     } catch (Exception e) {
-      LOG.info("Failed to clear unhealthy container records", e);
+      LOG.error("Failed to clear UNHEALTHY_CONTAINERS table's unhealthy container records", e);
     }
   }
 
+  /**
+   * POJO representing a record in UNHEALTHY_CONTAINERS table.
+   */
+  public static class UnhealthyContainerRecord {
+    private final long containerId;
+    private final String containerState;
+    private final long inStateSince;
+    private final int expectedReplicaCount;
+    private final int actualReplicaCount;
+    private final int replicaDelta;
+    private final String reason;
+
+    public UnhealthyContainerRecord(long containerId, String containerState,
+                                    long inStateSince, int expectedReplicaCount, int actualReplicaCount,
+                                    int replicaDelta, String reason) {
+      this.containerId = containerId;
+      this.containerState = containerState;
+      this.inStateSince = inStateSince;
+      this.expectedReplicaCount = expectedReplicaCount;
+      this.actualReplicaCount = actualReplicaCount;
+      this.replicaDelta = replicaDelta;
+      this.reason = reason;
+    }
+
+    public long getContainerId() {
+      return containerId;
+    }
+
+    public String getContainerState() {
+      return containerState;
+    }
+
+    public long getInStateSince() {
+      return inStateSince;
+    }
+
+    public int getExpectedReplicaCount() {
+      return expectedReplicaCount;
+    }
+
+    public int getActualReplicaCount() {
+      return actualReplicaCount;
+    }
+
+    public int getReplicaDelta() {
+      return replicaDelta;
+    }
+
+    public String getReason() {
+      return reason;
+    }
+  }
+
+  /**
+   * Key type for (containerId, state).
+   */
+  public static final class ContainerStateKey {
+    private final long containerId;
+    private final String state;
+
+    public ContainerStateKey(long containerId, String state) {
+      this.containerId = containerId;
+      this.state = state;
+    }
+
+    public long getContainerId() {
+      return containerId;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ContainerStateKey)) {
+        return false;
+      }
+      ContainerStateKey that = (ContainerStateKey) other;
+      return containerId == that.containerId && state.equals(that.state);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(containerId, state);
+    }
+  }
+
+  /**
+   * POJO representing a summary record for unhealthy containers.
+   */
+  public static class UnhealthyContainersSummary {
+    private final String containerState;
+    private final int count;
+
+    public UnhealthyContainersSummary(String containerState, int count) {
+      this.containerState = containerState;
+      this.count = count;
+    }
+
+    public String getContainerState() {
+      return containerState;
+    }
+
+    public int getCount() {
+      return count;
+    }
+  }
 }

@@ -851,10 +851,10 @@ public class KeyManagerImpl implements KeyManager {
               List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
                       .map(b -> new DeletedBlock(
-                          new BlockID(b.getContainerID(),
-                            b.getLocalID()),
-                            b.getLength(),
-                            QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig())
+                          new BlockID(b.getContainerID(), b.getLocalID()),
+                          b.getLength(),
+                          QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()),
+                          QuotaUtil.getSizePerReplica(b.getLength(), info.getReplicationConfig())
                       ))).collect(Collectors.toList());
               String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
 
@@ -1237,16 +1237,16 @@ public class KeyManagerImpl implements KeyManager {
       String partFileName = OzoneFSUtils.getFileName(partKeyInfo.getPartName());
 
       StringBuilder fullKeyPartName = new StringBuilder();
-      fullKeyPartName.append(OZONE_URI_DELIMITER);
-      fullKeyPartName.append(volName);
-      fullKeyPartName.append(OZONE_URI_DELIMITER);
-      fullKeyPartName.append(buckName);
+      fullKeyPartName.append(OZONE_URI_DELIMITER)
+          .append(volName)
+          .append(OZONE_URI_DELIMITER)
+          .append(buckName);
       if (StringUtils.isNotEmpty(parentDir)) {
-        fullKeyPartName.append(OZONE_URI_DELIMITER);
-        fullKeyPartName.append(parentDir);
+        fullKeyPartName.append(OZONE_URI_DELIMITER)
+            .append(parentDir);
       }
-      fullKeyPartName.append(OZONE_URI_DELIMITER);
-      fullKeyPartName.append(partFileName);
+      fullKeyPartName.append(OZONE_URI_DELIMITER)
+          .append(partFileName);
 
       return fullKeyPartName.toString();
     }

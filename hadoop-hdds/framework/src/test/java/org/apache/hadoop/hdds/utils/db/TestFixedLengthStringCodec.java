@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.google.common.primitives.Longs;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -36,9 +35,9 @@ public class TestFixedLengthStringCodec {
 
     for (long containerID : testContainerIDs) {
       String containerPrefix = FixedLengthStringCodec.bytes2String(
-          Longs.toByteArray(containerID));
-      long decodedContainerID = Longs.fromByteArray(
-          FixedLengthStringCodec.string2Bytes(containerPrefix));
+          LongCodec.get().toByteArray(containerID));
+      long decodedContainerID = LongCodec.get().
+          fromByteArray(FixedLengthStringCodec.string2Bytes(containerPrefix));
       assertEquals(containerID, decodedContainerID);
     }
   }

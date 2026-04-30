@@ -74,6 +74,8 @@ public class InterSCMGrpcProtocolService {
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslServerContextBuilder, securityConfig.getGrpcSslProvider());
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+        sslContextBuilder.protocols(securityConfig.getGrpcTlsProtocols());
+        sslContextBuilder.ciphers(securityConfig.getGrpcTlsCiphers());
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure " +

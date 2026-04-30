@@ -19,7 +19,9 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -85,11 +87,17 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   protected synchronized boolean validate() {
+    if (!validateBasedOnReportProcessing()) {
+      updateReportedPipelineSet();
+    }
     return currentReportedPipelineCount >= thresholdCount;
   }
 
   @Override
   protected synchronized void process(PipelineReportFromDatanode report) {
+    if (!validateBasedOnReportProcessing()) {
+      return;
+    }
     Objects.requireNonNull(report, "report == null");
     for (PipelineReport report1 : report.getReport().getPipelineReportList()) {
       Pipeline pipeline;
@@ -137,6 +145,10 @@ public class OneReplicaPipelineSafeModeRule extends
     return currentReportedPipelineCount;
   }
 
+  Set<PipelineID> getReportedPipelineIDSet() {
+    return Collections.unmodifiableSet(reportedPipelineIDSet);
+  }
+
   @Override
   public String getStatusText() {
     String status = String.format(
@@ -167,6 +179,22 @@ public class OneReplicaPipelineSafeModeRule extends
     } else {
       if (!validate()) {
         initializeRule(true);
+      }
+    }
+  }
+
+  private void updateReportedPipelineSet() {
+    List<Pipeline> openRatisPipelines =
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN);
+
+    for (Pipeline pipeline : openRatisPipelines) {
+      PipelineID pipelineID = pipeline.getId();
+      if (!pipeline.getNodeSet().isEmpty()
+          && oldPipelineIDSet.contains(pipelineID)
+          && reportedPipelineIDSet.add(pipelineID)) {
+        getSafeModeMetrics().incCurrentHealthyPipelinesWithAtleastOneReplicaReportedCount();
+        currentReportedPipelineCount++;
       }
     }
   }

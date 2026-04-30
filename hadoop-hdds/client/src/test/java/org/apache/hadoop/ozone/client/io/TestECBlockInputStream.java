@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for ECBlockInputStream.
@@ -554,6 +556,48 @@ public class TestECBlockInputStream {
     }
   }
 
+  @Test
+  @Timeout(value = 5, unit = TimeUnit.SECONDS)
+  public void testZeroByteReadThrowsBadDataLocationException() throws Exception {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, ONEMB);
+    Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
+      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+    }
+
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 8 * ONEMB, datanodes);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
+
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, null, null, streamFactory, clientConfig)) {
+
+      // Read a full stripe first to initialize and create streams in the factory
+      ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
+      int read = ecb.read(buf);
+      assertEquals(3 * ONEMB, read);
+
+      // Simulate the Bug: Force the underlying stream to return 0 bytes (Short Read).
+      // Note: If the test stub `TestBlockInputStream` does not currently have
+      // a method to simulate a 0-byte read, you should add a simple boolean flag
+      // like `simulateZeroByteRead` to that stub class, making its read() return 0.
+      streamFactory.getBlockStreams().get(0).setSimulateZeroByteRead(true);
+
+      buf.clear();
+
+      // Assert that instead of spinning infinitely, the short read (0 bytes)
+      // immediately triggers the strict validation and throws BadDataLocationException.
+      // This exception is essential for the Proxy to initiate the Failover to Reconstruction.
+      BadDataLocationException e = assertThrows(BadDataLocationException.class, () -> ecb.read(buf));
+      List<DatanodeDetails> failed = e.getFailedLocations();
+
+      // Expect exactly 1 DN reported as failure due to the inconsistent read
+      assertEquals(1, failed.size());
+      // The failure should map to index = 1 (stream 0)
+      assertEquals(1, datanodes.get(failed.get(0)));
+    }
+  }
+
   private void validateBufferContents(ByteBuffer buf, int from, int to,
       byte val) {
     for (int i = from; i < to; i++) {
@@ -593,6 +637,7 @@ public class TestECBlockInputStream {
     private BlockID blockID;
     private long length;
     private boolean throwException = false;
+    private boolean simulateZeroByteRead = false;
     private static final byte EOF = -1;
 
     @SuppressWarnings("checkstyle:parameternumber")
@@ -608,6 +653,10 @@ public class TestECBlockInputStream {
 
     public void setThrowException(boolean shouldThrow) {
       this.throwException = shouldThrow;
+    }
+
+    public void setSimulateZeroByteRead(boolean simulateZeroByteRead) {
+      this.simulateZeroByteRead = simulateZeroByteRead;
     }
 
     @Override
@@ -634,6 +683,10 @@ public class TestECBlockInputStream {
 
       if (throwException) {
         throw new IOException("Simulated exception");
+      }
+
+      if (simulateZeroByteRead) {
+        return 0;
       }
 
       int toRead = Math.min(buf.remaining(), (int)getRemaining());

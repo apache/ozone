@@ -62,20 +62,27 @@ Check snapshots on OM
     ${snap2_res} =      Execute                 echo "${snap_list}" | grep ${snap_2}
                         Should contain          ${snap2_res}        ${snap_2}
 
-Run snap diff and get response
+Get snap diff response
     [arguments]         ${volume}           ${bucket}           ${snap_1}       ${snap_2}
-    ${diff_res} =       Execute             ozone sh snapshot diff /${volume}/${bucket} ${snap_1} ${snap_2}
+    ${diff_res} =       Execute             ozone sh snapshot diff --get-report /${volume}/${bucket} ${snap_1} ${snap_2}
                         [return]            ${diff_res}
+
+Submit snap diff job
+    [arguments]         ${volume}           ${bucket}           ${snap_1}       ${snap_2}
+    ${submit_res} =     Execute             ozone sh snapshot diff /${volume}/${bucket} ${snap_1} ${snap_2}
+                        Should contain      ${submit_res}       --get-report option
+    [return]            ${submit_res}
 
 Snap diff finished
     [arguments]         ${volume}           ${bucket}           ${snap_1}       ${snap_2}
-    ${diff_res} =       Run snap diff and get response          ${volume}       ${bucket}       ${snap_1}       ${snap_2}
+    ${diff_res} =       Get snap diff response          ${volume}       ${bucket}       ${snap_1}       ${snap_2}
                         Should contain      ${diff_res}         Difference between snapshot: ${snap_1} and snapshot: ${snap_2}
 
 Run snap diff and validate results
     [arguments]         ${volume}           ${bucket}           ${snap_1}       ${snap_2}       ${key_1}        ${key_2}
+    Submit snap diff job                            ${volume}           ${bucket}       ${snap_1}       ${snap_2}
     Wait Until Keyword Succeeds             2min                3sec            Snap diff finished              ${volume}           ${bucket}       ${snap_1}       ${snap_2}
-    ${diff_res} =       Run snap diff and get response          ${volume}       ${bucket}       ${snap_1}       ${snap_2}
+    ${diff_res} =       Get snap diff response          ${volume}       ${bucket}       ${snap_1}       ${snap_2}
     ${key_num} =        Execute             echo "${diff_res}" | grep 'key' | wc -l
                         Should be true      ${key_num} == 2
     ${diff_key1} =      Execute             echo "${diff_res}" | grep ${key_1} | wc -l

@@ -1442,7 +1442,7 @@ public abstract class TestOmSnapshot {
 
     IOException ioException = assertThrows(IOException.class,
         () -> store.snapshotDiff(volume, bucket, snap6,
-            snap7, "3", 0, forceFullSnapshotDiff, disableNativeDiff));
+            snap7, "400000000000000000003", 0, forceFullSnapshotDiff, disableNativeDiff));
     assertThat(ioException.getMessage()).contains("Index (given: 3) " +
         "should be a number >= 0 and < totalDiffEntries: 2. Page size " +
         "(given: 1000) should be a positive number > 0.");

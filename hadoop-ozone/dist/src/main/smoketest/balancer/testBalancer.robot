@@ -66,6 +66,11 @@ Run Container Balancer
     ${result} =             Execute                         ozone admin containerbalancer start -t 0.1 -d 100 -i 3
                             Should Contain                  ${result}             Container Balancer started successfully.
 
+Run Container Balancer With Exclude Containers
+    [arguments]             ${exclude_containers}
+    ${result} =             Execute                         ozone admin containerbalancer start --exclude-containers "${exclude_containers}" -t 0.1 -d 100 -i 3
+                            Should Contain                  ${result}             Container Balancer started successfully.
+
 Wait Finish Of Balancing
     ${result} =             Execute                         ozone admin containerbalancer status
                             Wait Until Keyword Succeeds      4min    10sec    ContainerBalancer is Not Running
@@ -148,6 +153,11 @@ All container is closed
     ${output} =         Execute           ozone admin container list --state OPEN
                         Should Be Equal   ${output}   [ ]
 
+Get All Container IDs
+    [Documentation]    Fetches all container IDs from standard text output using awk
+    ${result} =        Execute    ozone admin container list | grep '"containerID"' | awk '{print $3}' | tr -d ',' | xargs | tr ' ' ','
+    [return]           ${result}
+
 Get Datanode Ozone Used Bytes Info
     [arguments]             ${uuid}
     ${output} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].id'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.uuid) : .[0].ozoneUsed}'; done | jq -s add
@@ -155,7 +165,7 @@ Get Datanode Ozone Used Bytes Info
     [return]          ${result}
 
 ** Test Cases ***
-Verify Container Balancer for RATIS/EC containers
+Verify exclude command CLI for Container Balancer
     Prepare For Tests
 
     Datanode In Maintenance Mode
@@ -171,6 +181,23 @@ Verify Container Balancer for RATIS/EC containers
     Should Be True    ${datanodeOzoneUsedBytesInfo} < ${SIZE}
 
     Datanode Recommission
+
+    ${all_containers} =         Get All Container IDs
+
+    Run Container Balancer With Exclude Containers          ${all_containers}
+
+    Wait Finish Of Balancing
+
+    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
+    Should Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
+
+Verify Container Balancer for RATIS/EC containers
+
+    ${uuid} =                   Get Uuid
+    Datanode Usageinfo          ${uuid}
+
+    ${datanodeOzoneUsedBytesInfo} =    Get Datanode Ozone Used Bytes Info          ${uuid}
+    Should Be True    ${datanodeOzoneUsedBytesInfo} < ${SIZE}
 
     Run Container Balancer
 

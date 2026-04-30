@@ -897,6 +897,10 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public void checkAdmin() throws OMException {
+    // Skip check if authorization is disabled
+    if (!ozoneManager.isAdminAuthorizationEnabled()) {
+      return;
+    }
 
     final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!ozoneManager.isAdmin(ugi)) {

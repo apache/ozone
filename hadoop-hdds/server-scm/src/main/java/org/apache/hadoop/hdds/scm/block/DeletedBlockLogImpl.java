@@ -171,6 +171,11 @@ public class DeletedBlockLogImpl
         builder.setTotalBlockReplicatedSize(replicatedSize);
         builder.setTotalBlockSize(blocks.stream().mapToLong(DeletedBlock::getSize).sum());
       }
+
+      long sizePerReplica = blocks.stream().mapToLong(DeletedBlock::getSizePerReplica).sum();
+      if (sizePerReplica >= 0) {
+        builder.setTotalSizePerReplica(sizePerReplica);
+      }
     }
     return builder.build();
   }

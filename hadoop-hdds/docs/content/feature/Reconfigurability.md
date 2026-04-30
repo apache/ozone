@@ -59,19 +59,19 @@ ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port|hostname:por
 
 ### Ozone Manager (OM)
 
-| Property | Default | Description |
-|----------|---------|-------------|
-| `ozone.administrators` | - | Comma-separated list of Ozone administrators |
-| `ozone.readonly.administrators` | - | Comma-separated list of read-only administrators |
-| `ozone.om.server.list.max.size` | `1000` | Maximum server-side response size for list operations |
-| `ozone.om.volume.listall.allowed` | `true` | Allow all users to list all volumes |
-| `ozone.om.follower.read.local.lease.enabled` | `false` | Enable local lease for follower read optimization |
-| `ozone.om.follower.read.local.lease.lag.limit` | `10000` | Maximum log lag for follower reads |
-| `ozone.om.follower.read.local.lease.time.ms` | `5000` | Lease time in milliseconds for follower reads |
-| `ozone.key.deleting.limit.per.task` | `50000` | Maximum keys to delete per task |
-| `ozone.directory.deleting.service.interval` | `60s` | Directory deletion service run interval |
-| `ozone.thread.number.dir.deletion` | `10` | Number of threads for directory deletion |
-| `ozone.snapshot.filtering.service.interval` | `60s` | Snapshot SST filtering service run interval |
+| Property                                       | Default | Description |
+|------------------------------------------------|---------|-------------|
+| `ozone.administrators`                         | - | Comma-separated list of Ozone administrators |
+| `ozone.readonly.administrators`                | - | Comma-separated list of read-only administrators |
+| `ozone.om.server.list.max.size`                | `1000` | Maximum server-side response size for list operations |
+| `ozone.om.volume.listall.allowed`              | `true` | Allow all users to list all volumes |
+| `ozone.om.follower.read.local.lease.enabled`   | `false` | Enable local lease for follower read optimization |
+| `ozone.om.follower.read.local.lease.log.limit` | `10000` | Maximum log lag for follower reads |
+| `ozone.om.follower.read.local.lease.time.ms`   | `5000` | Lease time in milliseconds for follower reads |
+| `ozone.key.deleting.limit.per.task`            | `50000` | Maximum keys to delete per task |
+| `ozone.directory.deleting.service.interval`    | `60s` | Directory deletion service run interval |
+| `ozone.thread.number.dir.deletion`             | `10` | Number of threads for directory deletion |
+| `ozone.snapshot.filtering.service.interval`    | `60s` | Snapshot SST filtering service run interval |
 
 ### Storage Container Manager (SCM)
 
@@ -119,7 +119,7 @@ ozone.administrators
 ozone.om.server.list.max.size
 ozone.om.volume.listall.allowed
 ozone.om.follower.read.local.lease.enabled
-ozone.om.follower.read.local.lease.lag.limit
+ozone.om.follower.read.local.lease.log.limit
 ozone.om.follower.read.local.lease.time.ms
 ```
 

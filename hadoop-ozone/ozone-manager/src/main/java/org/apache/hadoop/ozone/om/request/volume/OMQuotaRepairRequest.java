@@ -62,7 +62,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     UserGroupInformation ugi = createUGIForApi();
-    if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(ugi)) {
+    if (ozoneManager.isAdminAuthorizationEnabled() && !ozoneManager.isAdmin(ugi)) {
       throw new OMException("Access denied for user " + ugi + ". Admin privilege is required for quota repair.",
           OMException.ResultCodes.ACCESS_DENIED);
     }

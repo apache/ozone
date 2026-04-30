@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -64,6 +65,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -88,6 +90,8 @@ import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.ReadException;
+import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -501,7 +505,7 @@ public final class OzoneManagerRatisServer {
 
   /**
    * Create Write RaftClient request from OMRequest.
-   * @param omRequest
+   * @param omRequest OM request.
    * @return RaftClientRequest - Raft Client request which is submitted to
    * ratis server.
    */
@@ -514,8 +518,26 @@ public final class OzoneManagerRatisServer {
         .setMessage(
             Message.valueOf(
                 OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(isWrite ? RaftClientRequest.writeRequestType() : RaftClientRequest.readRequestType())
+        .setType(isWrite ? RaftClientRequest.writeRequestType() : getRaftReadRequestType(omRequest))
         .build();
+  }
+
+  private static RaftClientRequest.Type getRaftReadRequestType(OMRequest omRequest) {
+    if (!OmUtils.specifiedReadConsistency(omRequest)) {
+      // If there is no consistency hint, we simply follow the Raft server read option
+      return RaftClientRequest.readRequestType();
+    }
+    // Allow client to decide which read consistency semantic can be used
+    ReadConsistency readConsistency =
+        ReadConsistency.fromProto(omRequest.getReadConsistencyHint().getReadConsistency());
+    if (readConsistency.isLinearizable()) {
+      // Note that the linearizable request type might not be respected
+      // if the Raft server does not set the read option to LINEARIZABLE
+      return RaftClientRequest.readRequestType(false);
+    } else {
+      // This will do a leader-only read even if the Raft server read option is LINEARIZABLE
+      return RaftClientRequest.readRequestType(true);
+    }
   }
 
   private ClientId getClientId() {
@@ -588,6 +610,16 @@ public final class OzoneManagerRatisServer {
         throw new ServiceException(new OMNotLeaderException(leaderSteppingDownException.getMessage()));
       }
 
+      ReadIndexException readIndexException = reply.getReadIndexException();
+      if (readIndexException != null) {
+        throw new ServiceException(readIndexException);
+      }
+
+      ReadException readException = reply.getReadException();
+      if (readException != null) {
+        throw new ServiceException(readException);
+      }
+
       StateMachineException stateMachineException =
           reply.getStateMachineException();
       if (stateMachineException != null) {
@@ -657,6 +689,11 @@ public final class OzoneManagerRatisServer {
   }
 
   public boolean isLinearizableRead() {
+    // TODO: Currently we use LINEARIZABLE read option to imply
+    //  that we support follower reads although technically
+    //  linearizable leader-only read is also a valid configuration.
+    //  In the future, a separate configuration to check whether OM
+    //  supports follower read can be added.
     return readOption == Read.Option.LINEARIZABLE;
   }
 

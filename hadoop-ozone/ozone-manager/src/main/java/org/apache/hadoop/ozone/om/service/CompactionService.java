@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -31,12 +32,8 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,25 +131,21 @@ public class CompactionService extends BackgroundService {
     return !suspended.get();
   }
 
-  protected void compactFully(String tableName) throws IOException {
-    long startTime = Time.monotonicNow();
-    LOG.info("Compacting column family: {}", tableName);
-    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-      options.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
-      options.setExclusiveManualCompaction(true);
-      RocksDatabase rocksDatabase = ((RDBStore) omMetadataManager.getStore()).getDb();
+  /**
+   * Compact a specific table asynchronously. This method returns immediately
+   * with a CompletableFuture that completes when the compaction finishes.
+   * This is useful for on-demand compaction requests (e.g., via admin RPC)
+   * where the caller doesn't need to wait for completion.
+   *
+   * @param tableName the name of the table to compact
+   * @return CompletableFuture that completes when compaction finishes
+   */
+  public CompletableFuture<Void> compactTableAsync(String tableName) {
+    return CompactDBUtil.compactTableAsync(omMetadataManager, tableName);
+  }
 
-      try {
-        // Find CF Handler
-        RocksDatabase.ColumnFamily columnFamily = rocksDatabase.getColumnFamily(tableName);
-        rocksDatabase.compactRange(columnFamily, null, null, options);
-        LOG.info("Compaction of column family: {} completed in {} ms",
-            tableName, Time.monotonicNow() - startTime);
-      } catch (NullPointerException ex) {
-        LOG.error("Unable to trigger compaction for \"{}\". Column family not found ", tableName);
-        throw new IOException("Column family \"" + tableName + "\" not found.");
-      }
-    }
+  protected void compactFully(String tableName) throws IOException {
+    CompactDBUtil.compactTable(omMetadataManager, tableName);
   }
 
   private class CompactTask implements BackgroundTask {

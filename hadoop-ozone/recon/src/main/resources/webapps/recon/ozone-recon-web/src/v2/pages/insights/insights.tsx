@@ -90,6 +90,7 @@ const Insights: React.FC<{}> = () => {
           (map: Map<string, Set<string>>, current: FileCountResponse) => {
             const volume = current.volume;
             const bucket = current.bucket;
+            if (!volume || !bucket) return map;
             if (map.has(volume)) {
               const buckets = Array.from(map.get(volume)!);
               map.set(volume, new Set<string>([...buckets, bucket]));
@@ -148,7 +149,7 @@ const Insights: React.FC<{}> = () => {
             : <>
               <Row gutter={20}>
                 <Col xs={24} xl={12}>
-                  <Card title='File Size Distribution' size='small'>
+                  <Card title='File Size Frequency Distribution' size='small'>
                     {plotResponse.fileCountResponse?.length > 0
                       ? <FileSizeDistribution
                           volumeOptions={state.volumeOptions}
