@@ -75,7 +75,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     if (!ozoneManager.getConfiguration().getBoolean(
         OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY,
         OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT)) {
-      throw new OMException("Ozone snapshot rename feature is not allowed per Ozone Manager server config.",
+      throw new OMException("Ozone snapshot rename feature is not allowed per Ozone Manager server config",
           FEATURE_NOT_ENABLED);
     }
 
