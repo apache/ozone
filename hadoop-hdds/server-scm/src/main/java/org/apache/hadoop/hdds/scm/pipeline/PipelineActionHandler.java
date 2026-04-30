@@ -89,7 +89,7 @@ public class PipelineActionHandler
     LOG.info(logMsg);
     try {
       if (action == PipelineAction.Action.CLOSE) {
-        pipelineManager.closePipeline(pid);
+        pipelineManager.closePipelineAsError(pid, info);
       } else {
         LOG.error("Received unknown pipeline action {}, for pipeline {} ",
             action, pid);

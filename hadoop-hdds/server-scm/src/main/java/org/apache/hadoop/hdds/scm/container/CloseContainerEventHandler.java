@@ -55,13 +55,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CloseContainerEventHandler.class);
-
-  private final PipelineManager pipelineManager;
-  private final ContainerManager containerManager;
-  private final SCMContext scmContext;
-
-  private final LeaseManager<Object> leaseManager;
-  private final long timeout;
+  private final CloseContainerContext context;
 
   public CloseContainerEventHandler(
       final PipelineManager pipelineManager,
@@ -69,34 +63,35 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
       final SCMContext scmContext,
       @Nullable LeaseManager<Object> leaseManager,
       final long timeout) {
-    this.pipelineManager = pipelineManager;
-    this.containerManager = containerManager;
-    this.scmContext = scmContext;
-    this.leaseManager = leaseManager;
-    this.timeout = timeout;
+    context = new CloseContainerContext(pipelineManager, containerManager, scmContext, leaseManager, timeout);
   }
 
   @Override
   public void onMessage(ContainerID containerID, EventPublisher publisher) {
-    if (!scmContext.isLeader()) {
+    if (!context.getScmContext().isLeader()) {
       LOG.info("Skip close container {} since current SCM is not leader.",
           containerID);
       return;
     }
 
+    closeContainer(containerID, publisher, context);
+  }
+
+  public static void closeContainer(
+      ContainerID containerID, EventPublisher publisher, CloseContainerContext context) {
     try {
       LOG.info("Close container Event triggered for container : {}, " +
               "current state: {}", containerID,
-              containerManager.getContainer(containerID).getState());
+          context.getContainerManager().getContainer(containerID).getState());
       // If the container is in OPEN state, FINALIZE it.
-      if (containerManager.getContainer(containerID).getState()
+      if (context.getContainerManager().getContainer(containerID).getState()
           == LifeCycleState.OPEN) {
-        containerManager.updateContainerState(
+        context.getContainerManager().updateContainerState(
             containerID, LifeCycleEvent.FINALIZE);
       }
 
       // ContainerInfo has to read again after the above state change.
-      final ContainerInfo container = containerManager
+      final ContainerInfo container = context.getContainerManager()
           .getContainer(containerID);
       // Send close command to datanodes, if the container is in CLOSING state
       if (container.getState() == LifeCycleState.CLOSING) {
@@ -111,13 +106,13 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
         }
         SCMCommand<?> command = new CloseContainerCommand(
             containerID.getId(), container.getPipelineID(), force);
-        command.setTerm(scmContext.getTermOfLeader());
-        command.setEncodedToken(getContainerToken(containerID));
+        command.setTerm(context.getScmContext().getTermOfLeader());
+        command.setEncodedToken(getContainerToken(containerID, context.getScmContext()));
 
-        if (null != leaseManager) {
+        if (null != context.getLeaseManager()) {
           try {
-            leaseManager.acquire(command, timeout, () -> triggerCloseCallback(
-                publisher, container, command));
+            context.getLeaseManager().acquire(command, context.getTimeout(), () -> triggerCloseCallback(
+                publisher, container, command, context));
           } catch (LeaseAlreadyExistException ex) {
             LOG.debug("Close container {} in {} state already in queue.",
                 containerID, container.getState());
@@ -126,7 +121,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
           }
         } else {
           // case of recon, lease manager will be null, trigger event directly
-          triggerCloseCallback(publisher, container, command);
+          triggerCloseCallback(publisher, container, command, context);
         }
       } else {
         LOG.debug("Cannot close container {}, which is in {} state.",
@@ -153,16 +148,16 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
    * @return Void
    * @throws ContainerNotFoundException
    */
-  private Void triggerCloseCallback(
-      EventPublisher publisher, ContainerInfo container, SCMCommand<?> command)
+  private static Void triggerCloseCallback(
+      EventPublisher publisher, ContainerInfo container, SCMCommand<?> command, CloseContainerContext context)
       throws ContainerNotFoundException {
-    getNodes(container).forEach(node ->
+    getNodes(container, context).forEach(node ->
         publisher.fireEvent(DATANODE_COMMAND,
             new CommandForDatanode<>(node, command)));
     return null;
   }
 
-  private String getContainerToken(ContainerID containerID) {
+  private static String getContainerToken(ContainerID containerID, SCMContext scmContext) {
     if (scmContext.getScm() instanceof StorageContainerManager) {
       StorageContainerManager scm =
           (StorageContainerManager) scmContext.getScm();
@@ -178,16 +173,56 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
    * @return list of DatanodeDetails
    * @throws ContainerNotFoundException
    */
-  private List<DatanodeDetails> getNodes(final ContainerInfo container)
+  private static List<DatanodeDetails> getNodes(final ContainerInfo container, CloseContainerContext context)
       throws ContainerNotFoundException {
     try {
-      return pipelineManager.getPipeline(container.getPipelineID()).getNodes();
+      return context.getPipelineManager().getPipeline(container.getPipelineID()).getNodes();
     } catch (PipelineNotFoundException ex) {
       // Use container replica if the pipeline is not available.
-      return containerManager.getContainerReplicas(container.containerID())
+      return context.getContainerManager().getContainerReplicas(container.containerID())
           .stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
+    }
+  }
+
+  public static class CloseContainerContext {
+    private final PipelineManager pipelineManager;
+    private final ContainerManager containerManager;
+    private final SCMContext scmContext;
+
+    private final LeaseManager<Object> leaseManager;
+    private final long timeout;
+
+
+    public CloseContainerContext(
+        PipelineManager pipelineManager, ContainerManager containerManager, SCMContext scmContext,
+        LeaseManager<Object> leaseManager, long timeout) {
+      this.pipelineManager = pipelineManager;
+      this.containerManager = containerManager;
+      this.scmContext = scmContext;
+      this.leaseManager = leaseManager;
+      this.timeout = timeout;
+    }
+
+    public PipelineManager getPipelineManager() {
+      return pipelineManager;
+    }
+
+    public ContainerManager getContainerManager() {
+      return containerManager;
+    }
+
+    public SCMContext getScmContext() {
+      return scmContext;
+    }
+
+    public LeaseManager<Object> getLeaseManager() {
+      return leaseManager;
+    }
+
+    public long getTimeout() {
+      return timeout;
     }
   }
 }

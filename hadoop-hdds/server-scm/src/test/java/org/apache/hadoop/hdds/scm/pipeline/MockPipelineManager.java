@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -236,6 +237,12 @@ public class MockPipelineManager implements PipelineManager {
       throws IOException {
     stateManager.updatePipelineState(pipelineId.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_CLOSED);
+  }
+
+  @Override
+  public void closePipelineAsError(
+      final PipelineID pipelineId, StorageContainerDatanodeProtocolProtos.ClosePipelineInfo info) throws IOException {
+    closePipeline(pipelineId);
   }
 
   @Override

@@ -25,6 +25,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.utils.db.CodecException;
@@ -112,6 +113,9 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void openPipeline(PipelineID pipelineId) throws IOException;
 
   void closePipeline(PipelineID pipelineID) throws IOException;
+
+  void closePipelineAsError(PipelineID pipelineID, StorageContainerDatanodeProtocolProtos.ClosePipelineInfo info)
+      throws IOException;
 
   void deletePipeline(PipelineID pipelineID) throws IOException;
 

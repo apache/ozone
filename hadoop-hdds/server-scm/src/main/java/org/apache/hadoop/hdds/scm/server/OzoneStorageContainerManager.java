@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.ozone.lease.LeaseManager;
 
 /**
  * Interface for the SCM Facade class that can be used by a passive SCM like
@@ -68,4 +69,8 @@ public interface OzoneStorageContainerManager {
   SCMHAManager getScmHAManager();
 
   SequenceIdGenerator getSequenceIdGen();
+
+  default LeaseManager<Object> getLeaseManager() {
+    return null;
+  }
 }

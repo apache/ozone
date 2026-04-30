@@ -44,8 +44,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -58,12 +60,14 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.lease.LeaseAlreadyExistException;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -470,7 +474,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * @param pipelineId - ID of the pipeline.
    * @throws IOException
    */
-  private void closeContainersForPipeline(final PipelineID pipelineId)
+  private void closeContainersForPipeline(final PipelineID pipelineId, boolean async)
       throws IOException {
     Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
     ContainerManager containerManager = scmContext.getScm()
@@ -485,8 +489,17 @@ public class PipelineManagerImpl implements PipelineManager {
           throw new IOException(ex);
         }
       }
-      eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
-      LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
+
+      if (async) {
+        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+        LOG.info("Trigger Container {} closed for pipeline={}", containerID, pipelineId);
+      }
+      else {
+        CloseContainerEventHandler.CloseContainerContext closeContainerContext
+            = new CloseContainerEventHandler.CloseContainerContext(this, containerManager, scmContext, null, 0);
+        CloseContainerEventHandler.closeContainer(containerID, eventPublisher, closeContainerContext);
+        LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
+      }
     }
   }
 
@@ -499,7 +512,7 @@ public class PipelineManagerImpl implements PipelineManager {
   public void closePipeline(PipelineID pipelineID) throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
     // close containers.
-    closeContainersForPipeline(pipelineID);
+    closeContainersForPipeline(pipelineID, true);
     if (!getPipeline(pipelineID).isClosed()) {
       acquireWriteLock();
       try {
@@ -509,6 +522,51 @@ public class PipelineManagerImpl implements PipelineManager {
         releaseWriteLock();
       }
       LOG.info("Pipeline {} moved to CLOSED state", pipelineID);
+    }
+
+    metrics.removePipelineMetrics(pipelineID);
+
+  }
+
+  /**
+   * Move the Pipeline to CLOSED state.
+   * @param pipelineID ID of the Pipeline to be closed
+   * @param info ClosePipelineInfo containing the reason for closing the pipeline
+   * @throws IOException In case of exception while closing the Pipeline
+   */
+  @Override
+  public void closePipelineAsError(
+      PipelineID pipelineID, StorageContainerDatanodeProtocolProtos.ClosePipelineInfo info) throws IOException {
+    HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
+    // close containers.
+    closeContainersForPipeline(pipelineID, false);
+    if (!getPipeline(pipelineID).isClosed()) {
+      acquireWriteLock();
+      try {
+        stateManager.updatePipelineState(pipelineIDProtobuf,
+            HddsProtos.PipelineState.PIPELINE_CLOSED);
+      } finally {
+        releaseWriteLock();
+      }
+      if (null != scmContext.getScm().getLeaseManager()) {
+        try {
+          // wait for 2HB interval after CLOSE Container for closing pipeline
+          long pipelineCloseWait = HddsServerUtil.getScmHeartbeatInterval(conf) * 2;
+          LOG.info("Pipeline {} with status {} moved to CLOSED state, removing in {}ms", pipelineID, info.getReason(),
+              pipelineCloseWait);
+          scmContext.getScm().getLeaseManager().acquire(pipelineID, pipelineCloseWait, () -> {
+            LOG.info("Scrubbing pipeline: id: {} in CLOSED stage.", pipelineID.getId());
+            deletePipeline(pipelineID);
+            return null;
+          });
+        } catch (LeaseAlreadyExistException ex) {
+          LOG.debug("Close Pipeline {} delete already in queue.", pipelineID);
+        } catch (Exception ex) {
+          LOG.error("Error while scheduling pipeline removal", ex);
+        }
+      } else {
+        LOG.info("Pipeline {} with status moved to CLOSED state", pipelineID, info.getReason());
+      }
     }
 
     metrics.removePipelineMetrics(pipelineID);

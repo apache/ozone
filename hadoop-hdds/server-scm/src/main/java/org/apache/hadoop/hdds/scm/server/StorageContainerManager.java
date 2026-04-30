@@ -2033,6 +2033,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return serviceManager;
   }
 
+  public LeaseManager<Object> getLeaseManager() {
+    return leaseManager;
+  }
   /**
    * Force SCM out of safe mode.
    */
