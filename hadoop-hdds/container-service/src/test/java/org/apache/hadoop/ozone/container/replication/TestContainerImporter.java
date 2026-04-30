@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
@@ -66,7 +67,9 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
@@ -110,7 +113,7 @@ class TestContainerImporter {
           return container;
         });
     containerSet = spy(newContainerSet(0));
-    volumeSet = new MutableVolumeSet("test", conf, null,
+    volumeSet = new MutableVolumeSet("test", "test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     // create containerImporter object
     containerImporter = new ContainerImporter(conf,
@@ -232,6 +235,53 @@ class TestContainerImporter {
         targetVolume, NO_COMPRESSION);
 
     assertEquals(Optional.empty(), containerData.lastDataScanTime());
+  }
+
+  @Test
+  public void testImportWithVolumeRetrySkipsSelectedVolumeWithContainerDir()
+      throws Exception {
+    File volume2 = Files.createDirectory(tempDir.toPath().resolve("volume2"))
+        .toFile();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        tempDir.getAbsolutePath() + "," + volume2.getAbsolutePath());
+
+    volumeChoosingPolicy = mock(VolumeChoosingPolicy.class);
+    when(volumeChoosingPolicy.chooseVolume(any(), anyLong())).thenAnswer(
+        invocation -> {
+          List<HddsVolume> volumes = invocation.getArgument(0);
+          long spaceToReserve = invocation.getArgument(1);
+          HddsVolume volume = volumes.get(0);
+          volume.incCommittedBytes(spaceToReserve);
+          return volume;
+        });
+    volumeSet = new MutableVolumeSet("test", "test", conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    containerImporter = new ContainerImporter(conf,
+        containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
+
+    List<HddsVolume> volumes =
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+    HddsVolume firstVolume = volumes.get(0);
+    HddsVolume secondVolume = volumes.get(1);
+    long secondInitialCommittedBytes = secondVolume.getCommittedBytes();
+
+    String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+        firstVolume, firstVolume.getClusterID());
+    File staleContainerDir = new File(KeyValueContainerLocationUtil
+        .getBaseContainerLocation(firstVolume.getHddsRootDir().toString(),
+            idDir, containerId));
+    assertThat(staleContainerDir.mkdirs()).isTrue();
+
+    File tarFile = containerTarFile(containerId, containerData);
+    containerImporter.importContainerWithVolumeRetry(containerId,
+        tarFile.toPath(), firstVolume, NO_COMPRESSION,
+        containerImporter.getDefaultReplicationSpace());
+
+    assertEquals(secondVolume, containerData.getVolume());
+    assertThat(staleContainerDir).exists();
+    assertEquals(secondInitialCommittedBytes, secondVolume.getCommittedBytes());
+    verify(containerSet, atLeastOnce()).scanContainer(containerId,
+        "Imported container");
   }
 
   private File containerTarFile(long id, ContainerData data) throws IOException {

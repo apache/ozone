@@ -90,8 +90,9 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
               containerID, bytes);
       task.setTransferredBytes(bytes);
 
-      containerImporter.importContainer(containerID, tarFilePath, targetVolume,
-          compression);
+      containerImporter.importContainerWithVolumeRetry(containerID, tarFilePath,
+          targetVolume, compression,
+          containerImporter.getDefaultReplicationSpace());
 
       LOG.info("Container {} is replicated successfully", containerID);
       task.setStatus(Status.DONE);
