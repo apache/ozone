@@ -41,7 +41,7 @@ public final class OMEventListenerPluginContextImpl implements OMEventListenerPl
   // TODO: should we allow plugins to pass in maxResults or just limit
   // them to some predefined value for safety?  e.g. 10K
   @Override
-  public List<OmCompletedRequestInfo> listCompletedRequestInfo(String startKey, int maxResults) throws IOException {
+  public List<OmCompletedRequestInfo> listCompletedRequestInfo(Long startKey, int maxResults) throws IOException {
     return ozoneManager.getMetadataManager().listCompletedRequestInfo(startKey, maxResults);
   }
 

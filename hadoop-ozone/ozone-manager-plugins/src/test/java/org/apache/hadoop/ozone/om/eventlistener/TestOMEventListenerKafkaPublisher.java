@@ -38,7 +38,7 @@ import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Tests {@link OMEventListenerPluginManager}.
+ * Tests {@link OMEventListenerKafkaPublisher}.
  */
 @ExtendWith(MockitoExtension.class)
 public class TestOMEventListenerKafkaPublisher {
@@ -85,13 +85,13 @@ public class TestOMEventListenerKafkaPublisher {
     List<String> events = new ArrayList<>();
 
     OMEventListenerKafkaPublisher plugin = new OMEventListenerKafkaPublisher();
-    try (MockedConstruction<OMEventListenerKafkaPublisher.KafkaClientWrapper> mockeKafkaClientWrapper =
+    try (MockedConstruction<OMEventListenerKafkaPublisher.KafkaClientWrapper> mockedKafkaClientWrapper =
              mockConstruction(OMEventListenerKafkaPublisher.KafkaClientWrapper.class)) {
 
       plugin.initialize(conf, pluginContext);
       plugin.handleCompletedRequest(op);
 
-      OMEventListenerKafkaPublisher.KafkaClientWrapper mock = mockeKafkaClientWrapper.constructed().get(0);
+      OMEventListenerKafkaPublisher.KafkaClientWrapper mock = mockedKafkaClientWrapper.constructed().get(0);
       ArgumentCaptor<String> argument = ArgumentCaptor.forClass(String.class);
       verify(mock, times(expectEvents)).send(argument.capture());
 
@@ -144,7 +144,7 @@ public class TestOMEventListenerKafkaPublisher {
   }
 
   @Test
-  public void testRenameRequestProducesS3CreateAndDeleteEvents() throws InterruptedException, IOException {
+  public void testRenameRequestProducesRenameKeyEvent() throws InterruptedException, IOException {
     OmCompletedRequestInfo renameRequest = buildCompletedRequestInfo(4L, Type.RenameKey, "some/key4",
         new OperationArgs.RenameKeyArgs("some/key_RENAMED"));
 

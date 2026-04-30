@@ -60,8 +60,8 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
     long kafkaServiceTimeout = 300 * 1000;
 
     LOG.info("Creating OMEventListenerLedgerPoller with serviceInterval={}," +
-             "serviceTimeout={}, kafkaProps={}, seekPosition={}",
-        kafkaServiceInterval, kafkaServiceTimeout, kafkaProps,
+             "serviceTimeout={}, seekPosition={}",
+        kafkaServiceInterval, kafkaServiceTimeout,
         seekPosition);
 
     this.seekPosition = new OMEventListenerLedgerPollerSeekPosition();
@@ -135,14 +135,16 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
     }
 
     public void initialize() throws IOException {
-      LOG.info("Initializing with properties {}", kafkaProps);
+      LOG.info("Initializing kafka client for topic {}", topic);
       this.producer = new KafkaProducer<>(kafkaProps);
 
       ensureTopicExists();
     }
 
     public void shutdown() throws IOException {
-      producer.close();
+      if (producer != null) {
+        producer.close();
+      }
     }
 
     public void send(String message) throws IOException {

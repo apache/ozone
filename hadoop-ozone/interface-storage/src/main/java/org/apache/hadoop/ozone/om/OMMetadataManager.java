@@ -354,7 +354,7 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return a list of {@link OmCompletedRequestInfo}
    * @throws IOException
    */
-  List<OmCompletedRequestInfo> listCompletedRequestInfo(String startKey, int maxResults) throws IOException;
+  List<OmCompletedRequestInfo> listCompletedRequestInfo(Long startKey, int maxResults) throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is

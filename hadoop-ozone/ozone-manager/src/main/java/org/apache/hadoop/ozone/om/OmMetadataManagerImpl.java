@@ -1344,7 +1344,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * {@inheritDoc}
    */
   @Override
-  public List<OmCompletedRequestInfo> listCompletedRequestInfo(final String startKey,
+  public List<OmCompletedRequestInfo> listCompletedRequestInfo(final Long startKey,
                                                                final int maxResults)
       throws IOException {
     List<OmCompletedRequestInfo> results = new ArrayList<>();
@@ -1354,11 +1354,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             tableIterator = getCompletedRequestInfoTable().iterator()) {
 
       boolean skipFirst = false;
-      if (StringUtils.isNotBlank(startKey)) {
+      if (startKey != null) {
         // TODO: what happens if the seek position is no longer
         // available?  Do we go to the end of the list
         // or the first key > startKey
-        tableIterator.seek(Long.valueOf(startKey));
+        tableIterator.seek(startKey);
         skipFirst = true;
       }
 

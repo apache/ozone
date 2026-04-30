@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -59,7 +60,7 @@ public class OMEventListenerLedgerPoller extends BackgroundService {
 
     super("OMEventListenerLedgerPoller",
           interval,
-          TimeUnit.MILLISECONDS,
+          unit,
           poolSize,
           serviceTimeout, pluginContext.getThreadNamePrefix());
 
@@ -116,13 +117,15 @@ public class OMEventListenerLedgerPoller extends BackgroundService {
           LOG.debug("Running OMEventListenerLedgerPoller");
         }
         if (runCount.get() == 0) {
-          seekPosition.initSeekPosition();
+          seekPosition.set(seekPosition.initSeekPosition());
         }
         getRunCount().incrementAndGet();
 
         try {
+          String startKeyStr = seekPosition.get();
+          Long startKey = StringUtils.isNotBlank(startKeyStr) ? Long.valueOf(startKeyStr) : null;
           for (OmCompletedRequestInfo requestInfo : pluginContext.listCompletedRequestInfo(
-                  seekPosition.get(), MAX_RESULTS)) {
+                  startKey, MAX_RESULTS)) {
             callback.accept(requestInfo);
           }
           successRunCount.incrementAndGet();

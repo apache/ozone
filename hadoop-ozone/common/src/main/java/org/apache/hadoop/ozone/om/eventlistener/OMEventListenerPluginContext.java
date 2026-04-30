@@ -31,7 +31,7 @@ public interface OMEventListenerPluginContext {
 
   // TODO: should we allow plugins to pass in maxResults or just limit
   // them to some predefined value for safety?  e.g. 10K
-  List<OmCompletedRequestInfo> listCompletedRequestInfo(String startKey, int maxResults) throws IOException;
+  List<OmCompletedRequestInfo> listCompletedRequestInfo(Long startKey, int maxResults) throws IOException;
 
   // XXX: this probably doesn't belong here
   String getThreadNamePrefix();
