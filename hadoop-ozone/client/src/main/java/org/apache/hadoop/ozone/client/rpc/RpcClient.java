@@ -2155,6 +2155,39 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(
+      String volumeName, String bucketName, String keyName, String uploadID,
+      Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    HddsClientUtils.checkNotNull(keyName, uploadID);
+    String ownerName = getRealUserInfo().getShortUserName();
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setMultipartUploadID(uploadID)
+        .setOwnerName(ownerName);
+
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
+    }
+    if (expectedETag != null) {
+      builder.setExpectedETag(expectedETag);
+    }
+
+    OmKeyArgs keyArgs = builder.build();
+
+    OmMultipartUploadCompleteList omMultipartUploadCompleteList =
+        new OmMultipartUploadCompleteList(partsMap);
+
+    return ozoneManagerClient.completeMultipartUpload(keyArgs,
+        omMultipartUploadCompleteList);
+  }
+
+  @Override
   public void abortMultipartUpload(String volumeName,
        String bucketName, String keyName, String uploadID) throws IOException {
     verifyVolumeName(volumeName);
