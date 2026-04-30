@@ -414,7 +414,12 @@ public final class HAUtils {
       return retriableTask.call();
     } catch (Exception ex) {
       if (containsAccessControlException(ex)) {
-        throw new AccessControlException();
+        Throwable cause = ex;
+        while (cause != null && !(cause instanceof AccessControlException)) {
+          cause = cause.getCause();
+        }
+        throw new IOException(
+            cause != null ? cause.getMessage() : ex.getMessage(), ex);
       }
       throw new SCMSecurityException("Unable to obtain complete CA list", ex);
     }

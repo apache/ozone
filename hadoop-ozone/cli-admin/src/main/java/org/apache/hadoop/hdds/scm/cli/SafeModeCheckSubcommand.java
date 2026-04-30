@@ -122,7 +122,7 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
 
       return null;
     } catch (IOException e) {
-      throw new IOException("Could not determine leader node", e);
+      throw new IOException("Could not determine leader node. " + e.getMessage(), e);
     }
   }
 
