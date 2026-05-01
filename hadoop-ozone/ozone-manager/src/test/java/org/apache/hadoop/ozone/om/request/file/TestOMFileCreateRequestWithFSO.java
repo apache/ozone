@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -197,13 +198,13 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
       if (indx == pathComponents.length - 1) {
         String dbOpenFileName = omMetadataManager.getOpenFileName(
                 volumeId, bucketId, parentId, pathElement, id);
-        OmKeyInfo omKeyInfo =
+        OmOpenKeyInfo omOpenKeyInfo =
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
-          assertNotNull(omKeyInfo, "Invalid key!");
+          assertNotNull(omOpenKeyInfo, "Invalid key!");
         }
-        return omKeyInfo;
+        return omOpenKeyInfo != null ? omOpenKeyInfo.getKeyInfo() : null;
       } else {
         // directory
         String dbKey = omMetadataManager.getOzonePathKey(volumeId,

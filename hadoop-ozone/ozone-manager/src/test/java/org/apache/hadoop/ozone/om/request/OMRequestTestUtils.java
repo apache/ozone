@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -335,6 +336,15 @@ public final class OMRequestTestUtils {
                                    long trxnLogIndex,
                                    OMMetadataManager omMetadataManager)
       throws Exception {
+    addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex, null, omMetadataManager);
+  }
+
+  public static void addKeyToTable(boolean openKeyTable, boolean addToCache,
+                                   OmKeyInfo omKeyInfo,  long clientID,
+                                   long trxnLogIndex,
+                                   Long expectedDataGeneration,
+                                   OMMetadataManager omMetadataManager)
+      throws Exception {
     String volumeName = omKeyInfo.getVolumeName();
     String bucketName = omKeyInfo.getBucketName();
     String keyName = omKeyInfo.getKeyName();
@@ -342,13 +352,17 @@ public final class OMRequestTestUtils {
     if (openKeyTable) {
       String ozoneKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, clientID);
+      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+          .setKeyInfo(omKeyInfo)
+          .setExpectedDataGeneration(expectedDataGeneration)
+          .build();
       if (addToCache) {
         omMetadataManager.getOpenKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(ozoneKey),
-                CacheValue.get(trxnLogIndex, omKeyInfo));
+                CacheValue.get(trxnLogIndex, omOpenKeyInfo));
       }
       omMetadataManager.getOpenKeyTable(getDefaultBucketLayout())
-          .put(ozoneKey, omKeyInfo);
+          .put(ozoneKey, omOpenKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
@@ -394,13 +408,15 @@ public final class OMRequestTestUtils {
         omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
         omKeyInfo.getKeyName(), uploadId);
 
+    OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+        .setKeyInfo(omKeyInfo).build();
     if (addToCache) {
       omMetadataManager.getOpenKeyTable(BucketLayout.DEFAULT)
           .addCacheEntry(new CacheKey<>(multipartKey),
-              CacheValue.get(trxnLogIndex, omKeyInfo));
+              CacheValue.get(trxnLogIndex, omOpenKeyInfo));
     }
     omMetadataManager.getOpenKeyTable(BucketLayout.DEFAULT)
-        .put(multipartKey, omKeyInfo);
+        .put(multipartKey, omOpenKeyInfo);
   }
 
   /**
@@ -1564,13 +1580,15 @@ public final class OMRequestTestUtils {
       ozoneDBKey = omMetadataManager.getOpenFileName(
               volumeId, bucketId, omKeyInfo.getParentObjectID(),
               fileName, clientID);
+      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+          .setKeyInfo(omKeyInfo).build();
       if (addToCache) {
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
             .addCacheEntry(new CacheKey<>(ozoneDBKey),
-                CacheValue.get(trxnLogIndex, omKeyInfo));
+                CacheValue.get(trxnLogIndex, omOpenKeyInfo));
       }
       omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-          .put(ozoneDBKey, omKeyInfo);
+          .put(ozoneDBKey, omOpenKeyInfo);
     } else {
       ozoneDBKey = omMetadataManager.getOzonePathKey(
               omMetadataManager.getVolumeId(omKeyInfo.getVolumeName()),
@@ -1603,13 +1621,15 @@ public final class OMRequestTestUtils {
     String multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
         omKeyInfo.getParentObjectID(), fileName, uploadId);
 
+    OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+        .setKeyInfo(omKeyInfo).build();
     if (addToCache) {
       omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
           .addCacheEntry(new CacheKey<>(multipartKey),
-              CacheValue.get(trxnLogIndex, omKeyInfo));
+              CacheValue.get(trxnLogIndex, omOpenKeyInfo));
     }
     omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put(multipartKey, omKeyInfo);
+        .put(multipartKey, omOpenKeyInfo);
   }
 
   /**

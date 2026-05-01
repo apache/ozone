@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequestWithFSO;
@@ -408,9 +409,10 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     if (addOpenKeyTable) {
       String openKey = addToOpenFileTable(allocatedLocationList, openKeyInfoWithHsyncFlag);
 
-      omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+      OmOpenKeyInfo omOpenKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
           .get(openKey);
-      assertNotNull(omKeyInfo);
+      assertNotNull(omOpenKeyInfo);
+      omKeyInfo = omOpenKeyInfo.getKeyInfo();
     }
 
     // Set lease soft limit to 0
@@ -499,12 +501,12 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     }
     // Entry should be deleted from openKey Table.
     String openKey = getOpenFileName();
-    omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(openKey);
     if (hasOpenKey) {
-      assertNotNull(omKeyInfo);
+      assertNotNull(omOpenKeyInfo);
     } else {
-      assertNull(omKeyInfo);
+      assertNull(omOpenKeyInfo);
     }
   }
 

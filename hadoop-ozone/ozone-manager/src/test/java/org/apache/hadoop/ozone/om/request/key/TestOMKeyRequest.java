@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -297,12 +298,12 @@ public class TestOMKeyRequest {
       throws Exception {
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         key, id);
-    OmKeyInfo omKeyInfo =
+    OmOpenKeyInfo omOpenKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
     if (doAssert) {
-      assertNotNull(omKeyInfo, "Failed to find key in OpenKeyTable");
+      assertNotNull(omOpenKeyInfo, "Failed to find key in OpenKeyTable");
     }
-    return omKeyInfo;
+    return omOpenKeyInfo != null ? omOpenKeyInfo.getKeyInfo() : null;
   }
 
   public BucketLayout getBucketLayout() {
