@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -218,9 +219,12 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .build();
 
       // Add to cache
+      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+          .setKeyInfo(omKeyInfo)
+          .build();
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(multipartKey),
-          CacheValue.get(transactionLogIndex, omKeyInfo));
+          CacheValue.get(transactionLogIndex, omOpenKeyInfo));
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
           CacheValue.get(transactionLogIndex, multipartKeyInfo));
@@ -233,7 +237,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                       .setBucketName(requestedBucket)
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
-                  .build(), multipartKeyInfo, omKeyInfo, getBucketLayout());
+                  .build(), multipartKeyInfo, omOpenKeyInfo, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

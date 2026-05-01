@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -320,7 +321,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
       String openKey, String keyName) throws IOException {
 
-    return omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    return omOpenKeyInfo != null ? omOpenKeyInfo.getKeyInfo() : null;
   }
 
   protected String getOpenKey(String volumeName, String bucketName,

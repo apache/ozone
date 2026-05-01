@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -36,10 +37,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, @Nonnull List<OmKeyInfo> parentKeyInfos,
+      @Nonnull OmOpenKeyInfo omOpenKeyInfo, @Nonnull List<OmKeyInfo> parentKeyInfos,
       long openKeySessionID,
       @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID,
+    super(omResponse, omOpenKeyInfo, parentKeyInfos, openKeySessionID,
         omBucketInfo);
   }
 

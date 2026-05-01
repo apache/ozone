@@ -70,7 +70,6 @@ public class TestOmKeyInfo {
     key = key.withMetadataMutations(
         metadata -> metadata.put(OzoneConsts.HSYNC_CLIENT_ID, "clientid"));
     assertTrue(key.isHsync());
-    assertEquals(5678L, key.getExpectedDataGeneration());
   }
 
   @Test
@@ -129,7 +128,6 @@ public class TestOmKeyInfo {
         .addMetadata("key2", "value2")
         .addTag("tagKey1", "tagValue1")
         .addTag("tagKey2", "tagValue2")
-        .setExpectedDataGeneration(5678L)
         .build();
   }
 

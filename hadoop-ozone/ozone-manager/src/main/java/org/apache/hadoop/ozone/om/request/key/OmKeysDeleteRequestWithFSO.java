@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -90,7 +91,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   @Override
   protected Pair<Long, Integer> markKeysAsDeletedInCache(
       OzoneManager ozoneManager, long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap) throws IOException {
+      OMMetadataManager omMetadataManager, Map<String, OmOpenKeyInfo> openKeyInfoMap) throws IOException {
     long quotaReleased = 0L;
     int emptyKeys = 0;
     // Mark all keys which can be deleted, in cache as deleted.
@@ -118,16 +119,18 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       final String hsyncClientId = updatedOmKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
       if (hsyncClientId != null) {
-        final Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+        final Table<String, OmOpenKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
         final String dbOpenKey = omMetadataManager.getOpenFileName(
             volumeId, bucketId, parentId, fileName, hsyncClientId);
-        final OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
-        if (openKeyInfo != null) {
-          final OmKeyInfo updatedOpenKeyInfo = openKeyInfo.withMetadataMutations(
+        final OmOpenKeyInfo omOpenKeyInfo = openKeyTable.get(dbOpenKey);
+        if (omOpenKeyInfo != null) {
+          final OmKeyInfo updatedOpenKeyInfo = omOpenKeyInfo.getKeyInfo().withMetadataMutations(
               metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-          openKeyTable.addCacheEntry(dbOpenKey, updatedOpenKeyInfo, trxnLogIndex);
+          OmOpenKeyInfo updatedOmOpenKeyInfo = new OmOpenKeyInfo.Builder()
+              .setKeyInfo(updatedOpenKeyInfo).build();
+          openKeyTable.addCacheEntry(dbOpenKey, updatedOmOpenKeyInfo, trxnLogIndex);
           // Add to the map of open keys to be deleted.
-          openKeyInfoMap.put(dbOpenKey, updatedOpenKeyInfo);
+          openKeyInfoMap.put(dbOpenKey, updatedOmOpenKeyInfo);
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
@@ -165,7 +168,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
       Map<String, ErrorInfo> keyToErrors,
-      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap) {
+      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmOpenKeyInfo> openKeyInfoMap) {
     OMClientResponse omClientResponse;
     List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
     for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {

@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -253,13 +254,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
       String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, writerClientId);
-      omKeyInfo =
+      OmOpenKeyInfo omOpenKeyInfo =
           omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
-      if (omKeyInfo == null) {
+      if (omOpenKeyInfo == null) {
         String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             " entry is not found in the OpenKey table", KEY_NOT_FOUND);
-      } else if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
+      }
+
+      omKeyInfo = omOpenKeyInfo.getKeyInfo();
+      if (omKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
           omKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
         throw new OMException("Open Key " + keyName + " is already deleted/overwritten",
             KEY_NOT_FOUND);
@@ -273,7 +277,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      OmKeyInfo openKeyToDelete = null;
+      OmOpenKeyInfo openKeyToDelete = null;
       String dbOpenKeyToDeleteKey = null;
       if (isOverwrittenHsyncKey) {
         // find the overwritten openKey and add OVERWRITTEN_HSYNC_KEY to it.
@@ -291,25 +295,25 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
       // non-null indicates it is necessary to update the open key
-      OmKeyInfo newOpenKeyInfo = null;
+      OmOpenKeyInfo newOpenKeyInfo = null;
 
       if (isHSync) {
         if (!OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenKey)) {
           // Update open key as well if it is the first hsync of this key
           omKeyInfo = omKeyInfo.withMetadataMutations(
               metadata -> metadata.put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString));
-          newOpenKeyInfo = omKeyInfo.copyObject();
+          newOpenKeyInfo = new OmOpenKeyInfo.Builder()
+              .setKeyInfo(omKeyInfo.copyObject())
+              .setExpectedDataGeneration(omOpenKeyInfo.getExpectedDataGeneration())
+              .setExpectedETag(omOpenKeyInfo.getExpectedETag())
+              .build();
         }
       }
 
-      validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
-      // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
-      // not persisted in the key table.
-      // Combination
+      validateAtomicRewrite(keyToDelete, omOpenKeyInfo, auditMap);
+      // Optimistic locking validation has passed.
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
-          .setExpectedDataGeneration(null)
-          .setExpectedETag(null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
           .setUpdateID(trxnLogIndex)
@@ -618,12 +622,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     return req;
   }
 
-  protected void validateAtomicRewrite(OmKeyInfo existing, OmKeyInfo toCommit, Map<String, String> auditMap)
+  protected void validateAtomicRewrite(OmKeyInfo existing, OmOpenKeyInfo openKeyInfo, Map<String, String> auditMap)
       throws OMException {
-    if (toCommit.getExpectedDataGeneration() != null) {
+    if (openKeyInfo.getExpectedDataGeneration() != null) {
       // These values are not passed in the request keyArgs, so add them into the auditMap if they are present
       // in the open key entry.
-      Long expectedGen = toCommit.getExpectedDataGeneration();
+      Long expectedGen = openKeyInfo.getExpectedDataGeneration();
       auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
 
       if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {

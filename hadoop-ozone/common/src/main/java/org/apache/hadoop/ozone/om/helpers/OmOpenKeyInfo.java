@@ -61,9 +61,9 @@ public final class OmOpenKeyInfo implements CopyObject<OmOpenKeyInfo> {
   }
 
   /**
-   * Creates a backward-compatible codec that can read both:
-   * - Old format: raw KeyInfo proto bytes (for existing data migration)
-   * - New format: OpenKeyInfo proto bytes
+   * Creates a backward-compatible codec that can read both old and new formats.
+   * Old format: raw KeyInfo proto bytes (for existing data migration).
+   * New format: OpenKeyInfo proto bytes.
    */
   private static Codec<OmOpenKeyInfo> newCodec(boolean ignorePipeline) {
     return new BackwardCompatibleCodec(ignorePipeline);
@@ -101,6 +101,10 @@ public final class OmOpenKeyInfo implements CopyObject<OmOpenKeyInfo> {
 
   public String getKeyName() {
     return keyInfo.getKeyName();
+  }
+
+  public void setKeyName(String keyName) {
+    keyInfo.setKeyName(keyName);
   }
 
   public long getDataSize() {
@@ -240,6 +244,10 @@ public final class OmOpenKeyInfo implements CopyObject<OmOpenKeyInfo> {
   }
 
   // ========== Proto conversion ==========
+  
+  public KeyInfo getNetworkProtobuf(int clientVersion, boolean latestVersion) {
+    return keyInfo.getNetworkProtobuf(clientVersion, latestVersion);
+  }
 
   public OpenKeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
     OpenKeyInfo.Builder builder = OpenKeyInfo.newBuilder()
@@ -338,6 +346,7 @@ public final class OmOpenKeyInfo implements CopyObject<OmOpenKeyInfo> {
    */
   public static class Builder {
     private OmKeyInfo keyInfo;
+    private OmKeyInfo.Builder keyInfoBuilder;
     private Long expectedDataGeneration;
     private String expectedETag;
 
@@ -346,6 +355,7 @@ public final class OmOpenKeyInfo implements CopyObject<OmOpenKeyInfo> {
 
     public Builder setKeyInfo(OmKeyInfo keyInfo) {
       this.keyInfo = keyInfo;
+      this.keyInfoBuilder = null;
       return this;
     }
 
@@ -359,7 +369,36 @@ public final class OmOpenKeyInfo implements CopyObject<OmOpenKeyInfo> {
       return this;
     }
 
+    /**
+     * Adds metadata to the underlying keyInfo.
+     * For use in toBuilder() chains.
+     */
+    public Builder addMetadata(String key, String value) {
+      ensureKeyInfoBuilder();
+      keyInfoBuilder.addMetadata(key, value);
+      return this;
+    }
+
+    /**
+     * Sets the update ID on the underlying keyInfo.
+     */
+    public Builder setUpdateID(long updateID) {
+      ensureKeyInfoBuilder();
+      keyInfoBuilder.setUpdateID(updateID);
+      return this;
+    }
+
+    private void ensureKeyInfoBuilder() {
+      if (keyInfoBuilder == null && keyInfo != null) {
+        keyInfoBuilder = keyInfo.toBuilder();
+        keyInfo = null;
+      }
+    }
+
     public OmOpenKeyInfo build() {
+      if (keyInfoBuilder != null) {
+        keyInfo = keyInfoBuilder.build();
+      }
       return new OmOpenKeyInfo(this);
     }
   }

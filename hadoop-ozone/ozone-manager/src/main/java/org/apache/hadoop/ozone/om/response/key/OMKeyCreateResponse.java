@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -42,16 +43,16 @@ public class OMKeyCreateResponse extends OmKeyResponse {
 
   protected static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
-  private OmKeyInfo omKeyInfo;
+  private OmOpenKeyInfo omOpenKeyInfo;
   private long openKeySessionID;
   private List<OmKeyInfo> parentKeyInfos;
   private OmBucketInfo omBucketInfo;
 
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, List<OmKeyInfo> parentKeyInfos,
+      @Nonnull OmOpenKeyInfo omOpenKeyInfo, List<OmKeyInfo> parentKeyInfos,
       long openKeySessionID, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, omBucketInfo.getBucketLayout());
-    this.omKeyInfo = omKeyInfo;
+    this.omOpenKeyInfo = omOpenKeyInfo;
     this.openKeySessionID = openKeySessionID;
     this.parentKeyInfos = parentKeyInfos;
     this.omBucketInfo = omBucketInfo;
@@ -97,18 +98,18 @@ public class OMKeyCreateResponse extends OmKeyResponse {
           bucketKey, getOmBucketInfo());
     }
 
-    String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
+    String openKey = omMetadataManager.getOpenKey(omOpenKeyInfo.getVolumeName(),
+        omOpenKeyInfo.getBucketName(), omOpenKeyInfo.getKeyName(), openKeySessionID);
     omMetadataManager.getOpenKeyTable(getBucketLayout())
-        .putWithBatch(batchOperation, openKey, omKeyInfo);
+        .putWithBatch(batchOperation, openKey, omOpenKeyInfo);
   }
 
   protected long getOpenKeySessionID() {
     return openKeySessionID;
   }
 
-  protected OmKeyInfo getOmKeyInfo() {
-    return omKeyInfo;
+  protected OmOpenKeyInfo getOmOpenKeyInfo() {
+    return omOpenKeyInfo;
   }
 
   protected OmBucketInfo getOmBucketInfo() {

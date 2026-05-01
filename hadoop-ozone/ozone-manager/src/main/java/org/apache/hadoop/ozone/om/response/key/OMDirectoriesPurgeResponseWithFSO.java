@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -66,13 +67,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private List<OzoneManagerProtocolProtos.PurgePathRequest> paths;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
   private SnapshotInfo fromSnapshotInfo;
-  private Map<String, OmKeyInfo> openKeyInfoMap;
+  private Map<String, OmOpenKeyInfo> openKeyInfoMap;
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
       @Nonnull BucketLayout bucketLayout,
       Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
-      SnapshotInfo fromSnapshotInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
+      SnapshotInfo fromSnapshotInfo, Map<String, OmOpenKeyInfo> openKeyInfoMap) {
     super(omResponse, bucketLayout);
     this.paths = paths;
     this.volBucketInfoMap = volBucketInfoMap;
@@ -183,7 +184,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       }
 
       if (!openKeyInfoMap.isEmpty()) {
-        for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
+        for (Map.Entry<String, OmOpenKeyInfo> entry : openKeyInfoMap.entrySet()) {
           keySpaceOmMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
               keySpaceBatchOperation, entry.getKey(), entry.getValue());
         }

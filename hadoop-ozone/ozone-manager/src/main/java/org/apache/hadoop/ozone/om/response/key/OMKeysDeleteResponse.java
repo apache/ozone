@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -45,12 +46,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private List<OmKeyInfo> omKeyInfoList;
   private OmBucketInfo omBucketInfo;
-  private Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
+  private Map<String, OmOpenKeyInfo> openKeyInfoMap = new HashMap<>();
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
       @Nonnull OmBucketInfo omBucketInfo,
-      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
+      @Nonnull Map<String, OmOpenKeyInfo> openKeyInfoMap) {
     super(omResponse);
     this.omKeyInfoList = keyDeleteList;
     this.omBucketInfo = omBucketInfo;
@@ -102,7 +103,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
             omBucketInfo.getBucketName()), omBucketInfo);
 
     if (!openKeyInfoMap.isEmpty()) {
-      for (Map.Entry<String, OmKeyInfo> entry : openKeyInfoMap.entrySet()) {
+      for (Map.Entry<String, OmOpenKeyInfo> entry : openKeyInfoMap.entrySet()) {
         omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
             batchOperation, entry.getKey(), entry.getValue());
       }
@@ -117,7 +118,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     return omBucketInfo;
   }
 
-  protected Map<String, OmKeyInfo> getOpenKeyInfoMap() {
+  protected Map<String, OmOpenKeyInfo> getOpenKeyInfoMap() {
     return openKeyInfoMap;
   }
 }

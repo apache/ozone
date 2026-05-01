@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
 
   private long volumeId;
+  private OmOpenKeyInfo newOmOpenKeyInfo;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyCommitResponseWithFSO(
@@ -52,10 +54,13 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
       boolean isHSync,
-      OmKeyInfo newOpenKeyInfo, String openKeyNameToUpdate, OmKeyInfo openKeyToUpdate) {
+      OmOpenKeyInfo newOpenKeyInfo, String openKeyNameToUpdate, OmOpenKeyInfo openKeyToUpdate) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
-        omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo, openKeyNameToUpdate, openKeyToUpdate);
+        omBucketInfo, deleteKeyMap, isHSync,
+        newOpenKeyInfo,
+        openKeyNameToUpdate, openKeyToUpdate);
     this.volumeId = volumeId;
+    this.newOmOpenKeyInfo = newOpenKeyInfo;
   }
 
   /**
@@ -76,9 +81,9 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
     if (!this.isHSync()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .deleteWithBatch(batchOperation, getOpenKeyName());
-    } else if (getNewOpenKeyInfo() != null) {
+    } else if (newOmOpenKeyInfo != null) {
       omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
-          batchOperation, getOpenKeyName(), getNewOpenKeyInfo());
+          batchOperation, getOpenKeyName(), newOmOpenKeyInfo);
     }
 
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,

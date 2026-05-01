@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.slf4j.Logger;
@@ -463,17 +464,17 @@ public final class OMFileRequest {
    */
   public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
-          @Nullable OmKeyInfo omFileInfo, String keyName, long trxnLogIndex) {
+          @Nullable OmOpenKeyInfo omOpenFileInfo, String keyName, long trxnLogIndex) {
 
-    final Table<String, OmKeyInfo> table = omMetadataManager.getOpenKeyTable(
+    final Table<String, OmOpenKeyInfo> table = omMetadataManager.getOpenKeyTable(
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    if (omFileInfo != null) {
+    if (omOpenFileInfo != null) {
       // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
       // keyName field stores full path, which is '/a/b/c/d/e/file1'.
       // This is required as in some cases like hsync, Keys inside openKeyTable is used for auto commit after expiry.
       // (Full key path is required in commit key request)
-      omFileInfo.setKeyName(keyName);
-      table.addCacheEntry(dbOpenFileName, omFileInfo, trxnLogIndex);
+      omOpenFileInfo.getKeyInfo().setKeyName(keyName);
+      table.addCacheEntry(dbOpenFileName, omOpenFileInfo, trxnLogIndex);
     } else {
       table.addCacheEntry(dbOpenFileName, trxnLogIndex);
     }
@@ -516,15 +517,15 @@ public final class OMFileRequest {
    * @throws IOException DB failure
    */
   public static void addToOpenFileTable(OMMetadataManager omMetadataMgr,
-      BatchOperation batchOp, OmKeyInfo omFileInfo, long openKeySessionID,
+      BatchOperation batchOp, OmOpenKeyInfo omOpenFileInfo, long openKeySessionID,
       long volumeId, long bucketId) throws IOException {
 
     String dbOpenFileKey = omMetadataMgr.getOpenFileName(volumeId, bucketId,
-            omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
+            omOpenFileInfo.getParentObjectID(), omOpenFileInfo.getFileName(),
             openKeySessionID);
 
     omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .putWithBatch(batchOp, dbOpenFileKey, omFileInfo);
+        .putWithBatch(batchOp, dbOpenFileKey, omOpenFileInfo);
   }
 
   /**
@@ -539,15 +540,15 @@ public final class OMFileRequest {
    */
   public static String addToOpenFileTableForMultipart(
       OMMetadataManager omMetadataMgr,
-      BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID,
+      BatchOperation batchOp, OmOpenKeyInfo omOpenFileInfo, String uploadID,
       long volumeId, long bucketId) throws IOException {
 
     String multipartFileKey = omMetadataMgr.getMultipartKey(volumeId,
-            bucketId, omFileInfo.getParentObjectID(),
-            omFileInfo.getFileName(), uploadID);
+            bucketId, omOpenFileInfo.getParentObjectID(),
+            omOpenFileInfo.getFileName(), uploadID);
 
     omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .putWithBatch(batchOp, multipartFileKey, omFileInfo);
+        .putWithBatch(batchOp, multipartFileKey, omOpenFileInfo);
 
     return multipartFileKey;
   }
@@ -591,9 +592,10 @@ public final class OMFileRequest {
 
     OmKeyInfo dbOmKeyInfo;
     if (openFileTable) {
-      dbOmKeyInfo =
+      OmOpenKeyInfo omOpenKeyInfo =
           omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
               .get(dbOpenFileKey);
+      dbOmKeyInfo = omOpenKeyInfo != null ? omOpenKeyInfo.getKeyInfo() : null;
     } else {
       dbOmKeyInfo =
           omMetadataMgr.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)

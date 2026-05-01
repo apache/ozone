@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -171,8 +172,10 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
               .setKeyLocation(blockLocation).build());
       long volumeId = omMetadataManager.getVolumeId(volumeName);
+      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+          .setKeyInfo(openKeyInfo).build();
       omClientResponse = getOmClientResponse(clientID, omResponse,
-              openKeyInfo, omBucketInfo.copyObject(), volumeId);
+              omOpenKeyInfo, omBucketInfo.copyObject(), volumeId);
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
               volumeName, bucketName, openKeyName);
     } catch (IOException | InvalidPathException ex) {
@@ -223,14 +226,15 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       OMMetadataManager omMetadataManager, String openKeyName, String keyName,
       OmKeyInfo openKeyInfo) {
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, openKeyName,
-        openKeyInfo, keyName, trxnLogIndex);
+        new OmOpenKeyInfo.Builder().setKeyInfo(openKeyInfo).build(),
+        keyName, trxnLogIndex);
   }
 
   @Nonnull
   private OMClientResponse getOmClientResponse(long clientID,
-      OMResponse.Builder omResponse, OmKeyInfo openKeyInfo,
+      OMResponse.Builder omResponse, OmOpenKeyInfo omOpenKeyInfo,
       OmBucketInfo omBucketInfo, long volumeId) {
-    return new OMAllocateBlockResponseWithFSO(omResponse.build(), openKeyInfo,
+    return new OMAllocateBlockResponseWithFSO(omResponse.build(), omOpenKeyInfo,
             clientID, getBucketLayout(), volumeId, omBucketInfo.getObjectID());
   }
 }

@@ -25,7 +25,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -35,14 +35,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, BUCKET_TABLE})
 public class OMAllocateBlockResponse extends OmKeyResponse {
 
-  private OmKeyInfo omKeyInfo;
+  private OmOpenKeyInfo omOpenKeyInfo;
   private long clientID;
 
   public OMAllocateBlockResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, long clientID,
+      @Nonnull OmOpenKeyInfo omOpenKeyInfo, long clientID,
       @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
-    this.omKeyInfo = omKeyInfo;
+    this.omOpenKeyInfo = omOpenKeyInfo;
     this.clientID = clientID;
   }
 
@@ -60,14 +60,14 @@ public class OMAllocateBlockResponse extends OmKeyResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), clientID);
+    String openKey = omMetadataManager.getOpenKey(omOpenKeyInfo.getVolumeName(),
+        omOpenKeyInfo.getBucketName(), omOpenKeyInfo.getKeyName(), clientID);
     omMetadataManager.getOpenKeyTable(getBucketLayout())
-        .putWithBatch(batchOperation, openKey, omKeyInfo);
+        .putWithBatch(batchOperation, openKey, omOpenKeyInfo);
   }
 
-  protected OmKeyInfo getOmKeyInfo() {
-    return omKeyInfo;
+  protected OmOpenKeyInfo getOmOpenKeyInfo() {
+    return omOpenKeyInfo;
   }
 
   protected long getClientID() {

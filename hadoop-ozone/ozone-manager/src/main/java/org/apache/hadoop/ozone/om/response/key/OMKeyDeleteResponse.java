@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -43,11 +44,11 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
   private OmKeyInfo omKeyInfo;
   private OmBucketInfo omBucketInfo;
   // If not null, this key will be deleted from OpenKeyTable
-  private OmKeyInfo deletedOpenKeyInfo;
+  private OmOpenKeyInfo deletedOpenKeyInfo;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo,
-      @Nonnull OmBucketInfo omBucketInfo, OmKeyInfo deletedOpenKeyInfo) {
+      @Nonnull OmBucketInfo omBucketInfo, OmOpenKeyInfo deletedOpenKeyInfo) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.omBucketInfo = omBucketInfo;
@@ -99,7 +100,7 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     return omKeyInfo;
   }
 
-  protected OmKeyInfo getDeletedOpenKeyInfo() {
+  protected OmOpenKeyInfo getDeletedOpenKeyInfo() {
     return deletedOpenKeyInfo;
   }
 

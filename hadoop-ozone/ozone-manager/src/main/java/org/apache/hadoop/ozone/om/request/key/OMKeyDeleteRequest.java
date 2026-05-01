@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -165,20 +166,23 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
       omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
       omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty);
-      OmKeyInfo deletedOpenKeyInfo = null;
+      OmOpenKeyInfo deletedOmOpenKeyInfo = null;
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String dbOpenKey = null;
       String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
       if (hsyncClientId != null) {
-        Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+        Table<String, OmOpenKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
         dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
-        OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
-        if (openKeyInfo != null) {
-          openKeyInfo = openKeyInfo.withMetadataMutations(
+        OmOpenKeyInfo omOpenKeyInfo = openKeyTable.get(dbOpenKey);
+        if (omOpenKeyInfo != null) {
+          OmKeyInfo openKeyInfo = omOpenKeyInfo.getKeyInfo().withMetadataMutations(
               metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
-          deletedOpenKeyInfo = openKeyInfo;
+          OmOpenKeyInfo updatedOpenKeyInfo = new OmOpenKeyInfo.Builder()
+              .setKeyInfo(openKeyInfo)
+              .build();
+          openKeyTable.addCacheEntry(dbOpenKey, updatedOpenKeyInfo, trxnLogIndex);
+          deletedOmOpenKeyInfo = updatedOpenKeyInfo;
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
@@ -187,7 +191,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omClientResponse = new OMKeyDeleteResponse(
           omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder())
               .build(), omKeyInfo,
-          omBucketInfo.copyObject(), deletedOpenKeyInfo);
+          omBucketInfo.copyObject(), deletedOmOpenKeyInfo);
       if (omKeyInfo.isFile()) {
         auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(omKeyInfo.getDataSize()));
         auditMap.put(OzoneConsts.REPLICATION_CONFIG, omKeyInfo.getReplicationConfig().toString());

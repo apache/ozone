@@ -111,6 +111,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -160,14 +161,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, OmBucketInfo> bucketTable;
   private Table<String, OmKeyInfo> keyTable;
 
-  private Table<String, OmKeyInfo> openKeyTable;
+  private Table<String, OmOpenKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
   private Table<OmMultipartPartKey, OmMultipartPartInfo> multipartPartsTable;
   private Table<String, RepeatedOmKeyInfo> deletedTable;
 
   private Table<String, OmDirectoryInfo> dirTable;
   private Table<String, OmKeyInfo> fileTable;
-  private Table<String, OmKeyInfo> openFileTable;
+  private Table<String, OmOpenKeyInfo> openFileTable;
   private Table<String, OmKeyInfo> deletedDirTable;
 
   private Table<String, S3SecretValue> s3SecretTable;
@@ -367,7 +368,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<String, OmKeyInfo> getOpenKeyTable(BucketLayout bucketLayout) {
+  public Table<String, OmOpenKeyInfo> getOpenKeyTable(BucketLayout bucketLayout) {
     if (bucketLayout.isFileSystemOptimized()) {
       return openFileTable;
     }
@@ -989,13 +990,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     //  listKeys do. But that complicates the iteration logic by quite a bit.
     //  And if we do that, we need to refactor listKeys as well to dedup.
 
-    final Table<String, OmKeyInfo> okTable;
+    final Table<String, OmOpenKeyInfo> okTable;
     okTable = getOpenKeyTable(bucketLayout);
 
     // No lock required since table iterator creates a "snapshot"
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, OmOpenKeyInfo>>
              openKeyIter = okTable.iterator()) {
-      KeyValue<String, OmKeyInfo> kv;
+      KeyValue<String, OmOpenKeyInfo> kv;
       kv = openKeyIter.seek(dbContTokenPrefix);
       if (hasContToken && kv.getKey().equals(dbContTokenPrefix)) {
         // Skip one entry when cont token is specified and the current entry
@@ -1007,7 +1008,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
           String dbKey = kv.getKey();
           long clientID = OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
-          OmKeyInfo omKeyInfo = kv.getValue();
+          OmKeyInfo omKeyInfo = kv.getValue().getKeyInfo();
           // Note with HDDS-10077, there is no need to check KeyTable for hsync metadata
           openKeySessionList.add(
               new OpenKeySession(clientID, omKeyInfo,
@@ -1018,7 +1019,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       // Set hasMore flag as a hint for client-side pagination
       if (openKeyIter.hasNext()) {
-        KeyValue<String, OmKeyInfo> nextKv = openKeyIter.next();
+        KeyValue<String, OmOpenKeyInfo> nextKv = openKeyIter.next();
         hasMore = nextKv != null && nextKv.getKey().startsWith(dbOpenKeyPrefix);
       } else {
         hasMore = false;
@@ -1420,7 +1421,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, OmOpenKeyInfo>>
         keyValueTableIterator = getOpenKeyTable(bucketLayout).iterator()) {
 
       final long expiredCreationTimestamp =
@@ -1431,12 +1432,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       int num = 0;
       while (num < count && keyValueTableIterator.hasNext()) {
-        KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
+        KeyValue<String, OmOpenKeyInfo> openKeyValue = keyValueTableIterator.next();
         String dbOpenKeyName = openKeyValue.getKey();
 
         final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
         final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
-        OmKeyInfo openKeyInfo = openKeyValue.getValue();
+        OmKeyInfo openKeyInfo = openKeyValue.getValue().getKeyInfo();
 
         if (isOpenMultipartKey(openKeyInfo, dbOpenKeyName)) {
           continue;

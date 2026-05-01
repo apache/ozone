@@ -29,8 +29,8 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -47,21 +47,23 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
   private long volumeId;
   private long bucketId;
   private OmBucketInfo omBucketInfo;
+  private OmOpenKeyInfo omOpenKeyInfo;
 
   @SuppressWarnings("parameternumber")
   public S3InitiateMultipartUploadResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OmKeyInfo omKeyInfo, @Nonnull String mpuDBKey,
+      @Nonnull OmOpenKeyInfo omOpenKeyInfo, @Nonnull String mpuDBKey,
       @Nonnull List<OmDirectoryInfo> parentDirInfos,
       @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
       @Nonnull long bucketId, @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse, omMultipartKeyInfo, omKeyInfo, bucketLayout);
+    super(omResponse, omMultipartKeyInfo, omOpenKeyInfo, bucketLayout);
     this.parentDirInfos = parentDirInfos;
     this.mpuDBKey = mpuDBKey;
     this.volumeId = volumeId;
     this.bucketId = bucketId;
     this.omBucketInfo = omBucketInfo;
+    this.omOpenKeyInfo = omOpenKeyInfo;
   }
 
   /**
@@ -100,7 +102,7 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
 
     OMFileRequest.addToOpenFileTableForMultipart(omMetadataManager,
         batchOperation,
-        getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID(), volumeId,
+        omOpenKeyInfo, getOmMultipartKeyInfo().getUploadID(), volumeId,
         bucketId);
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,

@@ -159,6 +159,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -1185,16 +1186,16 @@ public class KeyManagerImpl implements KeyManager {
                     OMMultipartUploadUtils.getMultipartOpenKey(volumeName, bucketName, keyName, uploadID,
                             metadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
           }
-          OmKeyInfo omKeyInfo =
+          OmOpenKeyInfo omOpenKeyInfo =
               metadataManager.getOpenKeyTable(bucketLayout)
                   .get(multipartKey);
 
-          if (omKeyInfo == null) {
+          if (omOpenKeyInfo == null) {
             throw new IllegalStateException(
                 "Open key is missing for multipart upload " + multipartKey);
           }
 
-          replicationConfig = omKeyInfo.getReplicationConfig();
+          replicationConfig = omOpenKeyInfo.getReplicationConfig();
         }
         Objects.requireNonNull(replicationConfig,
             "ReplicationConfig can't be identified");
@@ -1340,8 +1341,9 @@ public class KeyManagerImpl implements KeyManager {
       // For Acl Type "WRITE", the key can only be found in
       // OpenKeyTable since appends to existing keys are not supported.
       if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
-        keyInfo =
+        OmOpenKeyInfo omOpenKeyInfo =
             metadataManager.getOpenKeyTable(bucketLayout).get(objectKey);
+        keyInfo = omOpenKeyInfo != null ? omOpenKeyInfo.getKeyInfo() : null;
       } else {
         // Recursive check is done only for ACL_TYPE DELETE
         // Rename and delete operations will send ACL_TYPE DELETE

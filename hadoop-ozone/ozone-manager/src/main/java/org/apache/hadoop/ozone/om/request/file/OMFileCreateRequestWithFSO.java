@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponseWithFSO;
@@ -197,8 +198,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
+      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+          .setKeyInfo(omFileInfo).build();
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-          dbOpenFileName, omFileInfo, keyName, trxnLogIndex);
+          dbOpenFileName, omOpenKeyInfo, keyName, trxnLogIndex);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
@@ -215,7 +218,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponseWithFSO(omResponse.build(),
-              omFileInfo, missingParentInfos, clientID,
+              omOpenKeyInfo, missingParentInfos, clientID,
               omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;

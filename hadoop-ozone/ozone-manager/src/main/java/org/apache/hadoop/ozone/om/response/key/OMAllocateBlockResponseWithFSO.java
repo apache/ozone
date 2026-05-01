@@ -25,7 +25,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -38,14 +38,16 @@ public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
 
   private long volumeId;
   private long bucketId;
+  private OmOpenKeyInfo omOpenKeyInfo;
 
   public OMAllocateBlockResponseWithFSO(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, long clientID,
+      @Nonnull OmOpenKeyInfo omOpenKeyInfo, long clientID,
       @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
       @Nonnull long bucketId) {
-    super(omResponse, omKeyInfo, clientID, bucketLayout);
+    super(omResponse, omOpenKeyInfo, clientID, bucketLayout);
     this.volumeId = volumeId;
     this.bucketId = bucketId;
+    this.omOpenKeyInfo = omOpenKeyInfo;
   }
 
   /**
@@ -62,7 +64,7 @@ public class OMAllocateBlockResponseWithFSO extends OMAllocateBlockResponse {
       BatchOperation batchOperation) throws IOException {
 
     OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
-            getOmKeyInfo(), getClientID(), volumeId, bucketId);
+            omOpenKeyInfo, getClientID(), volumeId, bucketId);
   }
 }
 

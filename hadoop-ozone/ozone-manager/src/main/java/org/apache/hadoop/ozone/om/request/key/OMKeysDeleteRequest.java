@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -190,7 +191,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
+      Map<String, OmOpenKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
       Pair<Long, Integer> quotaReleasedEmptyKeys =
           markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
@@ -285,7 +286,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       OMResponse.Builder omResponse,
       OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys,
       Map<String, ErrorInfo> keyToErrors,
-      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmKeyInfo> openKeyInfoMap) {
+      boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String, OmOpenKeyInfo> openKeyInfoMap) {
     OMClientResponse omClientResponse;
     List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
     for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
@@ -304,7 +305,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   protected Pair<Long, Integer> markKeysAsDeletedInCache(OzoneManager ozoneManager,
       long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap)
+      OMMetadataManager omMetadataManager, Map<String, OmOpenKeyInfo> openKeyInfoMap)
           throws IOException {
     int emptyKeys = 0;
     long quotaReleased = 0;
@@ -325,15 +326,18 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
       if (hsyncClientId != null) {
-        Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+        Table<String, OmOpenKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
         String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
-        OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
-        if (openKeyInfo != null) {
-          openKeyInfo = openKeyInfo.withMetadataMutations(
+        OmOpenKeyInfo omOpenKeyInfo = openKeyTable.get(dbOpenKey);
+        if (omOpenKeyInfo != null) {
+          OmKeyInfo openKeyInfo = omOpenKeyInfo.getKeyInfo().withMetadataMutations(
               metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
+          OmOpenKeyInfo updatedOpenKeyInfo = new OmOpenKeyInfo.Builder()
+              .setKeyInfo(openKeyInfo)
+              .build();
+          openKeyTable.addCacheEntry(dbOpenKey, updatedOpenKeyInfo, trxnLogIndex);
           // Add to the map of open keys to be deleted.
-          openKeyInfoMap.put(dbOpenKey, openKeyInfo);
+          openKeyInfoMap.put(dbOpenKey, updatedOpenKeyInfo);
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }

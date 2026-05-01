@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -795,14 +796,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
                 resolvedBucket.realBucket(), keyArgs.getKeyName(),
                 keyArgs.getMultipartUploadID(), omMetadataManager);
 
-        OmKeyInfo omKeyInfo =
+        OmOpenKeyInfo omOpenKeyInfo =
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbMultipartOpenKey);
 
-        if (omKeyInfo != null) {
-          if (omKeyInfo.getFileEncryptionInfo() != null) {
+        if (omOpenKeyInfo != null) {
+          if (omOpenKeyInfo.getFileEncryptionInfo() != null) {
             newKeyArgs.setFileEncryptionInfo(
-                OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+                OMPBHelper.convert(omOpenKeyInfo.getFileEncryptionInfo()));
           }
         } else {
           LOG.warn("omKeyInfo not found. Key: " + dbMultipartOpenKey +
@@ -990,13 +991,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
           .setFileEncryptionInfo(encInfo);
 
-      if (keyArgs.hasExpectedDataGeneration()) {
-        builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
-      }
-      if (keyArgs.hasExpectedETag()) {
-        builder.setExpectedETag(keyArgs.getExpectedETag());
-      }
-
       return builder.build();
     }
 
@@ -1043,9 +1037,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setUpdateID(transactionLogIndex)
             .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
-    if (keyArgs.hasExpectedDataGeneration()) {
-      builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
-    }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
       OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
@@ -1099,16 +1090,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
               .getMultipartKey(args.getVolumeName(), args.getBucketName(),
                       args.getKeyName(), uploadID);
     }
-    OmKeyInfo partKeyInfo =
+    OmOpenKeyInfo partOpenKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey);
-    if (partKeyInfo == null) {
+    if (partOpenKeyInfo == null) {
       throw new OMException("No such Multipart upload is with specified " +
               "uploadId " + uploadID,
               OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     }
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
-    return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
+    return createFileInfo(args, locations, partOpenKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID, configuration);
   }

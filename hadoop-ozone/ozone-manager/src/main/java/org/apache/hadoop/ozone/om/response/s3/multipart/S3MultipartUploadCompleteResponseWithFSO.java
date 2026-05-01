@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -56,6 +57,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
   private List<OmDirectoryInfo> missingParentInfos;
 
   private OmMultipartKeyInfo multipartKeyInfo;
+  private OmOpenKeyInfo omOpenKeyInfo;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponseWithFSO(
@@ -68,13 +70,15 @@ public class S3MultipartUploadCompleteResponseWithFSO
       OmBucketInfo omBucketInfo,
       @Nonnull long volumeId, @Nonnull long bucketId,
       List<OmDirectoryInfo> missingParentInfos,
-      OmMultipartKeyInfo multipartKeyInfo) {
+      OmMultipartKeyInfo multipartKeyInfo,
+      OmOpenKeyInfo omOpenKeyInfo) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo,
         allKeyInfoToRemove, bucketLayout, omBucketInfo, bucketId);
     this.volumeId = volumeId;
     this.bucketId = bucketId;
     this.missingParentInfos = missingParentInfos;
     this.multipartKeyInfo = multipartKeyInfo;
+    this.omOpenKeyInfo = omOpenKeyInfo;
   }
 
   /**
@@ -110,13 +114,13 @@ public class S3MultipartUploadCompleteResponseWithFSO
                 bucketKey, omBucketInfo);
       }
 
-      if (OMFileRequest.getOmKeyInfoFromFileTable(true,
+      if (omOpenKeyInfo != null && OMFileRequest.getOmKeyInfoFromFileTable(true,
           omMetadataManager, getMultiPartKey(), getOmKeyInfo().getKeyName())
           != null) {
         // Add multi part to open key table.
         OMFileRequest.addToOpenFileTableForMultipart(omMetadataManager,
             batchOperation,
-            getOmKeyInfo(), multipartKeyInfo.getUploadID(), volumeId,
+            omOpenKeyInfo, multipartKeyInfo.getUploadID(), volumeId,
             bucketId);
       }
     }

@@ -26,8 +26,8 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -38,15 +38,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, MULTIPART_INFO_TABLE})
 public class S3InitiateMultipartUploadResponse extends OmKeyResponse {
   private OmMultipartKeyInfo omMultipartKeyInfo;
-  private OmKeyInfo omKeyInfo;
+  private OmOpenKeyInfo omOpenKeyInfo;
 
   public S3InitiateMultipartUploadResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OmKeyInfo omKeyInfo, @Nonnull BucketLayout bucketLayout) {
+      @Nonnull OmOpenKeyInfo omOpenKeyInfo, @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
     this.omMultipartKeyInfo = omMultipartKeyInfo;
-    this.omKeyInfo = omKeyInfo;
+    this.omOpenKeyInfo = omOpenKeyInfo;
   }
 
   /**
@@ -64,12 +64,12 @@ public class S3InitiateMultipartUploadResponse extends OmKeyResponse {
       BatchOperation batchOperation) throws IOException {
 
     String multipartKey =
-        omMetadataManager.getMultipartKey(omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName(), omKeyInfo.getKeyName(),
+        omMetadataManager.getMultipartKey(omOpenKeyInfo.getVolumeName(),
+            omOpenKeyInfo.getBucketName(), omOpenKeyInfo.getKeyName(),
             omMultipartKeyInfo.getUploadID());
 
     omMetadataManager.getOpenKeyTable(getBucketLayout())
-        .putWithBatch(batchOperation, multipartKey, omKeyInfo);
+        .putWithBatch(batchOperation, multipartKey, omOpenKeyInfo);
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
         multipartKey, omMultipartKeyInfo);
   }
@@ -80,7 +80,7 @@ public class S3InitiateMultipartUploadResponse extends OmKeyResponse {
   }
 
   @VisibleForTesting
-  public OmKeyInfo getOmKeyInfo() {
-    return omKeyInfo;
+  public OmOpenKeyInfo getOmOpenKeyInfo() {
+    return omOpenKeyInfo;
   }
 }

@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -203,9 +204,10 @@ public class S3InitiateMultipartUploadRequestWithFSO
               volumeId, bucketId, transactionLogIndex,
               missingParentInfos, null);
 
+      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+          .setKeyInfo(omKeyInfo).build();
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-          multipartOpenKey, omKeyInfo, keyName,
-              transactionLogIndex);
+          multipartOpenKey, omOpenKeyInfo, keyName, transactionLogIndex);
 
       // Add to cache
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
@@ -219,7 +221,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
                       .setBucketName(requestedBucket)
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
-                  .build(), multipartKeyInfo, omKeyInfo, multipartKey,
+                  .build(), multipartKeyInfo, omOpenKeyInfo, multipartKey,
               missingParentInfos, getBucketLayout(), volumeId, bucketId,
               bucketInfo.copyObject());
 

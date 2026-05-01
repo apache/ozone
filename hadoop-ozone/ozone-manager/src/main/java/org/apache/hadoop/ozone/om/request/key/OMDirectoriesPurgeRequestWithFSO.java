@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -91,7 +92,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         purgeDirsRequest.getDeletedPathList();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
-    Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
+    Map<String, OmOpenKeyInfo> openKeyInfoMap = new HashMap<>();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -172,11 +173,13 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             long parentId = processed.keyInfo.getParentObjectID();
             dbOpenKey = omMetadataManager.getOpenFileName(path.getVolumeId(), path.getBucketId(),
                 parentId, processed.keyInfo.getFileName(), hsyncClientId);
-            OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
-            if (openKeyInfo != null) {
-              openKeyInfo = openKeyInfo.withMetadataMutations(
+            OmOpenKeyInfo omOpenKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
+            if (omOpenKeyInfo != null) {
+              OmKeyInfo openKeyInfo = omOpenKeyInfo.getKeyInfo().withMetadataMutations(
                   metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-              openKeyInfoMap.put(dbOpenKey, openKeyInfo);
+              OmOpenKeyInfo updatedOpenKeyInfo = new OmOpenKeyInfo.Builder()
+                  .setKeyInfo(openKeyInfo).build();
+              openKeyInfoMap.put(dbOpenKey, updatedOpenKeyInfo);
             }
           }
 

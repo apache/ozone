@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -94,7 +95,8 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
     // Add multi part to cache
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-        multipartOpenKey, omKeyInfo,
+        multipartOpenKey,
+        new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build(),
         keyName, transactionLogIndex);
 
   }
@@ -170,7 +172,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
         getBucketLayout(), omBucketInfo, volumeId, bucketId,
-        missingParentInfos, multipartKeyInfo);
+        missingParentInfos, multipartKeyInfo, null);
   }
 
   @Override

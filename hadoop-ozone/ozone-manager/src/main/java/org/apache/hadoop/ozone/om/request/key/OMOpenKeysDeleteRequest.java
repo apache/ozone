@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteResponse;
@@ -97,7 +98,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     // Map containing a pair of BucketId and delete key info.
-    Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys = new HashMap<>();
+    Map<String, Pair<Long, OmOpenKeyInfo>> deletedOpenKeys = new HashMap<>();
     Map<String, String> auditParams = new LinkedHashMap<>();
     try {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
@@ -113,8 +114,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       result = Result.SUCCESS;
 
       List<String> deletedOpenKeysLight = new ArrayList<>(deletedOpenKeys.size());
-      for (Pair<Long, OmKeyInfo> key : deletedOpenKeys.values()) {
-        OmKeyInfo keyInfo = key.getRight();
+      for (Pair<Long, OmOpenKeyInfo> key : deletedOpenKeys.values()) {
+        OmKeyInfo keyInfo = key.getRight().getKeyInfo();
         OzoneManagerProtocolProtos.KeyArgs keyArgs = OzoneManagerProtocolProtos.KeyArgs.newBuilder()
             .setVolumeName(keyInfo.getVolumeName())
             .setBucketName(keyInfo.getBucketName())
@@ -166,7 +167,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
   protected void updateOpenKeyTableCache(OzoneManager ozoneManager,
       long trxnLogIndex, OpenKeyBucket keysPerBucket,
-      Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys) throws IOException {
+      Map<String, Pair<Long, OmOpenKeyInfo>> deletedOpenKeys) throws IOException {
 
     boolean acquiredLock = false;
     String volumeName = keysPerBucket.getVolumeName();
@@ -184,10 +185,11 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
         // If an open key is no longer present in the table, it was committed
         // and should not be deleted.
-        OmKeyInfo omKeyInfo =
+        OmOpenKeyInfo omOpenKeyInfo =
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(fullKeyName);
-        if (omKeyInfo != null) {
+        if (omOpenKeyInfo != null) {
+          OmKeyInfo omKeyInfo = omOpenKeyInfo.getKeyInfo();
           if (trxnLogIndex < omKeyInfo.getUpdateID()) {
             LOG.warn("Transaction log index {} is smaller than " +
                 "the current updateID {} of key {}, skipping deletion.",
@@ -199,7 +201,10 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           omKeyInfo = omKeyInfo.toBuilder()
               .setUpdateID(trxnLogIndex)
               .build();
-          deletedOpenKeys.put(fullKeyName, Pair.of(bucketId, omKeyInfo));
+          OmOpenKeyInfo updatedOpenKeyInfo = new OmOpenKeyInfo.Builder()
+              .setKeyInfo(omKeyInfo)
+              .build();
+          deletedOpenKeys.put(fullKeyName, Pair.of(bucketId, updatedOpenKeyInfo));
 
           // Update openKeyTable cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(

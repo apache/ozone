@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
@@ -46,16 +47,18 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
 
   private List<OmKeyInfo> dirsList;
   private long volumeId;
+  private Map<String, OmOpenKeyInfo> omOpenKeyInfoMap;
 
   public OMKeysDeleteResponseWithFSO(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
       @Nonnull List<OmKeyInfo> dirDeleteList,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volId,
-      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
-    super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap);
+      @Nonnull Map<String, OmOpenKeyInfo> openKeyInfoMap) {
+    super(omResponse, keyDeleteList, omBucketInfo, java.util.Collections.emptyMap());
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
+    this.omOpenKeyInfoMap = openKeyInfoMap;
   }
 
   @Override
@@ -95,8 +98,8 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
         omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
             getOmBucketInfo().getBucketName()), getOmBucketInfo());
 
-    if (!getOpenKeyInfoMap().isEmpty()) {
-      for (Map.Entry<String, OmKeyInfo> entry : getOpenKeyInfoMap().entrySet()) {
+    if (!omOpenKeyInfoMap.isEmpty()) {
+      for (Map.Entry<String, OmOpenKeyInfo> entry : omOpenKeyInfoMap.entrySet()) {
         omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
             batchOperation, entry.getKey(), entry.getValue());
       }

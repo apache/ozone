@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -48,8 +49,8 @@ public class OMKeyCommitResponse extends OmKeyResponse {
   private OmBucketInfo omBucketInfo;
   private Map<String, RepeatedOmKeyInfo> keyToDeleteMap;
   private boolean isHSync;
-  private OmKeyInfo newOpenKeyInfo;
-  private OmKeyInfo openKeyToUpdate;
+  private OmOpenKeyInfo newOpenKeyInfo;
+  private OmOpenKeyInfo openKeyToUpdate;
   private String openKeyNameToUpdate;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -59,7 +60,7 @@ public class OMKeyCommitResponse extends OmKeyResponse {
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
       boolean isHSync,
-      OmKeyInfo newOpenKeyInfo, String openKeyNameToUpdate, OmKeyInfo openKeyToUpdate) {
+      OmOpenKeyInfo newOpenKeyInfo, String openKeyNameToUpdate, OmOpenKeyInfo openKeyToUpdate) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
@@ -151,7 +152,7 @@ public class OMKeyCommitResponse extends OmKeyResponse {
     return isHSync;
   }
 
-  public OmKeyInfo getNewOpenKeyInfo() {
+  public OmOpenKeyInfo getNewOpenKeyInfo() {
     return newOpenKeyInfo;
   }
 }

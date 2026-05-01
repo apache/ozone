@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
@@ -174,8 +175,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         writerClientId = Long.parseLong(clientId);
       }
       dbOpenFileKey = fsoFile.getOpenFileName(writerClientId);
-      omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
-              omMetadataManager, dbOpenFileKey, keyName);
+      OmOpenKeyInfo omOpenKeyInfo = omMetadataManager
+          .getOpenKeyTable(getBucketLayout()).get(dbOpenFileKey);
+      omKeyInfo = omOpenKeyInfo != null ? omOpenKeyInfo.getKeyInfo() : null;
       if (omKeyInfo == null) {
         String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";
         throw new OMException("Failed to " + action + " key, as " +
@@ -208,7 +210,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             .build();
         openKeyToDelete.setModificationTime(Time.now());
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenKeyToDeleteKey, openKeyToDelete, keyName, trxnLogIndex);
+            dbOpenKeyToDeleteKey,
+            new OmOpenKeyInfo.Builder().setKeyInfo(openKeyToDelete).build(),
+            keyName, trxnLogIndex);
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
@@ -242,11 +246,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // creation after the knob turned on.
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
 
-      validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
-      // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
-      // not persisted in the key table.
-      omKeyInfo.setExpectedDataGeneration(null);
-      omKeyInfo.setExpectedETag(null);
+      validateAtomicRewrite(keyToDelete, omOpenKeyInfo, auditMap);
+      // Optimistic locking validation has passed.
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
       // if keyToDelete isn't null, usedNamespace shouldn't check and increase.
@@ -340,7 +341,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, newOpenKeyInfo, keyName, trxnLogIndex);
+            dbOpenFileKey,
+            new OmOpenKeyInfo.Builder().setKeyInfo(newOpenKeyInfo).build(),
+            keyName, trxnLogIndex);
       }
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -348,9 +351,13 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omBucketInfo.incrUsedBytes(correctedSpace);
 
+      OmOpenKeyInfo newOmOpenKeyInfo = newOpenKeyInfo != null
+          ? new OmOpenKeyInfo.Builder().setKeyInfo(newOpenKeyInfo).build() : null;
+      OmOpenKeyInfo omOpenKeyToDelete = openKeyToDelete != null
+          ? new OmOpenKeyInfo.Builder().setKeyInfo(openKeyToDelete).build() : null;
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
           omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, volumeId, isHSync, newOpenKeyInfo, dbOpenKeyToDeleteKey, openKeyToDelete);
+          oldKeyVersionsToDeleteMap, volumeId, isHSync, newOmOpenKeyInfo, dbOpenKeyToDeleteKey, omOpenKeyToDelete);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

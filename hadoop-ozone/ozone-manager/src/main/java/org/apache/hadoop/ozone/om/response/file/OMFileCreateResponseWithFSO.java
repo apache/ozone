@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -44,15 +44,17 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
   private List<OmDirectoryInfo> parentDirInfos;
   private long volumeId;
+  private OmOpenKeyInfo omOpenKeyInfo;
 
   public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull OmOpenKeyInfo omOpenKeyInfo,
       @Nonnull List<OmDirectoryInfo> parentDirInfos, long openKeySessionID,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volumeId) {
-    super(omResponse, omKeyInfo, new ArrayList<>(), openKeySessionID,
+    super(omResponse, omOpenKeyInfo, new ArrayList<>(), openKeySessionID,
         omBucketInfo);
     this.parentDirInfos = parentDirInfos;
     this.volumeId = volumeId;
+    this.omOpenKeyInfo = omOpenKeyInfo;
   }
 
   /**
@@ -93,7 +95,7 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
           bucketKey, getOmBucketInfo());
     }
 
-    OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
+    OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, omOpenKeyInfo,
         getOpenKeySessionID(), volumeId, getOmBucketInfo().getObjectID());
   }
 
