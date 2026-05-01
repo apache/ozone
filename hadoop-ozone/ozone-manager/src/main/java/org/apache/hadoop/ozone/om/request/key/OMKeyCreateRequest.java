@@ -475,7 +475,4 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     }
     return req;
   }
-
-  // validateAtomicRewrite() and validateAndRewriteIfMatchAsExpectedGeneration()
-  // are inherited from OMKeyRequest base class
 }

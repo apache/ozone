@@ -1347,21 +1347,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Validates If-Match ETag condition and converts it to expectedDataGeneration.
+   * Validates If-Match ETag condition.
    * <p>
    * This method checks if the existing key's ETag matches the expected ETag.
-   * If it matches, the ETag condition is converted to a generation-based condition
-   * for atomic commit validation.
+   * Use this for single-phase operations (like MPU complete) where no rewrite is needed.
    *
    * @param keyArgs the key arguments containing expected ETag
    * @param dbKeyInfo the existing key info from the database
-   * @return updated KeyArgs with expectedDataGeneration set (if ETag matched)
    * @throws OMException if validation fails
    */
-  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
-      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+  protected void validateIfMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo)
+      throws OMException {
     if (!keyArgs.hasExpectedETag()) {
-      return keyArgs;
+      return;
     }
 
     String expectedETag = keyArgs.getExpectedETag();
@@ -1377,7 +1375,25 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw new OMException("ETag mismatch",
           OMException.ResultCodes.ETAG_MISMATCH);
     }
-    if (keyArgs.hasExpectedDataGeneration()) {
+  }
+
+  /**
+   * Validates If-Match ETag condition and converts it to expectedDataGeneration.
+   * <p>
+   * This method checks if the existing key's ETag matches the expected ETag.
+   * If it matches, the ETag condition is converted to a generation-based condition
+   * for atomic commit validation in two-phase operations (CreateKey → CommitKey).
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @return updated KeyArgs with expectedDataGeneration set (if ETag matched)
+   * @throws OMException if validation fails
+   */
+  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
+      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    validateIfMatchETag(keyArgs, dbKeyInfo);
+
+    if (!keyArgs.hasExpectedETag() || keyArgs.hasExpectedDataGeneration()) {
       return keyArgs;
     }
 

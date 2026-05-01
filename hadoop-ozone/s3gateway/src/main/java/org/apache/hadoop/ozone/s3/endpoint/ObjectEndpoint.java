@@ -785,11 +785,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
           || ex.getResult() == ResultCodes.ETAG_MISMATCH
           || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
-        // Conditional write precondition failed
         throw newError(PRECOND_FAILED, key, ex);
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
           && writeConditions.hasIfMatch()) {
-        // If-Match failed because the key doesn't exist
         throw newError(PRECOND_FAILED, key, ex);
       }
       throw newError(bucket, key, ex);

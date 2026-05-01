@@ -272,12 +272,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       // Conditional write validation for If-None-Match / If-Match headers
       // Load existing committed key to check preconditions
       OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
-
-      // Validate If-None-Match: * (create-if-absent) or generation match
       validateAtomicRewrite(existingKeyInfo, keyArgs);
-
-      // Convert If-Match ETag to expectedDataGeneration for atomic validation
-      keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(keyArgs, existingKeyInfo);
+      validateIfMatchETag(keyArgs, existingKeyInfo);
 
       if (!partsList.isEmpty()) {
         final OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap
