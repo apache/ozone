@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.shell;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,7 +33,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -43,6 +48,8 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -55,10 +62,12 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -172,6 +181,63 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     assertThat(cmdOut).contains(keyName);
   }
 
+  @Test
+  public void testLdbDropColumnFamilyForSnapshotInfoTable() throws Exception {
+    StringWriter stdout = new StringWriter();
+    StringWriter stderr = new StringWriter();
+    CommandLine cmd = new CommandLine(new RDBParser())
+        .setOut(new PrintWriter(stdout))
+        .setErr(new PrintWriter(stderr));
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String snapshotName1 = "snap1";
+    final String snapshotName2 = "snap2";
+    long initialSnapshotInfoRows = omMetadataManager.countRowsInTable(
+        omMetadataManager.getSnapshotInfoTable());
+
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+        BucketLayout.DEFAULT);
+    client.getObjectStore().createSnapshot(volumeName, bucketName,
+        snapshotName1);
+    client.getObjectStore().createSnapshot(volumeName, bucketName,
+        snapshotName2);
+
+    assertSnapshotInfoExists(volumeName, bucketName, snapshotName1);
+    assertSnapshotInfoExists(volumeName, bucketName, snapshotName2);
+    // Wait until both organically created snapshots are visible in the table.
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return omMetadataManager.countRowsInTable(
+            omMetadataManager.getSnapshotInfoTable())
+            >= initialSnapshotInfoRows + 2;
+      } catch (Exception ex) {
+        throw new AssertionError(ex);
+      }
+    }, 100, 10_000);
+
+    DBCheckpoint checkpoint = omMetadataManager.getStore()
+        .getCheckpoint(false);
+    try {
+      File dbPath = checkpoint.getCheckpointLocation().toFile();
+      assertThat(listColumnFamilies(dbPath)).contains(SNAPSHOT_INFO_TABLE);
+
+      int exitCode = cmd.execute(
+          "--db", dbPath.getAbsolutePath(),
+          "drop-column-family",
+          "--cf", SNAPSHOT_INFO_TABLE,
+          "-y");
+
+      assertEquals(0, exitCode, stderr.toString());
+      assertThat(stdout.toString())
+          .contains("Dropped column family " + SNAPSHOT_INFO_TABLE);
+      assertThat(listColumnFamilies(dbPath))
+          .contains(KEY_TABLE)
+          .doesNotContain(SNAPSHOT_INFO_TABLE);
+    } finally {
+      checkpoint.cleanupCheckpoint();
+    }
+  }
+
   private String getSnapshotDBPath(String checkPointDir) {
     return OMStorage.getOmDbDir(cluster().getConf()) +
         OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
@@ -229,6 +295,25 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
       assertEquals(3, blockFilePaths.size());
     }
     return exitCode;
+  }
+
+  private void assertSnapshotInfoExists(String volumeName, String bucketName,
+      String snapshotName) throws Exception {
+    SnapshotInfo snapshotInfo = omMetadataManager
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
+    assertNotNull(snapshotInfo);
+  }
+
+  private static List<String> listColumnFamilies(File dbLocation)
+      throws Exception {
+    List<String> columnFamilies = new ArrayList<>();
+    for (byte[] columnFamily
+        : RocksDatabase.listColumnFamiliesEmptyOptions(
+            dbLocation.getAbsolutePath())) {
+      columnFamilies.add(new String(columnFamily, StandardCharsets.UTF_8));
+    }
+    return columnFamilies;
   }
 
   /**

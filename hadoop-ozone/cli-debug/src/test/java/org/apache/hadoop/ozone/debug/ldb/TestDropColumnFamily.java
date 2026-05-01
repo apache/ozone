@@ -39,7 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
 
 /**
- * Tests for the ozone debug ldb drop_column_family command.
+ * Tests for the ozone debug ldb drop-column-family command.
  */
 public class TestDropColumnFamily {
 
@@ -84,7 +84,7 @@ public class TestDropColumnFamily {
 
     int exitCode = cmd.execute(
         "--db", dbLocation.getAbsolutePath(),
-        "drop_column_family",
+        "drop-column-family",
         "--column-family", KEY_TABLE,
         "-y");
 
@@ -103,7 +103,7 @@ public class TestDropColumnFamily {
 
     int exitCode = cmd.execute(
         "--db", dbLocation.getAbsolutePath(),
-        "drop_column_family",
+        "drop-column-family",
         "--column-family", PIPELINES,
         "-y");
 
@@ -121,7 +121,7 @@ public class TestDropColumnFamily {
 
     int exitCode = cmd.execute(
         "--db", dbLocation.getAbsolutePath(),
-        "drop_column_family",
+        "drop-column-family",
         "--column-family", "default");
 
     assertEquals(1, exitCode);
@@ -138,7 +138,7 @@ public class TestDropColumnFamily {
     int exitCode = withTextFromSystemIn("y")
         .execute(() -> cmd.execute(
             "--db", dbLocation.getAbsolutePath(),
-            "drop_column_family",
+            "drop-column-family",
             "--column-family", KEY_TABLE));
 
     assertEquals(0, exitCode, stderr.toString());
@@ -156,7 +156,7 @@ public class TestDropColumnFamily {
     int exitCode = withTextFromSystemIn("n")
         .execute(() -> cmd.execute(
             "--db", dbLocation.getAbsolutePath(),
-            "drop_column_family",
+            "drop-column-family",
             "--column-family", KEY_TABLE));
 
     assertEquals(1, exitCode);
@@ -187,7 +187,7 @@ public class TestDropColumnFamily {
 
     int exitCode = cmd.execute(
         "--db", dbLocation.getAbsolutePath(),
-        "drop_column_family",
+        "drop-column-family",
         "--column-family", KEY_TABLE,
         "-y");
 

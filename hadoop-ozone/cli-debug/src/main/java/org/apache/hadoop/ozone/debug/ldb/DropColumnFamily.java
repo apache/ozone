@@ -42,8 +42,7 @@ import picocli.CommandLine;
  * Drop a column family from a RocksDB.
  */
 @CommandLine.Command(
-    name = "drop_column_family",
-    aliases = "drop-column-family",
+    name = "drop-column-family",
     description = "Drop a column family from the DB.")
 public class DropColumnFamily extends AbstractSubcommand
     implements Callable<Void> {
@@ -57,7 +56,7 @@ public class DropColumnFamily extends AbstractSubcommand
   @CommandLine.ParentCommand
   private RDBParser parent;
 
-  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       required = true,
       description = "Column family name")
   private String columnFamilyName;
