@@ -412,7 +412,6 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
       OmOpenKeyInfo omOpenKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
           .get(openKey);
       assertNotNull(omOpenKeyInfo);
-      omKeyInfo = omOpenKeyInfo.getKeyInfo();
     }
 
     // Set lease soft limit to 0
