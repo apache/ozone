@@ -94,6 +94,9 @@ class App extends React.Component<Record<string, object>, IAppState> {
     }
 
     this.setState({ enableOldUI }, () => {
+      // This is to persist the state of the UI between refreshes.
+      // While using session storage to store state is an anti-pattern, provided the size of the data stored in this case
+      // and the plan to deprecate UI v1 (old UI) in the future - this is the simplest approach/fix for persisting state.
       sessionStorage.setItem('enableOldUI', JSON.stringify(enableOldUI));
       if (redirectMessage) {
         message.info(redirectMessage, TOAST_DURATION_SECONDS);
