@@ -31,6 +31,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -155,7 +156,9 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
           omMetadataManager.getOzoneDeletePathKey(e.getObjectID(), ozoneKey),
           new RepeatedOmKeyInfo(e, omBucketInfo.getObjectID())));
     }
+    OmOpenKeyInfo omOpenKeyInfo = newOpenKeyInfo != null
+        ? new OmOpenKeyInfo.Builder().setKeyInfo(newOpenKeyInfo).build() : null;
     return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
-        omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo, null, null);
+        omBucketInfo, deleteKeyMap, isHSync, omOpenKeyInfo, null, null);
   }
 }

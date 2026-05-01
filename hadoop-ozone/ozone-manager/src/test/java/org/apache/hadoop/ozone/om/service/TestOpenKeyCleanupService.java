@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -435,22 +436,26 @@ class TestOpenKeyCleanupService {
   }
 
   private List<OmKeyInfo> getKeyInfo(BucketLayout bucketLayout, boolean openKey) {
-    List<OmKeyInfo> omKeyInfo = new ArrayList<>();
+    List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
 
-    Table<String, OmKeyInfo> fileTable;
     if (openKey) {
-      fileTable = om.getMetadataManager().getOpenKeyTable(bucketLayout);
-    } else {
-      fileTable = om.getMetadataManager().getKeyTable(bucketLayout);
-    }
-    try (Table.KeyValueIterator<String, OmKeyInfo>
-             iterator = fileTable.iterator()) {
-      while (iterator.hasNext()) {
-        omKeyInfo.add(iterator.next().getValue());
+      Table<String, OmOpenKeyInfo> openKeyTable = om.getMetadataManager().getOpenKeyTable(bucketLayout);
+      try (Table.KeyValueIterator<String, OmOpenKeyInfo> iterator = openKeyTable.iterator()) {
+        while (iterator.hasNext()) {
+          omKeyInfoList.add(iterator.next().getValue().getKeyInfo());
+        }
+      } catch (Exception e) {
       }
-    } catch (Exception e) {
+    } else {
+      Table<String, OmKeyInfo> keyTable = om.getMetadataManager().getKeyTable(bucketLayout);
+      try (Table.KeyValueIterator<String, OmKeyInfo> iterator = keyTable.iterator()) {
+        while (iterator.hasNext()) {
+          omKeyInfoList.add(iterator.next().getValue());
+        }
+      } catch (Exception e) {
+      }
     }
-    return omKeyInfo;
+    return omKeyInfoList;
   }
 
   void waitForOpenKeyCleanup(boolean hsync, BucketLayout layout)

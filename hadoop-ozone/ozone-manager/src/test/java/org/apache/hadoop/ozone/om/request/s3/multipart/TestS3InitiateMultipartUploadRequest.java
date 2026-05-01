@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -84,10 +85,11 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    OmKeyInfo openMPUKeyInfo = omMetadataManager
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
         .get(multipartKey);
-    assertNotNull(openMPUKeyInfo);
+    assertNotNull(omOpenKeyInfo);
+    OmKeyInfo openMPUKeyInfo = omOpenKeyInfo.getKeyInfo();
     assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
     assertTrue(openMPUKeyInfo.getLatestVersionLocations().isMultipartKey());
     assertNotNull(openMPUKeyInfo.getMetadata());
@@ -219,11 +221,11 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    OmKeyInfo omKeyInfo = omMetadataManager
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
         .get(multipartKey);
 
-    verifyKeyInheritAcls(omKeyInfo.getAcls(), bucketAcls);
+    verifyKeyInheritAcls(omOpenKeyInfo.getKeyInfo().getAcls(), bucketAcls);
 
   }
 

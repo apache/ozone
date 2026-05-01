@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -53,9 +54,10 @@ public class TestS3InitiateMultipartUploadResponse
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
 
-    OmKeyInfo openMPUKeyInfo = omMetadataManager.getOpenKeyTable(
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager.getOpenKeyTable(
         getBucketLayout()).get(multipartKey);
-    assertNotNull(openMPUKeyInfo);
+    assertNotNull(omOpenKeyInfo);
+    OmKeyInfo openMPUKeyInfo = omOpenKeyInfo.getKeyInfo();
     assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
     assertTrue(openMPUKeyInfo.getLatestVersionLocations().isMultipartKey());
 

@@ -24,6 +24,7 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
@@ -102,7 +103,8 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
           OMResponse omResponse) throws IOException {
-    return new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID,
+    return new OMAllocateBlockResponse(omResponse,
+        new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build(), clientID,
         getBucketLayout());
   }
 }

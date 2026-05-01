@@ -115,6 +115,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -245,7 +246,7 @@ public class TestHSync {
         cluster.getOzoneManager().getMetadataManager();
 
     // Expect empty OpenKeyTable and KeyTable before key creation
-    Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    Table<String, OmOpenKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BUCKET_LAYOUT);
     assertTrue(openKeyTable.isEmpty());
     Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(BUCKET_LAYOUT);
     assertTrue(keyTable.isEmpty());
@@ -255,7 +256,7 @@ public class TestHSync {
         // Wait for double buffer flush to avoid flakiness because RDB iterator bypasses table cache
         cluster.getOzoneManager().awaitDoubleBufferFlush();
         // OpenKeyTable key should NOT have HSYNC_CLIENT_ID
-        OmKeyInfo keyInfo = getFirstKeyInTable(keyName, openKeyTable);
+        OmKeyInfo keyInfo = getFirstOpenKeyInTable(keyName, openKeyTable).getKeyInfo();
         assertFalse(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
         // KeyTable should still be empty
         assertTrue(keyTable.isEmpty());
@@ -263,7 +264,7 @@ public class TestHSync {
         os.hsync();
         cluster.getOzoneManager().awaitDoubleBufferFlush();
         // OpenKeyTable key should have HSYNC_CLIENT_ID now
-        keyInfo = getFirstKeyInTable(keyName, openKeyTable);
+        keyInfo = getFirstOpenKeyInTable(keyName, openKeyTable).getKeyInfo();
         assertTrue(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
         // KeyTable key should be there and have HSYNC_CLIENT_ID
         keyInfo = getFirstKeyInTable(keyName, keyTable);
@@ -272,7 +273,7 @@ public class TestHSync {
         // hsync again, metadata should not change
         os.hsync();
         cluster.getOzoneManager().awaitDoubleBufferFlush();
-        keyInfo = getFirstKeyInTable(keyName, openKeyTable);
+        keyInfo = getFirstOpenKeyInTable(keyName, openKeyTable).getKeyInfo();
         assertTrue(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
         keyInfo = getFirstKeyInTable(keyName, keyTable);
         assertTrue(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
@@ -606,12 +607,12 @@ public class TestHSync {
   private List<OmKeyInfo> getOpenKeyInfo(BucketLayout bucketLayout) {
     List<OmKeyInfo> omKeyInfo = new ArrayList<>();
 
-    Table<String, OmKeyInfo> openFileTable =
+    Table<String, OmOpenKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager().getOpenKeyTable(bucketLayout);
-    try (Table.KeyValueIterator<String, OmKeyInfo>
+    try (Table.KeyValueIterator<String, OmOpenKeyInfo>
              iterator = openFileTable.iterator()) {
       while (iterator.hasNext()) {
-        omKeyInfo.add(iterator.next().getValue());
+        omKeyInfo.add(iterator.next().getValue().getKeyInfo());
       }
     } catch (Exception e) {
     }
@@ -1127,15 +1128,33 @@ public class TestHSync {
   }
 
   /**
-   * Helper method to check and get the first key in the OpenKeyTable.
+   * Helper method to check and get the first key in the KeyTable.
    * @param keyName expect key name to contain this string
-   * @param openKeyTable Table<String, OmKeyInfo>
+   * @param keyTable Table<String, OmKeyInfo>
    * @return OmKeyInfo
    */
-  private OmKeyInfo getFirstKeyInTable(String keyName, Table<String, OmKeyInfo> openKeyTable) throws IOException {
-    try (Table.KeyValueIterator<String, OmKeyInfo> it = openKeyTable.iterator()) {
+  private OmKeyInfo getFirstKeyInTable(String keyName, Table<String, OmKeyInfo> keyTable) throws IOException {
+    try (Table.KeyValueIterator<String, OmKeyInfo> it = keyTable.iterator()) {
       assertTrue(it.hasNext());
       Table.KeyValue<String, OmKeyInfo> kv = it.next();
+      String dbOpenKey = kv.getKey();
+      assertNotNull(dbOpenKey);
+      assertTrue(dbOpenKey.contains(keyName));
+      return kv.getValue();
+    }
+  }
+
+  /**
+   * Helper method to check and get the first key in the OpenKeyTable.
+   * @param keyName expect key name to contain this string
+   * @param openKeyTable Table<String, OmOpenKeyInfo>
+   * @return OmOpenKeyInfo
+   */
+  private OmOpenKeyInfo getFirstOpenKeyInTable(String keyName, Table<String, OmOpenKeyInfo> openKeyTable)
+      throws IOException {
+    try (Table.KeyValueIterator<String, OmOpenKeyInfo> it = openKeyTable.iterator()) {
+      assertTrue(it.hasNext());
+      Table.KeyValue<String, OmOpenKeyInfo> kv = it.next();
       String dbOpenKey = kv.getKey();
       assertNotNull(dbOpenKey);
       assertTrue(dbOpenKey.contains(keyName));
@@ -1303,7 +1322,7 @@ public class TestHSync {
     cleanupDeletedTable(ozoneManager);
     cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
-    Table<String, OmKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    Table<String, OmOpenKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
     Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
     assertTrue(openKeyTable.isEmpty());
     assertTrue(deletedTable.isEmpty());
@@ -1402,7 +1421,7 @@ public class TestHSync {
     cleanupDeletedTable(ozoneManager);
     cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
-    Table<String, OmKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    Table<String, OmOpenKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
     Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
     assertTrue(openKeyTable.isEmpty());
     assertTrue(deletedTable.isEmpty());
@@ -1477,7 +1496,7 @@ public class TestHSync {
     cleanupDeletedTable(ozoneManager);
     cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
-    Table<String, OmKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    Table<String, OmOpenKeyInfo> openKeyTable = metadataManager.getOpenKeyTable(BUCKET_LAYOUT);
     Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
     assertTrue(openKeyTable.isEmpty());
     assertTrue(deletedTable.isEmpty());
@@ -1541,13 +1560,13 @@ public class TestHSync {
     }
   }
 
-  private Map<String, OmKeyInfo> getAllOpenKeys(Table<String, OmKeyInfo> table) throws IOException {
+  private Map<String, OmKeyInfo> getAllOpenKeys(Table<String, OmOpenKeyInfo> table) throws IOException {
     Map<String, OmKeyInfo> keys = new HashMap<String, OmKeyInfo>();
-    try (Table.KeyValueIterator<String, OmKeyInfo> tableIter = table.iterator()) {
+    try (Table.KeyValueIterator<String, OmOpenKeyInfo> tableIter = table.iterator()) {
       while (tableIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = tableIter.next();
+        Table.KeyValue<String, OmOpenKeyInfo> kv = tableIter.next();
         String key = kv.getKey();
-        keys.put(key, kv.getValue());
+        keys.put(key, kv.getValue().getKeyInfo());
       }
     }
     return keys;

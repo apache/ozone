@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.TestOMKeyCreateResponse;
@@ -62,7 +63,8 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
       OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
-    return new OMFileCreateResponseWithFSO(response, keyInfo,
+    return new OMFileCreateResponseWithFSO(response,
+        new OmOpenKeyInfo.Builder().setKeyInfo(keyInfo).build(),
         new ArrayList<>(), clientID, bucketInfo, getVolumeId());
   }
 

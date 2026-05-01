@@ -24,6 +24,7 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -97,7 +98,8 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
       OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
-    return new OMKeyCreateResponse(response, keyInfo, null, clientID,
+    return new OMKeyCreateResponse(response,
+            new OmOpenKeyInfo.Builder().setKeyInfo(keyInfo).build(), null, clientID,
             bucketInfo);
   }
 }

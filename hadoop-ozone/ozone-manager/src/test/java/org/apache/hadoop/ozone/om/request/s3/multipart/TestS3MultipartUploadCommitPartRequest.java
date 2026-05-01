@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -115,10 +116,11 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(1, omMetadataManager.getMultipartInfoTable()
         .get(multipartKey).getPartKeyInfoMap().size());
 
-    OmKeyInfo mpuOpenKeyInfo = omMetadataManager
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager
         .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
         .get(multipartOpenKey);
-    assertNotNull(mpuOpenKeyInfo);
+    assertNotNull(omOpenKeyInfo);
+    OmKeyInfo mpuOpenKeyInfo = omOpenKeyInfo.getKeyInfo();
     assertNotNull(mpuOpenKeyInfo.getLatestVersionLocations());
     assertTrue(mpuOpenKeyInfo.getLatestVersionLocations()
         .isMultipartKey());
@@ -383,9 +385,9 @@ public class TestS3MultipartUploadCommitPartRequest
     // Put the open key to simulate the part key upload using OMKeyCreateRequest
     String openMpuPartKey = addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID, allocatedBlockList);
 
-    OmKeyInfo openMpuPartKeyInfo =
+    OmOpenKeyInfo openMpuPartKeyOpenInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openMpuPartKey);
-    assertNotNull(openMpuPartKeyInfo);
+    assertNotNull(openMpuPartKeyOpenInfo);
 
     // Commit only the first 3 allocated blocks
     List<KeyLocation> committedKeyLocationList = allocatedKeyLocationList.subList(0, 3);
@@ -422,10 +424,11 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(1, omMetadataManager.getMultipartInfoTable()
         .get(multipartKey).getPartKeyInfoMap().size());
 
-    OmKeyInfo mpuOpenKeyInfo = omMetadataManager
+    OmOpenKeyInfo mpuOpenKeyOpenInfo = omMetadataManager
         .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
         .get(multipartOpenKey);
-    assertNotNull(mpuOpenKeyInfo);
+    assertNotNull(mpuOpenKeyOpenInfo);
+    OmKeyInfo mpuOpenKeyInfo = mpuOpenKeyOpenInfo.getKeyInfo();
     assertNotNull(mpuOpenKeyInfo.getLatestVersionLocations());
     assertTrue(mpuOpenKeyInfo.getLatestVersionLocations()
         .isMultipartKey());
@@ -505,9 +508,9 @@ public class TestS3MultipartUploadCommitPartRequest
     String openMpuPartKey = addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID,
         overwriteAllocatedBlockList);
 
-    OmKeyInfo openMpuPartKeyInfo =
+    OmOpenKeyInfo openMpuPartKeyOpenInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openMpuPartKey);
-    assertNotNull(openMpuPartKeyInfo);
+    assertNotNull(openMpuPartKeyOpenInfo);
 
     // Commit only the first allocated blocks
     List<KeyLocation> overwriteCommittedKeyLocationList = overwriteAllocatedKeyLocationList.subList(0, 1);

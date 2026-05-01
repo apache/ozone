@@ -120,6 +120,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -322,7 +323,7 @@ public class TestKeyManagerImpl {
         .setFileEncryptionInfo(null).build();
     metadataManager.getOpenKeyTable(getDefaultBucketLayout()).put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
-        omKeyInfo);
+        new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build());
     OMException omException = assertThrows(OMException.class,
          () ->
              writeClient.allocateBlock(keyArgs, 1L, new ExcludeList()));

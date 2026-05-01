@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -69,7 +70,8 @@ public class TestOMAllocateBlockResponseWithFSO
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
       OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
       OMResponse omResponse) throws IOException {
-    return new OMAllocateBlockResponseWithFSO(omResponse, omKeyInfo, clientID,
+    return new OMAllocateBlockResponseWithFSO(omResponse,
+        new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build(), clientID,
         getBucketLayout(), omMetadataManager.getVolumeId(volumeName),
         omBucketInfo.getObjectID());
   }

@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -229,7 +230,8 @@ public class TestS3MultipartResponse {
         omMetadataManager.getBucketTable().get(buckDBKey);
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos, getBucketLayout(),
+        multipartKeyInfo, new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build(),
+        mpuKey, parentDirInfos, getBucketLayout(),
         volumeId, bucketId, omBucketInfo);
   }
 
@@ -327,14 +329,14 @@ public class TestS3MultipartResponse {
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
         multipartKey, multipartOpenKey, omKeyInfo,  allKeyInfoToRemove,
         getBucketLayout(), omBucketInfo, volumeId, bucketId, null,
-        multipartKeyInfo);
+        multipartKeyInfo, null);
   }
 
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
       OMResponse omResponse, long volumeId, long bucketId) throws IOException {
     return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
-        omKeyInfo, getBucketLayout());
+        new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build(), getBucketLayout());
   }
 
   protected S3MultipartUploadAbortResponse getS3MultipartUploadAbortResp(

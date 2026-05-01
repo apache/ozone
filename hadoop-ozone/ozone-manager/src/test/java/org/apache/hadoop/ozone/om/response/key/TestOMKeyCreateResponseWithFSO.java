@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -63,7 +64,8 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
       OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
-    return new OMKeyCreateResponseWithFSO(response, keyInfo, new ArrayList<>(),
+    return new OMKeyCreateResponseWithFSO(response,
+        new OmOpenKeyInfo.Builder().setKeyInfo(keyInfo).build(), new ArrayList<>(),
         clientID, bucketInfo, getVolumeId());
   }
 

@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -548,11 +549,11 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
 
     String multipartOpenKey =
             metadataMgr.getMultipartKeyFSO(volumeName, bucketName, keyName, uploadID);
-    OmKeyInfo omKeyInfo =
+    OmOpenKeyInfo omOpenKeyInfo =
         metadataMgr.getOpenKeyTable(bucketLayout).get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
-    assertNull(omKeyInfo);
+    assertNull(omOpenKeyInfo);
     assertNull(omMultipartKeyInfo);
 
     // Since deleteTable operation is performed via
@@ -624,11 +625,11 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
     // Abort multipart upload with missing parent directory
     bucket.abortMultipartUpload(keyName, uploadID);
 
-    OmKeyInfo omKeyInfo =
+    OmOpenKeyInfo omOpenKeyInfo =
         metadataMgr.getOpenKeyTable(bucketLayout).get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
-    assertNull(omKeyInfo);
+    assertNull(omOpenKeyInfo);
     assertNull(omMultipartKeyInfo);
   }
 
@@ -1035,13 +1036,14 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
 
     String multipartKey = metadataMgr.getMultipartKey(volumeName, bucketName,
         keyName, uploadID);
-    OmKeyInfo omKeyInfo =
+    OmOpenKeyInfo omOpenKeyInfo =
         metadataMgr.getOpenKeyTable(bucketLayout).get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
         metadataMgr.getMultipartInfoTable().get(multipartKey);
 
-    assertNotNull(omKeyInfo);
+    assertNotNull(omOpenKeyInfo);
     assertNotNull(omMultipartKeyInfo);
+    OmKeyInfo omKeyInfo = omOpenKeyInfo.getKeyInfo();
     assertEquals(keyName, omKeyInfo.getKeyName());
     assertEquals(OzoneFSUtils.getFileName(keyName), omKeyInfo.getFileName());
     assertEquals(uploadID, omMultipartKeyInfo.getUploadID());

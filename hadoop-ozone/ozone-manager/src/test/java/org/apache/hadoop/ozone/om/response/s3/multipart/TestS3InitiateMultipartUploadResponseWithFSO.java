@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -81,9 +82,10 @@ public class TestS3InitiateMultipartUploadResponseWithFSO
         .getMultipartKey(volumeId, bucketId, parentID,
                 fileName, multipartUploadID);
 
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(multipartOpenKey);
-    assertNotNull(omKeyInfo, "Failed to find the fileInfo");
+    assertNotNull(omOpenKeyInfo, "Failed to find the fileInfo");
+    OmKeyInfo omKeyInfo = omOpenKeyInfo.getKeyInfo();
     assertNotNull(omKeyInfo.getLatestVersionLocations(), "Key Location is null!");
     assertTrue(omKeyInfo.getLatestVersionLocations().isMultipartKey(),
         "isMultipartKey is false!");

@@ -78,6 +78,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -328,7 +329,7 @@ public class ReconUtils {
     try {
       String[] names = EntityHandler.parseRequestPath(EntityHandler.normalizePath(
           prevKeyPrefix, BucketLayout.FILE_SYSTEM_OPTIMIZED));
-      Table<String, OmKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(
+      Table<String, OmOpenKeyInfo> openFileTable = omMetadataManager.getOpenKeyTable(
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
       // Root-Level: Return the original path
@@ -372,10 +373,10 @@ public class ReconUtils {
         long dirID = handler.getDirObjectId(names, names.length);
         String keyKey = constructObjectPathWithPrefix(volumeId, bucketId, dirID) +
             OM_KEY_PREFIX + lastEntiry;
-        OmKeyInfo keyInfo = openFileTable.getSkipCache(keyKey);
-        if (keyInfo != null && keyInfo.getFileName().equals(lastEntiry)) {
+        OmOpenKeyInfo openKeyInfo = openFileTable.getSkipCache(keyKey);
+        if (openKeyInfo != null && openKeyInfo.getKeyInfo().getFileName().equals(lastEntiry)) {
           return constructObjectPathWithPrefix(volumeId, bucketId,
-              keyInfo.getParentObjectID()) + OM_KEY_PREFIX + lastEntiry;
+              openKeyInfo.getKeyInfo().getParentObjectID()) + OM_KEY_PREFIX + lastEntiry;
         }
 
         return prevKeyPrefix;

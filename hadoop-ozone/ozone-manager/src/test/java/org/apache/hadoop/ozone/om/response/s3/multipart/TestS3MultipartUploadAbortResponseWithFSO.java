@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
@@ -76,7 +77,8 @@ public class TestS3MultipartUploadAbortResponseWithFSO
         omMetadataManager.getBucketTable().get(buckDBKey);
 
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
-        multipartKeyInfo, omKeyInfo, mpuDBKey, new ArrayList<>(),
+        multipartKeyInfo, new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build(),
+        mpuDBKey, new ArrayList<>(),
         getBucketLayout(), volumeId, bucketId, omBucketInfo);
   }
 

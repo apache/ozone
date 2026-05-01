@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -281,14 +282,16 @@ public class TestContainerToKeyMapping {
         "openFile", OPEN_FILE_ID, DIR_ID, CONTAINER_ID_1);
     String openFileKey = omMetadataManager.getOpenFileName(
         VOLUME_ID, FSO_BUCKET_ID, DIR_ID, "openFile", 1L);
-    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(openFileKey, openFileInfo);
+    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(openFileKey,
+        new OmOpenKeyInfo.Builder().setKeyInfo(openFileInfo).build());
 
     // Create open OBS key with a block in container 2
     OmKeyInfo openKeyInfo = createOBSKeyInfo(
         "openKey", OPEN_KEY_ID, CONTAINER_ID_2);
     String openKey = omMetadataManager.getOzoneKey(
         VOLUME_NAME, OBS_BUCKET_NAME, "openKey");
-    omMetadataManager.getOpenKeyTable(BucketLayout.OBJECT_STORE).put(openKey, openKeyInfo);
+    omMetadataManager.getOpenKeyTable(BucketLayout.OBJECT_STORE).put(openKey,
+        new OmOpenKeyInfo.Builder().setKeyInfo(openKeyInfo).build());
 
     // Create MPU (multipart upload) for OBS bucket with parts in container 5
     createMultipartUpload();

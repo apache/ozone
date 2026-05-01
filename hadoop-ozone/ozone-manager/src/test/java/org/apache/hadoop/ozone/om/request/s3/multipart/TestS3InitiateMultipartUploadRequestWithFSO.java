@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -99,10 +100,11 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
             modifiedRequest.getInitiateMultiPartUploadRequest()
                     .getKeyArgs().getMultipartUploadID());
 
-    OmKeyInfo omKeyInfo = omMetadataManager
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
         .get(multipartOpenFileKey);
-    assertNotNull(omKeyInfo, "Failed to find the fileInfo");
+    assertNotNull(omOpenKeyInfo, "Failed to find the fileInfo");
+    OmKeyInfo omKeyInfo = omOpenKeyInfo.getKeyInfo();
     assertNotNull(omKeyInfo.getLatestVersionLocations(),
         "Key Location is null!");
     assertTrue(
@@ -222,14 +224,14 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         bucketId, parentID, fileName,
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
-    OmKeyInfo omKeyInfo = omMetadataManager
+    OmOpenKeyInfo omOpenKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
         .get(multipartOpenFileKey);
 
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    verifyKeyInheritAcls(dirs, omKeyInfo, volumeId, bucketId, bucketAcls);
+    verifyKeyInheritAcls(dirs, omOpenKeyInfo.getKeyInfo(), volumeId, bucketId, bucketAcls);
 
   }
 

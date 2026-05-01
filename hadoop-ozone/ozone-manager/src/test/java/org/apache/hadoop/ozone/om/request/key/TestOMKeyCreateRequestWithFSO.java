@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
@@ -135,11 +136,11 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     String fileName = keyPathFileName.toString();
     String openKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
         parentID, fileName, omRequest.getCreateKeyRequest().getClientID());
-    OmKeyInfo omKeyInfo =
+    OmOpenKeyInfo omOpenKeyInfo =
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey);
-    assertNotNull(omKeyInfo);
-    return omKeyInfo;
+    assertNotNull(omOpenKeyInfo);
+    return omOpenKeyInfo.getKeyInfo();
   }
 
   @Override

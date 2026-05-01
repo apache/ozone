@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -352,7 +353,7 @@ public final class OMMetadataManagerTestUtils {
         .build();
 
     omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put(openKey, omKeyInfo);
+        .put(openKey, new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build());
   }
 
   /**
@@ -380,7 +381,7 @@ public final class OMMetadataManagerTestUtils {
         .build();
 
     omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY)
-        .put(openKey, omKeyInfo);
+        .put(openKey, new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build());
   }
 
   /**

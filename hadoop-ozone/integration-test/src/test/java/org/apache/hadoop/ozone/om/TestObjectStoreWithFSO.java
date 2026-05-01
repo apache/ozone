@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
@@ -157,12 +158,12 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     assertEquals(bucketName, ozoneBucket.getName());
 
-    Table<String, OmKeyInfo> openFileTable =
+    Table<String, OmOpenKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager()
             .getOpenKeyTable(getBucketLayout());
 
     // before file creation
-    verifyKeyInFileTable(openFileTable, file, 0, true);
+    assertTrue(openFileTable.isEmpty(), "openFileTable is not empty!");
 
     String data = "random data";
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
@@ -225,12 +226,12 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(testBucketName);
     assertEquals(ozoneBucket.getName(), testBucketName);
 
-    Table<String, OmKeyInfo> openFileTable =
+    Table<String, OmOpenKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager()
             .getOpenKeyTable(getBucketLayout());
 
     // before file creation
-    verifyKeyInFileTable(openFileTable, file, 0, true);
+    assertTrue(openFileTable.isEmpty(), "openFileTable is not empty!");
 
     // Create a key.
     ozoneBucket.createKey(key, 10).close();
@@ -277,7 +278,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     assertEquals(bucketName, ozoneBucket.getName());
 
-    Table<String, OmKeyInfo> openFileTable =
+    Table<String, OmOpenKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager()
             .getOpenKeyTable(getBucketLayout());
 
@@ -769,7 +770,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     }
   }
 
-  private void verifyKeyInOpenFileTable(Table<String, OmKeyInfo> openFileTable,
+  private void verifyKeyInOpenFileTable(Table<String, OmOpenKeyInfo> openFileTable,
       long clientID, String fileName, long parentID, boolean isEmpty)
           throws IOException, TimeoutException, InterruptedException {
     final OMMetadataManager omMetadataManager =
@@ -783,8 +784,8 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
       // wait for DB updates
       GenericTestUtils.waitFor(() -> {
         try {
-          OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
-          return omKeyInfo == null;
+          OmOpenKeyInfo omOpenKeyInfo = openFileTable.get(dbOpenFileKey);
+          return omOpenKeyInfo == null;
         } catch (IOException e) {
           fail("DB failure!");
           return false;
@@ -792,8 +793,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
 
       }, 1000, 120000);
     } else {
-      OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
-      assertNotNull(omKeyInfo, "Table is empty!");
+      OmOpenKeyInfo omOpenKeyInfo = openFileTable.get(dbOpenFileKey);
+      assertNotNull(omOpenKeyInfo, "Table is empty!");
+      OmKeyInfo omKeyInfo = omOpenKeyInfo.getKeyInfo();
       assertEquals(omKeyInfo.getFileName(), fileName, "Invalid file name: " + omKeyInfo.getObjectInfo());
       assertEquals(parentID, omKeyInfo.getParentObjectID(), "Invalid Key");
     }

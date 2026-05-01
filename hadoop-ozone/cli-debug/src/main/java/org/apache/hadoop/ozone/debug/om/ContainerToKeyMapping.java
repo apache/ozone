@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import picocli.CommandLine;
@@ -97,8 +98,8 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   private Table<String, OmDirectoryInfo> directoryTable;
   private Table<String, OmKeyInfo> fileTable;
   private Table<String, OmKeyInfo> keyTable;
-  private Table<String, OmKeyInfo> openFileTable;
-  private Table<String, OmKeyInfo> openKeyTable;
+  private Table<String, OmOpenKeyInfo> openFileTable;
+  private Table<String, OmOpenKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
   private DBStore dirTreeDbStore;
   private Table<Long, String> dirTreeTable;
@@ -273,11 +274,11 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processOpenFiles(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmOpenKeyInfo>> fileIterator =
              openFileTable.iterator()) {
       while (fileIterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> entry = fileIterator.next();
-        addOpenKeyToContainerMap(entry.getKey(), entry.getValue(), containerIds, containerToOpenKeysMap);
+        Table.KeyValue<String, OmOpenKeyInfo> entry = fileIterator.next();
+        addOpenKeyToContainerMap(entry.getKey(), entry.getValue().getKeyInfo(), containerIds, containerToOpenKeysMap);
       }
     } catch (Exception e) {
       err().println("Exception occurred reading openFileTable (FSO keys), " + e);
@@ -285,11 +286,11 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processOpenKeys(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIterator =
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmOpenKeyInfo>> keyIterator =
              openKeyTable.iterator()) {
       while (keyIterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> entry = keyIterator.next();
-        addOpenKeyToContainerMap(entry.getKey(), entry.getValue(), containerIds, containerToOpenKeysMap);
+        Table.KeyValue<String, OmOpenKeyInfo> entry = keyIterator.next();
+        addOpenKeyToContainerMap(entry.getKey(), entry.getValue().getKeyInfo(), containerIds, containerToOpenKeysMap);
       }
     } catch (Exception e) {
       err().println("Exception occurred reading openKeyTable (OBS keys), " + e);

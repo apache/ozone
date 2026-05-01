@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -190,8 +191,8 @@ public class OMDBInsightEndpoint {
       boolean skipPrevKeyDone = false;  // Tracks if prevKey was used earlier
       boolean keysFound = false; // Flag to track if any keys are found
       String lastKey = null;
-      Map<String, OmKeyInfo> obsKeys = Collections.emptyMap();
-      Map<String, OmKeyInfo> fsoKeys = Collections.emptyMap();
+      Map<String, OmOpenKeyInfo> obsKeys = Collections.emptyMap();
+      Map<String, OmOpenKeyInfo> fsoKeys = Collections.emptyMap();
 
       // Validate startPrefix if it's provided
       if (isNotBlank(startPrefix) && !validateStartPrefix(startPrefix)) {
@@ -201,15 +202,15 @@ public class OMDBInsightEndpoint {
       // Use searchOpenKeys logic with adjustments for FSO and Non-FSO filtering
       if (includeNonFso) {
         // Search for non-FSO keys in KeyTable
-        Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
+        Table<String, OmOpenKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
         obsKeys = ReconUtils.extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
-        for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
+        for (Map.Entry<String, OmOpenKeyInfo> entry : obsKeys.entrySet()) {
           keysFound = true;
           skipPrevKeyDone = true; // Don't use the prevKey for the file table
-          KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
+          KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue().getKeyInfo());
           openKeyInsightInfo.getNonFSOKeyInfoList().add(keyEntityInfo); // Add to non-FSO list
-          replicatedTotal += entry.getValue().getReplicatedSize();
-          unreplicatedTotal += entry.getValue().getDataSize();
+          replicatedTotal += entry.getValue().getKeyInfo().getReplicatedSize();
+          unreplicatedTotal += entry.getValue().getKeyInfo().getDataSize();
           lastKey = entry.getKey(); // Update lastKey
         }
       }
@@ -221,12 +222,12 @@ public class OMDBInsightEndpoint {
         // If limit = -1 then we need to fetch all keys without limit
         int effectiveLimit = limit == -1 ? limit : limit - obsKeys.size();
         fsoKeys = searchOpenKeysInFSO(startPrefix, effectiveLimit, effectivePrevKey);
-        for (Map.Entry<String, OmKeyInfo> entry : fsoKeys.entrySet()) {
+        for (Map.Entry<String, OmOpenKeyInfo> entry : fsoKeys.entrySet()) {
           keysFound = true;
-          KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
+          KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue().getKeyInfo());
           openKeyInsightInfo.getFsoKeyInfoList().add(keyEntityInfo); // Add to FSO list
-          replicatedTotal += entry.getValue().getReplicatedSize();
-          unreplicatedTotal += entry.getValue().getDataSize();
+          replicatedTotal += entry.getValue().getKeyInfo().getReplicatedSize();
+          unreplicatedTotal += entry.getValue().getKeyInfo().getDataSize();
           lastKey = entry.getKey(); // Update lastKey
         }
       }
@@ -252,15 +253,15 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  public Map<String, OmKeyInfo> searchOpenKeysInFSO(String startPrefix,
+  public Map<String, OmOpenKeyInfo> searchOpenKeysInFSO(String startPrefix,
                                                     int limit, String prevKey)
       throws IOException, IllegalArgumentException {
-    Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
+    Map<String, OmOpenKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = ReconUtils.convertToObjectPathForOpenKeySearch(
             startPrefix, omMetadataManager, reconNamespaceSummaryManager, reconSCM);
     String[] names = parseRequestPath(startPrefixObjectPath);
-    Table<String, OmKeyInfo> openFileTable =
+    Table<String, OmOpenKeyInfo> openFileTable =
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // If names.length <= 2, then the search prefix is at the volume or bucket level hence

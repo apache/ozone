@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -904,11 +905,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
 
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/bucketOne/key_one", omKeyInfo);
-    OmKeyInfo omKeyInfo1 =
+        .put("/sampleVol/bucketOne/key_one", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo).build());
+    OmOpenKeyInfo omOpenKeyInfo1 =
         reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
             .get("/sampleVol/bucketOne/key_one");
-    assertEquals("key_one", omKeyInfo1.getKeyName());
+    assertEquals("key_one", omOpenKeyInfo1.getKeyInfo().getKeyName());
     Response openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(-1, "", "", true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
@@ -1052,11 +1053,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         getOmKeyInfo("sampleVol", "bucketOne", "key_three", true);
 
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/bucketOne/key_one", omKeyInfo1);
+        .put("/sampleVol/bucketOne/key_one", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo1).build());
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put("/sampleVol/bucketOne/key_two", omKeyInfo2);
+        .put("/sampleVol/bucketOne/key_two", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo2).build());
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/bucketOne/key_three", omKeyInfo3);
+        .put("/sampleVol/bucketOne/key_three", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo3).build());
     Response openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(2, "", "", true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
@@ -1094,11 +1095,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         getOmKeyInfo("sampleVol", "non_fso_Bucket", "non_fso_key3", true);
 
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/non_fso_Bucket/non_fso_key1", omKeyInfo1);
+        .put("/sampleVol/non_fso_Bucket/non_fso_key1", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo1).build());
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/non_fso_Bucket/non_fso_key2", omKeyInfo2);
+        .put("/sampleVol/non_fso_Bucket/non_fso_key2", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo2).build());
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/non_fso_Bucket/non_fso_key3", omKeyInfo3);
+        .put("/sampleVol/non_fso_Bucket/non_fso_key3", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo3).build());
 
     omKeyInfo1 =
         getOmKeyInfo("sampleVol", "fso_Bucket", "fso_key1", false);
@@ -1110,13 +1111,13 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         getOmKeyInfo("sampleVol", "fso_Bucket", "fso_key4", false);
 
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put("/sampleVol/fso_Bucket/fso_key1", omKeyInfo1);
+        .put("/sampleVol/fso_Bucket/fso_key1", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo1).build());
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put("/sampleVol/fso_Bucket/fso_key2", omKeyInfo2);
+        .put("/sampleVol/fso_Bucket/fso_key2", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo2).build());
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put("/sampleVol/fso_Bucket/fso_key3", omKeyInfo3);
+        .put("/sampleVol/fso_Bucket/fso_key3", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo3).build());
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put("/sampleVol/fso_Bucket/fso_key4", omKeyInfo4);
+        .put("/sampleVol/fso_Bucket/fso_key4", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo4).build());
 
     // CASE 1 :- Display only FSO keys in response
     // includeFsoKeys=true, includeNonFsoKeys=false
@@ -1172,11 +1173,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         getOmKeyInfo("sampleVol", "bucketOne", "key_3", true);
 
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/bucketOne/key_1", omKeyInfo1);
+        .put("/sampleVol/bucketOne/key_1", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo1).build());
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put("/sampleVol/bucketOne/key_2", omKeyInfo2);
+        .put("/sampleVol/bucketOne/key_2", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo2).build());
     reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
-        .put("/sampleVol/bucketOne/key_3", omKeyInfo3);
+        .put("/sampleVol/bucketOne/key_3", new OmOpenKeyInfo.Builder().setKeyInfo(omKeyInfo3).build());
     Response openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(-1, "/sampleVol/bucketOne/key_1", "",
             true, true);
