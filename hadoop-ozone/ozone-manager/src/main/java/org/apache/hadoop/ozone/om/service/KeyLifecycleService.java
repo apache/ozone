@@ -323,64 +323,73 @@ public class KeyLifecycleService extends BackgroundService {
         // remove disabled rules
         List<OmLCRule> ruleList = originRuleList.stream().filter(r -> r.isEnabled()).collect(Collectors.toList());
 
-        // scan file or key table for evaluate rules against files or keys
-        LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(listMaxSize);
-        LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(listMaxSize);
-        Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(bucket.getBucketLayout());
-        /**
-         * Filter treatment.
-         * ""  - all objects
-         * "/" - if it's OBS/Legacy, means keys starting with "/"; If it's FSO, not supported
-         * "/key" - if it's OBS/Legacy, means keys starting with "/key", "/" is literally "/";
-         *          If it's FSO, means keys or dirs starting with "key", "/" will be treated as separator mark.
-         * "key" - if it's OBS/Legacy, means keys starting with "key";
-         *         if it's FSO, means keys for dirs starting with "key" too.
-         * "dir/" - if it's OBS/Legacy, means keys starting with "dir/";
-         *        - if it's FSO, means keys/dirs under directory "dir", doesn't include directory "dir" itself.
-         *        - For FSO bucket, as directory ModificationTime will not be updated when any of its child key/subdir
-         *          changes, so remember to add the tailing slash "/" when configure prefix, otherwise the whole
-         *          directory will be expired and deleted once its ModificationTime meats the condition.
-         */
-        if (bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-          OmVolumeArgs volume;
-          try {
-            volume = omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(bucket.getVolumeName()));
-            if (volume == null) {
-              LOG.warn("Volume {} cannot be found, might be deleted during this task's execution",
-                  bucket.getVolumeName());
+        List<OmLCRule> expirationRules = ruleList.stream()
+            .filter(r -> r.getExpiration() != null)
+            .collect(Collectors.toList());
+        List<OmLCRule> mpuRules = ruleList.stream()
+            .filter(r -> r.getAbortIncompleteMultipartUpload() != null)
+            .collect(Collectors.toList());
+
+        if (!expirationRules.isEmpty()) {
+          LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(listMaxSize);
+          LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(listMaxSize);
+          Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(bucket.getBucketLayout());
+          /**
+           * Filter treatment.
+           * ""  - all objects
+           * "/" - if it's OBS/Legacy, means keys starting with "/"; If it's FSO, not supported
+           * "/key" - if it's OBS/Legacy, means keys starting with "/key", "/" is literally "/";
+           *          If it's FSO, means keys or dirs starting with "key", "/" will be treated as separator mark.
+           * "key" - if it's OBS/Legacy, means keys starting with "key";
+           *         if it's FSO, means keys for dirs starting with "key" too.
+           * "dir/" - if it's OBS/Legacy, means keys starting with "dir/";
+           *        - if it's FSO, means keys/dirs under directory "dir", doesn't include directory "dir" itself.
+           *        - For FSO bucket, as directory ModificationTime will not be updated when any of its child key/subdir
+           *          changes, so remember to add the tailing slash "/" when configure prefix, otherwise the whole
+           *          directory will be expired and deleted once its ModificationTime meats the condition.
+           */
+          if (bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+            OmVolumeArgs volume;
+            try {
+              volume = omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(bucket.getVolumeName()));
+              if (volume == null) {
+                LOG.warn("Volume {} cannot be found, might be deleted during this task's execution",
+                    bucket.getVolumeName());
+                onFailure(bucketKey);
+                return result;
+              }
+            } catch (IOException e) {
+              LOG.warn("Failed to get volume {}", bucket.getVolumeName(), e);
               onFailure(bucketKey);
               return result;
             }
-          } catch (IOException e) {
-            LOG.warn("Failed to get volume {}", bucket.getVolumeName(), e);
-            onFailure(bucketKey);
-            return result;
-          }
-          evaluateFSOBucket(volume, bucket, bucketKey, keyTable, ruleList, expiredKeyList, expiredDirList);
-        } else {
-          // use bucket name as key iterator prefix
-          evaluateBucket(bucket, keyTable, ruleList, expiredKeyList);
-        }
-
-        if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
-          LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
-        } else {
-          LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
-              expiredKeyList.size(), expiredDirList.size(), bucketKey);
-
-          // If trash is enabled, move files to trash, instead of send delete requests.
-          // OBS bucket doesn't support trash.
-          if (bucket.getBucketLayout() == OBJECT_STORE) {
-            sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
+            evaluateFSOBucket(volume, bucket, bucketKey, keyTable, expirationRules, expiredKeyList, expiredDirList);
           } else {
-            // handle keys first, then directories
-            handleAndClearFullList(bucket, expiredKeyList, false);
-            handleAndClearFullList(bucket, expiredDirList, true);
+            // use bucket name as key iterator prefix
+            evaluateBucket(bucket, keyTable, expirationRules, expiredKeyList);
+          }
+
+          if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
+            LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
+          } else {
+            LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
+                expiredKeyList.size(), expiredDirList.size(), bucketKey);
+
+            // If trash is enabled, move files to trash, instead of send delete requests.
+            // OBS bucket doesn't support trash.
+            if (bucket.getBucketLayout() == OBJECT_STORE) {
+              sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
+            } else {
+              // handle keys first, then directories
+              handleAndClearFullList(bucket, expiredKeyList, false);
+              handleAndClearFullList(bucket, expiredDirList, true);
+            }
           }
         }
 
-        // Process AbortIncompleteMultipartUpload actions
-        processMultipartUploads(bucket, ruleList);
+        if (!mpuRules.isEmpty()) {
+          processMultipartUploads(bucket, mpuRules);
+        }
 
         onSuccess(bucketKey);
       }
@@ -765,18 +774,9 @@ public class KeyLifecycleService extends BackgroundService {
      * and have exceeded the configured days after initiation.
      *
      * @param bucketInfo the bucket information
-     * @param ruleList list of lifecycle rules to evaluate
+     * @param ruleList list of lifecycle rules with AbortIncompleteMultipartUpload action
      */
     private void processMultipartUploads(OmBucketInfo bucketInfo, List<OmLCRule> ruleList) {
-      // Filter rules that have AbortIncompleteMultipartUpload actions
-      List<OmLCRule> mpuRules = ruleList.stream()
-          .filter(r -> r.getAbortIncompleteMultipartUpload() != null)
-          .collect(Collectors.toList());
-
-      if (mpuRules.isEmpty()) {
-        return;
-      }
-
       String volumeName = bucketInfo.getVolumeName();
       String bucketName = bucketInfo.getBucketName();
       String bucketPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
@@ -828,7 +828,7 @@ public class KeyLifecycleService extends BackgroundService {
             continue;
           }
 
-          for (OmLCRule rule : mpuRules) {
+          for (OmLCRule rule : ruleList) {
             if (shouldAbortUpload(openKeyInfo, upload, keyName, rule)) {
               if (expiredUploads.isFull()) {
                 LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
