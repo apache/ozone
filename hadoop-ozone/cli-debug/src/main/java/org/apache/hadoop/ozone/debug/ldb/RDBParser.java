@@ -31,6 +31,7 @@ import picocli.CommandLine;
             ListTables.class,
             ValueSchema.class,
             Checkpoint.class,
+            DropColumnFamily.class,
         },
         description = "Parse rocksdb file content")
 @MetaInfServices(DebugSubcommand.class)

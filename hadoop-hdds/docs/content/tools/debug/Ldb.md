@@ -35,6 +35,7 @@ Commands:
   list_column_families, ls  list all column families in db.
   value-schema              Schema of value in metadataTable
   checkpoint                Create checkpoint for specified db
+  drop_column_family        Drop a column family from the DB.
 ```
 
 ### list_column_families command
@@ -58,6 +59,17 @@ deletedBlocks
 statefulServiceConfig
 revokedCerts
 move
+```
+
+### drop_column_family command
+
+`drop_column_family` command drops a column family from the db provided. The service that owns the DB should be stopped
+before running this command. The command prompts for confirmation by default; use `-y` or `--yes` to skip the prompt.
+
+```bash
+$ ozone debug ldb --db=/path/to/om.db drop_column_family --cf=snapshotInfoTable
+WARNING: Dropping a column family mutates RocksDB and can be unsafe if the DB is already open by an Ozone process. Ensure the service that owns this DB is stopped before running this command. Do you want to continue (y/N)? y
+Dropped column family snapshotInfoTable
 ```
 
 ### scan command
