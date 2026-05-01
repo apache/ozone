@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +49,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
                              Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
-      OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
+      OmOpenKeyInfo omOpenKeyInfo = (OmOpenKeyInfo) event.getValue();
+      OmKeyInfo omKeyInfo = omOpenKeyInfo.getKeyInfo();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName), (k, count) -> count + 1L);
       unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size + omKeyInfo.getDataSize());
@@ -72,7 +74,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
                                 Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
-      OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
+      OmOpenKeyInfo omOpenKeyInfo = (OmOpenKeyInfo) event.getValue();
+      OmKeyInfo omKeyInfo = omOpenKeyInfo.getKeyInfo();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count > 0 ? count - 1L : 0L);
       unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
@@ -107,8 +110,8 @@ public class OpenKeysInsightHandler implements OmTableHandler {
 
       // In Update event the count for the open table will not change. So we
       // don't need to update the count.
-      OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
-      OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
+      OmKeyInfo oldKeyInfo = ((OmOpenKeyInfo) event.getOldValue()).getKeyInfo();
+      OmKeyInfo newKeyInfo = ((OmOpenKeyInfo) event.getValue()).getKeyInfo();
       unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
           (k, size) -> size - oldKeyInfo.getDataSize() +
               newKeyInfo.getDataSize());
@@ -134,12 +137,12 @@ public class OpenKeysInsightHandler implements OmTableHandler {
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    Table<String, OmKeyInfo> table = (Table<String, OmKeyInfo>) omMetadataManager.getTable(tableName);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = table.iterator()) {
+    Table<String, OmOpenKeyInfo> table = (Table<String, OmOpenKeyInfo>) omMetadataManager.getTable(tableName);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmOpenKeyInfo>> iterator = table.iterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        Table.KeyValue<String, OmOpenKeyInfo> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
-          OmKeyInfo omKeyInfo = kv.getValue();
+          OmKeyInfo omKeyInfo = kv.getValue().getKeyInfo();
           unReplicatedSize += omKeyInfo.getDataSize();
           replicatedSize += omKeyInfo.getReplicatedSize();
           count++;

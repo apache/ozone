@@ -69,6 +69,13 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
   @Override
   protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo.Builder keyInfoBuilder)
       throws Exception {
+    return addKeyToOpenKeyTable(locationList, keyInfoBuilder, null);
+  }
+
+  @Override
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo.Builder keyInfoBuilder,
+      Long expectedDataGeneration)
+      throws Exception {
     // need to initialize parentID
     if (getParentDir() == null) {
       parentID = getBucketID();
@@ -83,8 +90,7 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     return OMRequestTestUtils.addFileToKeyTable(true, false,
-        fileName, keyInfo, clientID, txnLogId, omMetadataManager);
-
+        fileName, keyInfo, clientID, txnLogId, expectedDataGeneration, omMetadataManager);
   }
 
   @Override

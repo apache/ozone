@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -105,7 +104,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
             getOmRequest());
     OMClientResponse omClientResponse = null;
 
-    OmKeyInfo openKeyInfo = null;
+    OmOpenKeyInfo openKeyInfo = null;
     Exception exception = null;
     OmBucketInfo omBucketInfo = null;
     boolean acquiredLock = false;
@@ -172,10 +171,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
               .setKeyLocation(blockLocation).build());
       long volumeId = omMetadataManager.getVolumeId(volumeName);
-      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
-          .setKeyInfo(openKeyInfo).build();
       omClientResponse = getOmClientResponse(clientID, omResponse,
-              omOpenKeyInfo, omBucketInfo.copyObject(), volumeId);
+              openKeyInfo, omBucketInfo.copyObject(), volumeId);
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
               volumeName, bucketName, openKeyName);
     } catch (IOException | InvalidPathException ex) {
@@ -202,10 +199,10 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
     return omClientResponse;
   }
 
-  private OmKeyInfo getOpenKeyInfo(OMMetadataManager omMetadataManager,
+  private OmOpenKeyInfo getOpenKeyInfo(OMMetadataManager omMetadataManager,
       String openKeyName, String keyName) throws IOException {
     String fileName = OzoneFSUtils.getFileName(keyName);
-    return OMFileRequest.getOmKeyInfoFromFileTable(true,
+    return OMFileRequest.getOmOpenKeyInfoFromOpenFileTable(
             omMetadataManager, openKeyName, fileName);
   }
 
@@ -224,10 +221,9 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
       OMMetadataManager omMetadataManager, String openKeyName, String keyName,
-      OmKeyInfo openKeyInfo) {
+      OmOpenKeyInfo openKeyInfo) {
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, openKeyName,
-        new OmOpenKeyInfo.Builder().setKeyInfo(openKeyInfo).build(),
-        keyName, trxnLogIndex);
+        openKeyInfo, keyName, trxnLogIndex);
   }
 
   @Nonnull

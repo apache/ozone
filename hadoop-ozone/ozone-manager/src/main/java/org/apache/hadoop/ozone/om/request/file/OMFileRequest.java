@@ -618,6 +618,28 @@ public final class OMFileRequest {
   }
 
   /**
+   * Get OmOpenKeyInfo from the open file table.
+   *
+   * @param omMetadataMgr metadata manager
+   * @param dbOpenFileKey open file key
+   * @param keyName       key name
+   * @return OmOpenKeyInfo or null if not found
+   * @throws IOException DB failure
+   */
+  public static OmOpenKeyInfo getOmOpenKeyInfoFromOpenFileTable(
+      OMMetadataManager omMetadataMgr, String dbOpenFileKey, String keyName)
+      throws IOException {
+    OmOpenKeyInfo omOpenKeyInfo =
+        omMetadataMgr.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+            .get(dbOpenFileKey);
+    if (omOpenKeyInfo != null) {
+      // Set the full key name (DB stores only the file name)
+      omOpenKeyInfo.setKeyName(keyName);
+    }
+    return omOpenKeyInfo;
+  }
+
+  /**
    * Gets OmKeyInfo if exists and validate bucket and volume.
    *
    * @param omMetadataMgr metadata manager

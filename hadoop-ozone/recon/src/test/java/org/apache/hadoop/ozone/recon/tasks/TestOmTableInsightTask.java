@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -401,6 +402,10 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
                 uploadID, 1, 100L);
         multipartKeyInfo.addPartKeyInfo(partKeyInfo);
         when(mockKeyValue.getValue()).thenReturn(multipartKeyInfo);
+      } else if (tableName.equals(OPEN_KEY_TABLE) || tableName.equals(OPEN_FILE_TABLE)) {
+        OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
+            .setKeyInfo(mock(OmKeyInfo.class)).build();
+        when(mockKeyValue.getValue()).thenReturn(omOpenKeyInfo);
       } else {
         when(mockKeyValue.getValue()).thenReturn(mock(OmKeyInfo.class));
       }
@@ -808,12 +813,25 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       String table,
       OMDBUpdateEvent.OMDBUpdateAction action,
       Object oldValue) {
+    // For open key tables, wrap OmKeyInfo in OmOpenKeyInfo
+    Object wrappedValue = value;
+    Object wrappedOldValue = oldValue;
+    if (OPEN_KEY_TABLE.equals(table) || OPEN_FILE_TABLE.equals(table)) {
+      if (value instanceof OmKeyInfo) {
+        wrappedValue = new OmOpenKeyInfo.Builder()
+            .setKeyInfo((OmKeyInfo) value).build();
+      }
+      if (oldValue instanceof OmKeyInfo) {
+        wrappedOldValue = new OmOpenKeyInfo.Builder()
+            .setKeyInfo((OmKeyInfo) oldValue).build();
+      }
+    }
     return new OMDBUpdateEvent.OMUpdateEventBuilder()
         .setAction(action)
         .setKey(name)
-        .setValue(value)
+        .setValue(wrappedValue)
         .setTable(table)
-        .setOldValue(oldValue)
+        .setOldValue(wrappedOldValue)
         .build();
   }
 

@@ -188,13 +188,22 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 
+      // Build OmOpenKeyInfo with expectedDataGeneration/expectedETag
+      OmOpenKeyInfo.Builder openKeyInfoBuilder = new OmOpenKeyInfo.Builder()
+              .setKeyInfo(omFileInfo);
+      if (keyArgs.hasExpectedDataGeneration()) {
+        openKeyInfoBuilder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+      }
+      if (keyArgs.hasExpectedETag()) {
+        openKeyInfoBuilder.setExpectedETag(keyArgs.getExpectedETag());
+      }
+      OmOpenKeyInfo omOpenKeyInfo = openKeyInfoBuilder.build();
+
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-          dbOpenFileName,
-          new OmOpenKeyInfo.Builder().setKeyInfo(omFileInfo).build(),
-          keyName, trxnLogIndex);
+          dbOpenFileName, omOpenKeyInfo, keyName, trxnLogIndex);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
@@ -211,8 +220,6 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               .setID(clientID)
               .setOpenVersion(openVersion).build())
               .setCmdType(Type.CreateKey);
-      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
-              .setKeyInfo(omFileInfo).build();
       omClientResponse = new OMKeyCreateResponseWithFSO(omResponse.build(),
               omOpenKeyInfo, missingParentInfos, clientID,
               omBucketInfo.copyObject(), volumeId);

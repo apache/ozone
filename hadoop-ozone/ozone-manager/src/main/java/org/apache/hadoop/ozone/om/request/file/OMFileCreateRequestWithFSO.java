@@ -198,8 +198,15 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
-      OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
-          .setKeyInfo(omFileInfo).build();
+      OmOpenKeyInfo.Builder openKeyInfoBuilder = new OmOpenKeyInfo.Builder()
+          .setKeyInfo(omFileInfo);
+      if (keyArgs.hasExpectedDataGeneration()) {
+        openKeyInfoBuilder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+      }
+      if (keyArgs.hasExpectedETag()) {
+        openKeyInfoBuilder.setExpectedETag(keyArgs.getExpectedETag());
+      }
+      OmOpenKeyInfo omOpenKeyInfo = openKeyInfoBuilder.build();
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
           dbOpenFileName, omOpenKeyInfo, keyName, trxnLogIndex);
 

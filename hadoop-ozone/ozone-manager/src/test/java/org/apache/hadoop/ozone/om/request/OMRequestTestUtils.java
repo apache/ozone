@@ -1571,6 +1571,18 @@ public final class OMRequestTestUtils {
                                        long clientID, long trxnLogIndex,
                                        OMMetadataManager omMetadataManager)
           throws Exception {
+    return addFileToKeyTable(openKeyTable, addToCache, fileName, omKeyInfo,
+        clientID, trxnLogIndex, null, omMetadataManager);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public static String addFileToKeyTable(boolean openKeyTable,
+                                       boolean addToCache, String fileName,
+                                       OmKeyInfo omKeyInfo,
+                                       long clientID, long trxnLogIndex,
+                                       Long expectedDataGeneration,
+                                       OMMetadataManager omMetadataManager)
+          throws Exception {
     String ozoneDBKey;
     if (openKeyTable) {
       final long volumeId = omMetadataManager.getVolumeId(
@@ -1581,7 +1593,9 @@ public final class OMRequestTestUtils {
               volumeId, bucketId, omKeyInfo.getParentObjectID(),
               fileName, clientID);
       OmOpenKeyInfo omOpenKeyInfo = new OmOpenKeyInfo.Builder()
-          .setKeyInfo(omKeyInfo).build();
+          .setKeyInfo(omKeyInfo)
+          .setExpectedDataGeneration(expectedDataGeneration)
+          .build();
       if (addToCache) {
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
             .addCacheEntry(new CacheKey<>(ozoneDBKey),
