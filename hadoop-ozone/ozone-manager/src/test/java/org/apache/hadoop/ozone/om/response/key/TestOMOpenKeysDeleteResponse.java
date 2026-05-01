@@ -180,7 +180,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
 
   /**
    * Creates {@code numKeys} open keys with random names, maps each one to a
-   * new {@link OmKeyInfo} object, adds them to the open key table cache, and
+   * new {@link OmOpenKeyInfo} object, adds them to the open key table cache, and
    * returns them. These keys will have no associated block data.
    */
   private Map<String, Pair<Long, OmOpenKeyInfo>> addOpenKeysToDB(String volume, int numKeys)
@@ -190,7 +190,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
 
   /**
    * Creates {@code numKeys} open keys with random names, maps each one to a
-   * new {@link OmKeyInfo} object, adds them to the open key table cache, and
+   * new {@link OmOpenKeyInfo} object, adds them to the open key table cache, and
    * returns them.
    * If {@code keyLength} is greater than 0, adds one block with that many
    * bytes of data for each key.

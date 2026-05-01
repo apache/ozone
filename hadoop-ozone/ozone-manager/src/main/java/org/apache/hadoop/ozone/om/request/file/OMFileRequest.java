@@ -459,7 +459,8 @@ public final class OMFileRequest {
    *
    * @param omMetadataManager OM Metadata Manager
    * @param dbOpenFileName    open file name key
-   * @param omFileInfo        key info
+   * @param omOpenFileInfo    open key info
+   * @param keyName           key name
    * @param trxnLogIndex      transaction log index
    */
   public static void addOpenFileTableCacheEntry(
@@ -512,8 +513,10 @@ public final class OMFileRequest {
    *
    * @param omMetadataMgr    OM Metadata Manager
    * @param batchOp          batch of db operations
-   * @param omFileInfo       omKeyInfo
+   * @param omOpenFileInfo   open key info
    * @param openKeySessionID clientID
+   * @param volumeId         volume ID
+   * @param bucketId         bucket ID
    * @throws IOException DB failure
    */
   public static void addToOpenFileTable(OMMetadataManager omMetadataMgr,
@@ -531,10 +534,12 @@ public final class OMFileRequest {
   /**
    * Adding multipart omKeyInfo to open file table.
    *
-   * @param omMetadataMgr OM Metadata Manager
-   * @param batchOp       batch of db operations
-   * @param omFileInfo    omKeyInfo
-   * @param uploadID      uploadID
+   * @param omMetadataMgr  OM Metadata Manager
+   * @param batchOp        batch of db operations
+   * @param omOpenFileInfo open key info
+   * @param uploadID       uploadID
+   * @param volumeId       volume ID
+   * @param bucketId       bucket ID
    * @return multipartFileKey
    * @throws IOException DB failure
    */
