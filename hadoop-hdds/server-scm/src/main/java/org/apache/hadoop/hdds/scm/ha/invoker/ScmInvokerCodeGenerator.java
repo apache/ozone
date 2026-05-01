@@ -433,11 +433,11 @@ public final class ScmInvokerCodeGenerator {
       final Class<?> type = parameterTypes[i];
       final String checkType = getClassnameForApi(type.isPrimitive() ? getBoxedType(type) : type);
       if (type.isPrimitive()) {
-        b.append(" && ").append(actualParameter).append("[").append(i).append("] instanceof ")
+        b.append(" && ").append(actualParameter).append('[').append(i).append("] instanceof ")
             .append(checkType);
       } else {
-        b.append(" && (").append(actualParameter).append("[").append(i).append("] == null || ")
-            .append(checkType).append(".class.isInstance(").append(actualParameter).append("[")
+        b.append(" && (").append(actualParameter).append('[').append(i).append("] == null || ")
+            .append(checkType).append(".class.isInstance(").append(actualParameter).append('[')
             .append(i).append("]))");
       }
     }
