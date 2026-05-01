@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmOpenKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -218,11 +219,11 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           RepeatedOmKeyInfo.getCodec(true));
 
   public static final String OPEN_KEY_TABLE = "openKeyTable";
-  /** openKeyTable: /volume/bucket/key/id :- KeyInfo. */
-  public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_KEY_TABLE_DEF
+  /** openKeyTable: /volume/bucket/key/id :- OpenKeyInfo. */
+  public static final DBColumnFamilyDefinition<String, OmOpenKeyInfo> OPEN_KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmOpenKeyInfo.getCodec(true));
 
   public static final String MULTIPART_INFO_TABLE = "multipartInfoTable";
   /** multipartInfoTable: /volume/bucket/key/uploadId :- parts. */
@@ -248,11 +249,11 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           OmKeyInfo.getCodec(true));
 
   public static final String OPEN_FILE_TABLE = "openFileTable";
-  /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
-  public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
+  /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- OpenKeyInfo. */
+  public static final DBColumnFamilyDefinition<String, OmOpenKeyInfo> OPEN_FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmOpenKeyInfo.getCodec(true));
 
   public static final String DIRECTORY_TABLE = "directoryTable";
   /** directoryTable: /volumeId/bucketId/parentId/dirName :- DirInfo. */
