@@ -100,6 +100,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.xml.bind.DatatypeConverter;
@@ -115,7 +116,11 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
@@ -123,6 +128,7 @@ import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.BeforeAll;
@@ -1268,6 +1274,106 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals("", retrievedRule3.getPrefix());
     assertEquals(BucketLifecycleConfiguration.ENABLED, retrievedRule3.getStatus());
     assertEquals(30, retrievedRule3.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+  }
+
+  /**
+   * End-to-end test verifying that KeyLifecycleService correctly aborts
+   * incomplete multipart uploads based on lifecycle configuration.
+   */
+  @Test
+  void testAbortIncompleteMultipartUploadE2E() throws Exception {
+    OzoneManager ozoneManager = cluster().getOzoneManager();
+    KeyLifecycleService lifecycleService = ozoneManager.getKeyManager().getKeyLifecycleService();
+    if (lifecycleService == null) {
+      return;
+    }
+
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    String s3VolumeName;
+    try (OzoneClient ozoneClient = cluster().newClient()) {
+      s3VolumeName = ozoneClient.getObjectStore().getS3Volume().getName();
+    }
+
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+
+    // Create 3 MPUs
+    String matchingOldKey = "temp/old-file.txt";
+    InitiateMultipartUploadResult mpu1 = s3Client.initiateMultipartUpload(
+        new InitiateMultipartUploadRequest(bucketName, matchingOldKey));
+
+    String nonMatchingOldKey = "permanent/old-file.txt";
+    InitiateMultipartUploadResult mpu2 = s3Client.initiateMultipartUpload(
+        new InitiateMultipartUploadRequest(bucketName, nonMatchingOldKey));
+
+    String matchingRecentKey = "temp/recent-file.txt";
+    s3Client.initiateMultipartUpload(new InitiateMultipartUploadRequest(bucketName, matchingRecentKey));
+
+    MultipartUploadListing listBefore = s3Client.listMultipartUploads(
+        new ListMultipartUploadsRequest(bucketName));
+    assertEquals(3, listBefore.getMultipartUploads().size());
+
+    // Backdate 2 MPUs to 2 days ago
+    long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+    updateMpuCreationTime(metadataManager, s3VolumeName, bucketName,
+        matchingOldKey, mpu1.getUploadId(), oldCreationTime);
+    updateMpuCreationTime(metadataManager, s3VolumeName, bucketName,
+        nonMatchingOldKey, mpu2.getUploadId(), oldCreationTime);
+
+    // Set lifecycle rule: abort MPUs with prefix "temp/" after 1 day
+    BucketLifecycleConfiguration.Rule rule = new BucketLifecycleConfiguration.Rule()
+        .withId("abort-temp-uploads")
+        .withPrefix("temp/")
+        .withStatus(BucketLifecycleConfiguration.ENABLED);
+    rule.setAbortIncompleteMultipartUpload(
+        new AbortIncompleteMultipartUpload().withDaysAfterInitiation(1));
+
+    BucketLifecycleConfiguration config = new BucketLifecycleConfiguration();
+    config.setRules(Collections.singletonList(rule));
+    s3Client.setBucketLifecycleConfiguration(bucketName, config);
+
+    // Trigger lifecycle service
+    lifecycleService.runPeriodicalTaskNow();
+
+    // Wait for abort
+    GenericTestUtils.waitFor(() -> {
+      MultipartUploadListing listing = s3Client.listMultipartUploads(
+          new ListMultipartUploadsRequest(bucketName));
+      return listing.getMultipartUploads().size() == 2;
+    }, 500, 30000);
+
+    // Verify results
+    MultipartUploadListing listAfter = s3Client.listMultipartUploads(
+        new ListMultipartUploadsRequest(bucketName));
+    List<String> remainingKeys = listAfter.getMultipartUploads().stream()
+        .map(MultipartUpload::getKey)
+        .collect(Collectors.toList());
+
+    assertFalse(remainingKeys.contains(matchingOldKey), "Old MPU with matching prefix should be aborted");
+    assertTrue(remainingKeys.contains(nonMatchingOldKey), "Old MPU with non-matching prefix should remain");
+    assertTrue(remainingKeys.contains(matchingRecentKey), "Recent MPU should remain");
+  }
+
+  private void updateMpuCreationTime(OMMetadataManager metadataManager,
+      String volumeName, String bucketName, String keyName,
+      String uploadId, long newCreationTime) throws Exception {
+    String multipartKey = metadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId);
+    OmMultipartKeyInfo existingInfo = metadataManager.getMultipartInfoTable().get(multipartKey);
+    if (existingInfo == null) {
+      throw new RuntimeException("Multipart key info not found: " + multipartKey);
+    }
+
+    OmMultipartKeyInfo updatedInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(existingInfo.getUploadID())
+        .setCreationTime(newCreationTime)
+        .setReplicationConfig(existingInfo.getReplicationConfig())
+        .setObjectID(existingInfo.getObjectID())
+        .setUpdateID(existingInfo.getUpdateID())
+        .setParentID(existingInfo.getParentID())
+        .build();
+
+    metadataManager.getMultipartInfoTable().put(multipartKey, updatedInfo);
   }
 
   @Nested
