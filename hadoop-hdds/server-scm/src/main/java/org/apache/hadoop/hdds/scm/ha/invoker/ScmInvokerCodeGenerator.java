@@ -45,6 +45,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.ratis.protocol.Message;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
@@ -69,7 +70,7 @@ public final class ScmInvokerCodeGenerator {
   static final DeclaredMethod INVOKE_LOCAL = new DeclaredMethod("invokeLocal",
       new Class[]{String.class, Object[].class},
       new String[]{"methodName", "p"},
-      Object.class,
+      Message.class,
       new Class<?>[]{Exception.class});
 
   private final Class<?> api;
@@ -359,9 +360,11 @@ public final class ScmInvokerCodeGenerator {
       }
       if (apiMethod.getReturnType() == void.class) {
         println("getImpl().%s(%s);", apiMethod.getName(), b);
-        println("return null;");
+        println("return Message.EMPTY;");
       } else {
-        println("return getImpl().%s(%s);", apiMethod.getName(), b);
+        println("returnType = %s.class;", getClassname(apiMethod.getReturnType()));
+        println("returnValue = getImpl().%s(%s);", apiMethod.getName(), b);
+        println("break;");
       }
     }
     println();
@@ -390,7 +393,11 @@ public final class ScmInvokerCodeGenerator {
     println("@Override");
     printf(method.getSignature());
     try (UncheckedAutoCloseable ignored = printScope()) {
+      println("final Class<?> returnType;");
+      println("final Object returnValue;");
       printSwitch(method);
+      println();
+      println("return SCMRatisResponse.encode(returnValue, returnType);");
     }
   }
 
