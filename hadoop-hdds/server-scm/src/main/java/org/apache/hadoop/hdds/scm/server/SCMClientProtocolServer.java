@@ -677,7 +677,7 @@ public class SCMClientProtocolServer implements
     }
     try {
       List<HddsProtos.Node> result = new ArrayList<>();
-      for (DatanodeDetails node : queryNode(opState, state)) {
+      for (DatanodeDetails node : scm.getScmNodeManager().getNodes(opState, state)) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
         DatanodeInfo datanodeInfo = node instanceof DatanodeInfo ? (DatanodeInfo) node : null;
         HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
@@ -1579,26 +1579,6 @@ public class SCMClientProtocolServer implements
     }
   }
 
-  /**
-   * Queries a list of Node that match a set of statuses.
-   *
-   * <p>For example, if the nodeStatuses is HEALTHY and RAFT_MEMBER, then
-   * this call will return all
-   * healthy nodes which members in Raft pipeline.
-   *
-   * <p>Right now we don't support operations, so we assume it is an AND
-   * operation between the
-   * operators.
-   *
-   * @param opState - NodeOperational State
-   * @param state - NodeState.
-   * @return List of Datanodes.
-   */
-  public List<? extends DatanodeDetails> queryNode(
-      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state) {
-    return queryNodeState(opState, state);
-  }
-
   @VisibleForTesting
   public StorageContainerManager getScm() {
     return scm;
@@ -1609,18 +1589,6 @@ public class SCMClientProtocolServer implements
    */
   public boolean getSafeModeStatus() {
     return scm.getScmContext().isInSafeMode();
-  }
-
-  /**
-   * Query the System for Nodes.
-   *
-   * @params opState - The node operational state
-   * @param nodeState - NodeState that we are interested in matching.
-   * @return Set of Datanodes that match the NodeState.
-   */
-  private List<? extends DatanodeDetails> queryNodeState(
-      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodeState) {
-    return scm.getScmNodeManager().getNodes(opState, nodeState);
   }
 
   @Override
