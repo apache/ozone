@@ -462,6 +462,30 @@ public class MockNodeManager implements NodeManager {
     pendingContainerTracker.recordPendingAllocationForDatanode(info, containerID);
   }
 
+  @Override
+  public boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID) {
+    DatanodeDetails dd = nodeMetricMap.keySet().stream()
+        .filter(d -> d.getID().equals(datanodeID))
+        .findFirst().orElse(null);
+    DatanodeInfo info = getDatanodeInfo(dd);
+    if (info == null) {
+      return false;
+    }
+    return pendingContainerTracker.checkSpaceAndRecordAllocation(info, containerID);
+  }
+
+  @Override
+  public void removePendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
+    DatanodeDetails dd = nodeMetricMap.keySet().stream()
+        .filter(d -> d.getID().equals(datanodeID))
+        .findFirst().orElse(null);
+    DatanodeInfo info = getDatanodeInfo(dd);
+    if (info != null) {
+      pendingContainerTracker.removePendingAllocation(
+          info.getPendingContainerAllocations(), containerID);
+    }
+  }
+
   /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails - datanode details.

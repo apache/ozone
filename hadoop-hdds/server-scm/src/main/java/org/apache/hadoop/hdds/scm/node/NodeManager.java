@@ -198,6 +198,25 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID);
 
   /**
+   * Atomically checks if the datanode has space for a new container and records the allocation
+   * if space is available. This prevents race conditions where multiple threads check space
+   * concurrently and over-allocate.
+   *
+   * @param datanodeID the ID of the DataNode receiving the allocation
+   * @param containerID the container being allocated
+   * @return true if space was available and allocation was recorded, false otherwise
+   */
+  boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID);
+
+  /**
+   * Removes a pending container allocation from a datanode.
+   *
+   * @param datanodeID the ID of the DataNode
+   * @param containerID the container to remove from pending
+   */
+  void removePendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID);
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails DatanodeDetails.
    * @return node stat if it is live/stale, null if it is decommissioned or

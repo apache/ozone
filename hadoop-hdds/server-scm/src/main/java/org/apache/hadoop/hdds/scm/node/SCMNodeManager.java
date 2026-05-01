@@ -1103,6 +1103,27 @@ public class SCMNodeManager implements NodeManager {
     pendingContainerTracker.recordPendingAllocationForDatanode(datanodeInfo, containerID);
   }
 
+  @Override
+  public boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID) {
+    DatanodeInfo datanodeInfo = getNode(datanodeID);
+    if (datanodeInfo == null) {
+      LOG.warn("DatanodeInfo not found for node {}", datanodeID);
+      return false;
+    }
+    return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
+  }
+
+  @Override
+  public void removePendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
+    DatanodeInfo datanodeInfo = getNode(datanodeID);
+    if (datanodeInfo == null) {
+      LOG.warn("DatanodeInfo not found for node {}", datanodeID);
+      return;
+    }
+    pendingContainerTracker.removePendingAllocation(
+        datanodeInfo.getPendingContainerAllocations(), containerID);
+  }
+
   /**
    * Return the node stat of the specified datanode.
    *

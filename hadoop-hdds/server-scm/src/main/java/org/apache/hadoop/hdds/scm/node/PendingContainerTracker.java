@@ -191,6 +191,47 @@ public class PendingContainerTracker {
   }
 
   /**
+   * Atomically checks if the datanode has space for a new container and records the allocation
+   * if space is available. This prevents race conditions where multiple threads check space
+   * concurrently and over-allocate.
+   *
+   * @param datanodeInfo storage reports for the datanode
+   * @param containerID The container being allocated
+   * @return true if space was available and allocation was recorded, false otherwise
+   */
+  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    Objects.requireNonNull(datanodeInfo, "datanodeInfo == null");
+    Objects.requireNonNull(containerID, "containerID == null");
+
+    TwoWindowBucket bucket = datanodeInfo.getPendingContainerAllocations();
+    synchronized (bucket) {
+      long pendingAllocationSize = bucket.getCount() * maxContainerSize;
+      List<StorageReportProto> storageReports = datanodeInfo.getStorageReports();
+      Objects.requireNonNull(storageReports, "storageReports == null");
+      if (storageReports.isEmpty()) {
+        return false;
+      }
+      long effectiveAllocatableSpace = 0L;
+      for (StorageReportProto report : storageReports) {
+        long usableSpace = VolumeUsage.getUsableSpace(report);
+        long containersOnThisDisk = usableSpace / maxContainerSize;
+        effectiveAllocatableSpace += containersOnThisDisk * maxContainerSize;
+        if (effectiveAllocatableSpace - pendingAllocationSize >= maxContainerSize) {
+          boolean added = bucket.add(containerID);
+          if (added && metrics != null) {
+            metrics.incNumPendingContainersAdded();
+          }
+          return true;
+        }
+      }
+      if (metrics != null) {
+        metrics.incNumSkippedFullNodeContainerAllocation();
+      }
+      return false;
+    }
+  }
+
+  /**
    * Record a pending container allocation for a single DataNode.
    * Container is added to the current window.
    *

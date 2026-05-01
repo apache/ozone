@@ -351,6 +351,16 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(dn.getID(), containerID)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
   public int openContainerLimit(List<DatanodeDetails> datanodes) {
     // For tests that do not care about this limit, return a large value.
     return Integer.MAX_VALUE;

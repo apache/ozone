@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -648,6 +649,21 @@ public class PipelineManagerImpl implements PipelineManager {
     for (DatanodeDetails dn : pipeline.getNodes()) {
       nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
     }
+  }
+
+  @Override
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
+    List<DatanodeDetails> successfulNodes = new ArrayList<>();
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(dn.getID(), containerID)) {
+        for (DatanodeDetails rollbackNode : successfulNodes) {
+          nodeManager.removePendingAllocationForDatanode(rollbackNode.getID(), containerID);
+        }
+        return false;
+      }
+      successfulNodes.add(dn);
+    }
+    return true;
   }
 
   /**
