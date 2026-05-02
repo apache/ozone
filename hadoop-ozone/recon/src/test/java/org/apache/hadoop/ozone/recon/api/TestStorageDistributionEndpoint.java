@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
@@ -82,8 +84,6 @@ public class TestStorageDistributionEndpoint {
   private static final String TEXT_PLAIN = "text/plain";
   private static final String TEXT_CSV = "text/csv";
   private static final String CONTENT_DISPOSITION = "Content-Disposition";
-  private static final String DOWNLOAD_CONTENT_DISPOSITION =
-      "attachment; filename=\"datanode_storage_and_pending_deletion_stats.csv\"";
   private static final String METRICS_MISSING_ERROR =
       "Metrics data is missing despite FINISHED status.";
   private static final String ROOT_PATH = "/";
@@ -91,6 +91,7 @@ public class TestStorageDistributionEndpoint {
   private static final String PENDING_DIRECTORY_SIZE_KEY = "pendingDirectorySize";
   private static final String PENDING_KEY_SIZE_KEY = "pendingKeySize";
   private static final String TOTAL_REPLICATED_DATA_SIZE_KEY = "totalReplicatedDataSize";
+  private static final String CLUSTER_ID = "TestClusterID";
 
   private DataNodeMetricsService dataNodeMetricsService;
   private StorageDistributionEndpoint storageDistributionEndpoint;
@@ -108,11 +109,14 @@ public class TestStorageDistributionEndpoint {
     OzoneStorageContainerManager reconSCM = mock(OzoneStorageContainerManager.class);
     when(reconSCM.getScmNodeManager()).thenReturn(nodeManager);
     reconGlobalStatsManager = mock(ReconGlobalStatsManager.class);
+    ReconContext reconContext = mock(ReconContext.class);
+    when(reconContext.getClusterId()).thenReturn(CLUSTER_ID);
     storageDistributionEndpoint = new StorageDistributionEndpoint(reconSCM,
         nssummaryEndpoint,
         reconGlobalStatsManager,
         reconGlobalMetricsService,
-        dataNodeMetricsService);
+        dataNodeMetricsService,
+        reconContext);
   }
 
   @Test
@@ -189,7 +193,10 @@ public class TestStorageDistributionEndpoint {
     // then
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     assertEquals(TEXT_CSV, response.getMediaType().toString());
-    assertEquals(DOWNLOAD_CONTENT_DISPOSITION, response.getHeaderString(CONTENT_DISPOSITION));
+    String contentDisposition = response.getHeaderString(CONTENT_DISPOSITION);
+    assertNotNull(contentDisposition);
+    assertTrue(contentDisposition.startsWith("attachment; filename=\"Datanode_Insights_" + CLUSTER_ID + "_"));
+    assertTrue(contentDisposition.endsWith(".csv\""));
     String csv = readCsv(response);
     for (String row : csvRows) {
       assertTrue(csv.contains(row));
@@ -201,16 +208,16 @@ public class TestStorageDistributionEndpoint {
     List<String> headers = Arrays.asList(
         "HostName",
         "Datanode UUID",
-        "Filesystem Capacity",
-        "Filesystem Used Space",
-        "Filesystem Remaining Space",
-        "Ozone Capacity",
-        "Ozone Used Space",
-        "Ozone Remaining Space",
-        "PreAllocated Container Space",
-        "Reserved Space",
-        "Minimum Free Space",
-        "Pending Block Size");
+        "Filesystem Capacity (GB)",
+        "Filesystem Used Space (GB)",
+        "Filesystem Remaining Space (GB)",
+        "Ozone Capacity (GB)",
+        "Ozone Used Space (GB)",
+        "Ozone Remaining Space (GB)",
+        "PreAllocated Container Space (GB)",
+        "Reserved Space (GB)",
+        "Minimum Free Space (GB)",
+        "Pending Block Size (GB)");
     csvRows.add(String.join(",", headers));
 
     List<DatanodePendingDeletionMetrics> pendingDeletionMetrics = new ArrayList<>();
@@ -235,17 +242,16 @@ public class TestStorageDistributionEndpoint {
       csvRows.add(String.join(CSV_SEPARATOR,
           Arrays.asList(hostName,
               uuid.toString(),
-              String.valueOf(FS_CAPACITY),
-              String.valueOf(FS_USED),
-              String.valueOf(FS_AVAILABLE),
-              String.valueOf(OZONE_CAPACITY),
-              String.valueOf(OZONE_USED),
-              String.valueOf(OZONE_REMAINING),
-              String.valueOf(COMMITTED),
-              String.valueOf(RESERVED),
-              String.valueOf(MIN_FREE_SPACE),
-              String.valueOf(PENDING_DELETION_SIZE))));
-
+              String.format("%.2f", (double) FS_CAPACITY / OzoneConsts.GB),
+              String.format("%.2f", (double) FS_USED / OzoneConsts.GB),
+              String.format("%.2f", (double) FS_AVAILABLE / OzoneConsts.GB),
+              String.format("%.2f", (double) OZONE_CAPACITY / OzoneConsts.GB),
+              String.format("%.2f", (double) OZONE_USED / OzoneConsts.GB),
+              String.format("%.2f", (double) OZONE_REMAINING / OzoneConsts.GB),
+              String.format("%.2f", (double) COMMITTED / OzoneConsts.GB),
+              String.format("%.2f", (double) RESERVED / OzoneConsts.GB),
+              String.format("%.2f", (double) MIN_FREE_SPACE / OzoneConsts.GB),
+              String.format("%.2f", (double) PENDING_DELETION_SIZE / OzoneConsts.GB))));
     }
     when(nodeManager.getAllNodes()).thenReturn(dataNodes);
 

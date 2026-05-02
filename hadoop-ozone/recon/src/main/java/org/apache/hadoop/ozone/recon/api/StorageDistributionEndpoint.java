@@ -21,6 +21,8 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -34,11 +36,14 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
@@ -79,18 +84,21 @@ public class StorageDistributionEndpoint {
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final ReconGlobalMetricsService reconGlobalMetricsService;
   private final DataNodeMetricsService dataNodeMetricsService;
+  private final ReconContext reconContext;
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
                                      NSSummaryEndpoint nsSummaryEndpoint,
                                      ReconGlobalStatsManager reconGlobalStatsManager,
                                      ReconGlobalMetricsService reconGlobalMetricsService,
-                                     DataNodeMetricsService dataNodeMetricsService) {
+                                     DataNodeMetricsService dataNodeMetricsService,
+                                     ReconContext reconContext) {
     this.nodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
     this.nsSummaryEndpoint = nsSummaryEndpoint;
     this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconGlobalMetricsService = reconGlobalMetricsService;
     this.dataNodeMetricsService = dataNodeMetricsService;
+    this.reconContext = reconContext;
   }
 
   @GET
@@ -190,35 +198,49 @@ public class StorageDistributionEndpoint {
     List<String> headers = Arrays.asList(
         "HostName",
         "Datanode UUID",
-        "Filesystem Capacity",
-        "Filesystem Used Space",
-        "Filesystem Remaining Space",
-        "Ozone Capacity",
-        "Ozone Used Space",
-        "Ozone Remaining Space",
-        "PreAllocated Container Space",
-        "Reserved Space",
-        "Minimum Free Space",
-        "Pending Block Size"
+        "Filesystem Capacity (GB)",
+        "Filesystem Used Space (GB)",
+        "Filesystem Remaining Space (GB)",
+        "Ozone Capacity (GB)",
+        "Ozone Used Space (GB)",
+        "Ozone Remaining Space (GB)",
+        "PreAllocated Container Space (GB)",
+        "Reserved Space (GB)",
+        "Minimum Free Space (GB)",
+        "Pending Block Size (GB)"
     );
 
     List<Function<DataNodeStoragePendingDeletionView, Object>> columns =
         Arrays.asList(
             v -> v.getMetric() != null ? v.getMetric().getHostName() : "Unknown",
             v -> v.getMetric() != null ? v.getMetric().getDatanodeUuid() : "Unknown",
-            v -> v.getReport() != null ? v.getReport().getFilesystemCapacity() : -1,
-            v -> v.getReport() != null ? v.getReport().getFilesystemUsed() : -1,
-            v -> v.getReport() != null ? v.getReport().getFilesystemAvailable() : -1,
-            v -> v.getReport() != null ? v.getReport().getCapacity() : -1,
-            v -> v.getReport() != null ? v.getReport().getUsed() : -1,
-            v -> v.getReport() != null ? v.getReport().getRemaining() : -1,
-            v -> v.getReport() != null ? v.getReport().getCommitted() : -1,
-            v -> v.getReport() != null ? v.getReport().getReserved() : -1,
-            v -> v.getReport() != null ? v.getReport().getMinimumFreeSpace() : -1,
-            v -> v.getReport() != null ? v.getMetric().getPendingBlockSize() : -1
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getFilesystemCapacity()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getFilesystemUsed()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getFilesystemAvailable()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getCapacity()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getUsed()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getRemaining()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getCommitted()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getReserved()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getMinimumFreeSpace()) : -1,
+            v -> v.getReport() != null ? formatBytesToGB(v.getMetric().getPendingBlockSize()) : -1
         );
 
-    return ReconUtils.downloadCsv("datanode_storage_and_pending_deletion_stats.csv", headers, data, columns);
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
+    String timestamp = LocalDateTime.now().format(formatter);
+
+    // Retrieve clusterId from ReconContext
+    String clusterName = "UnknownCluster";
+    try {
+      if (reconContext != null && StringUtils.isNotBlank(reconContext.getClusterId())) {
+        clusterName = reconContext.getClusterId();
+      }
+    } catch (Exception e) {
+      LOG.warn("Could not retrieve cluster ID for export filename", e);
+    }
+    String fileName = String.format("Datanode_Insights_%s_%s.csv", clusterName, timestamp);
+
+    return ReconUtils.downloadCsv(fileName, headers, data, columns);
   }
 
   /**
@@ -397,5 +419,12 @@ public class StorageDistributionEndpoint {
     DatanodeStorageReport getReport() {
       return report;
     }
+  }
+
+  /**
+   * Converts a raw byte count into a GB string formatted to 2 decimal places.
+   */
+  private String formatBytesToGB(long bytes) {
+    return String.format("%.2f", (double) bytes / OzoneConsts.GB);
   }
 }
