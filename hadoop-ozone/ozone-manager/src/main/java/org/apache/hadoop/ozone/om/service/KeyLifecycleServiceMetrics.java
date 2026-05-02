@@ -62,6 +62,11 @@ public final class KeyLifecycleServiceMetrics {
   private MutableGaugeLong sizeKeyDeleted;
   @Metric("Total size of keys renamed")
   private MutableGaugeLong sizeKeyRenamed;
+  @Metric("Number of multipart uploads iterated")
+  private MutableGaugeLong numMultipartUploadsIterated;
+
+  @Metric("Total multipart uploads aborted")
+  private MutableGaugeLong numMultipartUploadsAborted;
 
   private KeyLifecycleServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -167,5 +172,25 @@ public final class KeyLifecycleServiceMetrics {
 
   public void incNumDirIterated(long dirCount) {
     numDirIterated.incr(dirCount);
+  }
+
+  public void incNumMultipartUploadIterated(long count) {
+    numMultipartUploadsIterated.incr(count);
+  }
+
+  public void incNumMultipartUploadAborted(long count) {
+    numMultipartUploadsAborted.incr(count);
+  }
+
+  public MutableGaugeLong getNumMultipartUploadsIterated() {
+    return numMultipartUploadsIterated;
+  }
+
+  public MutableGaugeLong getNumMultipartUploadsAborted() {
+    return numMultipartUploadsAborted;
+  }
+
+  public MutableGaugeLong getNumSuccessTask() {
+    return numSuccessTask;
   }
 }

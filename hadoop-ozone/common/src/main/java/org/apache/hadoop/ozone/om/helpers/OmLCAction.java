@@ -53,6 +53,7 @@ public interface OmLCAction {
    */
   enum ActionType {
     EXPIRATION,
+    ABORT_INCOMPLETE_MULTIPART_UPLOAD,
     // Future action types can be added here (e.g., TRANSITION)
   }
 }

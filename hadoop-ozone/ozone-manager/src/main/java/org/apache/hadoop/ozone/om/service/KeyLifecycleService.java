@@ -28,6 +28,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVIC
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -37,6 +39,7 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -77,11 +80,15 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
@@ -108,6 +115,7 @@ public class KeyLifecycleService extends BackgroundService {
   private final OzoneManager ozoneManager;
   private int keyDeleteBatchSize;
   private int listMaxSize;
+  private int mpuAbortLimitPerTask;
   private long cachedDirMaxCount;
   private final AtomicBoolean suspended;
   private final AtomicBoolean isServiceEnabled;
@@ -134,6 +142,10 @@ public class KeyLifecycleService extends BackgroundService {
     Preconditions.checkArgument(keyDeleteBatchSize > 0,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " should be a positive value.");
     this.listMaxSize = keyDeleteBatchSize >= 10000 ? keyDeleteBatchSize : 10000;
+    this.mpuAbortLimitPerTask = conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK,
+        OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT);
+    Preconditions.checkArgument(mpuAbortLimitPerTask > 0,
+        OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK + " should be a positive value.");
     this.cachedDirMaxCount = conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT);
     this.suspended = new AtomicBoolean(false);
@@ -264,6 +276,8 @@ public class KeyLifecycleService extends BackgroundService {
     private long numKeyRenamed = 0;
     private long sizeKeyRenamed = 0;
     private long numDirRenamed = 0;
+    private long numMultipartUploadIterated = 0;
+    private long numMultipartUploadAborted = 0;
 
     public LifecycleActionTask(OmLifecycleConfiguration lcConfig) {
       this.policy = lcConfig;
@@ -309,63 +323,74 @@ public class KeyLifecycleService extends BackgroundService {
         // remove disabled rules
         List<OmLCRule> ruleList = originRuleList.stream().filter(r -> r.isEnabled()).collect(Collectors.toList());
 
-        // scan file or key table for evaluate rules against files or keys
-        LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(listMaxSize);
-        LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(listMaxSize);
-        Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(bucket.getBucketLayout());
-        /**
-         * Filter treatment.
-         * ""  - all objects
-         * "/" - if it's OBS/Legacy, means keys starting with "/"; If it's FSO, not supported
-         * "/key" - if it's OBS/Legacy, means keys starting with "/key", "/" is literally "/";
-         *          If it's FSO, means keys or dirs starting with "key", "/" will be treated as separator mark.
-         * "key" - if it's OBS/Legacy, means keys starting with "key";
-         *         if it's FSO, means keys for dirs starting with "key" too.
-         * "dir/" - if it's OBS/Legacy, means keys starting with "dir/";
-         *        - if it's FSO, means keys/dirs under directory "dir", doesn't include directory "dir" itself.
-         *        - For FSO bucket, as directory ModificationTime will not be updated when any of its child key/subdir
-         *          changes, so remember to add the tailing slash "/" when configure prefix, otherwise the whole
-         *          directory will be expired and deleted once its ModificationTime meats the condition.
-         */
-        if (bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-          OmVolumeArgs volume;
-          try {
-            volume = omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(bucket.getVolumeName()));
-            if (volume == null) {
-              LOG.warn("Volume {} cannot be found, might be deleted during this task's execution",
-                  bucket.getVolumeName());
+        List<OmLCRule> expirationRules = ruleList.stream()
+            .filter(r -> r.getExpiration() != null)
+            .collect(Collectors.toList());
+        List<OmLCRule> mpuRules = ruleList.stream()
+            .filter(r -> r.getAbortIncompleteMultipartUpload() != null)
+            .collect(Collectors.toList());
+
+        if (!expirationRules.isEmpty()) {
+          LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(listMaxSize);
+          LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(listMaxSize);
+          Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(bucket.getBucketLayout());
+          /**
+           * Filter treatment.
+           * ""  - all objects
+           * "/" - if it's OBS/Legacy, means keys starting with "/"; If it's FSO, not supported
+           * "/key" - if it's OBS/Legacy, means keys starting with "/key", "/" is literally "/";
+           *          If it's FSO, means keys or dirs starting with "key", "/" will be treated as separator mark.
+           * "key" - if it's OBS/Legacy, means keys starting with "key";
+           *         if it's FSO, means keys for dirs starting with "key" too.
+           * "dir/" - if it's OBS/Legacy, means keys starting with "dir/";
+           *        - if it's FSO, means keys/dirs under directory "dir", doesn't include directory "dir" itself.
+           *        - For FSO bucket, as directory ModificationTime will not be updated when any of its child key/subdir
+           *          changes, so remember to add the tailing slash "/" when configure prefix, otherwise the whole
+           *          directory will be expired and deleted once its ModificationTime meats the condition.
+           */
+          if (bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+            OmVolumeArgs volume;
+            try {
+              volume = omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(bucket.getVolumeName()));
+              if (volume == null) {
+                LOG.warn("Volume {} cannot be found, might be deleted during this task's execution",
+                    bucket.getVolumeName());
+                onFailure(bucketKey);
+                return result;
+              }
+            } catch (IOException e) {
+              LOG.warn("Failed to get volume {}", bucket.getVolumeName(), e);
               onFailure(bucketKey);
               return result;
             }
-          } catch (IOException e) {
-            LOG.warn("Failed to get volume {}", bucket.getVolumeName(), e);
-            onFailure(bucketKey);
-            return result;
+            evaluateFSOBucket(volume, bucket, bucketKey, keyTable, expirationRules, expiredKeyList, expiredDirList);
+          } else {
+            // use bucket name as key iterator prefix
+            evaluateBucket(bucket, keyTable, expirationRules, expiredKeyList);
           }
-          evaluateFSOBucket(volume, bucket, bucketKey, keyTable, ruleList, expiredKeyList, expiredDirList);
-        } else {
-          // use bucket name as key iterator prefix
-          evaluateBucket(bucket, keyTable, ruleList, expiredKeyList);
+
+          if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
+            LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
+          } else {
+            LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
+                expiredKeyList.size(), expiredDirList.size(), bucketKey);
+
+            // If trash is enabled, move files to trash, instead of send delete requests.
+            // OBS bucket doesn't support trash.
+            if (bucket.getBucketLayout() == OBJECT_STORE) {
+              sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
+            } else {
+              // handle keys first, then directories
+              handleAndClearFullList(bucket, expiredKeyList, false);
+              handleAndClearFullList(bucket, expiredDirList, true);
+            }
+          }
         }
 
-        if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
-          LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
-          onSuccess(bucketKey);
-          return result;
+        if (!mpuRules.isEmpty()) {
+          processMultipartUploads(bucket, mpuRules);
         }
 
-        LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
-            expiredKeyList.size(), expiredDirList.size(), bucketKey);
-
-        // If trash is enabled, move files to trash, instead of send delete requests.
-        // OBS bucket doesn't support trash.
-        if (bucket.getBucketLayout() == OBJECT_STORE) {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
-        } else {
-          // handle keys first, then directories
-          handleAndClearFullList(bucket, expiredKeyList, false);
-          handleAndClearFullList(bucket, expiredDirList, true);
-        }
         onSuccess(bucketKey);
       }
 
@@ -744,6 +769,198 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     /**
+     * Process AbortIncompleteMultipartUpload actions for incomplete multipart uploads.
+     * Iterates through the multipartInfoTable and aborts uploads that match the rule criteria
+     * and have exceeded the configured days after initiation.
+     *
+     * @param bucketInfo the bucket information
+     * @param ruleList list of lifecycle rules with AbortIncompleteMultipartUpload action
+     */
+    private void processMultipartUploads(OmBucketInfo bucketInfo, List<OmLCRule> ruleList) {
+      String volumeName = bucketInfo.getVolumeName();
+      String bucketName = bucketInfo.getBucketName();
+      String bucketPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
+
+      LOG.debug("Processing AbortIncompleteMultipartUpload actions for bucket {}/{}", volumeName, bucketName);
+
+      PartCountLimitedList expiredUploads = new PartCountLimitedList(mpuAbortLimitPerTask);
+      try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
+               omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
+        while (mpuIterator.hasNext()) {
+          if (!shouldRun()) {
+            LOG.info("KeyLifecycleService is suspended or disabled. " +
+                "Stopping multipart upload processing for bucket {}.", bucketName);
+            return;
+          }
+
+          Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
+          OmMultipartKeyInfo mpuKeyInfo = entry.getValue();
+          numMultipartUploadIterated++;
+
+          OmMultipartUpload upload;
+          try {
+            upload = OmMultipartUpload.from(entry.getKey());
+          } catch (IllegalArgumentException e) {
+            LOG.warn("Failed to parse multipart upload key {} in bucket {}/{}, skipping",
+                entry.getKey(), volumeName, bucketName, e);
+            continue;
+          }
+
+          upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
+          String keyName = upload.getKeyName();
+
+          String multipartOpenKey;
+          try {
+            multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
+                volumeName, bucketName, keyName, upload.getUploadId(),
+                omMetadataManager, bucketInfo.getBucketLayout());
+          } catch (OMException e) {
+            LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
+                volumeName, bucketName, keyName, e);
+            continue;
+          }
+
+          OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(bucketInfo.getBucketLayout())
+              .get(multipartOpenKey);
+          if (openKeyInfo == null) {
+            LOG.warn("Open key not found for multipart upload {}/{}/{}, skipping",
+                volumeName, bucketName, keyName);
+            continue;
+          }
+
+          for (OmLCRule rule : ruleList) {
+            if (shouldAbortUpload(openKeyInfo, upload, keyName, rule)) {
+              if (expiredUploads.isFull()) {
+                LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
+                    "({} uploads, {} parts) for bucket {}/{}",
+                    mpuAbortLimitPerTask, expiredUploads.size(), expiredUploads.getPartCount(),
+                    volumeName, bucketName);
+                abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+              }
+
+              // Get part count for this MPU (at least 1 even if no parts uploaded yet)
+              int partCount = Math.max(1, mpuKeyInfo.getPartKeyInfoMap().size());
+              expiredUploads.add(upload, partCount);
+              LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
+                  volumeName, bucketName, keyName, upload.getUploadId(), partCount);
+              break;
+            }
+          }
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to iterate multipartInfoTable for bucket {}/{}", volumeName, bucketName, e);
+        return;
+      }
+
+      if (!expiredUploads.isEmpty()) {
+        LOG.info("{} expired multipart uploads ({} parts) remaining for bucket {}/{}",
+            expiredUploads.size(), expiredUploads.getPartCount(), volumeName, bucketName);
+        abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+      }
+    }
+
+    /**
+     * Check if a multipart upload should be aborted based on the lifecycle rule.
+     *
+     * @param openKeyInfo the open key information with tags
+     * @param upload the multipart upload information
+     * @param keyName the key name of the upload
+     * @param rule the lifecycle rule to evaluate against
+     * @return true if the upload should be aborted, false otherwise
+     */
+    private boolean shouldAbortUpload(OmKeyInfo openKeyInfo, OmMultipartUpload upload,
+                                      String keyName, OmLCRule rule) {
+
+      if (!rule.getAbortIncompleteMultipartUpload().shouldAbort(
+          upload.getCreationTime().toEpochMilli())) {
+        return false;
+      }
+
+      String effectivePrefix = rule.getEffectivePrefix();
+      if (effectivePrefix != null && !keyName.startsWith(effectivePrefix)) {
+        return false;
+      }
+
+      OmLCFilter filter = rule.getFilter();
+      if (filter != null && !filter.match(openKeyInfo, keyName)) {
+        return false;
+      }
+
+      return true;
+    }
+
+    /**
+     * Abort expired multipart uploads by sending an abort request.
+     *
+     * @param bucketInfo the bucket information
+     * @param expiredUploads list of expired multipart uploads to abort
+     */
+    private void abortExpiredMultipartUploads(OmBucketInfo bucketInfo, List<OmMultipartUpload> expiredUploads) {
+      String volumeName = bucketInfo.getVolumeName();
+      String bucketName = bucketInfo.getBucketName();
+
+      List<OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo> expiredMPUInfoList = expiredUploads.stream()
+          .map(upload -> OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo.newBuilder()
+              .setName(upload.getDbKey())
+              .build())
+          .collect(Collectors.toList());
+
+      OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket expiredMPUBucket =
+          OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket.newBuilder()
+              .setVolumeName(volumeName)
+              .setBucketName(bucketName)
+              .addAllMultipartUploads(expiredMPUInfoList)
+              .build();
+
+      OzoneManagerProtocolProtos.MultipartUploadsExpiredAbortRequest abortRequest =
+          OzoneManagerProtocolProtos.MultipartUploadsExpiredAbortRequest.newBuilder()
+              .addExpiredMultipartUploadsPerBucket(expiredMPUBucket)
+              .build();
+
+      OMRequest omRequest = OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.AbortExpiredMultiPartUploads)
+          .setMultipartUploadsExpiredAbortRequest(abortRequest)
+          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setClientId(clientId.toString())
+          .build();
+
+      try {
+        long startTime = System.nanoTime();
+        OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
+            getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+        long endTime = System.nanoTime();
+
+        if (response != null) {
+          if (response.getSuccess()) {
+            numMultipartUploadAborted += expiredUploads.size();
+
+            LOG.info("Successfully aborted {} multipart uploads for bucket {}/{} in {} ns",
+                expiredUploads.size(), volumeName, bucketName, endTime - startTime);
+          } else {
+            LOG.error("Failed to abort multipart uploads for bucket {}/{}: {}",
+                volumeName, bucketName, response.getMessage());
+          }
+        } else {
+          LOG.error("Received null response when aborting multipart uploads for bucket {}/{}",
+              volumeName, bucketName);
+        }
+      } catch (ServiceException e) {
+        LOG.error("Failed to submit abort multipart uploads request for bucket {}/{}",
+            volumeName, bucketName, e);
+      }
+    }
+
+    private void abortExpiredMultipartUploadsAndClear(OmBucketInfo bucketInfo,
+                                                      PartCountLimitedList expiredUploads) {
+      if (expiredUploads.isEmpty()) {
+        return;
+      }
+
+      abortExpiredMultipartUploads(bucketInfo, expiredUploads.getUploads());
+      expiredUploads.clear();
+    }
+
+    /**
      * If prefix is /dir1/dir2, but dir1 doesn't exist, then it will return exception.
      * If prefix is /dir1/dir2, but dir2 doesn't exist, then it will return a list with dir1 only.
      * If prefix is /dir1/dir2, although dir1 exists, but get(dir1) failed with IOException,
@@ -786,6 +1003,7 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incrNumFailureTask();
       metrics.incNumKeyIterated(numKeyIterated);
       metrics.incNumDirIterated(numDirIterated);
+      metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
     }
 
     private void onSuccess(String bucketName) {
@@ -795,9 +1013,13 @@ public class KeyLifecycleService extends BackgroundService {
       metrics.incTaskLatencyMs(timeSpent);
       metrics.incNumKeyIterated(numKeyIterated);
       metrics.incNumDirIterated(numDirIterated);
-      LOG.info("Spend {} ms on bucket {} to iterate {} keys and {} dirs, deleted {} keys with {} bytes, " +
-          "and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash", timeSpent, bucketName, numKeyIterated,
-          numDirIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted, numKeyRenamed, sizeKeyRenamed, numDirRenamed);
+      metrics.incNumMultipartUploadIterated(numMultipartUploadIterated);
+      metrics.incNumMultipartUploadAborted(numMultipartUploadAborted);
+      LOG.info("Spend {} ms on bucket {} to iterate {} keys and {} dirs and {} multipart uploads, " +
+              "deleted {} keys with {} bytes, and {} dirs, renamed {} keys with {} bytes, and {} dirs to trash, " +
+              "aborted {} multipart uploads", timeSpent, bucketName, numKeyIterated,
+          numDirIterated, numMultipartUploadIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted,
+          numKeyRenamed, sizeKeyRenamed, numDirRenamed, numMultipartUploadAborted);
     }
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList, boolean dir) {
@@ -1067,6 +1289,11 @@ public class KeyLifecycleService extends BackgroundService {
   }
 
   @VisibleForTesting
+  public void setMpuAbortLimitPerTask(int limit) {
+    this.mpuAbortLimitPerTask = limit;
+  }
+
+  @VisibleForTesting
   public void setOzoneTrash(OzoneTrash ozoneTrash) {
     this.ozoneTrash = ozoneTrash;
   }
@@ -1194,6 +1421,61 @@ public class KeyLifecycleService extends BackgroundService {
 
     public void clear() {
       internalList.clear();
+    }
+  }
+
+  /**
+   * A list that tracks the total part count of multipart uploads.
+   * The list is considered "full" when the total part count reaches the limit.
+   * This is used because some MPUs might have 1 part while others might have 10,000 parts.
+   */
+  public static class PartCountLimitedList {
+    private final List<OmMultipartUpload> uploads;
+    private final int maxPartCount;
+    private int currentPartCount;
+
+    public PartCountLimitedList(int maxPartCount) {
+      this.maxPartCount = maxPartCount;
+      this.uploads = new ArrayList<>();
+      this.currentPartCount = 0;
+    }
+
+    /**
+     * Add a multipart upload with its part count.
+     * Caller should check isFull() before calling this method.
+     */
+    public void add(OmMultipartUpload upload, int partCount) {
+      uploads.add(upload);
+      currentPartCount += partCount;
+    }
+
+    public List<OmMultipartUpload> getUploads() {
+      return uploads;
+    }
+
+    public int size() {
+      return uploads.size();
+    }
+
+    public int getPartCount() {
+      return currentPartCount;
+    }
+
+    public boolean isEmpty() {
+      return uploads.isEmpty();
+    }
+
+    public boolean isFull() {
+      boolean full = currentPartCount >= maxPartCount;
+      if (full) {
+        LOG.debug("PartCountLimitedList has reached maximum part count {}", maxPartCount);
+      }
+      return full;
+    }
+
+    public void clear() {
+      uploads.clear();
+      currentPartCount = 0;
     }
   }
 

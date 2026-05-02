@@ -63,6 +63,21 @@ public class OzoneLifecycleConfiguration {
   }
 
   /**
+   * A class that encapsulates OzoneLCAbortIncompleteMultipartUpload.
+   */
+  public static class OzoneLCAbortIncompleteMultipartUpload {
+    private final Integer daysAfterInitiation;
+
+    public OzoneLCAbortIncompleteMultipartUpload(Integer daysAfterInitiation) {
+      this.daysAfterInitiation = daysAfterInitiation;
+    }
+
+    public Integer getDaysAfterInitiation() {
+      return daysAfterInitiation;
+    }
+  }
+
+  /**
    * A class that encapsulates {@link org.apache.hadoop.ozone.om.helpers.OmLifecycleRuleAndOperator}.
    */
   public static final class LifecycleAndOperator {
@@ -120,14 +135,17 @@ public class OzoneLifecycleConfiguration {
     private final String prefix;
     private final String status;
     private final OzoneLCExpiration expiration;
+    private final OzoneLCAbortIncompleteMultipartUpload abortIncompleteMultipartUpload;
     private final OzoneLCFilter filter;
 
     public OzoneLCRule(String id, String prefix, String status,
-        OzoneLCExpiration expiration, OzoneLCFilter filter) {
+        OzoneLCExpiration expiration, OzoneLCAbortIncompleteMultipartUpload abortIncompleteMultipartUpload,
+        OzoneLCFilter filter) {
       this.id = id;
       this.prefix = prefix;
       this.status = status;
       this.expiration = expiration;
+      this.abortIncompleteMultipartUpload = abortIncompleteMultipartUpload;
       this.filter = filter;
     }
 
@@ -145,6 +163,10 @@ public class OzoneLifecycleConfiguration {
 
     public OzoneLCExpiration getExpiration() {
       return expiration;
+    }
+
+    public OzoneLCAbortIncompleteMultipartUpload getAbortIncompleteMultipartUpload() {
+      return abortIncompleteMultipartUpload;
     }
 
     public OzoneLCFilter getFilter() {
@@ -181,6 +203,12 @@ public class OzoneLifecycleConfiguration {
             r.getExpiration().getDays(), r.getExpiration().getDate());
       }
 
+      OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload a = null;
+      if (r.getAbortIncompleteMultipartUpload() != null) {
+        a = new OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload(
+            r.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+      }
+
       OzoneLifecycleConfiguration.OzoneLCFilter f = null;
       if (r.getFilter() != null) {
         LifecycleAndOperator andOperator = null;
@@ -193,7 +221,7 @@ public class OzoneLifecycleConfiguration {
       }
 
       rules.add(new OzoneLifecycleConfiguration.OzoneLCRule(r.getId(),
-          r.getPrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, f));
+          r.getPrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, a, f));
     }
 
     return new OzoneLifecycleConfiguration(lifecycleConfiguration.getVolume(),

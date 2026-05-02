@@ -188,6 +188,10 @@ public final class OMConfigKeys {
   public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE =
       "ozone.lifecycle.service.delete.batch-size";
   public static final int OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT = 1000;
+  // Batch limit for aborting incomplete multipart uploads, based on total part count
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK =
+      "ozone.lifecycle.service.mpu.abort.limit.per.task";
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT = 1000;
   public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT =
       "ozone.lifecycle.service.delete.cached.directory.max-count";
   public static final long OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT = 1000000;

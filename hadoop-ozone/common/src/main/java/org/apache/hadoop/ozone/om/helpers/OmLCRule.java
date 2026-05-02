@@ -124,6 +124,21 @@ public final class OmLCRule {
     return null;
   }
 
+  /**
+   * Get the AbortIncompleteMultipartUpload action if present.
+   *
+   * @return the AbortIncompleteMultipartUpload action if present, null otherwise
+   */
+  @Nullable
+  public OmLCAbortIncompleteMultipartUpload getAbortIncompleteMultipartUpload() {
+    for (OmLCAction action : actions) {
+      if (action instanceof OmLCAbortIncompleteMultipartUpload) {
+        return (OmLCAbortIncompleteMultipartUpload) action;
+      }
+    }
+    return null;
+  }
+
   @Nullable
   public OmLCFilter getFilter() {
     return filter;
@@ -299,6 +314,10 @@ public final class OmLCRule {
     for (LifecycleAction lifecycleAction : lifecycleRule.getActionList()) {
       if (lifecycleAction.hasExpiration()) {
         builder.addAction(OmLCExpiration.getFromProtobuf(lifecycleAction.getExpiration()));
+      }
+      if (lifecycleAction.hasAbortIncompleteMultipartUpload()) {
+        builder.addAction(OmLCAbortIncompleteMultipartUpload.getFromProtobuf(
+            lifecycleAction.getAbortIncompleteMultipartUpload()));
       }
     }
     if (lifecycleRule.hasFilter()) {

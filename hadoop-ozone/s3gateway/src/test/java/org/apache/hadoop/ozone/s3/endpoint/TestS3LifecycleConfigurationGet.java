@@ -83,6 +83,47 @@ public class TestS3LifecycleConfigurationGet {
         lcc.getRules().get(0).getExpiration().getDays().intValue());
   }
 
+  @Test
+  public void testGetLifecycleWithAbortIncompleteMultipartUpload() throws Exception {
+    String bucketName = "bucket1";
+    bucketEndpoint.put(bucketName, getBodyWithAbortAction());
+    Response r = bucketEndpoint.get(bucketName);
+
+    assertEquals(HTTP_OK, r.getStatus());
+    S3LifecycleConfiguration lcc = (S3LifecycleConfiguration) r.getEntity();
+    assertEquals(1, lcc.getRules().size());
+    S3LifecycleConfiguration.Rule rule = lcc.getRules().get(0);
+
+    assertEquals("abort-incomplete-uploads", rule.getId());
+    assertEquals("uploads/", rule.getPrefix());
+    assertEquals("Enabled", rule.getStatus());
+    assertEquals(7, rule.getAbortIncompleteMultipartUpload()
+        .getDaysAfterInitiation().intValue());
+  }
+
+  @Test
+  public void testGetLifecycleWithBothActions() throws Exception {
+    String bucketName = "bucket1";
+    bucketEndpoint.put(bucketName, getBodyWithBothActions());
+    Response r = bucketEndpoint.get(bucketName);
+
+    assertEquals(HTTP_OK, r.getStatus());
+    S3LifecycleConfiguration lcc = (S3LifecycleConfiguration) r.getEntity();
+    assertEquals(1, lcc.getRules().size());
+    S3LifecycleConfiguration.Rule rule = lcc.getRules().get(0);
+
+    assertEquals("cleanup-rule", rule.getId());
+    assertEquals("temp/", rule.getPrefix());
+    assertEquals("Enabled", rule.getStatus());
+
+    // Verify Expiration action
+    assertEquals(30, rule.getExpiration().getDays().intValue());
+
+    // Verify AbortIncompleteMultipartUpload action
+    assertEquals(7, rule.getAbortIncompleteMultipartUpload()
+        .getDaysAfterInitiation().intValue());
+  }
+
   private static InputStream getBody() {
     String xml = ("<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
         ".com/doc/2006-03-01/\">" +
@@ -93,6 +134,39 @@ public class TestS3LifecycleConfigurationGet {
         "<Status>Enabled</Status>" +
         "</Rule>" +
         "</LifecycleConfiguration>");
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream getBodyWithAbortAction() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>abort-incomplete-uploads</ID>" +
+        "<Prefix>uploads/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<AbortIncompleteMultipartUpload>" +
+        "<DaysAfterInitiation>7</DaysAfterInitiation>" +
+        "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream getBodyWithBothActions() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>cleanup-rule</ID>" +
+        "<Prefix>temp/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration>" +
+        "<Days>30</Days>" +
+        "</Expiration>" +
+        "<AbortIncompleteMultipartUpload>" +
+        "<DaysAfterInitiation>7</DaysAfterInitiation>" +
+        "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
 
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
