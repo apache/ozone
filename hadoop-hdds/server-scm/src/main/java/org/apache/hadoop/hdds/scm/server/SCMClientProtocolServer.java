@@ -108,6 +108,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -675,75 +676,43 @@ public class SCMClientProtocolServer implements
           SCMAction.QUERY_NODE, auditMap, ex));
       throw ex;
     }
-    try {
-      List<HddsProtos.Node> result = new ArrayList<>();
-      for (DatanodeDetails node : scm.getScmNodeManager().getNodes(opState, state)) {
-        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = node instanceof DatanodeInfo ? (DatanodeInfo) node : null;
-        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
-            .setNodeID(node.toProto(clientVersion))
-            .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState());
-        
-        if (datanodeInfo != null) {
-          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
-          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
-          addFailedVolumes(nodeBuilder, datanodeInfo);
-        }
-        result.add(nodeBuilder.build());
-      }
-      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-          SCMAction.QUERY_NODE, auditMap));
-      return result;
-    } catch (NodeNotFoundException e) {
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.QUERY_NODE, auditMap, e));
-      throw new IOException("An unexpected error occurred querying the NodeStatus", e);
+    final List<HddsProtos.Node> result = new ArrayList<>();
+    for (DatanodeInfo datanodeInfo : scm.getScmNodeManager().getNodes(opState, state)) {
+      result.add(buildNodeProto(datanodeInfo, clientVersion));
     }
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_NODE, auditMap));
+    return result;
   }
 
   @Override
-  public HddsProtos.Node queryNode(UUID uuid)
-      throws IOException {
-    final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("uuid", String.valueOf(uuid));
+  public HddsProtos.Node queryNode(UUID uuid) {
+    final Map<String, String> auditMap = Collections.singletonMap("uuid", String.valueOf(uuid));
     HddsProtos.Node result = null;
-    try {
-      DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
-      if (node != null) {
-        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = node instanceof DatanodeInfo ? (DatanodeInfo) node : null;
-        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
-            .setNodeID(node.getProtoBufMessage())
-            .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState());
-
-        if (datanodeInfo != null) {
-          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
-          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
-          addFailedVolumes(nodeBuilder, datanodeInfo);
-        }
-        result = nodeBuilder.build();
-      }
-    } catch (NodeNotFoundException e) {
-      IOException ex = new IOException(
-          "An unexpected error occurred querying the NodeStatus", e);
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.QUERY_NODE, auditMap, ex));
-      throw ex;
+    final DatanodeInfo datanodeInfo = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
+    if (datanodeInfo != null) {
+      result = buildNodeProto(datanodeInfo, ClientVersion.CURRENT_VERSION);
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.QUERY_NODE, auditMap));
     return result;
   }
 
-  private static void addFailedVolumes(HddsProtos.Node.Builder nodeBuilder,
-      DatanodeInfo datanodeInfo) {
-    for (StorageReportProto report : datanodeInfo.getStorageReports()) {
+  private static HddsProtos.Node buildNodeProto(DatanodeInfo datanodeInfo, int clientVersion) {
+    final List<StorageReportProto> reports = datanodeInfo.getStorageReports();
+    final HddsProtos.Node.Builder b = HddsProtos.Node.newBuilder()
+        .setTotalVolumeCount(reports.size());
+    for (StorageReportProto report : reports) {
       if (report.hasFailed() && report.getFailed()) {
-        nodeBuilder.addFailedVolumes(report.getStorageLocation());
+        b.addFailedVolumes(report.getStorageLocation());
       }
     }
+
+    final NodeStatus ns = datanodeInfo.getNodeStatus();
+    return b.setNodeID(datanodeInfo.toProto(clientVersion))
+        .setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount())
+        .addNodeStates(ns.getHealth())
+        .addNodeOperationalStates(ns.getOperationalState())
+        .build();
   }
 
   @Override
