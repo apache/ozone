@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collection;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -265,6 +266,18 @@ public abstract class Handler {
   public void setClusterID(String clusterID) {
     this.clusterId = clusterID;
   }
+
+  /**
+   * Copy container to the destination path.
+   */
+  public abstract void copyContainer(
+      Container container, Path destination)
+      throws IOException;
+
+  /**
+   * Imports container from a container which is under the temp directory.
+   */
+  public abstract Container importContainer(ContainerData targetTempContainerData) throws IOException;
 
   public abstract ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto msg, Container container,

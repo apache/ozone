@@ -190,13 +190,12 @@
               </transformers>
               <relocations>
                 <relocation>
-                  <pattern>org</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.org</shadedPattern>
+                  <pattern>org.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.org.</shadedPattern>
                   <excludes>
                     <exclude>org.apache.hadoop.**</exclude>
                     <exclude>org.apache.log4j.**</exclude>
                     <exclude>org.apache.ozone.**</exclude>
-                    <exclude>org.apache.ratis.**</exclude>
                     <!-- These packages are the ones that are not shaded in the hadoop release package.
                       To prevent conflicts, we do not include these packages in the ozone client release package.
                       Ozone will use hadoop / JVM to provide these dependencies. -->
@@ -210,10 +209,9 @@
                   </excludes>
                 </relocation>
                 <relocation>
-                  <pattern>org.apache.ratis</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.org.apache.ratis</shadedPattern>
-                </relocation>
-                <relocation>
+                  <!-- TODO: pattern should be "com." (with trailing dot) to avoid unintended shading,
+                  but this causes intermittent Ratis gRPC client timeouts. Fix root cause first.
+                  See https://issues.apache.org/jira/browse/HDDS-14869 -->
                   <pattern>com</pattern>
                   <shadedPattern>${ozone.shaded.prefix}.com</shadedPattern>
                   <excludes>
@@ -229,44 +227,44 @@
                   </excludes>
                 </relocation>
                 <relocation>
-                  <pattern>google</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.google</shadedPattern>
+                  <pattern>google.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.google.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>net.jcip</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.net.jcip</shadedPattern>
+                  <pattern>net.jcip.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.net.jcip.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javassist</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.javassist</shadedPattern>
+                  <pattern>javassist.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javassist.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javax.xml.bind</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.javax.xml.bind</shadedPattern>
+                  <pattern>javax.xml.bind.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javax.xml.bind.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javax.activation</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.javax.activation</shadedPattern>
+                  <pattern>javax.activation.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javax.activation.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>jakarta.annotation</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.jakarta.annotation</shadedPattern>
+                  <pattern>jakarta.annotation.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.jakarta.annotation.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>kotlin</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.kotlin</shadedPattern>
+                  <pattern>kotlin.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.kotlin.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>picocli</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.picocli</shadedPattern>
+                  <pattern>picocli.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.picocli.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>info</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.info</shadedPattern>
+                  <pattern>info.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.info.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>io</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.io</shadedPattern>
+                  <pattern>io.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.io.</shadedPattern>
                   <excludes>
                     <exclude>io!netty!*</exclude>
                     <!-- Exclude config keys for Hadoop that look like package names -->
@@ -286,12 +284,12 @@
 
                 <!-- handling some special packages with special names -->
                 <relocation>
-                  <pattern>okio</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.okio</shadedPattern>
+                  <pattern>okio.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.okio.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>okhttp3</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.okhttp3</shadedPattern>
+                  <pattern>okhttp3.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.okhttp3.</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>

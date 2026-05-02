@@ -29,12 +29,14 @@ import { showDataFetchError } from "@/utils/common";
 import { useDebounce } from "@/v2/hooks/useDebounce";
 import { useApiData } from "@/v2/hooks/useAPIData.hook";
 import { useAutoReload } from "@/v2/hooks/useAutoReload.hook";
+import * as CONSTANTS from '@/v2/constants/overview.constants';
 
 import {
   Container,
   ContainerState,
   ExpandedRow
 } from "@/v2/types/container.types";
+import { ClusterStateResponse } from "@/v2/types/overview.types";
 
 import './containers.less';
 
@@ -58,6 +60,7 @@ const DEFAULT_CONTAINERS_RESPONSE = {
 const Containers: React.FC<{}> = () => {
   const [state, setState] = useState<ContainerState>({
     lastUpdated: 0,
+    totalContainers: 0,
     columnOptions: defaultColumns,
     missingContainerData: [],
     underReplicatedContainerData: [],
@@ -84,9 +87,19 @@ const Containers: React.FC<{}> = () => {
     }
   );
 
+  const clusterState = useApiData<ClusterStateResponse>(
+    '/api/v1/clusterState',
+    CONSTANTS.DEFAULT_CLUSTER_STATE,
+    {
+      retryAttempts: 2,
+      initialFetch: true,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
   // Process containers data when it changes
   React.useEffect(() => {
-    if (containersData.data && containersData.data.containers) {
+    if (containersData.data && containersData.data.containers && clusterState.data) {
       const containers: Container[] = containersData.data.containers;
 
       const missingContainerData: Container[] = containers?.filter(
@@ -105,8 +118,11 @@ const Containers: React.FC<{}> = () => {
         container => container.containerState === 'MISMATCHED_REPLICA'
       ) ?? [];
 
+      const totalContainers = clusterState.data.containers;
+
       setState({
         ...state,
+        totalContainers,
         missingContainerData,
         underReplicatedContainerData,
         overReplicatedContainerData,
@@ -115,7 +131,7 @@ const Containers: React.FC<{}> = () => {
         lastUpdated: Number(moment())
       });
     }
-  }, [containersData.data]);
+  }, [containersData.data, clusterState.data]);
 
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
@@ -134,12 +150,14 @@ const Containers: React.FC<{}> = () => {
   // Create refresh function for auto-reload
   const loadContainersData = () => {
     containersData.refetch();
+    clusterState.refetch();
   };
 
   const autoReload = useAutoReload(loadContainersData);
 
   const {
     lastUpdated,
+    totalContainers,
     columnOptions,
     missingContainerData,
     underReplicatedContainerData,
@@ -163,6 +181,10 @@ const Containers: React.FC<{}> = () => {
         width: '90%',
         justifyContent: 'space-between'
       }}>
+      <div className='highlight-content'>
+        Total Containers <br/>
+        <span className='highlight-content-value'>{totalContainers ?? 'N/A'}</span>
+      </div>
       <div className='highlight-content'>
         Missing <br/>
         <span className='highlight-content-value'>{missingContainerData?.length ?? 'N/A'}</span>

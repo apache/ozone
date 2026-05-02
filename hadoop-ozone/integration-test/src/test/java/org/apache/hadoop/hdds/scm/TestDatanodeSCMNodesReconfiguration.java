@@ -128,7 +128,9 @@ public class TestDatanodeSCMNodesReconfiguration {
       for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
         String scmAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
-        datanode.getConf().set(scmAddrKey, cluster.getConf().get(scmAddrKey));
+        assertTrue(datanode.getReconfigurationHandler().isPropertyReconfigurable(scmAddrKey));
+        datanode.getReconfigurationHandler().reconfigureProperty(scmAddrKey,
+            cluster.getConf().get(scmAddrKey));
         String dnPortKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
         datanode.getConf().set(dnPortKey, cluster.getConf().get(dnPortKey));
@@ -273,7 +275,9 @@ public class TestDatanodeSCMNodesReconfiguration {
       for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
         String scmAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
-        datanode.getConf().set(scmAddrKey, cluster.getConf().get(scmAddrKey));
+        assertTrue(datanode.getReconfigurationHandler().isPropertyReconfigurable(scmAddrKey));
+        datanode.getReconfigurationHandler().reconfigureProperty(scmAddrKey,
+            cluster.getConf().get(scmAddrKey));
         String dnPortKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
         datanode.getConf().set(dnPortKey, cluster.getConf().get(dnPortKey));

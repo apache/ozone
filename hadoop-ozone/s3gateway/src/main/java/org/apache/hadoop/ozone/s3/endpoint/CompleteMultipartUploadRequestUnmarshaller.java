@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
+import javax.inject.Singleton;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -33,6 +35,7 @@ import javax.ws.rs.ext.Provider;
  * Custom unmarshaller to read CompleteMultipartUploadRequest wo namespace.
  */
 @Provider
+@Singleton
 public class CompleteMultipartUploadRequestUnmarshaller
     extends MessageUnmarshaller<CompleteMultipartUploadRequest> {
 
@@ -48,11 +51,13 @@ public class CompleteMultipartUploadRequestUnmarshaller
       InputStream inputStream) throws WebApplicationException {
     try {
       if (inputStream.available() == 0) {
-        throw wrapOS3Exception(INVALID_REQUEST.withMessage("You must specify at least one part"));
+        throw wrapOS3Exception(newError(INVALID_REQUEST, null, null)
+            .withMessage("You must specify at least one part"));
       }
       return super.readFrom(aClass, type, annotations, mediaType, multivaluedMap, inputStream);
     } catch (IOException e) {
-      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
+      throw wrapOS3Exception(newError(INVALID_REQUEST, null, e)
+          .withMessage(e.getMessage()));
     }
   }
 

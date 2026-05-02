@@ -132,12 +132,23 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=false
 }
 
+@test "script change including javadoc.sh" {
+  run dev-support/ci/selective_ci_checks.sh bad6cfdb6fea57b0940ea05c69aa122c6be08932
+
+  assert_output -p 'basic-checks=["rat","bats","checkstyle","findbugs","pmd"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=false
+}
+
 @test "script change including junit.sh" {
   run dev-support/ci/selective_ci_checks.sh 66093e52c6
 
   assert_output -p 'basic-checks=["rat","bats","checkstyle","findbugs"]'
   assert_output -p needs-build=true
-  assert_output -p needs-compile=true
+  assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false

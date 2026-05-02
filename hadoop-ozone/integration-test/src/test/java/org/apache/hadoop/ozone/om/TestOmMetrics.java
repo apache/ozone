@@ -970,9 +970,11 @@ public class TestOmMetrics {
 
   private OmKeyArgs createKeyArgs(String volumeName, String bucketName,
       ReplicationConfig repConfig) throws IOException {
+    int dataLength = 10;
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
         .setPipeline(MockPipeline.createSingleNodePipeline())
+        .setLength(dataLength)
         .build();
     keyLocationInfo.setCreateVersion(0);
 
@@ -984,6 +986,7 @@ public class TestOmMetrics {
         .setKeyName(keyName)
         .setAcls(Lists.emptyList())
         .setReplicationConfig(repConfig)
+        .setDataSize(dataLength)
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
   }

@@ -165,6 +165,7 @@ const Datanodes: React.FC<{}> = () => {
             ? COLUMN_UPDATE_DECOMMISSIONING
             : datanode.opState,
           lastHeartbeat: datanode.lastHeartbeat,
+          storageReport: datanode.storageReport,
           storageUsed: datanode.storageReport.used,
           storageTotal: datanode.storageReport.capacity,
           storageCommitted: datanode.storageReport.committed,

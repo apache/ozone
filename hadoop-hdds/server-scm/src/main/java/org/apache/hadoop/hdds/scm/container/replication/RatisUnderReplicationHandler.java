@@ -89,6 +89,15 @@ public class RatisUnderReplicationHandler
     ContainerInfo containerInfo = result.getContainerInfo();
     LOG.debug("Handling under replicated Ratis container {}", containerInfo);
 
+    // Check if container is empty before attempting replication
+    // Empty containers will be deleted by EmptyContainerHandler
+    boolean allReplicasEmpty = !replicas.isEmpty() && replicas.stream().allMatch(ContainerReplica::isEmpty);
+    if (allReplicasEmpty && containerInfo.getState() == LifeCycleState.QUASI_CLOSED) {
+      LOG.info("Skipping replication for empty QUASI_CLOSED container {}. " +
+          "It will be deleted by EmptyContainerHandler.", containerInfo.containerID());
+      return 0;
+    }
+
     RatisContainerReplicaCount withUnhealthy =
         new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
             minHealthyForMaintenance, true);

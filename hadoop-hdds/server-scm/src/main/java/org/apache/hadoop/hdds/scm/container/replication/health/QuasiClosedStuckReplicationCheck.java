@@ -21,23 +21,31 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QU
 
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.QuasiClosedStuckReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class to check for the replication of the replicas in quasi-closed stuck containers. As we want to maintain
- * as much data and information as possible, the rule for QC stuck container is to maintain 2 copies of each origin
- * if there is more than 1 origin. If there is only 1 origin, then we need to maintain 3 copies.
+ * as much data and information as possible, the rule for QC stuck container is to maintain a configurable number
+ * of copies of the origin with the highest BCSID (bestOriginCopies, default 3), and a configurable number of copies
+ * of each other origin (otherOriginCopies, default 2). If there is only 1 origin, bestOriginCopies copies are kept.
  */
 public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
   private static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckReplicationCheck.class);
+
+  private final ReplicationManager.ReplicationManagerConfiguration rmConf;
+
+  public QuasiClosedStuckReplicationCheck(ReplicationManager.ReplicationManagerConfiguration rmConf) {
+    this.rmConf = rmConf;
+  }
 
   public static boolean shouldHandleAsQuasiClosedStuck(ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
     if (containerInfo.getState() != QUASI_CLOSED) {
@@ -46,7 +54,7 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     if (!QuasiClosedContainerHandler.isQuasiClosedStuck(containerInfo, replicas)) {
       return false;
     }
-    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 0);
+    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 0, 3, 2);
     if (replicaCount.availableOrigins() == 1) {
       // This is the 3 copies of a single origin case, so allow it to be handled via the normal under-replicated
       // handler.
@@ -64,14 +72,16 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     }
 
     if (request.getContainerReplicas().isEmpty()) {
-      // If there are no replicas, then mark as missing and return.
-      request.getReport().incrementAndSample(
-          ReplicationManagerReport.HealthState.MISSING, request.getContainerInfo().containerID());
+      // If there are no replicas, mark as QUASI_CLOSED_STUCK + MISSING combination
+      request.getReport().incrementAndSample(ContainerHealthState.QUASI_CLOSED_STUCK_MISSING, 
+          request.getContainerInfo());
       return true;
     }
 
-    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(
-        request.getContainerReplicas(), request.getMaintenanceRedundancy());
+    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(request.getContainerReplicas(),
+        request.getMaintenanceRedundancy(),
+        rmConf.getQuasiClosedStuckBestOriginCopies(),
+        rmConf.getQuasiClosedStuckOtherOriginCopies());
 
     if (!replicaCount.hasHealthyReplicas()) {
       // All unhealthy are handled by a different handler
@@ -90,8 +100,9 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
 
     if (replicaCount.isUnderReplicated()) {
       LOG.debug("Container {} is quasi-closed-stuck under-replicated", request.getContainerInfo());
-      request.getReport().incrementAndSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-          request.getContainerInfo().containerID());
+      // Container is both QUASI_CLOSED_STUCK and UNDER_REPLICATED
+      request.getReport().incrementAndSample(ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED, 
+          request.getContainerInfo());
       if (pendingAdd == 0) {
         // Only queue if there are no pending adds, as that could correct the under replication.
         LOG.debug("Queueing under-replicated health result for container {}", request.getContainerInfo());
@@ -105,8 +116,9 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
 
     if (replicaCount.isOverReplicated()) {
       LOG.debug("Container {} is quasi-closed-stuck over-replicated", request.getContainerInfo());
-      request.getReport().incrementAndSample(ReplicationManagerReport.HealthState.OVER_REPLICATED,
-          request.getContainerInfo().containerID());
+      // Container is both QUASI_CLOSED_STUCK and OVER_REPLICATED
+      request.getReport().incrementAndSample(ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED, 
+          request.getContainerInfo());
       if (pendingDelete == 0) {
         // Only queue if there are no pending deletes which could correct the over replication
         LOG.debug("Queueing over-replicated health result for container {}", request.getContainerInfo());

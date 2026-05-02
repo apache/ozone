@@ -28,6 +28,7 @@
 
   <modules>
     <module>annotations</module>
+    <module>cli-common</module>
     <module>client</module>
     <module>common</module>
     <module>config</module>

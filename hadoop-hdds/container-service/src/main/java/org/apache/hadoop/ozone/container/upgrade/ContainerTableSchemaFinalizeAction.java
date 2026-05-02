@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -40,7 +39,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Upgrade Action for DataNode for update the table schema data of containerIds Table.
  */
-@UpgradeActionHdds(feature = WITNESSED_CONTAINER_DB_PROTO_VALUE, component = DATANODE, type = ON_FINALIZE)
+@UpgradeActionHdds(feature = WITNESSED_CONTAINER_DB_PROTO_VALUE, component = DATANODE)
 public class ContainerTableSchemaFinalizeAction
     implements HDDSUpgradeAction<DatanodeStateMachine> {
 

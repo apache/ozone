@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -114,7 +113,7 @@ public class TestOzoneManagerRatisRequest {
     when(ozoneManager.getConfig()).thenReturn(omConfig);
 
     OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
-    ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics =
+    ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type> protocolMessageMetrics =
         mock(ProtocolMessageMetrics.class);
 
     OzoneManagerProtocolProtos.OMResponse expectedResponse =

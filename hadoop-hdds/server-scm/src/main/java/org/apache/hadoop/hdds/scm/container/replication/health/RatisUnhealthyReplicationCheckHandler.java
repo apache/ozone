@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
@@ -63,8 +64,6 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
     } else {
       LOG.info("Container {} has unhealthy replicas [{}]. Checking its " +
           "replication status.", container, replicaCount.getReplicas());
-      report.incrementAndSample(ReplicationManagerReport.HealthState.UNHEALTHY,
-          container.containerID());
     }
 
     // At this point, we know there are only unhealthy replicas, so the
@@ -75,9 +74,8 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED,
-          container.containerID());
+      // Container is UNHEALTHY + UNDER_REPLICATED
+      report.incrementAndSample(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED, container);
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending" +
               " is [{}]. isUnrecoverable is [{}]. hasHealthyReplicas is [{}].",
           container,
@@ -92,9 +90,8 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
 
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.OVER_REPLICATED,
-          container.containerID());
+      // Container is UNHEALTHY + OVER_REPLICATED
+      report.incrementAndSample(ContainerHealthState.UNHEALTHY_OVER_REPLICATED, container);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending" +

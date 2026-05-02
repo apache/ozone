@@ -199,6 +199,9 @@ public final class OzoneConsts {
    */
   public static final String OZONE_SCM_DATANODE_ID_FILE_DEFAULT = "datanode.id";
 
+  public static final String
+      OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT = "diskBalancer.info";
+
   /**
    * The ServiceListJSONServlet context attribute where OzoneManager
    * instance gets stored.
@@ -316,6 +319,8 @@ public final class OzoneConsts {
   public static final String USER_PREFIX = "userPrefix";
   public static final String REWRITE_GENERATION = "rewriteGeneration";
   public static final String DELETED_KEY_SOURCE_TYPE = "deletedKeySourceType";
+  /** Sentinel generation used to request atomic create-if-not-exists(put if absent) semantics. */
+  public static final long EXPECTED_GEN_CREATE_IF_NOT_EXISTS = -1L;
   public static final String FROM_SNAPSHOT = "fromSnapshot";
   public static final String TO_SNAPSHOT = "toSnapshot";
   public static final String TOKEN = "token";

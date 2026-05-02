@@ -92,8 +92,15 @@ public class ReconControllerModule extends AbstractModule {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconControllerModule.class);
 
+  private final ReconServer reconServer;
+
+  public ReconControllerModule(ReconServer reconServer) {
+    this.reconServer = reconServer;
+  }
+
   @Override
   protected void configure() {
+    bind(ReconServer.class).toInstance(reconServer);
     bind(OzoneConfiguration.class).toProvider(ConfigurationProvider.class);
     bind(ReconHttpServer.class).in(Singleton.class);
     bind(ReconStorageConfig.class).in(Singleton.class);

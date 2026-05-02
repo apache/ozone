@@ -22,9 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.Duration;
-import java.util.Deque;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -39,19 +37,6 @@ public final class ConfigurationReflectionUtil {
 
   public static <T> Map<String, Field> mapReconfigurableProperties(
       Class<T> configurationClass) {
-    String prefix = getPrefix(configurationClass);
-    Map<String, Field> props =
-        mapReconfigurableProperties(configurationClass, prefix);
-    Class<? super T> superClass = configurationClass.getSuperclass();
-    while (superClass != null) {
-      props.putAll(mapReconfigurableProperties(superClass, prefix));
-      superClass = superClass.getSuperclass();
-    }
-    return props;
-  }
-
-  private static <T> Map<String, Field> mapReconfigurableProperties(
-      Class<T> configurationClass, String prefix) {
     Map<String, Field> props = new HashMap<>();
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
@@ -59,7 +44,7 @@ public final class ConfigurationReflectionUtil {
 
         if (configAnnotation.reconfigurable()) {
           checkNotFinal(configurationClass, field);
-          props.put(getFullKey(prefix, configAnnotation), field);
+          props.put(configAnnotation.key(), field);
         }
       }
     }
@@ -67,26 +52,10 @@ public final class ConfigurationReflectionUtil {
   }
 
   public static <T> void injectConfiguration(
-      ConfigurationSource configuration,
-      Class<T> configurationClass,
-      T configObject, boolean reconfiguration) {
-    String prefix = getPrefix(configurationClass);
-    injectConfigurationToObject(configuration, configurationClass, configObject,
-        prefix, reconfiguration);
-    Class<? super T> superClass = configurationClass.getSuperclass();
-    while (superClass != null) {
-      injectConfigurationToObject(configuration, superClass, configObject,
-          prefix, reconfiguration);
-      superClass = superClass.getSuperclass();
-    }
-  }
-
-  private static <T> void injectConfigurationToObject(ConfigurationSource from,
+      ConfigurationSource from,
       Class<T> configurationClass,
       T configuration,
-      String prefix,
-      boolean reconfiguration
-  ) {
+      boolean reconfiguration) {
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
         checkNotFinal(configurationClass, field);
@@ -97,7 +66,7 @@ public final class ConfigurationReflectionUtil {
           continue;
         }
 
-        String key = getFullKey(prefix, configAnnotation);
+        String key = configAnnotation.key();
         String defaultValue = configAnnotation.defaultValue();
         String value = from.get(key, defaultValue);
 
@@ -240,37 +209,13 @@ public final class ConfigurationReflectionUtil {
     }
   }
 
-  public static <T> void updateConfiguration(ConfigurationTarget config,
-      T object) {
-    updateConfiguration(config, object, getPrefix(object.getClass()));
-  }
-
-  private static <T> void updateConfiguration(ConfigurationTarget config,
-      T object, String prefix) {
-
-    Class<?> configClass = object.getClass();
-    Deque<Class<?>> classes = new LinkedList<>();
-    classes.addLast(configClass);
-    Class<?> superclass = configClass.getSuperclass();
-    while (superclass != null) {
-      classes.addFirst(superclass);
-      superclass = superclass.getSuperclass();
-    }
-
-    for (Class<?> cl : classes) {
-      updateConfigurationFromObject(config, cl, object, prefix);
-    }
-  }
-
-  private static <T> void updateConfigurationFromObject(
-      ConfigurationTarget config, Class<?> configClass, T configObject,
-      String prefix) {
-
+  public static <T> void updateConfiguration(ConfigurationTarget config, T configObject) {
+    Class<?> configClass = configObject.getClass();
     for (Field field : configClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
         Config configAnnotation = field.getAnnotation(Config.class);
         String fieldLocation = configClass + "." + field.getName();
-        String key = getFullKey(prefix, configAnnotation);
+        String key = configAnnotation.key();
         ConfigType type = configAnnotation.type();
 
         if (type == ConfigType.AUTO) {
@@ -301,10 +246,8 @@ public final class ConfigurationReflectionUtil {
 
   public static Optional<String> getKey(Class<?> configClass,
       String fieldName) {
-    ConfigGroup configGroup = getConfigGroup(configClass);
-
     return findFieldConfigAnnotationByName(configClass, fieldName)
-        .map(config -> getFullKey(configGroup, config));
+        .map(Config::key);
   }
 
   public static Optional<ConfigType> getType(Class<?> configClass,
@@ -344,34 +287,4 @@ public final class ConfigurationReflectionUtil {
           configurationClass.getSimpleName(), field.getName()));
     }
   }
-
-  /** Compose the full config property name to be used for {@code configGroup} and {@code configAnnotation}. */
-  public static String getFullKey(
-      ConfigGroup configGroup, Config configAnnotation) {
-    return getFullKey(getPrefix(configGroup), configAnnotation);
-  }
-
-  private static String getPrefix(Class<?> configurationClass) {
-    return getPrefix(getConfigGroup(configurationClass));
-  }
-
-  private static ConfigGroup getConfigGroup(Class<?> configurationClass) {
-    return configurationClass.getAnnotation(ConfigGroup.class);
-  }
-
-  /** Get {@code configGroup}'s prefix with dot appended. */
-  private static String getPrefix(ConfigGroup configGroup) {
-    return configGroup != null && !configGroup.prefix().isEmpty()
-        ? configGroup.prefix() + "."
-        : "";
-  }
-
-  private static String getFullKey(
-      String prefix, Config configAnnotation) {
-    String key = configAnnotation.key();
-    return prefix != null && !prefix.isEmpty() && !key.startsWith(prefix)
-        ? prefix + key
-        : key;
-  }
-
 }

@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nonnull;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
  * Args for key. Client use this to specify key's attributes on  key creation
  * (putKey()).
  */
-public final class OmKeyArgs implements Auditable {
+public final class OmKeyArgs extends WithMetadata implements Auditable {
   private final String volumeName;
   private final String bucketName;
   private final String keyName;
@@ -47,14 +47,13 @@ public final class OmKeyArgs implements Auditable {
   private final boolean isMultipartKey;
   private final String multipartUploadID;
   private final int multipartUploadPartNumber;
-  private final Map<String, String> metadata;
   private final boolean sortDatanodesInPipeline;
   private final ImmutableList<OzoneAcl> acls;
   private final boolean latestVersionLocation;
   private final boolean recursive;
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
-  private final Map<String, String> tags;
+  private final ImmutableMap<String, String> tags;
   // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
   // For a key commit to succeed, the original key should still be present with the
@@ -62,8 +61,10 @@ public final class OmKeyArgs implements Auditable {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
+  private final String expectedETag;
 
   private OmKeyArgs(Builder b) {
+    super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.keyName = b.keyName;
@@ -73,7 +74,6 @@ public final class OmKeyArgs implements Auditable {
     this.isMultipartKey = b.isMultipartKey;
     this.multipartUploadID = b.multipartUploadID;
     this.multipartUploadPartNumber = b.multipartUploadPartNumber;
-    this.metadata = b.metadata;
     this.acls = b.acls.build();
     this.sortDatanodesInPipeline = b.sortDatanodesInPipeline;
     this.latestVersionLocation = b.latestVersionLocation;
@@ -81,8 +81,9 @@ public final class OmKeyArgs implements Auditable {
     this.headOp = b.headOp;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
-    this.tags = b.tags;
+    this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.expectedETag = b.expectedETag;
   }
 
   public boolean getIsMultipartKey() {
@@ -129,10 +130,6 @@ public final class OmKeyArgs implements Auditable {
     dataSize = size;
   }
 
-  public Map<String, String> getMetadata() {
-    return metadata;
-  }
-
   public void setLocationInfoList(List<OmKeyLocationInfo> locationInfoList) {
     this.locationInfoList = locationInfoList;
   }
@@ -167,6 +164,10 @@ public final class OmKeyArgs implements Auditable {
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
+  }
+
+  public String getExpectedETag() {
+    return expectedETag;
   }
 
   @Override
@@ -214,13 +215,16 @@ public final class OmKeyArgs implements Auditable {
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
     }
+    if (expectedETag != null) {
+      builder.setExpectedETag(expectedETag);
+    }
     return builder.build();
   }
 
   /**
    * Builder class of OmKeyArgs.
    */
-  public static class Builder {
+  public static class Builder extends WithMetadata.Builder {
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -231,25 +235,43 @@ public final class OmKeyArgs implements Auditable {
     private boolean isMultipartKey;
     private String multipartUploadID;
     private int multipartUploadPartNumber;
-    private final Map<String, String> metadata = new HashMap<>();
     private boolean sortDatanodesInPipeline;
     private boolean latestVersionLocation;
     private final AclListBuilder acls;
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
-    private final Map<String, String> tags = new HashMap<>();
+    private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private String expectedETag;
 
     public Builder() {
       this(AclListBuilder.empty());
     }
 
+    @SuppressWarnings("checkstyle:parameternumber")
+    public Builder(String volumeName, String bucketName, String keyName,
+        long dataSize, ReplicationConfig replicationConfig,
+        Map<String, String> metadata, Map<String, String> tags,
+        boolean latestVersionLocation) {
+      this();
+      setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setDataSize(dataSize)
+          .setReplicationConfig(replicationConfig)
+          .addAllMetadataGdpr(metadata)
+          .addAllTags(tags)
+          .setLatestVersionLocation(latestVersionLocation);
+    }
+
     private Builder(AclListBuilder acls) {
       this.acls = acls;
+      this.tags = MapBuilder.empty();
     }
 
     public Builder(OmKeyArgs obj) {
+      super(obj);
       this.volumeName = obj.volumeName;
       this.bucketName = obj.bucketName;
       this.keyName = obj.keyName;
@@ -267,8 +289,8 @@ public final class OmKeyArgs implements Auditable {
       this.forceUpdateContainerCacheFromSCM =
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      this.metadata.putAll(obj.metadata);
-      this.tags.putAll(obj.tags);
+      this.expectedETag = obj.expectedETag;
+      this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
     }
 
@@ -287,6 +309,10 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public String getKeyName() {
+      return keyName;
+    }
+
     public Builder setOwnerName(String owner) {
       this.ownerName = owner;
       return this;
@@ -295,6 +321,10 @@ public final class OmKeyArgs implements Auditable {
     public Builder setDataSize(long size) {
       this.dataSize = size;
       return this;
+    }
+
+    public long getDataSize() {
+      return dataSize;
     }
 
     public Builder setReplicationConfig(ReplicationConfig replConfig) {
@@ -307,6 +337,10 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public List<OmKeyLocationInfo> getLocationInfoList() {
+      return locationInfoList;
+    }
+
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       this.acls.addAll(listOfAcls);
       return this;
@@ -315,6 +349,10 @@ public final class OmKeyArgs implements Auditable {
     public Builder setIsMultipartKey(boolean isMultipart) {
       this.isMultipartKey = isMultipart;
       return this;
+    }
+
+    public boolean getIsMultipartKey() {
+      return isMultipartKey;
     }
 
     public Builder setMultipartUploadID(String uploadID) {
@@ -327,20 +365,22 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
-      this.metadata.put(key, value);
+      super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> metadatamap) {
-      this.metadata.putAll(metadatamap);
+      super.addAllMetadata(metadatamap);
       return this;
     }
 
     public Builder addAllMetadataGdpr(Map<String, String> metadatamap) {
       addAllMetadata(metadatamap);
-      if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
-        GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(metadata::put);
+      if (metadatamap != null && Boolean.parseBoolean(metadatamap.get(OzoneConsts.GDPR_FLAG))) {
+        GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(this::addMetadata);
       }
       return this;
     }
@@ -382,6 +422,11 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setExpectedDataGeneration(long generation) {
       this.expectedDataGeneration = generation;
+      return this;
+    }
+
+    public Builder setExpectedETag(String eTag) {
+      this.expectedETag = eTag;
       return this;
     }
 

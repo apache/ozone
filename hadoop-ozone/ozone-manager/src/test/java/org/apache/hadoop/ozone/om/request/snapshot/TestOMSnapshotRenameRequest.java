@@ -138,6 +138,8 @@ public class TestOMSnapshotRenameRequest extends TestSnapshotRequestAndResponse 
 
   @Test
   public void testPreExecuteBadOwner() {
+    when(getOzoneManager().isAdminAuthorizationEnabled()).thenReturn(true);
+
     // Owner is not set for the request.
     OzoneManagerProtocolProtos.OMRequest omRequest = renameSnapshotRequest(getVolumeName(),
         getBucketName(), snapshotName1, snapshotName2);

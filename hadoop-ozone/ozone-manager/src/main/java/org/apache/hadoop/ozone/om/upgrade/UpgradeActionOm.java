@@ -21,15 +21,12 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 
 /**
- * Annotation to specify upgrade action run during specific phases.
+ * Annotation to specify upgrade action run during Ozone Manager finalization.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface UpgradeActionOm {
   OMLayoutFeature feature();
-
-  UpgradeActionType type();
 }

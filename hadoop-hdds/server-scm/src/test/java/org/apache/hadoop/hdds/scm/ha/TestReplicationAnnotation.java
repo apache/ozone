@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.List;
@@ -122,9 +124,10 @@ public class TestReplicationAnnotation {
 
   @Test
   public void testReplicateAnnotationBasic() throws Throwable {
+    ContainerStateManager impl = mock(ContainerStateManager.class);
+    when(impl.getType()).thenReturn(RequestType.CONTAINER);
 
-    ContainerStateManager proxy = scmRatisServer.getProxyHandler(RequestType.CONTAINER,
-        ContainerStateManager.class, null);
+    ContainerStateManager proxy = scmRatisServer.getProxyHandler(ContainerStateManager.class, impl);
 
     IOException e =
         assertThrows(IOException.class,

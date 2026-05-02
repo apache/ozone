@@ -118,9 +118,9 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
 
   @Override
   public synchronized void stop() {
-    if (store != null) {
-      store.close();
-      store = null;
+    if (this.store != null) {
+      this.store.close();
+      this.store = null;
     }
   }
 
@@ -143,8 +143,8 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
   }
 
   @Override
-  public void close() {
-    this.store.close();
+  public synchronized void close() {
+    stop();
     this.cfOptions.close();
   }
 

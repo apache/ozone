@@ -43,7 +43,7 @@ import org.slf4j.Logger;
  */
 public final class StorageVolumeUtil {
 
-  private static final String VERSION_FILE   = "VERSION";
+  public static final String VERSION_FILE   = "VERSION";
   private static final String STORAGE_ID_PREFIX = "DS-";
 
   private StorageVolumeUtil() {

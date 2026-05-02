@@ -59,7 +59,7 @@ public class TestObjectTaggingGet {
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)

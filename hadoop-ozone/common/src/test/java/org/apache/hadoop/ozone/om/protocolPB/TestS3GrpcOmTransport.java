@@ -66,6 +66,8 @@ public class TestS3GrpcOmTransport {
       .build();
 
   private boolean doFailover = false;
+  private boolean completeFailover = true;
+  private int failoverCount;
 
   private OzoneConfiguration conf;
 
@@ -91,7 +93,10 @@ public class TestS3GrpcOmTransport {
                                               responseObserver) {
                   try {
                     if (doFailover) {
-                      doFailover = false;
+                      if (completeFailover) {
+                        doFailover = false;
+                      }
+                      failoverCount++;
                       throw createNotLeaderException();
                     } else {
                       responseObserver.onNext(omResponse);
@@ -122,6 +127,7 @@ public class TestS3GrpcOmTransport {
 
   @BeforeEach
   public void setUp() throws Exception {
+    failoverCount = 0;
     // Generate a unique in-process server name.
     serverName = InProcessServerBuilder.generateName();
 
@@ -190,6 +196,7 @@ public class TestS3GrpcOmTransport {
 
   @Test
   public void testGrpcFailoverProxyExhaustRetry() throws Exception {
+    final int expectedFailoverCount = 1;
     ServiceListRequest req = ServiceListRequest.newBuilder().build();
 
     final OMRequest omRequest = OMRequest.newBuilder()
@@ -210,6 +217,29 @@ public class TestS3GrpcOmTransport {
     // max failovers
 
     assertThrows(Exception.class, () -> client.submitRequest(omRequest));
+    assertEquals(expectedFailoverCount, failoverCount);
+  }
+
+  @Test
+  public void testGrpcFailoverProxyCalculatesFailoverCountPerRequest() throws Exception {
+    final int maxFailoverAttempts = 2;
+    final int expectedRequest2FailoverAttemptsCount = 1;
+    doFailover = true;
+    completeFailover = false;
+    conf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, maxFailoverAttempts);
+    conf.setLong(OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY, 50);
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient(channel);
+
+    assertThrows(Exception.class, () -> client.submitRequest(arbitraryOmRequest()));
+    assertEquals(maxFailoverAttempts, failoverCount);
+
+    failoverCount = 0;
+    completeFailover = true;
+    //No exception this time
+    client.submitRequest(arbitraryOmRequest());
+
+    assertEquals(expectedRequest2FailoverAttemptsCount, failoverCount);
   }
 
   @Test
@@ -240,5 +270,15 @@ public class TestS3GrpcOmTransport {
     // This exception should cause failover to NOT retry,
     // rather to fail.
     assertThrows(Exception.class, () -> client.submitRequest(omRequest));
+  }
+
+  private static OMRequest arbitraryOmRequest() {
+    ServiceListRequest req = ServiceListRequest.newBuilder().build();
+    return OMRequest.newBuilder()
+        .setCmdType(Type.ServiceList)
+        .setVersion(CURRENT_VERSION)
+        .setClientId("test")
+        .setServiceListRequest(req)
+        .build();
   }
 }

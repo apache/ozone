@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,7 +95,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -168,6 +168,7 @@ public class TestStorageContainerManager {
   @Test
   void test(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     configureTopology(conf);
     configureBlockDeletion(conf);
     Path scmPath = tempDir.resolve("scm-meta");
@@ -603,17 +604,11 @@ public class TestStorageContainerManager {
     Path scmPath = tempDir.resolve("scm-meta");
 
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    scmStore.setClusterId(clusterId);
-    scmStore.setScmId(scmId);
-    scmStore.setSCMHAFlag(true);
-    // writes the version file properties
-    scmStore.initialize();
-    SCMRatisServerImpl.initialize(clusterId, scmId,
-        SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-            .getLocalNodeDetails(), conf);
+    // Use scmInit to initialize SCM properly (creates all required directories)
+    StorageContainerManager.scmInit(conf, clusterId);
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    String scmId = scmStore.getScmId();
     StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
     try {
       scm.start();

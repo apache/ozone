@@ -26,7 +26,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -46,10 +46,10 @@ class TestReplicationConfigValidator {
 
   @BeforeAll
   void setup() {
-    defaultValidator = new InMemoryConfiguration()
+    defaultValidator = new InMemoryConfigurationForTesting()
         .getObject(ReplicationConfigValidator.class);
 
-    MutableConfigurationSource disabled = new InMemoryConfiguration();
+    MutableConfigurationSource disabled = new InMemoryConfigurationForTesting();
     disabled.set("ozone.replication.allowed-configs", "");
     disabledValidator = disabled
         .getObject(ReplicationConfigValidator.class);
@@ -127,7 +127,7 @@ class TestReplicationConfigValidator {
 
   @Test
   void testCustomValidation() {
-    MutableConfigurationSource config = new InMemoryConfiguration();
+    MutableConfigurationSource config = new InMemoryConfigurationForTesting();
     config.set("ozone.replication.allowed-configs", "RATIS/THREE");
 
     final ReplicationConfigValidator validator =

@@ -73,4 +73,28 @@ public class TestInodeMetadataRocksDBCheckpoint {
     assertEquals(sourceFileInode, getINode(target2.toPath()),
         "Hard links should have same inode as source");
   }
+
+  /**
+   * Test with deleteSourceFiles=false (v1 format) - source files are preserved.
+   */
+  @Test
+  public void testCreateHardLinksWithoutDeletingSources(@TempDir File tempDir)
+      throws Exception {
+    File testDir = new File(tempDir, "testDir");
+    assertTrue(testDir.mkdir(), "Failed to create test dir");
+    File sourceFile = new File(testDir, "source.sst");
+    Files.write(sourceFile.toPath(), "test content".getBytes(UTF_8));
+
+    File hardlinkFile = new File(testDir, "hardLinkFile");
+    String hardlinkContent = "om.db/target.sst\tsource.sst\n";
+    Files.write(hardlinkFile.toPath(), hardlinkContent.getBytes(UTF_8));
+
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(testDir.toPath(), false);
+    assertNotNull(obtainedCheckpoint);
+
+    assertTrue(sourceFile.exists(), "Source file should be preserved");
+    assertTrue(new File(testDir, "om.db/target.sst").exists(),
+        "Hard link should be created");
+  }
 }

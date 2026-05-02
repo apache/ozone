@@ -197,8 +197,8 @@ public final class OMFileRequest {
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {
       String fileName = elements.next().toString();
-      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
-      fullKeyPath.append(fileName);
+      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX)
+          .append(fileName);
       if (!missing.isEmpty()) {
         // Add all the sub-dirs to the missing list except the leaf element.
         // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.
@@ -889,11 +889,25 @@ public final class OMFileRequest {
         Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator(seekDirInDB)) {
 
-      if (iterator.hasNext()) {
+      while (iterator.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        String dbKey = entry.getKey();
         OmDirectoryInfo dirInfo = entry.getValue();
-        return isImmediateChild(dirInfo.getParentObjectID(),
+        boolean isChild = isImmediateChild(dirInfo.getParentObjectID(),
             omKeyInfo.getObjectID());
+
+        if (!isChild) {
+          return false;
+        }
+
+        // If child found in DB, check if it's marked as deleted in cache
+        CacheValue<OmDirectoryInfo> cacheValue = dirTable.getCacheValue(new CacheKey<>(dbKey));
+        if (cacheValue != null && cacheValue.getCacheValue() == null) {
+          // Entry is in DB but marked for deletion in cache, ignore it and check next entry
+          continue;
+        }
+
+        return true;
       }
 
     }
@@ -933,11 +947,25 @@ public final class OMFileRequest {
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = fileTable.iterator(seekFileInDB)) {
 
-      if (iterator.hasNext()) {
+      while (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+        String dbKey = entry.getKey();
         OmKeyInfo fileInfo = entry.getValue();
-        return isImmediateChild(fileInfo.getParentObjectID(),
-            omKeyInfo.getObjectID()); // found a sub path file
+        boolean isChild = isImmediateChild(fileInfo.getParentObjectID(),
+            omKeyInfo.getObjectID());
+
+        if (!isChild) {
+          return false;
+        }
+
+        // If child found in DB, check if it's marked as deleted in cache
+        CacheValue<OmKeyInfo> cacheValue = fileTable.getCacheValue(new CacheKey<>(dbKey));
+        if (cacheValue != null && cacheValue.getCacheValue() == null) {
+          // Entry is in DB but marked for deletion in cache, ignore it and check next entry
+          continue;
+        }
+
+        return true; // found a sub path file
       }
     }
     return false; // no sub paths found

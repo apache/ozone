@@ -18,6 +18,11 @@
 package org.apache.hadoop.hdds.upgrade;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
@@ -109,12 +114,14 @@ public class TestScmDataDistributionFinalization {
     configurator.setUpgradeFinalizationExecutor(executor);
 
     conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
-        TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
-        TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-        100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 100, MILLISECONDS);
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 100, TimeUnit.MILLISECONDS);
+
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     scmConfig.setBlockDeletionInterval(Duration.ofMillis(100));
     conf.setFromObject(scmConfig);
@@ -123,6 +130,7 @@ public class TestScmDataDistributionFinalization {
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
     dnConf.setBlockDeletionInterval(Duration.ofMillis(100));
+    dnConf.setBlockDeleteCommandWorkerInterval(Duration.ofMillis(100));
     conf.setFromObject(dnConf);
 
     MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
@@ -344,13 +352,39 @@ public class TestScmDataDistributionFinalization {
     assertEquals(value.getBytes(UTF_8).length, summary.getTotalBlockSize());
     assertEquals(value.getBytes(UTF_8).length * 3, summary.getTotalBlockReplicatedSize());
 
+    // transfer SCM leader
+    String newLeaderScmId = null;
+    for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
+      if (scm != activeSCM) {
+        newLeaderScmId = scm.getScmId();
+        break;
+      }
+    }
+    cluster.getStorageContainerLocationClient().transferLeadership(newLeaderScmId);
+    StorageContainerManager newActiveSCM = cluster.getActiveSCM();
+    deletedBlockLog = (DeletedBlockLogImpl) newActiveSCM.getScmBlockManager().getDeletedBlockLog();
+    SCMDeletedBlockTransactionStatusManager newStatusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+    // new leader SCM should have the right deletion tx summary
+    summary = newStatusManager.getTransactionSummary();
+    assertEquals(1, summary.getTotalTransactionCount());
+    assertEquals(1, summary.getTotalBlockCount());
+    assertEquals(value.getBytes(UTF_8).length, summary.getTotalBlockSize());
+    assertEquals(value.getBytes(UTF_8).length * 3, summary.getTotalBlockReplicatedSize());
+
+    // flush buffer and start SCMBlockDeletingService
+    for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
+      flushDBTransactionBuffer(scm);
+      scm.getScmBlockManager().getSCMBlockDeletingService().start();
+    }
+
     // force close the container so that block can be deleted
-    activeSCM.getClientProtocolServer().closeContainer(
+    newActiveSCM.getClientProtocolServer().closeContainer(
         keyDetails.getOzoneKeyLocations().get(0).getContainerID());
     // wait for container to be closed
     GenericTestUtils.waitFor(() -> {
       try {
-        return activeSCM.getClientProtocolServer().getContainer(
+        return newActiveSCM.getClientProtocolServer().getContainer(
             keyDetails.getOzoneKeyLocations().get(0).getContainerID())
             .getState() == HddsProtos.LifeCycleState.CLOSED;
       } catch (IOException e) {
@@ -359,15 +393,15 @@ public class TestScmDataDistributionFinalization {
       }
     }, 100, 5000);
 
-    // flush buffer and start SCMBlockDeletingService
-    for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
-      flushDBTransactionBuffer(scm);
-      scm.getScmBlockManager().getSCMBlockDeletingService().start();
-    }
-
     // wait for block deletion transactions to be confirmed by DN
     GenericTestUtils.waitFor(
-        () -> statusManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 30000);
+        () -> newStatusManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 30000);
+
+    // transfer leader back to old SCM and verify
+    cluster.getStorageContainerLocationClient().transferLeadership(activeSCM.getScmId());
+    deletedBlockLog = (DeletedBlockLogImpl) activeSCM.getScmBlockManager().getDeletedBlockLog();
+    summary = deletedBlockLog.getSCMDeletedBlockTransactionStatusManager().getTransactionSummary();
+    assertEquals(EMPTY_SUMMARY, summary);
   }
 
   private Map<Long, List<DeletedBlock>> generateDeletedBlocks(int dataSize, boolean withSize) {

@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -157,10 +158,11 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertFalse(handler.handle(requestBuilder.build()));
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
+    // Handler doesn't run for this case
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(0,
-        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED));
+    assertEquals(0, report.getStat(
+        ContainerHealthState.UNHEALTHY_OVER_REPLICATED));
   }
 
   @Test
@@ -191,10 +193,9 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
+    // Now uses combination state
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED));
   }
 
   @Test
@@ -225,10 +226,9 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
+    // Only combination state is counted (not individual components)
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED));
   }
 
   @Test
@@ -258,10 +258,9 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
+    // Now uses combination state
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED));
   }
 
   @Test
@@ -287,10 +286,9 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(1, repQueue.overReplicatedQueueSize());
+    // Now uses combination state
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+        ContainerHealthState.UNHEALTHY_OVER_REPLICATED));
   }
 
   @Test
@@ -320,10 +318,9 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
+    // Only combination state is counted (not individual components)
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+        ContainerHealthState.UNHEALTHY_OVER_REPLICATED));
   }
 
   @Test
@@ -365,12 +362,11 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(1, repQueue.overReplicatedQueueSize());
+    // Now uses combination state instead of separate UNHEALTHY + OVER_REPLICATED
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        ContainerHealthState.UNHEALTHY_OVER_REPLICATED));
     assertEquals(0,
-        report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+        report.getStat(ContainerHealthState.UNDER_REPLICATED));
   }
 
   @Test
@@ -389,9 +385,10 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     assertTrue(handler.handle(requestBuilder.build()));
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
-    assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(1,
-        report.getStat(ReplicationManagerReport.HealthState.UNHEALTHY));
+    // Now uses combination state instead of separate UNHEALTHY + UNDER_REPLICATED
+    assertEquals(1, report.getStat(
+        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED));
+    assertEquals(0,
+        report.getStat(ContainerHealthState.OVER_REPLICATED));
   }
 }

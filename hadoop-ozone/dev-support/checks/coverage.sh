@@ -49,7 +49,7 @@ find hadoop-ozone/dist/target/*/share/ozone/lib -name 'hdds-*.jar' -or -name 'oz
     xargs -n1 unzip -o -q -d target/coverage-classes
 
 #Exclude some classes from the coverage
-find target/coverage-classes -type d \( -name proto -or -name proto3 -or -name codegen -or -name generated -or -name v1 -or -name freon \) \
+find target/coverage-classes -type d \( -name proto -or -name codegen -or -name generated -or -name v1 -or -name freon \) \
   | xargs rm -rf
 
 #generate the reports

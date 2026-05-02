@@ -50,6 +50,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -472,6 +474,13 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return Table
    */
   Table<String, OmMultipartKeyInfo> getMultipartInfoTable();
+
+  /**
+   * Gets the multipart part info table which holds
+   * the information about the parts of a Multipart Upload Key.
+   * @return Table
+   */
+  Table<OmMultipartPartKey, OmMultipartPartInfo> getMultipartPartsTable();
 
   @Override
   Table<String, TransactionInfo> getTransactionInfoTable();

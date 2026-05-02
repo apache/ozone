@@ -465,11 +465,11 @@ public class TestContainerCommandsEC {
         // To create the actual situation, container would have been in closed
         // state at SCM.
         scm.getContainerManager().getContainerStateManager()
-            .updateContainerState(container.containerID().getProtobuf(),
-                HddsProtos.LifeCycleEvent.FINALIZE);
+            .updateContainerStateWithSequenceId(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.FINALIZE, 0L);
         scm.getContainerManager().getContainerStateManager()
-            .updateContainerState(container.containerID().getProtobuf(),
-                HddsProtos.LifeCycleEvent.CLOSE);
+            .updateContainerStateWithSequenceId(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.CLOSE, 0L);
 
         //Create the recovering container in DN.
         String encodedToken = cToken.encodeToUrlString();
@@ -555,11 +555,11 @@ public class TestContainerCommandsEC {
         // To create the actual situation, container would have been in closed
         // state at SCM.
         scm.getContainerManager().getContainerStateManager()
-            .updateContainerState(container.containerID().getProtobuf(),
-                HddsProtos.LifeCycleEvent.FINALIZE);
+            .updateContainerStateWithSequenceId(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.FINALIZE, 0L);
         scm.getContainerManager().getContainerStateManager()
-            .updateContainerState(container.containerID().getProtobuf(),
-                HddsProtos.LifeCycleEvent.CLOSE);
+            .updateContainerStateWithSequenceId(container.containerID().getProtobuf(),
+                HddsProtos.LifeCycleEvent.CLOSE, 0L);
 
         //Create the recovering container in target DN.
         String encodedToken = cToken.encodeToUrlString();
@@ -936,12 +936,12 @@ public class TestContainerCommandsEC {
   private void closeContainer(long conID)
       throws IOException, InvalidStateTransitionException {
     //Close the container first.
-    scm.getContainerManager().getContainerStateManager().updateContainerState(
+    scm.getContainerManager().getContainerStateManager().updateContainerStateWithSequenceId(
         HddsProtos.ContainerID.newBuilder().setId(conID).build(),
-        HddsProtos.LifeCycleEvent.FINALIZE);
-    scm.getContainerManager().getContainerStateManager().updateContainerState(
+        HddsProtos.LifeCycleEvent.FINALIZE, 0L);
+    scm.getContainerManager().getContainerStateManager().updateContainerStateWithSequenceId(
         HddsProtos.ContainerID.newBuilder().setId(conID).build(),
-        HddsProtos.LifeCycleEvent.CLOSE);
+        HddsProtos.LifeCycleEvent.CLOSE, 0L);
   }
 
   private void checkBlockDataWithRetry(

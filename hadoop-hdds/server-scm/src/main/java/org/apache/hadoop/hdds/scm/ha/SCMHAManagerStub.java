@@ -18,9 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -218,26 +216,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     private Message process(final SCMRatisRequest request) throws Exception {
-      try {
-        final Object handler = handlers.get(request.getType());
-
-        if (handler == null) {
-          throw new IOException(
-              "No handler found for request type " + request.getType());
-        }
-
-        final Object result = handler.getClass()
-            .getMethod(request.getOperation(),
-                request.getParameterTypes())
-            .invoke(handler, request.getArguments());
-
-        return SCMRatisResponse.encode(result);
-      } catch (NoSuchMethodException | SecurityException ex) {
-        throw new InvalidProtocolBufferException(ex.getMessage());
-      } catch (InvocationTargetException e) {
-        final Throwable target = e.getTargetException();
-        throw target instanceof Exception ? (Exception) target : e;
-      }
+      return SCMStateMachine.process(request, handlers.get(request.getType()));
     }
 
     @Override

@@ -114,8 +114,7 @@ public class TestNodeDecommissionManager {
   @Test
   public void testHostStringsParseCorrectly()
       throws InvalidHostStringException {
-    NodeDecommissionManager.HostDefinition def =
-        new NodeDecommissionManager.HostDefinition("foobar");
+    NodeDecommissionManager.HostDefinition def = new NodeDecommissionManager.HostDefinition("foobar");
     assertEquals("foobar", def.getHostname());
     assertEquals(-1, def.getPort());
 
@@ -127,8 +126,7 @@ public class TestNodeDecommissionManager {
     assertEquals("foobar", def.getHostname());
     assertEquals(1234, def.getPort());
 
-    def = new NodeDecommissionManager.HostDefinition(
-        "foobar.mycompany.com:1234");
+    def = new NodeDecommissionManager.HostDefinition("foobar.mycompany.com:1234");
     assertEquals("foobar.mycompany.com", def.getHostname());
     assertEquals(1234, def.getPort());
 

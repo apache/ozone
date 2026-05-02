@@ -19,10 +19,12 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -47,6 +49,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,6 +88,13 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private long offset;
   // how much data has been ingested into the stream
   private long writeOffset;
+
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+
+  @Override
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
+    this.preCommits = preCommits;
+  }
 
   @VisibleForTesting
   public void insertFlushCheckpoint(long version) throws IOException {
@@ -484,6 +494,9 @@ public final class ECKeyOutputStream extends KeyOutputStream
           Preconditions.checkState(expectedSize == offset, String.format(
               "Expected: %d and actual %d write sizes do not match",
                   expectedSize, offset));
+        }
+        for (CheckedRunnable<IOException> preCommit : preCommits) {
+          preCommit.run();
         }
         blockOutputStreamEntryPool.commitKey(offset);
       }

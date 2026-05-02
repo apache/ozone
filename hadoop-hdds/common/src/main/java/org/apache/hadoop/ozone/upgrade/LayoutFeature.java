@@ -30,13 +30,13 @@ public interface LayoutFeature extends Versioned {
 
   String description();
 
-  default Optional<? extends UpgradeAction> action(UpgradeActionType p) {
+  default Optional<? extends UpgradeAction> action() {
     return Optional.empty();
   }
 
   /**
-   * Generic UpgradeAction interface. An operation that is run on specific
-   * upgrade states like post finalize, pre-downgrade etc.
+   * Generic UpgradeAction interface. An upgrade action is an operation that
+   * is run at least once as a pre-requisite to finalizing a layout feature.
    * @param <T>
    */
   interface UpgradeAction<T> {
@@ -51,34 +51,5 @@ public interface LayoutFeature extends Versioned {
   @Override
   default int version() {
     return this.layoutVersion();
-  }
-
-  /**
-   * Phase of execution for this action.
-   */
-  enum UpgradeActionType {
-
-    // Run every time an un-finalized component is started up.
-    VALIDATE_IN_PREFINALIZE,
-
-    // Run once when an upgraded cluster is started with this new
-    // layout version.
-    // If the action fails, it will be run again when the component is
-    // restarted.
-    // If updating the VERSION file fails, the action may be run again when the
-    // component is restarted, even if it finished successfully.
-    // NOTE 1 : This will not be run in a NEW cluster!
-    // NOTE 2 : This needs to be a backward compatible action until a DOWNGRADE
-    //  hook is provided!
-    //  Even if the action fails partway through, all on disk structures should
-    //  still be in a backwards compatible state.
-    // NOTE 3 : These actions are not submitted through RATIS (TODO)
-    ON_FIRST_UPGRADE_START,
-
-    // Run once during finalization of the layout feature.
-    // If the action fails, it will be run again when finalization is retried.
-    // If updating the VERSION file fails, the action may be run again when
-    // finalization is retried, even if it finished successfully.
-    ON_FINALIZE
   }
 }

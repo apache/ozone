@@ -24,9 +24,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.slf4j.Logger;
@@ -70,9 +70,7 @@ public class ClosingContainerHandler extends AbstractCheck {
 
     // TODO - review this logic - may need an empty check here
     if (request.getContainerReplicas().isEmpty()) {
-      request.getReport().incrementAndSample(
-          ReplicationManagerReport.HealthState.MISSING,
-          containerInfo.containerID());
+      request.getReport().incrementAndSample(ContainerHealthState.MISSING, containerInfo);
     }
 
     if (request.isReadOnly()) {

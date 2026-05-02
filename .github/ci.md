@@ -76,13 +76,6 @@ If they don't match, it describes how to make the updates to include the changes
 ### close-stale-prs Workflow
 [This](./workflows/close-stale-prs.yml) workflow is scheduled each night at midnight and uses the [actions/stale](https://github.com/actions/stale) to automatically manage inactive PRs. It marks PRs as stale after 21 days of inactivity and closes them 7 days later. If a stale PR receives any updates or comments, the stale label is automatically removed.
 
-### comment-commands Workflow
-[This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if the body of the comment begins with one of the following strings and, if so, invokes the corresponding command.
-- /help : [Show](./comment-commands/help.sh) all the available comment commands
-- /label : [Add](./comment-commands/label.sh) new label to the issue: /label "label"
-- /retest : [Provide](./comment-commands/retest.sh) help on how to trigger new CI build
-
-
 ## Old/Deprecated Workflows
 The following workflows no longer run but still exist on the [actions](https://github.com/apache/ozone/actions) page for historical reasons:
 - [Build](https://github.com/apache/ozone/actions/workflows/main.yml)
