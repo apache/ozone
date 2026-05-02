@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT;
 
@@ -95,7 +97,11 @@ public class DataNodeMetricsService {
         OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.metricsServiceProviderFactory = metricsServiceProviderFactory;
     this.lastCollectionEndTime.set(-minimumApiDelayMs);
-    int corePoolSize = Runtime.getRuntime().availableProcessors() * 2;
+    int corePoolSize = config.getInt(OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT,
+        OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT);
+    corePoolSize = corePoolSize > 0
+        ? corePoolSize
+        : OZONE_RECON_DN_METRICS_COLLECTION_THREAD_COUNT_DEFAULT;
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat("DataNodeMetricsCollector-%d")
         .build();
