@@ -204,18 +204,18 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   //---------------------------------------------------------------------------
   // Object Store (OBS) Tables:
   public static final String KEY_TABLE = "keyTable";
-  /** keyTable: /volume/bucket/key :- KeyInfo. */
+  /** keyTable: /volume/bucket/key :- KeyInfo (excludes fields only used in openKeyTable). */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(KEY_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getCodecForKeyTable(true));
 
   public static final String DELETED_TABLE = "deletedTable";
-  /** deletedTable: /volume/bucket/key :- RepeatedKeyInfo. */
+  /** deletedTable: /volume/bucket/key :- RepeatedKeyInfo (excludes fields only used in openKeyTable). */
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo> DELETED_TABLE_DEF
       = new DBColumnFamilyDefinition<>(DELETED_TABLE,
           StringCodec.get(),
-          RepeatedOmKeyInfo.getCodec(true));
+          RepeatedOmKeyInfo.getCodecForDeletedTable(true));
 
   public static final String OPEN_KEY_TABLE = "openKeyTable";
   /** openKeyTable: /volume/bucket/key/id :- KeyInfo. */
@@ -241,11 +241,11 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
   //---------------------------------------------------------------------------
   // File System Optimized (FSO) Tables:
   public static final String FILE_TABLE = "fileTable";
-  /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo. */
+  /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo (excludes fields only used in openKeyTable). */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(FILE_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getCodecForKeyTable(true));
 
   public static final String OPEN_FILE_TABLE = "openFileTable";
   /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
@@ -262,11 +262,14 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           OmDirectoryInfo.getCodec());
 
   public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
-  /** deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo. */
+  /**
+   * deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo
+   * (excludes fields only used in openKeyTable).
+   */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
       = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE,
           StringCodec.get(),
-          OmKeyInfo.getCodec(true));
+          OmKeyInfo.getCodecForKeyTable(true));
 
   //---------------------------------------------------------------------------
   // S3 Multi-Tenancy Tables
