@@ -22,6 +22,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -433,7 +434,7 @@ public final class ScmInvokerCodeGenerator {
       println("getImpl().%s(%s);", apiMethod.getName(), b);
       println("return Message.EMPTY;");
     } else {
-      println("returnType = %s.class;", getClassname(apiMethod.getReturnType()));
+      println("returnType = %s.class;", getClassnameForApi(apiMethod.getReturnType()));
       println("returnValue = getImpl().%s(%s);", apiMethod.getName(), b);
       println("break;");
     }
@@ -606,7 +607,7 @@ public final class ScmInvokerCodeGenerator {
   File updateFile(String classString) throws IOException {
     final File java = new File(DIR, invokerClassName + ".java");
     if (!java.isFile()) {
-      return createFile(java, classString);
+      throw new FileNotFoundException("Not found: " + java.getAbsolutePath());
     }
     final File tmp = new File(DIR, invokerClassName + "_tmp.java");
     if (tmp.exists()) {
@@ -680,40 +681,9 @@ public final class ScmInvokerCodeGenerator {
     }
   }
 
-  File createFile(File java, String classString) throws IOException {
-    try (OutputStream outStream = Files.newOutputStream(java.toPath(), StandardOpenOption.CREATE_NEW);
-        PrintWriter out = new PrintWriter(new OutputStreamWriter(outStream, UTF_8), true)) {
-      out.println("/*");
-      out.println(" * Licensed to the Apache Software Foundation (ASF) under one or more");
-      out.println(" * contributor license agreements. See the NOTICE file distributed with");
-      out.println(" * this work for additional information regarding copyright ownership.");
-      out.println(" * The ASF licenses this file to You under the Apache License, Version 2.0");
-      out.println(" * (the \"License\"); you may not use this file except in compliance with");
-      out.println(" * the License. You may obtain a copy of the License at");
-      out.println(" *");
-      out.println(" *      http://www.apache.org/licenses/LICENSE-2.0");
-      out.println(" *");
-      out.println(" * Unless required by applicable law or agreed to in writing, software");
-      out.println(" * distributed under the License is distributed on an \"AS IS\" BASIS,");
-      out.println(" * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.");
-      out.println(" * See the License for the specific language governing permissions and");
-      out.println(" * limitations under the License.");
-      out.println(" */");
-      out.println();
-      out.println("package org.apache.hadoop.hdds.scm.ha.invoker;");
-      out.println();
-      out.println("import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;");
-      out.println("import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;");
-      out.println("import org.apache.ratis.protocol.Message;");
-      out.println();
-      out.print(classString);
-    }
-    return java;
-  }
-
   static String stripTrailingSpaces(String s) {
     int end = s.length();
-    while (end > 0 && Character.isWhitespace(s.charAt(end - 1))) {
+    while (end > 0 && s.charAt(end - 1) == ' ') {
       end--;
     }
     return s.substring(0, end);
@@ -721,7 +691,7 @@ public final class ScmInvokerCodeGenerator {
 
   static String stripLeadingSpaces(String s) {
     int start = 0;
-    while (start < s.length() && Character.isWhitespace(s.charAt(start))) {
+    while (start < s.length() && s.charAt(start) == ' ') {
       start++;
     }
     return s.substring(start);
