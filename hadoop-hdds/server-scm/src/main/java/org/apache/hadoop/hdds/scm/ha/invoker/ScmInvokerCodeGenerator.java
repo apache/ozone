@@ -45,6 +45,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.util.Preconditions;
@@ -114,24 +115,38 @@ public final class ScmInvokerCodeGenerator {
     String s = lineBuffer.toString();
     lineBuffer.getBuffer().setLength(0);
 
-    if (s.length() <= LINE_LENGTH) {
-      out.append(s).append(System.lineSeparator());
-      return;
+    final int nonSpace = getLeadingSpaces(s);
+    String continuation = s.substring(0, nonSpace) + "    ";
+    while (s.length() > LINE_LENGTH) {
+      final int i = getLineBreakIndex(s);
+      out.append(stripTrailingSpaces(s.substring(0, i)))
+          .append(System.lineSeparator());
+      s = continuation + stripLeadingSpaces(s.substring(i));
     }
+    out.append(s).append(System.lineSeparator());
+  }
 
-    // break long lines
+  static int getLeadingSpaces(String s) {
     int nonSpace = 0;
-    while (s.charAt(nonSpace) == ' ') {
+    while (nonSpace < s.length() && s.charAt(nonSpace) == ' ') {
       nonSpace++;
     }
+    return nonSpace;
+  }
 
-    final int i = s.lastIndexOf(' ', LINE_LENGTH);
-    out.append(s.substring(0, i))
-        .append(System.lineSeparator());
-    out.append(s.substring(0, nonSpace)) // original indentation
-        .append("    ")
-        .append(s.substring(i + 1))
-        .append(System.lineSeparator());
+  static int getLineBreakIndex(String s) {
+    int i = s.lastIndexOf(' ', LINE_LENGTH);
+    if (i <= 0) {
+      return LINE_LENGTH;
+    }
+
+    if ("{".equals(s.substring(i).trim())) {
+      final int comma = s.lastIndexOf(',', i);
+      if (comma > 0) {
+        return comma + 1;
+      }
+    }
+    return i;
   }
 
   UncheckedAutoCloseable printScope() {
@@ -169,7 +184,9 @@ public final class ScmInvokerCodeGenerator {
   boolean hasSimpleNameConflict(Class<?> clazz) {
     final String simpleName = clazz.getSimpleName();
     return Arrays.stream(api.getMethods())
-        .flatMap(method -> Arrays.stream(method.getParameterTypes()))
+        .flatMap(method -> Stream.concat(
+            Arrays.stream(method.getParameterTypes()),
+            Stream.of(method.getReturnType())))
         .anyMatch(type -> type != clazz && type.getSimpleName().equals(simpleName));
   }
 
@@ -692,5 +709,21 @@ public final class ScmInvokerCodeGenerator {
       out.print(classString);
     }
     return java;
+  }
+
+  static String stripTrailingSpaces(String s) {
+    int end = s.length();
+    while (end > 0 && Character.isWhitespace(s.charAt(end - 1))) {
+      end--;
+    }
+    return s.substring(0, end);
+  }
+
+  static String stripLeadingSpaces(String s) {
+    int start = 0;
+    while (start < s.length() && Character.isWhitespace(s.charAt(start))) {
+      start++;
+    }
+    return s.substring(start);
   }
 }
