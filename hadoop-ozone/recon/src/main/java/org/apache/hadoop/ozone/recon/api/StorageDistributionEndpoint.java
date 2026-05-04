@@ -229,17 +229,16 @@ public class StorageDistributionEndpoint {
         );
 
     String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMATTER);
-
     // Retrieve clusterId from ReconContext
-    String ClusterID = "UnknownCluster";
+    String clusterID = "UnknownCluster";
     try {
       if (reconContext != null && StringUtils.isNotBlank(reconContext.getClusterId())) {
-        ClusterID = reconContext.getClusterId();
+        clusterID = reconContext.getClusterId();
       }
     } catch (Exception e) {
       LOG.warn("Could not retrieve cluster ID for export filename", e);
     }
-    String fileName = String.format("Datanode_Insights_%s_%s.csv", ClusterID, timestamp);
+    String fileName = String.format("Datanode_Insights_%s_%s.csv", clusterID, timestamp);
 
     return ReconUtils.downloadCsv(fileName, headers, data, columns);
   }
