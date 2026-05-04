@@ -18,11 +18,13 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -53,12 +55,15 @@ import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -82,9 +87,9 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * The balancer thread holds a <em>read</em> lock on the old replica while it copies the
  * container and then calls {@link ContainerSet#updateContainer} so the map points at the new
- * replica on another disk. Concurrent delete / block-deletion paths resolve the live
- * container by id via {@link ContainerSet#acquireContainerLock} and then operate on
- * that instance (paths/DB match the destination replica) {@link KeyValueContainerData} from before the swap.
+ * replica on another disk. Concurrent delete / block-deletion / unhealthy / close paths resolve
+ * the live container by id via {@link ContainerSet#acquireContainerLock} and then operate on
+ * that instance so paths, DB, and state match the destination replica.
  */
 @Timeout(60)
 class TestDiskBalancerWithConcurrentBackgroundTasks {
@@ -380,6 +385,146 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
         () -> diskBalancerLogs.getOutput().contains("Deleted expired container 42 after delay")
             && diskBalancerLogs.getOutput().contains(String.valueOf(CONTAINER_ID)),
         100, 10_000);
+  }
+
+  /**
+   * {@link KeyValueHandler#markContainerUnhealthy} with a stale container
+   * reference while DiskBalancer has already run {@link ContainerSet#updateContainer}
+   * (map = destination). Without {@link ContainerSet#acquireContainerLock}, the handler would
+   * take writeLock on the old object and mark it unhealthy after {@code markContainerForDelete}
+   * turns it {@link State#DELETED}, sending a false UNHEALTHY ICR for a replica SCM no longer tracks.
+   * With the fix, the live map entry (destination) is locked and marked {@link State#UNHEALTHY}.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  void markUnhealthyAppliedOnDestVolumeContainer(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    LogCapturer diskBalancerLogs = LogCapturer.captureLogs(DiskBalancerService.class);
+    String schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+
+    KeyValueContainer oldReplica = createClosedContainer(CONTAINER_ID, hotVolume, versionInfo);
+    Container staleContainerRef = oldReplica;
+
+    AfterInMemoryUpdateInjector raceInjector = new AfterInMemoryUpdateInjector();
+    DiskBalancerService.setInjector(raceInjector);
+
+    DiskBalancerService.DiskBalancerTask balancerTask =
+        (DiskBalancerService.DiskBalancerTask) diskBalancerService.getTasks().poll();
+    assertNotNull(balancerTask);
+    CompletableFuture<Void> balancerDone =
+        CompletableFuture.runAsync(balancerTask::call);
+
+    raceInjector.awaitSwapPoint();
+
+    Container<?> liveReplica = containerSet.getContainer(CONTAINER_ID);
+    assertNotNull(liveReplica);
+    assertNotEquals(staleContainerRef, liveReplica,
+        "ContainerSet should reference the destination replica at the race hook");
+    assertEquals(State.CLOSED, liveReplica.getContainerState());
+
+    ScanResult reason = getUnhealthyDataScanResult();
+    CountDownLatch unhealthyThreadStarted = new CountDownLatch(1);
+    CompletableFuture<Void> unhealthyDone = CompletableFuture.runAsync(() -> {
+      unhealthyThreadStarted.countDown();
+      try {
+        keyValueHandler.markContainerUnhealthy(staleContainerRef, reason);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    assertThat(unhealthyThreadStarted.await(10, TimeUnit.SECONDS)).isTrue();
+    Thread.sleep(200);
+
+    raceInjector.continueBalancer();
+    CompletableFuture.allOf(balancerDone, unhealthyDone).get(60, TimeUnit.SECONDS);
+
+    Container<?> afterMove = containerSet.getContainer(CONTAINER_ID);
+    assertNotNull(afterMove);
+    assertSame(liveReplica, afterMove);
+    assertEquals(State.UNHEALTHY, afterMove.getContainerState(),
+        "UNHEALTHY must apply to the live destination replica, not the stale source handle");
+
+    assertEquals(State.DELETED, staleContainerRef.getContainerState());
+    assertEquals(hotVolume, staleContainerRef.getContainerData().getVolume());
+
+    GenericTestUtils.waitFor(
+        () -> diskBalancerLogs.getOutput().contains("Deleted expired container 42 after delay")
+            && diskBalancerLogs.getOutput().contains(String.valueOf(CONTAINER_ID)),
+        100, 10_000);
+  }
+
+  /**
+   * SCM closeContainer with a stale source container while the map already references
+   * the destination after {@link ContainerSet#updateContainer}. Without resolving the live instance,
+   * the close would run on the source after it is DELETED and throw, leaving the destination
+   * {@link State#QUASI_CLOSED}. With {@link ContainerSet#acquireContainerLock}, the destination
+   * is closed to {@link State#CLOSED}.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  void closeContainerAppliesOnDestVolumeContainer(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    LogCapturer diskBalancerLogs = LogCapturer.captureLogs(DiskBalancerService.class);
+    String schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+
+    KeyValueContainer oldReplica = createClosedContainer(CONTAINER_ID, hotVolume, versionInfo);
+    persistQuasiClosedState(oldReplica);
+    Container staleContainerRef = oldReplica;
+
+    AfterInMemoryUpdateInjector raceInjector = new AfterInMemoryUpdateInjector();
+    DiskBalancerService.setInjector(raceInjector);
+
+    DiskBalancerService.DiskBalancerTask balancerTask =
+        (DiskBalancerService.DiskBalancerTask) diskBalancerService.getTasks().poll();
+    assertNotNull(balancerTask);
+    CompletableFuture<Void> balancerDone =
+        CompletableFuture.runAsync(balancerTask::call);
+
+    raceInjector.awaitSwapPoint();
+
+    Container<?> liveReplica = containerSet.getContainer(CONTAINER_ID);
+    assertNotNull(liveReplica);
+    assertNotEquals(staleContainerRef, liveReplica);
+    assertEquals(State.QUASI_CLOSED, liveReplica.getContainerState());
+
+    CountDownLatch closeThreadStarted = new CountDownLatch(1);
+    CompletableFuture<Void> closeDone = CompletableFuture.runAsync(() -> {
+      closeThreadStarted.countDown();
+      try {
+        keyValueHandler.closeContainer(staleContainerRef);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    assertThat(closeThreadStarted.await(10, TimeUnit.SECONDS)).isTrue();
+    Thread.sleep(200);
+
+    raceInjector.continueBalancer();
+    CompletableFuture.allOf(balancerDone, closeDone).get(60, TimeUnit.SECONDS);
+
+    Container<?> afterMove = containerSet.getContainer(CONTAINER_ID);
+    assertNotNull(afterMove);
+    assertSame(liveReplica, afterMove);
+    assertEquals(State.CLOSED, afterMove.getContainerState(),
+        "CLOSED transition must apply to the live destination replica");
+
+    assertEquals(State.DELETED, staleContainerRef.getContainerState());
+
+    GenericTestUtils.waitFor(
+        () -> diskBalancerLogs.getOutput().contains("Deleted expired container 42 after delay")
+            && diskBalancerLogs.getOutput().contains(String.valueOf(CONTAINER_ID)),
+        100, 10_000);
+  }
+
+  /**
+   * Makes {@link State#QUASI_CLOSED} visible on disk so import/copy sees the same state
+   * the in-memory container had before the move.
+   */
+  private void persistQuasiClosedState(KeyValueContainer container) throws IOException {
+    KeyValueContainerData data = container.getContainerData();
+    data.setState(State.QUASI_CLOSED);
+    File containerFile = ContainerUtils.getContainerFile(new File(data.getContainerPath()));
+    ContainerDataYaml.createContainerFile(data, containerFile);
   }
 
   private long readPendingDeleteBlockCount(KeyValueContainerData data) throws IOException {
