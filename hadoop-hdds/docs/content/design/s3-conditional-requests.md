@@ -105,8 +105,8 @@ temporary part state.
 |   |   |   |
 |---|---|---|
 |**Header**|**Meaning**|**Failure result**|
-|`If-None-Match: "*"`|Complete the MPU only if no committed object currently exists at the destination key.|`412 Precondition Failed` if the destination key already exists.|
-|`If-Match: "<etag>"`|Complete the MPU only if the current committed object exists and its ETag matches.|`412 Precondition Failed` if the object is missing or the ETag does not match.|
+|`If-None-Match: "*"`|Complete the MPU only if no committed object currently exists at the destination key.|`412 Precondition Failed` if the destination key already exists when the request is admitted; `409 ConditionalRequestConflict` if a conflicting write wins before the admitted complete request commits.|
+|`If-Match: "<etag>"`|Complete the MPU only if the current committed object exists and its ETag matches.|`412 Precondition Failed` if the object is missing or the ETag does not match when the request is admitted; `409 ConditionalRequestConflict` if a conflicting write wins before the admitted complete request commits.|
 
 #### Restrictions and Notes
 
@@ -118,6 +118,9 @@ temporary part state.
   object for `If-None-Match: *`.
 - The MPU parts remain associated with the multipart upload until the
   complete request succeeds or the upload is aborted.
+- After a `409 ConditionalRequestConflict`, the client must fetch the
+  latest object ETag, create a new multipart upload, re-upload the
+  parts, and complete that new upload using the latest condition.
 
 ### AWS S3 Conditional Read Specification
 
@@ -259,7 +262,7 @@ sequenceDiagram
         opt Open key created
             GW->>OM: commitKey()
             OM->>OM: Recheck key absence during commit
-            OM-->>GW: Success or generation mismatch
+            OM-->>GW: Success or ATOMIC_WRITE_CONFLICT
         end
     else If-Match: etag
         Note over GW,OM: No pre-read for current ETag/updateID on the optimistic path
@@ -269,10 +272,10 @@ sequenceDiagram
         opt Open key created
             GW->>OM: commitKey()
             OM->>OM: Reload open key and reuse atomic rewrite generation check
-            OM-->>GW: Success or KEY_NOT_FOUND
+            OM-->>GW: Success or ATOMIC_WRITE_CONFLICT
         end
     end
-    GW-->>User: 200 OK or 412 Precondition Failed
+    GW-->>User: 200 OK, 412 Precondition Failed, or 409 ConditionalRequestConflict
 ```
 
 #### If-None-Match Implementation
@@ -308,15 +311,17 @@ public static final long EXPECTED_DATA_GENERATION_CREATE_IF_NOT_EXISTS = -1L;
 
 1. During the commit phase (or strict atomic create), the OM validates that the key still does not exist.
 2. If a concurrent client created the key between the Create and Commit
-   phases, the transaction fails with a generation-mismatch error.
+   phases, the transaction fails with `ATOMIC_WRITE_CONFLICT`, which maps
+   to S3 `409 ConditionalRequestConflict`.
 
 ##### Race Condition Handling
 
 Using `OzoneConsts.EXPECTED_DATA_GENERATION_CREATE_IF_NOT_EXISTS = -1`
 ensures atomicity. If a concurrent write (Client B) commits between
 Client A's Create and Commit, Client A's commit fails the
-`CREATE IF NOT EXISTS` validation check, preserving strict
-create-if-not-exists semantics.
+`CREATE IF NOT EXISTS` validation check with `ATOMIC_WRITE_CONFLICT`,
+preserving strict create-if-not-exists semantics while telling the
+client to retry from a fresh object view.
 
 > **Note**: This ability will be added along with
 > [HDDS-13963](https://issues.apache.org/jira/browse/HDDS-13963)
@@ -395,15 +400,16 @@ from HDDS-10656:
 2. Read current committed key from `KeyTable`.
 3. Validate `currentKey.updateID == openKey.expectedDataGeneration`.
 4. If match, commit succeeds. If mismatch (concurrent modification),
-   throw `KEY_NOT_FOUND` (maps to S3 412).
+   throw `ATOMIC_WRITE_CONFLICT` (maps to S3 409).
 5. Clear the conditional fields before persisting the final committed
    key so they remain open-key state only.
 
 This approach ensures end-to-end atomicity: even if another client
 modifies the key between Create and Commit phases, the commit will
-fail. The gateway never needs to fetch `updateID` itself; OM derives it
-from the matched ETag during `createKey`, and the rest of the write then
-rides on the standard atomic rewrite path.
+fail with a retryable conflict instead of being reported as a failed
+precondition. The gateway never needs to fetch `updateID` itself; OM
+derives it from the matched ETag during `createKey`, and the rest of the
+write then rides on the standard atomic rewrite path.
 
 #### Error Mapping
 
@@ -411,18 +417,20 @@ rides on the standard atomic rewrite path.
 |---|---|---|---|
 |**OM Error**|**S3 Status**|**S3 Error Code**|**Scenario**|
 |`KEY_ALREADY_EXISTS`|412|PreconditionFailed|If-None-Match failed (key exists)|
-|`KEY_NOT_FOUND`|412|PreconditionFailed|If-Match failed (key missing or concurrent modification)|
+|`KEY_NOT_FOUND`|412|PreconditionFailed|If-Match failed during admission because the key is missing|
 |`ETAG_NOT_AVAILABLE`|412|PreconditionFailed|If-Match failed (key has no ETag, e.g., created via OFS)|
 |`ETAG_MISMATCH`|412|PreconditionFailed|If-Match failed (ETag mismatch)|
+|`ATOMIC_WRITE_CONFLICT`|409|ConditionalRequestConflict|An admitted conditional write lost a concurrent commit race|
 
 ## AWS S3 Conditional CompleteMultipartUpload Implementation
 
 Conditional MPU completion should reuse the same conditional write fields
-already present in `KeyArgs`, but unlike normal conditional `PUT`, it
-does not need an open-key plus later commit bridge. The final key is
-assembled and committed inside one OM transaction in
-`S3MultipartUploadCompleteRequest.validateAndUpdateCache(...)` while
-holding the normal bucket write lock.
+already present in `KeyArgs`. Unlike normal conditional `PUT`, the
+gateway does not stream object data through an open-key plus later
+client-side commit path. However, the condition still needs the same
+admission/commit split: OM resolves the destination precondition before
+the complete request is admitted, then revalidates the resolved
+generation during the serialized commit transaction.
 
 ### Request Sequence
 
@@ -435,17 +443,23 @@ sequenceDiagram
     User->>GW: CompleteMultipartUpload with optional If-None-Match / If-Match
     GW->>GW: Parse conditional write headers
     GW->>OM: completeMultipartUpload(keyArgs + partsList)
-    OM->>OM: Acquire bucket lock
-    OM->>OM: Load current committed key and MPU state
-    OM->>OM: Validate destination precondition
-    alt Precondition failed
+    OM->>OM: Admission check: verify MPU exists and resolve condition
+    alt Admission precondition failed
         OM-->>GW: KEY_ALREADY_EXISTS / KEY_NOT_FOUND / ETAG_*
         GW-->>User: 412 Precondition Failed
-    else Preconditions pass
-        OM->>OM: Validate MPU parts and build final key
-        OM->>OM: Write key table entry and remove MPU state
-        OM-->>GW: Success
-        GW-->>User: 200 OK
+    else Request admitted
+        OM->>OM: Acquire bucket lock
+        OM->>OM: Load current committed key and MPU state
+        OM->>OM: Revalidate expectedDataGeneration at commit
+        alt Admitted condition became stale
+            OM-->>GW: ATOMIC_WRITE_CONFLICT
+            GW-->>User: 409 ConditionalRequestConflict
+        else Condition still holds
+            OM->>OM: Validate MPU parts and build final key
+            OM->>OM: Write key table entry and remove MPU state
+            OM-->>GW: Success
+            GW-->>User: 200 OK
+        end
     end
 ```
 
@@ -462,38 +476,50 @@ sequenceDiagram
    - `If-Match: "<etag>"` -> `expectedETag = <etag>`
 4. Ensure the OM protocol translator copies these optional fields from
    `OmKeyArgs` into the `CompleteMultiPartUploadRequest` `KeyArgs`.
-5. Map conditional validation failures to the same S3
-   `PreconditionFailed` response used by the other conditional write
-   paths.
+5. Map admission-time conditional validation failures to
+   `PreconditionFailed`, and map commit-time
+   `ATOMIC_WRITE_CONFLICT` failures to
+   `ConditionalRequestConflict`.
 
 ### OM Validation
 
-Validation should occur in
-`S3MultipartUploadCompleteRequest.validateAndUpdateCache(...)` after the
-request acquires the bucket write lock and before it assembles the final
-key from the uploaded parts.
+Validation is split between request admission and serialized commit.
+This lets Ozone return `412 PreconditionFailed` when the caller's
+condition is already false, and `409 ConditionalRequestConflict` when a
+condition that was true at admission becomes stale before commit.
 
 The proposed flow is:
 
-1. Load the current committed destination key from `keyTable`.
-2. Reuse the same `If-Match` validation helper already used by
+1. During admission, verify that the multipart upload still exists for
+   conditional complete requests.
+2. Load the current committed destination key and call
+   `resolveConditionalWriteAtAdmission(...)`.
+3. For `If-Match`, reuse the same ETag validation helper used by
    conditional `PUT` to convert `expectedETag` into
-   `expectedDataGeneration`.
-3. Reuse the same atomic rewrite validation helper to evaluate:
-   - create-if-absent semantics for `If-None-Match: *`
-   - generation/ETag match semantics for `If-Match`
-4. If validation passes, continue with the existing MPU complete logic:
+   `expectedDataGeneration`. For `If-None-Match: *`, validate the
+   create-if-absent marker as an admission-time precondition.
+4. During `S3MultipartUploadCompleteRequest.validateAndUpdateCache(...)`,
+   while applying the request as a serialized OM transaction, reload the
+   current committed key and call `validateAtomicRewriteAtCommit(...)`
+   when `expectedDataGeneration` is present.
+5. If the admitted generation is stale, fail with
+   `ATOMIC_WRITE_CONFLICT`. This check runs before reporting a missing
+   MPU state, so duplicate conditional complete attempts for the same
+   upload surface the object conflict instead of being reduced to
+   `NoSuchUpload`.
+6. If validation passes, continue with the existing MPU complete logic:
    validate part order, validate part identity, compute the MPU ETag,
    write the final key, and delete the multipart metadata/open-key
    state.
-5. Clear conditional-only fields before persisting the committed key so
+7. Clear conditional-only fields before persisting the committed key so
    they remain request-scoped metadata rather than part of the final key
    state.
 
-Because the final destination validation and the key-table write happen
-under the same OM bucket lock in one request, this path does not need a
-separate second-phase commit revalidation step like conditional
-`PutObject`.
+The complete operation still writes the final key in one OM transaction.
+The additional commit-time generation check exists to distinguish a
+stale admitted condition from an admission-time precondition failure and
+to preserve AWS-compatible retry guidance for racing conditional
+completes.
 
 ### Error Mapping
 
@@ -504,13 +530,12 @@ separate second-phase commit revalidation step like conditional
 |`KEY_NOT_FOUND`|412|PreconditionFailed|`If-Match` failed because the current destination object is missing|
 |`ETAG_NOT_AVAILABLE`|412|PreconditionFailed|Destination key has no ETag metadata|
 |`ETAG_MISMATCH`|412|PreconditionFailed|Destination ETag mismatch|
+|`ATOMIC_WRITE_CONFLICT`|409|ConditionalRequestConflict|The destination changed after the condition was admitted but before the complete request committed|
 
-If Ozone later introduces an explicit conflict result for this path, the
-gateway should map it to `409 ConditionalRequestConflict`, reusing the
-same S3 error mapping as conditional `PutObject`. The initial MPU
-complete design does not require a dedicated second-phase conflict
-signal because the validation and final key update are already
-serialized in one OM transaction.
+On `409 ConditionalRequestConflict`, the client should fetch the latest
+destination object ETag, initiate a new multipart upload, re-upload the
+parts, and complete the new upload with a condition based on that latest
+view.
 
 ## AWS S3 Conditional Read Implementation
 
@@ -608,9 +633,9 @@ sequenceDiagram
         opt Destination open key created
             GW->>OM: commit destination key using source snapshot
             OM->>OM: Revalidate generation for conditional writes
-            OM-->>GW: Success or 412-mapped error
+            OM-->>GW: Success or ATOMIC_WRITE_CONFLICT
         end
-        GW-->>User: 200 OK or 412 Precondition Failed
+        GW-->>User: 200 OK, 412 Precondition Failed, or 409 ConditionalRequestConflict
     end
 ```
 
@@ -663,13 +688,15 @@ Conditional support should remain orthogonal to the existing metadata/tagging di
 |**Failure point**|**OM/Gateway result**|**S3 Status**|**Scenario**|
 |Source validator|Gateway precondition failure|412|Source ETag/date condition failed|
 |Destination validator|`KEY_ALREADY_EXISTS`|412|`If-None-Match` failed at destination|
-|Destination validator|`KEY_NOT_FOUND`|412|`If-Match` failed because destination is missing or changed|
+|Destination validator|`KEY_NOT_FOUND`|412|`If-Match` failed because destination is missing during admission|
 |Destination validator|`ETAG_NOT_AVAILABLE`|412|Destination key has no ETag metadata|
 |Destination validator|`ETAG_MISMATCH`|412|Destination ETag mismatch|
+|Destination commit|`ATOMIC_WRITE_CONFLICT`|409|Destination changed after the conditional open was admitted|
 
-This initial design intentionally reuses the `412` mapping already described for conditional writes. If Ozone later
-wants to distinguish in-flight destination races with a dedicated `409 ConditionalRequestConflict`, that can be added
-without changing the overall structure above.
+Admission-time destination failures reuse the `412` mapping already
+described for conditional writes. Once a destination condition has been
+admitted, a later generation mismatch is a write conflict and should be
+reported as `409 ConditionalRequestConflict`.
 
 ## AWS S3 Conditional Delete Implementation
 
