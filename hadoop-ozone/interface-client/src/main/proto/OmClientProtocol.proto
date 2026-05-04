@@ -1192,11 +1192,6 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
-
-    // expectedETag, when set, indicates that the existing key must have
-    // the given ETag for the operation to succeed. This is used for
-    // S3 conditional writes with the If-Match header.
-    optional string expectedETag = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
