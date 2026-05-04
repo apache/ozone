@@ -359,41 +359,28 @@ public final class TracingUtil {
   public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
       String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
     if (conf == null || !isTracingEnabled(conf)) {
-      return () -> {
-      };
+      return () -> {};
     }
 
-    final class HeaderCarrier {
-      private final Function<String, String> fn;
-
-      private HeaderCarrier(Function<String, String> fn) {
-        this.fn = fn;
-      }
+    String traceparent = getHeader.apply("traceparent");
+    if (traceparent == null || traceparent.isEmpty()) {
+      return () -> {};
     }
 
-    HeaderCarrier carrier = new HeaderCarrier(getHeader);
-    TextMapGetter<HeaderCarrier> getter = new TextMapGetter<HeaderCarrier>() {
-      @Override
-      public Iterable<String> keys(HeaderCarrier c) {
-        return Arrays.asList("traceparent", "tracestate");
-      }
-
-      @Override
-      public String get(HeaderCarrier c, String key) {
-        if (c == null) {
-          return null;
-        }
-        return c.fn.apply(key);
-      }
-    };
-
-    W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
-    Context remote = propagator.extract(Context.current(), carrier, getter);
-    Span parentSpan = Span.fromContext(remote);
-    if (!parentSpan.getSpanContext().isValid()) {
-      return () -> {
-      };
+    StringBuilder encoded = new StringBuilder().append("traceparent=").append(traceparent);
+    String tracestate = getHeader.apply("tracestate");
+    if (tracestate != null && !tracestate.isEmpty()) {
+      encoded.append(";tracestate=").append(tracestate);
     }
+
+    Context remote =
+        W3CTraceContextPropagator.getInstance().extract(
+            Context.current(), encoded.toString(), new TextExtractor());
+
+    if (!Span.fromContext(remote).getSpanContext().isValid()) {
+      return () -> {};
+    }
+
     Span span = tracer.spanBuilder(spanName).setParent(remote).startSpan();
     Scope scope = span.makeCurrent();
     return () -> {
