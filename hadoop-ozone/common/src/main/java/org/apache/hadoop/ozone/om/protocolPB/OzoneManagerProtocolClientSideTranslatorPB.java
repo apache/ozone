@@ -1805,6 +1805,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     }
 
+    if (omKeyArgs.getExpectedDataGeneration() != null) {
+      keyArgs.setExpectedDataGeneration(omKeyArgs.getExpectedDataGeneration());
+    }
+    if (omKeyArgs.getExpectedETag() != null) {
+      keyArgs.setExpectedETag(omKeyArgs.getExpectedETag());
+    }
+
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());
     multipartUploadCompleteRequest.addAllPartsList(multipartUploadList
         .getPartsList());
