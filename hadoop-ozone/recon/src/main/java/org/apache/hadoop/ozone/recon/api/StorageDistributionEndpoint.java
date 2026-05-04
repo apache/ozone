@@ -85,6 +85,8 @@ public class StorageDistributionEndpoint {
   private final ReconGlobalMetricsService reconGlobalMetricsService;
   private final DataNodeMetricsService dataNodeMetricsService;
   private final ReconContext reconContext;
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
@@ -223,22 +225,21 @@ public class StorageDistributionEndpoint {
             v -> v.getReport() != null ? formatBytesToGB(v.getReport().getCommitted()) : -1,
             v -> v.getReport() != null ? formatBytesToGB(v.getReport().getReserved()) : -1,
             v -> v.getReport() != null ? formatBytesToGB(v.getReport().getMinimumFreeSpace()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getMetric().getPendingBlockSize()) : -1
+            v -> v.getMetric() != null ? formatBytesToGB(v.getMetric().getPendingBlockSize()) : -1
         );
 
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
-    String timestamp = LocalDateTime.now().format(formatter);
+    String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMATTER);
 
     // Retrieve clusterId from ReconContext
-    String clusterName = "UnknownCluster";
+    String ClusterID = "UnknownCluster";
     try {
       if (reconContext != null && StringUtils.isNotBlank(reconContext.getClusterId())) {
-        clusterName = reconContext.getClusterId();
+        ClusterID = reconContext.getClusterId();
       }
     } catch (Exception e) {
       LOG.warn("Could not retrieve cluster ID for export filename", e);
     }
-    String fileName = String.format("Datanode_Insights_%s_%s.csv", clusterName, timestamp);
+    String fileName = String.format("Datanode_Insights_%s_%s.csv", ClusterID, timestamp);
 
     return ReconUtils.downloadCsv(fileName, headers, data, columns);
   }
