@@ -55,17 +55,17 @@ public final class ReconScmContainerSyncMetrics {
    */
   public static final int TARGETED_SYNC_STATUS_FAILURE = 3;
 
-  @Metric(about = "Count of full SCM DB snapshot download events caused by "
-      + "non-OPEN container drift exceeding the configured threshold")
-  private MutableCounterLong fullScmDbSnapshotDownloadCount;
+  @Metric(about = "Count of events where non-OPEN container drift exceeded "
+      + "the full SCM DB snapshot threshold")
+  private MutableCounterLong fullScmDbSnapshotThresholdExceededCount;
 
-  @Metric(about = "Last non-OPEN container drift that triggered a full SCM DB "
-      + "snapshot download")
-  private MutableGaugeLong lastFullScmDbSnapshotDownloadNonOpenDrift;
+  @Metric(about = "Last non-OPEN container drift observed when the full SCM "
+      + "DB snapshot threshold was exceeded")
+  private MutableGaugeLong lastFullScmDbSnapshotThresholdExceededNonOpenDrift;
 
-  @Metric(about = "Time between the last two full SCM DB snapshot download "
-      + "events in milliseconds")
-  private MutableGaugeLong intervalSinceLastFullScmDbSnapshotDownloadMs;
+  @Metric(about = "Time between the last two full SCM DB snapshot threshold "
+      + "exceeded events in milliseconds")
+  private MutableGaugeLong intervalSinceLastFullScmDbSnapshotThresholdExceededMs;
 
   @Metric(about = "Last OPEN container drift that triggered targeted sync")
   private MutableGaugeLong lastOpenContainerDrift;
@@ -83,7 +83,7 @@ public final class ReconScmContainerSyncMetrics {
   @Metric(about = "Time taken by the last targeted sync in milliseconds")
   private MutableGaugeLong lastTargetedSyncDurationMs;
 
-  private long lastFullSnapshotDownloadTimestampMs;
+  private long lastFullSnapshotThresholdExceededTimestampMs;
 
   private ReconScmContainerSyncMetrics() {
   }
@@ -100,15 +100,16 @@ public final class ReconScmContainerSyncMetrics {
     ms.unregisterSource(SOURCE_NAME);
   }
 
-  public synchronized void recordFullSnapshotDownloadEvent(long nonOpenDrift) {
-    fullScmDbSnapshotDownloadCount.incr();
-    lastFullScmDbSnapshotDownloadNonOpenDrift.set(nonOpenDrift);
+  public synchronized void recordFullSnapshotThresholdExceededEvent(
+      long nonOpenDrift) {
+    fullScmDbSnapshotThresholdExceededCount.incr();
+    lastFullScmDbSnapshotThresholdExceededNonOpenDrift.set(nonOpenDrift);
     long now = Time.monotonicNow();
-    if (lastFullSnapshotDownloadTimestampMs > 0) {
-      intervalSinceLastFullScmDbSnapshotDownloadMs.set(
-          now - lastFullSnapshotDownloadTimestampMs);
+    if (lastFullSnapshotThresholdExceededTimestampMs > 0) {
+      intervalSinceLastFullScmDbSnapshotThresholdExceededMs.set(
+          now - lastFullSnapshotThresholdExceededTimestampMs);
     }
-    lastFullSnapshotDownloadTimestampMs = now;
+    lastFullSnapshotThresholdExceededTimestampMs = now;
   }
 
   public void recordOpenContainerDrift(long drift) {
@@ -131,16 +132,16 @@ public final class ReconScmContainerSyncMetrics {
     lastTargetedSyncDurationMs.set(durationMs);
   }
 
-  public long getFullScmDbSnapshotDownloadCount() {
-    return fullScmDbSnapshotDownloadCount.value();
+  public long getFullScmDbSnapshotThresholdExceededCount() {
+    return fullScmDbSnapshotThresholdExceededCount.value();
   }
 
-  public long getLastFullScmDbSnapshotDownloadNonOpenDrift() {
-    return lastFullScmDbSnapshotDownloadNonOpenDrift.value();
+  public long getLastFullScmDbSnapshotThresholdExceededNonOpenDrift() {
+    return lastFullScmDbSnapshotThresholdExceededNonOpenDrift.value();
   }
 
-  public long getIntervalSinceLastFullScmDbSnapshotDownloadMs() {
-    return intervalSinceLastFullScmDbSnapshotDownloadMs.value();
+  public long getIntervalSinceLastFullScmDbSnapshotThresholdExceededMs() {
+    return intervalSinceLastFullScmDbSnapshotThresholdExceededMs.value();
   }
 
   public long getLastOpenContainerDrift() {

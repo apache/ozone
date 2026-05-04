@@ -444,7 +444,8 @@ public class ReconStorageContainerManagerFacade
     // — and then:
     //
     //   |total drift| > threshold (default 1,000,000)
-    //       → full snapshot: replace Recon's entire SCM DB from SCM checkpoint
+    //       → warn and expose the drift via metrics; full snapshot is not
+    //         downloaded automatically by this periodic task
     //
     //   0 < |total drift| <= threshold
     //       → targeted sync: 4-pass incremental repair
@@ -477,13 +478,11 @@ public class ReconStorageContainerManagerFacade
             containerSyncHelper.decideSyncAction();
         switch (action) {
         case FULL_SNAPSHOT:
-          LOG.info("Tiered sync decision: FULL_SNAPSHOT. "
-              + "Replacing Recon SCM DB with fresh SCM checkpoint.");
-          // updateReconSCMDBWithNewSnapshot guards itself with its own CAS;
-          // release our guard first so its internal guard can acquire.
-          isSyncDataFromSCMRunning.set(false);
-          updateReconSCMDBWithNewSnapshot();
-          return;   // finally block below will not double-release
+          LOG.warn("Tiered sync decision: FULL_SNAPSHOT. "
+              + "Non-OPEN container drift exceeded the configured threshold, "
+              + "but periodic full SCM DB snapshot download is disabled. "
+              + "Skipping automatic SCM checkpoint replacement.");
+          break;
         case TARGETED_SYNC:
           LOG.info("Tiered sync decision: TARGETED_SYNC. Running 4-pass incremental sync.");
           boolean success = runTargetedSyncWithMetrics();

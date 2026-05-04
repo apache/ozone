@@ -208,10 +208,10 @@ class ReconStorageContainerSyncHelper {
     if (nonOpenDrift > largeThreshold) {
       LOG.warn("Non-OPEN container drift {} exceeds threshold {} "
               + "(SCM_non_OPEN={}, Recon_non_OPEN={}, SCM_total={}, Recon_total={}). "
-              + "Triggering full snapshot.",
+              + "Recording full snapshot threshold-exceeded event.",
           nonOpenDrift, largeThreshold, scmNonOpen, reconNonOpen, scmTotal, reconTotal);
       if (metrics != null) {
-        metrics.recordFullSnapshotDownloadEvent(nonOpenDrift);
+        metrics.recordFullSnapshotThresholdExceededEvent(nonOpenDrift);
       }
       return SyncAction.FULL_SNAPSHOT;
     }

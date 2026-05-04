@@ -157,6 +157,15 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.snapshot.enabled";
   public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = true;
 
+  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT =
+      "ozone.recon.scm.connection.timeout";
+  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT_DEFAULT = "5s";
+
+  public static final String OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT =
+      "ozone.recon.scm.connection.request.timeout";
+  public static final String
+      OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
+
   public static final String OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD =
       "ozone.recon.nssummary.flush.db.max.threshold";
 
@@ -195,6 +204,15 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY =
       "ozone.recon.scm.snapshot.task.initial.delay";
 
+  public static final String
+      OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
+      "ozone.recon.scm.snapshot.task.interval.delay";
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT
+      = "24h";
+
   /**
    * How often the incremental (targeted) SCM container sync runs.
    *
@@ -210,7 +228,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.container.sync.task.interval.delay";
 
   public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT
-      = "12h";
+      = "1h";
 
   /**
    * Initial delay before the first incremental SCM container sync run.

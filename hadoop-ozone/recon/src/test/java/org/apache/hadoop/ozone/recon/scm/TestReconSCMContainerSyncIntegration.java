@@ -223,8 +223,9 @@ public class TestReconSCMContainerSyncIntegration
 
     @Test
     void largeTotalDriftReturnsFullSnapshot() throws Exception {
-      // Recon empty, SCM has 200,000 containers → above default 100k threshold
-      when(mockScm.getContainerCount()).thenReturn(200_000L);
+      // Recon empty, SCM is above the default threshold.
+      when(mockScm.getContainerCount()).thenReturn(
+          (long) OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT + 1L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
       assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
@@ -261,8 +262,9 @@ public class TestReconSCMContainerSyncIntegration
     void largeNonOpenDriftStillReturnsFullSnapshot() throws Exception {
       // Most of SCM's drift is in stable states, so a full snapshot is still
       // the correct escalation path.
-      when(mockScm.getContainerCount()).thenReturn(200_000L);
-      when(mockScm.getContainerCount(OPEN)).thenReturn(50_000L);
+      when(mockScm.getContainerCount()).thenReturn(
+          (long) OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT + 50_000L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(49_999L);
 
       assertEquals(SyncAction.FULL_SNAPSHOT, syncHelper.decideSyncAction());
     }
