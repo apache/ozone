@@ -224,10 +224,12 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
     RewriteResult<Snapshot> rewriteVersionResult = rewriteVersionFiles(endMetadata);
     Set<Snapshot> deltaSnapshots = deltaSnapshots(startMetadata, rewriteVersionResult.toRewrite());
+    Set<Long> deltaSnapshotIds =  deltaSnapshots.stream().map(Snapshot::snapshotId).collect(Collectors.toSet());
     Set<Snapshot> validSnapshots = new HashSet<>(RewriteTablePathOzoneUtils.snapshotSet(endMetadata));
     validSnapshots.removeAll(RewriteTablePathOzoneUtils.snapshotSet(startMetadata));
     //TODO: manifestsToRewrite will be used while re-write of manifest-list files.
-    Set<String> manifestsToRewrite = manifestsToRewrite(deltaSnapshots, validSnapshots, startMetadata);
+    Set<String> manifestsToRewrite = manifestsToRewrite(validSnapshots, 
+        startMetadata != null ? deltaSnapshotIds : null);
 
     Set<Pair<String, String>> copyPlan = new HashSet<>();
     copyPlan.addAll(rewriteVersionResult.copyPlan());
@@ -275,15 +277,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     return result;
   }
 
-  private Set<String> manifestsToRewrite(Set<Snapshot> deltaSnapshots, Set<Snapshot> validSnapshots,
-      TableMetadata startMetadata) {
-
-    final Set<Long> deltaSnapshotIds;
-    if (startMetadata != null) {
-      deltaSnapshotIds = deltaSnapshots.stream().map(Snapshot::snapshotId).collect(Collectors.toSet());
-    } else {
-      deltaSnapshotIds = null;
-    }
+  private Set<String> manifestsToRewrite(Set<Snapshot> validSnapshots, Set<Long> deltaSnapshotIds) {
 
     Set<String> manifestPaths = ConcurrentHashMap.newKeySet();
     int maxInFlight = parallelism * MAX_INFLIGHT_MULTIPLIER;
