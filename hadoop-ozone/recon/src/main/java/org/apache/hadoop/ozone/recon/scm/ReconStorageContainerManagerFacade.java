@@ -51,7 +51,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -168,6 +170,144 @@ public class ReconStorageContainerManagerFacade
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
   private final ReconStorageContainerSyncHelper containerSyncHelper;
+  private final ExecutorService scmSnapshotExecutor;
+  private final Object scmSnapshotLock = new Object();
+  private Future<?> scmSnapshotFuture;
+  private ScmDbSnapshotSyncStatus scmSnapshotStatus =
+      ScmDbSnapshotSyncStatus.IDLE;
+  private ScmDbSnapshotSyncPhase scmSnapshotPhase =
+      ScmDbSnapshotSyncPhase.NONE;
+  private long scmSnapshotStartedAt;
+  private long scmSnapshotFinishedAt;
+  private boolean scmSnapshotCancelAllowed;
+  private boolean scmSnapshotTaskStarted;
+  private String scmSnapshotLastError;
+
+  public enum ScmDbSnapshotSyncStatus {
+    IDLE,
+    IN_PROGRESS,
+    SUCCESS,
+    FAILED,
+    CANCELLED
+  }
+
+  public enum ScmDbSnapshotSyncPhase {
+    NONE,
+    DOWNLOADING_CHECKPOINT,
+    INITIALIZING_DB,
+    SWAPPING_DB,
+    COMPLETED,
+    FAILED,
+    CANCELLED
+  }
+
+  public static final class ScmDbSnapshotStatusResponse {
+    private final ScmDbSnapshotSyncStatus status;
+    private final ScmDbSnapshotSyncPhase phase;
+    private final long startedAt;
+    private final long finishedAt;
+    private final long durationMs;
+    private final boolean cancelAllowed;
+    private final String lastError;
+
+    public ScmDbSnapshotStatusResponse(ScmDbSnapshotSyncStatus status,
+        ScmDbSnapshotSyncPhase phase, long startedAt, long finishedAt,
+        boolean cancelAllowed, String lastError) {
+      this.status = status;
+      this.phase = phase;
+      this.startedAt = startedAt;
+      this.finishedAt = finishedAt;
+      long endTime = finishedAt > 0 ? finishedAt : System.currentTimeMillis();
+      this.durationMs = startedAt > 0 ? endTime - startedAt : 0;
+      this.cancelAllowed = cancelAllowed;
+      this.lastError = lastError;
+    }
+
+    public ScmDbSnapshotSyncStatus getStatus() {
+      return status;
+    }
+
+    public ScmDbSnapshotSyncPhase getPhase() {
+      return phase;
+    }
+
+    public long getStartedAt() {
+      return startedAt;
+    }
+
+    public long getFinishedAt() {
+      return finishedAt;
+    }
+
+    public long getDurationMs() {
+      return durationMs;
+    }
+
+    public boolean isCancelAllowed() {
+      return cancelAllowed;
+    }
+
+    public String getLastError() {
+      return lastError;
+    }
+  }
+
+  public static final class ScmDbSnapshotTriggerResponse {
+    private final boolean accepted;
+    private final ScmDbSnapshotSyncStatus status;
+    private final String message;
+
+    public ScmDbSnapshotTriggerResponse(boolean accepted,
+        ScmDbSnapshotSyncStatus status, String message) {
+      this.accepted = accepted;
+      this.status = status;
+      this.message = message;
+    }
+
+    public boolean isAccepted() {
+      return accepted;
+    }
+
+    public ScmDbSnapshotSyncStatus getStatus() {
+      return status;
+    }
+
+    public String getMessage() {
+      return message;
+    }
+  }
+
+  public static final class ScmDbSnapshotCancelResponse {
+    private final boolean cancelled;
+    private final ScmDbSnapshotSyncStatus status;
+    private final ScmDbSnapshotSyncPhase phase;
+    private final String message;
+
+    public ScmDbSnapshotCancelResponse(boolean cancelled,
+        ScmDbSnapshotSyncStatus status, ScmDbSnapshotSyncPhase phase,
+        String message) {
+      this.cancelled = cancelled;
+      this.status = status;
+      this.phase = phase;
+      this.message = message;
+    }
+
+    public boolean isCancelled() {
+      return cancelled;
+    }
+
+    public ScmDbSnapshotSyncStatus getStatus() {
+      return status;
+    }
+
+    public ScmDbSnapshotSyncPhase getPhase() {
+      return phase;
+    }
+
+    public String getMessage() {
+      return message;
+    }
+  }
 
   // To Do :- Refactor the constructor in a separate JIRA
   @Inject
@@ -249,6 +389,11 @@ public class ReconStorageContainerManagerFacade
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();
+    this.scmSnapshotExecutor = Executors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + "-SCM-Snapshot-Trigger-%d")
+            .setDaemon(true)
+            .build());
     this.containerCountBySizeDao = containerCountBySizeDao;
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
@@ -499,6 +644,7 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
+    scmSnapshotExecutor.shutdownNow();
     IOUtils.close(LOG, dbStore);
   }
 
@@ -550,20 +696,159 @@ public class ReconStorageContainerManagerFacade
 
   public void updateReconSCMDBWithNewSnapshot() throws IOException {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
-      DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
-      if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
-        LOG.info("Got new checkpoint from SCM : " +
-            dbSnapshot.getCheckpointLocation());
-        try {
-          initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
-        } catch (IOException e) {
-          LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
-        }
-      } else {
-        LOG.error("Null snapshot location got from SCM.");
+      try {
+        updateReconSCMDBWithNewSnapshotWithoutGuard();
+      } finally {
+        isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
     } else {
       LOG.warn("SCM DB sync is already running.");
+    }
+  }
+
+  private void updateReconSCMDBWithNewSnapshotWithoutGuard()
+      throws IOException {
+    DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+    if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
+      LOG.info("Got new checkpoint from SCM : {}",
+          dbSnapshot.getCheckpointLocation());
+      initializeNewRdbStore(dbSnapshot.getCheckpointLocation().toFile());
+    } else {
+      throw new IOException("Null snapshot location got from SCM.");
+    }
+  }
+
+  public ScmDbSnapshotTriggerResponse triggerScmDbSnapshotSync() {
+    synchronized (scmSnapshotLock) {
+      if (!isSyncDataFromSCMRunning.compareAndSet(false, true)) {
+        return new ScmDbSnapshotTriggerResponse(false, scmSnapshotStatus,
+            "SCM DB sync is already running.");
+      }
+      scmSnapshotStatus = ScmDbSnapshotSyncStatus.IN_PROGRESS;
+      scmSnapshotPhase = ScmDbSnapshotSyncPhase.DOWNLOADING_CHECKPOINT;
+      scmSnapshotStartedAt = System.currentTimeMillis();
+      scmSnapshotFinishedAt = 0;
+      scmSnapshotCancelAllowed = true;
+      scmSnapshotTaskStarted = false;
+      scmSnapshotLastError = null;
+      scmSnapshotFuture = scmSnapshotExecutor.submit(this::runScmSnapshotSync);
+      return new ScmDbSnapshotTriggerResponse(true, scmSnapshotStatus,
+          "SCM DB snapshot sync started.");
+    }
+  }
+
+  public ScmDbSnapshotStatusResponse getScmDbSnapshotSyncStatus() {
+    synchronized (scmSnapshotLock) {
+      return new ScmDbSnapshotStatusResponse(scmSnapshotStatus,
+          scmSnapshotPhase, scmSnapshotStartedAt, scmSnapshotFinishedAt,
+          scmSnapshotCancelAllowed, scmSnapshotLastError);
+    }
+  }
+
+  public ScmDbSnapshotCancelResponse cancelScmDbSnapshotSync() {
+    synchronized (scmSnapshotLock) {
+      if (scmSnapshotStatus != ScmDbSnapshotSyncStatus.IN_PROGRESS) {
+        return new ScmDbSnapshotCancelResponse(false, scmSnapshotStatus,
+            scmSnapshotPhase, "No SCM DB snapshot sync is running.");
+      }
+      if (!scmSnapshotCancelAllowed) {
+        return new ScmDbSnapshotCancelResponse(false, scmSnapshotStatus,
+            scmSnapshotPhase,
+            "Cancellation is not allowed after DB initialization has started.");
+      }
+      boolean cancelled = scmSnapshotFuture != null &&
+          scmSnapshotFuture.cancel(true);
+      if (cancelled) {
+        scmSnapshotStatus = ScmDbSnapshotSyncStatus.CANCELLED;
+        scmSnapshotPhase = ScmDbSnapshotSyncPhase.CANCELLED;
+        scmSnapshotFinishedAt = System.currentTimeMillis();
+        scmSnapshotCancelAllowed = false;
+        if (!scmSnapshotTaskStarted) {
+          isSyncDataFromSCMRunning.compareAndSet(true, false);
+        }
+      }
+      return new ScmDbSnapshotCancelResponse(cancelled, scmSnapshotStatus,
+          scmSnapshotPhase, cancelled ? "SCM DB snapshot sync cancelled." :
+          "Unable to cancel SCM DB snapshot sync.");
+    }
+  }
+
+  private void runScmSnapshotSync() {
+    File checkpointLocation = null;
+    boolean initialized = false;
+    try {
+      synchronized (scmSnapshotLock) {
+        scmSnapshotTaskStarted = true;
+      }
+      DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("SCM DB snapshot sync interrupted.");
+      }
+      if (dbSnapshot == null || dbSnapshot.getCheckpointLocation() == null) {
+        throw new IOException("Null snapshot location got from SCM.");
+      }
+      checkpointLocation = dbSnapshot.getCheckpointLocation().toFile();
+      synchronized (scmSnapshotLock) {
+        if (scmSnapshotStatus == ScmDbSnapshotSyncStatus.CANCELLED) {
+          return;
+        }
+        scmSnapshotPhase = ScmDbSnapshotSyncPhase.INITIALIZING_DB;
+        scmSnapshotCancelAllowed = false;
+      }
+      initializeNewRdbStore(checkpointLocation);
+      initialized = true;
+      synchronized (scmSnapshotLock) {
+        scmSnapshotStatus = ScmDbSnapshotSyncStatus.SUCCESS;
+        scmSnapshotPhase = ScmDbSnapshotSyncPhase.COMPLETED;
+        scmSnapshotFinishedAt = System.currentTimeMillis();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      markScmSnapshotCancelled();
+    } catch (Throwable t) {
+      LOG.error("Unable to refresh Recon SCM DB Snapshot.", t);
+      synchronized (scmSnapshotLock) {
+        if (scmSnapshotStatus != ScmDbSnapshotSyncStatus.CANCELLED) {
+          scmSnapshotStatus = ScmDbSnapshotSyncStatus.FAILED;
+          scmSnapshotPhase = ScmDbSnapshotSyncPhase.FAILED;
+          scmSnapshotLastError = t.getMessage();
+          scmSnapshotFinishedAt = System.currentTimeMillis();
+        }
+      }
+    } finally {
+      cleanupFailedOrCancelledCheckpoint(checkpointLocation, initialized);
+      synchronized (scmSnapshotLock) {
+        scmSnapshotCancelAllowed = false;
+      }
+      isSyncDataFromSCMRunning.compareAndSet(true, false);
+    }
+  }
+
+  private void markScmSnapshotCancelled() {
+    synchronized (scmSnapshotLock) {
+      scmSnapshotStatus = ScmDbSnapshotSyncStatus.CANCELLED;
+      scmSnapshotPhase = ScmDbSnapshotSyncPhase.CANCELLED;
+      scmSnapshotFinishedAt = System.currentTimeMillis();
+      scmSnapshotCancelAllowed = false;
+    }
+  }
+
+  private void cleanupFailedOrCancelledCheckpoint(File checkpointLocation,
+      boolean initialized) {
+    if (checkpointLocation == null || initialized) {
+      return;
+    }
+    synchronized (scmSnapshotLock) {
+      if (scmSnapshotStatus != ScmDbSnapshotSyncStatus.FAILED &&
+          scmSnapshotStatus != ScmDbSnapshotSyncStatus.CANCELLED) {
+        return;
+      }
+    }
+    try {
+      FileUtils.deleteDirectory(checkpointLocation);
+    } catch (IOException e) {
+      LOG.warn("Unable to clean up SCM DB snapshot checkpoint directory {}.",
+          checkpointLocation, e);
     }
   }
 
@@ -620,6 +905,7 @@ public class ReconStorageContainerManagerFacade
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
       LOG.error("Unable to initialize Recon SCM DB snapshot store.", ioEx);
+      throw ioEx;
     }
   }
 
