@@ -993,9 +993,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (keyArgs.hasExpectedDataGeneration()) {
         builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
-      if (keyArgs.hasExpectedETag()) {
-        builder.setExpectedETag(keyArgs.getExpectedETag());
-      }
 
       return builder.build();
     }
