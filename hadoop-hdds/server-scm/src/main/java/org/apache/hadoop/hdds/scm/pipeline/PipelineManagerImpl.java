@@ -659,7 +659,9 @@ public class PipelineManagerImpl implements PipelineManager {
       if (!nodeManager.checkSpaceAndRecordAllocation(dn.getID(), containerID)) {
         for (DatanodeDetails rollbackNode : successfulNodes) {
           DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(rollbackNode);
-          nodeManager.removePendingAllocationForDatanode(datanodeInfo, containerID);
+          if (datanodeInfo != null) {
+            nodeManager.removePendingAllocationForDatanode(datanodeInfo, containerID);
+          }
         }
         return false;
       }

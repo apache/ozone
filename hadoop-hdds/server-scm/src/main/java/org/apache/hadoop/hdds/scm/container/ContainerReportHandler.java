@@ -179,7 +179,9 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             getNodeManager().addContainer(datanodeDetails, cid);
             // Remove from pending tracker when container is added to DN
             // This container was just confirmed for the first time on this DN
-            getNodeManager().removePendingAllocationForDatanode(datanodeInfo, cid);
+            if (datanodeInfo != null) {
+              getNodeManager().removePendingAllocationForDatanode(datanodeInfo, cid);
+            }
           }
           if (container == null || ContainerReportValidator
                   .validate(container, datanodeDetails, replica)) {

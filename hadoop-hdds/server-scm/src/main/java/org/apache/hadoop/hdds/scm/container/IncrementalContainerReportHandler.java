@@ -105,7 +105,9 @@ public class IncrementalContainerReportHandler
           }
           if (ContainerReportValidator.validate(container, dd, replicaProto)) {
             processContainerReplica(dd, container, replicaProto, publisher, detailsForLogging);
-            getNodeManager().removePendingAllocationForDatanode(datanodeInfo, id);
+            if (datanodeInfo != null) {
+              getNodeManager().removePendingAllocationForDatanode(datanodeInfo, id);
+            }
           }
           success = true;
         } catch (ContainerNotFoundException e) {
