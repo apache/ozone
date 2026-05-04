@@ -19,4 +19,13 @@
     <Class name="org.apache.hadoop.hdds.scm.storage.ByteArrayReader"></Class>
     <Bug pattern="EI_EXPOSE_REP2" /> <!-- "Deep copy byte[] has bad impact on performance" -->
   </Match>
+  <Match>
+    <!--
+    Required until we have https://github.com/spotbugs/spotbugs/pull/3410 (SpotBugs 4.8)
+    FakeDatanodePipeline Line "doReturn(pipeline).when(xceiverClient).getPipeline();" (115 at time of this addition
+    is reported but is a false positive.
+    -->
+    <Class name="org.apache.hadoop.hdds.scm.storage.FakeDatanodePipeline"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+  </Match>
 </FindBugsFilter>
