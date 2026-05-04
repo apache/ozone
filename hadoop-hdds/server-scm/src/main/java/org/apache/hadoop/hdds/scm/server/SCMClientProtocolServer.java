@@ -703,34 +703,22 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public HddsProtos.Node queryNode(UUID uuid)
-      throws IOException {
+  public HddsProtos.Node queryNode(UUID uuid) {
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("uuid", String.valueOf(uuid));
     HddsProtos.Node result = null;
-    try {
-      DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
-      if (node != null) {
-        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = node instanceof DatanodeInfo ? (DatanodeInfo) node : null;
-        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
-            .setNodeID(node.getProtoBufMessage())
-            .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState());
+    DatanodeInfo datanodeInfo = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
+    if (datanodeInfo != null) {
+      NodeStatus ns = datanodeInfo.getNodeStatus();
+      HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
+          .setNodeID(datanodeInfo.getProtoBufMessage())
+          .addNodeStates(ns.getHealth())
+          .addNodeOperationalStates(ns.getOperationalState());
 
-        if (datanodeInfo != null) {
-          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
-          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
-          addFailedVolumes(nodeBuilder, datanodeInfo);
-        }
-        result = nodeBuilder.build();
-      }
-    } catch (NodeNotFoundException e) {
-      IOException ex = new IOException(
-          "An unexpected error occurred querying the NodeStatus", e);
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.QUERY_NODE, auditMap, ex));
-      throw ex;
+      nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
+      nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+      addFailedVolumes(nodeBuilder, datanodeInfo);
+      result = nodeBuilder.build();
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.QUERY_NODE, auditMap));
