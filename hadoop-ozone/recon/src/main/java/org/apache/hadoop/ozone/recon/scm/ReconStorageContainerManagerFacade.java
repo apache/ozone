@@ -183,6 +183,9 @@ public class ReconStorageContainerManagerFacade
   private boolean scmSnapshotTaskStarted;
   private String scmSnapshotLastError;
 
+  /**
+   * Status values for an explicitly triggered SCM DB snapshot sync.
+   */
   public enum ScmDbSnapshotSyncStatus {
     IDLE,
     IN_PROGRESS,
@@ -191,6 +194,9 @@ public class ReconStorageContainerManagerFacade
     CANCELLED
   }
 
+  /**
+   * Phase values for an explicitly triggered SCM DB snapshot sync.
+   */
   public enum ScmDbSnapshotSyncPhase {
     NONE,
     DOWNLOADING_CHECKPOINT,
@@ -201,6 +207,9 @@ public class ReconStorageContainerManagerFacade
     CANCELLED
   }
 
+  /**
+   * Response payload for the SCM DB snapshot sync status endpoint.
+   */
   public static final class ScmDbSnapshotStatusResponse {
     private final ScmDbSnapshotSyncStatus status;
     private final ScmDbSnapshotSyncPhase phase;
@@ -252,6 +261,9 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
+  /**
+   * Response payload for the SCM DB snapshot sync trigger endpoint.
+   */
   public static final class ScmDbSnapshotTriggerResponse {
     private final boolean accepted;
     private final ScmDbSnapshotSyncStatus status;
@@ -277,6 +289,9 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
+  /**
+   * Response payload for the SCM DB snapshot sync cancellation endpoint.
+   */
   public static final class ScmDbSnapshotCancelResponse {
     private final boolean cancelled;
     private final ScmDbSnapshotSyncStatus status;
