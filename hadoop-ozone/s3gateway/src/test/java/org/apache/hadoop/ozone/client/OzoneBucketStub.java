@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
@@ -580,6 +581,30 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     return new OmMultipartUploadCompleteInfo(getVolumeName(), getName(), key,
         DigestUtils.sha256Hex(key));
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
+      String uploadID, Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    // Handle If-None-Match: * (expectedDataGeneration == -1 means create-if-absent)
+    if (expectedDataGeneration != null &&
+        expectedDataGeneration == EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+      if (keyContents.containsKey(key)) {
+        throw new OMException("Key already exists", ResultCodes.KEY_ALREADY_EXISTS);
+      }
+    }
+
+    // Handle If-Match: <etag>
+    if (expectedETag != null) {
+      OzoneKeyDetails existingKey = keyDetails.get(key);
+      if (existingKey == null) {
+        throw new OMException("Key not found", ResultCodes.KEY_NOT_FOUND);
+      }
+      // Stub doesn't track ETag, so we just delegate
+    }
+
+    return completeMultipartUpload(key, uploadID, partsMap);
   }
 
   @Override

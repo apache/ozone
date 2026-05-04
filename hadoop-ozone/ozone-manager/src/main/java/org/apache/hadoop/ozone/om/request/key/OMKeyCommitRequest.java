@@ -309,7 +309,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
           .setExpectedDataGeneration(null)
-          .setExpectedETag(null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
           .setUpdateID(trxnLogIndex)

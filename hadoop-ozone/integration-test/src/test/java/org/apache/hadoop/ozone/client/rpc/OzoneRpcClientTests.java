@@ -3936,6 +3936,159 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
+  public void testConditionalCompleteMultipartUploadIfNoneMatch() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Initiate and upload part
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-None-Match semantics (key doesn't exist, should succeed)
+    OmMultipartUploadCompleteInfo result = bucket.completeMultipartUpload(
+        keyName, uploadID, partsMap,
+        EXPECTED_GEN_CREATE_IF_NOT_EXISTS, null);
+
+    assertNotNull(result);
+    assertEquals(keyName, result.getKey());
+    assertNotNull(result.getHash());
+
+    // Verify object exists
+    OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+    assertNotNull(keyDetails);
+  }
+
+  @Test
+  public void testConditionalCompleteMultipartUploadIfNoneMatchFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // First, create an existing key
+    createTestKey(bucket, keyName, "existing content");
+
+    // Initiate and upload part for same key
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-None-Match semantics (key exists, should fail)
+    OMException omEx = assertThrows(OMException.class,
+        () -> bucket.completeMultipartUpload(keyName, uploadID, partsMap,
+            EXPECTED_GEN_CREATE_IF_NOT_EXISTS, null));
+
+    assertEquals(KEY_ALREADY_EXISTS, omEx.getResult());
+  }
+
+  @Test
+  public void testConditionalCompleteMultipartUploadIfMatch() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // First, create an existing key with ETag
+    OzoneKeyDetails existingKey = createTestKeyWithETag(bucket, keyName, "existing content");
+    String existingETag = existingKey.getMetadata().get(ETAG);
+    assertNotNull(existingETag);
+
+    // Initiate and upload part for same key
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-Match semantics (ETag matches, should succeed)
+    OmMultipartUploadCompleteInfo result = bucket.completeMultipartUpload(
+        keyName, uploadID, partsMap, null, existingETag);
+
+    assertNotNull(result);
+    assertEquals(keyName, result.getKey());
+    assertNotNull(result.getHash());
+  }
+
+  @Test
+  public void testConditionalCompleteMultipartUploadIfMatchFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // First, create an existing key with ETag
+    createTestKeyWithETag(bucket, keyName, "existing content");
+
+    // Initiate and upload part for same key
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-Match semantics (wrong ETag, should fail)
+    OMException omEx = assertThrows(OMException.class,
+        () -> bucket.completeMultipartUpload(keyName, uploadID, partsMap,
+            null, "wrong-etag"));
+
+    assertEquals(ETAG_MISMATCH, omEx.getResult());
+  }
+
+  @Test
+  public void testConditionalCompleteMultipartUploadIfMatchMissingKeyFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Initiate and upload part (key doesn't exist)
+    String uploadID = initiateMultipartUpload(bucket, keyName, anyReplication());
+    byte[] data = generateData(5 * 1024 * 1024, (byte) 97);
+    Pair<String, String> partInfo = uploadPart(bucket, keyName, uploadID, 1, data);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, partInfo.getValue());
+
+    // Complete with If-Match on non-existent key (should fail)
+    OMException omEx = assertThrows(OMException.class,
+        () -> bucket.completeMultipartUpload(keyName, uploadID, partsMap,
+            null, "some-etag"));
+
+    assertEquals(KEY_NOT_FOUND, omEx.getResult());
+  }
+
+  @Test
   public void testAbortUploadSuccessWithOutAnyParts() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -4615,6 +4768,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     metadata.put(ETAG, UUID.randomUUID().toString());
     return createTestKey(bucket, getTestName(),
         UUID.randomUUID().toString().getBytes(UTF_8), metadata);
+  }
+
+  private OzoneKeyDetails createTestKeyWithETag(OzoneBucket bucket,
+      String keyName, String content) throws IOException {
+    Map<String, String> metadata = createTestKeyMetadata();
+    metadata.put(ETAG, UUID.randomUUID().toString());
+    return createTestKey(bucket, keyName, content.getBytes(UTF_8), metadata);
   }
 
   private static Map<String, String> createTestKeyMetadata() {
