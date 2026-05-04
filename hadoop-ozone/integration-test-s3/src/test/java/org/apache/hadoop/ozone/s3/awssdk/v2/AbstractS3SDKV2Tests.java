@@ -105,6 +105,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -222,6 +223,13 @@ import software.amazon.awssdk.utils.IoUtils;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonHATests.TestCase {
 
+  private static final String READ_CONSISTENCY_HEADER =
+      "x-ozone-read-consistency";
+  private static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
+      "x-ozone-local-lease-log-limit";
+  private static final String LOCAL_LEASE_TIME_MS_HEADER =
+      "x-ozone-local-lease-time-ms";
+
   private MiniOzoneCluster cluster;
   private S3Client s3Client;
   private S3AsyncClient s3AsyncClient;
@@ -298,6 +306,48 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     assertEquals(content, objectBytes.asUtf8String());
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"local-lease", "linearizable-follower"})
+  public void testGetObjectWithReadConsistencyHeader(String readConsistency) {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString(content));
+
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName)
+            .key(keyName)
+            .overrideConfiguration(c -> {
+              c.putHeader(READ_CONSISTENCY_HEADER, readConsistency);
+              if ("local-lease".equals(readConsistency)) {
+                c.putHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
+                c.putHeader(LOCAL_LEASE_TIME_MS_HEADER, "100");
+              }
+            }));
+
+    assertEquals(content, objectBytes.asUtf8String());
+  }
+
+  @Test
+  public void testGetObjectWithInvalidReadConsistencyHeader() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("bar"));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(b -> b.bucket(bucketName)
+            .key(keyName)
+            .overrideConfiguration(c -> c.putHeader(
+                READ_CONSISTENCY_HEADER, "invalid"))));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals("InvalidArgument", exception.awsErrorDetails().errorCode());
   }
 
   @Test

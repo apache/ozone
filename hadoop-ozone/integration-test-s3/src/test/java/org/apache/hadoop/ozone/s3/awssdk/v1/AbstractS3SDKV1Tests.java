@@ -183,6 +183,12 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
   // server-side limitation
   private static final int MAX_UPLOADS_LIMIT = 1000;
+  private static final String READ_CONSISTENCY_HEADER =
+      "x-ozone-read-consistency";
+  private static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
+      "x-ozone-local-lease-log-limit";
+  private static final String LOCAL_LEASE_TIME_MS_HEADER =
+      "x-ozone-local-lease-time-ms";
 
   /**
    * There are still some unsupported S3 operations.
@@ -574,6 +580,50 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"local-lease", "linearizable-follower"})
+  public void testGetObjectWithReadConsistencyHeader(String readConsistency)
+      throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, content);
+
+    GetObjectRequest request = new GetObjectRequest(bucketName, keyName);
+    request.putCustomRequestHeader(READ_CONSISTENCY_HEADER,
+        readConsistency);
+    if ("local-lease".equals(readConsistency)) {
+      request.putCustomRequestHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
+      request.putCustomRequestHeader(LOCAL_LEASE_TIME_MS_HEADER, "100");
+    }
+
+    try (S3Object object = s3Client.getObject(request);
+         S3ObjectInputStream objectContent = object.getObjectContent()) {
+      assertEquals(content, IOUtils.toString(objectContent,
+          StandardCharsets.UTF_8));
+    }
+  }
+
+  @Test
+  public void testGetObjectWithInvalidReadConsistencyHeader() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "bar");
+
+    GetObjectRequest request = new GetObjectRequest(bucketName, keyName);
+    request.putCustomRequestHeader(READ_CONSISTENCY_HEADER,
+        "invalid");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(request));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(400, ase.getStatusCode());
+    assertEquals("InvalidArgument", ase.getErrorCode());
   }
 
   @Test

@@ -41,6 +41,9 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_LOG_LIMIT_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_TIME_MS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
@@ -71,6 +74,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -107,6 +111,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
@@ -256,6 +261,7 @@ public abstract class EndpointBase {
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
+    setReadConsistencyFromHeader(clientProtocol);
 
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
@@ -280,6 +286,74 @@ public abstract class EndpointBase {
 
   protected void init() {
     // hook method
+  }
+
+  private void setReadConsistencyFromHeader(ClientProtocol clientProtocol) {
+    ReadConsistency readConsistency = parseReadConsistencyHeader();
+    Long localLeaseLogLimit = parseLocalLeaseContextHeader(
+        LOCAL_LEASE_LOG_LIMIT_HEADER);
+    Long localLeaseTimeMs = parseLocalLeaseContextHeader(
+        LOCAL_LEASE_TIME_MS_HEADER);
+    if (readConsistency == null) {
+      validateNoLocalLeaseContext(localLeaseLogLimit, localLeaseTimeMs);
+      clientProtocol.clearThreadLocalReadConsistency();
+    } else if (readConsistency == ReadConsistency.LOCAL_LEASE) {
+      clientProtocol.setThreadLocalReadConsistency(readConsistency,
+          localLeaseLogLimit, localLeaseTimeMs);
+    } else {
+      validateNoLocalLeaseContext(localLeaseLogLimit, localLeaseTimeMs);
+      clientProtocol.setThreadLocalReadConsistency(readConsistency);
+    }
+  }
+
+  private ReadConsistency parseReadConsistencyHeader() {
+    String header = getHeaders().getHeaderString(READ_CONSISTENCY_HEADER);
+    if (StringUtils.isBlank(header)) {
+      return null;
+    }
+    switch (header.trim().toLowerCase(Locale.ROOT)) {
+    case "local-lease":
+      return ReadConsistency.LOCAL_LEASE;
+    case "linearizable-follower":
+      return ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER;
+    default:
+      OS3Exception ex = newError(INVALID_ARGUMENT, READ_CONSISTENCY_HEADER);
+      ex.setErrorMessage("Unsupported read consistency: " + header);
+      throw ex;
+    }
+  }
+
+  private Long parseLocalLeaseContextHeader(String headerName) {
+    String header = getHeaders().getHeaderString(headerName);
+    if (StringUtils.isBlank(header)) {
+      return null;
+    }
+    try {
+      long value = Long.parseLong(header.trim());
+      if (value < -1) {
+        throw invalidLocalLeaseContext(headerName, header);
+      }
+      return value;
+    } catch (NumberFormatException e) {
+      throw invalidLocalLeaseContext(headerName, header);
+    }
+  }
+
+  private void validateNoLocalLeaseContext(Long localLeaseLogLimit,
+      Long localLeaseTimeMs) {
+    if (localLeaseLogLimit != null || localLeaseTimeMs != null) {
+      OS3Exception ex = newError(INVALID_ARGUMENT, READ_CONSISTENCY_HEADER);
+      ex.setErrorMessage("Local lease context requires read consistency: " +
+          "local-lease");
+      throw ex;
+    }
+  }
+
+  private OS3Exception invalidLocalLeaseContext(String headerName,
+      String header) {
+    OS3Exception ex = newError(INVALID_ARGUMENT, headerName);
+    ex.setErrorMessage("Invalid local lease context: " + header);
+    return ex;
   }
 
   /**

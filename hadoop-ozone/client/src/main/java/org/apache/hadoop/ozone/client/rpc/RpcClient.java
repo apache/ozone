@@ -162,6 +162,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -2923,13 +2924,35 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void setThreadLocalReadConsistency(ReadConsistency readConsistency) {
+    ozoneManagerClient.setThreadLocalReadConsistency(readConsistency);
+  }
+
+  @Override
+  public void setThreadLocalReadConsistency(ReadConsistency readConsistency,
+      Long localLeaseLogLimit, Long localLeaseTimeMs) {
+    ozoneManagerClient.setThreadLocalReadConsistency(readConsistency,
+        localLeaseLogLimit, localLeaseTimeMs);
+  }
+
+  @Override
   public S3Auth getThreadLocalS3Auth() {
     return ozoneManagerClient.getThreadLocalS3Auth();
   }
 
   @Override
+  public ReadConsistency getThreadLocalReadConsistency() {
+    return ozoneManagerClient.getThreadLocalReadConsistency();
+  }
+
+  @Override
   public void clearThreadLocalS3Auth() {
     ozoneManagerClient.clearThreadLocalS3Auth();
+  }
+
+  @Override
+  public void clearThreadLocalReadConsistency() {
+    ozoneManagerClient.clearThreadLocalReadConsistency();
   }
 
   @Override

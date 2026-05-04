@@ -28,8 +28,11 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQuotaRepairRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -97,6 +100,94 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
         .isInstanceOf(NullPointerException.class)
         .hasMessageContaining("buckets == null");
     verifyNoInteractions(omTransport);
+  }
+
+  @Test
+  void submitRequestAddsThreadLocalReadConsistencyHint() throws Exception {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+
+    client.setThreadLocalReadConsistency(ReadConsistency.LOCAL_LEASE);
+
+    client.getServiceList();
+
+    assertThat(transport.getLastRequest().hasReadConsistencyHint()).isTrue();
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .getReadConsistency())
+        .isEqualTo(ReadConsistency.LOCAL_LEASE.toProto());
+  }
+
+  @Test
+  void submitRequestAddsThreadLocalLocalLeaseContext() throws Exception {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+
+    client.setThreadLocalReadConsistency(ReadConsistency.LOCAL_LEASE,
+        10L, 100L);
+
+    client.getServiceList();
+
+    assertThat(transport.getLastRequest().hasReadConsistencyHint()).isTrue();
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .getReadConsistency())
+        .isEqualTo(ReadConsistency.LOCAL_LEASE.toProto());
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .hasLocalLeaseContext())
+        .isTrue();
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .getLocalLeaseContext()
+        .getLogLimit())
+        .isEqualTo(10L);
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .getLocalLeaseContext()
+        .getLeaseTimeMs())
+        .isEqualTo(100L);
+  }
+
+  @Test
+  void submitRequestOmitsReadConsistencyHintByDefault() throws Exception {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+
+    client.getServiceList();
+
+    assertThat(transport.getLastRequest().hasReadConsistencyHint()).isFalse();
+  }
+
+  private static final class CapturingTransport implements OmTransport {
+    private OMRequest lastRequest;
+
+    @Override
+    public OMResponse submitRequest(OMRequest payload) {
+      lastRequest = payload;
+      return OMResponse.newBuilder()
+          .setCmdType(payload.getCmdType())
+          .setStatus(Status.OK)
+          .setSuccess(true)
+          .setServiceListResponse(ServiceListResponse.newBuilder())
+          .build();
+    }
+
+    @Override
+    public Text getDelegationTokenService() {
+      return new Text();
+    }
+
+    @Override
+    public void close() throws IOException {
+    }
+
+    private OMRequest getLastRequest() {
+      return lastRequest;
+    }
   }
 
 }
