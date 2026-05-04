@@ -172,7 +172,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNotNull(openKeyInfo);
     assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
         openKeyInfo.getExpectedDataGeneration());
-    assertNull(openKeyInfo.getExpectedETag());
   }
 
   @ParameterizedTest
@@ -353,7 +352,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNotNull(openKeyInfo);
     assertEquals(existingKeyInfo.getUpdateID(),
         openKeyInfo.getExpectedDataGeneration());
-    assertNull(openKeyInfo.getExpectedETag());
     // Creation time should remain the same on rewrite
     assertEquals(existingKeyInfo.getCreationTime(),
         openKeyInfo.getCreationTime());

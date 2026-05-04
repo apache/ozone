@@ -38,13 +38,17 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.ratis.protocol.Message;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
@@ -69,7 +73,7 @@ public final class ScmInvokerCodeGenerator {
   static final DeclaredMethod INVOKE_LOCAL = new DeclaredMethod("invokeLocal",
       new Class[]{String.class, Object[].class},
       new String[]{"methodName", "p"},
-      Object.class,
+      Message.class,
       new Class<?>[]{Exception.class});
 
   private final Class<?> api;
@@ -112,24 +116,38 @@ public final class ScmInvokerCodeGenerator {
     String s = lineBuffer.toString();
     lineBuffer.getBuffer().setLength(0);
 
-    if (s.length() <= LINE_LENGTH) {
-      out.append(s).append(System.lineSeparator());
-      return;
+    final int nonSpace = getLeadingSpaces(s);
+    String continuation = s.substring(0, nonSpace) + "    ";
+    while (s.length() > LINE_LENGTH) {
+      final int i = getLineBreakIndex(s);
+      out.append(stripTrailingSpaces(s.substring(0, i)))
+          .append(System.lineSeparator());
+      s = continuation + stripLeadingSpaces(s.substring(i));
     }
+    out.append(s).append(System.lineSeparator());
+  }
 
-    // break long lines
+  static int getLeadingSpaces(String s) {
     int nonSpace = 0;
-    while (s.charAt(nonSpace) == ' ') {
+    while (nonSpace < s.length() && s.charAt(nonSpace) == ' ') {
       nonSpace++;
     }
+    return nonSpace;
+  }
 
-    final int i = s.lastIndexOf(' ', LINE_LENGTH);
-    out.append(s.substring(0, i))
-        .append(System.lineSeparator());
-    out.append(s.substring(0, nonSpace)) // original indentation
-        .append("    ")
-        .append(s.substring(i + 1))
-        .append(System.lineSeparator());
+  static int getLineBreakIndex(String s) {
+    int i = s.lastIndexOf(' ', LINE_LENGTH);
+    if (i <= 0) {
+      return LINE_LENGTH;
+    }
+
+    if ("{".equals(s.substring(i).trim())) {
+      final int comma = s.lastIndexOf(',', i);
+      if (comma > 0) {
+        return comma + 1;
+      }
+    }
+    return i;
   }
 
   UncheckedAutoCloseable printScope() {
@@ -153,6 +171,41 @@ public final class ScmInvokerCodeGenerator {
 
   static String getClassname(Class<?> clazz) {
     return getClassnameBuilder(clazz).toString();
+  }
+
+  String getClassnameForApi(Class<?> clazz) {
+    if (clazz.getEnclosingClass() != null
+        && clazz.getEnclosingClass().getSimpleName().endsWith("Protos")
+        && hasSimpleNameConflict(clazz)) {
+      return clazz.getEnclosingClass().getSimpleName() + "." + clazz.getSimpleName();
+    }
+    return getClassname(clazz);
+  }
+
+  boolean hasSimpleNameConflict(Class<?> clazz) {
+    final String simpleName = clazz.getSimpleName();
+    return Arrays.stream(api.getMethods())
+        .flatMap(method -> Stream.concat(
+            Arrays.stream(method.getParameterTypes()),
+            Stream.of(method.getReturnType())))
+        .anyMatch(type -> type != clazz && type.getSimpleName().equals(simpleName));
+  }
+
+  String getParameterStringForApi(Class<?>[] types, String[] names) {
+    final StringBuilder b = new StringBuilder();
+    final int n = names != null ? names.length : types.length;
+    for (int i = 0; i < n; i++) {
+      b.append(getClassnameForApi(types[i])).append(' ')
+          .append(names != null ? names[i] : "arg" + i).append(", ");
+    }
+    if (b.length() > 0) {
+      b.setLength(b.length() - 2);
+    }
+    return b.toString();
+  }
+
+  String classesToStringForApi(Class<?>[] classes, String suffix) {
+    return arrayToString(classes, c -> getClassnameForApi(c) + suffix);
   }
 
   static StringBuilder getClassnameBuilder(Class<?> clazz) {
@@ -304,7 +357,7 @@ public final class ScmInvokerCodeGenerator {
         if (classes == null) {
           printf("null");
         } else {
-          printf("new Class<?>[] {%s}", classesToString(classes, ".class"));
+          printf("new Class<?>[] {%s}", classesToStringForApi(classes, ".class"));
         }
       }
     }
@@ -341,30 +394,123 @@ public final class ScmInvokerCodeGenerator {
     }
   }
 
-  void printCase(Method apiMethod, String actualParameter, AtomicInteger argCount) {
-    printf("case \"%s\":", apiMethod.getName());
+  void printCase(List<Method> apiMethods, String actualParameter, String switchName, AtomicInteger argCount) {
+    printf("case \"%s\":", apiMethods.get(0).getName());
     try (UncheckedAutoCloseable ignore = printScope(false, 1)) {
-      final Parameter[] apiParameters = apiMethod.getParameters();
-      final StringBuilder b = new StringBuilder();
-      for (int i = 0; i < apiParameters.length; i++) {
-        final Parameter p = apiParameters[i];
-        final String classname = getClassname(p.getType());
-        final String arg = "arg" + argCount.getAndIncrement();
-        b.append(arg).append(", ");
-        println("final %s %s = %s.length > %d ? (%s) %s[%d] : null;", classname, arg,
-            actualParameter, i, classname, actualParameter, i);
-      }
-      if (b.length() > 0) {
-        b.setLength(b.length() - 2);
-      }
-      if (apiMethod.getReturnType() == void.class) {
-        println("getImpl().%s(%s);", apiMethod.getName(), b);
-        println("return null;");
+      if (apiMethods.size() == 1) {
+        printMethodCall(apiMethods.get(0), actualParameter, argCount, false);
       } else {
-        println("return getImpl().%s(%s);", apiMethod.getName(), b);
+        for (Method apiMethod : apiMethods) {
+          printf("if (%s)", getParameterMatchCondition(apiMethod, actualParameter));
+          try (UncheckedAutoCloseable ignored = printScope()) {
+            printMethodCall(apiMethod, actualParameter, argCount, true);
+          }
+        }
+        printMethodNotFound(null, switchName);
       }
     }
     println();
+  }
+
+  void printMethodCall(Method apiMethod, String actualParameter, AtomicInteger argCount, boolean exactArgs) {
+    final Parameter[] apiParameters = apiMethod.getParameters();
+    final StringBuilder b = new StringBuilder();
+    for (int i = 0; i < apiParameters.length; i++) {
+      final Parameter p = apiParameters[i];
+      final String classname = getClassnameForApi(p.getType());
+      final String arg = "arg" + argCount.getAndIncrement();
+      b.append(arg).append(", ");
+      if (exactArgs) {
+        println("final %s %s = (%s) %s[%d];", classname, arg, classname, actualParameter, i);
+      } else {
+        println("final %s %s = %s.length > %d ? (%s) %s[%d] : %s;", classname, arg,
+            actualParameter, i, classname, actualParameter, i, getDefaultValue(p.getType()));
+      }
+    }
+    if (b.length() > 0) {
+      b.setLength(b.length() - 2);
+    }
+    if (apiMethod.getReturnType() == void.class) {
+      println("getImpl().%s(%s);", apiMethod.getName(), b);
+      println("return Message.EMPTY;");
+    } else {
+      println("returnType = %s.class;", getClassnameForApi(apiMethod.getReturnType()));
+      println("returnValue = getImpl().%s(%s);", apiMethod.getName(), b);
+      println("break;");
+    }
+  }
+
+  String getParameterMatchCondition(Method method, String actualParameter) {
+    final StringBuilder b = new StringBuilder()
+        .append(actualParameter)
+        .append(".length == ")
+        .append(method.getParameterCount());
+
+    final Class<?>[] parameterTypes = method.getParameterTypes();
+    for (int i = 0; i < parameterTypes.length; i++) {
+      final Class<?> type = parameterTypes[i];
+      final String checkType = getClassnameForApi(type.isPrimitive() ? getBoxedType(type) : type);
+      if (type.isPrimitive()) {
+        b.append(" && ").append(actualParameter).append('[').append(i).append("] instanceof ")
+            .append(checkType);
+      } else {
+        b.append(" && (").append(actualParameter).append('[').append(i).append("] == null || ")
+            .append(checkType).append(".class.isInstance(").append(actualParameter).append('[')
+            .append(i).append("]))");
+      }
+    }
+    return b.toString();
+  }
+
+  static Class<?> getBoxedType(Class<?> type) {
+    if (type == boolean.class) {
+      return Boolean.class;
+    } else if (type == byte.class) {
+      return Byte.class;
+    } else if (type == char.class) {
+      return Character.class;
+    } else if (type == short.class) {
+      return Short.class;
+    } else if (type == int.class) {
+      return Integer.class;
+    } else if (type == long.class) {
+      return Long.class;
+    } else if (type == float.class) {
+      return Float.class;
+    } else if (type == double.class) {
+      return Double.class;
+    }
+    return type;
+  }
+
+  static String getDefaultValue(Class<?> type) {
+    if (!type.isPrimitive()) {
+      return "null";
+    } else if (type == boolean.class) {
+      return "false";
+    } else if (type == char.class) {
+      return "'\\0'";
+    } else if (type == long.class) {
+      return "0L";
+    } else if (type == float.class) {
+      return "0F";
+    } else if (type == double.class) {
+      return "0D";
+    }
+    return "0";
+  }
+
+  void printMethodNotFound(String label, String switchName) {
+    if (label != null) {
+      printf("%s:", label);
+      try (UncheckedAutoCloseable ignore = printScope(false, 1)) {
+        println("throw new IllegalArgumentException(\"Method not found: \" + %s + \" in %s\");",
+            switchName, apiName);
+      }
+    } else {
+      println("throw new IllegalArgumentException(\"Method not found: \" + %s + \" in %s\");",
+          switchName, apiName);
+    }
   }
 
   void printSwitch(DeclaredMethod method) {
@@ -372,15 +518,15 @@ public final class ScmInvokerCodeGenerator {
     printf("switch (%s)", switchName);
     try (UncheckedAutoCloseable ignored = printScope(true, 0)) {
       final AtomicInteger argCount = new AtomicInteger(0);
-      for (Method apiMethod : getMethods(false, null)) {
-        printCase(apiMethod, method.getParameterName(1), argCount);
+      final Map<String, List<Method>> methodsByName = getMethods(false, null).stream()
+          .collect(Collectors.groupingBy(
+              Method::getName, LinkedHashMap::new, Collectors.toList()));
+
+      for (List<Method> apiMethods : methodsByName.values()) {
+        printCase(apiMethods, method.getParameterName(1), switchName, argCount);
       }
 
-      printf("default:");
-      try (UncheckedAutoCloseable ignore = printScope(false, 1)) {
-        println("throw new IllegalArgumentException(\"Method not found: \" + %s + \" in %s\");",
-            switchName, apiName);
-      }
+      printMethodNotFound("default", switchName);
     }
   }
 
@@ -390,7 +536,11 @@ public final class ScmInvokerCodeGenerator {
     println("@Override");
     printf(method.getSignature());
     try (UncheckedAutoCloseable ignored = printScope()) {
+      println("final Class<?> returnType;");
+      println("final Object returnValue;");
       printSwitch(method);
+      println();
+      println("return SCMRatisResponse.encode(returnValue, returnType);");
     }
   }
 
@@ -406,7 +556,7 @@ public final class ScmInvokerCodeGenerator {
     printf("public %s %s(%s)%s",
         getReturnTypeString(method),
         method.getName(),
-        getParameterString(method.getParameterTypes(), null),
+        getParameterStringForApi(method.getParameterTypes(), null),
         getThrowsString(method.getExceptionTypes()));
 
     try (UncheckedAutoCloseable ignored = printScope()) {
@@ -529,5 +679,21 @@ public final class ScmInvokerCodeGenerator {
           getParameterString(parameterTypes, parameterNames),
           getThrowsString(exceptionTypes));
     }
+  }
+
+  static String stripTrailingSpaces(String s) {
+    int end = s.length();
+    while (end > 0 && s.charAt(end - 1) == ' ') {
+      end--;
+    }
+    return s.substring(0, end);
+  }
+
+  static String stripLeadingSpaces(String s) {
+    int start = 0;
+    while (start < s.length() && s.charAt(start) == ' ') {
+      start++;
+    }
+    return s.substring(start);
   }
 }

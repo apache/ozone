@@ -115,7 +115,6 @@ public final class OmKeyInfo extends WithParentObjectId
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
-  private String expectedETag;
 
   private OmKeyInfo(Builder b) {
     super(b);
@@ -135,7 +134,6 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
-    this.expectedETag = b.expectedETag;
   }
 
   /**
@@ -143,7 +141,7 @@ public final class OmKeyInfo extends WithParentObjectId
    *
    * @param ignorePipeline whether to ignore pipeline info during serialization
    * @param includeOpenKeyFields whether to include fields only used in openKeyTable
-   *                             (expectedDataGeneration, expectedETag) in serialization.
+   *                             (expectedDataGeneration) in serialization.
    *                             Use true for openKeyTable, false for keyTable.
    * @return the codec
    */
@@ -157,7 +155,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
   /**
    * Gets the codec for openKeyTable. This codec includes expectedDataGeneration
-   * and expectedETag fields during serialization.
+   * field during serialization.
    *
    * @param ignorePipeline whether to ignore pipeline info
    * @return the codec for openKeyTable
@@ -222,14 +220,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
-  }
-
-  public void setExpectedETag(String eTag) {
-    this.expectedETag = eTag;
-  }
-
-  public String getExpectedETag() {
-    return expectedETag;
   }
 
   public String getOwnerName() {
@@ -535,7 +525,6 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
-    private String expectedETag;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -558,7 +547,6 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      this.expectedETag = obj.expectedETag;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
@@ -730,11 +718,6 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setExpectedETag(String eTag) {
-      this.expectedETag = eTag;
-      return this;
-    }
-
     @Override
     protected void validate() {
       super.validate();
@@ -881,14 +864,8 @@ public final class OmKeyInfo extends WithParentObjectId
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
     kb.setIsFile(isFile);
-    
-    if (includeOpenKeyFields) {
-      if (expectedDataGeneration != null) {
-        kb.setExpectedDataGeneration(expectedDataGeneration);
-      }
-      if (expectedETag != null) {
-        kb.setExpectedETag(expectedETag);
-      }
+    if (includeOpenKeyFields && expectedDataGeneration != null) {
+      kb.setExpectedDataGeneration(expectedDataGeneration);
     }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
@@ -942,9 +919,6 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     if (keyInfo.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
-    }
-    if (keyInfo.hasExpectedETag()) {
-      builder.setExpectedETag(keyInfo.getExpectedETag());
     }
 
     if (keyInfo.hasOwnerName()) {

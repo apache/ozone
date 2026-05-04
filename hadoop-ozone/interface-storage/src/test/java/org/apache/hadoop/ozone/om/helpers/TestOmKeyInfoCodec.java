@@ -97,8 +97,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
   /**
    * Creates an OmKeyInfo with fields only used in openKeyTable set.
-   * These fields (expectedDataGeneration, expectedETag) are only meaningful
-   * for keys in openKeyTable.
+   * The expectedDataGeneration field is only meaningful for keys in openKeyTable.
    */
   private OmKeyInfo getKeyInfoWithOpenKeyFields(int chunkNum) {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -129,7 +128,6 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
             Collections.singletonList(omKeyLocationInfoGroup))
         .setFileChecksum(checksum)
         .setExpectedDataGeneration(12345L)
-        .setExpectedETag("test-etag-value")
         .build();
   }
 
@@ -173,21 +171,16 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     OmKeyInfo originKey = getKeyInfoWithOpenKeyFields(1);
 
     assertEquals(12345L, originKey.getExpectedDataGeneration());
-    assertEquals("test-etag-value", originKey.getExpectedETag());
 
     byte[] rawData = openKeyCodec.toPersistedFormat(originKey);
     OmKeyInfo deserializedKey = openKeyCodec.fromPersistedFormat(rawData);
-    
+
     assertEquals(12345L, deserializedKey.getExpectedDataGeneration());
-    assertEquals("test-etag-value", deserializedKey.getExpectedETag());
 
     KeyInfo keyInfo = KeyInfo.parseFrom(rawData);
     assertTrue(keyInfo.hasExpectedDataGeneration(),
         "openKeyTable codec should include expectedDataGeneration in proto");
-    assertTrue(keyInfo.hasExpectedETag(),
-        "openKeyTable codec should include expectedETag in proto");
     assertEquals(12345L, keyInfo.getExpectedDataGeneration());
-    assertEquals("test-etag-value", keyInfo.getExpectedETag());
   }
 
   @Test
@@ -195,14 +188,11 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getCodecForKeyTable(true);
     OmKeyInfo originKey = getKeyInfoWithOpenKeyFields(1);
     assertEquals(12345L, originKey.getExpectedDataGeneration());
-    assertEquals("test-etag-value", originKey.getExpectedETag());
 
     byte[] rawData = keyTableCodec.toPersistedFormat(originKey);
     KeyInfo keyInfo = KeyInfo.parseFrom(rawData);
     assertFalse(keyInfo.hasExpectedDataGeneration(),
         "keyTable codec should NOT include expectedDataGeneration in proto");
-    assertFalse(keyInfo.hasExpectedETag(),
-        "keyTable codec should NOT include expectedETag in proto");
 
     OmKeyInfo deserializedKey = keyTableCodec.fromPersistedFormat(rawData);
     assertEquals(VOLUME, deserializedKey.getVolumeName());
@@ -212,8 +202,6 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
     assertNull(deserializedKey.getExpectedDataGeneration(),
         "Deserialized key from keyTable should have null expectedDataGeneration");
-    assertNull(deserializedKey.getExpectedETag(),
-        "Deserialized key from keyTable should have null expectedETag");
   }
 
   @Test
@@ -228,7 +216,6 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     assertEquals(VOLUME, deserializedKey.getVolumeName());
     assertEquals(BUCKET, deserializedKey.getBucketName());
     assertEquals(12345L, deserializedKey.getExpectedDataGeneration());
-    assertEquals("test-etag-value", deserializedKey.getExpectedETag());
   }
 
   @Test
@@ -238,7 +225,6 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
 
     OmKeyInfo originKey = getKeyInfo(1);
     assertNull(originKey.getExpectedDataGeneration());
-    assertNull(originKey.getExpectedETag());
 
     byte[] openKeyData = openKeyCodec.toPersistedFormat(originKey);
     byte[] keyTableData = keyTableCodec.toPersistedFormat(originKey);

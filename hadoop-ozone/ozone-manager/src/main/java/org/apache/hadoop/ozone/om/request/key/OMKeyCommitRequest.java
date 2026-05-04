@@ -305,6 +305,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
+          .setExpectedDataGeneration(null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
           .setUpdateID(trxnLogIndex)

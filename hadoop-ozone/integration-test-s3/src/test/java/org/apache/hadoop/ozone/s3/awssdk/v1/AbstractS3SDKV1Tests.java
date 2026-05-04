@@ -656,6 +656,208 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testCompleteMultipartUploadIfNoneMatch() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // Initiate and complete multipart upload with If-None-Match: *
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "part1data";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-None-Match: * (key doesn't exist, should succeed)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-None-Match", "*");
+
+    CompleteMultipartUploadResult result = s3Client.completeMultipartUpload(completeRequest);
+    assertNotNull(result.getETag());
+
+    // Verify object was created
+    assertTrue(s3Client.doesObjectExist(bucketName, keyName));
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfNoneMatchFail() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // First, create an existing key
+    s3Client.putObject(bucketName, keyName,
+        new ByteArrayInputStream("existing".getBytes(StandardCharsets.UTF_8)),
+        new ObjectMetadata());
+
+    // Initiate multipart upload for same key
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "part1data";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-None-Match: * (key exists, should fail)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-None-Match", "*");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.completeMultipartUpload(completeRequest));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfMatch() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // First, create an existing key and get its ETag
+    PutObjectResult existingResult = s3Client.putObject(bucketName, keyName,
+        new ByteArrayInputStream("existing".getBytes(StandardCharsets.UTF_8)),
+        new ObjectMetadata());
+    String existingETag = existingResult.getETag();
+
+    // Initiate multipart upload for same key
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "newcontent";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-Match: <existingETag> (should succeed)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-Match", "\"" + existingETag + "\"");
+
+    CompleteMultipartUploadResult result = s3Client.completeMultipartUpload(completeRequest);
+    assertNotNull(result.getETag());
+    assertNotEquals(existingETag, stripQuotes(result.getETag()));
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfMatchFail() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // First, create an existing key
+    s3Client.putObject(bucketName, keyName,
+        new ByteArrayInputStream("existing".getBytes(StandardCharsets.UTF_8)),
+        new ObjectMetadata());
+
+    // Initiate multipart upload for same key
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "newcontent";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-Match: wrong-etag (should fail)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-Match", "\"wrong-etag\"");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.completeMultipartUpload(completeRequest));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfMatchMissingKeyFail() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // Initiate multipart upload (key doesn't exist)
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "newcontent";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-Match on non-existent key (should fail)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-Match", "\"some-etag\"");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.completeMultipartUpload(completeRequest));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+  }
+
+  @Test
   public void testPutDoubleSlashPrefixObject() throws IOException {
     final String bucketName = getBucketName();
     final String keyName = "//dir1";

@@ -181,7 +181,6 @@ public class TestRepeatedOmKeyInfoCodec
         .setOmKeyLocationInfos(
             Collections.singletonList(omKeyLocationInfoGroup))
         .setExpectedDataGeneration(12345L)
-        .setExpectedETag("test-etag-value")
         .build();
   }
 
@@ -196,9 +195,7 @@ public class TestRepeatedOmKeyInfoCodec
     RepeatedKeyInfo proto = RepeatedKeyInfo.parseFrom(rawData);
 
     assertTrue(proto.getKeyInfo(0).hasExpectedDataGeneration());
-    assertTrue(proto.getKeyInfo(0).hasExpectedETag());
     assertEquals(12345L, proto.getKeyInfo(0).getExpectedDataGeneration());
-    assertEquals("test-etag-value", proto.getKeyInfo(0).getExpectedETag());
   }
 
   @Test
@@ -212,7 +209,6 @@ public class TestRepeatedOmKeyInfoCodec
     RepeatedKeyInfo proto = RepeatedKeyInfo.parseFrom(rawData);
 
     assertFalse(proto.getKeyInfo(0).hasExpectedDataGeneration());
-    assertFalse(proto.getKeyInfo(0).hasExpectedETag());
 
     RepeatedOmKeyInfo deserialized = codec.fromPersistedFormat(rawData);
     assertEquals(VOLUME, deserialized.getOmKeyInfoList().get(0).getVolumeName());
@@ -234,7 +230,6 @@ public class TestRepeatedOmKeyInfoCodec
 
     assertEquals(VOLUME, deserialized.getOmKeyInfoList().get(0).getVolumeName());
     assertEquals(12345L, deserialized.getOmKeyInfoList().get(0).getExpectedDataGeneration());
-    assertEquals("test-etag-value", deserialized.getOmKeyInfoList().get(0).getExpectedETag());
   }
 
   @Test

@@ -726,6 +726,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     List<CompleteMultipartUploadRequest.Part> partList =
         multipartUploadRequest.getPartList();
 
+    S3ConditionalRequest.WriteConditions writeConditions =
+        S3ConditionalRequest.parseWriteConditions(getHeaders(), key);
+
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
       OzoneBucket ozoneBucket = volume.getBucket(bucket);
@@ -738,7 +741,16 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         LOG.debug("Parts map {}", partsMap);
       }
 
-      omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(key, uploadID, partsMap);
+      Long expectedDataGeneration = null;
+      String expectedETag = null;
+      if (writeConditions.hasIfNoneMatch()) {
+        expectedDataGeneration = OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS;
+      } else if (writeConditions.hasIfMatch()) {
+        expectedETag = writeConditions.getExpectedETag();
+      }
+
+      omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(
+          key, uploadID, partsMap, expectedDataGeneration, expectedETag);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
@@ -770,6 +782,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             "considered as Unix Paths. A directory already exists with a " +
             "given KeyName caused failure for MPU");
         throw os3Exception;
+      } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
+          || ex.getResult() == ResultCodes.ETAG_MISMATCH
+          || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
+        throw newError(PRECOND_FAILED, key, ex);
+      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
+          && writeConditions.hasIfMatch()) {
+        throw newError(PRECOND_FAILED, key, ex);
       }
       throw newError(bucket, key, ex);
     } catch (Exception ex) {
