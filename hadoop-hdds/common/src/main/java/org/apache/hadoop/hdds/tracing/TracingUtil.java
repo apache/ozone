@@ -26,7 +26,6 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
-import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
@@ -34,7 +33,6 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -359,12 +357,12 @@ public final class TracingUtil {
   public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
       String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
     if (conf == null || !isTracingEnabled(conf)) {
-      return () -> {};
+      return () -> { };
     }
 
     String traceparent = getHeader.apply("traceparent");
     if (traceparent == null || traceparent.isEmpty()) {
-      return () -> {};
+      return () -> { };
     }
 
     StringBuilder encoded = new StringBuilder().append("traceparent=").append(traceparent);
@@ -378,7 +376,7 @@ public final class TracingUtil {
             Context.current(), encoded.toString(), new TextExtractor());
 
     if (!Span.fromContext(remote).getSpanContext().isValid()) {
-      return () -> {};
+      return () -> { };
     }
 
     Span span = tracer.spanBuilder(spanName).setParent(remote).startSpan();
