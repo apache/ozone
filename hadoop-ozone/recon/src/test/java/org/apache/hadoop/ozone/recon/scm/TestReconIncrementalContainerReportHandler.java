@@ -46,7 +46,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
@@ -133,11 +135,12 @@ public class TestReconIncrementalContainerReportHandler
       ReconContainerManager containerManager = getContainerManager();
       containerManager.addNewContainer(containerWithPipeline);
 
-      DatanodeDetails datanodeDetails =
-          containerWithPipeline.getPipeline().getFirstNode();
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          containerWithPipeline.getPipeline().getFirstNode(),
+          NodeStatus.inServiceHealthy(), null, 1000);
       NodeManager nodeManagerMock = mock(NodeManager.class);
       when(nodeManagerMock.getNode(any(DatanodeID.class)))
-          .thenReturn(datanodeDetails);
+          .thenReturn(datanodeInfo);
       IncrementalContainerReportFromDatanode reportMock =
           mock(IncrementalContainerReportFromDatanode.class);
       when(reportMock.getDatanodeDetails())
@@ -145,7 +148,7 @@ public class TestReconIncrementalContainerReportHandler
 
       IncrementalContainerReportProto containerReport =
           getIncrementalContainerReportProto(containerID, state,
-              datanodeDetails.getUuidString());
+              datanodeInfo.getUuidString());
       when(reportMock.getReport()).thenReturn(containerReport);
       ReconIncrementalContainerReportHandler reconIcr =
           new ReconIncrementalContainerReportHandler(nodeManagerMock,

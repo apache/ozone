@@ -902,9 +902,9 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public DatanodeDetails getNode(DatanodeID id) {
+  public DatanodeInfo getNode(DatanodeID id) {
     Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + id);
-    return node == null ? null : (DatanodeDetails)node;
+    return node == null ? null : getDatanodeInfo((DatanodeDetails)node);
   }
 
   @Override
