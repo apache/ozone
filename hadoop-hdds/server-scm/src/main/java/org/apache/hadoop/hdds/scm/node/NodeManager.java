@@ -370,7 +370,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<SCMCommand<?>> getCommandQueue(DatanodeID dnID);
 
   /** @return the datanode of the given id if it exists; otherwise, return null. */
-  @Nullable DatanodeInfo getNode(@Nullable DatanodeID id);
+  @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of

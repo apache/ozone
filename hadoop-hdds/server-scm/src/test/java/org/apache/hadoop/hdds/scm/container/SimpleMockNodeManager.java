@@ -353,7 +353,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public DatanodeInfo getNode(DatanodeID id) {
+  public DatanodeDetails getNode(DatanodeID id) {
     return null;
   }
 
