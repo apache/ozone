@@ -41,8 +41,8 @@ public class TestAvailableSpaceFilter {
     when(report.getCapacity()).thenReturn(1000L);
     when(report.getRemaining()).thenReturn(100L);
     when(report.getCommitted()).thenReturn(0L);
+    when(report.getUsableSpace()).thenReturn(0L);
     when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
-    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
     when(volume.getVolumeInfoStats()).thenReturn(metrics);
 
     AvailableSpaceFilter filter = new AvailableSpaceFilter(50L);
@@ -61,8 +61,8 @@ public class TestAvailableSpaceFilter {
     when(report.getCapacity()).thenReturn(1000L);
     when(report.getRemaining()).thenReturn(100L);
     when(report.getCommitted()).thenReturn(0L);
+    when(report.getUsableSpace()).thenReturn(0L);
     when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
-    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
     when(volume.getVolumeInfoStats()).thenReturn(metrics);
 
     AvailableSpaceFilter filter = new AvailableSpaceFilter(80L);
@@ -81,14 +81,14 @@ public class TestAvailableSpaceFilter {
     when(report.getCapacity()).thenReturn(1000L);
     when(report.getRemaining()).thenReturn(1000L);
     when(report.getCommitted()).thenReturn(0L);
+    when(report.getUsableSpace()).thenReturn(900L);
     when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
-    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
     when(volume.getVolumeInfoStats()).thenReturn(metrics);
 
     AvailableSpaceFilter filter = new AvailableSpaceFilter(50L);
     assertTrue(filter.test(volume));
 
-    verify(metrics, never()).getNumContainerCreateRequestsInSoftBandMinFreeSpace();
-    verify(metrics, never()).incNumWriteRequestsRejectedHardMinFreeSpace();
+    verify(metrics, never()).incNumContainerCreateRequestsInSoftBandMinFreeSpace();
+    verify(metrics, never()).incNumContainerCreateRequestsRejectedHardMinFreeSpace();
   }
 }

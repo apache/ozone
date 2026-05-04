@@ -44,11 +44,9 @@ public class AvailableSpaceFilter implements Predicate<HddsVolume> {
     StorageLocationReport report = vol.getReport();
     long capacity = report.getCapacity();
     long spareAtHardLimit = vol.getFreeSpaceToSpare(capacity);
-    long spareReported = vol.getReportedFreeSpaceToSpare(capacity);
     long available =
         report.getRemaining() - report.getCommitted() - spareAtHardLimit;
-    long availableAtReportedSpare =
-        report.getRemaining() - report.getCommitted() - spareReported;
+    long availableAtReportedSpare = report.getUsableSpace();
 
     boolean hasEnoughSpace = available > requiredSpace;
 
