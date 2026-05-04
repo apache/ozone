@@ -142,16 +142,15 @@ public final class OmKeyInfo extends WithParentObjectId
    * Creates a new codec for OmKeyInfo.
    *
    * @param ignorePipeline whether to ignore pipeline info during serialization
-   * @param includeOpenKeyFields whether to include fields only used in openKeyTable
-   *                             (expectedDataGeneration, expectedETag) in serialization.
-   *                             Use true for openKeyTable, false for keyTable.
+   * @param isOpenKey true for openKeyTable (includes expectedDataGeneration/expectedETag),
+   *                  false for keyTable (excludes these fields)
    * @return the codec
    */
-  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline, boolean includeOpenKeyFields) {
+  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline, boolean isOpenKey) {
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION, includeOpenKeyFields),
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION, isOpenKey),
         OmKeyInfo.class);
   }
 
@@ -162,8 +161,8 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param ignorePipeline whether to ignore pipeline info
    * @return the codec for openKeyTable
    */
-  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
-    LOG.debug("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
+  public static Codec<OmKeyInfo> getOpenKeyTableCodec(boolean ignorePipeline) {
+    LOG.debug("OmKeyInfo.getOpenKeyTableCodec ignorePipeline = {}", ignorePipeline);
     return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
   }
 
@@ -174,8 +173,8 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param ignorePipeline whether to ignore pipeline info
    * @return the codec for keyTable
    */
-  public static Codec<OmKeyInfo> getCodecForKeyTable(boolean ignorePipeline) {
-    LOG.debug("OmKeyInfo.getCodecForKeyTable ignorePipeline = {}", ignorePipeline);
+  public static Codec<OmKeyInfo> getKeyTableCodec(boolean ignorePipeline) {
+    LOG.debug("OmKeyInfo.getKeyTableCodec ignorePipeline = {}", ignorePipeline);
     return ignorePipeline ? CODEC_KEY_TABLE_TRUE : CODEC_KEY_TABLE_FALSE;
   }
 
@@ -796,13 +795,12 @@ public final class OmKeyInfo extends WithParentObjectId
    *
    * @param ignorePipeline true for persist to DB, false for network transmit.
    * @param clientVersion the client version
-   * @param includeOpenKeyFields whether to include fields.
-   *                             Use true for openKeyTable, false for keyTable.
+   * @param isOpenKey true for openKeyTable, false for keyTable
    * @return KeyInfo
    */
   public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion,
-                             boolean includeOpenKeyFields) {
-    return getProtobuf(ignorePipeline, null, clientVersion, false, includeOpenKeyFields);
+                             boolean isOpenKey) {
+    return getProtobuf(ignorePipeline, null, clientVersion, false, isOpenKey);
   }
 
   /**
@@ -824,12 +822,12 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param fullKeyName user given key name
    * @param clientVersion the client version
    * @param latestVersionBlocks whether to include only latest version blocks
-   * @param includeOpenKeyFields whether to include fields only used in openKeyTable
+   * @param isOpenKey true for openKeyTable, false for keyTable
    * @return key info object
    */
   private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
                               int clientVersion, boolean latestVersionBlocks,
-                              boolean includeOpenKeyFields) {
+                              boolean isOpenKey) {
     long latestVersion = keyLocationVersions.isEmpty() ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
@@ -882,7 +880,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     kb.setIsFile(isFile);
     
-    if (includeOpenKeyFields) {
+    if (isOpenKey) {
       if (expectedDataGeneration != null) {
         kb.setExpectedDataGeneration(expectedDataGeneration);
       }
