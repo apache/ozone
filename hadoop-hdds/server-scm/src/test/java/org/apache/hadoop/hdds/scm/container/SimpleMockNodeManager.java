@@ -261,7 +261,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public void removePendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
+  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
   }
 
   @Override

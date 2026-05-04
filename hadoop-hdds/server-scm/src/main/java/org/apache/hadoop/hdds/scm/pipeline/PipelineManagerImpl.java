@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -657,7 +658,8 @@ public class PipelineManagerImpl implements PipelineManager {
     for (DatanodeDetails dn : pipeline.getNodes()) {
       if (!nodeManager.checkSpaceAndRecordAllocation(dn.getID(), containerID)) {
         for (DatanodeDetails rollbackNode : successfulNodes) {
-          nodeManager.removePendingAllocationForDatanode(rollbackNode.getID(), containerID);
+          DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(rollbackNode);
+          nodeManager.removePendingAllocationForDatanode(datanodeInfo, containerID);
         }
         return false;
       }

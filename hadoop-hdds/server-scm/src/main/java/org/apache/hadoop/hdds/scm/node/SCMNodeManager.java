@@ -1114,12 +1114,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public void removePendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
-    DatanodeInfo datanodeInfo = getNode(datanodeID);
-    if (datanodeInfo == null) {
-      LOG.warn("DatanodeInfo not found for node {}", datanodeID);
-      return;
-    }
+  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
     pendingContainerTracker.removePendingAllocation(
         datanodeInfo.getPendingContainerAllocations(), containerID);
   }

@@ -214,7 +214,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param datanodeID the ID of the DataNode
    * @param containerID the container to remove from pending
    */
-  void removePendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID);
+  void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID);
 
   /**
    * Return the node stat of the specified datanode.

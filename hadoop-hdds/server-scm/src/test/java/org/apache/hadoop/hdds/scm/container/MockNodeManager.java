@@ -475,14 +475,10 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public void removePendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
-    DatanodeDetails dd = nodeMetricMap.keySet().stream()
-        .filter(d -> d.getID().equals(datanodeID))
-        .findFirst().orElse(null);
-    DatanodeInfo info = getDatanodeInfo(dd);
-    if (info != null) {
+  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    if (datanodeInfo != null) {
       pendingContainerTracker.removePendingAllocation(
-          info.getPendingContainerAllocations(), containerID);
+          datanodeInfo.getPendingContainerAllocations(), containerID);
     }
   }
 
