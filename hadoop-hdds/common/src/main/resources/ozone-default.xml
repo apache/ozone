@@ -3607,7 +3607,7 @@
   </property>
   <property>
     <name>ozone.recon.scm.container.threshold</name>
-    <value>100000</value>
+    <value>1000000</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
       Non-OPEN container count drift threshold above which Recon escalates from

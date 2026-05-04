@@ -443,7 +443,7 @@ public class ReconStorageContainerManagerFacade
     // Each cycle calls decideSyncAction() — two lightweight count RPCs to SCM
     // — and then:
     //
-    //   |total drift| > threshold (default 100,000)
+    //   |total drift| > threshold (default 1,000,000)
     //       → full snapshot: replace Recon's entire SCM DB from SCM checkpoint
     //
     //   0 < |total drift| <= threshold

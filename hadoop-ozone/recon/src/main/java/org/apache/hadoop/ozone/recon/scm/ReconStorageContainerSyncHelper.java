@@ -154,7 +154,7 @@ class ReconStorageContainerSyncHelper {
    * <p>Decision logic:
    * <ol>
    *   <li>If {@code |(SCM_total - SCM_open) - (Recon_total - Recon_open)| >
-   *       ozone.recon.scm.container.threshold} (default 100,000): return
+   *       ozone.recon.scm.container.threshold} (default 1,000,000): return
    *       {@link SyncAction#FULL_SNAPSHOT}. Large drift in non-OPEN containers
    *       means Recon is badly behind on stable SCM state and a full checkpoint
    *       replacement is cheaper and more reliable at that scale.</li>

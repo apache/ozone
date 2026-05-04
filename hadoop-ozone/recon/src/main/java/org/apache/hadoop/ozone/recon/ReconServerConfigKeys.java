@@ -145,26 +145,17 @@ public final class  ReconServerConfigKeys {
    * SCM DB. For drift at or below this value the incremental sync corrects the
    * gap without replacing the entire database.
    *
-   * <p>Default: 100,000. In large clusters (millions of containers) operators
+   * <p>Default: 1,000,000. In large clusters (millions of containers) operators
    * may raise this further since the targeted sync handles per-state
    * corrections efficiently even at higher drift levels.
    */
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
-  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 100_000;
+  public static final int OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT = 1_000_000;
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_ENABLED =
       "ozone.recon.scm.snapshot.enabled";
   public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = true;
-
-  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT =
-      "ozone.recon.scm.connection.timeout";
-  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT_DEFAULT = "5s";
-
-  public static final String OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT =
-      "ozone.recon.scm.connection.request.timeout";
-  public static final String
-      OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
 
   public static final String OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD =
       "ozone.recon.nssummary.flush.db.max.threshold";
@@ -201,17 +192,8 @@ public final class  ReconServerConfigKeys {
 
   public static final int OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT = 2000;
 
-  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
-      "ozone.recon.scm.snapshot.task.interval.delay";
-
-  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT
-      = "24h";
-
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY =
       "ozone.recon.scm.snapshot.task.initial.delay";
-
-  public static final String
-      OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
 
   /**
    * How often the incremental (targeted) SCM container sync runs.
@@ -228,7 +210,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.container.sync.task.interval.delay";
 
   public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT
-      = "1h";
+      = "12h";
 
   /**
    * Initial delay before the first incremental SCM container sync run.
