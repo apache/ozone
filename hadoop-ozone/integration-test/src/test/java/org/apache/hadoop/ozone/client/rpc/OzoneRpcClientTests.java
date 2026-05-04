@@ -1554,6 +1554,37 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @ParameterizedTest
   @EnumSource
+  void testRewriteKeyIfMatchFailsDueToOutdatedGenerationAtCommit(
+      BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKeyWithETag(bucket);
+    String etag = keyDetails.getMetadata().get(ETAG);
+    byte[] overwriteContent = "overwrite".getBytes(UTF_8);
+
+    OzoneOutputStream out = null;
+    try {
+      out = bucket.rewriteKeyIfMatch(
+          keyDetails.getName(), keyDetails.getDataSize(), etag,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          keyDetails.getMetadata(), Collections.emptyMap());
+      out.write("rewrite".getBytes(UTF_8));
+
+      createTestKey(bucket, keyDetails.getName(), overwriteContent);
+
+      OMException e = assertThrows(OMException.class, out::close);
+      assertEquals(ATOMIC_WRITE_CONFLICT, e.getResult());
+    } finally {
+      if (out != null) {
+        out.close();
+      }
+    }
+
+    assertKeyContent(bucket, keyDetails.getName(), overwriteContent);
+  }
+
+  @ParameterizedTest
+  @EnumSource
   void testRewriteKeyIfMatchFailsWithWrongETag(BucketLayout layout) throws IOException {
     checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     OzoneBucket bucket = createBucket(layout);

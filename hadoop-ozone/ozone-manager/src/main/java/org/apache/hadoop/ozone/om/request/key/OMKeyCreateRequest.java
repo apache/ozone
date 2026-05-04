@@ -243,8 +243,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           keyName);
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
-      validateAtomicRewrite(dbKeyInfo, keyArgs);
-      keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(keyArgs, dbKeyInfo);
+      keyArgs = resolveConditionalWriteAtAdmission(
+          dbKeyInfo, keyArgs, auditMap);
 
       OmBucketInfo bucketInfo =
           getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
