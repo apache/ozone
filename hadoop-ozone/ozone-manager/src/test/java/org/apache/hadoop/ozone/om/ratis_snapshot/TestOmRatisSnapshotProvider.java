@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.om.ratis_snapshot;
 
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.mock;
@@ -37,9 +39,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,6 +82,27 @@ public class TestOmRatisSnapshotProvider {
     omRatisSnapshotProvider =
         new OmRatisSnapshotProvider(snapshotDir, peerNodesMap, httpPolicy,
             false, connectionFactory);
+  }
+
+  @Test
+  public void testBootstrapDiskSpaceCheckSkippedWhenZero(@TempDir File snapshotDir) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY, "0GB");
+    OmRatisSnapshotProvider provider =
+        new OmRatisSnapshotProvider(conf, snapshotDir, new HashMap<>());
+    assertDoesNotThrow(() -> provider.ensureBootstrapDiskSpace());
+  }
+
+  @Test
+  public void testBootstrapDiskSpaceCheckFailsWhenBelowMinimum(@TempDir File snapshotDir) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY, "1024EB");
+    OmRatisSnapshotProvider provider =
+        new OmRatisSnapshotProvider(conf, snapshotDir, new HashMap<>());
+    IOException ex =
+        assertThrows(IOException.class, provider::ensureBootstrapDiskSpace);
+    assertEquals(true,
+        ex.getMessage().contains(OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY));
   }
 
   @Test

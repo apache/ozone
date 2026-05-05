@@ -291,6 +291,10 @@ public final class OMConfigKeys {
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
       TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
 
+  public static final String OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY =
+      "ozone.om.bootstrap.min.space";
+  public static final String OZONE_OM_BOOTSTRAP_MIN_SPACE_DEFAULT = "5GB";
+
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
   public static final int OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT = 10000;

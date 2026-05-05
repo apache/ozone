@@ -24,6 +24,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY;
@@ -45,6 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -54,6 +57,7 @@ import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +90,8 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
   private final boolean useV2CheckpointApi;
+  /** Minimum usable bytes on snapshot volume before download; 0 = disabled. */
+  private final long bootstrapMinSpaceBytes;
 
   public OmRatisSnapshotProvider(File snapshotDir,
       Map<String, OMNodeDetails> peerNodesMap, HttpConfig.Policy httpPolicy,
@@ -96,6 +102,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     this.spnegoEnabled = spnegoEnabled;
     this.connectionFactory = connectionFactory;
     this.useV2CheckpointApi = OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
+    this.bootstrapMinSpaceBytes = 0L;
   }
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
@@ -106,6 +113,10 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     peerNodesMap.putAll(peerNodeDetails);
     this.useV2CheckpointApi = conf.getBoolean(OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY,
         OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT);
+    this.bootstrapMinSpaceBytes = (long) conf.getStorageSize(
+        OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+        OZONE_OM_BOOTSTRAP_MIN_SPACE_DEFAULT,
+        StorageUnit.BYTES);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
     this.spnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
@@ -144,9 +155,57 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     peerNodesMap.remove(decommNodeId);
   }
 
+  /**
+   * Ensures the filesystem that holds {@link #getSnapshotDir()} has enough
+   * free space for OM bootstrap / install snapshot download and unpack.
+   *
+   * @throws IOException if {@link #bootstrapMinSpaceBytes} is &gt; 0 and
+   *                     usable space is below the configured minimum
+   */
+  void ensureBootstrapDiskSpace() throws IOException {
+    if (bootstrapMinSpaceBytes <= 0) {
+      LOG.debug("{} is 0 or negative; skipping bootstrap disk space check.",
+          OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
+      return;
+    }
+    File snapshotRoot = getSnapshotDir();
+    if (!snapshotRoot.exists()) {
+      throw new IOException(String.format(
+          "OM ratis snapshot directory %s does not exist; cannot verify "
+              + "%s (required %s)",
+          snapshotRoot.getAbsolutePath(),
+          OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+          StringUtils.byteDesc(bootstrapMinSpaceBytes)));
+    }
+    final long usable = Files.getFileStore(snapshotRoot.toPath()).getUsableSpace();
+    if (usable < bootstrapMinSpaceBytes) {
+      String message = String.format(
+          "OM bootstrap / install snapshot aborted: volume containing ratis snapshot dir "
+              + "%s has usable space %s (%d bytes) but %s requires at least %s (%d bytes). "
+              + "Free disk on this OM host and increase %s if your checkpoints are larger.",
+          snapshotRoot.getAbsolutePath(),
+          StringUtils.byteDesc(usable),
+          usable,
+          OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+          StringUtils.byteDesc(bootstrapMinSpaceBytes),
+          bootstrapMinSpaceBytes,
+          OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
+      LOG.error(message);
+      throw new IOException(message);
+    }
+    LOG.info(
+        "Bootstrap disk space check passed for OM ratis snapshot dir {}: usable {} >= "
+            + "minimum {} ({})",
+        snapshotRoot.getAbsolutePath(),
+        StringUtils.byteDesc(usable),
+        StringUtils.byteDesc(bootstrapMinSpaceBytes),
+        OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
+  }
+
   @Override
   public void downloadSnapshot(String leaderNodeID, File targetFile)
       throws IOException {
+    ensureBootstrapDiskSpace();
     OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
     URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
         useV2CheckpointApi, httpPolicy.isHttpEnabled(), true);
