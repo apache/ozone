@@ -76,7 +76,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private DatanodeDetails datanodeDetails;
   private ThreadPoolExecutor readExecutors;
   private EventLoopGroup eventLoopGroup;
-  private GrpcConnectionLimitFilter connectionLimitFilter;
 
   /**
    * Constructs a Grpc server class.
@@ -104,7 +103,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         HddsServerUtil.getDatanodeStorageDirs(conf).size();
     final int poolSize = threadCountPerDisk * numberOfDisks;
     final int maxConnections = dnConf.getGrpcMaxConnections();
-    connectionLimitFilter = new GrpcConnectionLimitFilter(maxConnections);
+    GrpcConnectionLimitFilter connectionLimitFilter =
+        new GrpcConnectionLimitFilter(maxConnections);
     LOG.info("Datanode gRPC server max connections: {}",
         maxConnections > 0 ? maxConnections : "unlimited");
 

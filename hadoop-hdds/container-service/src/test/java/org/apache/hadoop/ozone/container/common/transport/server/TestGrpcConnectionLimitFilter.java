@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.transport.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -178,7 +179,8 @@ class TestGrpcConnectionLimitFilter {
     }
 
     startLatch.countDown();
-    doneLatch.await(10, TimeUnit.SECONDS);
+    assertTrue(doneLatch.await(10, TimeUnit.SECONDS),
+        "All threads should complete within timeout");
     executor.shutdown();
     
     assertEquals(maxConnections, acceptedCount.get(),
