@@ -1585,7 +1585,6 @@ message CommitKeyRequest {
 }
 
 message CommitKeyResponse {
-
 }
 
 message AllocateBlockRequest {
@@ -2346,6 +2345,9 @@ message S3Authentication {
     optional string resolvedStsOriginalAccessKeyId = 7;
     optional string resolvedStsTempAccessKeyId = 8;
     optional string resolvedStsSecretKeyId = 9;
+    // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
+    // in finer-grained STS permissions.
+    optional string s3Action = 10;
 }
 
 message RecoverLeaseRequest {

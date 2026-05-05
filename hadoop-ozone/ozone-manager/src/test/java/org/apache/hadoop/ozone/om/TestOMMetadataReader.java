@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,8 +77,9 @@ public class TestOMMetadataReader {
   private static final long MAX_KEYS = 100L;
 
   @AfterEach
-  public void clearStsThreadLocal() {
+  public void clearOmThreadLocals() {
     OzoneManager.setStsTokenIdentifier(null);
+    OzoneManager.setS3Auth(null);
   }
 
   @Test
@@ -145,7 +145,58 @@ public class TestOMMetadataReader {
   }
 
   @Test
-  public void testListStatusUsesListAclForStsS3Request() throws Exception {
+  public void testCheckAclsAttachesS3ActionFromThreadLocal() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObject")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    final RequestContext contextWithoutS3Action = createTestRequestContext();
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3Action, true));
+
+    verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, "GetObject");
+  }
+
+  @Test
+  public void testCheckAclsLeavesS3ActionUnsetWhenS3AuthThreadLocalNull() throws Exception {
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    final RequestContext contextWithoutS3Action = createTestRequestContext();
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3Action, true));
+
+    verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, null);
+  }
+
+  @Test
+  public void testCheckAclsAttachesSessionPolicyAndS3ActionFromThreadLocals() throws Exception {
+    setupStsTokenIdentifier();
+
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("PutObject")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    final RequestContext baseContext = createTestRequestContext();
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, baseContext, true));
+
+    verifySessionPolicyAndS3ActionPassedToAuthorizer(accessAuthorizer, obj);
+  }
+
+  @Test
+  public void testListStatusUsesReadAclForStsS3Request() throws Exception {
     setupStsS3Request();
 
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
@@ -161,10 +212,9 @@ public class TestOMMetadataReader {
 
     // For STS S3 requests, listStatus() performs these checks:
     // 1. Volume READ (for volume access)
-    // 2) Key LIST (for the specific prefix being listed) - we need LIST permission for STS in order to tell whether the
-    //    file should be listed only or downloadable (downloadable would be READ)
+    // 2) Key READ (for the specific prefix being listed)
     assertContainsVolumeReadCheck(checks);
-    assertContainsKeyListCheckWithName(checks, KEY_PREFIX);
+    assertContainsKeyReadCheckWithName(checks, KEY_PREFIX);
   }
 
   @Test
@@ -186,7 +236,6 @@ public class TestOMMetadataReader {
     assertContainsVolumeReadCheck(checks);
     // We want to ensure the current behavior for non-STS requests remains the same
     assertContainsKeyReadCheckWithName(checks);
-    assertDoesNotContainKeyListCheck(checks);
   }
 
   @Test
@@ -209,7 +258,7 @@ public class TestOMMetadataReader {
 
     final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
     assertContainsVolumeReadCheck(checks);
-    assertContainsKeyListCheckWithName(checks, "userA/");
+    assertContainsKeyReadCheckWithName(checks, "userA/");
   }
 
   @Test
@@ -231,7 +280,7 @@ public class TestOMMetadataReader {
 
     final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
     assertContainsVolumeReadCheck(checks);
-    assertContainsKeyListCheckWithName(checks, "*");
+    assertContainsKeyReadCheckWithName(checks, "*");
   }
 
   @Test
@@ -254,7 +303,7 @@ public class TestOMMetadataReader {
 
     final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
     assertContainsVolumeReadCheck(checks);
-    assertContainsKeyListCheckWithName(checks, "user");
+    assertContainsKeyReadCheckWithName(checks, "user");
   }
 
   @Test
@@ -277,7 +326,7 @@ public class TestOMMetadataReader {
 
     final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
     assertContainsVolumeReadCheck(checks);
-    assertContainsKeyListCheckWithName(checks, "user/foo");
+    assertContainsKeyReadCheckWithName(checks, "user/foo");
   }
 
   @Test
@@ -301,7 +350,7 @@ public class TestOMMetadataReader {
   }
 
   @Test
-  public void testGetFileStatusUsesListAclForStsS3Request() throws Exception {
+  public void testGetFileStatusUsesReadAclForStsS3Request() throws Exception {
     setupStsS3Request();
 
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
@@ -314,8 +363,7 @@ public class TestOMMetadataReader {
 
     final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
     assertContainsVolumeReadCheck(checks);
-    assertContainsKeyListCheckWithName(checks, KEY_PREFIX);
-    assertDoesNotContainKeyReadCheck(checks);
+    assertContainsKeyReadCheckWithName(checks, KEY_PREFIX);
   }
 
   @Test
@@ -333,7 +381,6 @@ public class TestOMMetadataReader {
     final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
     assertContainsVolumeReadCheck(checks);
     assertContainsKeyReadCheckWithName(checks);
-    assertDoesNotContainKeyListCheck(checks);
   }
 
   @Test
@@ -350,7 +397,7 @@ public class TestOMMetadataReader {
 
     List<AclCheck> checks = captureAclChecks(accessAuthorizer, 4);
     assertContainsBucketListCheck(checks);
-    assertContainsKeyListCheckWithName(checks, "userA/");
+    assertContainsKeyReadCheckWithName(checks, "userA/");
 
     // Reset to make case 2 assertions independent of case 1 captures.
     reset(accessAuthorizer);
@@ -361,7 +408,7 @@ public class TestOMMetadataReader {
 
     checks = captureAclChecks(accessAuthorizer, 4);
     assertContainsBucketListCheck(checks);
-    assertContainsKeyListCheckWithName(checks, "*");
+    assertContainsKeyReadCheckWithName(checks, "*");
   }
 
   private OmMetadataReader createMetadataReader(IAccessAuthorizer accessAuthorizer) throws IOException {
@@ -505,6 +552,27 @@ public class TestOMMetadataReader {
     assertEquals(expectedSessionPolicy, captor.getValue().getSessionPolicy());
   }
 
+  /**
+   * Verifies that the accessAuthorizer received a call to checkAccess with the expected s3 action.
+   * @param accessAuthorizer the mock authorizer to verify
+   * @param expectedObj the expected OzoneObj
+   * @param expectedS3Action the expected s3 action (could be null)
+   */
+  private void verifyS3ActionPassedToAuthorizer(IAccessAuthorizer accessAuthorizer, OzoneObj expectedObj,
+      String expectedS3Action) throws OMException {
+    final ArgumentCaptor<RequestContext> captor = ArgumentCaptor.forClass(RequestContext.class);
+    verify(accessAuthorizer).checkAccess(eq(expectedObj), captor.capture());
+    assertEquals(expectedS3Action, captor.getValue().getS3Action());
+  }
+
+  private void verifySessionPolicyAndS3ActionPassedToAuthorizer(IAccessAuthorizer accessAuthorizer,
+      OzoneObj expectedObj) throws OMException {
+    final ArgumentCaptor<RequestContext> captor = ArgumentCaptor.forClass(RequestContext.class);
+    verify(accessAuthorizer).checkAccess(eq(expectedObj), captor.capture());
+    assertEquals("session-policy-from-thread-local", captor.getValue().getSessionPolicy());
+    assertEquals("PutObject", captor.getValue().getS3Action());
+  }
+
   private List<AclCheck> captureAclChecks(IAccessAuthorizer accessAuthorizer, int expectedCheckCount)
       throws OMException {
     final ArgumentCaptor<OzoneObj> objCaptor = ArgumentCaptor.forClass(OzoneObj.class);
@@ -538,12 +606,12 @@ public class TestOMMetadataReader {
         "Expected a BUCKET LIST ACL check");
   }
 
-  private void assertContainsKeyListCheckWithName(List<AclCheck> checks, String keyName) {
+  private void assertContainsKeyReadCheckWithName(List<AclCheck> checks, String keyName) {
     assertTrue(
         checks.stream().anyMatch(
-            check -> check.getObj().getResourceType() == KEY && check.getContext().getAclRights() == LIST &&
+            check -> check.getObj().getResourceType() == KEY && check.getContext().getAclRights() == READ &&
                 keyName.equals(check.getObj().getKeyName())),
-        "Expected a KEY LIST ACL check for key '" + keyName + "'");
+        "Expected a KEY READ ACL check for key '" + keyName + "'");
   }
 
   private void assertContainsKeyReadCheckWithName(List<AclCheck> checks) {
@@ -552,20 +620,6 @@ public class TestOMMetadataReader {
             check -> check.getObj().getResourceType() == KEY && check.getContext().getAclRights() == READ &&
                 TestOMMetadataReader.KEY_PREFIX.equals(check.getObj().getKeyName())),
         "Expected a KEY READ ACL check for key '" + TestOMMetadataReader.KEY_PREFIX + "'");
-  }
-
-  private void assertDoesNotContainKeyReadCheck(List<AclCheck> checks) {
-    assertFalse(
-        checks.stream().anyMatch(
-            check -> check.getObj().getResourceType() == KEY && check.getContext().getAclRights() == READ),
-        "Did not expect a KEY READ ACL check");
-  }
-
-  private void assertDoesNotContainKeyListCheck(List<AclCheck> checks) {
-    assertFalse(
-        checks.stream().anyMatch(
-            check -> check.getObj().getResourceType() == KEY && check.getContext().getAclRights() == LIST),
-        "Did not expect a KEY LIST ACL check");
   }
 
   private static final class AclCheck {
