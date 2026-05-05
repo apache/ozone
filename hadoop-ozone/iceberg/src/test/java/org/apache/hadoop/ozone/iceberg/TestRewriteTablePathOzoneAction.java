@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.iceberg;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
@@ -33,7 +32,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileFormat;
+import org.apache.iceberg.GenericManifestFile;
+import org.apache.iceberg.GenericPartitionFieldSummary;
 import org.apache.iceberg.HasTableOperations;
+import org.apache.iceberg.InternalData;
+import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.Schema;
@@ -44,6 +47,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadata.MetadataLogEntry;
 import org.apache.iceberg.actions.RewriteTablePath;
 import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.Pair;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,7 +100,9 @@ class TestRewriteTablePathOzoneAction {
     }
 
     Set<Pair<String, String>> csvPairs = readCsvPairs(table, result.fileListLocation());
-    assertEquals(expectedTargets, csvPairs.stream().map(Pair::second).collect(Collectors.toSet()));
+    Set<String> actualTargets = csvPairs.stream().map(Pair::second).collect(Collectors.toSet());
+    assertTrue(actualTargets.containsAll(expectedTargets),
+        "Copy plan should contain all expected version file targets");
 
     // Verify all internal paths inside each staged metadata file are rewritten to target.
     assertAllInternalPathsRewritten(csvPairs, targetPrefix);
@@ -124,7 +130,9 @@ class TestRewriteTablePathOzoneAction {
     }
 
     Set<Pair<String, String>> csvPairs = readCsvPairs(table, result.fileListLocation());
-    assertEquals(expectedTargets, csvPairs.stream().map(Pair::second).collect(Collectors.toSet()));
+    Set<String> actualTargets = csvPairs.stream().map(Pair::second).collect(Collectors.toSet());
+    assertTrue(actualTargets.containsAll(expectedTargets),
+        "Copy plan should contain all expected version file targets");
 
     // Verify all internal paths inside each staged metadata file are rewritten to target
     assertAllInternalPathsRewritten(csvPairs, targetPrefix);
@@ -152,7 +160,9 @@ class TestRewriteTablePathOzoneAction {
     }
 
     Set<Pair<String, String>> csvPairs = readCsvPairs(table, result.fileListLocation());
-    assertEquals(expectedTargets, csvPairs.stream().map(Pair::second).collect(Collectors.toSet()));
+    Set<String> actualTargets = csvPairs.stream().map(Pair::second).collect(Collectors.toSet());
+    assertTrue(actualTargets.containsAll(expectedTargets),
+        "Copy plan should contain all expected version file targets");
 
     // Verify all internal paths inside each staged metadata file are rewritten to target
     assertAllInternalPathsRewritten(csvPairs, targetPrefix);
@@ -182,7 +192,9 @@ class TestRewriteTablePathOzoneAction {
     }
 
     Set<Pair<String, String>> csvPairs = readCsvPairs(table, result.fileListLocation());
-    assertEquals(expectedTargets, csvPairs.stream().map(Pair::second).collect(Collectors.toSet()));
+    Set<String> actualTargets = csvPairs.stream().map(Pair::second).collect(Collectors.toSet());
+    assertTrue(actualTargets.containsAll(expectedTargets),
+        "Copy plan should contain all expected version file targets");
 
     // Verify all internal paths inside each staged metadata file are rewritten to target
     assertAllInternalPathsRewritten(csvPairs, targetPrefix);
@@ -196,33 +208,62 @@ class TestRewriteTablePathOzoneAction {
    * - Every statistics file path starts with target
    * - None of the above contain the source prefix.
    */
-  private void assertAllInternalPathsRewritten(Set<Pair<String, String>> csvPairs, String target) {
+  private void assertAllInternalPathsRewritten(Set<Pair<String, String>> csvPairs, String target) throws Exception {
+
     for (Pair<String, String> pair : csvPairs) {
       String stagingPath = pair.first();
       String targetPath = pair.second();
 
-      // Only inspect .metadata.json files, manifest/data files and snapshots are not yet rewritten
-      if (!stagingPath.endsWith(".metadata.json")) {
-        continue;
+      if (stagingPath.endsWith(".metadata.json")) {
+        assertMetadataFileRewritten(stagingPath, targetPath, target);
+      } else if (RewriteTablePathUtil.fileName(stagingPath).startsWith("snap-")) {
+        assertManifestListRewritten(stagingPath, targetPath, target);
+      } else if (RewriteTablePathUtil.fileName(stagingPath).endsWith(".avro")) {
+        assertTrue(targetPath.startsWith(target),
+            "Manifest file target path should start with target prefix: " + targetPath);
       }
+    }
+  }
 
-      assertTrue(targetPath.startsWith(target),
-          "Target path in CSV should start with target prefix: " + targetPath);
+  private void assertMetadataFileRewritten(String stagingPath, String targetPath, String target) {
 
-      TableMetadata rewritten = new StaticTableOperations(stagingPath, table.io()).current();
+    assertTrue(targetPath.startsWith(target),
+        "Target path in CSV should start with target prefix: " + targetPath);
 
-      assertTrue(rewritten.location().startsWith(target),
-          "Metadata location should start with target: " + rewritten.location());
+    TableMetadata rewritten = new StaticTableOperations(stagingPath, table.io()).current();
 
-      for (MetadataLogEntry entry : rewritten.previousFiles()) {
-        assertTrue(entry.file().startsWith(target),
-            "Metadata log entry should start with target: " + entry.file());
-      }
+    assertTrue(rewritten.location().startsWith(target),
+        "Metadata location should start with target: " + rewritten.location());
 
-      for (Snapshot snapshot : rewritten.snapshots()) {
-        String manifestList = snapshot.manifestListLocation();
-        assertTrue(manifestList.startsWith(target),
-            "Snapshot manifest-list should start with target: " + manifestList);
+    for (MetadataLogEntry entry : rewritten.previousFiles()) {
+      assertTrue(entry.file().startsWith(target),
+          "Metadata log entry should start with target: " + entry.file());
+    }
+
+    for (Snapshot snapshot : rewritten.snapshots()) {
+      String manifestList = snapshot.manifestListLocation();
+      assertTrue(manifestList.startsWith(target),
+          "Snapshot manifest-list should start with target: " + manifestList);
+    }
+  }
+
+  private void assertManifestListRewritten(String stagingPath, String targetPath, String target) throws Exception {
+
+    assertTrue(targetPath.startsWith(target),
+        "Manifest list target path should start with target prefix: " + targetPath);
+
+    try (CloseableIterable<ManifestFile> manifests =
+             InternalData.read(FileFormat.AVRO, table.io().newInputFile(stagingPath))
+                 .setRootType(GenericManifestFile.class)
+                 .setCustomType(
+                     ManifestFile.PARTITION_SUMMARIES_ELEMENT_ID,
+                     GenericPartitionFieldSummary.class)
+                 .project(ManifestFile.schema())
+                 .build()) {
+      for (ManifestFile manifest : manifests) {
+        assertTrue(manifest.path().startsWith(target),
+            "Manifest path inside staged manifest list should start with target prefix: "
+                + manifest.path());
       }
     }
   }
