@@ -5803,7 +5803,15 @@
             ]
           },
           {
-            "name": "CommitKeyResponse"
+            "name": "CommitKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "modificationTime",
+                "type": "uint64",
+                "optional": true
+              }
+            ]
           },
           {
             "name": "AllocateBlockRequest",
@@ -6371,6 +6379,12 @@
                 "id": 2,
                 "name": "eTag",
                 "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "modificationTime",
+                "type": "uint64",
                 "optional": true
               }
             ]
