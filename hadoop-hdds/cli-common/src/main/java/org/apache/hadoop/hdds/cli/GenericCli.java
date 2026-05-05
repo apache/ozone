@@ -39,6 +39,7 @@ import picocli.CommandLine.Option;
 public abstract class GenericCli implements GenericParentCommand {
 
   public static final int EXECUTION_ERROR_EXIT_CODE = -1;
+  public static final String INTERACTIVE_SHELL_PROPERTY = "ozone.interactive.shell";
 
   private final OzoneConfiguration config = new OzoneConfiguration();
   private final CommandLine cmd;
@@ -78,12 +79,7 @@ public abstract class GenericCli implements GenericParentCommand {
     int exitCode = execute(argv);
 
     if (exitCode != ExitCode.OK) {
-      if (cmd.getOut() != null) {
-        cmd.getOut().println("Command executed with exit code: " + exitCode);
-      }
-      if (System.getProperty("ozone.interactive.shell") == null) {
-        ExitUtils.terminate(exitCode, null, null);
-      }
+      ExitUtils.terminate(exitCode, null, null);
     }
   }
 

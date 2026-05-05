@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.function.Supplier;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.jline.console.SystemRegistry;
 import org.jline.console.impl.SystemRegistryImpl;
 import org.jline.reader.EndOfFileException;
@@ -71,7 +72,7 @@ class REPL {
       }
 
       String prompt = shell.prompt() + "> ";
-      System.setProperty("ozone.interactive.shell", "true");
+      System.setProperty(GenericCli.INTERACTIVE_SHELL_PROPERTY, "true");
 
       final int batchSize = lines == null ? 0 : lines.size();
       if (batchSize > 0) {

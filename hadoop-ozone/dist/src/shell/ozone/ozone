@@ -59,6 +59,7 @@ function ozone_usage
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
+  ozone_add_subcommand "interactive" client "interactive shell for ozone commands"
   ozone_add_subcommand "admin" client "Ozone admin tool"
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
@@ -221,7 +222,7 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.security.token.DtUtilShell
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
-    interactive | --interactive)
+    interactive)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneInteractiveShell
       OZONE_RUN_ARTIFACT_NAME="ozone-cli-shell"
       OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
@@ -328,10 +329,6 @@ if [[ $# = 0 ]]; then
 fi
 
 OZONE_SUBCMD=$1
-
-if [[ "$OZONE_SUBCMD" == "--interactive" ]]; then
-  OZONE_SUBCMD="interactive"
-fi
 
 if [[ "$OZONE_SUBCMD" == "auditparser" ]] || [[ "$OZONE_SUBCMD" == "checknative" ]]; then
   echo "warning: 'ozone $OZONE_SUBCMD' is deprecated, use 'ozone debug $OZONE_SUBCMD' instead."

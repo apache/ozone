@@ -46,7 +46,6 @@ public final class OzoneInteractiveShell {
     // Dynamically add subcommands from other modules to avoid circular dependencies.
     addDynamicSubcommand(topCmd, "admin", "org.apache.hadoop.ozone.admin.OzoneAdmin");
     addDynamicSubcommand(topCmd, "debug", "org.apache.hadoop.ozone.debug.OzoneDebug");
-    addDynamicSubcommand(topCmd, "fs", "org.apache.hadoop.fs.ozone.OzoneFsShell");
     addDynamicSubcommand(topCmd, "repair", "org.apache.hadoop.ozone.repair.OzoneRepair");
 
     Shell dummyShell = new Shell() {
