@@ -29,6 +29,8 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DB_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.GRPC_MAX_CONNECTIONS_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.GRPC_MAX_CONNECTIONS_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
@@ -282,5 +284,45 @@ public class TestDatanodeConfiguration {
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     assertEquals(expected, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
+  }
+
+  @Test
+  void testGrpcMaxConnectionsDefault() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(GRPC_MAX_CONNECTIONS_DEFAULT, subject.getGrpcMaxConnections());
+  }
+
+  @Test
+  void testGrpcMaxConnectionsCustomValue() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    int customMaxConnections = 10000;
+    conf.setInt(GRPC_MAX_CONNECTIONS_KEY, customMaxConnections);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(customMaxConnections, subject.getGrpcMaxConnections());
+  }
+
+  @Test
+  void testGrpcMaxConnectionsZeroDisablesLimit() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(GRPC_MAX_CONNECTIONS_KEY, 0);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(0, subject.getGrpcMaxConnections());
+  }
+
+  @Test
+  void testGrpcMaxConnectionsSetter() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    subject.setGrpcMaxConnections(8000);
+
+    assertEquals(8000, subject.getGrpcMaxConnections());
   }
 }

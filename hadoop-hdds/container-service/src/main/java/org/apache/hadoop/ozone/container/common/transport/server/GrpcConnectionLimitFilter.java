@@ -90,7 +90,6 @@ public class GrpcConnectionLimitFilter extends ServerTransportFilter {
     super.transportTerminated(transportAttrs);
   }
 
-
   public int getActiveConnections() {
     return activeConnections.get();
   }
