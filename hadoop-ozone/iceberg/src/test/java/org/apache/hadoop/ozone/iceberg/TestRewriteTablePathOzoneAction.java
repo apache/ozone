@@ -201,12 +201,16 @@ class TestRewriteTablePathOzoneAction {
   }
 
   /**
-   * For every staged metadata JSON file in the CSV, parses the file and asserts that:
-   * - The table location starts with target
-   * - Every metadata-log entry path starts with target
-   * - Every snapshot's manifest-list path starts with target
-   * - Every statistics file path starts with target
-   * - None of the above contain the source prefix.
+   * For every staged file in the CSV copy plan, asserts that internal paths are rewritten
+   * to the target prefix:
+   * <ul>
+   *   <li><b>.metadata.json</b>: table location, metadata-log entries, and snapshot
+   *       manifest-list references all start with target.</li>
+   *   <li><b>snap-*.avro (manifest-list)</b>: target path starts with target, and every
+   *       manifest entry path inside the staged file starts with target.</li>
+   *   <li><b>*.avro (manifest)</b>: target path starts with target (content rewrite
+   *       is not yet implemented).</li>
+   * </ul>
    */
   private void assertAllInternalPathsRewritten(Set<Pair<String, String>> csvPairs, String target) throws Exception {
 
