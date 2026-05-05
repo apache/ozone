@@ -362,7 +362,7 @@ public final class TracingUtil {
 
     String traceparent = getHeader.apply("traceparent");
     if (traceparent == null || traceparent.isEmpty()) {
-      return () -> { };
+      return createActivatedSpan(spanName);
     }
 
     StringBuilder encoded = new StringBuilder().append("traceparent=").append(traceparent);
