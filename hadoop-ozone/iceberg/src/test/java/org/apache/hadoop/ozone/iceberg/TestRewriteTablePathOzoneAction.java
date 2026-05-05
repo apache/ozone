@@ -207,6 +207,51 @@ class TestRewriteTablePathOzoneAction {
   }
 
   @Test
+  void executeRejectsMissingLocationPrefix() {
+    NullPointerException exception = assertThrows(NullPointerException.class,
+        () -> new RewriteTablePathOzoneAction(table)
+            .stagingLocation(stagingDir.toString() + "/")
+            .execute());
+
+    assertEquals("Source prefix is null", exception.getMessage());
+  }
+
+  @Test
+  void rewriteLocationPrefixRejectsSameSourceAndTarget() {
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> new RewriteTablePathOzoneAction(table)
+            .rewriteLocationPrefix(sourcePrefix, sourcePrefix)
+            .execute());
+
+    assertEquals("Source prefix cannot be the same as target prefix (" +
+        sourcePrefix + ")", exception.getMessage());
+  }
+
+  @Test
+  void startVersionRejectsUnknownVersion() {
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> new RewriteTablePathOzoneAction(table)
+            .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+            .startVersion("missing.metadata.json")
+            .execute());
+
+    assertEquals("Cannot find provided version file missing.metadata.json " +
+        "in metadata log.", exception.getMessage());
+  }
+
+  @Test
+  void endVersionRejectsUnknownVersion() {
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> new RewriteTablePathOzoneAction(table)
+            .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+            .endVersion("missing.metadata.json")
+            .execute());
+
+    assertEquals("Cannot find provided version file missing.metadata.json " +
+        "in metadata log.", exception.getMessage());
+  }
+
+  @Test
   void statsFileCopyPlanReturnsEmptySetForEmptyStats() {
     Set<Pair<String, String>> copyPlan =
         RewriteTablePathOzoneUtils.statsFileCopyPlan(List.of(), List.of());

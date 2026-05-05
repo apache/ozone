@@ -50,6 +50,8 @@ import org.apache.iceberg.actions.ImmutableRewriteTablePath;
 import org.apache.iceberg.actions.RewriteTablePath;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.util.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An implementation of {@link RewriteTablePath} for Apache Ozone backed Iceberg tables.
@@ -61,6 +63,9 @@ import org.apache.iceberg.util.Pair;
  * and all rewritten files are staged in a temporary directory.</p>
  */
 public class RewriteTablePathOzoneAction implements RewriteTablePath {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RewriteTablePathOzoneAction.class);
 
   private String sourcePrefix;
   private String targetPrefix;
@@ -144,6 +149,9 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   }
 
   private void validateInputs() {
+    RewriteTablePathOzoneUtils.checkNonNullNonEmpty(sourcePrefix, "Source prefix");
+    RewriteTablePathOzoneUtils.checkNonNullNonEmpty(targetPrefix, "Target prefix");
+
     if (sourcePrefix.equals(targetPrefix)) {
       throw new IllegalArgumentException(
           String.format(
@@ -268,7 +276,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     Set<Pair<String, String>> result = new HashSet<>();
     String stagingPath = RewriteTablePathUtil.stagingPath(versionFilePath, sourcePrefix, stagingDir);
     
-    System.out.println("Processing version file " + versionFilePath);
+    LOG.info("Processing version file {}", versionFilePath);
     TableMetadata newTableMetadata = RewriteTablePathUtil.replacePaths(metadata, sourcePrefix, targetPrefix);
     TableMetadataParser.overwrite(newTableMetadata, table.io().newOutputFile(stagingPath));
     
