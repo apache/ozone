@@ -107,11 +107,6 @@ Rather than offloading the verification to the backend Ozone cluster or introduc
 - Fail-Fast: This allows us to immediately reject requests with invalid signatures at the edge, preventing malformed data from consuming DataNode I/O, network bandwidth, and storage capacity.
 - Stateless Scalability: Signature verification is a CPU-intensive task. Since the S3 Gateway is stateless and horizontally scalable, offloading the verification computations to S3G prevents the backend Ozone Managers (OM) or DataNodes (DN) from becoming CPU bottlenecks. S3G instances can be scaled out independently as compute demands increase.
 
-## Accumulative Buffering
-
-The chunk size defined by AWS S3 Signature V4 (e.g., 64KB) is fundamentally different from—and typically much smaller than—Ozone's optimal internal transmission chunk size (e.g., 4MB).
-To bridge this impedance mismatch, we introduce an internal buffering mechanism within the SignedChunksInputStream. The stream will aggressively read, verify, and accumulate multiple small S3 chunks in its buffer until the data reaches Ozone's preferred transmission length. This significantly reduces the number of micro-writes and system calls made to the downstream OzoneOutputStream, maximizing Ratis pipeline throughput.
-
 ## Incremental Hashing
 
 To maintain a low memory footprint during the continuous buffering process, the system utilizes incremental hashing (e.g., MessageDigest.update()) on the incoming byte streams to calculate the payload digest on the fly. This prevents allocating massive temporary byte arrays and avoids Garbage Collection (GC) spikes during large multi-gigabyte uploads. The computed digest is then used to construct the required StringToSign, which dictates the final signature calculation.
@@ -120,6 +115,7 @@ To maintain a low memory footprint during the continuous buffering process, the 
 
 To ensure that introducing the real-time signature verification process does not significantly degrade the overall upload throughput, the architecture is designed with the following optimizations in mind. Furthermore, we plan to conduct simple benchmarks in the future to validate these performance expectations:
 
+- Extra RPC Calls: The additional RPC call from S3G to OM to retrieve the Derived Key is expected to add minimal latency compared to the overall upload time. This is a one-time cost per upload request and does not impact the per-chunk processing time.
 - Constant Memory: Incremental hashing processes byte streams on the fly. This prevents large memory allocations and avoids GC spikes during massive uploads.
 - CPU Offloading & Scalability: Verification computation is isolated in the stateless, horizontally scalable S3G instances. This allows verification throughput to scale easily by adding more S3G nodes, protecting backend OM and DataNodes from CPU bottlenecks.
 
