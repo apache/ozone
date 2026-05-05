@@ -47,7 +47,7 @@ public class GrpcConnectionLimitFilter extends ServerTransportFilter {
    * Creates a new connection limit filter.
    *
    * @param maxConnections the maximum number of concurrent connections allowed.
-   *                       If <= 0, no limit is enforced.
+   *                       If zero or negative, no limit is enforced.
    */
   public GrpcConnectionLimitFilter(int maxConnections) {
     this.maxConnections = maxConnections;
