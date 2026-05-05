@@ -50,7 +50,7 @@ import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -200,7 +200,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     // Set layout version.
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     layoutStorage.initialize();
@@ -486,7 +486,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     ExecutorService executor = Executors.newFixedThreadPool(1);
     Future<Void> readFuture = executor.submit(() -> {
       // Layout version check should be thread safe.
-      while (!dsm.getLayoutVersionManager()
+      while (!dsm.getVersionManager()
           .isAllowed(HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
         UpgradeTestHelper.readChunk(dispatcher, writeChunk, pipeline);
       }
@@ -514,7 +514,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Let HddsVolume be formatted to mimic the real cluster upgrade
     // Set layout version.
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     layoutStorage.initialize();

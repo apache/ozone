@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_REQUIRED;
-
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewLayoutVersionCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -28,30 +26,32 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handler for FinalizeNewLayoutVersion command received from SCM.
+ * Handler for FinalizeVersion command received from SCM.
  */
-public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
+public class FinalizeVersionCommandHandler implements CommandHandler {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(FinalizeNewLayoutVersionCommandHandler.class);
+      LoggerFactory.getLogger(FinalizeVersionCommandHandler.class);
 
-  private AtomicLong invocationCount = new AtomicLong(0);
+  private final AtomicLong invocationCount = new AtomicLong(0);
   private final MutableRate opsLatencyMs;
 
   /**
-   * Constructs a FinalizeNewLayoutVersionCommandHandler.
+   * Constructs a FinalizeVersionCommandHandler.
    */
-  public FinalizeNewLayoutVersionCommandHandler() {
+  public FinalizeVersionCommandHandler() {
     MetricsRegistry registry = new MetricsRegistry(
-        FinalizeNewLayoutVersionCommandHandler.class.getSimpleName());
-    this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.finalizeNewLayoutVersionCommand + "Ms");
+        FinalizeVersionCommandHandler.class.getSimpleName());
+    this.opsLatencyMs =
+        registry.newRate(SCMCommandProto.Type.finalizeNewLayoutVersionCommand + "Ms");
   }
 
   /**
@@ -65,24 +65,20 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
   @Override
   public void handle(SCMCommand<?> command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
-    LOG.info("Processing FinalizeNewLayoutVersionCommandHandler command.");
+    LOG.info("Processing FinalizeVersionCommandHandler command.");
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
     DatanodeStateMachine dsm = context.getParent();
     final FinalizeNewLayoutVersionCommandProto finalizeCommand =
-        ((FinalizeNewLayoutVersionCommand)command).getProto();
+        ((FinalizeVersionCommand) command).getProto();
     try {
       if (finalizeCommand.getFinalizeNewLayoutVersion()) {
-        // SCM is asking datanode to finalize
-        if (dsm.getLayoutVersionManager().getUpgradeState() ==
-            FINALIZATION_REQUIRED) {
-          // SCM will keep sending Finalize command until datanode mlv == slv
-          // we need to avoid multiple invocations of finalizeUpgrade.
-          LOG.info("Finalize Upgrade called!");
-          dsm.finalizeUpgrade();
+        if (dsm.getVersionManager().needsFinalization()) {
+          LOG.info("Finalize upgrade called.");
+          dsm.getVersionManager().finalizeUpgrade();
         }
       }
-    } catch (Exception e) {
+    } catch (UpgradeException e) {
       LOG.error("Exception during finalization.", e);
     } finally {
       long endTime = Time.monotonicNow();
@@ -107,7 +103,7 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
    */
   @Override
   public int getInvocationCount() {
-    return (int)invocationCount.get();
+    return (int) invocationCount.get();
   }
 
   /**

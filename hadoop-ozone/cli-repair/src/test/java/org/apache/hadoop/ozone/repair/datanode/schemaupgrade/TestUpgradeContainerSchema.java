@@ -67,7 +67,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -137,7 +137,7 @@ class TestUpgradeContainerSchema {
   }
 
   private void initDatanode(HDDSLayoutFeature layoutFeature) throws IOException {
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         datanodeDetails.getUuidString(),
         layoutFeature.layoutVersion());
     layoutStorage.initialize();

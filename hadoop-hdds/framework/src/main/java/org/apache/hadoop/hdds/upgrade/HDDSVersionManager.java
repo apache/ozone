@@ -17,19 +17,37 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Component version manager for HDDS (Datanodes and SCM).
  */
 public class HDDSVersionManager extends ComponentVersionManager {
+  private static final Logger LOG = LoggerFactory.getLogger(HDDSVersionManager.class);
+
+  private final Map<ComponentVersion, HDDSUpgradeAction<?>> upgradeActions;
+  private volatile Object upgradeActionArg;
+
   public HDDSVersionManager(Storage storage) throws IOException {
+    this(storage, Collections::emptyMap);
+  }
+
+  protected HDDSVersionManager(Storage storage,
+                               ComponentUpgradeActionProvider<HDDSUpgradeAction<?>> upgradeActionProvider)
+      throws IOException {
     super(storage, computeApparentVersion(storage.getApparentVersion()), HDDSVersion.SOFTWARE_VERSION);
+    upgradeActions = upgradeActionProvider.load();
   }
 
   /**
@@ -57,8 +75,34 @@ public class HDDSVersionManager extends ComponentVersionManager {
         " after finalization");
   }
 
+  protected void setUpgradeActionArg(Object upgradeActionArg) {
+    this.upgradeActionArg = upgradeActionArg;
+  }
+
+  @VisibleForTesting
+  public Map<ComponentVersion, HDDSUpgradeAction<?>> getUpgradeActionsForTesting() {
+    return upgradeActions;
+  }
+
   @Override
   protected void runUpgradeAction(ComponentVersion componentVersion) throws UpgradeException {
-    // TODO HDDS-15129: Register upgrade actions based on annotations
+    HDDSUpgradeAction<?> action = upgradeActions.get(componentVersion);
+    if (action == null) {
+      return;
+    }
+    if (upgradeActionArg == null) {
+      logAndThrow(new IllegalStateException("Upgrade action argument is not set."),
+          "HDDS upgrade action for version " + componentVersion + " failed.",
+          UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED);
+    }
+    try {
+      @SuppressWarnings("unchecked")
+      HDDSUpgradeAction<Object> typedAction = (HDDSUpgradeAction<Object>) action;
+      typedAction.execute(upgradeActionArg);
+    } catch (Exception e) {
+      LOG.warn("HDDS upgrade action for version {} failed.", componentVersion, e);
+      logAndThrow(e, "HDDS upgrade action for version " + componentVersion + " failed.",
+          UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED);
+    }
   }
 }

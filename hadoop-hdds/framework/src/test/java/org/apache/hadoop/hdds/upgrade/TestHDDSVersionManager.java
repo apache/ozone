@@ -17,28 +17,31 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static org.mockito.Mockito.when;
-
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.AbstractComponentVersionManagerTest;
 import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
-import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 /**
  * Tests for {@link HDDSVersionManager} using on-disk {@link Storage} under a JUnit temp directory.
  */
 class TestHDDSVersionManager extends AbstractComponentVersionManagerTest {
+
+  @TempDir
+  private Path tempDir;
 
   private static final List<ComponentVersion> ALL_VERSIONS;
 
@@ -59,20 +62,14 @@ class TestHDDSVersionManager extends AbstractComponentVersionManagerTest {
         .map(Arguments::of);
   }
 
-  @ParameterizedTest
-  @MethodSource("preFinalizedVersionArgs")
-  @Override
-  @Unhealthy
-  public void testFinalizationFromEarlierVersions(ComponentVersion apparentVersion) {
-    // TODO Once HDDSVersionManager implementation is finished, this override can be removed to enable the test in the
-    //  parent class.
-  }
-
   @Override
   protected ComponentVersionManager createManager(int serializedApparentVersion) throws IOException {
-    Storage mockStorage = Mockito.mock(Storage.class);
-    when(mockStorage.getApparentVersion()).thenReturn(serializedApparentVersion);
-    return new HDDSVersionManager(mockStorage);
+    Path storageRoot = Files.createTempDirectory(tempDir, "hdds-version-manager-");
+    Storage storage = new TestStorage(storageRoot.toFile(), serializedApparentVersion);
+    storage.setApparentVersion(serializedApparentVersion);
+    storage.getCurrentDir().mkdirs();
+    storage.persistCurrentState();
+    return new HDDSVersionManager(storage);
   }
 
   @Override
@@ -83,5 +80,16 @@ class TestHDDSVersionManager extends AbstractComponentVersionManagerTest {
   @Override
   protected ComponentVersion expectedSoftwareVersion() {
     return HDDSVersion.SOFTWARE_VERSION;
+  }
+
+  private static final class TestStorage extends Storage {
+    TestStorage(File root, int defaultLayoutVersion) throws IOException {
+      super(NodeType.DATANODE, root, "hdds-test", defaultLayoutVersion);
+    }
+
+    @Override
+    protected Properties getNodeProperties() {
+      return new Properties();
+    }
   }
 }

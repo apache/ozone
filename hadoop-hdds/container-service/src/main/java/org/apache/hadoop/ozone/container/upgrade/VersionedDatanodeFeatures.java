@@ -21,23 +21,21 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 /**
  * Utility class to retrieve the version of a feature that corresponds to the
- * metadata layout version specified by the provided
- * {@link HDDSLayoutVersionManager}.
+ * apparent version specified by the provided
+ * {@link DatanodeVersionManager}.
  */
 public final class VersionedDatanodeFeatures {
-  private static HDDSLayoutVersionManager versionManager;
+  private static DatanodeVersionManager versionManager;
 
   private VersionedDatanodeFeatures() { }
 
-  public static void initialize(
-      HDDSLayoutVersionManager manager) {
+  public static void initialize(DatanodeVersionManager manager) {
     versionManager = manager;
   }
 

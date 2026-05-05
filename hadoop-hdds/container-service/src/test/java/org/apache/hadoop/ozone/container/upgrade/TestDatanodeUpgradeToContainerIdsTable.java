@@ -105,7 +105,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
     dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
     assertEquals(WitnessedContainerDBDefinition.CONTAINER_CREATE_INFO_TABLE_DEF.getName(),
         metadataStore.getContainerCreateInfoTable().getName());
     ContainerCreateInfo containerCreateInfo = metadataStore.getContainerCreateInfoTable().get(
@@ -163,7 +163,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     // trigger another upgrade which will update metainfo for upgrade
     dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
     assertEquals(WitnessedContainerDBDefinition.CONTAINER_CREATE_INFO_TABLE_DEF.getName(),
         metadataStore.getContainerCreateInfoTable().getName());
     ContainerCreateInfo containerCreateInfo

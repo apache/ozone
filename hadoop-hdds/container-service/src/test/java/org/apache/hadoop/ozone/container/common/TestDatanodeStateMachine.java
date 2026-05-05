@@ -229,7 +229,7 @@ public class TestDatanodeStateMachine {
       task = stateMachine.getContext().getTask();
       assertEquals(RunningDatanodeState.class, task.getClass());
 
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+      DatanodeStorage layoutStorage = new DatanodeStorage(conf,
           UUID.randomUUID().toString(),
           HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
       layoutStorage.initialize();

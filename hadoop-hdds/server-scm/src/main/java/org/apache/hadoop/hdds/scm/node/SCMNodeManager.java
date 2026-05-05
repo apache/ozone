@@ -91,7 +91,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -781,8 +781,8 @@ public class SCMNodeManager implements NodeManager {
     LOG.warn("Data node {} has a MetadataLayoutVersion = {}, SCM MetadataLayoutVersion = {}. Sending finalize",
         datanodeDetails.getHostName(), dnMlv, scmMlv);
 
-    FinalizeNewLayoutVersionCommand finalizeCmd =
-        new FinalizeNewLayoutVersionCommand(true,
+    FinalizeVersionCommand finalizeCmd =
+        new FinalizeVersionCommand(true,
             LayoutVersionProto.newBuilder()
                 .setSoftwareLayoutVersion(dnSlv)
                 .setMetadataLayoutVersion(dnSlv).build());

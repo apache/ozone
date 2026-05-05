@@ -213,7 +213,7 @@ public class TestDNDataDistributionFinalization {
     assertTrue(!isDataDistributionFinalized ||
             // In test environment, version manager might be null
             cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-                .getLayoutVersionManager() == null,
+                .getVersionManager() == null,
         "STORAGE_SPACE_DISTRIBUTION should not be finalized in pre-upgrade state");
 
     // Verify containers exist and have pending deletion metadata
@@ -227,7 +227,7 @@ public class TestDNDataDistributionFinalization {
     assertTrue(isDataDistributionFinalized ||
             // In test environment, version manager might be null
             cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-                .getLayoutVersionManager() == null,
+                .getVersionManager() == null,
         "STORAGE_SPACE_DISTRIBUTION should be finalized in post-upgrade state");
 
     // Verify containers can handle post-finalization pending deletion logic

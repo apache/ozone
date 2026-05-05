@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -241,8 +241,8 @@ public final class DatanodeIdYaml {
       DatanodeDetails datanodeDetails, ConfigurationSource conf)
       throws IOException {
 
-    DatanodeLayoutStorage datanodeLayoutStorage
-        = new DatanodeLayoutStorage(conf, datanodeDetails.getUuidString());
+    DatanodeStorage datanodeStorage
+        = new DatanodeStorage(conf, datanodeDetails.getUuidString());
 
     Map<String, Integer> portDetails = new LinkedHashMap<>();
     final List<DatanodeDetails.Port> ports = datanodeDetails.getPorts();
@@ -261,7 +261,7 @@ public final class DatanodeIdYaml {
           HDDSLayoutFeature layoutFeature
               = f.getAnnotation(BelongsToHDDSLayoutVersion.class).value();
           if (layoutFeature.layoutVersion() >
-              datanodeLayoutStorage.getApparentVersion()) {
+              datanodeStorage.getApparentVersion()) {
             continue;
           }
         }

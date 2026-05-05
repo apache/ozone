@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 
 /**
@@ -105,7 +105,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     dnConf.set(HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, ratisDir.toString());
 
     if (layoutVersion != null) {
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(
+      DatanodeStorage layoutStorage = new DatanodeStorage(
           dnConf, UUID.randomUUID().toString(), layoutVersion);
       layoutStorage.initialize();
     }

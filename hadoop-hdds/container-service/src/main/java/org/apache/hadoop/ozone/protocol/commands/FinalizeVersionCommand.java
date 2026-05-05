@@ -23,27 +23,27 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 
 /**
- * Asks DataNode to Finalize new upgrade version.
+ * Asks DataNode to finalize new upgrade version.
  */
-public class FinalizeNewLayoutVersionCommand
+public class FinalizeVersionCommand
     extends SCMCommand<FinalizeNewLayoutVersionCommandProto> {
 
   private boolean finalizeUpgrade = false;
-  private LayoutVersionProto layoutInfo;
+  private LayoutVersionProto versionInfo;
 
-  public FinalizeNewLayoutVersionCommand(boolean finalizeNewLayoutVersion,
-                                         LayoutVersionProto layoutInfo,
-                                         long id) {
+  public FinalizeVersionCommand(boolean finalizeNewLayoutVersion,
+                                LayoutVersionProto versionInfo,
+                                long id) {
     super(id);
     finalizeUpgrade = finalizeNewLayoutVersion;
-    this.layoutInfo = layoutInfo;
+    this.versionInfo = versionInfo;
   }
 
-  public FinalizeNewLayoutVersionCommand(boolean finalizeNewLayoutVersion,
-                                         LayoutVersionProto layoutInfo) {
+  public FinalizeVersionCommand(boolean finalizeNewLayoutVersion,
+                                LayoutVersionProto versionInfo) {
     super();
     finalizeUpgrade = finalizeNewLayoutVersion;
-    this.layoutInfo = layoutInfo;
+    this.versionInfo = versionInfo;
   }
 
   /**
@@ -61,14 +61,14 @@ public class FinalizeNewLayoutVersionCommand
     return FinalizeNewLayoutVersionCommandProto.newBuilder()
         .setFinalizeNewLayoutVersion(finalizeUpgrade)
         .setCmdId(getId())
-        .setDataNodeLayoutVersion(layoutInfo)
+        .setDataNodeLayoutVersion(versionInfo)
         .build();
   }
 
-  public static  FinalizeNewLayoutVersionCommand getFromProtobuf(
+  public static FinalizeVersionCommand getFromProtobuf(
       FinalizeNewLayoutVersionCommandProto finalizeProto) {
     Objects.requireNonNull(finalizeProto, "finalizeProto == null");
-    return new FinalizeNewLayoutVersionCommand(
+    return new FinalizeVersionCommand(
         finalizeProto.getFinalizeNewLayoutVersion(),
         finalizeProto.getDataNodeLayoutVersion(), finalizeProto.getCmdId());
   }
@@ -82,7 +82,7 @@ public class FinalizeNewLayoutVersionCommand
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", finalizeUpgrade: ").append(finalizeUpgrade)
-        .append(", layoutInfo: ").append(layoutInfo);
+        .append(", versionInfo: ").append(versionInfo);
     return sb.toString();
   }
 }

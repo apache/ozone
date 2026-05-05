@@ -17,27 +17,19 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import org.apache.hadoop.hdds.HDDSVersion;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import java.io.IOException;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionManager;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 
 /**
- * Util methods for upgrade.
+ * Datanode-specific version manager that wires upgrade actions internally.
  */
-public final class UpgradeUtils {
+public class DatanodeVersionManager extends HDDSVersionManager {
 
-  private UpgradeUtils() {
-  }
-
-  public static LayoutVersionProto defaultLayoutVersionProto() {
-    int softwareVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
-    return LayoutVersionProto.newBuilder()
-        .setMetadataLayoutVersion(softwareVersion)
-        .setSoftwareLayoutVersion(softwareVersion).build();
-  }
-
-  public static LayoutVersionProto toLayoutVersionProto(int mLv, int sLv) {
-    return LayoutVersionProto.newBuilder()
-        .setMetadataLayoutVersion(mLv)
-        .setSoftwareLayoutVersion(sLv).build();
+  public DatanodeVersionManager(DatanodeStorage storage,
+      DatanodeStateMachine datanodeStateMachine) throws IOException {
+    super(storage, new DatanodeUpgradeActionProvider());
+    setUpgradeActionArg(datanodeStateMachine);
   }
 }
