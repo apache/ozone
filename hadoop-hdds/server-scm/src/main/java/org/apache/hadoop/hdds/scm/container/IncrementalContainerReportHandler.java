@@ -84,7 +84,7 @@ public class IncrementalContainerReportHandler
     // issue between the container list in NodeManager and the replicas in
     // ContainerManager.
     synchronized (dd) {
-      DatanodeInfo datanodeInfo = getNodeManager().getDatanodeInfo(dd);
+      DatanodeInfo datanodeInfo = dd instanceof DatanodeInfo ? (DatanodeInfo) dd : null;
       for (ContainerReplicaProto replicaProto :
           report.getReport().getReportList()) {
         Object detailsForLogging = getDetailsForLogging(null, replicaProto, dd);

@@ -154,7 +154,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             containerReport.getReportsList();
         final Set<ContainerID> expectedContainersInDatanode =
             getNodeManager().getContainers(datanodeDetails);
-        DatanodeInfo datanodeInfo = getNodeManager().getDatanodeInfo(datanodeDetails);
+        DatanodeInfo datanodeInfo = datanodeDetails instanceof DatanodeInfo ? (DatanodeInfo) datanodeDetails : null;
 
         for (ContainerReplicaProto replica : replicas) {
           ContainerID cid = ContainerID.valueOf(replica.getContainerID());
