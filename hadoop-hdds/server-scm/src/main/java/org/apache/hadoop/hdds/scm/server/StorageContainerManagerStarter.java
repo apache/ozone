@@ -132,7 +132,7 @@ public class StorageContainerManagerStarter extends GenericCli implements Callab
     try {
       result = receiver.bootStrap(conf);
     } catch (IOException e) {
-      LOG.error("SCM bootstrap failed");
+      LOG.error("SCM bootstrap failed", e);
       throw e;
     }
     if (!result) {

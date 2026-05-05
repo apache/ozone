@@ -99,6 +99,7 @@ public final class HAUtils {
       }
       return getScmBlockClient(configuration).getScmInfo();
     } catch (ConfigurationException e) {
+      LOG.error("Failed to get SCM info", e);
       throw new IOException("Failed to get SCM info due to configuration error.\n" +
           "Please verify SCM HA configuration properties:\n" +
           "  - ozone.scm.service.ids\n" +
