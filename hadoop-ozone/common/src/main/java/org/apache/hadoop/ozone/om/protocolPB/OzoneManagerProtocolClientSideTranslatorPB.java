@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -829,6 +830,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public OptionalLong commitKeyWithModificationTime(OmKeyArgs args, long clientId) throws IOException {
+    return updateKeyAndGetModificationTime(args, clientId, false, false);
+  }
+
+  @Override
   public void recoverKey(OmKeyArgs args, long clientId)
       throws IOException {
     updateKey(args, clientId, false, true);
@@ -848,6 +854,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   private void updateKey(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
+      throws IOException {
+    // Preserve legacy behavior (ignore response payload).
+    updateKeyAndGetModificationTime(args, clientId, hsync, recovery);
+  }
+
+  private OptionalLong updateKeyAndGetModificationTime(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
@@ -874,7 +886,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCommitKeyRequest(req)
         .build();
 
-    handleError(submitRequest(omRequest));
+    final OMResponse resp = handleError(submitRequest(omRequest));
+    if (resp.hasCommitKeyResponse() && resp.getCommitKeyResponse().hasModificationTime()) {
+      return OptionalLong.of(resp.getCommitKeyResponse().getModificationTime());
+    }
+    return OptionalLong.empty();
   }
 
   @Override
@@ -1791,7 +1807,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest))
         .getCommitMultiPartUploadResponse();
 
-    return new OmMultipartCommitUploadPartInfo(response.getPartName(), response.getETag());
+    final Long modificationTime = response.hasModificationTime() ? response.getModificationTime() : null;
+    return new OmMultipartCommitUploadPartInfo(response.getPartName(), response.getETag(), modificationTime);
   }
 
   @Override
