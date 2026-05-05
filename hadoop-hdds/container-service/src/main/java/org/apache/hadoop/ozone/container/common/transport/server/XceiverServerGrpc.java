@@ -76,6 +76,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private DatanodeDetails datanodeDetails;
   private ThreadPoolExecutor readExecutors;
   private EventLoopGroup eventLoopGroup;
+  private GrpcConnectionLimitFilter connectionLimitFilter;
 
   /**
    * Constructs a Grpc server class.
@@ -97,11 +98,15 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       this.port = 0;
     }
 
-    final int threadCountPerDisk =
-        conf.getObject(DatanodeConfiguration.class).getNumReadThreadPerVolume();
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    final int threadCountPerDisk = dnConf.getNumReadThreadPerVolume();
     final int numberOfDisks =
         HddsServerUtil.getDatanodeStorageDirs(conf).size();
     final int poolSize = threadCountPerDisk * numberOfDisks;
+    final int maxConnections = dnConf.getGrpcMaxConnections();
+    connectionLimitFilter = new GrpcConnectionLimitFilter(maxConnections);
+    LOG.info("Datanode gRPC server max connections: {}",
+        maxConnections > 0 ? maxConnections : "unlimited");
 
     readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
         60, TimeUnit.SECONDS,
@@ -136,7 +141,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
             xceiverService.bindServiceWithZeroCopy(),
-            new GrpcServerInterceptor()));
+            new GrpcServerInterceptor()))
+        .addTransportFilter(connectionLimitFilter);
 
     SecurityConfig secConf = new SecurityConfig(conf);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
