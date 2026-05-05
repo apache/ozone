@@ -21,7 +21,9 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.mock;
@@ -35,6 +37,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystemException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -82,6 +85,25 @@ public class TestOmRatisSnapshotProvider {
     omRatisSnapshotProvider =
         new OmRatisSnapshotProvider(snapshotDir, peerNodesMap, httpPolicy,
             false, connectionFactory);
+  }
+
+  @Test
+  public void testIsDiskFullOrQuotaIOExceptionDetectsNoSpaceMessage() {
+    assertTrue(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(
+        new IOException("No space left on device")));
+  }
+
+  @Test
+  public void testIsDiskFullOrQuotaIOExceptionDetectsFileSystemExceptionReason() {
+    IOException wrapped = new IOException("write failed",
+        new FileSystemException("p", null, "No space left on device"));
+    assertTrue(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(wrapped));
+  }
+
+  @Test
+  public void testIsDiskFullOrQuotaIOExceptionReturnsFalseForOtherErrors() {
+    assertFalse(OmRatisSnapshotProvider.isDiskFullOrQuotaIOException(
+        new IOException("Connection reset")));
   }
 
   @Test

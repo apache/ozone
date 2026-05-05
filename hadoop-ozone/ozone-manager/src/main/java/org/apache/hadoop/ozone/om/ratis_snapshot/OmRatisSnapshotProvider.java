@@ -39,9 +39,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -84,6 +86,73 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmRatisSnapshotProvider.class);
+
+  /**
+   * Whether this {@link IOException} (or its causes) typically means the
+   * local filesystem ran out of space or hit a quota while writing.
+   */
+  public static boolean isDiskFullOrQuotaIOException(IOException ioe) {
+    for (Throwable t = ioe; t != null; t = t.getCause()) {
+      if (t instanceof FileSystemException) {
+        FileSystemException fse = (FileSystemException) t;
+        String reason = fse.getReason();
+        if (reason != null) {
+          String r = reason.toLowerCase(Locale.ROOT);
+          if (r.contains("no space") || r.contains("space left")
+              || r.contains("quota") || r.contains("enospc")) {
+            return true;
+          }
+        }
+      }
+      String msg = t.getMessage();
+      if (msg != null) {
+        String m = msg.toLowerCase(Locale.ROOT);
+        if (m.contains("no space left on device")
+            || m.contains("enospc")
+            || m.contains("disk quota exceeded")
+            || m.contains("quota exceeded")) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static String formatSnapshotVolumeUsableSpace(File pathOnVolume) {
+    try {
+      Path storePath =
+          pathOnVolume.isDirectory() ? pathOnVolume.toPath() : pathOnVolume.toPath().getParent();
+      if (storePath == null) {
+        return "unknown";
+      }
+      long usable = Files.getFileStore(storePath).getUsableSpace();
+      return String.format("%s (%d bytes)", StringUtils.byteDesc(usable), usable);
+    } catch (Exception e) {
+      return "unknown (" + e.getMessage() + ")";
+    }
+  }
+
+  /**
+   * Logs at ERROR when the failure is likely due to disk full / quota, so
+   * operators can distinguish it from network or leader-side errors.
+   */
+  private static void logDiskFullOrQuotaDuringDownload(
+      IOException ioe, File targetFile, String leaderNodeId, URL checkpointUrl) {
+    if (!isDiskFullOrQuotaIOException(ioe)) {
+      return;
+    }
+    LOG.error(
+        "OM ratis snapshot download from leader {} failed: disk full or filesystem quota while "
+            + "writing checkpoint file {} (checkpoint URL {}). Usable space on this volume: {}. "
+            + "Free disk on this OM node or raise {}. Underlying message: {}",
+        leaderNodeId,
+        targetFile.getAbsolutePath(),
+        checkpointUrl,
+        formatSnapshotVolumeUsableSpace(targetFile),
+        OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+        ioe.getMessage(),
+        ioe);
+  }
 
   private final Map<String, OMNodeDetails> peerNodesMap;
   private final HttpConfig.Policy httpPolicy;
@@ -215,29 +284,32 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       HttpURLConnection connection = (HttpURLConnection)
           connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
 
-      connection.setRequestMethod("POST");
-      String contentTypeValue = "multipart/form-data; boundary=" +
-          MULTIPART_FORM_DATA_BOUNDARY;
-      connection.setRequestProperty("Content-Type", contentTypeValue);
-      connection.setDoOutput(true);
+      try {
+        connection.setRequestMethod("POST");
+        String contentTypeValue = "multipart/form-data; boundary=" +
+            MULTIPART_FORM_DATA_BOUNDARY;
+        connection.setRequestProperty("Content-Type", contentTypeValue);
+        connection.setDoOutput(true);
 
-      List<String> existingFiles = useV2CheckpointApi ? HAUtils.getExistingFiles(getCandidateDir())
-          : HAUtils.getExistingSstFilesRelativeToDbDir(getCandidateDir());
-      writeFormData(connection, existingFiles);
+        List<String> existingFiles = useV2CheckpointApi ? HAUtils.getExistingFiles(getCandidateDir())
+            : HAUtils.getExistingSstFilesRelativeToDbDir(getCandidateDir());
+        writeFormData(connection, existingFiles);
 
-      connection.connect();
-      int errorCode = connection.getResponseCode();
-      if ((errorCode != HTTP_OK) && (errorCode != HTTP_CREATED)) {
-        throw new IOException("Unexpected exception when trying to reach " +
-            "OM to download latest checkpoint. Checkpoint URL: " +
-            omCheckpointUrl + ". ErrorCode: " + errorCode);
-      }
+        connection.connect();
+        int errorCode = connection.getResponseCode();
+        if ((errorCode != HTTP_OK) && (errorCode != HTTP_CREATED)) {
+          throw new IOException("Unexpected exception when trying to reach " +
+              "OM to download latest checkpoint. Checkpoint URL: " +
+              omCheckpointUrl + ". ErrorCode: " + errorCode);
+        }
 
-      try (InputStream inputStream = connection.getInputStream()) {
-        downloadFileWithProgress(inputStream, targetFile);
+        try (InputStream inputStream = connection.getInputStream()) {
+          downloadFileWithProgress(inputStream, targetFile);
+        }
       } catch (IOException ex) {
+        logDiskFullOrQuotaDuringDownload(ex, targetFile, leaderNodeID, omCheckpointUrl);
         boolean deleted = FileUtils.deleteQuietly(targetFile);
-        if (!deleted) {
+        if (!deleted && targetFile.exists()) {
           LOG.error("OM snapshot which failed to download {} cannot be deleted",
               targetFile);
         }
