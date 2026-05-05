@@ -36,6 +36,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import static org.mockito.ArgumentMatchers.eq;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -220,7 +222,8 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
 
   @Test
   public void testMarkContainerUnhealthyInFailedVolume() throws IOException {
-    KeyValueHandler handler = getDummyHandler();
+    ContainerSet containerSet = mock(ContainerSet.class);
+    KeyValueHandler handler = getDummyHandler(containerSet);
     KeyValueContainerData kvData = new KeyValueContainerData(1L,
         ContainerLayoutVersion.FILE_PER_BLOCK,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
@@ -233,6 +236,10 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         .build();
     kvData.setVolume(hddsVolume);
     KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    when(containerSet.acquireContainerLock(eq(1L))).thenAnswer(invocation -> {
+      container.writeLock();
+      return container;
+    });
 
     // When volume is failed, the call to mark the container unhealthy should
     // be ignored.
@@ -252,6 +259,10 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   // -- Helper methods below.
 
   private KeyValueHandler getDummyHandler() {
+    return getDummyHandler(mock(ContainerSet.class));
+  }
+
+  private KeyValueHandler getDummyHandler(ContainerSet containerSet) {
     DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
         .setUuid(UUID.fromString(DATANODE_UUID))
         .setHostName("dummyHost")
@@ -263,7 +274,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     return new KeyValueHandler(
         conf,
         stateMachine.getDatanodeDetails().getUuidString(),
-        mock(ContainerSet.class),
+        containerSet,
         mock(MutableVolumeSet.class),
         mock(ContainerMetrics.class), mockIcrSender, new ContainerChecksumTreeManager(conf));
   }
