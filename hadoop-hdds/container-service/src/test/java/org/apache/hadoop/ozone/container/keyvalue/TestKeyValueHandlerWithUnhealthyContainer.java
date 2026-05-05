@@ -29,14 +29,13 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChun
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
-import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
 import java.nio.file.Path;
