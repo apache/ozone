@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import java.io.IOException;
+import java.util.List;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -30,11 +32,6 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-
-import java.io.IOException;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Class for handling OBS buckets NameSpaceSummaries.
@@ -48,10 +45,8 @@ public class OBSBucketHandler extends BucketHandler {
   public OBSBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
       OmBucketInfo bucketInfo) {
-    super(reconNamespaceSummaryManager, omMetadataManager,
-        reconSCM);
+    super(reconNamespaceSummaryManager, omMetadataManager);
     this.omBucketInfo = bucketInfo;
     this.vol = omBucketInfo.getVolumeName();
     this.bucket = omBucketInfo.getBucketName();
@@ -174,40 +169,8 @@ public class OBSBucketHandler extends BucketHandler {
    */
   @Override
   public long calculateDUUnderObject(long parentId) throws IOException {
-    // Initialize the total disk usage variable.
-    long totalDU = 0L;
-
-    // Access the key table for the bucket.
-    Table<String, OmKeyInfo> keyTable = getKeyTable();
-
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
-      // Construct the seek prefix to filter keys under this bucket.
-      String seekPrefix =
-          OM_KEY_PREFIX + vol + OM_KEY_PREFIX + bucket + OM_KEY_PREFIX;
-      iterator.seek(seekPrefix);
-
-      // Iterate over keys in the bucket.
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-        String keyName = kv.getKey();
-
-        // Break the loop if the current key does not start with the seekPrefix.
-        if (!keyName.startsWith(seekPrefix)) {
-          break;
-        }
-
-        // Sum the size of each key to the total disk usage.
-        OmKeyInfo keyInfo = kv.getValue();
-        if (keyInfo != null) {
-          totalDU += keyInfo.getDataSize();
-        }
-      }
-    }
-
-    // Return the total disk usage of all keys in the bucket.
-    return totalDU;
+    NSSummary nsSummary = getReconNamespaceSummaryManager().getNSSummary(parentId);
+    return nsSummary != null ? nsSummary.getReplicatedSizeOfFiles() : 0L;
   }
 
   /**
@@ -261,6 +224,7 @@ public class OBSBucketHandler extends BucketHandler {
     return getOmMetadataManager().getKeyTable(getBucketLayout());
   }
 
+  @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.OBJECT_STORE;
   }

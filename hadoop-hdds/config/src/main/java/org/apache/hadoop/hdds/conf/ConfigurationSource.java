@@ -1,20 +1,20 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.conf;
 
 import java.io.IOException;
@@ -98,7 +98,11 @@ public interface ConfigurationSource {
 
   default String[] getTrimmedStrings(String name) {
     String valueString = get(name);
-    if (null == valueString || valueString.trim().isEmpty()) {
+    return getTrimmedStringsFromValue(valueString);
+  }
+
+  static String[] getTrimmedStringsFromValue(String valueString) {
+    if (null == valueString) {
       return EMPTY_STRING_ARRAY;
     }
 
@@ -108,7 +112,7 @@ public interface ConfigurationSource {
   /**
    * Gets the configuration entries where the key contains the prefix. This
    * method will strip the prefix from the key in the return Map.
-   * Example: somePrefix.key->value will be key->value in the returned map.
+   * Example: {@code somePrefix.key->value} will be {@code key->value} in the returned map.
    * @param keyPrefix Prefix to search.
    * @return Map containing keys that match and their values.
    */
@@ -151,6 +155,7 @@ public interface ConfigurationSource {
   default boolean isConfigured(String key) {
     return get(key) != null;
   }
+
   /**
    * Create a Configuration object and inject the required configuration values.
    *
@@ -168,14 +173,7 @@ public interface ConfigurationSource {
       throw new ConfigurationException(
           "Configuration class can't be created: " + configurationClass, e);
     }
-    ConfigGroup configGroup =
-        configurationClass.getAnnotation(ConfigGroup.class);
-
-    String prefix = configGroup.prefix();
-
-    ConfigurationReflectionUtil
-        .injectConfiguration(this, configurationClass, configObject,
-            prefix, false);
+    ConfigurationReflectionUtil.injectConfiguration(this, configurationClass, configObject, false);
 
     ConfigurationReflectionUtil.callPostConstruct(configObject);
 
@@ -187,10 +185,7 @@ public interface ConfigurationSource {
    * Update {@code object}'s reconfigurable properties from this configuration.
    */
   default <T> void reconfigure(Class<T> configClass, T object) {
-    ConfigGroup configGroup = configClass.getAnnotation(ConfigGroup.class);
-    String prefix = configGroup.prefix();
-    ConfigurationReflectionUtil.injectConfiguration(
-        this, configClass, object, prefix, true);
+    ConfigurationReflectionUtil.injectConfiguration(this, configClass, object, true);
   }
 
   /**

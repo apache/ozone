@@ -1,0 +1,191 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.hdds.scm.cli.container;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.server.JsonUtils;
+import picocli.CommandLine;
+
+/**
+ * This is the handler to process the container report command.
+ */
+@CommandLine.Command(
+    name = "report",
+    description = "Display the container summary report",
+    mixinStandardHelpOptions = true,
+    versionProvider = HddsVersionProvider.class)
+public class ReportSubcommand extends ScmSubcommand {
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
+  @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
+  private SuppressOptions suppressOptions;
+
+  @CommandLine.Mixin
+  private ContainerIDParameters containerList;
+
+  @CommandLine.Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
+
+  static class SuppressOptions {
+    @CommandLine.Option(names = {"--suppress"},
+        description = "Suppress container(s) from future reports")
+    private boolean suppress;
+
+    @CommandLine.Option(names = {"--unsuppress"},
+        description = "Unsuppress container(s) to include in future reports")
+    private boolean unsuppress;
+  }
+
+  @Override
+  public void execute(ScmClient scmClient) throws IOException {
+    if (suppressOptions != null) {
+      handleSuppressUnsuppress(scmClient);
+      return;
+    }
+
+    if (containerList != null && containerList.size() > 0) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "Container IDs are only valid with --suppress or --unsuppress. " +
+          "To print the summary report, do not pass any container ID.");
+    }
+
+    printReport(scmClient);
+  }
+
+  private void handleSuppressUnsuppress(ScmClient scmClient) throws IOException {
+    boolean suppress = suppressOptions.suppress;
+    List<Long> containerIDs = containerList.getValidatedIDs();
+    List<Long> failedContainerIDs = scmClient.suppressContainers(containerIDs, suppress);
+
+    int failures = 0;
+    for (long id : containerIDs) {
+      if (failedContainerIDs.contains(id)) {
+        err().println("Failed to " + (suppress ? "suppress" : "unsuppress") + " container " + id + ".");
+        failures++;
+      } else {
+        out().println((suppress ? "Suppressed" : "Unsuppressed") + " container: " + id);
+      }
+    }
+
+    int numOfSuccess = containerIDs.size() - failures;
+    if (numOfSuccess > 0) {
+      blankLine();
+      out().println((suppress ? "Suppressed " : "Unsuppressed ") + numOfSuccess + " container(s) successfully.");
+      out().println("Container report will be updated after the next Replication Manager cycle.");
+    }
+
+    if (failures > 0) {
+      throw new IOException("Failed to " + (suppress ? "suppress " : "unsuppress ") + failures + " container(s).");
+    }
+  }
+
+  private void printReport(ScmClient scmClient) throws IOException {
+    ReplicationManagerReport report = scmClient.getReplicationManagerReport();
+    if (report.getReportTimeStamp() == 0) {
+      System.err.println("The Container Report is not available until Replication Manager completes" +
+          " its first run after startup or fail over. All values will be zero until that time.");
+      System.err.println();
+    }
+
+    if (json) {
+      output(JsonUtils.toJsonStringWithDefaultPrettyPrinter(report));
+      return;
+    }
+
+    outputHeader(report.getReportTimeStamp());
+    blankLine();
+    outputContainerStats(report);
+    blankLine();
+    outputContainerHealthStats(report);
+    blankLine();
+    outputContainerSamples(report);
+  }
+
+  private void outputHeader(long epochMs) {
+    if (epochMs == 0) {
+      epochMs = Instant.now().toEpochMilli();
+    }
+    Instant reportTime = Instant.ofEpochSecond(epochMs / 1000);
+    outputHeading("Container Summary Report generated at " + reportTime);
+  }
+
+  private void outputContainerStats(ReplicationManagerReport report) {
+    outputHeading("Container State Summary");
+    for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
+      long stat = report.getStat(state);
+      if (stat != -1) {
+        output(state + ": " + stat);
+      }
+    }
+  }
+
+  private void outputContainerHealthStats(ReplicationManagerReport report) {
+    outputHeading("Container Health Summary");
+    for (ContainerHealthState state : ContainerHealthState.values()) {
+      long stat = report.getStat(state);
+      if (stat != -1) {
+        output(state + ": " + stat);
+      }
+    }
+  }
+
+  private void outputContainerSamples(ReplicationManagerReport report) {
+    for (ContainerHealthState state : ContainerHealthState.values()) {
+      List<ContainerID> containers = report.getSample(state);
+      if (!containers.isEmpty()) {
+        output("First " + report.getSampleLimit() + " " +
+            state + " containers:");
+        output(containers
+            .stream()
+            .map(ContainerID::toString)
+            .collect(Collectors.joining(", ")));
+        blankLine();
+      }
+    }
+  }
+
+  private void blankLine() {
+    System.out.println();
+  }
+
+  private void output(String s) {
+    System.out.println(s);
+  }
+
+  private void outputHeading(String s) {
+    output(s);
+    for (int i = 0; i < s.length(); i++) {
+      System.out.print("=");
+    }
+    System.out.println();
+  }
+}

@@ -1,89 +1,86 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
-
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.BucketArgs;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Optional;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.NonHATests;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * Test covers listKeys(keyPrefix, startKey) combinations
  * in a FSO bucket layout type.
  */
-@Timeout(1200)
-public class TestListKeysWithFSO {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneConfiguration conf;
+  private OzoneBucket legacyOzoneBucket;
+  private OzoneBucket fsoOzoneBucket;
+  private OzoneBucket legacyOzoneBucket2;
+  private OzoneBucket fsoOzoneBucket2;
+  private OzoneBucket emptyLegacyOzoneBucket;
+  private OzoneBucket emptyFsoOzoneBucket;
+  private OzoneClient client;
+  private boolean originalFileSystemPathEnabled;
+  private long originalMaxListSize;
 
-  private static OzoneBucket legacyOzoneBucket;
-  private static OzoneBucket fsoOzoneBucket;
-  private static OzoneBucket legacyOzoneBucket2;
-  private static OzoneBucket fsoOzoneBucket2;
-  private static OzoneBucket emptyLegacyOzoneBucket;
-  private static OzoneBucket emptyFsoOzoneBucket;
-  private static OzoneClient client;
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   *
-   * @throws IOException
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        true);
+  void init() throws Exception {
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    originalFileSystemPathEnabled = omConfig.isFileSystemPathEnabled();
+    omConfig.setFileSystemPathEnabled(true);
+    originalMaxListSize = omConfig.getMaxListSize();
+    omConfig.setMaxListSize(2);
+
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+
+    client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
     legacyOzoneBucket = TestDataUtil
@@ -99,15 +96,15 @@ public class TestListKeysWithFSO {
     builder.setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     omBucketArgs = builder.build();
 
-    String fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     fsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
 
-    fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     fsoOzoneBucket2 = ozoneVolume.getBucket(fsoBucketName);
 
-    fsoBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    fsoBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(fsoBucketName, omBucketArgs);
     emptyFsoOzoneBucket = ozoneVolume.getBucket(fsoBucketName);
 
@@ -115,11 +112,11 @@ public class TestListKeysWithFSO {
     builder.setStorageType(StorageType.DISK);
     builder.setBucketLayout(BucketLayout.LEGACY);
     omBucketArgs = builder.build();
-    String legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String legacyBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     legacyOzoneBucket2 = ozoneVolume.getBucket(legacyBucketName);
 
-    legacyBucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    legacyBucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
     ozoneVolume.createBucket(legacyBucketName, omBucketArgs);
     emptyLegacyOzoneBucket = ozoneVolume.getBucket(legacyBucketName);
 
@@ -127,14 +124,14 @@ public class TestListKeysWithFSO {
   }
 
   @AfterAll
-  public static void teardownClass() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    omConfig.setFileSystemPathEnabled(originalFileSystemPathEnabled);
+    omConfig.setMaxListSize(originalMaxListSize);
   }
 
-  private static void initFSNameSpace() throws Exception {
+  private void initFSNameSpace() throws Exception {
     /*
     Keys Namespace:
 
@@ -508,6 +505,26 @@ public class TestListKeysWithFSO {
     checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
   }
 
+  @Test
+  void testIsFileFalseForDir() throws Exception {
+    byte[] data = "key-data".getBytes(StandardCharsets.UTF_8);
+    try (OzoneOutputStream out = emptyFsoOzoneBucket.createKey("dir1/key1", data.length)) {
+      out.write(data);
+    }
+
+    Iterator<? extends OzoneKey> keyIterator = emptyFsoOzoneBucket.listKeys("");
+
+    assertTrue(keyIterator.hasNext(), "Expected dir1, key1 in the bucket");
+
+    OzoneKey ozoneKey = keyIterator.next();
+    assertEquals("dir1/", ozoneKey.getName());
+    assertFalse(ozoneKey.isFile(), "Expected isFile to be false for directory key");
+
+    ozoneKey = keyIterator.next();
+    assertEquals("dir1/key1", ozoneKey.getName());
+    assertTrue(ozoneKey.isFile(), "Expected isFile to be true for key");
+  }
+
   /**
    * Verify listKeys at different levels.
    *
@@ -550,7 +567,7 @@ public class TestListKeysWithFSO {
     keys.add("/a1/b3/e2/e21.tx");
     keys.add("/a1/b3/e3/e31.tx");
 
-    createKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, keys);
   }
 
   private static void buildNameSpaceTree2(OzoneBucket ozoneBucket)
@@ -577,9 +594,8 @@ public class TestListKeysWithFSO {
 
     keys.add("/dir1/dir2/dir3/d11.tx");
 
-    createKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, keys);
   }
-
 
   private static List<String> getExpectedKeyList(String keyPrefix,
       String startKey, OzoneBucket legacyBucket, boolean shallow)
@@ -614,7 +630,7 @@ public class TestListKeysWithFSO {
         fsoBucket.listKeys(keyPrefix, startKey, shallow);
     ReplicationConfig expectedReplication =
         Optional.ofNullable(fsoBucket.getReplicationConfig())
-            .orElse(cluster.getOzoneManager().getDefaultReplicationConfig());
+            .orElse(cluster().getOzoneManager().getDefaultReplicationConfig());
 
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
@@ -643,33 +659,22 @@ public class TestListKeysWithFSO {
     checkKeyList(keyPrefix, startKey, keys, fsoBucket, true);
   }
 
-  private static void createKeys(OzoneBucket ozoneBucket, List<String> keys)
+  private static void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
+      // Read the key with given key name.
+      readkey(ozoneBucket, key, 10, input);
     }
   }
 
-  private static void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
-
-    OzoneOutputStream ozoneOutputStream =
-        ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-
-    // Read the key with given key name.
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
+  private static void readkey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
+      throws Exception {
     byte[] read = new byte[length];
-    ozoneInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    try (InputStream ozoneInputStream = ozoneBucket.readKey(key)) {
+      IOUtils.readFully(ozoneInputStream, read);
+    }
 
-    assertEquals(new String(input, StandardCharsets.UTF_8),
-        new String(read, StandardCharsets.UTF_8));
+    assertEquals(new String(input, StandardCharsets.UTF_8), new String(read, StandardCharsets.UTF_8));
   }
 }

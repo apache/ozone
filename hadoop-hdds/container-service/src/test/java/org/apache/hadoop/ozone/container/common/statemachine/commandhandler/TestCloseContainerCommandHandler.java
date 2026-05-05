@@ -1,25 +1,42 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import static java.util.Collections.singletonMap;
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -35,20 +52,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
-
-import java.io.IOException;
-import java.util.UUID;
-
-import static java.util.Collections.singletonMap;
-import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test cases to verify CloseContainerCommandHandler in datanode.
@@ -87,7 +91,7 @@ public class TestCloseContainerCommandHandler {
         pipelineID.getId().toString(), null);
 
     container = new KeyValueContainer(data, conf);
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     containerSet.addContainer(container);
 
     containerHandler = mock(Handler.class);
@@ -232,8 +236,8 @@ public class TestCloseContainerCommandHandler {
     initLayoutVersion(layout);
     long containerID = 1L;
 
-    IOException ioe = assertThrows(IOException.class, () -> controller.markContainerForClose(containerID));
-    assertThat(ioe).hasMessage("The Container is not found. ContainerID: " + containerID);
+    Exception e = assertThrows(ContainerNotFoundException.class, () -> controller.markContainerForClose(containerID));
+    assertThat(e).hasMessageContaining(" " + ContainerID.valueOf(containerID) + " ");
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -243,9 +247,8 @@ public class TestCloseContainerCommandHandler {
     long containerID = 2L;
     containerSet.getMissingContainerSet().add(containerID);
 
-    IOException ioe = assertThrows(IOException.class, () -> controller.markContainerForClose(containerID));
-    assertThat(ioe)
-        .hasMessage("The Container is in the MissingContainerSet hence we can't close it. ContainerID: " + containerID);
+    Exception e = assertThrows(ContainerNotFoundException.class, () -> controller.markContainerForClose(containerID));
+    assertThat(e).hasMessageContaining(" " + ContainerID.valueOf(containerID) + " ");
   }
 
   private CloseContainerCommand closeWithKnownPipeline() {
@@ -270,12 +273,9 @@ public class TestCloseContainerCommandHandler {
    */
   private static DatanodeDetails randomDatanodeDetails() {
     String ipAddress = "127.0.0.1";
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, 0);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, 0);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, 0);
+    DatanodeDetails.Port containerPort = DatanodeDetails.newStandalonePort(0);
+    DatanodeDetails.Port ratisPort = DatanodeDetails.newRatisPort(0);
+    DatanodeDetails.Port restPort = DatanodeDetails.newRestPort(0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     builder.setUuid(UUID.randomUUID())
         .setHostName("localhost")
@@ -292,4 +292,10 @@ public class TestCloseContainerCommandHandler {
     GenericTestUtils.waitFor(()
         -> closeHandler.getQueuedCount() <= 0, 10, 3000);
   }
+
+  @Test
+  public void testThreadPoolPoolSize() {
+    assertEquals(1, subject.getThreadPoolMaxPoolSize());
+  }
+
 }

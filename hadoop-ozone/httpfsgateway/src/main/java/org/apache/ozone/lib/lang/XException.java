@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,10 +17,9 @@
 
 package org.apache.ozone.lib.lang;
 
+import java.text.MessageFormat;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.ozone.lib.util.Check;
-
-import java.text.MessageFormat;
 
 /**
  * Generic exception that requires error codes and uses the a message
@@ -29,23 +27,6 @@ import java.text.MessageFormat;
  */
 @InterfaceAudience.Private
 public class XException extends Exception {
-
-  /**
-   * Interface to define error codes.
-   */
-  public interface ERROR {
-
-    /**
-     * Returns the template for the error.
-     *
-     * @return the template for the error, the template must be in JDK
-     *         <code>MessageFormat</code> syntax (using {#} positional
-     *         parameters).
-     */
-    String getTemplate();
-
-  }
-
   private ERROR error;
 
   /**
@@ -58,17 +39,6 @@ public class XException extends Exception {
   private XException(ERROR error, String message, Throwable cause) {
     super(message, cause);
     this.error = error;
-  }
-
-  /**
-   * Creates an XException using another XException as cause.
-   * <p>
-   * The error code and error message are extracted from the cause.
-   *
-   * @param cause exception cause.
-   */
-  public XException(XException cause) {
-    this(cause.getError(), cause.getMessage(), cause);
   }
 
   /**
@@ -112,7 +82,7 @@ public class XException extends Exception {
     if (template == null) {
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < args.length; i++) {
-        sb.append(" {").append(i).append("}");
+        sb.append(" {").append(i).append('}');
       }
       template = sb.deleteCharAt(0).toString();
     }
@@ -137,4 +107,17 @@ public class XException extends Exception {
     return throwable;
   }
 
+  /**
+   * Interface to define error codes.
+   */
+  public interface ERROR {
+    /**
+     * Returns the template for the error.
+     *
+     * @return the template for the error, the template must be in JDK
+     *         <code>MessageFormat</code> syntax (using {#} positional
+     *         parameters).
+     */
+    String getTemplate();
+  }
 }

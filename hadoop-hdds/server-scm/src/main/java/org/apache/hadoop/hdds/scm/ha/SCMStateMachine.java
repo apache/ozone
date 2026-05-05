@@ -1,50 +1,55 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * <p>http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * <p>Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static java.util.Objects.requireNonNull;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
@@ -56,16 +61,12 @@ import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
-
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * The SCMStateMachine is the state machine for SCMRatisServer. It is
@@ -78,26 +79,27 @@ public class SCMStateMachine extends BaseStateMachine {
 
   private StorageContainerManager scm;
   private Map<RequestType, Object> handlers;
+  private Map<RequestType, ScmInvoker<?>> invokers;
   private SCMHADBTransactionBuffer transactionBuffer;
+  private final SCMMetrics metrics;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
-  // The atomic variable RaftServerImpl#inProgressInstallSnapshotRequest
-  // ensures serializable between notifyInstallSnapshotFromLeader()
-  // and reinitialize().
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 
   private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
-  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean();
+  private AtomicBoolean isStateMachineReady = new AtomicBoolean();
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
     this.handlers = new EnumMap<>(RequestType.class);
+    this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
+    this.metrics = scm.getMetrics();
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isDefault()) {
       updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
@@ -115,10 +117,22 @@ public class SCMStateMachine extends BaseStateMachine {
 
   public SCMStateMachine() {
     isInitialized = false;
+    this.metrics = null;
   }
 
   public void registerHandler(RequestType type, Object handler) {
     handlers.put(type, handler);
+  }
+
+  private void addRatisEvent(String message) {
+    if (metrics != null) {
+      metrics.addRatisEvent(message);
+    }
+  }
+
+  public void registerInvoker(RequestType type,
+      ScmInvoker<?> invoker) {
+    invokers.put(type, invoker);
   }
 
   @Override
@@ -137,6 +151,7 @@ public class SCMStateMachine extends BaseStateMachine {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       storage.init(raftStorage);
+      LOG.info("{}: initialize {}", server.getId(), id);
     });
   }
 
@@ -149,6 +164,9 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
 
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{}: applyTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
+      }
       try {
         applyTransactionFuture.complete(process(request));
       } catch (SCMException ex) {
@@ -165,10 +183,12 @@ public class SCMStateMachine extends BaseStateMachine {
 
       // After previous term transactions are applied, still in safe mode,
       // perform refreshAndValidate to update the safemode rule state.
-      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
+      if (scm.isInSafeMode() && isStateMachineReady.get()) {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(TermIndex.valueOf(trx.getLogEntry())));
+      final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
+      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
+      updateLastAppliedTermIndex(appliedTermIndex);
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
@@ -177,18 +197,23 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   private Message process(final SCMRatisRequest request) throws Exception {
-    try {
-      final Object handler = handlers.get(request.getType());
+    final ScmInvoker<?> invoker = invokers.get(request.getType());
+    if (invoker != null) {
+      return invoker.invokeLocal(request.getOperation(), request.getArguments());
+    }
+    return process(request, handlers.get(request.getType()));
+  }
 
+  public static Message process(final SCMRatisRequest request, Object handler) throws Exception {
+    try {
       if (handler == null) {
         throw new IOException("No handler found for request type " +
             request.getType());
       }
 
-      final Object result = handler.getClass().getMethod(
-          request.getOperation(), request.getParameterTypes())
-          .invoke(handler, request.getArguments());
-      return SCMRatisResponse.encode(result);
+      final Method method = handler.getClass().getMethod(request.getOperation(), request.getParameterTypes());
+      final Object result = method.invoke(handler, request.getArguments());
+      return SCMRatisResponse.encode(result, method.getReturnType());
     } catch (NoSuchMethodException | SecurityException ex) {
       throw new InvalidProtocolBufferException(ex.getMessage());
     } catch (InvocationTargetException e) {
@@ -209,7 +234,9 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
-    LOG.info("current leader SCM steps down.");
+    String message = "SCM " + scm.getScmId() + " steps down from being leader.";
+    LOG.info(message);
+    addRatisEvent(message);
 
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
@@ -240,6 +267,8 @@ public class SCMStateMachine extends BaseStateMachine {
     final String leaderNodeId = leaderDetails.get().getNodeId();
     LOG.info("Received install snapshot notification from SCM leader: {} with "
         + "term index: {}", leaderAddress, firstTermIndexInLog);
+    addRatisEvent("Installing snapshot from SCM leader " + leaderNodeId +
+        ", term index: " + firstTermIndexInLog);
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
         () -> {
@@ -284,16 +313,36 @@ public class SCMStateMachine extends BaseStateMachine {
     currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
         .getInfo().getCurrentTerm());
 
+    if (isStateMachineReady.compareAndSet(false, true)) {
+      // refresh and validate safe mode rules if it can exit safe mode
+      // if being leader, all previous term transactions have been applied
+      // if other states, just refresh safe mode rules, and transaction keeps flushing from leader
+      // and does not depend on pending transactions.
+      scm.getScmSafeModeManager().refreshAndValidate();
+    }
+
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
-      LOG.info("leader changed, yet current SCM is still follower.");
+      String message = "Leader changed to " + newLeaderId +
+          ", current SCM " + scm.getScmId() + " is still follower.";
+      LOG.info(message);
+      addRatisEvent(message);
       return;
     }
 
-    LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
+    String message = "current SCM " + scm.getScmId() +
+        " becomes leader of term " + currentLeaderTerm;
+    LOG.info(message);
+    addRatisEvent(message);
 
     scm.getScmContext().updateLeaderAndTerm(true,
         currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
+
+    try {
+      transactionBuffer.flush();
+    } catch (Exception ex) {
+      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
+    }
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
@@ -354,19 +403,17 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (currentLeaderTerm.get() == term) {
-      // Means all transactions before this term have been applied.
       // This means after a restart, all pending transactions have been applied.
-      // Perform
-      // 1. Refresh Safemode rules state.
-      // 2. Start DN Rpc server.
-      if (!refreshedAfterLeaderReady.get()) {
-        scm.getScmSafeModeManager().refresh();
-        scm.getDatanodeProtocolServer().start();
-
-        refreshedAfterLeaderReady.set(true);
+      if (isStateMachineReady.compareAndSet(false, true)) {
+        // Refresh Safemode rules state if not already done.
+        scm.getScmSafeModeManager().refreshAndValidate();
       }
       currentLeaderTerm.set(-1L);
     }
+  }
+
+  public boolean getIsStateMachineReady() {
+    return isStateMachineReady.get();
   }
 
   @Override
@@ -379,16 +426,21 @@ public class SCMStateMachine extends BaseStateMachine {
     scm.getScmContext().setLeaderReady();
     scm.getSCMServiceManager().notifyStatusChanged();
     scm.getFinalizationManager().onLeaderReady();
+    addRatisEvent("SCM " + scm.getScmId() +
+        " is ready to serve requests as the leader");
   }
 
   @Override
   public void notifyConfigurationChanged(long term, long index,
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
+    addRatisEvent("Configuration changed at term index (" + term + ", " + index +
+        ") to " + newRaftConfiguration.toString());
   }
 
   @Override
   public void pause() {
     final LifeCycle lc = getLifeCycle();
+    LOG.info("{}: Try to pause from current LifeCycle state {}", getId(), lc);
     if (lc.getCurrentState() != LifeCycle.State.NEW) {
       lc.transition(LifeCycle.State.PAUSING);
       lc.transition(LifeCycle.State.PAUSED);
@@ -397,7 +449,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    Preconditions.checkNotNull(installingDBCheckpoint);
+    requireNonNull(installingDBCheckpoint, "installingDBCheckpoint == null");
     DBCheckpoint checkpoint = installingDBCheckpoint;
     List<ManagedSecretKey> secretKeys = installingSecretKeys;
 
@@ -413,6 +465,9 @@ public class SCMStateMachine extends BaseStateMachine {
       LOG.error("Failed to reinitialize SCMStateMachine.", e);
       throw new IOException(e);
     }
+
+    LOG.info("{}: SCMStateMachine is reinitializing. newTermIndex = {}", getId(), termIndex);
+    addRatisEvent("reinitialize: " + termIndex);
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
     try {

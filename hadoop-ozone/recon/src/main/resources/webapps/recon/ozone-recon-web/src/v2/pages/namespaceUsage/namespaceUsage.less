@@ -1,0 +1,75 @@
+/*
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
+
+.du-alert-message {
+  background-color: #FFFFFF;
+  border: unset;
+  box-shadow: -1px -2px 28px -14px rgba(0,0,0,0.68);
+  -webkit-box-shadow: -1px -2px 28px -14px rgba(0,0,0,0.68);
+  -moz-box-shadow: -1px -2px 28px -14px rgba(0,0,0,0.68);
+  margin-bottom: 20px;
+}
+
+.content-div {
+  min-height: unset;
+
+  #breadcrumb-container {
+    overflow-y: hidden;
+    overflow-x: auto;
+    padding: 0px 8px 16px 8px;
+    margin-bottom: 10px;
+    width: 83vw;
+    height: 20%;
+    flex: 0.98;
+
+    .breadcrumb-nav {
+      font-size: 0.9vw;
+      width: max-content;
+      .breadcrumb-nav-item {
+        background: transparent;
+        border: none !important;
+        cursor: pointer;
+        color: @primary-color;
+        
+      }
+    }
+  }
+
+  .du-table-header-section {
+    display: flex;
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .du-content {
+    width: 100%;
+    display: flex;
+  }
+
+  .tag-block {
+    display: flex;
+    column-gap: 8px;
+    padding: 0px 8px 16px 8px;
+  }
+}
+
+.quota-info-icon {
+  font-size: 12px;
+  margin-left: 5px;
+  color: @primary-color;
+}

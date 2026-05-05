@@ -17,11 +17,14 @@
 
 #suite:s3a
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
+export COMPOSE_FILE="docker-compose.yaml:s3g-port-forward.yml"
 
 source "$COMPOSE_DIR/../common/s3a-test.sh"

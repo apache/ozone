@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,26 +17,23 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
-
 /**
  * ServiceInfo holds the config details of Ozone services.
  */
 public final class ServiceInfo {
-
 
   /**
    * Type of node/service.
@@ -59,6 +55,7 @@ public final class ServiceInfo {
   private Map<ServicePort.Type, Integer> ports;
   
   private OMRoleInfo omRoleInfo;
+  private OzoneFsServerDefaults serverDefaults;
 
   /**
    * Default constructor for JSON deserialization.
@@ -76,8 +73,26 @@ public final class ServiceInfo {
                       List<ServicePort> portList,
                       OzoneManagerVersion omVersion,
                       OMRoleInfo omRole) {
-    Preconditions.checkNotNull(nodeType);
-    Preconditions.checkNotNull(hostname);
+    this(nodeType, hostname, portList, omVersion, omRole, null);
+  }
+
+  /**
+   * Constructs the ServiceInfo for the {@code nodeType}.
+   * @param nodeType type of node/service
+   * @param hostname hostname of the service
+   * @param portList list of ports the service listens to
+   * @param omVersion Om Version
+   * @param omRole OM role Ino
+   * @param keyProviderUri KMS provider URI
+   */
+  private ServiceInfo(NodeType nodeType,
+                      String hostname,
+                      List<ServicePort> portList,
+                      OzoneManagerVersion omVersion,
+                      OMRoleInfo omRole,
+                      OzoneFsServerDefaults serverDefaults) {
+    Objects.requireNonNull(nodeType, "nodeType == null");
+    Objects.requireNonNull(hostname, "hostname == null");
     this.nodeType = nodeType;
     this.hostname = hostname;
     this.omVersion = omVersion;
@@ -86,6 +101,7 @@ public final class ServiceInfo {
       ports.put(port.getType(), port.getValue());
     }
     this.omRoleInfo = omRole;
+    this.serverDefaults = serverDefaults;
   }
 
   /**
@@ -144,6 +160,15 @@ public final class ServiceInfo {
   }
 
   /**
+   * Returns the Ozone Server default configuration.
+   * @return OmRoleInfo
+   */
+  @JsonIgnore
+  public OzoneFsServerDefaults getServerDefaults() {
+    return serverDefaults;
+  }
+
+  /**
    * Converts {@link ServiceInfo} to OzoneManagerProtocolProtos.ServiceInfo.
    *
    * @return OzoneManagerProtocolProtos.ServiceInfo
@@ -170,6 +195,9 @@ public final class ServiceInfo {
     if (nodeType == NodeType.OM && omRoleInfo != null) {
       builder.setOmRole(omRoleInfo);
     }
+    if (serverDefaults != null) {
+      builder.setServerDefaults(serverDefaults.getProtobuf());
+    }
     return builder.build();
   }
 
@@ -185,7 +213,9 @@ public final class ServiceInfo {
         serviceInfo.getHostname(),
         serviceInfo.getServicePortsList(),
         OzoneManagerVersion.fromProtoValue(serviceInfo.getOMVersion()),
-        serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null);
+        serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null,
+        serviceInfo.hasServerDefaults() ? OzoneFsServerDefaults.getFromProtobuf(
+            serviceInfo.getServerDefaults()) : null);
   }
 
   /**
@@ -206,6 +236,7 @@ public final class ServiceInfo {
     private List<ServicePort> portList = new ArrayList<>();
     private OMRoleInfo omRoleInfo;
     private OzoneManagerVersion omVersion;
+    private OzoneFsServerDefaults serverDefaults;
 
     /**
      * Gets the Om Client Protocol Version.
@@ -259,6 +290,11 @@ public final class ServiceInfo {
       return this;
     }
 
+    public Builder setServerDefaults(OzoneFsServerDefaults defaults) {
+      serverDefaults = defaults;
+      return this;
+    }
+
     /**
      * Builds and returns {@link ServiceInfo} with the set values.
      * @return {@link ServiceInfo}
@@ -268,7 +304,8 @@ public final class ServiceInfo {
           host,
           portList,
           omVersion,
-          omRoleInfo);
+          omRoleInfo,
+          serverDefaults);
     }
   }
 

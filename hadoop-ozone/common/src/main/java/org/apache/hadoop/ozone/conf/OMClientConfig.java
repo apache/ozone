@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,20 +13,18 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.conf;
 
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
-
-import java.util.concurrent.TimeUnit;
-
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigType;
 
 /**
  * Config for OM Client.
@@ -35,11 +32,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 @ConfigGroup(prefix = "ozone.om.client")
 public class OMClientConfig {
 
-  public static final String OM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
-  public static final String OM_TRASH_EMPTIER_CORE_POOL_SIZE
-      = "trash.core.pool.size";
-
-  @Config(key = OM_CLIENT_RPC_TIME_OUT,
+  @Config(key = "ozone.om.client.rpc.timeout",
       defaultValue = "15m",
       type = ConfigType.TIME,
       tags = {OZONE, OM, CLIENT},
@@ -53,13 +46,12 @@ public class OMClientConfig {
   )
   private long rpcTimeOut = 15 * 60 * 1000;
 
-  @Config(key = OM_TRASH_EMPTIER_CORE_POOL_SIZE,
+  @Config(key = "ozone.om.client.trash.core.pool.size",
       defaultValue = "5",
       type = ConfigType.INT,
       tags = {OZONE, OM, CLIENT},
       description = "Total number of threads in pool for the Trash Emptier")
   private int trashEmptierPoolSize = 5;
-
 
   public int getTrashEmptierPoolSize() {
     return trashEmptierPoolSize;

@@ -1,22 +1,33 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+
+import jakarta.annotation.Nonnull;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -25,17 +36,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-
-import jakarta.annotation.Nonnull;
-import java.io.IOException;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for DeleteKeys request.
@@ -50,10 +50,10 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
   public OMKeysDeleteResponseWithFSO(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
-      @Nonnull List<OmKeyInfo> dirDeleteList, boolean isRatisEnabled,
+      @Nonnull List<OmKeyInfo> dirDeleteList,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volId,
-      @Nonnull List<String> dbOpenKeys) {
-    super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo, dbOpenKeys);
+      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
+    super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
   }
@@ -87,7 +87,7 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
       deletedKey = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), deletedKey);
       addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
-          ozoneDbKey, deletedKey, omKeyInfo);
+          ozoneDbKey, deletedKey, omKeyInfo, bucketId, true);
     }
 
     // update bucket usedBytes.
@@ -95,9 +95,11 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
         omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
             getOmBucketInfo().getBucketName()), getOmBucketInfo());
 
-    for (String dbOpenKey : getDbOpenKeys()) {
-      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
-          batchOperation, dbOpenKey);
+    if (!getOpenKeyInfoMap().isEmpty()) {
+      for (Map.Entry<String, OmKeyInfo> entry : getOpenKeyInfoMap().entrySet()) {
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+            batchOperation, entry.getKey(), entry.getValue());
+      }
     }
   }
 

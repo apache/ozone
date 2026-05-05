@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,11 +17,17 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
@@ -30,16 +35,10 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests {@link RoundRobinVolumeChoosingPolicy}.
@@ -93,8 +92,8 @@ public class TestRoundRobinVolumeChoosingPolicy {
     HddsVolume hddsVolume1 = volumes.get(0);
     HddsVolume hddsVolume2 = volumes.get(1);
 
-    assertEquals(100L, hddsVolume1.getAvailable());
-    assertEquals(200L, hddsVolume2.getAvailable());
+    assertEquals(100L, hddsVolume1.getCurrentUsage().getAvailable());
+    assertEquals(200L, hddsVolume2.getCurrentUsage().getAvailable());
 
     // Test two rounds of round-robin choosing
     assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0));
@@ -115,7 +114,18 @@ public class TestRoundRobinVolumeChoosingPolicy {
 
     String msg = e.getMessage();
     assertThat(msg).contains("No volumes have enough space for a new container.  " +
-        "Most available space: 150 bytes");
+        "Most available space: 140 bytes");
   }
 
+  @Test
+  public void testVolumeCommittedSpace() throws Exception {
+    Map<HddsVolume, Long> initialCommittedSpace = new HashMap<>();
+    volumes.forEach(vol ->
+        initialCommittedSpace.put(vol, vol.getCommittedBytes()));
+
+    HddsVolume selectedVolume = policy.chooseVolume(volumes, 50);
+
+    assertEquals(initialCommittedSpace.get(selectedVolume) + 50,
+        selectedVolume.getCommittedBytes());
+  }
 }

@@ -1,28 +1,30 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue.interfaces;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-
-import java.io.IOException;
-import java.util.List;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 
 /**
  * BlockManager is for performing key related operations on the container.
@@ -49,6 +51,18 @@ public interface BlockManager {
    */
   long putBlock(Container container, BlockData data, boolean endOfBlock)
       throws IOException;
+
+  /**
+   * Persists the block data for a closed container. The block data should have all the chunks and bcsId.
+   * Overwrites the block if it already exists, The container's used bytes should be updated by the caller with
+   * {@link ChunkManager#writeChunk(Container, BlockID, ChunkInfo, ByteBuffer, DispatcherContext)}.
+   *
+   * @param container      - Container for which block data need to be persisted.
+   * @param data           - Block Data to be persisted (BlockData should have the chunks).
+   * @param overwriteBcsId - To overwrite bcsId of the container.
+   */
+  long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
+          throws IOException;
 
   /**
    * Gets an existing block.
@@ -81,6 +95,15 @@ public interface BlockManager {
       throws IOException;
 
   /**
+   * Check if a block exists in the container.
+   *
+   * @param container - Container from which blocks need to be listed.
+   * @param blockID - BlockID of the Block.
+   * @return True if block exists, false otherwise.
+   */
+  boolean blockExists(Container container, BlockID blockID) throws IOException;
+
+  /**
    * Returns last committed length of the block.
    *
    * @param container - Container from which block need to be fetched.
@@ -91,10 +114,19 @@ public interface BlockManager {
   long getCommittedBlockLength(Container container, BlockID blockID)
       throws IOException;
 
+  void finalizeBlock(Container container, BlockID blockId)
+      throws IOException;
+
   int getDefaultReadBufferCapacity();
 
   /** @return the threshold to read using memory mapped buffers. */
   int getReadMappedBufferThreshold();
+
+  /** @return the max count of memory mapped buffers to read. */
+  int getReadMappedBufferMaxCount();
+
+  /** @return true iff Netty ChunkedNioFile read is enabled. */
+  boolean isReadNettyChunkedNioFile();
 
   /**
    * Shutdown ContainerManager.

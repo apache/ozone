@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
+Resource            mpu_lib.robot
 Test Timeout        5 minutes
 Suite Setup         Setup s3 tests
 
@@ -48,17 +49,20 @@ Delete bucket with incomplete multipart uploads
     [tags]    no-bucket-type
     ${bucket} =                Create bucket
 
-    # initiate incomplete multipart uploads (multipart upload is initiated but not completed/aborted)
-    ${initiate_result} =       Execute AWSS3APICli     create-multipart-upload --bucket ${bucket} --key incomplete-multipartkey
-    ${uploadID} =              Execute                 echo '${initiate_result}' | jq -r '.UploadId'
-                               Should contain          ${initiate_result}    ${bucket}
-                               Should contain          ${initiate_result}    incomplete-multipartkey
-                               Should contain          ${initiate_result}    UploadId
+    # initiate incomplete multipart upload (multipart upload is initiated but not completed/aborted)
+    ${uploadID} =              Initiate MPU    ${bucket}    incomplete-multipartkey
 
     # bucket deletion should fail since there is still incomplete multipart upload
     ${delete_fail_result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket ${bucket}    255
                                Should contain                     ${delete_fail_result}               BucketNotEmpty
 
     # after aborting the multipart upload, the bucket deletion should succeed
-    ${abort_result} =          Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${bucket} --key incomplete-multipartkey --upload-id ${uploadID}   0
+    ${abort_result} =          Abort MPU    ${bucket}    incomplete-multipartkey    ${uploadID}
     ${delete_result} =         Execute AWSS3APICli and checkrc    delete-bucket --bucket ${bucket}    0
+
+Check bucket ownership verification
+    [tags]    bucket-ownership-verification
+    ${bucket} =           Create bucket to be deleted
+    ${correct_owner} =    Get bucket owner    ${bucket}
+
+    Execute AWSS3APICli with bucket owner check       delete-bucket --bucket ${bucket}  ${correct_owner}

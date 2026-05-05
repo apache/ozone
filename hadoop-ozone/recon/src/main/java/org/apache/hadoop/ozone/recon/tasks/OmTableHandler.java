@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,12 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.commons.lang3.tuple.Triple;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 
 /**
  * Interface for handling PUT, DELETE and UPDATE events for size-related
@@ -43,9 +40,9 @@ public interface OmTableHandler {
    */
   void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                       String tableName,
-                      HashMap<String, Long> objectCountMap,
-                      HashMap<String, Long> unReplicatedSizeMap,
-                      HashMap<String, Long> replicatedSizeMap);
+                      Map<String, Long> objectCountMap,
+                      Map<String, Long> unReplicatedSizeMap,
+                      Map<String, Long> replicatedSizeMap);
 
 
   /**
@@ -60,9 +57,9 @@ public interface OmTableHandler {
    */
   void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,
-                         HashMap<String, Long> objectCountMap,
-                         HashMap<String, Long> unReplicatedSizeMap,
-                         HashMap<String, Long> replicatedSizeMap);
+                         Map<String, Long> objectCountMap,
+                         Map<String, Long> unReplicatedSizeMap,
+                         Map<String, Long> replicatedSizeMap);
 
 
   /**
@@ -77,27 +74,25 @@ public interface OmTableHandler {
    */
   void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,
-                         HashMap<String, Long> objectCountMap,
-                         HashMap<String, Long> unReplicatedSizeMap,
-                         HashMap<String, Long> replicatedSizeMap);
+                         Map<String, Long> objectCountMap,
+                         Map<String, Long> unReplicatedSizeMap,
+                         Map<String, Long> replicatedSizeMap);
 
 
   /**
    * Returns a triple with the total count of records (left), total unreplicated
-   * size (middle), and total replicated size (right) in the given iterator.
+   * size (middle), and total replicated size (right) for the given table.
    * Increments count for each record and adds the dataSize if a record's value
    * is an instance of OmKeyInfo,RepeatedOmKeyInfo.
-   * If the iterator is null, returns (0, 0, 0).
    *
-   * @param iterator The iterator over the table to be iterated.
+   * @param tableName The name of the table to process.
+   * @param omMetadataManager The OM metadata manager to get the table.
    * @return A Triple with three Long values representing the count,
    * unReplicated size and replicated size.
    * @throws IOException If an I/O error occurs during the iterator traversal.
    */
-  Triple<Long, Long, Long> getTableSizeAndCount(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
-      throws IOException;
-
+  Triple<Long, Long, Long> getTableSizeAndCount(String tableName, 
+      OMMetadataManager omMetadataManager) throws IOException;
 
   /**
    * Returns the count key for the given table.

@@ -29,16 +29,29 @@ _realpath() {
 tempfile="${REPORT_DIR}/summary.tmp"
 
 ## generate summary txt file
+failures=${REPORT_DIR}/failures.txt
 find "." -not -path '*/iteration*' -name 'TEST*.xml' -print0 \
     | xargs -n1 -0 "grep" -l -E "<failure|<error" \
     | awk -F/ '{sub("'"TEST-"'",""); sub(".xml",""); print $NF}' \
-    > "${tempfile}"
+    > "${failures}"
+cat ${failures} > "${tempfile}"
 
+leaks=${REPORT_DIR}/leaks.txt
 if [[ "${CHECK:-unit}" == "integration" ]]; then
-  find hadoop-ozone/integration-test -not -path '*/iteration*' -name '*-output.txt' -print0 \
+  find hadoop-ozone/integration-test* -not -path '*/iteration*' -name '*-output.txt' -print0 \
       | xargs -n1 -0 "grep" -l -E "not closed properly|was not shutdown properly" \
       | awk -F/ '{sub("-output.txt",""); print $NF}' \
-      >> "${tempfile}"
+      > "${leaks}"
+  cat ${leaks} >> "${tempfile}"
+fi
+
+cluster=${REPORT_DIR}/cluster-startup-errors.txt
+if [[ "${CHECK:-unit}" == "integration" ]]; then
+  find hadoop-ozone/integration-test* -not -path '*/iteration*' -name '*-output.txt' -print0 \
+      | xargs -n1 -0 "grep" -l -E "Unable to build MiniOzoneCluster" \
+      | awk -F/ '{sub("-output.txt",""); print $NF}' \
+      > "${cluster}"
+  cat ${cluster} >> "${tempfile}"
 fi
 
 #Copy heap dump and dump leftovers
@@ -50,13 +63,16 @@ find "." -not -path '*/iteration*' \
   -exec mv {} "$REPORT_DIR/" \;
 
 ## Add the tests where the JVM is crashed
+crashes=${REPORT_DIR}/crashes.txt
 grep -A1 'Crashed tests' "${REPORT_DIR}/output.log" \
   | grep -v -e 'Crashed tests' -e '--' \
   | cut -f2- -d' ' \
   | sort -u \
-  >> "${tempfile}"
+  > "${crashes}"
+cat "${crashes}" >> "${tempfile}"
 
 # Check for tests that started but were not finished
+timeouts=${REPORT_DIR}/timeouts.txt
 if grep -q 'There was a timeout.*in the fork' "${REPORT_DIR}/output.log"; then
   diff -uw \
     <(grep -e 'Running org' "${REPORT_DIR}/output.log" \
@@ -69,7 +85,8 @@ if grep -q 'There was a timeout.*in the fork' "${REPORT_DIR}/output.log"; then
       | sort -u -k2) \
     | grep '^- ' \
     | awk '{ print $3 }' \
-    >> "${tempfile}"
+    > "${timeouts}"
+  cat "${timeouts}" >> "${tempfile}"
 fi
 
 sort -u "${tempfile}" | tee "${REPORT_DIR}/summary.txt"
@@ -93,20 +110,36 @@ fi
 
 ## generate summary markdown file
 export SUMMARY_FILE="$REPORT_DIR/summary.md"
-for TEST_RESULT_FILE in $(find "$REPORT_DIR" -name "*.txt" | grep -v output); do
-
-    FAILURES=$(grep FAILURE "$TEST_RESULT_FILE" | grep "Tests run" | awk '{print $18}' | sort | uniq)
-
-    for FAILURE in $FAILURES; do
-        TEST_RESULT_LOCATION="$(_realpath --relative-to="$REPORT_DIR" "$TEST_RESULT_FILE")"
-        TEST_OUTPUT_LOCATION="${TEST_RESULT_LOCATION//.txt/-output.txt}"
-        printf " * [%s](%s) ([output](%s))\n" "$FAILURE" "$TEST_RESULT_LOCATION" "$TEST_OUTPUT_LOCATION" >> "$SUMMARY_FILE"
-    done
-done
-
-if [ -s "$SUMMARY_FILE" ]; then
-   printf "# Failing tests: \n\n" | cat - "$SUMMARY_FILE" > temp && mv temp "$SUMMARY_FILE"
+echo -n > "$SUMMARY_FILE"
+if [ -s "${failures}" ]; then
+  printf "# Failed Tests\n\n" >> "$SUMMARY_FILE"
+  cat "${failures}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
 fi
+rm -f "${failures}"
+
+if [[ -s "${leaks}" ]]; then
+  printf "# Leaks Detected\n\n" >> "$SUMMARY_FILE"
+  cat "${leaks}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
+fi
+rm -f "${leaks}"
+
+if [[ -s "${cluster}" ]]; then
+  printf "# Cluster Startup Errors\n\n" >> "$SUMMARY_FILE"
+  cat "${cluster}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
+fi
+rm -f "${cluster}"
+
+if [[ -s "${crashes}" ]]; then
+  printf "# Crashed Tests\n\n" >> "$SUMMARY_FILE"
+  cat "${crashes}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
+fi
+rm -f "${crashes}"
+
+if [[ -s "${timeouts}" ]]; then
+  printf "# Fork Timeout\n\n" >> "$SUMMARY_FILE"
+  cat "${timeouts}" | sed 's/^/ * /' >> "$SUMMARY_FILE"
+fi
+rm -f "${timeouts}"
 
 ## generate counter
 wc -l "$REPORT_DIR/summary.txt" | awk '{print $1}'> "$REPORT_DIR/failures"

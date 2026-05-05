@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,13 +13,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
-
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import java.io.IOException;
 import java.security.PrivateKey;
@@ -28,6 +23,8 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 /**
  * Certificate Approver interface is used to inspectCSR a certificate.
@@ -68,7 +65,6 @@ public interface CertificateApprover {
       String clusterId,
       String certSerialId)
       throws IOException, CertificateException;
-
 
   /**
    * Approval Types for a certificate request.

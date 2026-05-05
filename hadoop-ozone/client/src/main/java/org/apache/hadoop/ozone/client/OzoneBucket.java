@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,39 +17,12 @@
 
 package org.apache.hadoop.ozone.client;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.WithMetadata;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -58,14 +30,40 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Stack;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
-import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 /**
  * A class that encapsulates OzoneBucket.
@@ -153,6 +151,14 @@ public class OzoneBucket extends WithMetadata {
    * Bucket Owner.
    */
   private String owner;
+  /**
+   * Pending deletion bytes (Includes bytes retained by snapshots).
+   */
+  private long pendingDeleteBytes;
+  /**
+   * Pending deletion namespace (Includes keys retained by snapshots).
+   */
+  private long pendingDeleteNamespace;
 
   protected OzoneBucket(Builder builder) {
     super(builder);
@@ -169,6 +175,8 @@ public class OzoneBucket extends WithMetadata {
     }
     this.usedBytes = builder.usedBytes;
     this.usedNamespace = builder.usedNamespace;
+    this.pendingDeleteBytes = builder.pendingDeleteBytes;
+    this.pendingDeleteNamespace = builder.pendingDeleteNamespace;
     this.creationTime = Instant.ofEpochMilli(builder.creationTime);
     if (builder.modificationTime != 0) {
       this.modificationTime = Instant.ofEpochMilli(builder.modificationTime);
@@ -500,7 +508,7 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param keyName Existing key to rewrite. This must exist in the bucket.
    * @param size The size of the new key
-   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   * @param existingKeyGeneration The positive generation of the existing key which is checked for changes at key create
    *                              and commit time.
    * @param replicationConfig The replication configuration for the key to be rewritten.
    * @param metadata custom key value metadata
@@ -510,6 +518,44 @@ public class OzoneBucket extends WithMetadata {
   public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
       ReplicationConfig replicationConfig, Map<String, String> metadata) throws IOException {
     return proxy.rewriteKey(volumeName, name, keyName, size, existingKeyGeneration, replicationConfig, metadata);
+  }
+
+  /**
+   * Creates a key only if it does not exist (S3 If-None-Match: * semantics).
+   *
+   * @param keyName Name of the key
+   * @param size Size of the data
+   * @param replicationConfig Replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return proxy.createKeyIfNotExists(volumeName, name, keyName, size,
+        replicationConfig, metadata, tags);
+  }
+
+  /**
+   * Rewrites a key only if its ETag matches (S3 If-Match semantics).
+   *
+   * @param keyName Name of the key
+   * @param size Size of the data
+   * @param expectedETag The ETag value the existing key must have
+   * @param replicationConfig Replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags)
+      throws IOException {
+    return proxy.rewriteKeyIfMatch(volumeName, name, keyName, size,
+        expectedETag, replicationConfig, metadata, tags);
   }
 
   /**
@@ -568,6 +614,52 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Creates a key with datastream only if it does not exist already
+   * (S3 If-None-Match: * semantics).
+   *
+   * @param key Name of the key to be created.
+   * @param size Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata Custom key metadata.
+   * @param tags Tags used for S3 object tags
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
+        replicationConfig, keyMetadata, tags);
+  }
+
+  /**
+   * Rewrites a key with datastream only if its ETag matches
+   * (S3 If-Match semantics).
+   *
+   * @param key Name of the key to be rewritten.
+   * @param size Size of the data the key will point to.
+   * @param expectedETag The ETag value the existing key must have.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata Custom key metadata.
+   * @param tags Tags used for S3 object tags
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.rewriteStreamKeyIfMatch(volumeName, name, key, size,
+        expectedETag, replicationConfig, keyMetadata, tags);
+  }
+
+  /**
    * Reads an existing key from the bucket.
    *
    * @param key Name of the key to be read.
@@ -610,6 +702,14 @@ public class OzoneBucket extends WithMetadata {
 
   public long getUsedNamespace() {
     return usedNamespace;
+  }
+
+  public long getPendingDeleteBytes() {
+    return pendingDeleteBytes;
+  }
+
+  public long getPendingDeleteNamespace() {
+    return pendingDeleteNamespace;
   }
 
   /**
@@ -851,6 +951,27 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Complete Multipart upload with conditional write support.
+   * This will combine all the parts and make the key visible in ozone,
+   * but only if the specified preconditions are met.
+   *
+   * @param key key name
+   * @param uploadID multipart upload ID
+   * @param partsMap map of part numbers to ETags
+   * @param expectedDataGeneration expected data generation for conditional write
+   *        (use OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS for If-None-Match: *)
+   * @param expectedETag expected ETag for conditional write (for If-Match)
+   * @return OmMultipartUploadCompleteInfo
+   * @throws IOException if precondition fails or other I/O error occurs
+   */
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
+      String uploadID, Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    return proxy.completeMultipartUpload(volumeName, name, key, uploadID,
+        partsMap, expectedDataGeneration, expectedETag);
+  }
+
+  /**
    * Abort multipart upload request.
    * @param keyName
    * @param uploadID
@@ -985,8 +1106,23 @@ public class OzoneBucket extends WithMetadata {
    */
   public List<OzoneFileStatus> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries) throws IOException {
-    return proxy
-        .listStatus(volumeName, name, keyName, recursive, startKey, numEntries);
+    return proxy.listStatus(volumeName, name, keyName, recursive, startKey, numEntries);
+  }
+
+  /**
+   * List the lightweight status for a file or a directory and its contents.
+   *
+   * @param keyName    Absolute path of the entry to be listed
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @return list of file status
+   */
+  public List<OzoneFileStatusLight> listStatusLight(String keyName, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return proxy.listStatusLight(volumeName, name, keyName, recursive, startKey, numEntries, false);
   }
 
   /**
@@ -1016,9 +1152,10 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param prefix Optional string to filter for the selected keys.
    */
-  public OzoneMultipartUploadList listMultipartUploads(String prefix)
+  public OzoneMultipartUploadList listMultipartUploads(String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads)
       throws IOException {
-    return proxy.listMultipartUploads(volumeName, getName(), prefix);
+    return proxy.listMultipartUploads(volumeName, getName(), prefix, keyMarker, uploadIdMarker, maxUploads);
   }
 
   /**
@@ -1046,6 +1183,37 @@ public class OzoneBucket extends WithMetadata {
     proxy.setTimes(ozoneObj, keyName, mtime, atime);
   }
 
+  /**
+   * Gets the tags for an existing key.
+   * @param keyName Key name.
+   * @return Tags for the specified key.
+   * @throws IOException
+   */
+  public Map<String, String> getObjectTagging(String keyName)
+      throws IOException {
+    return proxy.getObjectTagging(volumeName, name, keyName);
+  }
+
+  /**
+   * Sets the tags to an existing key.
+   * @param keyName Key name.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  public void putObjectTagging(String keyName, Map<String, String> tags)
+      throws IOException {
+    proxy.putObjectTagging(volumeName, name, keyName, tags);
+  }
+
+  /**
+   * Removes all the tags from an existing key.
+   * @param keyName Key name
+   * @throws IOException
+   */
+  public void deleteObjectTagging(String keyName) throws IOException {
+    proxy.deleteObjectTagging(volumeName, name, keyName);
+  }
+
   public void setSourcePathExist(boolean b) {
     this.sourcePathExist = b;
   }
@@ -1056,7 +1224,7 @@ public class OzoneBucket extends WithMetadata {
 
   public static Builder newBuilder(ConfigurationSource conf,
       ClientProtocol proxy) {
-    Preconditions.checkNotNull(proxy, "Client proxy is not set.");
+    Objects.requireNonNull(proxy, "Client proxy is not set.");
     return new Builder(conf, proxy);
   }
 
@@ -1082,6 +1250,8 @@ public class OzoneBucket extends WithMetadata {
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
     private String owner;
+    private long pendingDeleteBytes;
+    private long pendingDeleteNamespace;
 
     protected Builder() {
     }
@@ -1175,6 +1345,16 @@ public class OzoneBucket extends WithMetadata {
 
     public Builder setOwner(String owner) {
       this.owner = owner;
+      return this;
+    }
+
+    public Builder setPendingDeleteBytes(long pendingDeleteBytes) {
+      this.pendingDeleteBytes = pendingDeleteBytes;
+      return this;
+    }
+
+    public Builder setPendingDeleteNamespace(long pendingDeleteNamespace) {
+      this.pendingDeleteNamespace = pendingDeleteNamespace;
       return this;
     }
 
@@ -1362,7 +1542,7 @@ public class OzoneBucket extends WithMetadata {
           proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
               startKey, listCacheSize, false);
 
-      if (addedKeyPrefix && statuses.size() > 0) {
+      if (addedKeyPrefix && !statuses.isEmpty()) {
         // previous round already include the startKey, so remove it
         statuses.remove(0);
       } else {
@@ -1409,11 +1589,10 @@ public class OzoneBucket extends WithMetadata {
         keyInfo.getModificationTime(),
         keyInfo.getReplicationConfig(),
         metadata,
-        keyInfo.isFile(),
+        status.isFile(),
         keyInfo.getOwnerName(),
         Collections.emptyMap());
   }
-
 
   /**
    * An Iterator to iterate over {@link OzoneKey} list.
@@ -1762,7 +1941,6 @@ public class OzoneBucket extends WithMetadata {
       // 1. Get immediate children of keyPrefix, starting with startKey
       List<OzoneFileStatusLight> statuses = proxy.listStatusLight(volumeName,
           name, keyPrefix, false, startKey, listCacheSize, true);
-      boolean reachedLimitCacheSize = statuses.size() == listCacheSize;
 
       // 2. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank
@@ -1794,7 +1972,7 @@ public class OzoneBucket extends WithMetadata {
           // Return it so that the next iteration will be
           // started using the stacked items.
           return true;
-        } else if (reachedLimitCacheSize && indx == statuses.size() - 1) {
+        } else if (indx == statuses.size() - 1) {
           // The last element is a FILE and reaches the listCacheSize.
           // Now, sets next seek key to this element
           stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));

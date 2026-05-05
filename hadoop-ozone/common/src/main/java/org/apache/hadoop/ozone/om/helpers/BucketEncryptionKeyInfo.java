@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,13 +17,16 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.util.Objects;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 
 /**
  * Encryption key info for bucket encryption key.
  */
-public class BucketEncryptionKeyInfo {
+@Immutable
+public final class BucketEncryptionKeyInfo {
   private final CryptoProtocolVersion version;
   private final CipherSuite suite;
   private final String keyName;
@@ -49,14 +51,29 @@ public class BucketEncryptionKeyInfo {
     return version;
   }
 
-  public BucketEncryptionKeyInfo copy() {
-    return new BucketEncryptionKeyInfo(version, suite, keyName);
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    BucketEncryptionKeyInfo that = (BucketEncryptionKeyInfo) o;
+    return version == that.version
+        && suite == that.suite
+        && Objects.equals(keyName, that.keyName);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(version, suite, keyName);
   }
 
   /**
    * Builder for BucketEncryptionKeyInfo.
    */
-  public static class Builder {
+  public static final class Builder {
     private CryptoProtocolVersion version;
     private CipherSuite suite;
     private String keyName;

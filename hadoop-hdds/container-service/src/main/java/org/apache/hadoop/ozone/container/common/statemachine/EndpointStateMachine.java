@@ -1,32 +1,27 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.protocol.VersionResponse;
-import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
-import org.apache.hadoop.ozone.protocolPB
-    .StorageContainerDatanodeProtocolClientSideTranslatorPB;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.ZonedDateTime;
 import java.util.concurrent.ExecutorService;
@@ -35,9 +30,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.protocol.VersionResponse;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Endpoint is used as holder class that keeps state around the RPC endpoint.
@@ -51,7 +49,7 @@ public class EndpointStateMachine
   private final InetSocketAddress address;
   private final Lock lock;
   private final ConfigurationSource conf;
-  private EndPointStates state;
+  private EndPointStates state = EndPointStates.FIRST;
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
@@ -72,7 +70,6 @@ public class EndpointStateMachine
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
     this.address = address;
-    state = EndPointStates.getInitState();
     lock = new ReentrantLock();
     this.conf = conf;
     executorService = Executors.newSingleThreadExecutor(
@@ -153,11 +150,9 @@ public class EndpointStateMachine
 
   /**
    * Closes the connection.
-   *
-   * @throws IOException
    */
   @Override
-  public void close() throws IOException {
+  public void close() {
     if (endPoint != null) {
       endPoint.close();
     }
@@ -232,19 +227,23 @@ public class EndpointStateMachine
     String serverName = "SCM";
 
     if (isPassive) {
-      // Recon connection failures can be logged 10 times lower than regular
-      // SCM.
-      missCounter = this.getMissedCount() % (10 * getLogWarnInterval(conf));
+      // Recon connection failures can be logged 10 times lower than regular SCM.
+      missCounter = this.getMissedCount() % (10L * getLogWarnInterval(conf));
       serverName = "Recon";
     }
 
     if (missCounter == 0) {
+      long missedDurationSeconds = TimeUnit.MILLISECONDS.toSeconds(
+              this.getMissedCount() * getScmHeartbeatInterval(this.conf)
+      );
       LOG.warn(
-          "Unable to communicate to {} server at {} for past {} seconds.",
-          serverName,
-          getAddress().getHostString() + ":" + getAddress().getPort(),
-          TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() *
-                  getScmHeartbeatInterval(this.conf)), ex);
+              "Unable to communicate to {} server at {}:{} for past {} seconds.",
+              serverName,
+              address.getAddress(),
+              address.getPort(),
+              missedDurationSeconds,
+              ex
+      );
     }
 
     if (LOG.isTraceEnabled()) {
@@ -266,56 +265,21 @@ public class EndpointStateMachine
     isPassive = passive;
   }
 
-
   /**
    * States that an Endpoint can be in.
    * <p>
    * This is a sorted list of states that EndPoint will traverse.
    * <p>
-   * GetNextState will move this enum from getInitState to getLastState.
+   * {@link #getNextState()} will move from {@link #FIRST} to {@link #LAST}.
    */
   public enum EndPointStates {
-    GETVERSION(1),
-    REGISTER(2),
-    HEARTBEAT(3),
-    SHUTDOWN(4); // if you add value after this please edit getLastState too.
-    private final int value;
+    GETVERSION,
+    REGISTER,
+    HEARTBEAT,
+    SHUTDOWN;
 
-    /**
-     * Constructs endPointStates.
-     *
-     * @param value  state.
-     */
-    EndPointStates(int value) {
-      this.value = value;
-    }
-
-    /**
-     * Returns the first State.
-     *
-     * @return First State.
-     */
-    public static EndPointStates getInitState() {
-      return GETVERSION;
-    }
-
-    /**
-     * The last state of endpoint states.
-     *
-     * @return last state.
-     */
-    public static EndPointStates getLastState() {
-      return SHUTDOWN;
-    }
-
-    /**
-     * returns the numeric value associated with the endPoint.
-     *
-     * @return int.
-     */
-    public int getValue() {
-      return value;
-    }
+    private static final EndPointStates FIRST = values()[0];
+    private static final EndPointStates LAST = values()[values().length - 1];
 
     /**
      * Returns the next logical state that endPoint should move to.
@@ -324,15 +288,8 @@ public class EndpointStateMachine
      * @return NextState.
      */
     public EndPointStates getNextState() {
-      if (this.getValue() < getLastState().getValue()) {
-        int stateValue = this.getValue() + 1;
-        for (EndPointStates iter : values()) {
-          if (stateValue == iter.getValue()) {
-            return iter;
-          }
-        }
-      }
-      return getLastState();
+      final int n = this.ordinal();
+      return n >= LAST.ordinal() ? LAST : values()[n + 1];
     }
   }
 

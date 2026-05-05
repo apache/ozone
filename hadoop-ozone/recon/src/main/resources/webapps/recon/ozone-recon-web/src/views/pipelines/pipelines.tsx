@@ -116,8 +116,8 @@ const COLUMNS = [
     render: (datanodes: string[]) => <div> {datanodes && datanodes.map(datanode =>
       <div key={datanode.hostName}>
         <div className='uuidtooltip'>
-          <Tooltip placement='top' title={`UUID: ${datanode && datanode.uuid}`} getPopupContainer={(triggerNode) => triggerNode}>
-            {datanode && datanode.hostName}
+          <Tooltip placement='top' title={`UUID: ${datanode?.uuid ?? 'NA'}`} getPopupContainer={(triggerNode) => triggerNode}>
+            {datanode?.hostName ?? 'N/A'}
           </Tooltip>
         </div>
       </div>)}
@@ -205,7 +205,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
       this.setState({
         activeLoading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 

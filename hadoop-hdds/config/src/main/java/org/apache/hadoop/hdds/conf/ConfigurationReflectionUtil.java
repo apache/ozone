@@ -1,20 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.conf;
 
 import java.lang.reflect.Field;
@@ -22,9 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.Duration;
-import java.util.Deque;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -39,19 +37,6 @@ public final class ConfigurationReflectionUtil {
 
   public static <T> Map<String, Field> mapReconfigurableProperties(
       Class<T> configurationClass) {
-    Optional<String> prefix = getPrefix(configurationClass);
-    Map<String, Field> props =
-        mapReconfigurableProperties(configurationClass, prefix);
-    Class<? super T> superClass = configurationClass.getSuperclass();
-    while (superClass != null) {
-      props.putAll(mapReconfigurableProperties(superClass, prefix));
-      superClass = superClass.getSuperclass();
-    }
-    return props;
-  }
-
-  private static <T> Map<String, Field> mapReconfigurableProperties(
-      Class<T> configurationClass, Optional<String> prefix) {
     Map<String, Field> props = new HashMap<>();
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
@@ -59,7 +44,7 @@ public final class ConfigurationReflectionUtil {
 
         if (configAnnotation.reconfigurable()) {
           checkNotFinal(configurationClass, field);
-          props.put(getFullKey(prefix, configAnnotation), field);
+          props.put(configAnnotation.key(), field);
         }
       }
     }
@@ -67,25 +52,10 @@ public final class ConfigurationReflectionUtil {
   }
 
   public static <T> void injectConfiguration(
-      ConfigurationSource configuration,
-      Class<T> configurationClass,
-      T configObject, String prefix, boolean reconfiguration) {
-    injectConfigurationToObject(configuration, configurationClass, configObject,
-        prefix, reconfiguration);
-    Class<? super T> superClass = configurationClass.getSuperclass();
-    while (superClass != null) {
-      injectConfigurationToObject(configuration, superClass, configObject,
-          prefix, reconfiguration);
-      superClass = superClass.getSuperclass();
-    }
-  }
-
-  private static <T> void injectConfigurationToObject(ConfigurationSource from,
+      ConfigurationSource from,
       Class<T> configurationClass,
       T configuration,
-      String prefix,
-      boolean reconfiguration
-  ) {
+      boolean reconfiguration) {
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
         checkNotFinal(configurationClass, field);
@@ -96,7 +66,7 @@ public final class ConfigurationReflectionUtil {
           continue;
         }
 
-        String key = prefix + "." + configAnnotation.key();
+        String key = configAnnotation.key();
         String defaultValue = configAnnotation.defaultValue();
         String value = from.get(key, defaultValue);
 
@@ -239,32 +209,13 @@ public final class ConfigurationReflectionUtil {
     }
   }
 
-  public static <T> void updateConfiguration(ConfigurationTarget config,
-      T object, String prefix) {
-
-    Class<?> configClass = object.getClass();
-    Deque<Class<?>> classes = new LinkedList<>();
-    classes.addLast(configClass);
-    Class<?> superclass = configClass.getSuperclass();
-    while (superclass != null) {
-      classes.addFirst(superclass);
-      superclass = superclass.getSuperclass();
-    }
-
-    for (Class<?> cl : classes) {
-      updateConfigurationFromObject(config, cl, object, prefix);
-    }
-  }
-
-  private static <T> void updateConfigurationFromObject(
-      ConfigurationTarget config, Class<?> configClass, T configObject,
-      String prefix) {
-
+  public static <T> void updateConfiguration(ConfigurationTarget config, T configObject) {
+    Class<?> configClass = configObject.getClass();
     for (Field field : configClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
         Config configAnnotation = field.getAnnotation(Config.class);
         String fieldLocation = configClass + "." + field.getName();
-        String key = prefix + "." + configAnnotation.key();
+        String key = configAnnotation.key();
         ConfigType type = configAnnotation.type();
 
         if (type == ConfigType.AUTO) {
@@ -295,10 +246,8 @@ public final class ConfigurationReflectionUtil {
 
   public static Optional<String> getKey(Class<?> configClass,
       String fieldName) {
-    Optional<String> prefix = getPrefix(configClass);
-
     return findFieldConfigAnnotationByName(configClass, fieldName)
-        .map(config -> getFullKey(prefix, config));
+        .map(Config::key);
   }
 
   public static Optional<ConfigType> getType(Class<?> configClass,
@@ -328,8 +277,8 @@ public final class ConfigurationReflectionUtil {
     return Optional.empty();
   }
 
-  private static <T> void checkNotFinal(
-      Class<T> configurationClass, Field field) {
+  private static void checkNotFinal(
+      Class<?> configurationClass, Field field) {
 
     if ((field.getModifiers() & Modifier.FINAL) != 0) {
       throw new ConfigurationException(String.format(
@@ -338,21 +287,4 @@ public final class ConfigurationReflectionUtil {
           configurationClass.getSimpleName(), field.getName()));
     }
   }
-
-  private static <T> Optional<String> getPrefix(Class<T> configurationClass) {
-    ConfigGroup configGroup =
-        configurationClass.getAnnotation(ConfigGroup.class);
-    return configGroup != null
-        ? Optional.of(configGroup.prefix())
-        : Optional.empty();
-  }
-
-  private static String getFullKey(
-      Optional<String> optionalPrefix, Config configAnnotation) {
-    String key = configAnnotation.key();
-    return optionalPrefix
-        .map(prefix -> prefix + "." + key)
-        .orElse(key);
-  }
-
 }

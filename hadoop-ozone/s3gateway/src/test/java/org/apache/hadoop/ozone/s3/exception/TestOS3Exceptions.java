@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,11 +29,8 @@ public class TestOS3Exceptions {
 
   @Test
   public void testOS3Exceptions() {
-    OS3Exception ex = new OS3Exception("AccessDenied", "Access Denied",
-        403);
-    String requestId = OzoneUtils.getRequestID();
-    ex = S3ErrorTable.newError(ex, "bucket");
-    ex.setRequestId(requestId);
+    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, "bucket");
+    ex.setRequestId(OzoneUtils.getRequestID());
     String val = ex.toXml();
     String formatString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n" +
         "<Error>%n" +

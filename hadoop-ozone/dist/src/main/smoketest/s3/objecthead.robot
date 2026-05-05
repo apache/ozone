@@ -34,6 +34,7 @@ Head existing object
     ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/headobject/key=value/f1 --body /tmp/testfile   0
 
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/key=value/f1   0
+                        Should Contain    ${result}          "StorageClass":
     ${result} =         Execute AWSS3APICli and checkrc    delete-object --bucket ${BUCKET} --key ${PREFIX}/headobject/key=value/f1   0
 
 Head object in non existing bucket
@@ -60,3 +61,13 @@ Head non existing key
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-existent   255
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
+
+Check Bucket Ownership Verification
+    Execute                                                  echo "Randomtext" > /tmp/testfile
+    ${result} =  Execute AWSS3APICli and checkrc             put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile   0
+
+    ${result} =  Execute AWSS3APICli and checkrc             head-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --expected-bucket-owner wrong-owner  255
+                 Should contain                              ${result}  403
+
+    ${correct_owner} =    Get bucket owner                   ${BUCKET}
+    Execute AWSS3APICli using bucket ownership verification  head-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1    ${correct_owner}

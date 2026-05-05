@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.OzoneAcl;
-
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.hadoop.ozone.OzoneAcl;
 
 /**
  * Metadata object represents one Ozone ACL.
@@ -73,7 +72,6 @@ public final class AclMetadata {
   /**
    * Builder for AclMetadata.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String type;
     private String name;
@@ -84,31 +82,31 @@ public final class AclMetadata {
 
     }
 
-    public Builder withType(String type) {
+    public Builder setType(String type) {
       this.type = type;
       return this;
     }
 
-    public Builder withName(String name) {
+    public Builder setName(String name) {
       this.name = name;
       return this;
     }
 
-    public Builder withScope(String scope) {
+    public Builder setScope(String scope) {
       this.scope = scope;
       return this;
 
     }
 
-    public Builder withAclList(List<String> aclList) {
+    public Builder setAclList(List<String> aclList) {
       this.aclList = aclList;
       return this;
     }
 
     public AclMetadata build() {
-      Preconditions.checkNotNull(type);
-      Preconditions.checkNotNull(name);
-      Preconditions.checkNotNull(scope);
+      Objects.requireNonNull(type, "type == null");
+      Objects.requireNonNull(name, "name == null");
+      Objects.requireNonNull(scope, "scope == null");
 
       return new AclMetadata(this);
     }
@@ -127,10 +125,10 @@ public final class AclMetadata {
 
     AclMetadata.Builder builder = AclMetadata.newBuilder();
 
-    return builder.withType(ozoneAcl.getType().toString().toUpperCase())
-        .withName(ozoneAcl.getName())
-        .withScope(ozoneAcl.getAclScope().toString().toUpperCase())
-        .withAclList(ozoneAcl.getAclStringList())
+    return builder.setType(ozoneAcl.getType().toString().toUpperCase())
+        .setName(ozoneAcl.getName())
+        .setScope(ozoneAcl.getAclScope().toString().toUpperCase())
+        .setAclList(ozoneAcl.getAclStringList())
         .build();
   }
 }

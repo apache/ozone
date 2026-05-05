@@ -28,6 +28,196 @@
     </tbody>
 </table>
 
+<h2>Usage Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Datanode Usage</th>
+        <th>in percentage (%)</th>
+    </tr>
+    <tr>
+        <td>Min</td>
+        <td>{{statistics.nodes.usages.min}}</td>
+    </tr>
+    <tr>
+        <td>Median</td>
+        <td>{{statistics.nodes.usages.median}}</td>
+    </tr>
+    <tr>
+        <td>Max</td>
+        <td>{{statistics.nodes.usages.max}}</td>
+    </tr>
+    <tr>
+        <td>Standard Deviation</td>
+        <td>{{statistics.nodes.usages.stdev}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>State Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Datanode State</th>
+        <th>Count</th>
+    </tr>
+    <tr>
+        <td>Healthy Nodes</td>
+        <td>{{statistics.nodes.state.healthy}}</td>
+    </tr>
+    <tr>
+        <td>Dead Nodes</td>
+        <td>{{statistics.nodes.state.dead}}</td>
+    </tr>
+    <tr>
+        <td>Decommissioning Nodes</td>
+        <td>{{statistics.nodes.state.decommissioning}}</td>
+    </tr>
+    <tr>
+        <td>Entering Maintenance Nodes</td>
+        <td>{{statistics.nodes.state.enteringmaintenance}}</td>
+    </tr>
+    <tr>
+        <td>Volume Failures Nodes</td>
+        <td>{{statistics.nodes.state.volumefailures}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Space Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Datanode Space</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Capacity</td>
+        <td>{{statistics.nodes.space.capacity}}</td>
+    </tr>
+    <tr>
+        <td>ScmUsed</td>
+        <td>{{statistics.nodes.space.scmused}}</td>
+    </tr>
+    <tr>
+        <td>Remaining</td>
+        <td>{{statistics.nodes.space.remaining}}</td>
+    </tr>
+    <tr>
+        <td>Non ScmUsed</td>
+        <td>{{statistics.nodes.space.nonscmused}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Pipeline Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Pipeline State</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Closed</td>
+        <td>{{statistics.pipelines.closed}}</td>
+    </tr>
+    <tr>
+        <td>Allocated</td>
+        <td>{{statistics.pipelines.allocated}}</td>
+    </tr>
+    <tr>
+        <td>Open</td>
+        <td>{{statistics.pipelines.open}}</td>
+    </tr>
+    <tr>
+        <td>Dormant</td>
+        <td>{{statistics.pipelines.dormant}}</td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Container Statistics</h2>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Operational State</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Open</td>
+        <td>{{statistics.containers.lifecycle.open}}</td>
+    </tr>
+    <tr>
+        <td>Closing</td>
+        <td>{{statistics.containers.lifecycle.closing}}</td>
+    </tr>
+    <tr>
+        <td>Quasi Closed</td>
+        <td>{{statistics.containers.lifecycle.quasi_closed}}</td>
+    </tr>
+    <tr>
+        <td>Closed</td>
+        <td>{{statistics.containers.lifecycle.closed}}</td>
+    </tr>
+    <tr>
+        <td>Deleting</td>
+        <td>{{statistics.containers.lifecycle.deleting}}</td>
+    </tr>
+    <tr>
+        <td>Deleted</td>
+        <td>{{statistics.containers.lifecycle.deleted}}</td>
+    </tr>
+    <tr>
+        <td>Recovering</td>
+        <td>{{statistics.containers.lifecycle.recovering}}</td>
+    </tr>
+    </tbody>
+</table>
+<table class="table table-bordered table-striped">
+    <tbody>
+    <tr>
+        <th>Health</th>
+        <th>Size</th>
+    </tr>
+    <tr>
+        <td>Under Replicated</td>
+        <td>{{statistics.containers.health.under_replicated}}</td>
+    </tr>
+    <tr>
+        <td>Mis Replicated</td>
+        <td>{{statistics.containers.health.mis_replicated}}</td>
+    </tr>
+    <tr>
+        <td>Over Replicated</td>
+        <td>{{statistics.containers.health.over_replicated}}</td>
+    </tr>
+    <tr>
+        <td>Missing</td>
+        <td>{{statistics.containers.health.missing}}</td>
+    </tr>
+    <tr>
+        <td>Unhealthy</td>
+        <td>{{statistics.containers.health.unhealthy}}</td>
+    </tr>
+    <tr>
+        <td>Empty</td>
+        <td>{{statistics.containers.health.empty}}</td>
+    </tr>
+    <tr>
+        <td>Open Unhealthy</td>
+        <td>{{statistics.containers.health.open_unhealthy}}</td>
+    </tr>
+    <tr>
+        <td>Quasi Closed Stuck</td>
+        <td>{{statistics.containers.health.quasi_closed_stuck}}</td>
+    </tr>
+    <tr>
+        <td>Open Without Pipeline</td>
+        <td>{{statistics.containers.health.open_without_pipeline}}</td>
+    </tr>
+    </tbody>
+</table>
+
 <h2>Node Status</h2>
 <div class="row">
     <div class="col-md-6 text-left">
@@ -58,6 +248,10 @@
                                         'sortdesc':(columnName == 'comstate' && !reverse)}">Commisioned State</span> </th>
             <th ng-click = "columnSort('lastheartbeat')" class="nodeStatusInfo">  <span ng-class="{'sorting' : (columnName != 'lastheartbeat'), 'sortasc' : (columnName == 'heartbeat' && !reverse),
                                         'sortdesc':(columnName == 'lastheartbeat' && !reverse)}">Last Heartbeat</span> </th>
+            <th ng-click = "columnSort('uuid')" class="uuId" ><span ng-class="{'sorting' : (columnName != 'uuid'), 'sortasc' : (columnName == 'uuid' && !reverse),
+                                        'sortdesc':(columnName == 'uuid' && !reverse)}">UUID</span></th>
+            <th ng-click = "columnSort('version')" class="version" ><span ng-class="{'sorting' : (columnName != 'version'), 'sortasc' : (columnName == 'version' && !reverse),
+                                        'sortdesc':(columnName == 'version' && !reverse)}">Version</span></th>
         </tr>
     </thead>
     <tbody>
@@ -75,6 +269,8 @@
             <td>{{typestat.opstate}}</td>
             <td>{{typestat.comstate}}</td>
             <td>{{typestat.lastheartbeat}}</td>
+            <td>{{typestat.uuid}}</td>
+            <td>{{typestat.version}}</td>
        </tr>
     </tbody>
 </table>
@@ -128,10 +324,6 @@
         <td> Force Exit Safe Mode </td>
         <td>{{$ctrl.overview.jmx.SafeModeExitForceful}}</td>
     </tr>
-    <tr>
-        <td> SCM Roles (HA) </td>
-        <td>{{$ctrl.overview.jmx.ScmRatisRoles}}</td>
-    </tr>
     <tr ng-hide="!$ctrl.overview.jmx.PrimordialNode">
         <td> Primordial Node (HA) </td>
         <td>{{$ctrl.overview.jmx.PrimordialNode}}</td>
@@ -153,6 +345,35 @@
     </tbody>
 </table>
 
+<h2>SCM Roles (HA)</h2>
+<h4 ng-show="$ctrl.overview.jmx.ScmRatisRoles.length == 1 && $ctrl.overview.jmx.ScmRatisRoles[0].length == 1">{{$ctrl.overview.jmx.ScmRatisRoles[0][0]}}</h4>
+<div ng-show="$ctrl.overview.jmx.ScmRatisRoles.length > 1">
+    <table class="table table-striped table-bordered" class="col-md-6">
+        <thead>
+        <tr>
+            <th>Host Name</th>
+            <th>Node ID</th>
+            <th>Ratis Port</th>
+            <th>Role</th>
+        </tr>
+        </thead>
+        <tbody ng-repeat="roles in $ctrl.overview.jmx.ScmRatisRoles">
+        <tr class="scm-roles-background" ng-if="$ctrl.role.Id == roles[1]">
+            <td>{{roles[0]}}</td>
+            <td>{{roles[1]}}</td>
+            <td>{{roles[2]}}</td>
+            <td>{{roles[3]}}</td>
+        </tr>
+        <tr ng-if="$ctrl.role.Id != roles[1]">
+            <td>{{roles[0]}}</td>
+            <td>{{roles[1]}}</td>
+            <td>{{roles[2]}}</td>
+            <td>{{roles[3]}}</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
 <h2>Safemode rules statuses</h2>
 
 <table class="table table-bordered table-striped" class="col-md-6">
@@ -166,7 +387,7 @@
     <tbody>
     <tr ng-repeat="typestat in $ctrl.overview.jmx.SafeModeRuleStatus">
         <td>{{typestat.key}}</td>
-        <td>{{typestat.value[0]}}</td>
+        <td ng-bind-html="formatValue(typestat.value[0])"></td>
         <td>{{typestat.value[1]}}</td>
     </tr>
     </tbody>

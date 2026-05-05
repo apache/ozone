@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,13 +18,15 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTAINER;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,16 +35,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
 import javax.inject.Inject;
 import javax.inject.Singleton;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
@@ -52,13 +57,9 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import jakarta.annotation.Nonnull;
+import org.apache.hadoop.ozone.util.SeekableIterator;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,17 +83,34 @@ public class ReconContainerMetadataManagerImpl
 
   private DBStore containerDbStore;
 
-  @Inject
   private Configuration sqlConfiguration;
 
-  @Inject
   private ReconOMMetadataManager omMetadataManager;
 
   @Inject
-  public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
-                                           Configuration sqlConfiguration) {
-    containerDbStore = reconDBProvider.getDbStore();
+  public ReconContainerMetadataManagerImpl(
+      ReconDBProvider reconDBProvider, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+    this(reconDBProvider.getDbStore(), sqlConfiguration, omMetadataManager);
+  }
+
+  private ReconContainerMetadataManagerImpl(
+      DBStore reconDBStore, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+    containerDbStore = reconDBStore;
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
+    this.sqlConfiguration = sqlConfiguration;
+    this.omMetadataManager = omMetadataManager;
+    initializeTables();
+  }
+
+  @Override
+  public ReconContainerMetadataManager getStagedReconContainerMetadataManager(
+      DBStore stagedReconDbStore) {
+    return new ReconContainerMetadataManagerImpl(stagedReconDbStore, sqlConfiguration, omMetadataManager);
+  }
+
+  @Override
+  public void reinitialize(ReconDBProvider reconDBProvider) {
+    containerDbStore = reconDBProvider.getDbStore();
     initializeTables();
   }
 
@@ -153,24 +171,6 @@ public class ReconContainerMetadataManagerImpl
 
   /**
    * Concatenate the containerID and Key Prefix using a delimiter and store the
-   * count into the container DB store.
-   *
-   * @param containerKeyPrefix the containerID, key-prefix tuple.
-   * @param count Count of the keys matching that prefix.
-   * @throws IOException on failure.
-   */
-  @Override
-  public void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
-                                       Integer count)
-      throws IOException {
-    containerKeyTable.put(containerKeyPrefix, count);
-    if (containerKeyPrefix.toKeyPrefixContainer() != null) {
-      keyContainerTable.put(containerKeyPrefix.toKeyPrefixContainer(), count);
-    }
-  }
-
-  /**
-   * Concatenate the containerID and Key Prefix using a delimiter and store the
    * count into a batch.
    *
    * @param batch the batch we store into
@@ -191,20 +191,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Store the containerID -> no. of keys count into the container DB store.
-   *
-   * @param containerID the containerID.
-   * @param count count of the keys within the given containerID.
-   * @throws IOException on failure.
-   */
-  @Override
-  public void storeContainerKeyCount(Long containerID, Long count)
-      throws IOException {
-    containerKeyCountTable.put(containerID, count);
-  }
-
-  /**
-   * Store the containerID -> no. of keys count into a batch.
+   * Store the containerID -&gt; no. of keys count into a batch.
    *
    * @param batch the batch we store into
    * @param containerID the containerID.
@@ -219,7 +206,7 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Store the ContainerID -> ContainerReplicaHistory (container first and last
+   * Store the ContainerID -&gt; ContainerReplicaHistory (container first and last
    * seen time) mapping to the container DB store.
    *
    * @param containerID the containerID.
@@ -346,7 +333,8 @@ public class ReconContainerMetadataManagerImpl
   public Map<ContainerKeyPrefix, Integer> getKeyPrefixesForContainer(
       long containerId) throws IOException {
     // set the default startKeyPrefix to empty string
-    return getKeyPrefixesForContainer(containerId, StringUtils.EMPTY);
+    return getKeyPrefixesForContainer(containerId, StringUtils.EMPTY,
+        Integer.parseInt(ReconConstants.DEFAULT_FETCH_COUNT));
   }
 
   /**
@@ -360,7 +348,7 @@ public class ReconContainerMetadataManagerImpl
    */
   @Override
   public Map<ContainerKeyPrefix, Integer> getKeyPrefixesForContainer(
-      long containerId, String prevKeyPrefix) throws IOException {
+      long containerId, String prevKeyPrefix, int limit) throws IOException {
 
     Map<ContainerKeyPrefix, Integer> prefixes = new LinkedHashMap<>();
     try (TableIterator<ContainerKeyPrefix,
@@ -387,7 +375,7 @@ public class ReconContainerMetadataManagerImpl
         return prefixes;
       }
 
-      while (containerIterator.hasNext()) {
+      while (containerIterator.hasNext() && prefixes.size() < limit) {
         KeyValue<ContainerKeyPrefix, Integer> keyValue =
             containerIterator.next();
         ContainerKeyPrefix containerKeyPrefix = keyValue.getKey();
@@ -417,16 +405,16 @@ public class ReconContainerMetadataManagerImpl
   }
 
   /**
-   * Iterate the DB to construct a Map of containerID -> containerMetadata
+   * Iterate the DB to construct a Map of containerID -&gt; containerMetadata
    * only for the given limit from the given start key. The start containerID
    * is skipped from the result.
    *
-   * Return all the containers if limit < 0.
+   * Return all the containers if limit &lt; 0.
    *
    * @param limit No of containers to get.
    * @param prevContainer containerID after which the
    *                      list of containers are scanned.
-   * @return Map of containerID -> containerMetadata.
+   * @return Map of containerID -&gt; containerMetadata.
    * @throws IOException on failure.
    */
   @Override
@@ -434,53 +422,80 @@ public class ReconContainerMetadataManagerImpl
                                                     long prevContainer)
       throws IOException {
     Map<Long, ContainerMetadata> containers = new LinkedHashMap<>();
-    try (
-        TableIterator<ContainerKeyPrefix,
-            ? extends KeyValue<ContainerKeyPrefix, Integer>>
-            containerIterator = containerKeyTable.iterator()) {
-      ContainerKeyPrefix seekKey;
-      if (prevContainer > 0L) {
-        seekKey = ContainerKeyPrefix.get(prevContainer);
-        KeyValue<ContainerKeyPrefix,
-            Integer> seekKeyValue = containerIterator.seek(seekKey);
-        // Check if RocksDB was able to correctly seek to the given
-        // prevContainer containerId. If not, then return empty result
-        if (seekKeyValue != null &&
-            seekKeyValue.getKey().getContainerId() != prevContainer) {
-          return containers;
-        } else {
-          // seek to the prevContainer+1 containerID to start scan
-          seekKey = ContainerKeyPrefix.get(prevContainer + 1);
-          containerIterator.seek(seekKey);
-        }
-      }
-      while (containerIterator.hasNext()) {
-        KeyValue<ContainerKeyPrefix, Integer> keyValue =
-            containerIterator.next();
-        ContainerKeyPrefix containerKeyPrefix = keyValue.getKey();
-        Long containerID = containerKeyPrefix.getContainerId();
-        Integer numberOfKeys = keyValue.getValue();
-        List<Pipeline> pipelines =
-            getPipelines(containerKeyPrefix);
-
-        // break the loop if limit has been reached
-        // and one more new entity needs to be added to the containers map
-        if (containers.size() == limit &&
-            !containers.containsKey(containerID)) {
-          break;
-        }
-
-        // initialize containerMetadata with 0 as number of keys.
-        containers.computeIfAbsent(containerID, ContainerMetadata::new);
-        // increment number of keys for the containerID
-        ContainerMetadata containerMetadata = containers.get(containerID);
-        containerMetadata.setNumberOfKeys(containerMetadata.getNumberOfKeys() +
-            numberOfKeys);
-        containerMetadata.setPipelines(pipelines);
-        containers.put(containerID, containerMetadata);
+    try (SeekableIterator<Long, ContainerMetadata> containerIterator = getContainersIterator()) {
+      containerIterator.seek(prevContainer + 1);
+      while (containerIterator.hasNext() && ((limit < 0) || containers.size() < limit)) {
+        ContainerMetadata containerMetadata = containerIterator.next();
+        containers.put(containerMetadata.getContainerID(), containerMetadata);
       }
     }
     return containers;
+  }
+
+  @Override
+  public SeekableIterator<Long, ContainerMetadata> getContainersIterator()
+          throws IOException {
+    return new ContainerMetadataIterator();
+  }
+
+  private class ContainerMetadataIterator implements SeekableIterator<Long, ContainerMetadata> {
+    private TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerIterator;
+    private KeyValue<ContainerKeyPrefix, Integer> currentKey;
+
+    ContainerMetadataIterator()
+            throws IOException {
+      containerIterator = containerKeyTable.iterator();
+      currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
+    }
+
+    @Override
+    public void seek(Long containerID) throws IOException {
+      ContainerKeyPrefix seekKey = ContainerKeyPrefix.get(containerID);
+      containerIterator.seek(seekKey);
+      currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
+    }
+
+    @Override
+    public void close() {
+      try {
+        containerIterator.close();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
+
+    @Override
+    public boolean hasNext() {
+      return currentKey != null;
+    }
+
+    @Override
+    public ContainerMetadata next() {
+      try {
+        if (currentKey == null) {
+          return null;
+        }
+        Map<PipelineID, Pipeline> pipelines = new HashMap<>();
+        ContainerMetadata containerMetadata = new ContainerMetadata(currentKey.getKey().getContainerId());
+        do {
+          ContainerKeyPrefix containerKeyPrefix = this.currentKey.getKey();
+          containerMetadata.setNumberOfKeys(containerMetadata.getNumberOfKeys() + 1);
+          getPipelines(containerKeyPrefix).forEach(pipeline -> {
+            pipelines.putIfAbsent(pipeline.getId(), pipeline);
+          });
+          if (containerIterator.hasNext()) {
+            currentKey = containerIterator.next();
+          } else {
+            currentKey = null;
+          }
+        } while (currentKey != null &&
+                currentKey.getKey().getContainerId() == containerMetadata.getContainerID());
+        containerMetadata.setPipelines(new ArrayList<>(pipelines.values()));
+        return containerMetadata;
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
   }
 
   @Nonnull
@@ -538,9 +553,8 @@ public class ReconContainerMetadataManagerImpl
         containerCountRecord.getValue();
   }
 
-  @Override
-  public TableIterator getContainerTableIterator() throws IOException {
-    return containerKeyTable.iterator();
+  public Table<ContainerKeyPrefix, Integer> getContainerKeyTableForTesting() {
+    return containerKeyTable;
   }
 
   @Override

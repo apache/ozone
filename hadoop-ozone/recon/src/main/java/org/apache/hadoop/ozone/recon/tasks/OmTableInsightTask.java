@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,37 +17,38 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
+
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.jooq.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
-import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Collection;
 import java.util.Map.Entry;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.jooq.impl.DSL.select;
-import static org.jooq.impl.DSL.using;
-import static org.jooq.impl.DSL.currentTimestamp;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to iterate over the OM DB and store the total counts of volumes,
@@ -58,17 +58,20 @@ public class OmTableInsightTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmTableInsightTask.class);
 
-  private GlobalStatsDao globalStatsDao;
-  private Configuration sqlConfiguration;
+  private ReconGlobalStatsManager reconGlobalStatsManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private Map<String, OmTableHandler> tableHandlers;
+  private Collection<String> tables;
+  private Map<String, Long> objectCountMap;
+  private Map<String, Long> unReplicatedSizeMap;
+  private Map<String, Long> replicatedSizeMap;
+  private final int maxKeysInMemory;
+  private final int maxIterators;
 
   @Inject
-  public OmTableInsightTask(GlobalStatsDao globalStatsDao,
-                             Configuration sqlConfiguration,
-                             ReconOMMetadataManager reconOMMetadataManager) {
-    this.globalStatsDao = globalStatsDao;
-    this.sqlConfiguration = sqlConfiguration;
+  public OmTableInsightTask(ReconGlobalStatsManager reconGlobalStatsManager,
+                             ReconOMMetadataManager reconOMMetadataManager) throws IOException {
+    this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
 
     // Initialize table handlers
@@ -76,51 +79,70 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
+    tableHandlers.put(MULTIPART_INFO_TABLE, new MultipartInfoInsightHandler());
+    this.maxKeysInMemory = reconOMMetadataManager.getOzoneConfiguration().getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
+    this.maxIterators = reconOMMetadataManager.getOzoneConfiguration().getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
+  }
+
+  @Override
+  public ReconOmTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    ReconGlobalStatsManager stagedGlobalStatsManager =
+        reconGlobalStatsManager.getStagedReconGlobalStatsManager(stagedReconDbStore);
+    return new OmTableInsightTask(stagedGlobalStatsManager, stagedOmMetadataManager);
   }
 
   /**
-   * Iterates the rows of each table in the OM snapshot DB and calculates the
-   * counts and sizes for table data.
-   *
-   * For tables that require data size calculation
-   * (as returned by getTablesToCalculateSize), both the number of
-   * records (count) and total data size of the records are calculated.
-   * For all other tables, only the count of records is calculated.
-   *
-   * @param omMetadataManager OM Metadata instance.
-   * @return Pair
+   * Initialize the OM table insight task with first time initialization of resources.
    */
   @Override
-  public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
-    HashMap<String, Long> objectCountMap = initializeCountMap();
-    HashMap<String, Long> unReplicatedSizeMap = initializeSizeMap(false);
-    HashMap<String, Long> replicatedSizeMap = initializeSizeMap(true);
+  public void init() {
+    ReconOmTask.super.init();
+    tables = getTaskTables();
 
-    for (String tableName : getTaskTables()) {
-      Table table = omMetadataManager.getTable(tableName);
-      if (table == null) {
-        LOG.error("Table " + tableName + " not found in OM Metadata.");
-        return new ImmutablePair<>(getTaskName(), false);
-      }
+    // Initialize maps to store count and size information
+    objectCountMap = initializeCountMap();
+    unReplicatedSizeMap = initializeSizeMap(false);
+    replicatedSizeMap = initializeSizeMap(true);
+  }
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
-               = table.iterator()) {
+  /**
+   * Reprocess all OM tables to calculate counts and sizes.
+   * Handler tables (with size calculation) use sequential iteration.
+   * Simple tables (count only) use parallel iteration with String keys,
+   * or sequential for non-String key tables.
+   *
+   * @param omMetadataManager OM Metadata instance
+   * @return TaskResult indicating success or failure
+   */
+  @Override
+  public TaskResult reprocess(OMMetadataManager omMetadataManager) {
+    LOG.info("{}: Starting reprocess", getTaskName());
+    long startTime = Time.monotonicNow();
+
+    init();
+    for (String tableName : tables) {
+      try {
         if (tableHandlers.containsKey(tableName)) {
-          Triple<Long, Long, Long> details =
-              tableHandlers.get(tableName).getTableSizeAndCount(iterator);
-          objectCountMap.put(getTableCountKeyFromTable(tableName),
-              details.getLeft());
-          unReplicatedSizeMap.put(
-              getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
-          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName),
-              details.getRight());
+          Triple<Long, Long, Long> details = 
+              tableHandlers.get(tableName).getTableSizeAndCount(tableName, omMetadataManager);
+          objectCountMap.put(getTableCountKeyFromTable(tableName), details.getLeft());
+          unReplicatedSizeMap.put(getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
+          replicatedSizeMap.put(getReplicatedSizeKeyFromTable(tableName), details.getRight());
         } else {
-          long count = Iterators.size(iterator);
-          objectCountMap.put(getTableCountKeyFromTable(tableName), count);
+          if (usesNonStringKeys(tableName)) {
+            processTableSequentially(tableName, omMetadataManager);
+          } else {
+            processTableInParallel(tableName, omMetadataManager);
+          }
         }
-      } catch (IOException ioEx) {
+      } catch (Exception ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
-        return new ImmutablePair<>(getTaskName(), false);
+        return buildTaskResult(false);
       }
     }
     // Write the data to the DB
@@ -133,9 +155,77 @@ public class OmTableInsightTask implements ReconOmTask {
     if (!replicatedSizeMap.isEmpty()) {
       writeDataToDB(replicatedSizeMap);
     }
+    long endTime = Time.monotonicNow();
+    long durationMs = endTime - startTime;
 
-    LOG.debug("Completed a 'reprocess' run of OmTableInsightTask.");
-    return new ImmutablePair<>(getTaskName(), true);
+    LOG.info("{}: Reprocess completed in {} ms", getTaskName(), durationMs);
+    return buildTaskResult(true);
+  }
+
+  /**
+   * Check if table uses non-String keys (e.g., OzoneTokenIdentifier).
+   * These tables cannot use StringCodec and must be processed sequentially.
+   */
+  private boolean usesNonStringKeys(String tableName) {
+    return tableName.equals("dTokenTable") || tableName.equals("s3SecretTable");
+  }
+
+  /**
+   * Process table sequentially using key-only iterator.
+   * Used for tables with non-String keys or as fallback.
+   */
+  private void processTableSequentially(String tableName, OMMetadataManager omMetadataManager) throws IOException {
+    LOG.info("{}: Processing table {} sequentially (non-String keys)", getTaskName(), tableName);
+
+    Table<byte[], byte[]> table = omMetadataManager.getStore()
+        .getTable(tableName, ByteArrayCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE);
+    try (TableIterator<byte[], byte[]> keyIterator = table.keyIterator()) {
+      long count = Iterators.size(keyIterator);
+      objectCountMap.put(getTableCountKeyFromTable(tableName), count);
+    }
+  }
+
+  /**
+   * Process table in parallel using multiple iterators and workers.
+   * Only for tables with String keys.
+   */
+  private void processTableInParallel(String tableName, OMMetadataManager omMetadataManager) throws Exception {
+    int workerCount = 2;  // Only 2 workers needed for simple counting
+    
+    Table<String, byte[]> table = omMetadataManager.getStore()
+        .getTable(tableName, StringCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE);
+    
+    long estimatedCount = 100000;  // Default
+    try {
+      estimatedCount = table.getEstimatedKeyCount();
+    } catch (IOException e) {
+      LOG.info("Could not estimate key count for table {}, using default", tableName);
+    }
+    long loggingThreshold = calculateLoggingThreshold(estimatedCount);
+    
+    AtomicLong count = new AtomicLong(0);
+
+    try (ParallelTableIteratorOperation<String, byte[]> parallelIter = new ParallelTableIteratorOperation<>(
+        omMetadataManager, table, StringCodec.get(),
+        maxIterators, workerCount, maxKeysInMemory, loggingThreshold)) {
+
+      parallelIter.performTaskOnTableVals(getTaskName(), null, null, kv -> {
+        if (kv != null) {
+          count.incrementAndGet();
+        }
+        return null;
+      });
+    }
+    
+    objectCountMap.put(getTableCountKeyFromTable(tableName), count.get());
+  }
+
+  /**
+   * Calculate logging threshold based on estimated key count.
+   * Logs progress every 1% of total keys, minimum 1.
+   */
+  private long calculateLoggingThreshold(long estimatedCount) {
+    return Math.max(estimatedCount / 100, 1);
   }
 
   @Override
@@ -151,40 +241,42 @@ public class OmTableInsightTask implements ReconOmTask {
    * Read the update events and update the count and sizes of respective object
    * (volume, bucket, key etc.) based on the action (put or delete).
    *
-   * @param events Update events - PUT, DELETE and UPDATE.
+   * @param events            Update events - PUT, DELETE and UPDATE.
+   * @param subTaskSeekPosMap
    * @return Pair
    */
   @Override
-  public Pair<String, Boolean> process(OMUpdateEventBatch events) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
-    // Initialize maps to store count and size information
-    HashMap<String, Long> objectCountMap = initializeCountMap();
-    HashMap<String, Long> unReplicatedSizeMap = initializeSizeMap(false);
-    HashMap<String, Long> replicatedSizeMap = initializeSizeMap(true);
-    final Collection<String> taskTables = getTaskTables();
+  public TaskResult process(OMUpdateEventBatch events,
+                            Map<String, Integer> subTaskSeekPosMap) {
+    // Initialize tables if not already initialized
+    if (tables == null || tables.isEmpty()) {
+      init();
+    }
 
+    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+
+    String tableName;
+    OMDBUpdateEvent<String, Object> omdbUpdateEvent;
     // Process each update event
+    long startTime = Time.monotonicNow();
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
-      String tableName = omdbUpdateEvent.getTable();
-      if (!taskTables.contains(tableName)) {
+      omdbUpdateEvent = eventIterator.next();
+      tableName = omdbUpdateEvent.getTable();
+      if (!tables.contains(tableName)) {
         continue;
       }
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          handlePutEvent(omdbUpdateEvent, tableName, objectCountMap,
-              unReplicatedSizeMap, replicatedSizeMap);
+          handlePutEvent(omdbUpdateEvent, tableName);
           break;
 
         case DELETE:
-          handleDeleteEvent(omdbUpdateEvent, tableName, objectCountMap,
-              unReplicatedSizeMap, replicatedSizeMap);
+          handleDeleteEvent(omdbUpdateEvent, tableName);
           break;
 
         case UPDATE:
-          handleUpdateEvent(omdbUpdateEvent, tableName, objectCountMap,
-              unReplicatedSizeMap, replicatedSizeMap);
+          handleUpdateEvent(omdbUpdateEvent, tableName);
           break;
 
         default:
@@ -195,7 +287,7 @@ public class OmTableInsightTask implements ReconOmTask {
         LOG.error(
             "Unexpected exception while processing the table {}, Action: {}",
             tableName, omdbUpdateEvent.getAction(), e);
-        return new ImmutablePair<>(getTaskName(), false);
+        return buildTaskResult(false);
       }
     }
     // Write the updated count and size information to the database
@@ -208,16 +300,13 @@ public class OmTableInsightTask implements ReconOmTask {
     if (!replicatedSizeMap.isEmpty()) {
       writeDataToDB(replicatedSizeMap);
     }
-    LOG.debug("Completed a 'process' run of OmTableInsightTask.");
-    return new ImmutablePair<>(getTaskName(), true);
+    LOG.debug("{} successfully processed in {} milliseconds",
+        getTaskName(), (Time.monotonicNow() - startTime));
+    return buildTaskResult(true);
   }
 
   private void handlePutEvent(OMDBUpdateEvent<String, Object> event,
-                              String tableName,
-                              HashMap<String, Long> objectCountMap,
-                              HashMap<String, Long> unReplicatedSizeMap,
-                              HashMap<String, Long> replicatedSizeMap)
-      throws IOException {
+                              String tableName) {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
     if (event.getValue() != null) {
       if (tableHandler != null) {
@@ -230,32 +319,22 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
-
   private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
-                                 String tableName,
-                                 HashMap<String, Long> objectCountMap,
-                                 HashMap<String, Long> unReplicatedSizeMap,
-                                 HashMap<String, Long> replicatedSizeMap)
-      throws IOException {
+                                 String tableName) {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
     if (event.getValue() != null) {
       if (tableHandler != null) {
         tableHandler.handleDeleteEvent(event, tableName, objectCountMap,
             unReplicatedSizeMap, replicatedSizeMap);
       } else {
-        String countKey = getTableCountKeyFromTable(tableName);
-        objectCountMap.computeIfPresent(countKey,
+        objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
             (k, count) -> count > 0 ? count - 1L : 0L);
       }
     }
   }
 
-
   private void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
-                                 String tableName,
-                                 HashMap<String, Long> objectCountMap,
-                                 HashMap<String, Long> unReplicatedSizeMap,
-                                 HashMap<String, Long> replicatedSizeMap) {
+                                 String tableName) {
 
     OmTableHandler tableHandler = tableHandlers.get(tableName);
     if (event.getValue() != null) {
@@ -273,26 +352,17 @@ public class OmTableInsightTask implements ReconOmTask {
    * @param dataMap Map containing the updated count and size information.
    */
   private void writeDataToDB(Map<String, Long> dataMap) {
-    List<GlobalStats> insertGlobalStats = new ArrayList<>();
-    List<GlobalStats> updateGlobalStats = new ArrayList<>();
-
-    for (Entry<String, Long> entry : dataMap.entrySet()) {
-      Timestamp now =
-          using(sqlConfiguration).fetchValue(select(currentTimestamp()));
-      GlobalStats record = globalStatsDao.fetchOneByKey(entry.getKey());
-      GlobalStats newRecord
-          = new GlobalStats(entry.getKey(), entry.getValue(), now);
-
-      // Insert a new record for key if it does not exist
-      if (record == null) {
-        insertGlobalStats.add(newRecord);
-      } else {
-        updateGlobalStats.add(newRecord);
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
+      for (Entry<String, Long> entry : dataMap.entrySet()) {
+        String key = entry.getKey();
+        Long value = entry.getValue();
+        GlobalStatsValue globalStatsValue = new GlobalStatsValue(value);
+        reconGlobalStatsManager.batchStoreGlobalStats(rdbBatchOperation, key, globalStatsValue);
       }
+      reconGlobalStatsManager.commitBatchOperation(rdbBatchOperation);
+    } catch (IOException e) {
+      LOG.error("Failed to write data to RocksDB GlobalStats table", e);
     }
-
-    globalStatsDao.insert(insertGlobalStats);
-    globalStatsDao.update(updateGlobalStats);
   }
 
   /**
@@ -300,14 +370,13 @@ public class OmTableInsightTask implements ReconOmTask {
    *
    * @return The count map containing the counts for each table.
    */
-  private HashMap<String, Long> initializeCountMap() {
-    Collection<String> tables = getTaskTables();
-    HashMap<String, Long> objectCountMap = new HashMap<>(tables.size());
+  public HashMap<String, Long> initializeCountMap() {
+    HashMap<String, Long> objCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
       String key = getTableCountKeyFromTable(tableName);
-      objectCountMap.put(key, getValueForKey(key));
+      objCountMap.put(key, getValueForKey(key));
     }
-    return objectCountMap;
+    return objCountMap;
   }
 
   /**
@@ -316,11 +385,13 @@ public class OmTableInsightTask implements ReconOmTask {
    *
    * @return The size map containing the size counts for each table.
    */
-  private HashMap<String, Long> initializeSizeMap(boolean replicated) {
+  public HashMap<String, Long> initializeSizeMap(boolean replicated) {
+    String tableName;
+    OmTableHandler tableHandler;
     HashMap<String, Long> sizeCountMap = new HashMap<>();
     for (Map.Entry<String, OmTableHandler> entry : tableHandlers.entrySet()) {
-      String tableName = entry.getKey();
-      OmTableHandler tableHandler = entry.getValue();
+      tableName = entry.getKey();
+      tableHandler = entry.getValue();
       String key =
           replicated ? tableHandler.getReplicatedSizeKeyFromTable(tableName) :
           tableHandler.getUnReplicatedSizeKeyFromTable(tableName);
@@ -349,11 +420,34 @@ public class OmTableInsightTask implements ReconOmTask {
    * @return The value associated with the key
    */
   private long getValueForKey(String key) {
-    GlobalStats record = globalStatsDao.fetchOneByKey(key);
-
-    return (record == null) ? 0L : record.getValue();
+    try {
+      GlobalStatsValue globalStatsValue = reconGlobalStatsManager.getGlobalStatsValue(key);
+      return (globalStatsValue == null) ? 0L : globalStatsValue.getValue();
+    } catch (IOException e) {
+      LOG.error("Failed to get value for key {} from RocksDB GlobalStats table", key, e);
+      return 0L;
+    }
   }
 
+  @VisibleForTesting
+  public void setTables(Collection<String> tables) {
+    this.tables = tables;
+  }
+
+  @VisibleForTesting
+  public void setObjectCountMap(HashMap<String, Long> objectCountMap) {
+    this.objectCountMap = objectCountMap;
+  }
+
+  @VisibleForTesting
+  public void setUnReplicatedSizeMap(HashMap<String, Long> unReplicatedSizeMap) {
+    this.unReplicatedSizeMap = unReplicatedSizeMap;
+  }
+
+  @VisibleForTesting
+  public void setReplicatedSizeMap(HashMap<String, Long> replicatedSizeMap) {
+    this.replicatedSizeMap = replicatedSizeMap;
+  }
 }
 
 

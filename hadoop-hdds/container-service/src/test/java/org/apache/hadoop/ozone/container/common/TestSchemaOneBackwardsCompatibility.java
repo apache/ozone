@@ -1,34 +1,53 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -52,29 +71,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.yaml.snakeyaml.Yaml;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.UUID;
-import java.util.ArrayList;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.Arrays;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests processing of containers written with DB schema version 1,
@@ -195,7 +191,7 @@ public class TestSchemaOneBackwardsCompatibility {
               refCountedDB.getStore().getDeletedBlocksTable();
 
       // Test rangeKVs.
-      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
+      List<Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
               deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(), 100,
                   cData.containerPrefix());
 
@@ -279,11 +275,8 @@ public class TestSchemaOneBackwardsCompatibility {
     ContainerSet containerSet = makeContainerSet();
     VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     long initialTotalSpace = newKvData().getBytesUsed();
     long blockSpace = initialTotalSpace / TestDB.KEY_COUNT;
 
@@ -352,15 +345,12 @@ public class TestSchemaOneBackwardsCompatibility {
     ContainerSet containerSet = makeContainerSet();
     VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
-        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
-            metrics, c -> {
-        });
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     KeyValueContainerData cData = newKvData();
     try (DBHandle refCountedDB = BlockUtils.getDB(cData, conf)) {
       // Read blocks that were already deleted before the upgrade.
-      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
+      List<Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
               refCountedDB.getStore().getDeletedBlocksTable()
                   .getRangeKVs(cData.startKeyEmpty(), 100,
                       cData.containerPrefix());
@@ -369,8 +359,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
       for (Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
         preUpgradeBlocks.add(chunkListKV.getKey());
-        assertThrows(IOException.class, () -> chunkListKV.getValue(),
-            "No exception thrown when trying to retrieve old deleted blocks values as chunk lists.");
+        assertNull(chunkListKV.getValue());
       }
 
       assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());
@@ -419,7 +408,7 @@ public class TestSchemaOneBackwardsCompatibility {
       }
 
       // Test decoding keys from the database.
-      List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
+      List<Table.KeyValue<String, BlockData>> blockKeyValues =
           blockDataTable.getRangeKVs(cData.startKeyEmpty(), 100,
               cData.containerPrefix(), cData.getUnprefixedKeyFilter());
 
@@ -465,7 +454,7 @@ public class TestSchemaOneBackwardsCompatibility {
       }
 
       // Test decoding keys from the database.
-      List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
+      List<Table.KeyValue<String, BlockData>> blockKeyValues =
           blockDataTable.getRangeKVs(cData.startKeyEmpty(), 100,
               cData.containerPrefix(), cData.getDeletingBlockKeyFilter());
 
@@ -538,7 +527,7 @@ public class TestSchemaOneBackwardsCompatibility {
       }
 
       // Test decoding keys from the database.
-      List<? extends Table.KeyValue<String, ChunkInfoList>> chunkInfoKeyValues =
+      List<Table.KeyValue<String, ChunkInfoList>> chunkInfoKeyValues =
           deletedBlocksTable.getRangeKVs(cData.startKeyEmpty(), 100,
               cData.containerPrefix());
 
@@ -555,9 +544,6 @@ public class TestSchemaOneBackwardsCompatibility {
 
   private void runBlockDeletingService(KeyValueHandler keyValueHandler)
       throws Exception {
-    conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
-    conf.setInt(OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
-
     OzoneContainer container = makeMockOzoneContainer(keyValueHandler);
 
     BlockDeletingServiceTestImpl service =
@@ -571,7 +557,7 @@ public class TestSchemaOneBackwardsCompatibility {
   }
 
   private ContainerSet makeContainerSet() throws Exception {
-    ContainerSet containerSet = new ContainerSet(1000);
+    ContainerSet containerSet = newContainerSet();
     KeyValueContainer container = new KeyValueContainer(newKvData(), conf);
     containerSet.addContainer(container);
 
@@ -614,7 +600,7 @@ public class TestSchemaOneBackwardsCompatibility {
     Yaml yaml = ContainerDataYaml.getYamlForContainerType(
             kvData.getContainerType(),
         kvData.getReplicaIndex() > 0);
-    kvData.computeAndSetChecksum(yaml);
+    kvData.computeAndSetContainerFileChecksum(yaml);
 
     KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 

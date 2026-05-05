@@ -15,8 +15,4 @@
    limitations under the License.
 -->
 <FindBugsFilter>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpIterator$KeyValue"/>
-    <Bug pattern="EI_EXPOSE_REP" />
-  </Match>
 </FindBugsFilter>

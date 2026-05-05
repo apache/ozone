@@ -15,6 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${SCRIPT_DIR}/../../smoketest/testlib.sh"
+
 retry() {
    local -i n=0
    local -i attempts=${RETRY_ATTEMPTS:-100}
@@ -45,6 +48,23 @@ wait_for_startup(){
    else
      return 1
    fi
+}
+
+wait_for_pipeline() {
+  retry assert_pipeline_exists
+}
+
+execute_command_in_container() {
+   CONTAINER="$1"
+   shift 1 #Remove first argument which was the container name
+
+   kubectl exec "${CONTAINER}" -- "$@"
+}
+
+assert_pipeline_exists() {
+   local count
+   count=$(execute_command_in_container scm-0 ozone admin pipeline list --state OPEN --filter-by-factor THREE --json | jq -r 'length')
+   [[ $count -gt 0 ]]
 }
 
 all_pods_are_running() {
@@ -160,14 +180,14 @@ execute_robot_test() {
 
    kubectl exec -it "${CONTAINER}" -- bash -c 'rm -rf /tmp/report'
    kubectl exec -it "${CONTAINER}" -- bash -c 'mkdir -p  /tmp/report'
-   kubectl exec -it "${CONTAINER}" -- robot --nostatusrc -d /tmp/report ${ARGUMENTS[@]} || true
+   kubectl exec -it "${CONTAINER}" -- robot --nostatusrc -d /tmp/report ${ARGUMENTS[@]-} || true
    kubectl cp "${CONTAINER}":/tmp/report/output.xml "result/$CONTAINER-$RANDOM.xml" || true
 }
 
 combine_reports() {
   if [[ -d result ]]; then
     rm -f result/output.xml
-    rebot -d result --nostatusrc -o output.xml -N $(basename "$(pwd)") result/*.xml
+    run_rebot result result "-o output.xml -N '$(basename $(pwd))' *.xml"
   fi
 }
 

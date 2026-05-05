@@ -1,28 +1,35 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-
-import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -32,16 +39,6 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
-
 
 /**
  * Handle the SetNodeOperationalStateCommand sent from SCM to the datanode
@@ -53,8 +50,9 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(SetNodeOperationalStateCommandHandler.class);
   private final ConfigurationSource conf;
   private final Consumer<HddsProtos.NodeOperationalState> replicationSupervisor;
+  private final Consumer<HddsProtos.NodeOperationalState> diskBalancerService;
   private final AtomicInteger invocationCount = new AtomicInteger(0);
-  private final AtomicLong totalTime = new AtomicLong(0);
+  private final MutableRate opsLatencyMs;
 
   /**
    * Set Node State command handler.
@@ -62,9 +60,14 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    * @param conf - Configuration for the datanode.
    */
   public SetNodeOperationalStateCommandHandler(ConfigurationSource conf,
-      Consumer<HddsProtos.NodeOperationalState> replicationSupervisor) {
+      Consumer<HddsProtos.NodeOperationalState> replicationSupervisor,
+      Consumer<HddsProtos.NodeOperationalState> diskBalancerService) {
     this.conf = conf;
     this.replicationSupervisor = replicationSupervisor;
+    this.diskBalancerService = diskBalancerService;
+    MetricsRegistry registry = new MetricsRegistry(
+        SetNodeOperationalStateCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(Type.setNodeOperationalStateCommand + "Ms");
   }
 
   /**
@@ -76,13 +79,10 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    * @param connectionManager - The SCMs that we are talking to.
    */
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     long startTime = Time.monotonicNow();
     invocationCount.incrementAndGet();
-    StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto
-        setNodeCmdProto = null;
-
     if (command.getType() != Type.setNodeOperationalStateCommand) {
       LOG.warn("Skipping handling command, expected command "
               + "type {} but found {}",
@@ -91,22 +91,36 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
     }
     SetNodeOperationalStateCommand setNodeCmd =
         (SetNodeOperationalStateCommand) command;
-    setNodeCmdProto = setNodeCmd.getProto();
+    SetNodeOperationalStateCommandProto setNodeCmdProto = setNodeCmd.getProto();
     DatanodeDetails dni = context.getParent().getDatanodeDetails();
     HddsProtos.NodeOperationalState state =
         setNodeCmdProto.getNodeOperationalState();
-    dni.setPersistedOpState(state);
-    dni.setPersistedOpStateExpiryEpochSec(
-        setNodeCmd.getStateExpiryEpochSeconds());
     try {
-      persistDatanodeDetails(dni);
+      persistUpdatedDatanodeDetails(dni, state, setNodeCmd.getStateExpiryEpochSeconds());
     } catch (IOException ioe) {
       LOG.error("Failed to persist the datanode state", ioe);
       // TODO - this should probably be raised, but it will break the command
       //      handler interface.
     }
+
+    // Handle DiskBalancerService state changes
+    if (diskBalancerService != null) {
+      diskBalancerService.accept(state);
+    }
+
     replicationSupervisor.accept(state);
-    totalTime.addAndGet(Time.monotonicNow() - startTime);
+    this.opsLatencyMs.add(Time.monotonicNow() - startTime);
+  }
+
+  private void persistUpdatedDatanodeDetails(
+      DatanodeDetails dnDetails, HddsProtos.NodeOperationalState state, long stateExpiryEpochSeconds)
+      throws IOException {
+    DatanodeDetails persistedDni = new DatanodeDetails(dnDetails);
+    persistedDni.setPersistedOpState(state);
+    persistedDni.setPersistedOpStateExpiryEpochSec(stateExpiryEpochSeconds);
+    persistDatanodeDetails(persistedDni);
+    dnDetails.setPersistedOpState(state);
+    dnDetails.setPersistedOpStateExpiryEpochSec(stateExpiryEpochSeconds);
   }
 
   // TODO - this duplicates code in HddsDatanodeService and InitDatanodeState
@@ -114,7 +128,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath, "idFilePath == null");
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
@@ -125,8 +139,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    * @return Type
    */
   @Override
-  public StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type
-      getCommandType() {
+  public Type getCommandType() {
     return Type.setNodeOperationalStateCommand;
   }
 
@@ -147,14 +160,12 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    */
   @Override
   public long getAverageRunTime() {
-    final int invocations = invocationCount.get();
-    return invocations == 0 ?
-        0 : totalTime.get() / invocations;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime.get();
+    return (long) this.opsLatencyMs.lastStat().total();
   }
 
   @Override

@@ -1,29 +1,40 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.keyvalue;
+
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -34,19 +45,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerInspector;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreWithIncrementalChunkList;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.function.BooleanSupplier;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 /**
  * Container inspector for key value container metadata. It is capable of
@@ -74,10 +76,12 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContain
  * log4j.appender.inspectorAppender.layout=org.apache.log4j.PatternLayout
  */
 public class KeyValueContainerMetadataInspector implements ContainerInspector {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
-  public static final Logger REPORT_LOG = LoggerFactory.getLogger(
-      "ContainerMetadataInspectorReport");
+  private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
+  public static final Logger REPORT_LOG = LoggerFactory.getLogger("ContainerMetadataInspectorReport");
+
+  public static final String SYSTEM_PROPERTY = "ozone.datanode.container.metadata.inspector";
+
+  private Mode mode;
 
   /**
    * The mode to run the inspector in.
@@ -93,15 +97,11 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       this.name = name;
     }
 
+    @Override
     public String toString() {
       return name;
     }
   }
-
-  public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +
-      ".metadata.inspector";
-
-  private Mode mode;
 
   public KeyValueContainerMetadataInspector(Mode mode) {
     this.mode = mode;
@@ -241,6 +241,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         metadataTable.get(containerData.getBytesUsedKey()));
     dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
         metadataTable.get(containerData.getPendingDeleteBlockCountKey()));
+    if (metadataTable.get(containerData.getPendingDeleteBlockBytesKey()) != null) {
+      dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
+          metadataTable.get(containerData.getPendingDeleteBlockBytesKey()));
+    }
     dBMetadata.put(OzoneConsts.DELETE_TRANSACTION_KEY,
         metadataTable.get(containerData.getLatestDeleteTxnKey()));
     dBMetadata.put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID,
@@ -249,7 +253,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return dBMetadata;
   }
 
-  static ObjectNode getAggregateValues(DatanodeStore store,
+  private static ObjectNode getAggregateValues(DatanodeStore store,
       KeyValueContainerData containerData, String schemaVersion)
       throws IOException {
 
@@ -269,6 +273,23 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     // Count pending delete blocks.
+    final PendingDelete pendingDelete = getAggregatePendingDelete(store, containerData, schemaVersion);
+
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
+      blockCountTotal += pendingDelete.getCount();
+      usedBytesTotal += pendingDelete.getBytes();
+    }
+
+    aggregates.put("blockCount", blockCountTotal);
+    aggregates.put("usedBytes", usedBytesTotal);
+    pendingDelete.addToJson(aggregates);
+
+    return aggregates;
+  }
+
+  public static PendingDelete getAggregatePendingDelete(DatanodeStore store,
+      KeyValueContainerData containerData, String schemaVersion)
+      throws IOException {
     final PendingDelete pendingDelete;
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
       long pendingDeleteBlockCountTotal = 0;
@@ -278,10 +299,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
                    containerData.getDeletingBlockKeyFilter())) {
 
         while (blockIter.hasNext()) {
-          blockCountTotal++;
           pendingDeleteBlockCountTotal++;
           final long bytes = getBlockLength(blockIter.nextBlock());
-          usedBytesTotal += bytes;
           pendingDeleteBytes += bytes;
         }
       }
@@ -299,14 +318,9 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           countPendingDeletesSchemaV3(schemaThreeStore, containerData);
     } else {
       throw new IOException("Failed to process deleted blocks for unknown " +
-              "container schema " + schemaVersion);
+          "container schema " + schemaVersion);
     }
-
-    aggregates.put("blockCount", blockCountTotal);
-    aggregates.put("usedBytes", usedBytesTotal);
-    pendingDelete.addToJson(aggregates);
-
-    return aggregates;
+    return pendingDelete;
   }
 
   static ObjectNode getChunksDirectoryJson(File chunksDir) throws IOException {
@@ -331,9 +345,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       KeyValueContainerData containerData, DatanodeStore store) {
     ArrayNode errors = JsonUtils.createArrayNode();
     boolean passed = true;
-
     Table<String, Long> metadataTable = store.getMetadataTable();
-
     ObjectNode dBMetadata = (ObjectNode) parent.get("dBMetadata");
     ObjectNode aggregates = (ObjectNode) parent.get("aggregates");
 
@@ -344,7 +356,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     // If block count is absent from the DB, it is only an error if there are
     // a non-zero amount of block keys in the DB.
     long blockCountDBLong = blockCountDB.isNull() ? 0 : blockCountDB.asLong();
-
     if (blockCountDBLong != blockCountAggregate.asLong()) {
       passed = false;
 
@@ -427,6 +438,32 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       errors.add(deleteCountError);
     }
 
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
+      // check and repair if db delete bytes mismatches delete transaction
+      JsonNode pendingDeletionBlockSize = dBMetadata.path(
+          OzoneConsts.PENDING_DELETE_BLOCK_BYTES);
+      final long dbDeleteBytes = jsonToLong(pendingDeletionBlockSize);
+      final JsonNode pendingDeleteBytesAggregate = aggregates.path(PendingDelete.BYTES);
+      final long deleteTransactionBytes = jsonToLong(pendingDeleteBytesAggregate);
+      if (dbDeleteBytes != deleteTransactionBytes) {
+        passed = false;
+        final BooleanSupplier deleteBytesRepairAction = () -> {
+          final String key = containerData.getPendingDeleteBlockBytesKey();
+          try {
+            metadataTable.put(key, deleteTransactionBytes);
+          } catch (IOException ex) {
+            LOG.error("Failed to reset {} for container {}.",
+                key, containerData.getContainerID(), ex);
+          }
+          return false;
+        };
+        final ObjectNode deleteBytesError = buildErrorAndRepair(
+            "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
+            pendingDeleteBytesAggregate, pendingDeletionBlockSize, deleteBytesRepairAction);
+        errors.add(deleteBytesError);
+      }
+    }
+
     // check and repair chunks dir.
     JsonNode chunksDirPresent = parent.path("chunksDirectory").path("present");
     if (!chunksDirPresent.asBoolean()) {
@@ -449,7 +486,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           JsonNodeFactory.instance.booleanNode(true), chunksDirPresent, dirRepairAction);
       errors.add(chunksDirError);
     }
-
     parent.put("correct", passed);
     parent.set("errors", errors);
     return passed;
@@ -475,24 +511,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return error;
   }
 
-  static class PendingDelete {
-    static final String COUNT = "pendingDeleteBlocks";
-    static final String BYTES = "pendingDeleteBytes";
-
-    private final long count;
-    private final long bytes;
-
-    PendingDelete(long count, long bytes) {
-      this.count = count;
-      this.bytes = bytes;
-    }
-
-    void addToJson(ObjectNode json) {
-      json.put(COUNT, count);
-      json.put(BYTES, bytes);
-    }
-  }
-
   static PendingDelete countPendingDeletesSchemaV2(
       DatanodeStoreSchemaTwoImpl schemaTwoStore,
       KeyValueContainerData containerData) throws IOException {
@@ -501,13 +519,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
     Table<Long, DeletedBlocksTransaction> delTxTable =
         schemaTwoStore.getDeleteTransactionTable();
-    final Table<String, BlockData> blockDataTable
-        = schemaTwoStore.getBlockDataTable();
 
-    try (TableIterator<Long, ? extends Table.KeyValue<Long,
-        DeletedBlocksTransaction>> iterator = delTxTable.iterator()) {
+    try (TableIterator<Long, DeletedBlocksTransaction> iterator = delTxTable.valueIterator()) {
       while (iterator.hasNext()) {
-        DeletedBlocksTransaction txn = iterator.next().getValue();
+        final DeletedBlocksTransaction txn = iterator.next();
         final List<Long> localIDs = txn.getLocalIDList();
         // In schema 2, pending delete blocks are stored in the
         // transaction object. Since the actual blocks still exist in the
@@ -515,7 +530,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         // counted towards bytes used and total block count above.
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(
-            localIDs, containerData, blockDataTable);
+            localIDs, containerData, schemaTwoStore);
       }
     }
 
@@ -525,12 +540,12 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
 
   static long computePendingDeleteBytes(List<Long> localIDs,
       KeyValueContainerData containerData,
-      Table<String, BlockData> blockDataTable) {
+      DatanodeStoreWithIncrementalChunkList store) {
     long pendingDeleteBytes = 0;
     for (long id : localIDs) {
       try {
         final String blockKey = containerData.getBlockKey(id);
-        final BlockData blockData = blockDataTable.get(blockKey);
+        final BlockData blockData = store.getBlockByID(null, blockKey);
         if (blockData != null) {
           pendingDeleteBytes += blockData.getSize();
         }
@@ -544,23 +559,18 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   }
 
   static PendingDelete countPendingDeletesSchemaV3(
-      DatanodeStoreSchemaThreeImpl schemaThreeStore,
+      DatanodeStoreSchemaThreeImpl store,
       KeyValueContainerData containerData) throws IOException {
     long pendingDeleteBlockCountTotal = 0;
     long pendingDeleteBytes = 0;
-    final Table<String, BlockData> blockDataTable
-        = schemaThreeStore.getBlockDataTable();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String,
-            DeletedBlocksTransaction>>
-            iter = schemaThreeStore.getDeleteTransactionTable()
-            .iterator(containerData.containerPrefix())) {
-      while (iter.hasNext()) {
-        DeletedBlocksTransaction delTx = iter.next().getValue();
+    try (TableIterator<String, DeletedBlocksTransaction> iterator
+        = store.getDeleteTransactionTable().valueIterator(containerData.containerPrefix())) {
+      while (iterator.hasNext()) {
+        final DeletedBlocksTransaction delTx = iterator.next();
         final List<Long> localIDs = delTx.getLocalIDList();
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(
-            localIDs, containerData, blockDataTable);
+            localIDs, containerData, store);
       }
     }
     return new PendingDelete(pendingDeleteBlockCountTotal,

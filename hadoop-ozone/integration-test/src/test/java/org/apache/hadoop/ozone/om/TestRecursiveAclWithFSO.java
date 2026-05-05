@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,66 +17,50 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.client.BucketArgs;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import static org.apache.hadoop.ozone.TestDataUtil.createKey;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.util.UUID;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.AclTests;
+import org.apache.ozone.test.NonHATests;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test recursive acl checks for delete and rename for FSO Buckets.
  */
-@Timeout(120)
-public class TestRecursiveAclWithFSO {
+public abstract class TestRecursiveAclWithFSO implements NonHATests.TestCase {
 
-  private MiniOzoneCluster cluster;
+  private static final String UNIQUE = UUID.randomUUID().toString();
+  private static final String VOLUME_NAME = "vol-" + UNIQUE;
 
-  private final UserGroupInformation adminUser =
-      UserGroupInformation.createUserForTesting("om", new String[] {"ozone"});
   private final UserGroupInformation user1 = UserGroupInformation
-      .createUserForTesting("user1", new String[] {"test1"});
+      .createUserForTesting("user1-" + UNIQUE, new String[] {"test1"});
   private final UserGroupInformation user2 = UserGroupInformation
-      .createUserForTesting("user2", new String[] {"test2"});
-
-  @BeforeEach
-  public void init() throws Exception {
-    // loginUser is the user running this test.
-    // Implication: loginUser is automatically added to the OM admin list.
-    UserGroupInformation.setLoginUser(adminUser);
-    // ozone.acl.enabled = true
-    // start a cluster
-    startCluster();
-  }
+      .createUserForTesting("user2-" + UNIQUE, new String[] {"test2"});
+  private final UserGroupInformation user3 = UserGroupInformation
+      .createUserForTesting("user3-" + UNIQUE, new String[] {"test3, test4"});
 
   @Test
   public void testKeyDeleteAndRenameWithoutPermission() throws Exception {
@@ -86,16 +69,16 @@ public class TestRecursiveAclWithFSO {
     String aclWorldAll = "world::a";
     List<String> keys = new ArrayList<>();
     // Create volumes with user1
-    try (OzoneClient client = cluster.newClient()) {
+    try (OzoneClient client = cluster().newClient()) {
       ObjectStore objectStore = client.getObjectStore();
-      createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclWorldAll);
+      createVolumeWithOwnerAndAcl(objectStore, VOLUME_NAME, user1.getShortUserName(), aclWorldAll);
     }
 
     // Login as user1, create directories and keys
     UserGroupInformation.setLoginUser(user1);
-    try (OzoneClient client = cluster.newClient()) {
+    try (OzoneClient client = cluster().newClient()) {
       ObjectStore objectStore = client.getObjectStore();
-      OzoneVolume volume = objectStore.getVolume("volume1");
+      OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
       BucketArgs omBucketArgs =
           BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
 
@@ -140,8 +123,8 @@ public class TestRecursiveAclWithFSO {
       String keyf4 = "a/b2/d2/d21/f4";
       String keyf5 = "/a/b3/e1/f5";
       String keyf6 = "/a/b3/e2/f6";
-      String file1 = "a/" + "file" + RandomStringUtils.randomNumeric(5);
-      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.randomNumeric(5);
+      String file1 = "a/" + "file" + RandomStringUtils.secure().nextNumeric(5);
+      String file2 = "a/b2/d2/" + "file" + RandomStringUtils.secure().nextNumeric(5);
 
       keys.add(keyf1);
       keys.add(keyf2);
@@ -161,9 +144,9 @@ public class TestRecursiveAclWithFSO {
     }
 
     UserGroupInformation.setLoginUser(user2);
-    try (OzoneClient client = cluster.newClient()) {
+    try (OzoneClient client = cluster().newClient()) {
       ObjectStore objectStore = client.getObjectStore();
-      OzoneVolume volume = objectStore.getVolume("volume1");
+      OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
 
       // perform  delete
@@ -183,9 +166,9 @@ public class TestRecursiveAclWithFSO {
       // Remove acl from directory c2, delete/rename a/b1 should throw
       // permission denied since c2 is a subdirectory
       user1.doAs((PrivilegedExceptionAction<Void>) () -> {
-        try (OzoneClient c = cluster.newClient()) {
+        try (OzoneClient c = cluster().newClient()) {
           ObjectStore o = c.getObjectStore();
-          OzoneBucket b = o.getVolume("volume1").getBucket("bucket1");
+          OzoneBucket b = o.getVolume(VOLUME_NAME).getBucket("bucket1");
           removeAclsFromKey(o, b, "a/b1/c2");
         }
         return null;
@@ -213,6 +196,70 @@ public class TestRecursiveAclWithFSO {
     }
   }
 
+  @Test
+  public void testKeyDefaultACL() throws Exception {
+    String volumeName = "vol1";
+    try (OzoneClient client = cluster().newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
+      objectStore.createVolume(volumeName);
+      addVolumeAcl(objectStore, volumeName, "world::a");
+
+      // verify volume ACLs. This volume will have 2 default ACLs, plus above one added
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
+          .setResType(OzoneObj.ResourceType.VOLUME)
+          .setStoreType(OZONE).build();
+      List<OzoneAcl> acls = objectStore.getAcl(obj);
+      assertEquals(3, acls.size());
+      assertEquals(AclTests.ADMIN_UGI.getShortUserName(), acls.get(0).getName());
+      OmConfig omConfig = cluster().getOzoneManager().getConfig();
+      assertEquals(omConfig.getUserDefaultRights(), acls.get(0).getAclSet());
+      assertEquals(AclTests.ADMIN_UGI.getPrimaryGroupName(), acls.get(1).getName());
+      assertEquals(omConfig.getGroupDefaultRights(), acls.get(1).getAclSet());
+      assertEquals("WORLD", acls.get(2).getName());
+      assertEquals(omConfig.getUserDefaultRights(), acls.get(2).getAclSet());
+    }
+
+    // set LoginUser as user3
+    UserGroupInformation.setLoginUser(user3);
+    try (OzoneClient client = cluster().newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
+      OzoneVolume volume = objectStore.getVolume(volumeName);
+      BucketArgs omBucketArgs =
+          BucketArgs.newBuilder().setStorageType(StorageType.DISK).build();
+      String bucketName = "bucket";
+      volume.createBucket(bucketName, omBucketArgs);
+      OzoneBucket ozoneBucket = volume.getBucket(bucketName);
+
+      // verify bucket default ACLs
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volume.getName())
+          .setBucketName(ozoneBucket.getName()).setResType(OzoneObj.ResourceType.BUCKET)
+          .setStoreType(OZONE).build();
+      List<OzoneAcl> acls = objectStore.getAcl(obj);
+      assertEquals(2, acls.size());
+      assertEquals(user3.getShortUserName(), acls.get(0).getName());
+      OmConfig omConfig = cluster().getOzoneManager().getConfig();
+      assertEquals(omConfig.getUserDefaultRights(), acls.get(0).getAclSet());
+      assertEquals(user3.getPrimaryGroupName(), acls.get(1).getName());
+      assertEquals(omConfig.getGroupDefaultRights(), acls.get(1).getAclSet());
+
+      // verify key default ACLs
+      int length = 10;
+      byte[] input = new byte[length];
+      Arrays.fill(input, (byte) 96);
+      String keyName = UUID.randomUUID().toString();
+      createKey(ozoneBucket, keyName, input);
+      obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volume.getName())
+          .setBucketName(ozoneBucket.getName()).setKeyName(keyName)
+          .setResType(OzoneObj.ResourceType.KEY).setStoreType(OZONE).build();
+      acls = objectStore.getAcl(obj);
+      assertEquals(2, acls.size());
+      assertEquals(user3.getShortUserName(), acls.get(0).getName());
+      assertEquals(omConfig.getUserDefaultRights(), acls.get(0).getAclSet());
+      assertEquals(user3.getPrimaryGroupName(), acls.get(1).getName());
+      assertEquals(omConfig.getGroupDefaultRights(), acls.get(1).getAclSet());
+    }
+  }
+
   private void removeAclsFromKey(ObjectStore objectStore,
       OzoneBucket ozoneBucket, String key) throws IOException {
     OzoneObj ozoneObj = OzoneObjInfo.Builder.newBuilder().setKeyName(key)
@@ -223,32 +270,6 @@ public class TestRecursiveAclWithFSO {
     List<OzoneAcl> aclList1 = objectStore.getAcl(ozoneObj);
     for (OzoneAcl acl : aclList1) {
       objectStore.removeAcl(ozoneObj, acl);
-    }
-  }
-
-  /**
-   * Create a MiniOzoneCluster for testing.
-   */
-  private void startCluster() throws Exception {
-
-    OzoneConfiguration conf = new OzoneConfiguration();
-
-    // Use native impl here, default impl doesn't do actual checks
-    conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    // Note: OM doesn't support live config reloading
-    conf.setBoolean(OZONE_ACL_ENABLED, true);
-
-    OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
-
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-
-  }
-
-  @AfterEach
-  public void stopCluster() {
-    if (cluster != null) {
-      cluster.shutdown();
     }
   }
 
@@ -269,6 +290,16 @@ public class TestRecursiveAclWithFSO {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
     assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+  }
+
+  /**
+   * Helper function to add volume ACL.
+   */
+  private void addVolumeAcl(ObjectStore objectStore, String volumeName,
+      String aclString) throws IOException {
+    OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
+        .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
+    assertTrue(objectStore.addAcl(obj, OzoneAcl.parseAcl(aclString)));
   }
 
   /**
@@ -295,24 +326,14 @@ public class TestRecursiveAclWithFSO {
 
   private void createKeys(ObjectStore objectStore, OzoneBucket ozoneBucket,
       List<String> keys) throws Exception {
-    int length = 10;
+
     String aclWorldAll = "world::a";
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
+
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      TestDataUtil.createStringKey(ozoneBucket, key, 10);
       setKeyAcl(objectStore, ozoneBucket.getVolumeName(), ozoneBucket.getName(),
           key, aclWorldAll);
     }
   }
-
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key, length);
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-  }
-
 }
 

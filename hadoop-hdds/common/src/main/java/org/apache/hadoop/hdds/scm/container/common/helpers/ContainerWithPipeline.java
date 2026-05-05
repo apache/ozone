@@ -1,19 +1,18 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container.common.helpers;
@@ -21,10 +20,10 @@ package org.apache.hadoop.hdds.scm.container.common.helpers;
 import java.util.Comparator;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.UnknownPipelineStateException;
 
 /**
  * Class wraps ozone container info.
@@ -48,24 +47,18 @@ public class ContainerWithPipeline implements Comparator<ContainerWithPipeline>,
     return pipeline;
   }
 
-  public static ContainerWithPipeline fromProtobuf(
-      HddsProtos.ContainerWithPipeline allocatedContainer)
-      throws UnknownPipelineStateException {
+  public static ContainerWithPipeline fromProtobuf(HddsProtos.ContainerWithPipeline allocatedContainer) {
     return new ContainerWithPipeline(
         ContainerInfo.fromProtobuf(allocatedContainer.getContainerInfo()),
         Pipeline.getFromProtobuf(allocatedContainer.getPipeline()));
   }
 
-  public HddsProtos.ContainerWithPipeline getProtobuf(int clientVersion)
-      throws UnknownPipelineStateException {
-    HddsProtos.ContainerWithPipeline.Builder builder =
-        HddsProtos.ContainerWithPipeline.newBuilder();
-    builder.setContainerInfo(getContainerInfo().getProtobuf())
-        .setPipeline(getPipeline().getProtobufMessage(clientVersion));
-
-    return builder.build();
+  public HddsProtos.ContainerWithPipeline getProtobuf(int clientVersion) {
+    return HddsProtos.ContainerWithPipeline.newBuilder()
+        .setContainerInfo(getContainerInfo().getProtobuf())
+        .setPipeline(getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS))
+        .build();
   }
-
 
   @Override
   public String toString() {

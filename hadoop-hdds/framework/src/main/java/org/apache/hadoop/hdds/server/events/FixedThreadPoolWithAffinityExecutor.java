@@ -1,32 +1,26 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.server.events;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.hdds.utils.MetricsUtil;
-import org.apache.hadoop.metrics2.annotation.Metric;
-import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,9 +30,10 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Fixed thread pool EventExecutor to call all the event handler one-by-one.
@@ -46,7 +41,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QU
  *
  * @param <P> the payload type of events
  */
-@Metrics(context = "EventQueue")
 public class FixedThreadPoolWithAffinityExecutor<P, Q>
     implements EventExecutor<P> {
 
@@ -67,27 +61,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   private final List<ThreadPoolExecutor> executors;
 
-  // MutableCounterLong is thread safe.
-  @Metric
-  private MutableCounterLong queued;
-
-  @Metric
-  private MutableCounterLong done;
-
-  @Metric
-  private MutableCounterLong failed;
-
-  @Metric
-  private MutableCounterLong scheduled;
-
-  @Metric
-  private MutableCounterLong dropped;
-  
-  @Metric
-  private MutableCounterLong longWaitInQueue;
-  
-  @Metric
-  private MutableCounterLong longTimeExecution;
+  private final EventExecutorMetrics metrics;
 
   private final AtomicBoolean isRunning = new AtomicBoolean(true);
   private long queueWaitThreshold
@@ -113,6 +87,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     this.eventPublisher = eventPublisher;
     this.executors = executors;
     this.executorMap = executorMap;
+    this.metrics = new EventExecutorMetrics(EVENT_QUEUE + name, "Event Executor metrics");
     executorMap.put(clazz.getName(), this);
 
     // Add runnable which will wait for task over another queue
@@ -126,9 +101,6 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
       }
       ++i;
     }
-
-    MetricsUtil.registerDynamic(this, EVENT_QUEUE + name,
-        "Event Executor metrics ", "EventQueue");
   }
   
   public void setQueueWaitThreshold(long queueWaitThreshold) {
@@ -169,7 +141,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   @Override
   public void onMessage(EventHandler<P> handler, P message, EventPublisher
       publisher) {
-    queued.incr();
+    metrics.incrementQueued();
     // For messages that need to be routed to the same thread need to
     // implement hashCode to match the messages. This should be safe for
     // other messages that implement the native hash.
@@ -177,42 +149,44 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
     BlockingQueue<Q> queue = workQueues.get(index);
     queue.add((Q) message);
     if (queue instanceof IQueueMetrics) {
-      dropped.incr(((IQueueMetrics) queue).getAndResetDropCount(
+      metrics.incrementDropped(((IQueueMetrics) queue).getAndResetDropCount(
           message.getClass().getSimpleName()));
     }
   }
 
   @Override
   public long failedEvents() {
-    return failed.value();
+    return metrics.getFailed();
   }
 
   @Override
   public long successfulEvents() {
-    return done.value();
+    return metrics.getDone();
   }
 
   @Override
   public long queuedEvents() {
-    return queued.value();
+    return metrics.getQueued();
   }
 
   @Override
   public long scheduledEvents() {
-    return scheduled.value();
+    return metrics.getScheduled();
   }
 
   @Override
   public long droppedEvents() {
-    return dropped.value();
+    return metrics.getDropped();
   }
 
+  @Override
   public long longWaitInQueueEvents() {
-    return longWaitInQueue.value();
+    return metrics.getLongWaitInQueue();
   }
   
+  @Override
   public long longTimeExecutionEvents() {
-    return longTimeExecution.value();
+    return metrics.getLongExecution();
   }
 
   @Override
@@ -222,6 +196,7 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
       executor.shutdown();
     }
     executorMap.clear();
+    metrics.unregister();
     DefaultMetricsSystem.instance().unregisterSource(EVENT_QUEUE + name);
   }
 
@@ -272,26 +247,26 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
           long curTime = Time.monotonicNow();
           if (createTime != 0
               && ((curTime - createTime) > executor.queueWaitThreshold)) {
-            executor.longWaitInQueue.incr();
+            executor.metrics.incrementLongWaitInQueue();
             LOG.warn("Event remained in queue for long time {} millisec, {}",
                 (curTime - createTime), eventId);
           }
 
-          executor.scheduled.incr();
+          executor.metrics.incrementScheduled();
           try {
             executor.eventHandler.onMessage(report,
                 executor.eventPublisher);
-            executor.done.incr();
+            executor.metrics.incrementDone();
             curTime = Time.monotonicNow();
             if (createTime != 0
                 && (curTime - createTime) > executor.execWaitThreshold) {
-              executor.longTimeExecution.incr();
+              executor.metrics.incrementLongExecution();
               LOG.warn("Event taken long execution time {} millisec, {}",
                   (curTime - createTime), eventId);
             }
           } catch (Exception ex) {
             LOG.error("Error on execution message {}", report, ex);
-            executor.failed.incr();
+            executor.metrics.incrementFailed();
           }
           if (Thread.currentThread().isInterrupted()) {
             LOG.warn("Interrupt of execution of Reports");

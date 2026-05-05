@@ -1,21 +1,26 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.safemode;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -24,40 +29,40 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
-
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import org.mockito.Mockito;
 
 /**
  * This class tests OneReplicaPipelineSafeModeRule.
@@ -69,15 +74,11 @@ public class TestOneReplicaPipelineSafeModeRule {
   private OneReplicaPipelineSafeModeRule rule;
   private PipelineManagerImpl pipelineManager;
   private EventQueue eventQueue;
-  private SCMServiceManager serviceManager;
-  private SCMContext scmContext;
   private MockNodeManager mockNodeManager;
 
   private void setup(int nodes, int pipelineFactorThreeCount,
       int pipelineFactorOneCount) throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.setBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     ozoneConfiguration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempDir.toString());
     ozoneConfiguration.setBoolean(
@@ -86,10 +87,11 @@ public class TestOneReplicaPipelineSafeModeRule {
     List<ContainerInfo> containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(1));
     mockNodeManager = new MockNodeManager(true, nodes);
-
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
     eventQueue = new EventQueue();
-    serviceManager = new SCMServiceManager();
-    scmContext = SCMContext.emptyContext();
+    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
 
     SCMMetadataStore scmMetadataStore =
             new SCMMetadataStoreImpl(ozoneConfiguration);
@@ -115,11 +117,11 @@ public class TestOneReplicaPipelineSafeModeRule {
     createPipelines(pipelineFactorOneCount,
         HddsProtos.ReplicationFactor.ONE);
 
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(ozoneConfiguration, containers, null,
-            pipelineManager, eventQueue, serviceManager, scmContext);
+    SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(ozoneConfiguration,
+        mockNodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+    scmSafeModeManager.start();
 
-    rule = scmSafeModeManager.getOneReplicaPipelineSafeModeRule();
+    rule = SafeModeRuleFactory.getInstance().getSafeModeRule(OneReplicaPipelineSafeModeRule.class);
   }
 
   @Test
@@ -133,9 +135,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     int pipelineCountOne = 0;
     setup(nodes, pipelineFactorThreeCount, pipelineCountOne);
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(SCMSafeModeManager.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.class);
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
     firePipelineEvent(pipelines.subList(0, pipelineFactorThreeCount - 1));
@@ -155,7 +155,6 @@ public class TestOneReplicaPipelineSafeModeRule {
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
   }
 
-
   @Test
   public void testOneReplicaPipelineRuleMixedPipelines() throws Exception {
 
@@ -168,9 +167,7 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     setup(nodes, pipelineCountThree, pipelineCountOne);
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            LoggerFactory.getLogger(SCMSafeModeManager.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.class);
 
     List<Pipeline> pipelines =
         pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
@@ -198,6 +195,46 @@ public class TestOneReplicaPipelineSafeModeRule {
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
   }
 
+  @Test
+  public void testOneReplicaPipelineRuleWithReportProcessingFalse() {
+    EventQueue localEventQueue = new EventQueue();
+    PipelineManager mockedPipelineManager = mock(PipelineManager.class);
+    SCMSafeModeManager mockedSafeModeManager = mock(SCMSafeModeManager.class);
+    SafeModeMetrics mockedMetrics = mock(SafeModeMetrics.class);
+    when(mockedSafeModeManager.getSafeModeMetrics()).thenReturn(mockedMetrics);
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    PipelineID pipelineID = PipelineID.randomId();
+    Pipeline mockedPipeline = mock(Pipeline.class);
+    when(mockedPipeline.getId()).thenReturn(pipelineID);
+
+    // First validate(): pipeline has no nodes -> not counted as reported.
+    // Second validate(): pipeline has at least one node -> counted as reported.
+    when(mockedPipeline.getNodeSet())
+        .thenReturn(java.util.Collections.emptySet(),
+            new java.util.HashSet<>(
+                java.util.Collections.singletonList(mock(DatanodeDetails.class))));
+
+    when(mockedPipelineManager.getPipelines(
+        Mockito.any(ReplicationConfig.class),
+        Mockito.eq(Pipeline.PipelineState.OPEN)))
+        .thenReturn(java.util.Collections.singletonList(mockedPipeline));
+
+    OneReplicaPipelineSafeModeRule localRule =
+        new OneReplicaPipelineSafeModeRule(localEventQueue, mockedPipelineManager,
+            mockedSafeModeManager, conf);
+
+    localRule.setValidateBasedOnReportProcessing(false);
+
+    // With no nodes in the pipeline, the rule should not be satisfied.
+    assertFalse(localRule.validate());
+
+    // After at least one node is present in the pipeline, the rule should pass.
+    assertTrue(localRule.validate());
+    assertTrue(localRule.getReportedPipelineIDSet().contains(pipelineID));
+  }
+
   private void createPipelines(int count,
       HddsProtos.ReplicationFactor factor) throws Exception {
     for (int i = 0; i < count; i++) {
@@ -219,7 +256,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     for (DatanodeDetails dn : reportMap.keySet()) {
       List<PipelineReport> reports = new ArrayList<>();
       for (PipelineID pipeline : mockNodeManager.
-              getNode2PipelineMap().getPipelines(dn.getUuid())) {
+              getNode2PipelineMap().getPipelines(dn.getID())) {
         try {
           if (!pipelines.contains(pipelineManager.getPipeline(pipeline))) {
             continue;
@@ -231,7 +268,6 @@ public class TestOneReplicaPipelineSafeModeRule {
         reports.add(PipelineReport.newBuilder()
                 .setPipelineID(pipelineID)
                 .setIsLeader(true)
-                .setBytesWritten(0)
                 .build());
       }
       PipelineReportsProto.Builder pipelineReportsProto =

@@ -187,6 +187,26 @@
               {
                 "name": "DecommissionScm",
                 "integer": 40
+              },
+              {
+                "name": "SingleNodeQuery",
+                "integer": 41
+              },
+              {
+                "name": "GetContainersOnDecomNode",
+                "integer": 42
+              },
+              {
+                "name": "GetMetrics",
+                "integer": 43
+              },
+              {
+                "name": "GetContainerBalancerStatusInfo",
+                "integer": 44
+              },
+              {
+                "name": "ReconcileContainer",
+                "integer": 45
               }
             ]
           },
@@ -478,7 +498,13 @@
                 "id": 41,
                 "name": "resetDeletedBlockRetryCountRequest",
                 "type": "ResetDeletedBlockRetryCountRequestProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 42,
@@ -490,12 +516,48 @@
                 "id": 43,
                 "name": "getFailedDeletedBlocksTxnRequest",
                 "type": "GetFailedDeletedBlocksTxnRequestProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 44,
                 "name": "decommissionScmRequest",
                 "type": "DecommissionScmRequestProto",
+                "optional": true
+              },
+              {
+                "id": 45,
+                "name": "singleNodeQueryRequest",
+                "type": "SingleNodeQueryRequestProto",
+                "optional": true
+              },
+              {
+                "id": 46,
+                "name": "getContainersOnDecomNodeRequest",
+                "type": "GetContainersOnDecomNodeRequestProto",
+                "optional": true
+              },
+              {
+                "id": 47,
+                "name": "getMetricsRequest",
+                "type": "GetMetricsRequestProto",
+                "optional": true
+              },
+              {
+                "id": 48,
+                "name": "containerBalancerStatusInfoRequest",
+                "type": "ContainerBalancerStatusInfoRequestProto",
+                "optional": true
+              },
+              {
+                "id": 49,
+                "name": "reconcileContainerRequest",
+                "type": "ReconcileContainerRequestProto",
                 "optional": true
               }
             ]
@@ -753,7 +815,13 @@
                 "id": 41,
                 "name": "resetDeletedBlockRetryCountResponse",
                 "type": "ResetDeletedBlockRetryCountResponseProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 42,
@@ -765,12 +833,48 @@
                 "id": 43,
                 "name": "getFailedDeletedBlocksTxnResponse",
                 "type": "GetFailedDeletedBlocksTxnResponseProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 44,
                 "name": "decommissionScmResponse",
                 "type": "DecommissionScmResponseProto",
+                "optional": true
+              },
+              {
+                "id": 45,
+                "name": "singleNodeQueryResponse",
+                "type": "SingleNodeQueryResponseProto",
+                "optional": true
+              },
+              {
+                "id": 46,
+                "name": "getContainersOnDecomNodeResponse",
+                "type": "GetContainersOnDecomNodeResponseProto",
+                "optional": true
+              },
+              {
+                "id": 47,
+                "name": "getMetricsResponse",
+                "type": "GetMetricsResponseProto",
+                "optional": true
+              },
+              {
+                "id": 48,
+                "name": "containerBalancerStatusInfoResponse",
+                "type": "ContainerBalancerStatusInfoResponseProto",
+                "optional": true
+              },
+              {
+                "id": 49,
+                "name": "reconcileContainerResponse",
+                "type": "ReconcileContainerResponseProto",
                 "optional": true
               }
             ]
@@ -782,7 +886,7 @@
                 "id": 2,
                 "name": "replicationFactor",
                 "type": "ReplicationFactor",
-                "required": true
+                "optional": true
               },
               {
                 "id": 3,
@@ -800,6 +904,12 @@
                 "id": 5,
                 "name": "traceID",
                 "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "ecReplicationConfig",
+                "type": "ECReplicationConfig",
                 "optional": true
               }
             ]
@@ -1059,6 +1169,12 @@
                 "name": "containers",
                 "type": "ContainerInfoProto",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "containerCount",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -1157,6 +1273,28 @@
             ]
           },
           {
+            "name": "SingleNodeQueryRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "uuid",
+                "type": "UUID",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "SingleNodeQueryResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanode",
+                "type": "Node",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "DatanodeUsageInfoRequestProto",
             "fields": [
               {
@@ -1204,6 +1342,12 @@
                 "name": "hosts",
                 "type": "string",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "force",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -1270,6 +1414,12 @@
                 "id": 2,
                 "name": "endInHours",
                 "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "force",
+                "type": "bool",
                 "optional": true
               }
             ]
@@ -1832,6 +1982,42 @@
                 "name": "iterations",
                 "type": "int32",
                 "optional": true
+              },
+              {
+                "id": 10,
+                "name": "balancingInterval",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "moveTimeout",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "moveReplicationTimeout",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "networkTopologyEnable",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 14,
+                "name": "includeNodes",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 15,
+                "name": "excludeNodes",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -1889,6 +2075,145 @@
             ]
           },
           {
+            "name": "ContainerBalancerStatusInfoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerBalancerStatusInfoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "isRunning",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerBalancerStatusInfo",
+                "type": "ContainerBalancerStatusInfoProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerBalancerStatusInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "startedAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "configuration",
+                "type": "ContainerBalancerConfigurationProto",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "iterationsStatusInfo",
+                "type": "ContainerBalancerTaskIterationStatusInfoProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerBalancerTaskIterationStatusInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "iterationNumber",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "iterationResult",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "sizeScheduledForMove",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "dataSizeMoved",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "containerMovesScheduled",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "containerMovesCompleted",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "containerMovesFailed",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "containerMovesTimeout",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "sizeEnteringNodes",
+                "type": "NodeTransferInfoProto",
+                "is_repeated": true
+              },
+              {
+                "id": 10,
+                "name": "sizeLeavingNodes",
+                "type": "NodeTransferInfoProto",
+                "is_repeated": true
+              },
+              {
+                "id": 11,
+                "name": "iterationDuration",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "NodeTransferInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "uuid",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "dataVolume",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "DecommissionScmRequestProto",
             "fields": [
               {
@@ -1915,6 +2240,81 @@
                 "optional": true
               }
             ]
+          },
+          {
+            "name": "GetContainersOnDecomNodeRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanodeDetails",
+                "type": "DatanodeDetailsProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ContainersOnDecomNodeProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "id",
+                "type": "ContainerID",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainersOnDecomNodeResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containersOnDecomNode",
+                "type": "ContainersOnDecomNodeProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetMetricsRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "query",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetMetricsResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "metricsJson",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ReconcileContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ReconcileContainerResponseProto"
           }
         ],
         "services": [

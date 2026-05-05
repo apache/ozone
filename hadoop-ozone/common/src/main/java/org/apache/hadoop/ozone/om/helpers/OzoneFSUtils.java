@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,23 +14,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 import jakarta.annotation.Nonnull;
 import java.nio.file.Paths;
 import java.util.UUID;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for OzoneFileSystem.
  */
 public final class OzoneFSUtils {
+  static final Logger LOG = LoggerFactory.getLogger(OzoneFSUtils.class);
 
   private OzoneFSUtils() { }
 
@@ -93,32 +99,79 @@ public final class OzoneFSUtils {
   }
 
   /**
-   * Whether the pathname is valid.  Currently prohibits relative paths,
-   * names which contain a ":" or "//", or other non-canonical paths.
+   * Core validation logic for key path components.
+   * Checks for invalid characters: ".", "..", ":", "/", and "//" in the middle.
+   *
+   * @param path the path to validate
+   * @param allowLeadingSlash whether leading slash is allowed (true) or invalid (false)
+   * @return true if path components are valid, false otherwise
    */
-  public static boolean isValidName(String src) {
-    // Path must be absolute.
-    if (!src.startsWith(Path.SEPARATOR)) {
-      return false;
-    }
-
-    // Check for ".." "." ":" "/"
-    String[] components = StringUtils.split(src, '/');
-    for (int i = 0; i < components.length; i++) {
-      String element = components[i];
-      if (element.equals(".")  ||
-          (element.contains(":"))  ||
-          (element.contains("/") || element.equals(".."))) {
+  private static boolean validateKeyPathComponents(String path, boolean allowLeadingSlash) {
+    if (allowLeadingSlash) {
+      if (!path.startsWith(Path.SEPARATOR)) {
         return false;
       }
-      // The string may start or end with a /, but not have
-      // "//" in the middle.
-      if (element.isEmpty() && i != components.length - 1 &&
-          i != 0) {
+    } else {
+      if (path.startsWith(Path.SEPARATOR)) {
+        return false;
+      }
+    }
+
+    String[] components = StringUtils.split(path, '/');
+    for (int i = 0; i < components.length; i++) {
+      String element = components[i];
+      if (element.equals(".") ||
+          element.contains(":") ||
+          element.contains("/") ||
+          element.equals("..")) {
+        return false;
+      }
+
+      // The string may end with a /, but not have "//" in the middle.
+      if (element.isEmpty() && i != components.length - 1) {
+        // Allow empty at start for absolute paths (e.g., "/a/b" → ["", "a", "b"])
+        // This is needed for isValidName but not for isValidKeyPath (which rejects leading slashes)
+        if (allowLeadingSlash && i == 0) {
+          continue;
+        }
         return false;
       }
     }
     return true;
+  }
+
+  /**
+   * Whether the pathname is valid.  Currently prohibits relative paths,
+   * names which contain a ":" or "//", or other non-canonical paths.
+   */
+  public static boolean isValidName(String path) {
+    return validateKeyPathComponents(path, true);
+  }
+
+  /**
+   * Whether the pathname is valid.  Check key names which contain a
+   * ":", ".", "..", "//", "". If it has any of these characters throws
+   * OMException, else return the path.
+   *
+   * @param path the path to validate
+   * @param throwOnEmpty whether to throw exception if path is empty
+   * @return the path if valid
+   * @throws OMException if path is invalid
+   */
+  public static String isValidKeyPath(String path, boolean throwOnEmpty) throws OMException {
+    if (path.isEmpty()) {
+      if (throwOnEmpty) {
+        throw new OMException("Invalid KeyPath, empty keyName",
+            INVALID_KEY_NAME);
+      }
+      return path;
+    }
+
+    if (!validateKeyPathComponents(path, false)) {
+      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
+    }
+
+    return path;
   }
 
   /**
@@ -197,7 +250,6 @@ public final class OzoneFSUtils {
     return childParent == parentParent;
   }
 
-
   /**
    * Verifies whether the childKey is an immediate path under the given
    * parentKey.
@@ -256,8 +308,8 @@ public final class OzoneFSUtils {
   public static String appendFileNameToKeyPath(String keyName,
                                                String fileName) {
     StringBuilder newToKeyName = new StringBuilder(keyName);
-    newToKeyName.append(OZONE_URI_DELIMITER);
-    newToKeyName.append(fileName);
+    newToKeyName.append(OZONE_URI_DELIMITER)
+        .append(fileName);
     return newToKeyName.toString();
   }
 
@@ -291,5 +343,32 @@ public final class OzoneFSUtils {
       res = res.getParent();
     }
     return res;
+  }
+
+  /**
+   * Helper method to return whether Hsync can be enabled.
+   * And print warning when the config is ignored.
+   */
+  public static boolean canEnableHsync(ConfigurationSource conf, boolean isClient) {
+    final String confKey = isClient ?
+        "ozone.client.hbase.enhancements.allowed" :
+        OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED;
+
+    boolean confHBaseEnhancementsAllowed = conf.getBoolean(
+        confKey, OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED_DEFAULT);
+
+    boolean confHsyncEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+
+    if (confHBaseEnhancementsAllowed) {
+      return confHsyncEnabled;
+    } else {
+      if (confHsyncEnabled) {
+        LOG.debug("Ignoring {} = {} because HBase enhancements are disallowed. To enable it, set {} = true as well.",
+            OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true,
+            confKey);
+      }
+      return false;
+    }
   }
 }

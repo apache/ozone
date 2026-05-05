@@ -1,26 +1,26 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.hadoop.util.ClosableIterator;
-
+import com.google.common.primitives.UnsignedBytes;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,33 +28,26 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.ozone.util.ClosableIterator;
 
 /**
  * Util classes for Snapshot Persistent DataStructures for tests.
  */
 public class SnapshotTestUtils {
 
-  private static <K> String getStringKey(K key) {
-    if (key.getClass().isArray()) {
-      Class<?> componentType = key.getClass().getComponentType();
-      if (componentType == byte.class) {
-        return Arrays.toString((byte[])key);
-      } else if (componentType == int.class) {
-        return Arrays.toString((int[])key);
-      } else if (componentType == long.class) {
-        return Arrays.toString((long[])key);
-      } else if (componentType == float.class) {
-        return Arrays.toString((float[])key);
-      } else if (componentType == double.class) {
-        return Arrays.toString((double[])key);
-      } else if (componentType == char.class) {
-        return Arrays.toString((char[])key);
-      } else {
-        return Arrays.toString((Object[])key);
-      }
+  private static final CodecRegistry CODEC_REGISTRY = CodecRegistry.newBuilder().build();
+
+  private static final Comparator<byte[]> UNSIGNED_BYTE_COMPARATOR = UnsignedBytes.lexicographicalComparator();
+  private static final Comparator<Object> COMPARATOR = (k1, k2) -> {
+    try {
+      byte[] k1Bytes = CODEC_REGISTRY.asRawData(k1);
+      byte[] k2Bytes = CODEC_REGISTRY.asRawData(k2);
+      return UNSIGNED_BYTE_COMPARATOR.compare(k1Bytes, k2Bytes);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
-    return key.toString();
-  }
+  };
 
   /**
    * Stubbed implementation of CloseableIterator containing iterators.
@@ -93,13 +86,12 @@ public class SnapshotTestUtils {
 
     public StubbedPersistentMap(Map<K, V> map) {
       this();
-      map.entrySet().iterator().forEachRemaining(i ->
-          this.put(i.getKey(), i.getValue()));
+      this.map.putAll(map);
     }
 
     public StubbedPersistentMap() {
-      this.map = new TreeMap<>(
-          Comparator.comparing(SnapshotTestUtils::getStringKey));
+
+      this.map = new TreeMap<>(COMPARATOR);
     }
 
     @Override
@@ -143,8 +135,7 @@ public class SnapshotTestUtils {
     }
 
     public StubbedPersistentSet() {
-      this.set = new TreeSet<>(
-          Comparator.comparing(SnapshotTestUtils::getStringKey));
+      this.set = new TreeSet<>(COMPARATOR);
     }
 
     @Override

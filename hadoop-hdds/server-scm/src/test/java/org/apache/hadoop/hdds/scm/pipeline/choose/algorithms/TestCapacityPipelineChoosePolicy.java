@@ -1,21 +1,31 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
@@ -25,16 +35,6 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.junit.jupiter.api.Test;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test for the capacity pipeline choose policy.
@@ -53,13 +53,13 @@ public class TestCapacityPipelineChoosePolicy {
     // used       0   10    20    30
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodeStat(datanodes.get(0)))
-        .thenReturn(new SCMNodeMetric(100L, 0, 100L, 0, 0));
+        .thenReturn(new SCMNodeMetric(100L, 0, 100L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(1)))
-        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0, 0));
+        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 20L, 80L, 0, 0));
+        .thenReturn(new SCMNodeMetric(100L, 20L, 80L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0, 0));
+        .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0, 0, 0));
 
     PipelineChoosePolicy policy = new CapacityPipelineChoosePolicy().init(mockNodeManager);
 

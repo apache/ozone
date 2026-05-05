@@ -27,7 +27,8 @@ import {
   FolderOpenOutlined,
   FileTextOutlined,
   QuestionCircleOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  HourglassOutlined
 } from '@ant-design/icons';
 import { RouteComponentProps } from 'react-router';
 import { withRouter, Link } from 'react-router-dom';
@@ -70,7 +71,8 @@ const IconSelector = ({ iconType, ...extras }: { iconType: string }) => {
     'inbox': <InboxOutlined {...extras} />,
     'folder-open': <FolderOpenOutlined {...extras} />,
     'file-text': <FileTextOutlined {...extras} />,
-    'delete': <DeleteOutlined {...extras} />
+    'delete': <DeleteOutlined {...extras} />,
+    'hourglass': <HourglassOutlined {...extras} />
   }
 
   const selectIcon = (type: string) => {
@@ -101,7 +103,7 @@ class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
         active: '3'
       }
     }
-    else if (title === 'OM Service') {
+    else if (title === 'Ozone Service ID') {
       return {
         active: '4'
       }
@@ -140,10 +142,10 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
   render() {
     let { icon, data, title, loading, hoverable, storageReport, linkToUrl, error } = this.props;
 
-    let meta = <Meta title={data} description={title} />;
+    let meta = <Meta title={data} description={title} data-testid={`overview-${title}`} />;
     let errorClass = error ? 'card-error' : '';
 
-    if (typeof data === 'string' && data === 'N/A'){
+    if (typeof data === 'string' && data === 'N/A') {
       errorClass = 'card-error';
     }
 
@@ -152,7 +154,12 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
         <div className='ant-card-percentage'>
           {meta}
           <div className='storage-bar'>
-            <StorageBar total={storageReport.capacity} used={storageReport.used} remaining={storageReport.remaining} showMeta={false} />
+            <StorageBar
+              total={storageReport.capacity}
+              used={storageReport.used}
+              remaining={storageReport.remaining}
+              committed={storageReport.committed}
+              showMeta={false} />
           </div>
         </div>
       );

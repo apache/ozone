@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,17 +17,26 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 import javax.xml.bind.DatatypeConverter;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -38,41 +46,27 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test verifies object store with OZONE_OM_ENABLE_FILESYSTEM_PATHS enabled.
  */
-@Timeout(200)
-public class TestObjectStoreWithLegacyFS {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static OzoneClient client;
+  private OzoneClient client;
 
   private String volumeName;
 
@@ -82,36 +76,28 @@ public class TestObjectStoreWithLegacyFS {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestObjectStoreWithLegacyFS.class);
+  private boolean originalFileSystemPathEnabled;
 
   @BeforeAll
-  public static void initClass() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  void initClass() throws Exception {
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    originalFileSystemPathEnabled = omConfig.isFileSystemPathEnabled();
+    omConfig.setFileSystemPathEnabled(true);
 
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        BucketLayout.LEGACY.name());
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+    client = cluster().newClient();
   }
 
-  /**
-   * Shutdown MiniOzoneCluster.
-   */
   @AfterAll
-  public static void shutdown() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    omConfig.setFileSystemPathEnabled(originalFileSystemPathEnabled);
   }
 
   @BeforeEach
   public void init() throws Exception {
-    volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    volumeName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
+    bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
@@ -132,11 +118,11 @@ public class TestObjectStoreWithLegacyFS {
         .createKey("dir1/dir2/dir3/key-1", 0);
     stream.close();
     Table<String, OmKeyInfo> keyTable =
-        cluster.getOzoneManager().getMetadataManager()
+        cluster().getOzoneManager().getMetadataManager()
             .getKeyTable(BucketLayout.OBJECT_STORE);
 
     String seekKey = "dir";
-    String dbKey = cluster.getOzoneManager().getMetadataManager()
+    String dbKey = cluster().getOzoneManager().getMetadataManager()
         .getOzoneKey(volumeName, bucketName, seekKey);
 
     GenericTestUtils
@@ -155,7 +141,7 @@ public class TestObjectStoreWithLegacyFS {
       String dbKey, int expectedCnt, String keyName) {
     int countKeys = 0;
     int matchingKeys = 0;
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (Table.KeyValueIterator<String, OmKeyInfo>
           itr = keyTable.iterator()) {
       itr.seek(dbKey);
       while (itr.hasNext()) {
@@ -226,7 +212,7 @@ public class TestObjectStoreWithLegacyFS {
     String uploadID = omMultipartInfo.getUploadID();
 
     // upload part 1.
-    byte[] data = generateData(128, (byte) RandomUtils.nextLong());
+    byte[] data = generateData(128, (byte) RandomUtils.secure().randomLong());
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);

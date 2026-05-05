@@ -28,7 +28,7 @@ ${USERNAME}                         hadoop
 ${PUBLIC_KEY}                       /opt/.ssh/id_rsa
 ${OM_SERVICE_ID}                    %{OM_SERVICE_ID}
 ${OZONE_LOG_DIR}                    /ozone/logs/
-${RATIS_DIR}                        /data/metadata/ratis
+${RATIS_DIR}                        /data/metadata/om.ratis
 ${VOLUME}                           volume1
 ${BUCKET}                           bucket1
 ${TEST_FILE}                        NOTICE.txt

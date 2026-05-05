@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,16 +19,14 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.Set;
-
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
-import org.apache.hadoop.ozone.upgrade.VersionFactoryKey;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
@@ -37,8 +34,6 @@ import org.reflections.util.ClasspathHelper;
 import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Class to manage layout versions and features for Ozone Manager.
@@ -55,16 +50,12 @@ public final class OMLayoutVersionManager
       OM_CLASS_PACKAGE + ".request";
   public static final String OM_UPGRADE_CLASS_PACKAGE =
       OM_CLASS_PACKAGE + ".upgrade";
-  private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
-      requestFactory;
 
   public OMLayoutVersionManager(int layoutVersion) throws OMException {
-    requestFactory = new LayoutVersionInstanceFactory<>();
     init(layoutVersion);
   }
 
   public OMLayoutVersionManager() throws IOException {
-    requestFactory = new LayoutVersionInstanceFactory<>();
     OMLayoutFeature[] features = OMLayoutFeature.values();
     init(features[features.length - 1].layoutVersion(), features);
   }
@@ -108,7 +99,7 @@ public final class OMLayoutVersionManager
           OMLayoutFeature feature = annotation.feature();
           if (feature.layoutVersion() > getMetadataLayoutVersion()) {
             LOG.info("Registering Upgrade Action : {}", action.name());
-            feature.addAction(annotation.type(), action);
+            feature.addAction(action);
           }  else {
             LOG.info("Skipping Upgrade Action {} since it has been finalized" +
                 ".", action.name());
@@ -145,29 +136,9 @@ public final class OMLayoutVersionManager
     return validRequests;
   }
 
-  private void registerRequestType(String type, int version,
-                                   Class<? extends OMClientRequest> reqClass) {
-    VersionFactoryKey key = new VersionFactoryKey.Builder()
-        .key(type).version(version).build();
-    requestFactory.register(this, key, reqClass);
-  }
-
-  /**
-   * Given a type and version, get the corresponding request class type.
-   * @param type type string
-   * @return class type.
-   */
-  @Override
-  public Class<? extends OMClientRequest> getHandler(String type) {
-    VersionFactoryKey versionFactoryKey = new VersionFactoryKey.Builder()
-        .key(type).build();
-    return requestFactory.get(this, versionFactoryKey);
-  }
-
   @Override
   public void finalized(OMLayoutFeature layoutFeature) {
     super.finalized(layoutFeature);
-    requestFactory.finalizeFeature(layoutFeature);
   }
 
   public static int maxLayoutVersion() {

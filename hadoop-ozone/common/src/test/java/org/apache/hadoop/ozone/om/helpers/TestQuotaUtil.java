@@ -1,31 +1,31 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.junit.jupiter.api.Test;
+package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for the QuotaUtil class.
@@ -95,6 +95,30 @@ public class TestQuotaUtil {
     long replicatedSize = QuotaUtil.getReplicatedSize(dataSize, repConfig);
     // Expected is 123 parity stripes, plus another 1MB in each parity
     assertEquals(dataSize + ONE_MB * 2, replicatedSize);
+  }
+
+  @Test
+  public void testGetSizePerReplicaRatisThree() {
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
+    // Each of the 3 DNs holds the full block, so per-replica == logical size.
+    assertEquals(123 * ONE_MB, QuotaUtil.getSizePerReplica(123 * ONE_MB, repConfig));
+  }
+
+  @Test
+  public void testGetSizePerReplicaRatisOne() {
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(ONE);
+    assertEquals(123 * ONE_MB, QuotaUtil.getSizePerReplica(123 * ONE_MB, repConfig));
+  }
+
+  @Test
+  public void testGetSizePerReplicaEC() {
+    // EC(3,2): 5 nodes total. replicatedSize = dataSize + parity overhead.
+    // Per-replica = replicatedSize / 5.
+    ECReplicationConfig repConfig = new ECReplicationConfig(3, 2, RS, ONE_MB);
+    long dataSize = ONE_MB * 3 * 10; // 10 full stripes
+    long replicatedSize = QuotaUtil.getReplicatedSize(dataSize, repConfig);
+    long expected = replicatedSize / repConfig.getRequiredNodes(); // / 5
+    assertEquals(expected, QuotaUtil.getSizePerReplica(dataSize, repConfig));
   }
 
 }

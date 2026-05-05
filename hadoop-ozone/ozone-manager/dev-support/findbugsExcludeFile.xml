@@ -16,77 +16,8 @@
    limitations under the License.
 -->
 <FindBugsFilter>
-  <!-- Test -->
   <Match>
-    <Class name="org.apache.hadoop.ozone.om.TestChunkStreams"/>
-    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.TestOMStorage"/>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.TestOmMetadataManager"/>
-    <Bug pattern="UC_USELESS_OBJECT" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.TestOzoneManagerHttpServer"/>
-    <Bug pattern="REC_CATCH_EXCEPTION" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.TestOzoneManagerHttpServer"/>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.ratis.TestOzoneManagerDoubleBufferWithOMResponse"/>
-    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.ratis.TestOzoneManagerRatisServer"/>
-    <Bug pattern="URF_UNREAD_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.ratis.TestOzoneManagerDoubleBufferWithDummyResponse"/>
-    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.request.TestNormalizePaths"/>
-    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
-  </Match>
-  <Match>
-    <Class name="~org\.apache\.hadoop\.ozone\.om\.request\.TestOMClientRequestWithUserInfo\$.*"/>
-    <Bug pattern="UMAC_UNCALLABLE_METHOD_OF_ANONYMOUS_CLASS" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.request.security.TestOMDelegationTokenRequest"/>
-    <Bug pattern="UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.snapshot.TestSnapshotDiffManager" />
+    <Class name="org.apache.hadoop.ozone.om.snapshot.diff.delta.TestRDBDifferComputer"/>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.security.TestOzoneManagerBlockToken"/>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.security.TestOzoneManagerBlockToken"/>
-    <Bug pattern="UC_USELESS_OBJECT" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.security.TestOzoneTokenIdentifier"/>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.security.TestOzoneTokenIdentifier"/>
-    <Bug pattern="UC_USELESS_OBJECT" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.snapshot.TestFSODirectoryPathResolver"/>
-    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.upgrade.TestOMLayoutFeatureAspect"/>
-    <Bug pattern="BC_IMPOSSIBLE_CAST" />
   </Match>
 </FindBugsFilter>

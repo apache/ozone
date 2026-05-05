@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,9 +17,18 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Preconditions;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+
+import jakarta.annotation.Nonnull;
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -28,13 +36,14 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -45,18 +54,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Allocat
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handles allocate block request - prefix layout.
@@ -72,8 +71,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     AllocateBlockRequest allocateBlockRequest =
             getOmRequest().getAllocateBlockRequest();
@@ -83,7 +82,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
     OzoneManagerProtocolProtos.KeyLocation blockLocation =
             allocateBlockRequest.getKeyLocation();
-    Preconditions.checkNotNull(blockLocation);
+    Objects.requireNonNull(blockLocation, "blockLocation == null");
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -125,7 +124,15 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
         throw new OMException("Open Key not found " + openKeyName,
                 KEY_NOT_FOUND);
       }
-
+      if (openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
+        throw new OMException("Open Key " + openKeyName + " is under lease recovery",
+            KEY_UNDER_LEASE_RECOVERY);
+      }
+      if (openKeyInfo.getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY) ||
+          openKeyInfo.getMetadata().containsKey(OzoneConsts.OVERWRITTEN_HSYNC_KEY)) {
+        throw new OMException("Open Key " + openKeyName + " is already deleted/overwritten",
+            KEY_NOT_FOUND);
+      }
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
               OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
@@ -153,10 +160,12 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       openKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       // Set the UpdateID to current transactionLogIndex
-      openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      openKeyInfo = openKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // Add to cache.
-      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName,
+      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName, keyName,
               openKeyInfo);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
@@ -184,7 +193,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
             exception, getOmRequest().getUserInfo()));
 
     return omClientResponse;
@@ -211,11 +220,10 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,
-      OMMetadataManager omMetadataManager, String openKeyName,
+      OMMetadataManager omMetadataManager, String openKeyName, String keyName,
       OmKeyInfo openKeyInfo) {
-    String fileName = openKeyInfo.getFileName();
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, openKeyName,
-            openKeyInfo, fileName, trxnLogIndex);
+        openKeyInfo, keyName, trxnLogIndex);
   }
 
   @Nonnull

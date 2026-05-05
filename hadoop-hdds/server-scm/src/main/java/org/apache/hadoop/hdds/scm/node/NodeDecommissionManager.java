@@ -1,43 +1,24 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.scm.DatanodeAdminError;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -53,6 +34,25 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class used to manage datanodes scheduled for maintenance or decommission.
@@ -110,7 +110,7 @@ public class NodeDecommissionManager {
         }
       } catch (URISyntaxException e) {
         throw new InvalidHostStringException(
-            "Unable to parse the hoststring " + rawHostname, e);
+            "Unable to parse the host string " + rawHostname, e);
       }
     }
   }
@@ -215,9 +215,9 @@ public class NodeDecommissionManager {
     if (dns.size() < 2) {
       return true;
     }
-    int port = dns.get(0).getPort(DatanodeDetails.Port.Name.RATIS).getValue();
+    int port = dns.get(0).getRatisPort().getValue();
     for (int i = 1; i < dns.size(); i++) {
-      if (dns.get(i).getPort(DatanodeDetails.Port.Name.RATIS).getValue()
+      if (dns.get(i).getRatisPort().getValue()
           != port) {
         return false;
       }
@@ -273,24 +273,15 @@ public class NodeDecommissionManager {
     );
 
     useHostnames = config.getBoolean(
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
 
-    long monitorInterval = config.getTimeDuration(
+    long monitorIntervalMs = config.getOrFixDuration(
+        LOG,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
-        TimeUnit.SECONDS);
-    if (monitorInterval <= 0) {
-      LOG.warn("{} must be greater than zero, defaulting to {}",
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
-      config.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
-      monitorInterval = config.getTimeDuration(
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
-          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
-          TimeUnit.SECONDS);
-    }
+        TimeUnit.MILLISECONDS);
+
     setMaintenanceConfigs(config.getInt("hdds.scm.replication.maintenance.replica.minimum", 2),
         config.getInt("hdds.scm.replication.maintenance.remaining.redundancy", 1));
 
@@ -298,8 +289,8 @@ public class NodeDecommissionManager {
         rm);
     this.metrics = NodeDecommissionMetrics.create();
     monitor.setMetrics(this.metrics);
-    executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
-        TimeUnit.SECONDS);
+    executor.scheduleAtFixedRate(monitor, monitorIntervalMs, monitorIntervalMs,
+        TimeUnit.MILLISECONDS);
   }
 
   public Map<String, List<ContainerID>> getContainersPendingReplication(DatanodeDetails dn)
@@ -398,10 +389,12 @@ public class NodeDecommissionManager {
         if (opState != NodeOperationalState.IN_SERVICE) {
           numDecom--;
           validDns.remove(dn);
+          LOG.warn("Cannot decommission {} because it is not IN-SERVICE", dn.getHostName());
         }
       } catch (NodeNotFoundException ex) {
         numDecom--;
         validDns.remove(dn);
+        LOG.warn("Cannot decommission {} because it is not found in SCM", dn.getHostName());
       }
     }
 
@@ -430,9 +423,11 @@ public class NodeDecommissionManager {
           }
           int reqNodes = cif.getReplicationConfig().getRequiredNodes();
           if ((inServiceTotal - numDecom) < reqNodes) {
+            final int unHealthyTotal = nodeManager.getAllNodeCount() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to decommission " + dns.size() +
-                " nodes of which " + numDecom + " nodes were valid. Cluster has " + inServiceTotal +
-                " IN-SERVICE nodes, " + reqNodes + " of which are required for minimum replication. ";
+                " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
+                " not IN-SERVICE or not HEALTHY nodes. Cannot decommission as a minimum of " + reqNodes +
+                " IN-SERVICE HEALTHY nodes are required to maintain replication after decommission. ";
             LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
             errors.add(new DatanodeAdminError("AllHosts", errorMsg));
             return false;
@@ -552,10 +547,12 @@ public class NodeDecommissionManager {
         if (opState != NodeOperationalState.IN_SERVICE) {
           numMaintenance--;
           validDns.remove(dn);
+          LOG.warn("{} cannot enter maintenance because it is not IN-SERVICE", dn.getHostName());
         }
       } catch (NodeNotFoundException ex) {
         numMaintenance--;
         validDns.remove(dn);
+        LOG.warn("{} cannot enter maintenance because it is not found in SCM", dn.getHostName());
       }
     }
 
@@ -594,9 +591,11 @@ public class NodeDecommissionManager {
             minInService = maintenanceReplicaMinimum;
           }
           if ((inServiceTotal - numMaintenance) < minInService) {
+            final int unHealthyTotal = nodeManager.getAllNodeCount() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to start maintenance for " + dns.size() +
-                " nodes of which " + numMaintenance + " nodes were valid. Cluster has " + inServiceTotal +
-                " IN-SERVICE nodes, " + minInService + " of which are required for minimum replication. ";
+                " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
+                " not IN-SERVICE or not HEALTHY nodes. Cannot enter maintenance mode as a minimum of " + minInService +
+                " IN-SERVICE HEALTHY nodes are required to maintain replication after maintenance. ";
             LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
             errors.add(new DatanodeAdminError("AllHosts", errorMsg));
             return false;

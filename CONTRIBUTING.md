@@ -75,9 +75,12 @@ cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
 OZONE_REPLICATION_FACTOR=3 ./run.sh -d
 ```
 
-See more details in the [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) and in the [docs](https://ozone.apache.org/docs/current/start.html).
+See more details in the [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) and in the [docs](https://ozone.apache.org/docs/developer-guide/run/docker-compose/).
 
 ## Jira guideline
+
+If you do not have an ASF Jira account yet, please request one from the official ASF self-service page:
+[Request a Jira account](https://selfserve.apache.org/jira-account.html?project=ozone).
 
 When creating a new jira for any kind of new feature, improvement or bug, please follow below guideline: 
 
@@ -89,6 +92,10 @@ When creating a new jira for any kind of new feature, improvement or bug, please
      * For bugs, add steps to reproduce it. Where the root cause is unknown and needs investigation, it would be great to update the jira description or add the summary once the root cause is identified.
      * If it is follow up of another issue, please link the previous jira to it so that context is preserve.
   3. **Jira examples:** [HDDS-9272](https://issues.apache.org/jira/browse/HDDS-9272), [HDDS-9322](https://issues.apache.org/jira/browse/HDDS-9322), [HDDS-9291](https://issues.apache.org/jira/browse/HDDS-9291), [HDDS-8940](https://issues.apache.org/jira/browse/HDDS-8940), [HDDS-9282](https://issues.apache.org/jira/browse/HDDS-9282)
+
+## New feature development
+
+For large feature development changes, we use a process called "Ozone Enhancement Proposals" (OEP). This process is designed to ensure that major changes to Ozone are well-designed and have community consensus. If you are planning to propose a significant change, please read the [Ozone Enhancement Proposals](https://ozone.apache.org/docs/edge/design/ozone-enhancement-proposals.html) documentation and create a design document before you start coding. Please note that we only accept design documents in Markdown format; PDF or Google Docs are no longer accepted.
 
 ## Contribute your modifications
 
@@ -125,13 +132,9 @@ Basic code conventions followed by Ozone:
 
 These are checked by tools like Checkstyle and RAT.
 
-For IntelliJ users, it is recommended to import and select the Code Style scheme located at:
+Ozone code style is shared via `.editorconfig` configuration file and will be automatically imported when the project is opened.
 
-```
-./hadoop-ozone/dev-support/intellij/ozone-style.xml
-```
-
-See https://www.jetbrains.com/help/idea/configuring-code-style.html#import-code-style for detailed instructions.
+See https://www.jetbrains.com/help/idea/configure-project-settings.html#share-project-through-vcs for detailed instructions.
 
 ### Check your contribution
 
@@ -145,6 +148,7 @@ The [`hadoop-ozone/dev-support/checks` directory](https://github.com/apache/ozon
     * `docs.sh`: sanity checks for [Ozone documentation](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs)
     * `dependency.sh`: compares list of jars in build output with known list
     * `checkstyle.sh`: Checkstyle
+    * `pmd.sh`: PMD
  3. moderate (around 10 minutes)
     * `findbugs.sh`: SpotBugs
     * `kubernetes.sh`: very limited set of tests run in Kubernetes environment
@@ -165,16 +169,17 @@ As Ozone uses Apache Maven it can be developed from any IDE.  IntelliJ IDEA is a
 
 ### Run Ozone from IntelliJ
 
-Ozone components depends on maven classpath. We generate classpath descriptor from the maven pom.xml files to use exactly the same classpath at runtime.
+Ozone components depend on maven classpath. We generate classpath descriptor from the maven pom.xml files to use exactly the same classpath at runtime.
 
-As a result, it's easy to start _all_ the components from IDE as the right classpath (without provided scope) has already been set.
+As a result, it's straightforward to start _all_ the components from IDE as the right classpath (without provided scope) has already been set.
 
-To start Ozone from IntelliJ:
+Ozone project has pre-defined run configurations shared via standard IDE folder for run configurations:
 
-1. Stop your IDE
-2. Execute the `./hadoop-ozone/dev-support/intellij/install-runconfigs.sh` helper script.
-3. Start the IDE
-4. New runner definitions are available from the Run menu.
+```
+.run
+```
+
+They will be automatically added to the IDE on project import.
 
 You can use the installed Run configurations in the following order:
 

@@ -1,22 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
@@ -26,7 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -109,7 +106,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
   }
 
   @Override
-  public void createBucket(String bucketName) {
+  public void createBucket(String bucketName) throws OMException {
     createBucket(bucketName, new BucketArgs.Builder()
         .setStorageType(StorageType.DEFAULT)
         .setVersioning(false)
@@ -117,7 +114,11 @@ public final class OzoneVolumeStub extends OzoneVolume {
   }
 
   @Override
-  public void createBucket(String bucketName, BucketArgs bucketArgs) {
+  public void createBucket(String bucketName, BucketArgs bucketArgs) throws OMException {
+    if (buckets.containsKey(bucketName)) {
+      throw new OMException("", OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
+    }
+
     buckets.put(bucketName, OzoneBucketStub.newBuilder()
         .setVolumeName(getName())
         .setName(bucketName)
@@ -169,10 +170,14 @@ public final class OzoneVolumeStub extends OzoneVolume {
 
   @Override
   public void deleteBucket(String bucketName) throws IOException {
-    if (buckets.containsKey(bucketName)) {
+    if (!buckets.containsKey(bucketName)) {
+      throw new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND);
+    }
+    OzoneBucketStub bucket = (OzoneBucketStub) buckets.get(bucketName);
+    if (bucket.isEmpty()) {
       buckets.remove(bucketName);
     } else {
-      throw new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND);
+      throw new OMException("", OMException.ResultCodes.BUCKET_NOT_EMPTY);
     }
   }
 

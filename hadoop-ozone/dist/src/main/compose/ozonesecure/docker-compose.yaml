@@ -22,9 +22,9 @@ services:
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
-    command: ["krb5kdc","-n"]
+    command: ["/opt/hadoop/compose/common/init-kdc.sh"]
   kms:
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: kms
     dns_search: .
     ports:
@@ -96,7 +96,7 @@ services:
       - 9878:9878
     env_file:
       - ./docker-config
-    command: ["/opt/hadoop/bin/ozone","s3g"]
+    command: ["/opt/hadoop/bin/ozone","s3g", "-Dozone.om.transport.class=${OZONE_S3_OM_TRANSPORT:-org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory}"]
     environment:
       OZONE_OPTS:
   recon:

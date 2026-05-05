@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.cache.CacheBuilder;
@@ -34,7 +34,7 @@ public class ResourceCache<K, V> implements Cache<K, V> {
   public ResourceCache(
       Weigher<K, V> weigher, long limits,
       RemovalListener<K, V> listener) {
-    Objects.requireNonNull(weigher);
+    Objects.requireNonNull(weigher, "weigher == null");
     if (listener == null) {
       cache = CacheBuilder.newBuilder()
           .maximumWeight(limits).weigher(weigher).build();
@@ -47,26 +47,26 @@ public class ResourceCache<K, V> implements Cache<K, V> {
 
   @Override
   public V get(K key) {
-    Objects.requireNonNull(key);
+    Objects.requireNonNull(key, "key == null");
     return cache.getIfPresent(key);
   }
 
   @Override
   public void put(K key, V value) throws InterruptedException {
-    Objects.requireNonNull(key);
-    Objects.requireNonNull(value);
+    Objects.requireNonNull(key, "key == null");
+    Objects.requireNonNull(value, "value == null");
     cache.put(key, value);
   }
 
   @Override
   public void remove(K key) {
-    Objects.requireNonNull(key);
+    Objects.requireNonNull(key, "key == null");
     cache.invalidate(key);
   }
 
   @Override
   public void removeIf(Predicate<K> predicate) {
-    Objects.requireNonNull(predicate);
+    Objects.requireNonNull(predicate, "predicate == null");
     for (K key : cache.asMap().keySet()) {
       if (predicate.test(key)) {
         remove(key);

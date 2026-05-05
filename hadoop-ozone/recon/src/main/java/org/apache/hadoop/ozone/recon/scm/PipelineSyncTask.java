@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,11 +21,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Node;
@@ -34,8 +31,9 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
+import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.util.Time;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,24 +53,26 @@ public class PipelineSyncTask extends ReconScmTask {
 
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final long interval;
+  private final ReconTaskStatusUpdater taskStatusUpdater;
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
       ReconNodeManager nodeManager,
       StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao,
-      ReconTaskConfig reconTaskConfig) {
-    super(reconTaskStatusDao);
+      ReconTaskConfig reconTaskConfig,
+      ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+    super(taskStatusUpdaterManager);
     this.scmClient = scmClient;
     this.reconPipelineManager = pipelineManager;
     this.nodeManager = nodeManager;
     this.interval = reconTaskConfig.getPipelineSyncTaskInterval().toMillis();
+    this.taskStatusUpdater = getTaskStatusUpdater();
   }
 
   @Override
   public void run() {
     try {
       while (canRun()) {
-        triggerPipelineSyncTask();
+        initializeAndRunTask();
         Thread.sleep(interval);
       }
     } catch (Throwable t) {
@@ -80,11 +80,13 @@ public class PipelineSyncTask extends ReconScmTask {
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+      taskStatusUpdater.recordRunCompletion();
     }
   }
 
-  public void triggerPipelineSyncTask()
-      throws IOException, TimeoutException, NodeNotFoundException {
+  @Override
+  protected void runTask() throws IOException, NodeNotFoundException {
     lock.writeLock().lock();
     try {
       long start = Time.monotonicNow();
@@ -93,7 +95,7 @@ public class PipelineSyncTask extends ReconScmTask {
       syncOperationalStateOnDeadNodes();
       LOG.debug("Pipeline sync Thread took {} milliseconds.",
           Time.monotonicNow() - start);
-      recordSingleRunCompletion();
+      taskStatusUpdater.setLastTaskRunStatus(0);
     } finally {
       lock.writeLock().unlock();
     }

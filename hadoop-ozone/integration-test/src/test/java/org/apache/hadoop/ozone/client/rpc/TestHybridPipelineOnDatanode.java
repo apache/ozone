@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,31 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import java.io.IOException;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,30 +24,44 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
-import java.util.HashMap;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests Hybrid Pipeline Creation and IO on same set of Datanodes.
  */
-@Timeout(300)
 public class TestHybridPipelineOnDatanode {
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
   private static OzoneClient client;
   private static ObjectStore objectStore;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 5);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .build();
@@ -83,9 +71,6 @@ public class TestHybridPipelineOnDatanode {
     objectStore = client.getObjectStore();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -112,22 +97,16 @@ public class TestHybridPipelineOnDatanode {
     String keyName1 = UUID.randomUUID().toString();
 
     // Write data into a key
-    OzoneOutputStream out = bucket
-        .createKey(keyName1, data.length,
-            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                ReplicationFactor.ONE), new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+    TestDataUtil.createKey(bucket, keyName1,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.ONE), value.getBytes(UTF_8));
 
     String keyName2 = UUID.randomUUID().toString();
 
     // Write data into a key
-    out = bucket
-        .createKey(keyName2, data.length,
-            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                ReplicationFactor.THREE), new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+    TestDataUtil.createKey(bucket, keyName2,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.THREE), value.getBytes(UTF_8));
 
     // We need to find the location of the chunk file corresponding to the
     // data we just wrote.
@@ -164,14 +143,13 @@ public class TestHybridPipelineOnDatanode {
     byte[] b1 = new byte[data.length];
     byte[] b2 = new byte[data.length];
     // now try to read both the keys
-    OzoneInputStream is = bucket.readKey(keyName1);
-    is.read(b1);
-    is.close();
+    try (InputStream is = bucket.readKey(keyName1)) {
+      IOUtils.readFully(is, b1);
+    }
 
-    // now try to read both the keys
-    is = bucket.readKey(keyName2);
-    is.read(b2);
-    is.close();
+    try (InputStream is = bucket.readKey(keyName2)) {
+      IOUtils.readFully(is, b2);
+    }
     assertArrayEquals(b1, data);
     assertArrayEquals(b1, b2);
   }

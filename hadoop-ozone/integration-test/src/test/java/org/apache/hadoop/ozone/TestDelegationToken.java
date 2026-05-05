@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,51 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.KeyPair;
-import java.security.PrivilegedExceptionAction;
-import java.util.Properties;
-import java.util.stream.Stream;
-import java.util.UUID;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
-import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
-import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
-import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.minikdc.MiniKdc;
-import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
-import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ratis.util.ExitUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -90,24 +46,63 @@ import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMeth
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.slf4j.event.Level.INFO;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyPair;
+import java.security.PrivilegedExceptionAction;
+import java.util.Properties;
+import java.util.UUID;
+import java.util.stream.Stream;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
+import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
+import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.minikdc.MiniKdc;
+import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test class to for security enabled Ozone cluster.
  */
-@Timeout(80)
 public final class TestDelegationToken {
 
   private static final String TEST_USER = "testUgiUser@EXAMPLE.COM";
@@ -119,10 +114,11 @@ public final class TestDelegationToken {
 
   @TempDir
   private Path folder;
+  @TempDir
+  private File workDir;
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
-  private File workDir;
   private File scmKeytab;
   private File spnegoKeytab;
   private File omKeyTab;
@@ -165,8 +161,6 @@ public final class TestDelegationToken {
       conf.set(OZONE_METADATA_DIRS, metaDirPath.toString());
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
       conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
-
-      workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
 
       startMiniKdc();
       setSecureConfig();
@@ -279,9 +273,8 @@ public final class TestDelegationToken {
 
     // Capture logs for assertions
     LogCapturer logs = LogCapturer.captureLogs(Server.AUDITLOG);
-    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
-    GenericTestUtils
-        .setLogLevel(LoggerFactory.getLogger(Server.class.getName()), INFO);
+    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.class);
+    GenericTestUtils.setLogLevel(Server.class, INFO);
     SecurityUtil.setTokenServiceUseIp(useIp);
 
     // Setup secure OM for start
@@ -322,7 +315,7 @@ public final class TestDelegationToken {
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       // Assert if auth was successful via Kerberos
       assertThat(logs.getOutput()).doesNotContain(
@@ -355,7 +348,7 @@ public final class TestDelegationToken {
       testUser.doAs((PrivilegedExceptionAction<Void>) () -> {
         omClient = new OzoneManagerProtocolClientSideTranslatorPB(
             OmTransportFactory.create(conf, testUser, null),
-            RandomStringUtils.randomAscii(5));
+            RandomStringUtils.secure().nextAscii(5));
         return null;
       });
 
@@ -383,7 +376,7 @@ public final class TestDelegationToken {
       UserGroupInformation.setLoginUser(ugi);
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       // Case 5: Test success of token cancellation.
       omClient.cancelDelegationToken(token);
@@ -399,7 +392,7 @@ public final class TestDelegationToken {
       // token is not in cache anymore.
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, testUser, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
       ex = assertThrows(OMException.class,
           () -> omClient.cancelDelegationToken(token));
       assertEquals(TOKEN_ERROR_OTHER, ex.getResult());
@@ -415,8 +408,8 @@ public final class TestDelegationToken {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGenerator.generateKey();
-    KeyCodec pemWriter = new KeyCodec(securityConfig, COMPONENT);
-    pemWriter.writeKey(keyPair, true);
+    KeyStorage keyStorage = new KeyStorage(securityConfig, COMPONENT);
+    keyStorage.storeKeyPair(keyPair);
   }
 
   private void setupOm(OzoneConfiguration config) throws Exception {

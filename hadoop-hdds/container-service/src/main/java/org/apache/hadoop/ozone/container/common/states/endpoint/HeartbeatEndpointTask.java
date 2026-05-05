@@ -1,53 +1,53 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
+import java.io.IOException;
+import java.time.ZonedDateTime;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ozone.container.common.helpers
-    .DeletedContainerBlocksSummary;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .EndpointStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .EndpointStateMachine.EndPointStates;
+import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSummary;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
@@ -55,59 +55,28 @@ import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.ZonedDateTime;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_CONTAINER_ACTION_MAX_LIMIT;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_PIPELINE_ACTION_MAX_LIMIT;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 /**
  * Heartbeat class for SCMs.
  */
 public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(HeartbeatEndpointTask.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
-  private final ConfigurationSource conf;
   private DatanodeDetailsProto datanodeDetailsProto;
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
   private HDDSLayoutVersionManager layoutVersionManager;
-
-  /**
-   * Constructs a SCM heart beat.
-   *
-   * @param rpcEndpoint rpc Endpoint
-   * @param conf Config.
-   * @param context State context
-   */
-  public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
-                               ConfigurationSource conf, StateContext context) {
-    this(rpcEndpoint, conf, context,
-        context.getParent().getLayoutVersionManager());
-  }
 
   /**
    * Constructs a SCM heart beat.
@@ -121,7 +90,6 @@ public class HeartbeatEndpointTask
                                ConfigurationSource conf, StateContext context,
                                HDDSLayoutVersionManager versionManager) {
     this.rpcEndpoint = rpcEndpoint;
-    this.conf = conf;
     this.context = context;
     this.maxContainerActionsPerHB = conf.getInt(HDDS_CONTAINER_ACTION_MAX_LIMIT,
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
@@ -275,14 +243,16 @@ public class HeartbeatEndpointTask
    */
   private void addQueuedCommandCounts(
       SCMHeartbeatRequestProto.Builder requestBuilder) {
-    Map<SCMCommandProto.Type, Integer> commandCount =
+    EnumCounters<SCMCommandProto.Type> commandCount =
         context.getParent().getQueuedCommandCount();
     CommandQueueReportProto.Builder reportProto =
         CommandQueueReportProto.newBuilder();
-    for (Map.Entry<SCMCommandProto.Type, Integer> entry
-        : commandCount.entrySet()) {
-      reportProto.addCommand(entry.getKey())
-          .addCount(entry.getValue());
+    for (SCMCommandProto.Type type : SCMCommandProto.Type.values()) {
+      long count = commandCount.get(type);
+      if (count > 0) {
+        reportProto.addCommand(type)
+            .addCount((int) count);
+      }
     }
     requestBuilder.setCommandQueueReport(reportProto.build());
   }
@@ -416,6 +386,11 @@ public class HeartbeatEndpointTask
             commandResponseProto.getRefreshVolumeUsageCommandProto());
         processCommonCommand(commandResponseProto, refreshVolumeUsageCommand);
         break;
+      case reconcileContainerCommand:
+        ReconcileContainerCommand reconcileContainerCommand =
+            ReconcileContainerCommand.getFromProtobuf(commandResponseProto.getReconcileContainerCommandProto());
+        processCommonCommand(commandResponseProto, reconcileContainerCommand);
+        break;
       default:
         throw new IllegalArgumentException("Unknown response : "
             + commandResponseProto.getCommandType().name());
@@ -451,6 +426,8 @@ public class HeartbeatEndpointTask
             + " Interrupt HEARTBEAT and transit to GETVERSION state.");
       }
       rpcEndpoint.setState(EndPointStates.GETVERSION);
+      // trigger immediate GETVERSION
+      context.getParent().setNextHB(Time.monotonicNow());
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Illegal state {} found, expecting {}.",
@@ -489,7 +466,7 @@ public class HeartbeatEndpointTask
     /**
      * Sets the LayoutVersionManager.
      *
-     * @param versionMgr - config
+     * @param lvm config
      * @return Builder
      */
     public Builder setLayoutVersionManager(HDDSLayoutVersionManager lvm) {
@@ -538,7 +515,7 @@ public class HeartbeatEndpointTask
 
       if (conf == null) {
         LOG.error("No config specified.");
-        throw new IllegalArgumentException("A valid configration is needed to" +
+        throw new IllegalArgumentException("A valid configuration is needed to" +
             " construct HeartbeatEndpointTask task");
       }
 

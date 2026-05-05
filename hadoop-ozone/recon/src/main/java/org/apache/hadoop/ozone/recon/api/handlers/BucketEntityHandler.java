@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,29 +14,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.handlers;
 
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
-import org.apache.hadoop.ozone.recon.api.types.CountStats;
-import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
-import org.apache.hadoop.ozone.recon.api.types.EntityType;
-import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
-import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
-import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
-import static org.apache.hadoop.ozone.recon.ReconConstants.DISK_USAGE_TOP_RECORDS_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconUtils.sortDiskUsageDescendingWithLimit;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
+import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
 /**
  * Class for handling bucket entity type.
@@ -109,8 +108,10 @@ public class BucketEntityHandler extends EntityHandler {
     Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
     duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
     List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
-    long bucketDataSize = duResponse.getKeySize();
-    long bucketDataSizeWithReplica = 0L;
+    long bucketDataSize = bucketNSSummary.getSizeOfFiles();
+    if (withReplica) {
+      duResponse.setSizeWithReplica(bucketNSSummary.getReplicatedSizeOfFiles());
+    }
     for (long subdirObjectId: bucketSubdirs) {
       NSSummary subdirNSSummary = getReconNamespaceSummaryManager()
               .getNSSummary(subdirObjectId);
@@ -122,26 +123,16 @@ public class BucketEntityHandler extends EntityHandler {
       // format with leading slash and without trailing slash
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       diskUsage.setSubpath(subpath);
-      long dataSize = getTotalSize(subdirObjectId);
-      bucketDataSize += dataSize;
 
       if (withReplica) {
-        long dirDU = getBucketHandler()
-            .calculateDUUnderObject(subdirObjectId);
-        diskUsage.setSizeWithReplica(dirDU);
-        bucketDataSizeWithReplica += dirDU;
+        diskUsage.setSizeWithReplica(subdirNSSummary.getReplicatedSizeOfFiles());
       }
-      diskUsage.setSize(dataSize);
+      diskUsage.setSize(subdirNSSummary.getSizeOfFiles());
       dirDUData.add(diskUsage);
     }
-    // Either listFile or withReplica is enabled, we need the directKeys info
     if (listFile || withReplica) {
-      bucketDataSizeWithReplica += getBucketHandler()
-              .handleDirectKeys(bucketObjectId, withReplica,
-                  listFile, dirDUData, getNormalizedPath());
-    }
-    if (withReplica) {
-      duResponse.setSizeWithReplica(bucketDataSizeWithReplica);
+      getBucketHandler().handleDirectKeys(bucketObjectId, withReplica,
+          listFile, dirDUData, getNormalizedPath());
     }
     duResponse.setCount(dirDUData.size());
     duResponse.setSize(bucketDataSize);

@@ -19,39 +19,43 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-: ${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}
+OZONE_ROOT=$(pwd -P)
 
 export KUBECONFIG
 
-source "${DIR}/_lib.sh"
+REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/kubernetes"}
+mkdir -p "$REPORT_DIR"
+REPORT_FILE="$REPORT_DIR/summary.txt"
 
-install_flekszible
-install_virtualenv
-install_robot
+source "${DIR}/_lib.sh"
+source "${DIR}/install/flekszible.sh"
+
 if [[ "$(uname -s)" = "Darwin" ]]; then
   echo "Skip installing k3s, not supported on Mac.  Make sure a working Kubernetes cluster is available." >&2
 else
-  install_k3s
+  source "${DIR}/install/k3s.sh"
 fi
-
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/kubernetes"}
 
 OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
-DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
+DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
-    echo "Distribution dir is missing. Doing a full build"
-    "$DIR/build.sh" -Pcoverage
+  echo "Error: distribution dir not found: $DIST_DIR"
+  echo "Please build Ozone first."
+  if [[ "${CI:-}" == "true" ]]; then
+    ls -la "${OZONE_ROOT}/hadoop-ozone/dist/target"
+  fi
+  exit 1
 fi
 
-mkdir -p "$REPORT_DIR"
+create_aws_dir
 
 cd "$DIST_DIR/kubernetes/examples" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
-RES=$?
+rc=$?
 cp -r result/* "$REPORT_DIR/"
-cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
 
-grep -A1 FAIL "${REPORT_DIR}/output.log" > "${REPORT_DIR}/summary.txt"
+grep -A1 FAIL "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
 
-exit $RES
+ERROR_PATTERN="FAIL"
+source "${DIR}/_post_process.sh"

@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,15 +13,26 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
+
 import com.google.common.base.Preconditions;
-import org.apache.ratis.server.protocol.TermIndex;
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -31,6 +41,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -52,57 +63,40 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
-
-/*
-  Ratis execution flow for OMTenantCreate
-
-- preExecute (perform checks and init)
-  - Check tenant name validity (again)
-    - If name is invalid, throw exception to client; else continue
-- validateAndUpdateCache (update DB)
-  - Grab VOLUME_LOCK write lock
-  - Check volume existence
-    - If tenant already exists, throw exception to client; else continue
-  - Check tenant existence by checking tenantStateTable keys
-    - If tenant already exists, throw exception to client; else continue
-  - tenantStateTable: New entry
-    - Key: tenant name. e.g. finance
-    - Value: new OmDBTenantState for the tenant
-      - tenantId: finance
-      - bucketNamespaceName: finance
-      - accountNamespaceName: finance
-      - userPolicyGroupName: finance-users
-      - bucketPolicyGroupName: finance-buckets
-  - tenantPolicyTable: Generate default policies for the new tenant
-    - K: finance-Users, V: finance-users-default
-    - K: finance-Buckets, V: finance-buckets-default
-  - Grab USER_LOCK write lock
-  - Create volume finance (See OMVolumeCreateRequest)
-  - Release VOLUME_LOCK write lock
-  - Release USER_LOCK write lock
-  - Queue Ranger policy sync that pushes default policies:
-      OMMultiTenantManager#createTenant
- */
-
 /**
  * Handles OMTenantCreate request.
- *
  * Extends OMVolumeRequest but not OMClientRequest since tenant creation
  *  involves volume creation.
+ * Ratis execution flow for OMTenantCreate
+ * - preExecute (perform checks and init)
+ *   - Check tenant name validity (again)
+ *     - If name is invalid, throw exception to client; else continue
+ * - validateAndUpdateCache (update DB)
+ *   - Grab VOLUME_LOCK write lock
+ *   - Check volume existence
+ *     - If tenant already exists, throw exception to client; else continue
+ *   - Check tenant existence by checking tenantStateTable keys
+ *     - If tenant already exists, throw exception to client; else continue
+ *   - tenantStateTable: New entry
+ *     - Key: tenant name. e.g. finance
+ *     - Value: new OmDBTenantState for the tenant
+ *       - tenantId: finance
+ *       - bucketNamespaceName: finance
+ *       - accountNamespaceName: finance
+ *       - userPolicyGroupName: finance-users
+ *       - bucketPolicyGroupName: finance-buckets
+ *   - tenantPolicyTable: Generate default policies for the new tenant
+ *     - K: finance-Users, V: finance-users-default
+ *     - K: finance-Buckets, V: finance-buckets-default
+ *   - Grab USER_LOCK write lock
+ *   - Create volume finance (See OMVolumeCreateRequest)
+ *   - Release VOLUME_LOCK write lock
+ *   - Release USER_LOCK write lock
+ *   - Queue Ranger policy sync that pushes default policies:
+ *       OMMultiTenantManager#createTenant
  */
 public class OMTenantCreateRequest extends OMVolumeRequest {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantCreateRequest.class);
 
   public OMTenantCreateRequest(OMRequest omRequest) {
@@ -121,7 +115,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final CreateTenantRequest request = omRequest.getCreateTenantRequest();
-    Preconditions.checkNotNull(request);
+    Objects.requireNonNull(request, "request == null");
     final String tenantId = request.getTenantId();
 
     // Check tenantId validity
@@ -147,6 +141,22 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     final String dbVolumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
+
+    // ACL check during preExecute (align with other create requests)
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            volumeName, null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.CREATE_TENANT,
+                buildVolumeAuditMap(volumeName), ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
 
     // Backwards compatibility with older Ozone clients that don't have this
     // field. Defaults to false.
@@ -212,8 +222,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -225,7 +235,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    OmVolumeArgs omVolumeArgs = null;
+    OmVolumeArgs omVolumeArgs;
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
     final String owner = getOmRequest().getUserInfo().getUserName();
@@ -242,7 +252,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
-    Preconditions.checkNotNull(volumeName);
+    Objects.requireNonNull(volumeName, "volumeName == null");
     Preconditions.checkState(request.getVolumeName().equals(volumeName),
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
@@ -250,13 +260,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     Exception exception = null;
 
     try {
-      // Check ACL: requires volume CREATE permission.
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-            tenantId, null, null);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
@@ -279,18 +282,18 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           USER_LOCK, owner));
       acquiredUserLock = getOmLockDetails().isLockAcquired();
 
+      OmVolumeArgs.Builder volumeBuilder;
       PersistedUserVolumeInfo volumeList = null;
       if (!skipVolumeCreation) {
         // Create volume. TODO: dedup OMVolumeCreateRequest
-        omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
-        omVolumeArgs.setQuotaInBytes(OzoneConsts.QUOTA_RESET);
-        omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
-        omVolumeArgs.setObjectID(
-            ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-        omVolumeArgs.setUpdateID(transactionLogIndex,
-            ozoneManager.isRatisEnabled());
+        volumeBuilder = OmVolumeArgs.builderFromProtobuf(volumeInfo)
+            .setQuotaInBytes(OzoneConsts.QUOTA_RESET)
+            .setQuotaInNamespace(OzoneConsts.QUOTA_RESET)
+            .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+            .setUpdateID(transactionLogIndex)
+            .incRefCount();
+        omVolumeArgs = volumeBuilder.build();
 
-        omVolumeArgs.incRefCount();
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
             "refCount should have been set to 1");
@@ -305,20 +308,22 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       } else {
         LOG.info("Skipped volume '{}' creation. "
             + "Will only increment volume refCount", volumeName);
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+        volumeBuilder = getVolumeInfo(omMetadataManager, volumeName)
+            .toBuilder()
+            .incRefCount();
+        omVolumeArgs = volumeBuilder.build();
 
-        omVolumeArgs.incRefCount();
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
             "refCount should have been set to 1");
 
         omMetadataManager.getVolumeTable().addCacheEntry(
-            new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+            new CacheKey<>(dbVolumeKey),
             CacheValue.get(transactionLogIndex, omVolumeArgs));
       }
 
       // Audit
-      auditMap = omVolumeArgs.toAuditMap();
+      auditMap = volumeBuilder.toAuditMap();
 
       // Check tenant existence in tenantStateTable
       if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {
@@ -375,12 +380,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     // Perform audit logging
     auditMap.put(OzoneConsts.TENANT, tenantId);
     // Note auditMap contains volume creation info
-    auditLog(ozoneManager.getAuditLogger(),
+    markForAudit(ozoneManager.getAuditLogger(),
         buildAuditMessage(OMAction.CREATE_TENANT, auditMap, exception,
-            getOmRequest().getUserInfo()));
-    // Log CREATE_VOLUME as well since a volume is created
-    auditLog(ozoneManager.getAuditLogger(),
-        buildAuditMessage(OMAction.CREATE_VOLUME, auditMap, exception,
             getOmRequest().getUserInfo()));
 
     if (exception == null) {

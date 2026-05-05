@@ -10,6 +10,7 @@
 *.vcxproj.user
 *.patch
 .idea
+.vscode
 .svn
 .classpath
 .project

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +17,9 @@
 
 package org.apache.hadoop.conf;
 
-import org.apache.commons.lang3.StringUtils;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -34,13 +33,11 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import org.apache.commons.lang3.StringUtils;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Copied from Hadoop until the original one is migrated to JUnit5.
@@ -437,13 +434,13 @@ public abstract class TestConfigurationFieldsBase {
     LOG.info("({} member variables)\n", configurationMemberVariables.size());
     StringBuilder xmlErrorMsg = new StringBuilder();
     for (Class c : configurationClasses) {
-      xmlErrorMsg.append(c);
-      xmlErrorMsg.append(" ");
+      xmlErrorMsg.append(c)
+          .append(' ');
     }
-    xmlErrorMsg.append("has ");
-    xmlErrorMsg.append(missingXmlSize);
-    xmlErrorMsg.append(" variables missing in ");
-    xmlErrorMsg.append(xmlFilename);
+    xmlErrorMsg.append("has ")
+        .append(missingXmlSize)
+        .append(" variables missing in ")
+        .append(xmlFilename);
     LOG.error(xmlErrorMsg.toString());
     if (missingXmlSize == 0) {
       LOG.info("  (None)");
@@ -485,10 +482,10 @@ public abstract class TestConfigurationFieldsBase {
 
     LOG.info("File {} ({} properties)", xmlFilename, xmlKeyValueMap.size());
     StringBuilder configErrorMsg = new StringBuilder();
-    configErrorMsg.append(xmlFilename);
-    configErrorMsg.append(" has ");
-    configErrorMsg.append(missingConfigSize);
-    configErrorMsg.append(" properties missing in");
+    configErrorMsg.append(xmlFilename)
+        .append(" has ")
+        .append(missingConfigSize)
+        .append(" properties missing in");
     Arrays.stream(configurationClasses)
         .forEach(c -> configErrorMsg.append("  ").append(c));
     LOG.info(configErrorMsg.toString());

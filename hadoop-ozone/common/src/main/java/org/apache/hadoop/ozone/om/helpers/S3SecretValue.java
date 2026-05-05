@@ -1,28 +1,27 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
-
-import java.util.Objects;
 
 /**
  * S3Secret to be saved in database.
@@ -31,17 +30,18 @@ public final class S3SecretValue {
   private static final Codec<S3SecretValue> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(S3Secret.getDefaultInstance()),
       S3SecretValue::fromProtobuf,
-      S3SecretValue::getProtobuf);
-
-  public static Codec<S3SecretValue> getCodec() {
-    return CODEC;
-  }
+      S3SecretValue::getProtobuf,
+      S3SecretValue.class);
 
   // TODO: This field should be renamed to accessId for generalization.
   private final String kerberosID;
   private final String awsSecret;
   private final boolean isDeleted;
   private final long transactionLogIndex;
+
+  public static Codec<S3SecretValue> getCodec() {
+    return CODEC;
+  }
 
   public static S3SecretValue of(String kerberosID, String awsSecret) {
     return of(kerberosID, awsSecret, 0);

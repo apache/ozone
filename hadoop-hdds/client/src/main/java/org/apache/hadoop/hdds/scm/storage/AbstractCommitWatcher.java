@@ -1,32 +1,24 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.scm.XceiverClientReply;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.ratis.util.JavaUtils;
-import org.apache.ratis.util.MemoizedSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -37,7 +29,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.scm.XceiverClientReply;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.ratis.util.JavaUtils;
+import org.apache.ratis.util.MemoizedSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
@@ -62,7 +60,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   private final XceiverClientSpi client;
 
-  private long totalAckDataLength;
+  private final AtomicLong totalAckDataLength = new AtomicLong();
 
   AbstractCommitWatcher(XceiverClientSpi client) {
     this.client = client;
@@ -80,12 +78,11 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   /** @return the total data which has been acknowledged. */
   long getTotalAckDataLength() {
-    return totalAckDataLength;
+    return totalAckDataLength.get();
   }
 
   long addAckDataLength(long acked) {
-    totalAckDataLength += acked;
-    return totalAckDataLength;
+    return totalAckDataLength.addAndGet(acked);
   }
 
   /**
@@ -125,34 +122,36 @@ abstract class AbstractCommitWatcher<BUFFER> {
    *
    * @param commitIndex log index to watch for
    * @return minimum commit index replicated to all nodes
-   * @throws IOException IOException in case watch gets timed out
    */
-  XceiverClientReply watchForCommit(long commitIndex)
-      throws IOException {
+  CompletableFuture<XceiverClientReply> watchForCommitAsync(long commitIndex) {
     final MemoizedSupplier<CompletableFuture<XceiverClientReply>> supplier
         = JavaUtils.memoize(CompletableFuture::new);
     final CompletableFuture<XceiverClientReply> f = replies.compute(commitIndex,
         (key, value) -> value != null ? value : supplier.get());
     if (!supplier.isInitialized()) {
       // future already exists
-      return f.join();
+      return f;
     }
 
-    try {
-      final XceiverClientReply reply = client.watchForCommit(commitIndex);
+    return client.watchForCommit(commitIndex).thenApply(reply -> {
       f.complete(reply);
-      final CompletableFuture<XceiverClientReply> removed
-          = replies.remove(commitIndex);
+      final CompletableFuture<XceiverClientReply> removed = replies.remove(commitIndex);
       Preconditions.checkState(removed == f);
 
       final long index = reply != null ? reply.getLogIndex() : 0;
       adjustBuffers(index);
       return reply;
+    });
+  }
+
+  XceiverClientReply watchForCommit(long commitIndex) throws IOException {
+    try {
+      return watchForCommitAsync(commitIndex).get();
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
       Thread.currentThread().interrupt();
       throw getIOExceptionForWatchForCommit(commitIndex, e);
-    } catch (TimeoutException | ExecutionException e) {
+    } catch (ExecutionException e) {
       throw getIOExceptionForWatchForCommit(commitIndex, e);
     }
   }
@@ -166,7 +165,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
   /** Release the buffers for the given index. */
   abstract void releaseBuffers(long index);
 
-  void adjustBuffers(long commitIndex) {
+  synchronized void adjustBuffers(long commitIndex) {
     commitIndexMap.keySet().stream()
         .filter(p -> p <= commitIndex)
         .forEach(this::releaseBuffers);

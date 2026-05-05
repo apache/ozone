@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +14,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.server.http;
 
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.client.exporter.common.TextFormat;
+import java.io.IOException;
+import java.io.PrintWriter;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
-
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-
-import io.prometheus.client.CollectorRegistry;
-import io.prometheus.client.exporter.common.TextFormat;
 
 /**
  * Servlet to publish hadoop metrics in prometheus format.
@@ -35,7 +32,7 @@ import io.prometheus.client.exporter.common.TextFormat;
 public class PrometheusServlet extends HttpServlet {
 
   public static final String SECURITY_TOKEN = "PROMETHEUS_SECURITY_TOKEN";
-  public static final String BEARER = "Bearer";
+  public static final String BEARER = "Bearer ";
 
   public PrometheusMetricsSink getPrometheusSink() {
     return
@@ -53,12 +50,11 @@ public class PrometheusServlet extends HttpServlet {
       if (authorizationHeader == null
           || !authorizationHeader.startsWith(BEARER)
           || !securityToken.equals(
-              authorizationHeader.substring(BEARER.length() + 1))) {
+              authorizationHeader.substring(BEARER.length()))) {
         resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
         return;
       }
     }
-    DefaultMetricsSystem.instance().publishMetricsNow();
     PrintWriter writer = resp.getWriter();
     getPrometheusSink().writeMetrics(writer);
     writer.write("\n\n#Dropwizard metrics\n\n");

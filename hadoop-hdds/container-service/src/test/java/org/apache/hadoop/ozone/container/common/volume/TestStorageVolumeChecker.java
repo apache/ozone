@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,9 +17,39 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
+import java.io.File;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,11 +65,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -48,35 +76,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-
-import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.isNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-
 /**
  * Tests for {@link StorageVolumeChecker}.
  */
-@Timeout(300)
 public class TestStorageVolumeChecker {
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageVolumeChecker.class);
 
   private static final int NUM_VOLUMES = 2;
@@ -91,12 +95,8 @@ public class TestStorageVolumeChecker {
    */
   private VolumeCheckResult expectedVolumeHealth;
 
-  private ContainerLayoutVersion layoutVersion;
-
-  private void initTest(VolumeCheckResult result,
-      ContainerLayoutVersion layout) {
+  private void initTest(VolumeCheckResult result) {
     this.expectedVolumeHealth = result;
-    this.layoutVersion = layout;
     setup();
   }
 
@@ -110,13 +110,19 @@ public class TestStorageVolumeChecker {
    * Run each test case for each possible value of {@link VolumeCheckResult}.
    * Including "null" for 'throw exception'.
    */
+  private static List<VolumeCheckResult> volumeCheckResults() {
+    List<VolumeCheckResult> list = new ArrayList<>(Arrays.asList(VolumeCheckResult.values()));
+    list.add(null);
+    return list;
+  }
+
   private static List<Arguments> provideTestData() {
+    List<VolumeCheckResult> volumeCheckResults = volumeCheckResults();
     List<Arguments> values = new ArrayList<>();
     for (ContainerLayoutVersion layout : ContainerLayoutVersion.values()) {
-      for (VolumeCheckResult result : VolumeCheckResult.values()) {
+      for (VolumeCheckResult result : volumeCheckResults) {
         values.add(Arguments.of(result, layout));
       }
-      values.add(Arguments.of(null, layout));
     }
     return values;
   }
@@ -125,23 +131,18 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkVolume} propagates the
    * check to the delegate checker.
-   *
-   * @throws Exception
    */
   @ParameterizedTest
-  @MethodSource("provideTestData")
-  public void testCheckOneVolume(
-      VolumeCheckResult checkResult, ContainerLayoutVersion layout,
-      TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
-    LOG.info("Executing {}", testInfo.getTestMethod());
+  @MethodSource("volumeCheckResults")
+  public void testCheckOneVolume(VolumeCheckResult checkResult) throws Exception {
+    initTest(checkResult);
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final StorageVolumeChecker checker =
         new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
-    /**
+    /*
      * Request a check and ensure it triggered {@link HddsVolume#check}.
      */
     boolean result =
@@ -171,15 +172,11 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
    * checks for all volumes to the delegate checker.
-   *
-   * @throws Exception
    */
   @ParameterizedTest
-  @MethodSource("provideTestData")
-  public void testCheckAllVolumes(VolumeCheckResult checkResult,
-      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
-    LOG.info("Executing {}", testInfo.getTestMethod());
+  @MethodSource("volumeCheckResults")
+  public void testCheckAllVolumes(VolumeCheckResult checkResult) throws Exception {
+    initTest(checkResult);
 
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
@@ -209,20 +206,21 @@ public class TestStorageVolumeChecker {
   /**
    * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
    * checks for all volumes to the delegate checker.
-   *
-   * @throws Exception
    */
   @ParameterizedTest
   @MethodSource("provideTestData")
   public void testVolumeDeletion(VolumeCheckResult checkResult,
-      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
-    initTest(checkResult, layout);
-    LOG.info("Executing {}", testInfo.getTestMethod());
+      ContainerLayoutVersion layout) throws Exception {
+    initTest(checkResult);
 
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
     dnConf.setDiskCheckMinGap(Duration.ofMillis(0));
     conf.setFromObject(dnConf);
+    File volParentDir =
+        new File(folder.toString(), UUID.randomUUID().toString());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        conf.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY) + "," + volParentDir.getPath());
 
     DatanodeDetails datanodeDetails =
         ContainerTestUtils.createDatanodeDetails();
@@ -233,9 +231,7 @@ public class TestStorageVolumeChecker {
 
     StorageVolumeChecker volumeChecker = volumeSet.getVolumeChecker();
     volumeChecker.setDelegateChecker(new DummyChecker());
-    File volParentDir =
-        new File(folder.toString(), UUID.randomUUID().toString());
-    volumeSet.addVolume(volParentDir.getPath());
+
     File volRootDir = new File(volParentDir, "hdds");
 
     int i = 0;
@@ -269,6 +265,228 @@ public class TestStorageVolumeChecker {
   }
 
   /**
+   * Test numScansSkipped metric from VolumeInfoMetrics when volume check is skipped.
+   */
+  @Test
+  public void testNumScansSkipped() throws Exception {
+    initTest(VolumeCheckResult.HEALTHY);
+
+    final List<HddsVolume> volumes = makeVolumes(3, expectedVolumeHealth);
+
+    FakeTimer timer = new FakeTimer();
+    final StorageVolumeChecker checker =
+        new StorageVolumeChecker(new OzoneConfiguration(), timer, "");
+
+    VolumeInfoMetrics metrics1 = new VolumeInfoMetrics("test-volume-1", volumes.get(0));
+    VolumeInfoMetrics metrics2 = new VolumeInfoMetrics("test-volume-2", volumes.get(1));
+    VolumeInfoMetrics metrics3 = new VolumeInfoMetrics("test-volume-3", volumes.get(2));
+    when(volumes.get(0).getVolumeInfoStats()).thenReturn(metrics1);
+    when(volumes.get(1).getVolumeInfoStats()).thenReturn(metrics2);
+    when(volumes.get(2).getVolumeInfoStats()).thenReturn(metrics3);
+
+    checker.checkAllVolumes(volumes);
+
+    // No volume skipped on first call
+    assertEquals(0, metrics1.getNumScansSkipped());
+    assertEquals(0, metrics2.getNumScansSkipped());
+    assertEquals(0, metrics3.getNumScansSkipped());
+
+    // Second call skipped because msSinceLastCheck (8 mins) < minMsBetweenChecks (10 mins)
+    timer.advance(480_000);
+    checker.checkAllVolumes(volumes);
+
+    assertEquals(1, metrics1.getNumScansSkipped());
+    assertEquals(1, metrics2.getNumScansSkipped());
+    assertEquals(1, metrics3.getNumScansSkipped());
+
+    // Third call should not skip volumes as msSinceLastCheck (11 mins) > minMsBetweenChecks (10 mins)
+    timer.advance(180_000);
+    checker.checkAllVolumes(volumes);
+
+    assertEquals(1, metrics1.getNumScansSkipped());
+    assertEquals(1, metrics2.getNumScansSkipped());
+    assertEquals(1, metrics3.getNumScansSkipped());
+
+    checker.shutdownAndWait(0, TimeUnit.SECONDS);
+  }
+
+  /**
+   * Explicitly captures the {@link Throwable} type that
+   * {@link Futures#withTimeout} delivers to {@code onFailure()} when the
+   * deadline fires.
+   *
+   * <p>{@link ThrottledAsyncChecker} uses {@code Futures.withTimeout()}
+   * internally; this test replicates that exact call to confirm that Guava
+   * 28+ (including the 33.5.0-jre version used by Ozone) delivers a
+   * {@link TimeoutException} — NOT a {@link java.util.concurrent.CancellationException}.
+   * {@code CancellationException} in new Guava means external cancellation
+   * (e.g. executor shutdown), not a disk-check timeout, so
+   * {@link StorageVolumeChecker} {@code ResultHandler.onFailure()} only
+   * treats {@link TimeoutException} as a timeout.
+   */
+  @Test
+  public void testFuturesWithTimeoutExceptionType() throws Exception {
+    ScheduledExecutorService scheduler =
+        Executors.newSingleThreadScheduledExecutor();
+    AtomicReference<Throwable> captured = new AtomicReference<>();
+    CountDownLatch done = new CountDownLatch(1);
+
+    try {
+      // A future that never completes on its own — same situation as a
+      // check() thread blocked inside fsync().
+      SettableFuture<VolumeCheckResult> neverCompletes = SettableFuture.create();
+
+      // Wrap with a real Futures.withTimeout(), identical to what
+      // ThrottledAsyncChecker does.
+      ListenableFuture<VolumeCheckResult> timedFuture =
+          Futures.withTimeout(neverCompletes, 100, TimeUnit.MILLISECONDS,
+              scheduler);
+
+      Futures.addCallback(timedFuture, new FutureCallback<VolumeCheckResult>() {
+        @Override
+        public void onSuccess(VolumeCheckResult result) {
+          done.countDown();
+        }
+
+        @Override
+        public void onFailure(Throwable t) {
+          captured.set(t);
+          done.countDown();
+        }
+      }, MoreExecutors.directExecutor());
+
+      assertTrue(done.await(2, TimeUnit.SECONDS),
+          "Timeout should have fired within 2 seconds");
+
+      Throwable thrown = captured.get();
+      LOG.info("Futures.withTimeout() delivered to onFailure(): {}",
+          thrown.getClass().getName());
+
+      // Guava 28+ delivers TimeoutException for a timeout.
+      // CancellationException would mean external cancellation, not a timeout.
+      assertTrue(thrown instanceof TimeoutException,
+          "Expected TimeoutException from Futures.withTimeout() but got: "
+              + thrown.getClass().getName());
+    } finally {
+      scheduler.shutdownNow();
+    }
+  }
+
+  /**
+   * Verifies that when the per-check timeout inside {@link ThrottledAsyncChecker}
+   * fires on {@link StorageVolumeChecker#checkVolume}, the first timeout is
+   * tolerated (callback invoked with no failed volumes) and the second timeout
+   * within the timeout window causes the volume to be failed.
+   *
+   * <p>This test uses the real {@link ThrottledAsyncChecker} (not
+   * {@link DummyChecker}) so that the actual {@code TimeoutException}
+   * path in {@code ResultHandler.onFailure()} fires.
+   */
+  @Test
+  public void testCheckVolumeTimeoutTolerance() throws Exception {
+    setup();
+    // Use a very short check timeout so the test completes quickly.
+    OzoneConfiguration timeoutConf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = timeoutConf.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeout(Duration.ofMillis(200));
+    dnConf.setDiskCheckMinGap(Duration.ZERO);
+    timeoutConf.setFromObject(dnConf);
+
+    // A latch-controlled mock volume: check() blocks until released.
+    HddsVolume volume = mock(HddsVolume.class);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    when(volume.check(any())).thenAnswer(inv -> {
+      blockLatch.await();
+      return VolumeCheckResult.HEALTHY;
+    });
+    // First timeout returns false (within tolerance), second returns true.
+    when(volume.recordTimeoutAndCheckFailure()).thenReturn(false).thenReturn(true);
+
+    AtomicLong callbackCount = new AtomicLong(0);
+    AtomicLong failedVolumeCount = new AtomicLong(-1);
+    CountDownLatch firstCallback = new CountDownLatch(1);
+    CountDownLatch secondCallback = new CountDownLatch(1);
+    StorageVolumeChecker checker =
+        new StorageVolumeChecker(timeoutConf, new FakeTimer(), "test-");
+
+    // First checkVolume — should time out, be tolerated, and invoke callback
+    // with no failed volumes.
+    checker.checkVolume(volume, (healthy, failed) -> {
+      failedVolumeCount.set(failed.size());
+      callbackCount.incrementAndGet();
+      firstCallback.countDown();
+    });
+
+    assertTrue(firstCallback.await(2, TimeUnit.SECONDS),
+        "Callback should fire within 2 seconds for a tolerated timeout");
+    assertEquals(1, callbackCount.get(),
+        "Callback must fire for a tolerated timeout");
+    assertEquals(0, failedVolumeCount.get(),
+        "Failed set must stay empty for a tolerated timeout");
+    verify(volume, times(1)).recordTimeoutAndCheckFailure();
+
+    // Second checkVolume — should time out and exceed tolerance (callback fired).
+    checker.checkVolume(volume, (healthy, failed) -> {
+      failedVolumeCount.set(failed.size());
+      callbackCount.incrementAndGet();
+      secondCallback.countDown();
+    });
+    assertTrue(secondCallback.await(2, TimeUnit.SECONDS),
+        "Callback should fire within 2 seconds when tolerance is exceeded");
+
+    assertEquals(2, callbackCount.get(),
+        "Callback must fire when tolerance is exceeded");
+    assertEquals(1, failedVolumeCount.get(),
+        "Failed set must contain the volume when tolerance is exceeded");
+
+    blockLatch.countDown();
+    checker.shutdownAndWait(5, TimeUnit.SECONDS);
+  }
+
+  /**
+   * Verifies that when the {@code checkAllVolumes()} latch times out and
+   * pending volumes have not yet reported a result, the timeout is recorded in
+   * the timeout window and the first timeout is tolerated.
+   *
+   * <p>This test confirms that {@code recordTimeoutAndCheckFailure()} is called on
+   * pending volumes, and that the volume is NOT in the returned failed set on
+   * the first timeout.
+   */
+  @Test
+  public void testCheckAllVolumesLatchTimeoutTolerance() throws Exception {
+    setup();
+    OzoneConfiguration timeoutConf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = timeoutConf.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeout(Duration.ofMillis(200));
+    dnConf.setDiskCheckMinGap(Duration.ZERO);
+    timeoutConf.setFromObject(dnConf);
+
+    HddsVolume volume = mock(HddsVolume.class);
+    CountDownLatch blockLatch = new CountDownLatch(1);
+    when(volume.check(any())).thenAnswer(inv -> {
+      blockLatch.await();
+      return VolumeCheckResult.HEALTHY;
+    });
+    // Simulate: first timeout is within tolerance.
+    when(volume.recordTimeoutAndCheckFailure()).thenReturn(false);
+    when(volume.getVolumeInfoStats()).thenReturn(
+        new VolumeInfoMetrics("test-vol", volume));
+
+    StorageVolumeChecker checker =
+        new StorageVolumeChecker(timeoutConf, new FakeTimer(), "test-");
+
+    Set<? extends StorageVolume> failed =
+        checker.checkAllVolumes(Arrays.asList(volume));
+
+    assertFalse(failed.contains(volume),
+        "Volume must NOT be in failed set on first tolerated timeout");
+    verify(volume, times(1)).recordTimeoutAndCheckFailure();
+
+    blockLatch.countDown();
+    checker.shutdownAndWait(5, TimeUnit.SECONDS);
+  }
+
+  /**
    * A checker to wraps the result of {@link HddsVolume#check} in
    * an ImmediateFuture.
    */
@@ -284,7 +502,7 @@ public class TestStorageVolumeChecker {
         return Optional.of(
             Futures.immediateFuture(target.check(context)));
       } catch (Exception e) {
-        LOG.info("check routine threw exception {}", e);
+        LOG.info("check routine threw exception", e);
         return Optional.of(Futures.immediateFailedFuture(e));
       }
     }

@@ -1,0 +1,76 @@
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DataNode IO Status</title>
+</head>
+<body>
+
+    <h2>Read Performance</h2>
+    <table class="table" class="col-md-6">
+        <thead>
+        <tr>
+            <th>Directory</th>
+            <th>ReadBytes</th>
+            <th>ReadOpCount</th>
+            <th>ReadAvgTime</th>
+            <th>ReadLatency60s(P90)</th>
+            <th>ReadLatency60s(P95)</th>
+            <th>ReadLatency60s(P99)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr ng-repeat="volumeInfo in ioStatusCtrl.dniostatus">
+            <td>{{volumeInfo["tag.StorageDirectory"]}}</td>
+            <td>{{volumeInfo.ReadBytes}}</td>
+            <td>{{volumeInfo.ReadOpCount}}</td>
+            <td>{{volumeInfo.ReadTimeAvgTime | twoDecimalPlaces}} ms</td>
+            <td>{{volumeInfo.ReadLatency60s90thPercentileLatency | twoDecimalPlaces}} ms</td>
+            <td>{{volumeInfo.ReadLatency60s95thPercentileLatency | twoDecimalPlaces}} ms</td>
+            <td>{{volumeInfo.ReadLatency60s99thPercentileLatency | twoDecimalPlaces}} ms</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h2>Write Performance</h2>
+    <table class="table" class="col-md-6">
+        <thead>
+        <tr>
+            <th>Directory</th>
+            <th>WriteBytes</th>
+            <th>WriteOpCount</th>
+            <th>WriteAvgTime</th>
+            <th>WriteLatency60s(P90)</th>
+            <th>WriteLatency60s(P95)</th>
+            <th>WriteLatency60s(P99)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr ng-repeat="volumeInfo in ioStatusCtrl.dniostatus">
+            <td>{{volumeInfo["tag.StorageDirectory"]}}</td>
+            <td>{{volumeInfo.WriteBytes}}</td>
+            <td>{{volumeInfo.WriteOpCount}}</td>
+            <td>{{volumeInfo.WriteTimeAvgTime | twoDecimalPlaces}} ms</td>
+            <td>{{volumeInfo.WriteLatency60s90thPercentileLatency | twoDecimalPlaces}} ms</td>
+            <td>{{volumeInfo.WriteLatency60s95thPercentileLatency | twoDecimalPlaces}} ms</td>
+            <td>{{volumeInfo.WriteLatency60s99thPercentileLatency | twoDecimalPlaces}} ms</td>
+        </tr>
+        </tbody>
+    </table>
+</body>
+</html>

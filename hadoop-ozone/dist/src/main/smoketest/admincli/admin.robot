@@ -22,7 +22,7 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   container
                         Should contain   ${output}   datanode
                         Should contain   ${output}   om

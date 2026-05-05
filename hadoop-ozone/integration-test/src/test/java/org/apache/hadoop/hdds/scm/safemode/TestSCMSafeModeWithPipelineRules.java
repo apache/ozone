@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,19 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,20 +47,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-
 /**
  * This class tests SCM Safe mode with pipeline rules.
  */
@@ -56,16 +54,12 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class TestSCMSafeModeWithPipelineRules {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
 
   public void setup(int numDatanodes) throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
-    conf.setBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        true);
     conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "10s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
@@ -83,7 +77,6 @@ public class TestSCMSafeModeWithPipelineRules {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     pipelineManager = scm.getPipelineManager();
   }
-
 
   @Test
   void testScmSafeMode() throws Exception {
@@ -118,19 +111,18 @@ public class TestSCMSafeModeWithPipelineRules {
     SCMSafeModeManager scmSafeModeManager =
         cluster.getStorageContainerManager().getScmSafeModeManager();
 
-
     // Ceil(0.1 * 2) is 1, as one pipeline is healthy pipeline rule is
     // satisfied
 
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getHealthyPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    final HealthyPipelineSafeModeRule healthyPipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(healthyPipelineRule::validate, 1000, 60000);
 
     // As Ceil(0.9 * 2) is 2, and from second pipeline no datanodes's are
     // reported this rule is not met yet.
-    GenericTestUtils.waitFor(() ->
-        !scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    final OneReplicaPipelineSafeModeRule oneReplicaPipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(() -> !oneReplicaPipelineRule.validate(), 1000, 60000);
 
     assertTrue(cluster.getStorageContainerManager().isInSafeMode());
 
@@ -138,9 +130,7 @@ public class TestSCMSafeModeWithPipelineRules {
     // Now restart one datanode from the 2nd pipeline
     cluster.restartHddsDatanode(restartedDatanode, false);
 
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    GenericTestUtils.waitFor(oneReplicaPipelineRule::validate, 1000, 60000);
 
     // All safeMode preChecks are now satisfied, SCM should be out of safe mode.
 
@@ -163,8 +153,7 @@ public class TestSCMSafeModeWithPipelineRules {
     ReplicationManager replicationManager =
         cluster.getStorageContainerManager().getReplicationManager();
 
-    GenericTestUtils.waitFor(() ->
-        replicationManager.isRunning(), 1000, 60000);
+    GenericTestUtils.waitFor(replicationManager::isRunning, 1000, 60000);
   }
 
   @AfterEach
@@ -173,7 +162,6 @@ public class TestSCMSafeModeWithPipelineRules {
       cluster.shutdown();
     }
   }
-
 
   private void waitForRatis3NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {

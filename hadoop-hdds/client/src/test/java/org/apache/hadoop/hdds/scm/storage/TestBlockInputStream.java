@@ -1,49 +1,38 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.google.common.primitives.Bytes;
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ContainerBlockID;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.ozone.common.Checksum;
-
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
-import org.apache.ratis.thirdparty.io.grpc.Status;
-import org.apache.ratis.thirdparty.io.grpc.StatusException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.stubbing.OngoingStubbing;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -56,20 +45,33 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
-import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.stubbing.OngoingStubbing;
+import org.slf4j.event.Level;
 
 /**
  * Tests for {@link BlockInputStream}'s functionality.
@@ -191,7 +193,7 @@ public class TestBlockInputStream {
 
     // Seek to random positions between 0 and the block size.
     for (int i = 0; i < 10; i++) {
-      pos = RandomUtils.nextInt(0, blockSize);
+      pos = RandomUtils.secure().randomInt(0, blockSize);
       seekAndVerify(pos);
     }
   }
@@ -203,7 +205,8 @@ public class TestBlockInputStream {
     // the read should result in 3 ChunkInputStream reads
     seekAndVerify(50);
     byte[] b = new byte[200];
-    blockStream.read(b, 0, 200);
+    int bytesRead = blockStream.read(b, 0, 200);
+    assertEquals(200, bytesRead, "Expected to read 200 bytes");
     matchWithInputData(b, 50, 200);
 
     // The new position of the blockInputStream should be the last index read
@@ -251,17 +254,21 @@ public class TestBlockInputStream {
     // Seek to a position and read data
     seekAndVerify(50);
     byte[] b1 = new byte[100];
-    blockStream.read(b1, 0, 100);
+    int bytesRead1 = blockStream.read(b1, 0, 100);
+    assertEquals(100, bytesRead1, "Expected to read 100 bytes");
     matchWithInputData(b1, 50, 100);
 
     // Next read should start from the position of the last read + 1 i.e. 100
     byte[] b2 = new byte[100];
-    blockStream.read(b2, 0, 100);
+    int bytesRead2 = blockStream.read(b2, 0, 100);
+    assertEquals(100, bytesRead2, "Expected to read 100 bytes");
     matchWithInputData(b2, 150, 100);
   }
 
   @Test
   public void testRefreshPipelineFunction() throws Exception {
+    LogCapturer logCapturer = LogCapturer.captureLogs(BlockExtendedInputStream.class);
+    GenericTestUtils.setLogLevel(BlockExtendedInputStream.class, Level.DEBUG);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);
@@ -276,7 +283,9 @@ public class TestBlockInputStream {
       assertFalse(isRefreshed.get());
       seekAndVerify(50);
       byte[] b = new byte[200];
-      blockInputStreamWithRetry.read(b, 0, 200);
+      int bytesRead = blockInputStreamWithRetry.read(b, 0, 200);
+      assertEquals(200, bytesRead, "Expected to read 200 bytes");
+      assertThat(logCapturer.getOutput()).contains("Retry read after");
       assertTrue(isRefreshed.get());
     }
   }
@@ -383,7 +392,12 @@ public class TestBlockInputStream {
 
       // WHEN
       assertThrows(ex.getClass(),
-          () -> subject.read(new byte[len], 0, len));
+          () -> {
+            byte[] buffer = new byte[len];
+            int bytesRead = subject.read(buffer, 0, len);
+            // This line should never be reached due to the exception
+            assertEquals(len, bytesRead);
+          });
 
       // THEN
       verify(refreshFunction, never()).apply(blockID);
@@ -413,17 +427,20 @@ public class TestBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
-    BlockInputStream subject = new BlockInputStream(blockID, blockSize,
+    BlockInputStream subject = new BlockInputStream(
+        new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
         pipeline, null, clientFactory, refreshFunction,
         clientConfig) {
       @Override
-      protected List<ChunkInfo> getChunkInfoListUsingClient() {
-        return chunks;
+      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+        return stream;
       }
 
       @Override
-      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
-        return stream;
+      protected ContainerProtos.BlockData getBlockDataUsingClient() throws IOException {
+        BlockID blockID = getBlockID();
+        ContainerProtos.DatanodeBlockID datanodeBlockID = blockID.getDatanodeBlockIDProtobuf();
+        return ContainerProtos.BlockData.newBuilder().addAllChunks(chunks).setBlockID(datanodeBlockID).build();
       }
     };
 

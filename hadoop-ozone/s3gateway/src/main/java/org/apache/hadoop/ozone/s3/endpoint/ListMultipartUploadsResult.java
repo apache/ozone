@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,16 +17,16 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 
 /**
@@ -35,7 +34,7 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "ListMultipartUploadsResult", namespace =
-    "http://s3.amazonaws.com/doc/2006-03-01/")
+    S3Consts.S3_XML_NAMESPACE)
 public class ListMultipartUploadsResult {
 
   @XmlElement(name = "Bucket")
@@ -49,6 +48,9 @@ public class ListMultipartUploadsResult {
 
   @XmlElement(name = "NextKeyMarker")
   private String nextKeyMarker;
+
+  @XmlElement(name = "Prefix")
+  private String prefix;
 
   @XmlElement(name = "NextUploadIdMarker")
   private String nextUploadIdMarker;
@@ -92,6 +94,14 @@ public class ListMultipartUploadsResult {
 
   public void setNextKeyMarker(String nextKeyMarker) {
     this.nextKeyMarker = nextKeyMarker;
+  }
+
+  public String getPrefix() {
+    return prefix;
+  }
+
+  public void setPrefix(String prefix) {
+    this.prefix = prefix;
   }
 
   public String getNextUploadIdMarker() {
@@ -145,10 +155,10 @@ public class ListMultipartUploadsResult {
     private String uploadId;
 
     @XmlElement(name = "Owner")
-    private S3Owner owner = S3Owner.NOT_SUPPORTED_OWNER;
+    private S3Owner owner = S3Owner.DEFAULT_S3_OWNER;
 
     @XmlElement(name = "Initiator")
-    private S3Owner initiator = S3Owner.NOT_SUPPORTED_OWNER;
+    private S3Owner initiator = S3Owner.DEFAULT_S3_OWNER;
 
     @XmlElement(name = "StorageClass")
     private String storageClass = "STANDARD";

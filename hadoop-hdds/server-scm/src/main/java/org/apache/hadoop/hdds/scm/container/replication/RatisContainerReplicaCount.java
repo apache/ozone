@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,9 +14,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.compareState;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -26,23 +42,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Ov
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.compareState;
 
 /**
  * Immutable object that is created with a set of ContainerReplica objects and
@@ -186,23 +185,17 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * For example, consider a CLOSED container with the following replicas:
    * {CLOSED, CLOSING, OPEN, UNHEALTHY}
    * In this case, healthy replica count equals 3. Calculation:
-   * 1 CLOSED -> 1 matching replica.
-   * 1 OPEN, 1 CLOSING -> 2 mismatched replicas.
-   * 1 UNHEALTHY -> 1 unhealthy replica. Not counted as healthy.
+   * 1 CLOSED -&gt; 1 matching replica.
+   * 1 OPEN, 1 CLOSING -&gt; 2 mismatched replicas.
+   * 1 UNHEALTHY -&gt; 1 unhealthy replica. Not counted as healthy.
    * Total healthy replicas = 3 = 1 matching + 2 mismatched replicas
    */
   public int getHealthyReplicaCount() {
-    return healthyReplicaCount + healthyReplicaCountAdapter()
-        + decommissionCount + maintenanceCount;
+    return healthyReplicaCount + decommissionCount + maintenanceCount;
   }
 
   public int getUnhealthyReplicaCount() {
-    return unhealthyReplicaCount + getUnhealthyReplicaCountAdapter()
-        + unhealthyDecommissionCount + unhealthyMaintenanceCount;
-  }
-
-  protected int getUnhealthyReplicaCountAdapter() {
-    return 0;
+    return unhealthyReplicaCount + unhealthyDecommissionCount + unhealthyMaintenanceCount;
   }
 
   public int getMisMatchedReplicaCount() {
@@ -214,23 +207,11 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   }
 
   private int getAvailableReplicas() {
-    int available = healthyReplicaCount + healthyReplicaCountAdapter();
+    int available = healthyReplicaCount;
     if (considerUnhealthy) {
-      available += unhealthyReplicaCount + getUnhealthyReplicaCountAdapter();
+      available += unhealthyReplicaCount;
     }
     return available;
-  }
-
-  /**
-   * The new replication manager now does not consider replicas with
-   * UNHEALTHY state when counting sufficient replication. This method is
-   * overridden to ensure LegacyReplicationManager works as intended in
-   * HDDS-6447.
-   * See {@link LegacyRatisContainerReplicaCount}, which overrides this
-   * method, for details.
-   */
-  protected int healthyReplicaCountAdapter() {
-    return 0;
   }
 
   @Override
@@ -530,7 +511,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     vulnerable and need to be saved.
      */
     // TODO should we also consider pending deletes?
-    Set<UUID> originsOfInServiceReplicas = new HashSet<>();
+    final Set<DatanodeID> originsOfInServiceReplicas = new HashSet<>();
     for (ContainerReplica replica : replicas) {
       if (replica.getDatanodeDetails().getPersistedOpState()
           .equals(IN_SERVICE) && replica.getSequenceId().equals(container.getSequenceId())) {

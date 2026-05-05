@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,14 +18,16 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.fs.FSExceptionMessages;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * A stream for accessing multipart streams.
@@ -34,10 +35,11 @@ import java.util.List;
 public class MultipartInputStream extends ExtendedInputStream {
 
   private final String key;
-  private final long length;
+  private long length;
 
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
+  private final boolean isStreamBlockInputStream;
 
   // partOffsets[i] stores the index of the first data byte in
   // partStream w.r.t the whole key data.
@@ -56,13 +58,15 @@ public class MultipartInputStream extends ExtendedInputStream {
   // can be reset if a new position is seeked.
   private int prevPartIndex;
 
+  private boolean initialized = false;
+
   public MultipartInputStream(String keyName,
                               List<? extends PartInputStream> inputStreams) {
-
-    Preconditions.checkNotNull(inputStreams);
+    Objects.requireNonNull(inputStreams, "inputStreams == null");
 
     this.key = keyName;
-    this.partStreams = inputStreams;
+    this.partStreams = Collections.unmodifiableList(inputStreams);
+    this.isStreamBlockInputStream = !inputStreams.isEmpty() && inputStreams.get(0) instanceof StreamBlockInputStream;
 
     // Calculate and update the partOffsets
     this.partOffsets = new long[inputStreams.size()];
@@ -70,20 +74,27 @@ public class MultipartInputStream extends ExtendedInputStream {
     long streamLength = 0L;
     for (PartInputStream partInputStream : inputStreams) {
       this.partOffsets[i++] = streamLength;
+      if (isStreamBlockInputStream) {
+        Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
+      }
       streamLength += partInputStream.getLength();
     }
     this.length = streamLength;
   }
 
+  public boolean isStreamBlockInputStream() {
+    return isStreamBlockInputStream;
+  }
+
   @Override
   protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
       throws IOException {
-    Preconditions.checkArgument(strategy != null);
+    Objects.requireNonNull(strategy, "strategy == null");
     checkOpen();
 
     int totalReadLen = 0;
     while (strategy.getTargetLength() > 0) {
-      if (partStreams.size() == 0 ||
+      if (partStreams.isEmpty() ||
           partStreams.size() - 1 <= partIndex &&
               partStreams.get(partIndex).getRemaining() == 0) {
         return totalReadLen == 0 ? EOF : totalReadLen;
@@ -130,6 +141,9 @@ public class MultipartInputStream extends ExtendedInputStream {
   @Override
   public synchronized void seek(long pos) throws IOException {
     checkOpen();
+    if (!initialized) {
+      initialize();
+    }
     if (pos == 0 && length == 0) {
       // It is possible for length and pos to be zero in which case
       // seek should return instead of throwing exception
@@ -174,6 +188,48 @@ public class MultipartInputStream extends ExtendedInputStream {
   }
 
   @Override
+  public boolean readFully(long position, ByteBuffer buffer) throws IOException {
+    if (!isStreamBlockInputStream) {
+      return false;
+    }
+
+    final long oldPos = getPos();
+    seek(position);
+    try {
+      read(new ByteBufferReader(buffer) {
+        @Override
+        int readImpl(InputStream inputStream) throws IOException {
+          return Preconditions.assertInstanceOf(inputStream, StreamBlockInputStream.class)
+              .readFully(getBuffer(), false);
+        }
+      });
+    } finally {
+      seek(oldPos);
+    }
+    return true;
+  }
+
+  public synchronized void initialize() throws IOException {
+    // Pre-check that the stream has not been intialized already
+    if (initialized) {
+      return;
+    }
+
+    for (PartInputStream partInputStream : partStreams) {
+      if (partInputStream instanceof BlockInputStream) {
+        ((BlockInputStream) partInputStream).initialize();
+      }
+    }
+
+    long streamLength = 0L;
+    for (PartInputStream partInputStream : partStreams) {
+      streamLength += partInputStream.getLength();
+    }
+    this.length = streamLength;
+    initialized = true;
+  }
+
+  @Override
   public synchronized long getPos() throws IOException {
     return length == 0 ? 0 :
         partOffsets[partIndex] + partStreams.get(partIndex).getPos();
@@ -195,6 +251,11 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   @Override
   public synchronized long skip(long n) throws IOException {
+    checkOpen();
+    if (!initialized) {
+      initialize();
+    }
+
     if (n <= 0) {
       return 0;
     }

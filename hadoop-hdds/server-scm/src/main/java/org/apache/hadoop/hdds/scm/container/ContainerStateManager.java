@@ -1,30 +1,34 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -48,7 +52,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
  * 4. The declaration should throw RaftException
  *
  */
-public interface ContainerStateManager {
+public interface ContainerStateManager extends SCMHandler {
 
   /* **********************************************************************
    * Container Life Cycle                                                 *
@@ -103,16 +107,42 @@ public interface ContainerStateManager {
   boolean contains(ContainerID containerID);
 
   /**
-   * Returns the ID of all the managed containers.
+   * Get {@link ContainerID}s for the given state.
    *
-   * @return Set of {@link ContainerID}
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerID};
    */
-  Set<ContainerID> getContainerIDs();
+  List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count);
 
   /**
+   * Get {@link ContainerInfo}s.
    *
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerInfo};
    */
-  Set<ContainerID> getContainerIDs(LifeCycleState state);
+  List<ContainerInfo> getContainerInfos(ContainerID start, int count);
+
+  /**
+   * Get {@link ContainerInfo}s for the given state.
+   *
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerInfo};
+   */
+  List<ContainerInfo> getContainerInfos(LifeCycleState state, ContainerID start, int count);
+
+  /** @return all {@link ContainerInfo}s for the given state. */
+  List<ContainerInfo> getContainerInfos(LifeCycleState state);
+
+  /**
+   * @return number of containers for the given state.
+   */
+  int getContainerCount(LifeCycleState state);
+
+  /** @return all {@link ContainerInfo}s for the given type. */
+  List<ContainerInfo> getContainerInfos(ReplicationType type);
 
   /**
    *
@@ -127,14 +157,12 @@ public interface ContainerStateManager {
   /**
    *
    */
-  void updateContainerReplica(ContainerID id,
-                              ContainerReplica replica);
+  void updateContainerReplica(ContainerReplica replica);
 
   /**
    *
    */
-  void removeContainerReplica(ContainerID id,
-                              ContainerReplica replica);
+  void removeContainerReplica(ContainerReplica replica);
 
   /**
    *
@@ -144,12 +172,27 @@ public interface ContainerStateManager {
       throws IOException;
 
   /**
-   *
+   * Updates container state with sequenceId synchronization for HA consistency.
+   * This method ensures that all SCM nodes have the same sequenceId when 
+   * state transitions occur.
    */
   @Replicate
-  void updateContainerState(HddsProtos.ContainerID id,
-                            HddsProtos.LifeCycleEvent event)
+  void updateContainerStateWithSequenceId(HddsProtos.ContainerID id,
+                                          HddsProtos.LifeCycleEvent event,
+                                          Long sequenceId)
       throws IOException, InvalidStateTransitionException;
+
+
+  /**
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
+   *
+   * @param id id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
+   * @throws IOException
+   */
+  @Replicate
+  void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
+      throws IOException;
 
   /**
    *
@@ -180,8 +223,22 @@ public interface ContainerStateManager {
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
 
+  @Override
+  default RequestType getType() {
+    return RequestType.CONTAINER;
+  }
+
   /**
+   * Update container info.
    *
+   * @param containerInfo Updated container info proto
+   * @throws IOException
    */
-  void close() throws IOException;
+  @Replicate
+  void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
+      throws IOException;
+
+  static void main(String[] args) {
+    ScmInvokerCodeGenerator.generate(ContainerStateManager.class, true);
+  }
 }

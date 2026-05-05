@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,13 +13,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
+
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeSet;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -32,6 +41,7 @@ import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -49,57 +59,43 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateG
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeSet;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
-
-/*
-  Execution flow (might be a bit outdated):
-
-- Client (AssignUserToTenantHandler)
-  - Check admin privilege
-  - Check username validity: ensure no invalid characters
-  - Send request to server
-- OMAssignUserToTenantRequest
-  - preExecute (perform checks and init)
-    - Check username validity (again), check $
-      - If username is invalid, throw exception to client; else continue
-    - Generate S3 secret for the new user
-  - validateAndUpdateCache (update DB)
-    - Permission check (checkACL need to check access key now)
-    - Grab VOLUME_LOCK write lock
-    - Check tenant existence
-      - If tenant doesn't exist, throw exception to client; else continue
-    - Check accessId existence
-      - If accessId exists, throw exception to client; else continue
-    - Grab S3_SECRET_LOCK write lock
-    - S3SecretTable: Flush generated S3 secret
-      - Key: TENANTNAME$USERNAME (equivalent to kerberosID)
-      - Value: <GENERATED_SECRET>
-    - Release S3_SECRET_LOCK write lock
-    - New entry in tenantAccessIdTable:
-      - Key: New accessId for the user in this tenant.
-             Example of accessId: finance$bob@EXAMPLE.COM
-      - Value: OmDBAccessIdInfo. Has tenantId, kerberosPrincipal, sharedSecret.
-    - New entry or update existing entry in principalToAccessIdsTable:
-      - Key: User principal. Usually the short name of the Kerberos principal.
-      - Value: OmDBUserPrincipalInfo. Has accessIds.
-    - Release VOLUME_LOCK write lock
- */
-
 /**
  * Handles OMAssignUserToTenantRequest.
+ * Execution flow (might be a bit outdated):
+ * - Client (AssignUserToTenantHandler)
+ *   - Check admin privilege
+ *   - Check username validity: ensure no invalid characters
+ *   - Send request to server
+ * - OMAssignUserToTenantRequest
+ *   - preExecute (perform checks and init)
+ *     - Check username validity (again), check $
+ *       - If username is invalid, throw exception to client; else continue
+ *     - Generate S3 secret for the new user
+ *   - validateAndUpdateCache (update DB)
+ *     - Permission check (checkACL need to check access key now)
+ *     - Grab VOLUME_LOCK write lock
+ *     - Check tenant existence
+ *       - If tenant doesn't exist, throw exception to client; else continue
+ *     - Check accessId existence
+ *       - If accessId exists, throw exception to client; else continue
+ *     - Grab S3_SECRET_LOCK write lock
+ *     - S3SecretTable: Flush generated S3 secret
+ *       - Key: TENANTNAME$USERNAME (equivalent to kerberosID)
+ *       - Value: <GENERATED_SECRET>
+ *     - Release S3_SECRET_LOCK write lock
+ *     - New entry in tenantAccessIdTable:
+ *       - Key: New accessId for the user in this tenant.
+ *              Example of accessId: finance$bob@EXAMPLE.COM
+ *       - Value: OmDBAccessIdInfo. Has tenantId, kerberosPrincipal, sharedSecret.
+ *     - New entry or update existing entry in principalToAccessIdsTable:
+ *       - Key: User principal. Usually the short name of the Kerberos principal.
+ *       - Value: OmDBUserPrincipalInfo. Has accessIds.
+ *     - Release VOLUME_LOCK write lock
+ *
  */
 public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantAssignUserAccessIdRequest.class);
 
   public OMTenantAssignUserAccessIdRequest(OMRequest omRequest) {
@@ -192,8 +188,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
   @Override
   @SuppressWarnings("checkstyle:methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
 
@@ -334,7 +330,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (acquiredVolumeLock) {
-        Preconditions.checkNotNull(volumeName);
+        Objects.requireNonNull(volumeName, "volumeName == null");
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
                 volumeName));
@@ -350,7 +346,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.TENANT, tenantId);
     auditMap.put("user", userPrincipal);
     auditMap.put("accessId", accessId);
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.TENANT_ASSIGN_USER_ACCESSID, auditMap, exception,
             getOmRequest().getUserInfo()));
 

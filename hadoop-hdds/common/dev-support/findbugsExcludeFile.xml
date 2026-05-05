@@ -19,8 +19,10 @@
     <Package name="org.apache.hadoop.hdds.protocol.proto"/>
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.hdds.cli.GenericCli"></Class>
-    <Bug pattern="DM_EXIT" />
+    <Package name="org.apache.hadoop.ipc_"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.security_"/>
   </Match>
   <Match>
     <Class name="org.apache.hadoop.ozone.OzoneConsts"/>
@@ -30,19 +32,5 @@
     <Class name="org.apache.hadoop.ozone.common.ChecksumByteBuffer$CrcIntTable" />
     <Method name="update" />
     <Bug pattern="SF_SWITCH_FALLTHROUGH,SF_SWITCH_NO_DEFAULT" />
-  </Match>
-
-  <!-- Test -->
-  <Match>
-    <Class name="org.apache.hadoop.hdds.TestHddsUtils"></Class>
-    <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
-  </Match>
-  <Match>
-    <Class name="~org\.apache\.hadoop\.hdds\.scm\.net\.TestNodeSchemaLoader\$.*"></Class>
-    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase"/>
-    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
   </Match>
 </FindBugsFilter>

@@ -1,56 +1,68 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.compareState;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.compareState;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for ReplicationManager.
  */
 public final class ReplicationManagerUtil {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ReplicationManagerUtil.class);
+
   private ReplicationManagerUtil() {
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(
-      ReplicationManagerUtil.class);
+  private static String formatDatanodeDetails(List<DatanodeDetails> dns) {
+    if (dns == null) {
+      return "[]";
+    }
+    return dns.stream()
+        .map(dn -> String.format("%s[%s]", dn, dn.getPersistedOpState()))
+        .collect(Collectors.toList()).toString();
+  }
 
   /**
    * Using the passed placement policy attempt to select a list of datanodes to
@@ -79,7 +91,7 @@ public final class ReplicationManagerUtil {
     // Ensure that target datanodes have enough space to hold a complete
     // container.
     final long dataSizeRequired =
-        Math.max(container.getUsedBytes(), defaultContainerSize);
+        HddsServerUtil.requiredReplicationSpace(Math.max(container.getUsedBytes(), defaultContainerSize));
 
     int mutableRequiredNodes = requiredNodes;
     while (mutableRequiredNodes > 0) {
@@ -99,8 +111,9 @@ public final class ReplicationManagerUtil {
       }
     }
     throw new SCMException(String.format("Placement Policy: %s did not return"
-            + " any nodes. Number of required Nodes %d, Datasize Required: %d",
-        policy.getClass(), requiredNodes, dataSizeRequired),
+            + " any nodes. Number of required Nodes %d, Data size Required: %d. Container: %s, Used Nodes %s, " +
+            "Excluded Nodes: %s.", policy.getClass(), requiredNodes, dataSizeRequired, container,
+        formatDatanodeDetails(usedNodes), formatDatanodeDetails(excludedNodes)),
         SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
 
@@ -175,6 +188,17 @@ public final class ReplicationManagerUtil {
           excludedNodes.add(r.getDatanodeDetails());
           continue;
         }
+        if (nodeStatus.isMaintenance() && nodeStatus.isDead()) {
+          // Dead maintenance nodes are removed from the network topology, so the topology logic can't find
+          // out their location and hence can't consider them for figuring out rack placement. So, we don't add them
+          // to the used nodes list. We also don't add them to excluded nodes, as the placement policy logic won't
+          // consider a node that's not in the topology anyway. In fact, adding it to excluded nodes will cause a
+          // problem if total nodes (in topology) + required nodes becomes less than excluded + used nodes.
+
+          // TODO: In the future, can the policy logic be changed to use the DatanodeDetails network location to figure
+          //  out  the rack?
+          continue;
+        }
       } catch (NodeNotFoundException e) {
         LOG.warn("Node {} not found in node manager.", r.getDatanodeDetails());
         // This should not happen, but if it does, just add the node to the
@@ -196,9 +220,55 @@ public final class ReplicationManagerUtil {
         excludedNodes.add(pending.getTarget());
       }
     }
+    excludeFullNodes(replicationManager, container, excludedNodes);
     return new ExcludedAndUsedNodes(excludedNodes, usedNodes);
   }
 
+  private static void excludeFullNodes(ReplicationManager replicationManager,
+      ContainerInfo container, List<DatanodeDetails> excludedNodes) {
+    ContainerReplicaPendingOps pendingOps = replicationManager.getContainerReplicaPendingOps();
+    Map<DatanodeID, ContainerReplicaPendingOps.SizeAndTime>
+        containerSizeScheduled = pendingOps.getContainerSizeScheduled();
+    if (containerSizeScheduled == null || containerSizeScheduled.isEmpty()) {
+      return;
+    }
+
+    final long requiredSize = HddsServerUtil.requiredReplicationSpace(container.getUsedBytes());
+    NodeManager nodeManager = replicationManager.getNodeManager();
+
+    for (Map.Entry<DatanodeID, ContainerReplicaPendingOps.SizeAndTime> entry : containerSizeScheduled.entrySet()) {
+      DatanodeDetails dn = nodeManager.getNode(entry.getKey());
+      if (dn == null || excludedNodes.contains(dn)) {
+        continue;
+      }
+
+      SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
+      if (nodeMetric == null) {
+        continue;
+      }
+
+      long scheduledSize = 0;
+      ContainerReplicaPendingOps.SizeAndTime sizeAndTime = entry.getValue();
+      if (sizeAndTime != null) {
+        // Only consider sizes added in the last event timeout window
+        if (pendingOps.getClock().millis() - sizeAndTime.getLastUpdatedTime()
+            < replicationManager.getConfig().getEventTimeout()) {
+          scheduledSize = sizeAndTime.getSize();
+        } else {
+          LOG.debug("Expired op {} found while computing exclude nodes", entry);
+        }
+      }
+
+      SCMNodeStat scmNodeStat = nodeMetric.get();
+      if (scmNodeStat.getRemaining().get() - scmNodeStat.getFreeSpaceToSpare().get() - scheduledSize
+          < requiredSize) {
+        LOG.debug("Adding datanode {} to exclude list. Remaining: {}, freeSpaceToSpare: {}, scheduledSize: {}, " +
+            "requiredSize: {}. ContainerInfo: {}.", dn, scmNodeStat.getRemaining().get(),
+            scmNodeStat.getFreeSpaceToSpare().get(), scheduledSize, requiredSize, container);
+        excludedNodes.add(dn);
+      }
+    }
+  }
 
   /**
    * Simple class to hold the excluded and used nodes lists.
@@ -274,14 +344,14 @@ public final class ReplicationManagerUtil {
     deleteCandidates.sort(
         Comparator.comparingLong(ContainerReplica::getSequenceId));
     if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
-      return deleteCandidates.size() > 0 ? deleteCandidates : null;
+      return !deleteCandidates.isEmpty() ? deleteCandidates : null;
     }
 
     if (containerInfo.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
       List<ContainerReplica> nonUniqueOrigins =
           findNonUniqueDeleteCandidates(replicas, deleteCandidates,
               nodeStatusFn);
-      return nonUniqueOrigins.size() > 0 ? nonUniqueOrigins : null;
+      return !nonUniqueOrigins.isEmpty() ? nonUniqueOrigins : null;
     }
     return null;
   }
@@ -333,7 +403,7 @@ public final class ReplicationManagerUtil {
       Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
     // Gather the origin node IDs of replicas which are not candidates for
     // deletion.
-    Set<UUID> existingOriginNodeIDs = allReplicas.stream()
+    final Set<DatanodeID> existingOriginNodeIDs = allReplicas.stream()
         .filter(r -> !deleteCandidates.contains(r))
         .filter(r -> {
           NodeStatus status = nodeStatusFn.apply(r.getDatanodeDetails());
@@ -376,7 +446,7 @@ public final class ReplicationManagerUtil {
     return nonUniqueDeleteCandidates;
   }
 
-  private static void checkUniqueness(Set<UUID> existingOriginNodeIDs,
+  private static void checkUniqueness(Set<DatanodeID> existingOriginNodeIDs,
       List<ContainerReplica> nonUniqueDeleteCandidates,
       ContainerReplica replica) {
     if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {

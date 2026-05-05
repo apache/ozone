@@ -15,13 +15,17 @@
 
 *** Settings ***
 Documentation       Test om compatibility
-Library             BuiltIn
-Resource            ../lib/os.robot
+Resource            lib.resource
 Test Timeout        5 minutes
 
 *** Test Cases ***
 Picks up command line options
     Pass Execution If    '%{HDFS_OM_OPTS}' == ''    Command-line option required for process check
-    ${processes} =    List All Processes
+    ${processes} =    Wait for server command-line options
     Should Contain    ${processes}   %{HDFS_OM_OPTS}
-    Should Contain    ${processes}   %{HADOOP_OPTS}
+    Check client command-line options
+
+Rejects Atomic Key Rewrite
+    Execute           ozone freon ockg -n1 -t1 -p rewrite
+    ${output} =       Execute and check rc    ozone sh key rewrite -t EC -r rs-3-2-1024k /vol1/bucket1/rewrite/0    255
+    Should Contain    ${output}    Feature disabled: ATOMIC_REWRITE_KEY

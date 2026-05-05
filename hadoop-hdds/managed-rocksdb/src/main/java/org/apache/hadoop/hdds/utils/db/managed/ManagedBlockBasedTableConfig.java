@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,14 +13,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.Cache;
-
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Managed BlockBasedTableConfig.
@@ -33,7 +31,7 @@ public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
   public synchronized ManagedBlockBasedTableConfig closeAndSetBlockCache(
       Cache blockCache) {
     Cache previous = blockCacheHolder;
-    if (previous.isOwningHandle()) {
+    if (previous != null && previous.isOwningHandle()) {
       previous.close();
     }
     return setBlockCache(blockCache);

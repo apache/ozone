@@ -1,22 +1,41 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,33 +54,12 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.any;
-
 /**
  * Tests the ECMisReplicationHandling functionality.
  */
 public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   private static final int DATA = 3;
   private static final int PARITY = 2;
-
 
   @BeforeEach
   void setup(@TempDir File testDir) throws NodeNotFoundException,
@@ -163,13 +161,13 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
     when(placementPolicy.validateContainerPlacement(anyList(),
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = singletonList(
-            ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-                    MockDatanodeDetails.randomDatanodeDetails(), 1));
+            new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+                    MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
-    pendingOp = singletonList(ContainerReplicaOp
-            .create(ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
-                    .stream().findAny().get().getDatanodeDetails(), 1));
+    pendingOp = singletonList(new ContainerReplicaOp(
+            ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
+                    .stream().findAny().get().getDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
   }

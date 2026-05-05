@@ -1,47 +1,53 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handles requests to move open keys from the open key table to the delete
@@ -54,14 +60,18 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
   private static final Logger LOG =
           LoggerFactory.getLogger(OMOpenKeysDeleteRequest.class);
 
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
+  private static final String AUDIT_PARAM_NUM_OPEN_KEYS = "numOpenKeysDeleted";
+  private static final String AUDIT_PARAM_OPEN_KEYS = "openKeysDeleted";
+
   public OMOpenKeysDeleteRequest(OMRequest omRequest,
                                  BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumOpenKeyDeleteRequests();
@@ -86,8 +96,9 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
-    Map<String, OmKeyInfo> deletedOpenKeys = new HashMap<>();
-
+    // Map containing a pair of BucketId and delete key info.
+    Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys = new HashMap<>();
+    Map<String, String> auditParams = new LinkedHashMap<>();
     try {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
         // For each bucket where keys will be deleted from,
@@ -97,11 +108,26 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       }
 
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled(), getBucketLayout());
+          deletedOpenKeys, getBucketLayout());
 
       result = Result.SUCCESS;
+
+      List<String> deletedOpenKeysLight = new ArrayList<>(deletedOpenKeys.size());
+      for (Pair<Long, OmKeyInfo> key : deletedOpenKeys.values()) {
+        OmKeyInfo keyInfo = key.getRight();
+        OzoneManagerProtocolProtos.KeyArgs keyArgs = OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(keyInfo.getVolumeName())
+            .setBucketName(keyInfo.getBucketName())
+            .setKeyName(keyInfo.getKeyName())
+            .build();
+        deletedOpenKeysLight.add(buildLightKeyArgsAuditMap(keyArgs).toString());
+      }
+      auditParams.put(AUDIT_PARAM_NUM_OPEN_KEYS, String.valueOf(deletedOpenKeys.size()));
+      auditParams.put(AUDIT_PARAM_OPEN_KEYS, deletedOpenKeysLight.toString());
+      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.OPEN_KEY_CLEANUP, auditParams));
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.OPEN_KEY_CLEANUP, auditParams, ex));
       exception = ex;
       omClientResponse =
           new OMOpenKeysDeleteResponse(createErrorOMResponse(omResponse,
@@ -138,9 +164,9 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     }
   }
 
-  private void updateOpenKeyTableCache(OzoneManager ozoneManager,
+  protected void updateOpenKeyTableCache(OzoneManager ozoneManager,
       long trxnLogIndex, OpenKeyBucket keysPerBucket,
-      Map<String, OmKeyInfo> deletedOpenKeys) throws IOException {
+      Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys) throws IOException {
 
     boolean acquiredLock = false;
     String volumeName = keysPerBucket.getVolumeName();
@@ -151,7 +177,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
-
+      OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      long bucketId = omBucketInfo == null ? 0L : omBucketInfo.getObjectID();
       for (OpenKey key: keysPerBucket.getKeysList()) {
         String fullKeyName = key.getName();
 
@@ -161,8 +188,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(fullKeyName);
         if (omKeyInfo != null) {
-          if (ozoneManager.isRatisEnabled() &&
-              trxnLogIndex < omKeyInfo.getUpdateID()) {
+          if (trxnLogIndex < omKeyInfo.getUpdateID()) {
             LOG.warn("Transaction log index {} is smaller than " +
                 "the current updateID {} of key {}, skipping deletion.",
                 trxnLogIndex, omKeyInfo.getUpdateID(), fullKeyName);
@@ -170,8 +196,10 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
-          deletedOpenKeys.put(fullKeyName, omKeyInfo);
+          omKeyInfo = omKeyInfo.toBuilder()
+              .setUpdateID(trxnLogIndex)
+              .build();
+          deletedOpenKeys.put(fullKeyName, Pair.of(bucketId, omKeyInfo));
 
           // Update openKeyTable cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(

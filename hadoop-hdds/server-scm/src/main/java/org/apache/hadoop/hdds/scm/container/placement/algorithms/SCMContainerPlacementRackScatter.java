@@ -1,23 +1,34 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
+
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -29,18 +40,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
 
 /**
  * Container placement policy that scatter datanodes on different racks
@@ -56,7 +55,7 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAI
 public final class SCMContainerPlacementRackScatter
     extends SCMCommonPlacementPolicy {
   @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRackScatter.class);
   private final NetworkTopology networkTopology;
   private static final int RACK_LEVEL = 1;
@@ -127,7 +126,7 @@ public final class SCMContainerPlacementRackScatter
         skippedRacks.clear();
       }
 
-      if (mutableFavoredNodes.size() > 0) {
+      if (!mutableFavoredNodes.isEmpty()) {
         List<DatanodeDetails> chosenFavoredNodesInForLoop = new ArrayList<>();
         for (DatanodeDetails favoredNode : mutableFavoredNodes) {
           Node curRack = getRackOfDatanodeDetails(favoredNode);
@@ -474,7 +473,7 @@ public final class SCMContainerPlacementRackScatter
       if (maxRetry == 0) {
         // avoid the infinite loop
         LOG.info("No satisfied datanode to meet the constraints. "
-            + "Metadatadata size required: {} Data size required: {}, scope "
+            + "Metadata size required: {} Data size required: {}, scope "
             + "{}, excluded nodes {}",
             metadataSizeRequired, dataSizeRequired, scope, excludedNodes);
         return null;

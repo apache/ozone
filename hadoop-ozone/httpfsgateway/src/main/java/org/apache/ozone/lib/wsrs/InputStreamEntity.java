@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,16 +17,15 @@
 
 package org.apache.ozone.lib.wsrs;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.ozone.fs.http.server.FSOperations;
-import org.apache.ozone.fs.http.server.HttpFSServerWebApp;
-import org.apache.ozone.fs.http.server.metrics.HttpFSServerMetrics;
-import org.apache.hadoop.io.IOUtils;
-
-import javax.ws.rs.core.StreamingOutput;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import javax.ws.rs.core.StreamingOutput;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.ozone.fs.http.server.FSOperations;
+import org.apache.ozone.fs.http.server.HttpFSServerWebApp;
+import org.apache.ozone.fs.http.server.metrics.HttpFSServerMetrics;
 
 /**
  * This entity represents an input stream.
@@ -42,10 +40,6 @@ public class InputStreamEntity implements StreamingOutput {
     this.is = is;
     this.offset = offset;
     this.len = len;
-  }
-
-  public InputStreamEntity(InputStream is) {
-    this(is, 0, -1);
   }
 
   @Override

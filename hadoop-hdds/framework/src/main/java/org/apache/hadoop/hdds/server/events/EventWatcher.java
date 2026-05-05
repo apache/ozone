@@ -1,40 +1,39 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.server.events;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.lease.LeaseAlreadyExistException;
 import org.apache.hadoop.ozone.lease.LeaseExpiredException;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseNotFoundException;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +77,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     this.completionEvent = completionEvent;
     this.leaseManager = leaseManager;
     this.metrics = new EventWatcherMetrics();
-    Preconditions.checkNotNull(name);
+    Objects.requireNonNull(name, "name == null");
     if (name.equals("")) {
       name = getClass().getSimpleName();
     }
@@ -118,7 +117,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
                                              EventPublisher publisher) {
     metrics.incrementTrackedEvents();
     long identifier = payload.getId();
-    startTrackingTimes.put(identifier, System.currentTimeMillis());
+    startTrackingTimes.put(identifier, Time.monotonicNow());
 
     trackedEventsByID.put(identifier, payload);
     trackedEvents.add(payload);
@@ -141,7 +140,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     if (trackedEvents.remove(payload)) {
       metrics.incrementCompletedEvents();
       long originalTime = startTrackingTimes.remove(id);
-      metrics.updateFinishingTime(System.currentTimeMillis() - originalTime);
+      metrics.updateFinishingTime(Time.monotonicNow() - originalTime);
       onFinished(publisher, payload);
     }
   }
@@ -155,7 +154,6 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     onTimeout(publisher, payload);
     return null;
   }
-
 
   /**
    * Check if a specific payload is in-progress.

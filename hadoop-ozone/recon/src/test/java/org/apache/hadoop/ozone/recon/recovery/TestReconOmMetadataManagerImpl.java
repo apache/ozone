@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,16 +19,19 @@ package org.apache.hadoop.ozone.recon.recovery;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -37,14 +39,9 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Recon OM Metadata Manager implementation.
@@ -65,7 +62,7 @@ public class TestReconOmMetadataManagerImpl {
     File snapshotFile = new File(
         checkpoint.getCheckpointLocation().getParent() + "/" +
             "om.snapshot.db_" + System.currentTimeMillis());
-    checkpoint.getCheckpointLocation().toFile().renameTo(snapshotFile);
+    assertTrue(checkpoint.getCheckpointLocation().toFile().renameTo(snapshotFile));
 
     //Create new Recon OM Metadata manager instance.
     File reconOmDbDir = Files.createDirectory(
@@ -120,7 +117,7 @@ public class TestReconOmMetadataManagerImpl {
 
     //Update Recon OM DB with the OM DB checkpoint location.
     reconOMMetadataManager.updateOmDB(
-        checkpoint.getCheckpointLocation().toFile());
+        checkpoint.getCheckpointLocation().toFile(), true);
 
     //Now, the tables should have been initialized.
     assertNotNull(reconOMMetadataManager.getBucketTable());
@@ -144,7 +141,7 @@ public class TestReconOmMetadataManagerImpl {
     // Update again with an existing OM DB.
     DBStore current = reconOMMetadataManager.getStore();
     reconOMMetadataManager.updateOmDB(
-        newCheckpoint.getCheckpointLocation().toFile());
+        newCheckpoint.getCheckpointLocation().toFile(), true);
     // Verify that the existing DB instance is closed.
     assertTrue(current.isClosed());
   }

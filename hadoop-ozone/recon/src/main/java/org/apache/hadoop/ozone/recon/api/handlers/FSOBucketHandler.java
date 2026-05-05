@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.Iterator;
+import java.util.List;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -30,33 +35,19 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.Paths;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Class for handling FSO buckets NameSpaceSummaries.
  */
 public class FSOBucketHandler extends BucketHandler {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(FSOBucketHandler.class);
   private final long volumeId;
   private final long bucketId;
   
   public FSOBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
       OmBucketInfo bucketInfo) throws IOException {
-    super(reconNamespaceSummaryManager, omMetadataManager,
-        reconSCM);
+    super(reconNamespaceSummaryManager, omMetadataManager);
 
     String vol = bucketInfo.getVolumeName();
     String bucket = bucketInfo.getBucketName();
@@ -123,48 +114,9 @@ public class FSOBucketHandler extends BucketHandler {
   @Override
   public long calculateDUUnderObject(long parentId)
       throws IOException {
-    Table<String, OmKeyInfo> keyTable = getOmMetadataManager().getFileTable();
-
-    long totalDU = 0L;
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
-
-      String seekPrefix = OM_KEY_PREFIX +
-          volumeId +
-          OM_KEY_PREFIX +
-          bucketId +
-          OM_KEY_PREFIX +
-          parentId +
-          OM_KEY_PREFIX;
-      iterator.seek(seekPrefix);
-      // handle direct keys
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-        String dbKey = kv.getKey();
-        // since the RocksDB is ordered, seek until the prefix isn't matched
-        if (!dbKey.startsWith(seekPrefix)) {
-          break;
-        }
-        OmKeyInfo keyInfo = kv.getValue();
-        if (keyInfo != null) {
-          totalDU += keyInfo.getReplicatedSize();
-        }
-      }
-    }
-
-    // handle nested keys (DFS)
     NSSummary nsSummary = getReconNamespaceSummaryManager()
-            .getNSSummary(parentId);
-    // empty bucket
-    if (nsSummary == null) {
-      return 0;
-    }
-
-    Set<Long> subDirIds = nsSummary.getChildDir();
-    for (long subDirId: subDirIds) {
-      totalDU += calculateDUUnderObject(subDirId);
-    }
-    return totalDU;
+        .getNSSummary(parentId);
+    return nsSummary != null ? nsSummary.getReplicatedSizeOfFiles() : 0L;
   }
 
   /**

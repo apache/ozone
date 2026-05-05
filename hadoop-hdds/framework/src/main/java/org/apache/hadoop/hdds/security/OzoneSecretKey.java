@@ -1,39 +1,30 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.security;
 
-import com.google.common.base.Preconditions;
-import com.google.protobuf.ByteString;
-import java.io.ByteArrayInputStream;
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.DataOutput;
-import java.io.IOException;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
-import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.SecretKeyProto;
 
 /**
  * Wrapper class for Ozone/Hdds secret keys. Used in delegation tokens and block
@@ -41,38 +32,22 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.SecretKeyProto;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class OzoneSecretKey implements Writable {
+public class OzoneSecretKey {
 
   private int keyId;
   private long expiryDate;
   private PrivateKey privateKey;
   private PublicKey publicKey;
-  private SecurityConfig securityConfig;
   private String certSerialId;
 
   public OzoneSecretKey(int keyId, long expiryDate, KeyPair keyPair,
       String certificateSerialId) {
-    Preconditions.checkNotNull(keyId);
+    Objects.requireNonNull(keyPair, "keyPair == null");
     this.keyId = keyId;
     this.expiryDate = expiryDate;
     this.privateKey = keyPair.getPrivate();
     this.publicKey = keyPair.getPublic();
     this.certSerialId = certificateSerialId;
-  }
-
-  /*
-   * Create new instance using default signature algorithm and provider.
-   * */
-  public OzoneSecretKey(int keyId, long expiryDate, byte[] pvtKey,
-      byte[] publicKey) {
-    Preconditions.checkNotNull(pvtKey);
-    Preconditions.checkNotNull(publicKey);
-
-    this.securityConfig = new SecurityConfig(new OzoneConfiguration());
-    this.keyId = keyId;
-    this.expiryDate = expiryDate;
-    this.privateKey = SecurityUtil.getPrivateKey(pvtKey, securityConfig);
-    this.publicKey = SecurityUtil.getPublicKey(publicKey, securityConfig);
   }
 
   public int getKeyId() {
@@ -103,32 +78,6 @@ public class OzoneSecretKey implements Writable {
     return publicKey.getEncoded();
   }
 
-  public void setExpiryDate(long expiryDate) {
-    this.expiryDate = expiryDate;
-  }
-
-  @Override
-  public void write(DataOutput out) throws IOException {
-    SecretKeyProto token = SecretKeyProto.newBuilder()
-        .setKeyId(getKeyId())
-        .setExpiryDate(getExpiryDate())
-        .setPrivateKeyBytes(ByteString.copyFrom(getEncodedPrivateKey()))
-        .setPublicKeyBytes(ByteString.copyFrom(getEncodedPubliceKey()))
-        .build();
-    out.write(token.toByteArray());
-  }
-
-  @Override
-  public void readFields(DataInput in) throws IOException {
-    SecretKeyProto secretKey = SecretKeyProto.parseFrom((DataInputStream) in);
-    expiryDate = secretKey.getExpiryDate();
-    keyId = secretKey.getKeyId();
-    privateKey = SecurityUtil.getPrivateKey(secretKey.getPrivateKeyBytes()
-        .toByteArray(), securityConfig);
-    publicKey = SecurityUtil.getPublicKey(secretKey.getPublicKeyBytes()
-        .toByteArray(), securityConfig);
-  }
-
   @Override
   public int hashCode() {
     HashCodeBuilder hashCodeBuilder = new HashCodeBuilder(537, 963);
@@ -156,27 +105,6 @@ public class OzoneSecretKey implements Writable {
           .build();
     }
     return false;
-  }
-
-  /**
-   * Reads protobuf encoded input stream to construct {@link OzoneSecretKey}.
-   */
-  static OzoneSecretKey readProtoBuf(DataInput in) throws IOException {
-    Preconditions.checkNotNull(in);
-    SecretKeyProto key = SecretKeyProto.parseFrom((DataInputStream) in);
-    return new OzoneSecretKey(key.getKeyId(), key.getExpiryDate(),
-        key.getPrivateKeyBytes().toByteArray(),
-        key.getPublicKeyBytes().toByteArray());
-  }
-
-  /**
-   * Reads protobuf encoded input stream to construct {@link OzoneSecretKey}.
-   */
-  static OzoneSecretKey readProtoBuf(byte[] identifier) throws IOException {
-    Preconditions.checkNotNull(identifier);
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(
-        identifier));
-    return readProtoBuf(in);
   }
 
 }

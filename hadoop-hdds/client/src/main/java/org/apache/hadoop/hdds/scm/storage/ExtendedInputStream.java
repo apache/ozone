@@ -1,32 +1,31 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.storage;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.util.StringUtils;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
 
 /**
  * Abstact class which extends InputStream and some common interfaces used by
@@ -36,6 +35,17 @@ public abstract class ExtendedInputStream extends InputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable, StreamCapabilities {
 
   protected static final int EOF = -1;
+
+  /**
+   * Positioned read.
+   *
+   * @param position the starting position of the read.
+   * @param buffer the buffer for storing the data.
+   * @return true iff positioned read is supported in this implementation.
+   */
+  public boolean readFully(long position, ByteBuffer buffer) throws IOException {
+    return false;
+  }
 
   @Override
   public synchronized int read() throws IOException {
@@ -48,19 +58,16 @@ public abstract class ExtendedInputStream extends InputStream
 
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
-    int bufferLen = strategy.getTargetLength();
-    if (bufferLen == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
+    return read(new ByteArrayReader(b, off, len));
   }
 
   @Override
   public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
-    int bufferLen = strategy.getTargetLength();
-    if (bufferLen == 0) {
+    return read(new ByteBufferReader(byteBuffer));
+  }
+
+  public synchronized int read(ByteReaderStrategy strategy) throws IOException {
+    if (strategy.getTargetLength() == 0) {
       return 0;
     }
     return readWithStrategy(strategy);
@@ -75,7 +82,6 @@ public abstract class ExtendedInputStream extends InputStream
    * readWithStrategy implementation, as it will never be called by the tests.
    *
    * @param strategy
-   * @return
    * @throws IOException
    */
   protected abstract int readWithStrategy(ByteReaderStrategy strategy) throws

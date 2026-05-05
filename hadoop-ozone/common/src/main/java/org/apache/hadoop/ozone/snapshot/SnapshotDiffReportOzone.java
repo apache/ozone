@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,11 @@
 
 package org.apache.hadoop.ozone.snapshot;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,12 +33,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffReportProto;
 
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-
 /**
  * Snapshot diff report.
  * <p>
@@ -43,18 +41,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 public class SnapshotDiffReportOzone
     extends org.apache.hadoop.hdfs.protocol.SnapshotDiffReport {
 
+  private static final String LINE_SEPARATOR = System.getProperty("line.separator", "\n");
+
   private static final Codec<DiffReportEntry> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(DiffReportEntryProto.getDefaultInstance()),
       SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
       SnapshotDiffReportOzone::toProtobufDiffReportEntry,
+      DiffReportEntry.class,
       DelegatedCodec.CopyType.SHALLOW);
-
-  public static Codec<DiffReportEntry> getDiffReportEntryCodec() {
-    return CODEC;
-  }
-
-  private static final String LINE_SEPARATOR = System.getProperty(
-      "line.separator", "\n");
 
   /**
    * Volume name to which the snapshot bucket belongs.
@@ -66,12 +60,10 @@ public class SnapshotDiffReportOzone
    */
   private final String bucketName;
 
-
   /**
    * subsequent token for the diff report.
    */
   private final String token;
-
 
   public SnapshotDiffReportOzone(final String snapshotRoot,
       final String volumeName,
@@ -85,6 +77,11 @@ public class SnapshotDiffReportOzone
     this.token = token;
   }
 
+  public static Codec<DiffReportEntry> getDiffReportEntryCodec() {
+    return CODEC;
+  }
+
+  @Override
   public List<DiffReportEntry> getDiffList() {
     return super.getDiffList();
   }
@@ -149,7 +146,7 @@ public class SnapshotDiffReportOzone
         report.getDiffListList().stream()
             .map(SnapshotDiffReportOzone::fromProtobufDiffReportEntry)
             .collect(Collectors.toList()),
-        report.getToken());
+        report.hasToken() ? report.getToken() : null);
   }
 
   public static DiffType fromProtobufDiffType(
@@ -189,7 +186,6 @@ public class SnapshotDiffReportOzone
     }
     return builder.build();
   }
-
 
   public static DiffReportEntry getDiffReportEntry(final DiffType type,
       final String sourcePath) {

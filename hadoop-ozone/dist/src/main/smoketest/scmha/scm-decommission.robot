@@ -19,7 +19,7 @@ Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
-Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Suite Setup         Kinit test user     testuser     testuser.keytab
 
 *** Variables ***
 ${VOLUME}           decom-volume

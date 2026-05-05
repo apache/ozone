@@ -28,18 +28,21 @@ OZONE-SITE.XML_ozone.scm.block.size=1MB
 OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
 OZONE-SITE.XML_ozone.scm.names=scm
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
+OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_hdds.container.report.interval=60s
@@ -55,6 +58,8 @@ OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 
+OZONE-SITE.XML_ozone.fs.hsync.enabled=true
+OZONE-SITE.XML_ozone.recon.dn.metrics.collection.minimum.api.delay=5s
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 

@@ -1,23 +1,39 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -36,24 +52,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.any;
-
 /**
  * Tests for {@link VulnerableUnhealthyReplicasHandler}.
  */
@@ -62,7 +60,6 @@ public class TestVulnerableUnhealthyReplicasHandler {
   private ReplicationConfig repConfig;
   private ReplicationQueue repQueue;
   private ContainerCheckRequest.Builder requestBuilder;
-  private ReplicationManagerReport report;
   private VulnerableUnhealthyReplicasHandler handler;
 
   @BeforeEach
@@ -71,7 +68,9 @@ public class TestVulnerableUnhealthyReplicasHandler {
     handler = new VulnerableUnhealthyReplicasHandler(replicationManager);
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
-    report = new ReplicationManagerReport();
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManagerReport report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
         .setMaintenanceRedundancy(2)
@@ -150,7 +149,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+            return NodeStatus.valueOf(DECOMMISSIONING, HEALTHY);
           }
           return NodeStatus.inServiceHealthy();
         });
@@ -193,7 +192,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+            return NodeStatus.valueOf(DECOMMISSIONING, HEALTHY);
           }
           return NodeStatus.inServiceHealthy();
         });
@@ -221,7 +220,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+            return NodeStatus.valueOf(DECOMMISSIONING, HEALTHY);
           }
           return NodeStatus.inServiceHealthy();
         });
@@ -252,7 +251,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+            return NodeStatus.valueOf(DECOMMISSIONING, HEALTHY);
           }
           return NodeStatus.inServiceHealthy();
         });

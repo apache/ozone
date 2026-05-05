@@ -1,24 +1,24 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * SCM Node Metric that is used in the placement classes.
@@ -33,7 +33,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    * @param stat - SCMNodeStat.
    */
   public SCMNodeMetric(SCMNodeStat stat) {
-    this.stat = stat;
+    this.stat = Objects.requireNonNull(stat, "stat == null");
   }
 
   /**
@@ -42,14 +42,13 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    * @param capacity  in bytes
    * @param used      in bytes
    * @param remaining in bytes
-   * @param committed
-   * @paaram committed in bytes
+   * @param committed in bytes
    */
   @VisibleForTesting
   public SCMNodeMetric(long capacity, long used, long remaining,
-                       long committed, long freeSpaceToSpare) {
+                       long committed, long freeSpaceToSpare, long reserved) {
     this.stat = new SCMNodeStat();
-    this.stat.set(capacity, used, remaining, committed, freeSpaceToSpare);
+    this.stat.set(capacity, used, remaining, committed, freeSpaceToSpare, reserved);
   }
 
   /**
@@ -59,8 +58,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isGreater(SCMNodeStat o) {
-    Preconditions.checkNotNull(this.stat, "Argument cannot be null");
-    Preconditions.checkNotNull(o, "Argument cannot be null");
+    Objects.requireNonNull(o, "o == null");
 
     // if zero, replace with 1 for the division to work.
     long thisDenominator = (this.stat.getCapacity().get() == 0)
@@ -90,7 +88,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isLess(SCMNodeStat o) {
-    Preconditions.checkNotNull(o, "Argument cannot be null");
+    Objects.requireNonNull(o, "Argument cannot be null");
 
     // if zero, replace with 1 for the division to work.
     long thisDenominator = (this.stat.getCapacity().get() == 0)
@@ -161,7 +159,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
   public void set(SCMNodeStat value) {
     stat.set(value.getCapacity().get(), value.getScmUsed().get(),
         value.getRemaining().get(), value.getCommitted().get(),
-        value.getFreeSpaceToSpare().get());
+        value.getFreeSpaceToSpare().get(), value.getReserved().get());
   }
 
   /**

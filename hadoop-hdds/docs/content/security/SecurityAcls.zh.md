@@ -1,6 +1,6 @@
 ---
 title: "Ozone 访问控制列表"
-date: "2019-April-03"
+date: "2019-04-03"
 weight: 6
 menu:
    main:
@@ -30,7 +30,7 @@ Ozone 既支持类似 Ranger 这样的 ACL 插件，也支持原生的 ACL。如
 Property|Value
 --------|------------------------------------------------------------
 ozone.acl.enabled         | true
-ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.OzoneNativeAuthorizer
+ozone.acl.authorizer.class| org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
 
 Ozone 的 ACL 是 Posix ACL 和 S3 ACL 的超集。
 

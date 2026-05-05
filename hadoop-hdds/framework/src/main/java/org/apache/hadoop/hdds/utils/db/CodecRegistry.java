@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,18 +13,16 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
-
-import com.google.common.base.Preconditions;
-
+import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.ClassUtils;
 
 /**
@@ -33,6 +30,9 @@ import org.apache.commons.lang3.ClassUtils;
  * This class is immutable.
  */
 public final class CodecRegistry {
+
+  private final CodecMap valueCodecs;
+
   /** To build {@link CodecRegistry}. */
   public static class Builder {
     private final Map<Class<?>, Codec<?>> codecs = new HashMap<>();
@@ -64,6 +64,7 @@ public final class CodecRegistry {
     }
 
     <T> Codec<T> get(Class<T> clazz) {
+      Objects.requireNonNull(clazz, "clazz == null");
       final Codec<?> codec = map.get(clazz);
       return (Codec<T>) codec;
     }
@@ -78,8 +79,6 @@ public final class CodecRegistry {
       return null;
     }
   }
-
-  private final CodecMap valueCodecs;
 
   private CodecRegistry(Map<Class<?>, Codec<?>> valueCodecs) {
     this.valueCodecs = new CodecMap(valueCodecs);
@@ -123,7 +122,7 @@ public final class CodecRegistry {
    * @return byte array to store it ini the kv store.
    */
   public <T> byte[] asRawData(T object) throws IOException {
-    Preconditions.checkNotNull(object,
+    Objects.requireNonNull(object,
         "Null value shouldn't be persisted in the database");
     Codec<T> codec = getCodec(object);
     return codec.toPersistedFormat(object);

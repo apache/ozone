@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import java.util.List;
 import java.util.Map;
-
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
 
@@ -48,13 +47,6 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
    */
   boolean isInSafeMode();
 
-
-  /**
-   * Returns if safe mode exit is forceful.
-   * @return boolean
-   */
-  boolean isSafeModeExitForceful();
-
   /**
    * Returns live safe mode container threshold.
    * @return String
@@ -72,7 +64,7 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
 
   String getClusterId();
 
-  String getScmRatisRoles();
+  List<List<String>> getScmRatisRoles();
 
   /**
    * Primordial node is the node on which scm init operation is performed.
@@ -83,4 +75,11 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   String getRatisLogDirectory();
 
   String getRocksDbDirectory();
+
+  /**
+   * Gets the SCM hostname.
+   *
+   * @return the SCM hostname for the datanode.
+   */
+  String getHostname();
 }

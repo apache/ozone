@@ -1,27 +1,40 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -29,15 +42,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for StorageVolume health checks using Real volume instances with
@@ -48,6 +52,7 @@ public class TestStorageVolumeHealthChecks {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final TestClock TEST_CLOCK = TestClock.newInstance();
 
   @TempDir
   private static Path volumePath;
@@ -57,19 +62,22 @@ public class TestStorageVolumeHealthChecks {
         new HddsVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     MetadataVolume.Builder metadataVolumeBuilder =
         new MetadataVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     DbVolume.Builder dbVolumeBuilder =
         new DbVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     return Stream.of(
         Arguments.of(Named.of("HDDS Volume", hddsVolumeBuilder)),
@@ -84,6 +92,15 @@ public class TestStorageVolumeHealthChecks {
     // needs to be cleared before each test.
     FileUtils.deleteDirectory(volumePath.toFile());
     DiskCheckUtil.clearTestImpl();
+    TEST_CLOCK.set(Instant.now());
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckEnabled(true);
+    dnConf.setDiskCheckTimeoutTestEnabled(true);
+    dnConf.setVolumeIOFailureTolerance(1);
+    dnConf.setDiskCheckTimeoutFailureTolerance(1);
+    dnConf.setDiskCheckSlidingWindowTimeout(Duration.ofMinutes(70));
+    dnConf.setDiskCheckTimeoutSlidingWindowTimeout(Duration.ofMinutes(70));
+    CONF.setFromObject(dnConf);
   }
 
   @ParameterizedTest
@@ -108,6 +125,52 @@ public class TestStorageVolumeHealthChecks {
     DiskCheckUtil.setTestImpl(doesNotExist);
     result = volume.check(false);
     assertEquals(VolumeCheckResult.FAILED, result);
+  }
+
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testVolumeFullHealth(StorageVolume.Builder<?> builder) throws Exception {
+    verifyFullVolumeHealthWithDiskReadWriteStatus(builder, true, false);
+  }
+
+  public void verifyFullVolumeHealthWithDiskReadWriteStatus(StorageVolume.Builder<?> builder, boolean... checkResult)
+      throws Exception {
+
+    for (boolean result : checkResult) {
+      StorageVolume volume = builder.build();
+
+      VolumeUsage usage = volume.getVolumeUsage();
+      DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+      int minimumDiskSpace = dnConf.getVolumeHealthCheckFileSize() * 2;
+      // Keep remaining space as just less than double of VolumeHealthCheckFileSize.
+      usage.incrementUsedSpace(usage.getCurrentUsage().getAvailable() - minimumDiskSpace + 1);
+      usage.realUsage();
+      DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
+        @Override
+        public boolean checkReadWrite(File storageDir, File testFileDir,
+                                      int numBytesToWrite) {
+          return result;
+        }
+      };
+      DiskCheckUtil.setTestImpl(ioFailure);
+      // Volume will remain healthy as volume don't have enough space to check READ/WRITE
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      // Even in second try volume will remain HEALTHY
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+
+      // Now keep enough space for read/write check to go through
+      usage.decrementUsedSpace(minimumDiskSpace + 1);
+
+      // volumeIOFailureTolerance is 1, so first time it will be HEALTHY always
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      if (result) {
+        // Volume will remain as healthy as READ/WRITE check is fine
+        assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      } else {
+        // Second time volume will fail as READ/WRITE check has failed
+        assertEquals(VolumeCheckResult.FAILED, volume.check(false));
+      }
+    }
   }
 
   @ParameterizedTest
@@ -142,7 +205,7 @@ public class TestStorageVolumeHealthChecks {
   public void testCheckIODisabled(StorageVolume.Builder<?> builder)
       throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setVolumeIOTestCount(0);
+    dnConf.setDiskCheckEnabled(false);
     CONF.setFromObject(dnConf);
 
     builder.conf(CONF);
@@ -162,46 +225,17 @@ public class TestStorageVolumeHealthChecks {
   }
 
   @Test
-  public void testCheckIODefaultConfigs() {
-    CONF.clear();
-    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    // Make sure default values are not invalid.
-    assertThat(dnConf.getVolumeIOFailureTolerance())
-        .isLessThan(dnConf.getVolumeIOTestCount());
-  }
-
-  @Test
   public void testCheckIOInvalidConfig() {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
 
-    // When failure tolerance is above test count, default values should be
-    // used.
-    dnConf.setVolumeIOTestCount(3);
     dnConf.setVolumeIOFailureTolerance(4);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration.class);
-    assertEquals(dnConf.getVolumeIOTestCount(),
-        DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT);
-    assertEquals(dnConf.getVolumeIOFailureTolerance(),
-        DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
-
-    // When test count and failure tolerance are set to the same value,
-    // Default values should be used.
-    dnConf.setVolumeIOTestCount(2);
-    dnConf.setVolumeIOFailureTolerance(2);
-    CONF.setFromObject(dnConf);
-    dnConf = CONF.getObject(DatanodeConfiguration.class);
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT,
-        dnConf.getVolumeIOTestCount());
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
-        dnConf.getVolumeIOFailureTolerance());
+    assertEquals(4, dnConf.getVolumeIOFailureTolerance());
 
     // Negative test count should reset to default value.
-    dnConf.setVolumeIOTestCount(-1);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration .class);
-    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT,
-        dnConf.getVolumeIOTestCount());
 
     // Negative failure tolerance should reset to default value.
     dnConf.setVolumeIOFailureTolerance(-1);
@@ -256,15 +290,22 @@ public class TestStorageVolumeHealthChecks {
       int ioTestCount, int ioFailureTolerance, boolean... checkResults)
       throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setVolumeIOTestCount(ioTestCount);
     dnConf.setVolumeIOFailureTolerance(ioFailureTolerance);
+    dnConf.setDiskCheckSlidingWindowTimeout(Duration.ofMillis(ioTestCount));
     CONF.setFromObject(dnConf);
     builder.conf(CONF);
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
+    // Sliding window protocol transitioned from count-based to a time-based system
+    // Update the event rate so that all the tested events are processed within the same sliding window period
+    long slidingWindowTimeoutMillis = volume.getConf().getObject(DatanodeConfiguration.class)
+        .getDiskCheckSlidingWindowTimeout().toMillis();
+    long eventRateMillis = slidingWindowTimeoutMillis / ioTestCount;
 
     for (int i = 0; i < checkResults.length; i++) {
+      // Sleep to allow entries in the sliding window to eventually timeout
+      TEST_CLOCK.fastForward(eventRateMillis);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override
@@ -293,6 +334,88 @@ public class TestStorageVolumeHealthChecks {
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
     volume.check(false);
+  }
+
+  /**
+   * With the default settings (diskCheckTimeoutFailureTolerance=1), the first
+   * simulated timeout within the timeout window must be tolerated.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testFirstTimeoutWithinWindowIsTolerated(
+      StorageVolume.Builder<?> builder)
+      throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "First timeout within the window should be tolerated");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
+  }
+
+  /**
+   * With the default settings (diskCheckTimeoutFailureTolerance=1), the
+   * second timeout within the timeout window must fail the volume.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testSecondTimeoutWithinWindowFails(
+      StorageVolume.Builder<?> builder)
+      throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "First timeout should be tolerated");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
+
+    assertTrue(volume.recordTimeoutAndCheckFailure(),
+        "Second timeout in the window should exceed tolerance and return true");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getWindowSize());
+  }
+
+  /**
+   * Timeout events automatically expire from the timeout window, so an old
+   * timeout does not need an explicit reset before a later timeout is
+   * tolerated again.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testExpiredTimeoutDoesNotCountTowardLaterFailure(
+      StorageVolume.Builder<?> builder) throws Exception {
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "First timeout should be tolerated");
+    TEST_CLOCK.fastForward(
+        volume.getTimeoutFailureSlidingWindow().getExpiryDurationMillis() + 1);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Timeout after the window expires should be tolerated again");
+    assertEquals(1, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
+  }
+
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testTimeoutCheckDisabled(StorageVolume.Builder<?> builder)
+      throws Exception {
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeoutTestEnabled(false);
+    CONF.setFromObject(dnConf);
+
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Timeout tracking should be disabled");
+    assertFalse(volume.recordTimeoutAndCheckFailure(),
+        "Disabled timeout tracking should never fail the volume");
+    assertEquals(0, volume.getTimeoutFailureSlidingWindow().getNumEventsInWindow());
   }
 
   /**

@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,38 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.security.acl;
-
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.BucketManager;
-import org.apache.hadoop.ozone.om.KeyManager;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmTestManagers;
-import org.apache.hadoop.ozone.om.PrefixManager;
-import org.apache.hadoop.ozone.om.VolumeManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -72,15 +39,41 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.BucketManager;
+import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmTestManagers;
+import org.apache.hadoop.ozone.om.PrefixManager;
+import org.apache.hadoop.ozone.om.VolumeManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.tag.Unhealthy;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
 /**
  * Test parent acl requirements when accessing children with native authorizer.
  */
 public class TestParentAcl {
-  private static OzoneConfiguration ozConfig;
-  private static KeyManager keyManager;
-  private static VolumeManager volumeManager;
-  private static BucketManager bucketManager;
-  private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static OzoneNativeAuthorizer nativeAuthorizer;
   private static UserGroupInformation adminUgi;
@@ -91,7 +84,7 @@ public class TestParentAcl {
 
   @BeforeAll
   static void setup() throws Exception {
-    ozConfig = new OzoneConfiguration();
+    OzoneConfiguration ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     ozConfig.set(OZONE_METADATA_DIRS, testDir.toString());
@@ -100,10 +93,10 @@ public class TestParentAcl {
     OmTestManagers omTestManagers =
         new OmTestManagers(ozConfig);
     metadataManager = omTestManagers.getMetadataManager();
-    volumeManager = omTestManagers.getVolumeManager();
-    bucketManager = omTestManagers.getBucketManager();
-    prefixManager = omTestManagers.getPrefixManager();
-    keyManager = omTestManagers.getKeyManager();
+    VolumeManager volumeManager = omTestManagers.getVolumeManager();
+    BucketManager bucketManager = omTestManagers.getBucketManager();
+    PrefixManager prefixManager = omTestManagers.getPrefixManager();
+    KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
@@ -121,7 +114,7 @@ public class TestParentAcl {
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;
-    int randomInt = RandomUtils.nextInt();
+    int randomInt = RandomUtils.secure().randomInt();
     String vol = "vol" + randomInt;
     String buck = "bucket" + randomInt;
     String key = "key" + randomInt;
@@ -167,7 +160,7 @@ public class TestParentAcl {
   public void testBucketAcl()
       throws IOException {
     OzoneObj bucketObj;
-    int randomInt = RandomUtils.nextInt();
+    int randomInt = RandomUtils.secure().randomInt();
     String vol = "vol" + randomInt;
     String buck = "bucket" + randomInt;
 
@@ -217,15 +210,16 @@ public class TestParentAcl {
   private void testParentChild(OzoneObj child,
       ACLType parentAclType, ACLType childAclType) throws IOException {
 
-    RequestContext requestContext = new RequestContext.Builder()
+    RequestContext requestContext = RequestContext.newBuilder()
         .setClientUgi(testUgi1)
         .setAclType(USER)
-        .setAclRights(childAclType).build();
+        .setAclRights(childAclType)
+        .build();
 
-    OzoneAcl childAcl = new OzoneAcl(USER,
+    OzoneAcl childAcl = OzoneAcl.of(USER,
         testUgi1.getUserName(), ACCESS, childAclType);
 
-    OzoneAcl parentAcl = new OzoneAcl(USER,
+    OzoneAcl parentAcl = OzoneAcl.of(USER,
         testUgi1.getUserName(), ACCESS, parentAclType);
 
     assertFalse(nativeAuthorizer.checkAccess(child, requestContext));
@@ -253,7 +247,7 @@ public class TestParentAcl {
           child, requestContext));
 
       // add the volume acl (grand-parent), now key access is allowed.
-      OzoneAcl parentVolumeAcl = new OzoneAcl(USER,
+      OzoneAcl parentVolumeAcl = OzoneAcl.of(USER,
           testUgi1.getUserName(), ACCESS, READ);
       addVolumeAcl(child.getVolumeName(), parentVolumeAcl);
       assertTrue(nativeAuthorizer.checkAccess(
@@ -292,11 +286,6 @@ public class TestParentAcl {
   private List<OzoneAcl> getBucketAcls(String vol, String buck)
       throws IOException {
     return OzoneNativeAclTestUtil.getBucketAcls(metadataManager, vol, buck);
-  }
-
-  private List<OzoneAcl> getKeyAcls(String vol, String buck, String key)
-      throws IOException {
-    return OzoneNativeAclTestUtil.getKeyAcls(metadataManager, vol, buck, getBucketLayout(), key);
   }
 
   private void setBucketAcl(String vol, String buck,
@@ -344,8 +333,7 @@ public class TestParentAcl {
             HddsProtos.ReplicationFactor.ONE))
         .setDataSize(0)
         // here we give test ugi full access
-        .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
-            testUgi.getGroupNames(), ALL, ALL))
+        .setAcls(OzoneAclUtil.getAclList(testUgi, ALL, ALL))
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
 

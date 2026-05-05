@@ -1,22 +1,39 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- *
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -24,9 +41,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -41,6 +59,8 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -50,55 +70,31 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
-
-import java.io.IOException;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
+import org.slf4j.event.Level;
 
 /**
  * Tests for Pipeline Closing.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public class TestPipelineClose {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private StorageContainerManager scm;
   private ContainerWithPipeline ratisContainer;
   private ContainerManager containerManager;
   private PipelineManager pipelineManager;
 
-  private long pipelineDestroyTimeoutInMillis;
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
-    pipelineDestroyTimeoutInMillis = 1000;
+    long pipelineDestroyTimeoutInMillis = 1000;
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
         pipelineDestroyTimeoutInMillis, TimeUnit.MILLISECONDS);
     cluster.waitForClusterToBeReady();
@@ -119,9 +115,6 @@ public class TestPipelineClose {
     // the other with an open container.
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     if (cluster != null) {
@@ -167,7 +160,7 @@ public class TestPipelineClose {
     assertEquals(1, setOpen.size());
 
     pipelineManager
-        .closePipeline(ratisContainer.getPipeline(), false);
+        .closePipeline(ratisContainer.getPipeline().getId());
     GenericTestUtils.waitFor(() -> {
       try {
         return containerManager
@@ -190,7 +183,7 @@ public class TestPipelineClose {
     // send closing action for pipeline
     final PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager,
-            SCMContext.emptyContext(), conf);
+            SCMContext.emptyContext());
 
     pipelineActionHandler.onMessage(
         pipelineActionsFromDatanode, new EventQueue());
@@ -259,6 +252,52 @@ public class TestPipelineClose {
 
     // match the pipeline id
     verifyCloseForPipeline(openPipeline, actionsFromDatanode);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testPipelineCloseTriggersSkippedWhenAlreadyInProgress() throws Exception {
+    ContainerInfo allocateContainer = containerManager
+        .allocateContainer(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "newTestOwner");
+    ContainerWithPipeline containerWithPipeline = new ContainerWithPipeline(allocateContainer,
+        pipelineManager.getPipeline(allocateContainer.getPipelineID()));
+    
+    DatanodeStateMachine datanodeStateMachine = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine();
+    XceiverServerRatis xceiverRatis = (XceiverServerRatis) datanodeStateMachine.getContainer().getWriteChannel();
+
+    GenericTestUtils.setLogLevel(XceiverServerRatis.class, Level.DEBUG);
+    GenericTestUtils.LogCapturer xceiverLogCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(XceiverServerRatis.class);
+
+    RaftGroupId groupId = RaftGroupId.valueOf(containerWithPipeline.getPipeline().getId().getId());
+    PipelineID pipelineID = PipelineID.valueOf(groupId.getUuid());
+
+    ClosePipelineCommandHandler handler = datanodeStateMachine.getCommandDispatcher().getClosePipelineCommandHandler();
+     
+    Field pipelinesInProgressField = handler.getClass().getDeclaredField("pipelinesInProgress");
+    pipelinesInProgressField.setAccessible(true);
+    Set<UUID> pipelinesInProgress = (Set<UUID>) pipelinesInProgressField.get(handler);
+
+    try {
+      pipelinesInProgress.add(pipelineID.getId());
+
+      String detail = "test duplicate trigger ";
+      int numOfDuplicateTriggers = 10;
+      for (int i = 1; i <= numOfDuplicateTriggers; i++) {
+        xceiverRatis.triggerPipelineClose(groupId, detail + i, ClosePipelineInfo.Reason.PIPELINE_FAILED);
+      }
+
+      String xceiverLogs = xceiverLogCapturer.getOutput();
+      int skippedCount = StringUtils.countMatches(xceiverLogs.toLowerCase(), "skipped triggering pipeline close");
+      assertEquals(numOfDuplicateTriggers, skippedCount);
+    } finally {
+      pipelinesInProgress.remove(pipelineID.getId());
+      xceiverLogCapturer.stopCapturing();
+
+      pipelineManager.closePipeline(containerWithPipeline.getPipeline().getId());
+      pipelineManager.deletePipeline(containerWithPipeline.getPipeline().getId());
+    }
   }
 
   private boolean verifyCloseForPipeline(Pipeline pipeline,

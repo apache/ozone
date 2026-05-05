@@ -1,23 +1,25 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -30,9 +32,6 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Class contains metrics related to the NodeDecommissionManager.
@@ -60,83 +59,6 @@ public final class NodeDecommissionMetrics implements MetricsSource {
 
   @Metric("Number of containers sufficiently replicated in tracked nodes.")
   private MutableGaugeLong containersSufficientlyReplicatedTotal;
-
-  /**
-   * Inner class for snapshot of Datanode ContainerState in
-   * Decommissioning and Maintenance mode workflow.
-   */
-  public static final class ContainerStateInWorkflow {
-    private long sufficientlyReplicated = 0;
-    private long unclosedContainers = 0;
-    private long underReplicatedContainers = 0;
-    private String host = "";
-    private long pipelinesWaitingToClose = 0;
-    private long startTime = 0;
-
-    private static final MetricsInfo HOST_UNDER_REPLICATED = Interns.info(
-        "UnderReplicatedDN",
-        "Number of under-replicated containers "
-            + "for host in decommissioning and "
-            + "maintenance mode");
-
-    private static final MetricsInfo HOST_PIPELINES_TO_CLOSE = Interns.info(
-        "PipelinesWaitingToCloseDN",
-        "Number of pipelines waiting to close for "
-            + "host in decommissioning and "
-            + "maintenance mode");
-
-    private static final MetricsInfo HOST_SUFFICIENTLY_REPLICATED = Interns
-        .info(
-            "SufficientlyReplicatedDN",
-        "Number of sufficiently replicated containers "
-            + "for host in decommissioning and "
-            + "maintenance mode");
-
-    private static final MetricsInfo HOST_UNCLOSED_CONTAINERS = Interns.info("UnclosedContainersDN",
-        "Number of containers not fully closed for host in decommissioning and maintenance mode");
-
-    private static final MetricsInfo HOST_START_TIME = Interns.info("StartTimeDN",
-        "Time at which decommissioning was started");
-
-
-    public ContainerStateInWorkflow(String host,
-                                    long sufficiently,
-                                    long under,
-                                    long unclosed,
-                                    long pipelinesToClose,
-                                    long startTime) {
-      this.host = host;
-      sufficientlyReplicated = sufficiently;
-      underReplicatedContainers = under;
-      unclosedContainers = unclosed;
-      pipelinesWaitingToClose = pipelinesToClose;
-      this.startTime = startTime;
-    }
-
-    public String getHost() {
-      return host;
-    }
-
-    public long getSufficientlyReplicated() {
-      return sufficientlyReplicated;
-    }
-
-    public long getPipelinesWaitingToClose() {
-      return pipelinesWaitingToClose;
-    }
-
-    public long getUnderReplicatedContainers() {
-      return underReplicatedContainers;
-    }
-
-    public long getUnclosedContainers() {
-      return unclosedContainers;
-    }
-
-    public long getStartTime() {
-      return startTime;
-    }
-  }
 
   private MetricsRegistry registry;
 
@@ -294,5 +216,81 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     ContainerStateInWorkflow workflowMetrics = metricsByHost.get(host);
     return workflowMetrics == null ? null :
         workflowMetrics.getUnclosedContainers();
+  }
+
+  /**
+   * Inner class for snapshot of Datanode ContainerState in
+   * Decommissioning and Maintenance mode workflow.
+   */
+  public static final class ContainerStateInWorkflow {
+    private long sufficientlyReplicated = 0;
+    private long unclosedContainers = 0;
+    private long underReplicatedContainers = 0;
+    private String host = "";
+    private long pipelinesWaitingToClose = 0;
+    private long startTime = 0;
+
+    private static final MetricsInfo HOST_UNDER_REPLICATED = Interns.info(
+        "UnderReplicatedDN",
+        "Number of under-replicated containers "
+            + "for host in decommissioning and "
+            + "maintenance mode");
+
+    private static final MetricsInfo HOST_PIPELINES_TO_CLOSE = Interns.info(
+        "PipelinesWaitingToCloseDN",
+        "Number of pipelines waiting to close for "
+            + "host in decommissioning and "
+            + "maintenance mode");
+
+    private static final MetricsInfo HOST_SUFFICIENTLY_REPLICATED = Interns
+        .info(
+            "SufficientlyReplicatedDN",
+            "Number of sufficiently replicated containers "
+                + "for host in decommissioning and "
+                + "maintenance mode");
+
+    private static final MetricsInfo HOST_UNCLOSED_CONTAINERS = Interns.info("UnclosedContainersDN",
+        "Number of containers not fully closed for host in decommissioning and maintenance mode");
+
+    private static final MetricsInfo HOST_START_TIME = Interns.info("StartTimeDN",
+        "Time at which decommissioning was started");
+
+    public ContainerStateInWorkflow(String host,
+                                    long sufficiently,
+                                    long under,
+                                    long unclosed,
+                                    long pipelinesToClose,
+                                    long startTime) {
+      this.host = host;
+      sufficientlyReplicated = sufficiently;
+      underReplicatedContainers = under;
+      unclosedContainers = unclosed;
+      pipelinesWaitingToClose = pipelinesToClose;
+      this.startTime = startTime;
+    }
+
+    public String getHost() {
+      return host;
+    }
+
+    public long getSufficientlyReplicated() {
+      return sufficientlyReplicated;
+    }
+
+    public long getPipelinesWaitingToClose() {
+      return pipelinesWaitingToClose;
+    }
+
+    public long getUnderReplicatedContainers() {
+      return underReplicatedContainers;
+    }
+
+    public long getUnclosedContainers() {
+      return unclosedContainers;
+    }
+
+    public long getStartTime() {
+      return startTime;
+    }
   }
 }

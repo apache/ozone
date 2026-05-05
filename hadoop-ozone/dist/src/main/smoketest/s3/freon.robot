@@ -39,7 +39,20 @@ Freon S3BG
     ${result} =        Execute          ozone freon s3bg -e ${ENDPOINT_URL} -t ${threads} -n ${n} -p ${prefix} ${args}
                        Should contain   ${result}       Successful executions: ${n}
 
+Freon S3KG
+    [arguments]    ${prefix}=s3kg    ${n}=100    ${threads}=10   ${args}=${EMPTY}
+    ${result} =        Execute          ozone freon s3kg -e ${ENDPOINT_URL} -t ${threads} -n ${n} -p ${prefix} --bucket ${BUCKET} ${args}
+                       Should contain   ${result}       Successful executions: ${n}
+
 *** Test Cases ***
 Run Freon S3BG
     [Setup]    Setup aws credentials
     Freon S3BG   s3bg-${BUCKET}
+
+Run Freon S3KG
+    [Setup]    Setup aws credentials
+    Freon S3KG   s3kg-${BUCKET}
+
+Run Freon S3KG MPU
+    [Setup]    Setup aws credentials
+    Freon S3KG   s3kg-mpu-${BUCKET}  10  1  --multi-part-upload --parts=2 --size=5242880

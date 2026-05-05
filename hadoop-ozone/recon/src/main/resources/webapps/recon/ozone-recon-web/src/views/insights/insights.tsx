@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import axios, { CanceledError, AxiosError } from 'axios';
+import axios, { CanceledError } from 'axios';
 import filesize from 'filesize';
 import { Row, Col, Tabs, message } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
@@ -27,7 +27,7 @@ import { graphic, type EChartsOption } from 'echarts';
 import { EChart } from '@/components/eChart/eChart';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
 import { showDataFetchError } from '@/utils/common';
-import { PromiseAllSettledGetHelper, PromiseAllSettledError } from '@/utils/axiosRequestHelper';
+import { PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import './insights.less';
 
@@ -101,9 +101,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     // Disable bucket selection dropdown if more than one volume is selected
     // If there is only one volume, bucket selection dropdown should not be disabled.
     const isBucketSelectionDisabled = !selectedVolumes ||
-      (selectedVolumes &&
-        (selectedVolumes.length > 1 &&
-          (volumeBucketMap.size !== 1)));
+      (selectedVolumes?.length > 1 && volumeBucketMap.size !== 1);
     let bucketOptions: IOption[] = [];
     // When volume is changed and more than one volume is selected,
     // selected buckets value should be reset to all buckets
@@ -158,13 +156,18 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         filteredData = filteredData.filter(item => selectedBucketValues.has(item.bucket));
       }
 
-      const xyFileCountMap: Map<number, number> = filteredData.reduce(
+      const unsortedFileCountMap: Map<number, number> = filteredData.reduce(
         (map: Map<number, number>, current) => {
           const fileSize = current.fileSize;
           const oldCount = map.has(fileSize) ? map.get(fileSize)! : 0;
           map.set(fileSize, oldCount + current.count);
           return map;
         }, new Map<number, number>());
+      // Sort by file size so that labels and bar values are both in ascending
+      // size order, preventing label-value misalignment.
+      const xyFileCountMap = new Map(
+        [...unsortedFileCountMap.entries()].sort((a, b) => a[0] - b[0])
+      );
       // Calculate the previous power of 2 to find the lower bound of the range
       // Ex: for 2048, the lower bound is 1024
       const xFileCountValues = Array.from(xyFileCountMap.keys()).map(value => {
@@ -176,13 +179,16 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         return `${lowerbound} - ${upperbound}`;
       });
 
-      const xyContainerCountMap: Map<number, number> = containerCountResponse.reduce(
+      const unsortedContainerCountMap: Map<number, number> = containerCountResponse.reduce(
         (map: Map<number, number>, current) => {
           const containerSize = current.containerSize;
           const oldCount = map.has(containerSize) ? map.get(containerSize)! : 0;
           map.set(containerSize, oldCount + current.count);
           return map;
         }, new Map<number, number>());
+      const xyContainerCountMap = new Map(
+        [...unsortedContainerCountMap.entries()].sort((a, b) => a[0] - b[0])
+      );
       // Calculate the previous power of 2 to find the lower bound of the range
       // Ex: for 2048, the lower bound is 1024
       const xContainerCountValues = Array.from(xyContainerCountMap.keys()).map(value => {
@@ -278,15 +284,21 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       this.setState({
         fileCountData: {
           title: {
-            text: 'File Size Distribution',
+            text: 'File Size Frequency Distribution',
             left: 'center'
           },
           xAxis: {
             type: 'category',
-            data: xFileCountValues
+            data: xFileCountValues,
+            name: 'File Size Range',
+            nameLocation: 'middle',
+            nameGap: 40
           },
           yAxis: {
-            type: 'value'
+            type: 'value',
+            name: 'Number of Files',
+            nameLocation: 'middle',
+            nameGap: 50
           },
           tooltip: {
             trigger: 'item',
@@ -422,7 +434,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       this.setState({
         isLoading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   }
 
@@ -455,7 +467,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             <Tabs.TabPane tab='File Size' key='1'>
               <div className='content-div'>
                 {isLoading ? <span><LoadingOutlined /> Loading...</span> :
-                  ((fileCountsResponse && fileCountsResponse.length > 0) ?
+                  ((fileCountsResponse?.length > 0) ?
                     <div>
                       <Row>
                         <Col xs={24} xl={18}>
@@ -506,7 +518,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
             <Tabs.TabPane tab='Container Size' key='2'>
               <div className='content-div'>
                 {isLoading ? <span><LoadingOutlined /> Loading...</span> :
-                  ((containerCountResponse && containerCountResponse.length > 0) ?
+                  ((containerCountResponse?.length > 0) ?
                     <div>
                       <Row>
                         <Col style={{ margin: 'auto', marginTop: '2%' }}>

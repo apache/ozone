@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +17,8 @@
 
 package org.apache.hadoop.tools.contract;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IOSTATISTICS_LOGGING_LEVEL_INFO;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.createSubdirs;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.verifyFileContents;
@@ -28,11 +27,13 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.logIOStatistic
 import static org.apache.hadoop.tools.DistCpConstants.CONF_LABEL_DISTCP_JOB_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,19 +46,20 @@ import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.tools.CopyListingFileStatus;
 import org.apache.hadoop.tools.DistCp;
 import org.apache.hadoop.tools.DistCpConstants;
 import org.apache.hadoop.tools.DistCpOptions;
 import org.apache.hadoop.tools.SimpleCopyListing;
 import org.apache.hadoop.tools.mapred.CopyMapper;
-import org.apache.hadoop.tools.util.DistCpTestUtils;
+import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.util.functional.RemoteIterators;
-
+import org.apache.ozone.test.GenericTestUtils;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,15 +104,6 @@ public abstract class AbstractContractDistCpTest
    */
   protected static final int DEFAULT_WIDTH = 2;
 
-  /**
-   * The timeout value is extended over the default so that large updates
-   * are allowed to take time, especially to remote stores.
-   * @return the current test timeout
-   */
-  protected int getTestTimeoutMillis() {
-    return 15  * 60 * 1000;
-  }
-
   private Configuration conf;
   private FileSystem localFS, remoteFS;
   private Path localDir, remoteDir;
@@ -133,10 +126,6 @@ public abstract class AbstractContractDistCpTest
 
   private Path inputFile5;
 
-  private Path outputDir;
-
-  private Path outputSubDir1;
-
   private Path outputSubDir2;
 
   private Path outputSubDir4;
@@ -149,9 +138,20 @@ public abstract class AbstractContractDistCpTest
 
   private Path outputFile4;
 
-  private Path outputFile5;
-
   private Path inputDirUnderOutputDir;
+
+  @TempDir
+  private File testDir;
+
+  /**
+   * The timeout value is extended over the default so that large updates
+   * are allowed to take time, especially to remote stores.
+   * @return the current test timeout
+   */
+  @Override
+  protected int getTestTimeoutMillis() {
+    return 15  * 60 * 1000;
+  }
 
   @Override
   protected Configuration createConfiguration() {
@@ -174,8 +174,7 @@ public abstract class AbstractContractDistCpTest
     String className = getClass().getSimpleName();
     String testSubDir = className + "/" + getMethodName();
     localDir =
-        localFS.makeQualified(new Path(new Path(
-        GenericTestUtils.getTestDir().toURI()), testSubDir + "/local"));
+        localFS.makeQualified(new Path(new Path(testDir.toURI()), testSubDir + "/local"));
     localFS.delete(localDir, true);
     mkdirs(localFS, localDir);
     Path testSubPath = path(testSubDir);
@@ -189,7 +188,7 @@ public abstract class AbstractContractDistCpTest
   @Override
   public void teardown() throws Exception {
     // if remote FS supports IOStatistics log it.
-    logIOStatisticsAtLevel(LOG, IOSTATISTICS_LOGGING_LEVEL_INFO, getRemoteFS());
+    logIOStatisticsAtLevel(LOG, "info", getRemoteFS());
     super.teardown();
   }
 
@@ -208,16 +207,15 @@ public abstract class AbstractContractDistCpTest
    * @param path path to set up
    */
   protected void initOutputFields(final Path path) {
-    outputDir = new Path(path, "outputDir");
+    Path outputDir = new Path(path, "outputDir");
     inputDirUnderOutputDir = new Path(outputDir, "inputDir");
     outputFile1 = new Path(inputDirUnderOutputDir, "file1");
-    outputSubDir1 = new Path(inputDirUnderOutputDir, "subDir1");
+    Path outputSubDir1 = new Path(inputDirUnderOutputDir, "subDir1");
     outputFile2 = new Path(outputSubDir1, "file2");
     outputSubDir2 = new Path(inputDirUnderOutputDir, "subDir2/subDir2");
     outputFile3 = new Path(outputSubDir2, "file3");
     outputSubDir4 = new Path(inputDirUnderOutputDir, "subDir4/subDir4");
     outputFile4 = new Path(outputSubDir4, "file4");
-    outputFile5 = new Path(outputSubDir4, "file5");
   }
 
   /**
@@ -401,7 +399,6 @@ public abstract class AbstractContractDistCpTest
     return inputFileNew1;
   }
 
-
   @Test
   public void testTrackDeepDirectoryStructureToRemote() throws Exception {
     describe("copy a deep directory structure from local to remote");
@@ -437,7 +434,7 @@ public abstract class AbstractContractDistCpTest
             .withDirectWrite(shouldUseDirectWrite())
             .withOverwrite(false)));
 
-    lsR("tracked udpate", remoteFS, destDir);
+    lsR("tracked update", remoteFS, destDir);
     // new file went over
     Path outputFileNew1 = new Path(outputSubDir2, "newfile1");
     ContractTestUtils.assertIsFile(remoteFS, outputFileNew1);
@@ -534,8 +531,7 @@ public abstract class AbstractContractDistCpTest
   public void testSetJobId() throws Exception {
     describe("check jobId is set in the conf");
     remoteFS.create(new Path(remoteDir, "file1")).close();
-    DistCpTestUtils
-        .assertRunDistCp(DistCpConstants.SUCCESS, remoteDir.toString(),
+    assertRunDistCp(DistCpConstants.SUCCESS, remoteDir.toString(),
             localDir.toString(), getDefaultCLIOptionsOrNull(), conf);
     assertThat(conf.get(CONF_LABEL_DISTCP_JOB_ID))
         .withFailMessage("DistCp job id isn't set")
@@ -712,14 +708,13 @@ public abstract class AbstractContractDistCpTest
     Path dest = new Path(localDir, "dest");
     dest = localFS.makeQualified(dest);
 
-    GenericTestUtils
-        .createFiles(remoteFS, source, getDepth(), getWidth(), getWidth());
+    createSubdirs(remoteFS, source, getDepth(), getWidth(), getWidth(), 0);
 
     GenericTestUtils.LogCapturer log =
         GenericTestUtils.LogCapturer.captureLogs(SimpleCopyListing.LOG);
 
     String options = "-useiterator -update -delete" + getDefaultCLIOptions();
-    DistCpTestUtils.assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
+    assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
         dest.toString(), options, conf);
 
     // Check the target listing was also done using iterator.
@@ -831,6 +826,7 @@ public abstract class AbstractContractDistCpTest
                     Collections.singletonList(srcDir), destDir)
                     .withDirectWrite(true)));
   }
+
   /**
    * Run distcp srcDir destDir.
    * @param srcDir local source directory
@@ -864,7 +860,7 @@ public abstract class AbstractContractDistCpTest
     verifyPathExists(remoteFS, "", source);
     verifyPathExists(localFS, "", localDir);
 
-    DistCpTestUtils.assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
+    assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
         dest.toString(), getDefaultCLIOptionsOrNull(), conf);
 
     assertThat(RemoteIterators.toList(localFS.listFiles(dest, true)))
@@ -889,7 +885,7 @@ public abstract class AbstractContractDistCpTest
 
     verifyPathExists(remoteFS, "", source);
     verifyPathExists(localFS, "", dest);
-    DistCpTestUtils.assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
+    assertRunDistCp(DistCpConstants.SUCCESS, source.toString(),
         dest.toString(), "-delete -update" + getDefaultCLIOptions(), conf);
 
     assertThat(RemoteIterators.toList(localFS.listFiles(dest, true)))
@@ -1014,5 +1010,38 @@ public abstract class AbstractContractDistCpTest
     assertThat(skipActualValue)
         .withFailMessage("Mismatch in SKIP counter value")
         .isEqualTo(skipExpectedValue);
+  }
+
+  /**
+   * Runs distcp from src to dst, preserving XAttrs. Asserts the
+   * expected exit code.
+   *
+   * @param exitCode expected exit code
+   * @param src distcp src path
+   * @param dst distcp destination
+   * @param options distcp command line options
+   * @param conf Configuration to use
+   * @throws Exception if there is any error
+   */
+  public static void assertRunDistCp(int exitCode, String src, String dst,
+                                     String options, Configuration conf)
+      throws Exception {
+    assertRunDistCp(exitCode, src, dst,
+        options == null ? new String[0] : options.trim().split(" "), conf);
+  }
+
+  private static void assertRunDistCp(int exitCode, String src, String dst,
+                                      String[] options, Configuration conf)
+      throws Exception {
+    DistCp distCp = new DistCp(conf, null);
+    String[] optsArr = new String[options.length + 2];
+    System.arraycopy(options, 0, optsArr, 0, options.length);
+    optsArr[optsArr.length - 2] = src;
+    optsArr[optsArr.length - 1] = dst;
+
+    Assertions.assertThat(ToolRunner.run(conf, distCp, optsArr))
+        .describedAs("Exit code of distcp %s",
+            Arrays.stream(optsArr).collect(Collectors.joining(" ")))
+        .isEqualTo(exitCode);
   }
 }

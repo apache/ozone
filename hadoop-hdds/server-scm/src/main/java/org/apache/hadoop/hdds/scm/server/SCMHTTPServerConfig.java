@@ -1,24 +1,20 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license
- * agreements. See the NOTICE file distributed with this work for additional
- * information regarding
- * copyright ownership. The ASF licenses this file to you under the Apache
- * License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the
- * License. You may obtain a
- * copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * <p>http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * <p>Unless required by applicable law or agreed to in writing, software
- * distributed under the
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- * CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.conf.Config;
@@ -32,23 +28,22 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hdds.scm.http.auth")
 public class SCMHTTPServerConfig {
 
-  @Config(key = "kerberos.principal",
+  @Config(key = "hdds.scm.http.auth.kerberos.principal",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = {ConfigTag.SECURITY},
-      description = "This Kerberos principal is used when communicating to " +
-          "the HTTP server of SCM.The protocol used is SPNEGO."
+      defaultValue = "HTTP/_HOST@REALM",
+      tags = { ConfigTag.KERBEROS, ConfigTag.SCM, ConfigTag.SECURITY },
+      description = "SCM http server service principal if SPNEGO is enabled for SCM http server."
   )
-  private String principal = "";
+  private String principal;
 
-  @Config(key = "kerberos.keytab",
+  @Config(key = "hdds.scm.http.auth.kerberos.keytab",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = {ConfigTag.SECURITY},
+      defaultValue = "/etc/security/keytabs/HTTP.keytab",
+      tags = { ConfigTag.KERBEROS, ConfigTag.SCM, ConfigTag.SECURITY },
       description = "The keytab file used by SCM http server to login" +
-          " as its service principal."
+          " as its service principal if SPNEGO is enabled for SCM http server."
   )
-  private String keytab = "";
+  private String keytab;
 
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
@@ -70,17 +65,15 @@ public class SCMHTTPServerConfig {
    * This static class is required to support other classes
    * that reference the key names and also require attributes.
    * Example: SCMSecurityProtocol where the KerberosInfo references
-   * the old configuration with the annotation shown below:-
-   * @KerberosInfo(serverPrincipal =
-   *    ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
+   * the old configuration with the annotation shown below:
+   * <br>
+   * {@code KerberosInfo(serverPrincipal =
+   *    ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)}
    */
   public static class ConfigStrings {
     public static final String HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX =
         SCMHTTPServerConfig.class.getAnnotation(ConfigGroup.class).prefix() +
             ".";
-
-    public static final String HDDS_SCM_HTTP_AUTH_TYPE =
-        HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX + "type";
 
     public static final String HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY =
         HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";

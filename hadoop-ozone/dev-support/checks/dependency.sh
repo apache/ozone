@@ -32,8 +32,8 @@ cp ${src_dir}/current.txt "$REPORT_DIR"/
 
 #implementation of sort cli is not exactly the same everywhere. It's better to sort with the same command locally
 (diff -uw \
-  <(sort ${src_dir}/jar-report.txt) \
-  <(sort ${src_dir}/current.txt) \
+  <(sort -u ${src_dir}/jar-report.txt) \
+  <(sort -u ${src_dir}/current.txt) \
   || true) \
   > "$REPORT_FILE"
 

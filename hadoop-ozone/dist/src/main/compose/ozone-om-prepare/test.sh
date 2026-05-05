@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -23,23 +25,13 @@ export COMPOSE_DIR
 
 export OZONE_VOLUME
 
-# Clean up saved internal state from each container's volume for the next run.
-rm -rf "${OZONE_VOLUME}"
-mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om1,om2,om3,scm}
-
-if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
-  current_user=$(whoami)
-  if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
-    chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
-      || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
-  fi
-fi
-
 export OZONE_DIR=/opt/hadoop
 export OM_SERVICE_ID=omservice
 
 # shellcheck source=/dev/null
 source "${COMPOSE_DIR}/../testlib.sh"
+
+create_data_dirs dn{1..3} om{1..3} scm
 
 start_docker_env
 

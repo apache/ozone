@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,12 +17,15 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,17 +42,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.util.Timer;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Sets;
-import jakarta.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,15 +61,12 @@ public class StorageVolumeChecker {
 
   public static final int MAX_VOLUME_FAILURE_TOLERATED_LIMIT = -1;
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(StorageVolumeChecker.class);
 
   private AsyncChecker<Boolean, VolumeCheckResult> delegateChecker;
 
-  private final AtomicLong numVolumeChecks = new AtomicLong(0);
-  private final AtomicLong numAllVolumeChecks = new AtomicLong(0);
-  private final AtomicLong numAllVolumeSetsChecks = new AtomicLong(0);
-  private final AtomicLong numSkippedChecks = new AtomicLong(0);
+  private final BackgroundVolumeScannerMetrics metrics;
 
   /**
    * Max allowed time for a disk check in milliseconds. If the check
@@ -92,6 +87,7 @@ public class StorageVolumeChecker {
   private final Timer timer;
 
   private final ExecutorService checkVolumeResultHandlerExecutorService;
+  private final Object resultLock = new Object();
 
   private final DatanodeConfiguration dnConf;
 
@@ -110,6 +106,8 @@ public class StorageVolumeChecker {
    */
   public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
       String threadNamePrefix) {
+
+    metrics = BackgroundVolumeScannerMetrics.create();
 
     this.timer = timer;
 
@@ -168,7 +166,7 @@ public class StorageVolumeChecker {
   public synchronized void checkAllVolumeSets() {
     final long gap = timer.monotonicNow() - lastAllVolumeSetsCheckComplete;
     if (gap < minDiskCheckGapMs) {
-      numSkippedChecks.incrementAndGet();
+      metrics.incNumIterationsSkipped();
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "Skipped checking all volumes, time since last check {} is less " +
@@ -179,12 +177,29 @@ public class StorageVolumeChecker {
     }
 
     try {
+      long totalVolumesScanned = 0;
       for (VolumeSet volSet : registeredVolumeSets) {
+        long volumeCount = volSet.getVolumesList().size();
+        if (volSet instanceof MutableVolumeSet) {
+          StorageVolume.VolumeType type = ((MutableVolumeSet) volSet).getVolumeType();
+          switch (type) {
+          case DATA_VOLUME:
+            metrics.incNumDataVolumeScans(volumeCount);
+            break;
+          case META_VOLUME:
+            metrics.incNumMetadataVolumeScans(volumeCount);
+            break;
+          default:
+            LOG.warn("Unknown volume type: {}", type);
+            break;
+          }
+        }
         volSet.checkAllVolumes(this);
+        totalVolumesScanned += volSet.getVolumesList().size();
       }
-
+      metrics.setNumVolumesScannedInLastIteration(totalVolumesScanned);
+      metrics.incNumScanIterations();
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
-      numAllVolumeSetsChecks.incrementAndGet();
     } catch (IOException e) {
       LOG.warn("Exception while checking disks", e);
     }
@@ -219,9 +234,13 @@ public class StorageVolumeChecker {
         allVolumes.add(v);
         Futures.addCallback(olf.get(),
             new ResultHandler(v, healthyVolumes, failedVolumes,
-                numVolumes, (ignored1, ignored2) -> latch.countDown()),
+                numVolumes, (ignored1, ignored2) -> latch.countDown(),
+                true, resultLock),
             MoreExecutors.directExecutor());
       } else {
+        if (v instanceof HddsVolume) {
+          ((HddsVolume) v).getVolumeInfoStats().incNumScansSkipped();
+        }
         if (numVolumes.decrementAndGet() == 0) {
           latch.countDown();
         }
@@ -230,19 +249,41 @@ public class StorageVolumeChecker {
 
     // Wait until our timeout elapses, after which we give up on
     // the remaining volumes.
-    if (!latch.await(maxAllowedTimeForCheckMs, TimeUnit.MILLISECONDS)) {
-      LOG.warn("checkAllVolumes timed out after {} ms",
-          maxAllowedTimeForCheckMs);
-    }
+    boolean completedOnTime =
+        latch.await(maxAllowedTimeForCheckMs, TimeUnit.MILLISECONDS);
 
-    numAllVolumeChecks.incrementAndGet();
-    synchronized (this) {
-      // All volumes that have not been detected as healthy should be
-      // considered failed. This is a superset of 'failedVolumes'.
-      //
-      // Make a copy under the mutex as Sets.difference() returns a view
-      // of a potentially changing set.
-      return new HashSet<>(Sets.difference(allVolumes, healthyVolumes));
+    synchronized (resultLock) {
+      if (!completedOnTime) {
+        LOG.warn("checkAllVolumes timed out after {} ms."
+            + " Evaluating per-volume latch-timeout tolerance.",
+            maxAllowedTimeForCheckMs);
+      }
+
+      final Set<StorageVolume> failedSnapshot = new HashSet<>(failedVolumes);
+      final Set<StorageVolume> healthySnapshot = new HashSet<>(healthyVolumes);
+
+      // Volumes that explicitly reported FAILED via check() are always
+      // returned — the IO-failure sliding window in StorageVolume.check()
+      // already applied its own tolerance.
+      final Set<StorageVolume> result = new HashSet<>(failedSnapshot);
+
+      // Volumes still pending (neither healthy nor explicitly failed) at
+      // latch-timeout time. Timeout accounting for batch checks happens here
+      // in one place, regardless of whether the per-check timeout callback
+      // has already fired.
+      final Set<StorageVolume> pendingVolumes =
+          new HashSet<>(Sets.difference(allVolumes,
+              Sets.union(healthySnapshot, failedSnapshot)));
+
+      for (StorageVolume v : pendingVolumes) {
+        if (v.recordTimeoutAndCheckFailure()) {
+          // Tolerance exceeded — mark as failed.
+          result.add(v);
+        }
+        // else: within tolerance this round — omit from failed set.
+      }
+
+      return result;
     }
   }
 
@@ -280,11 +321,10 @@ public class StorageVolumeChecker {
     Optional<ListenableFuture<VolumeCheckResult>> olf =
         delegateChecker.schedule(volume, null);
     if (olf.isPresent()) {
-      numVolumeChecks.incrementAndGet();
       Futures.addCallback(olf.get(),
           new ResultHandler(volume,
               ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
-              new AtomicLong(1), callback),
+              new AtomicLong(1), callback, false, resultLock),
           checkVolumeResultHandlerExecutorService
       );
       return true;
@@ -306,23 +346,37 @@ public class StorageVolumeChecker {
     private final Callback callback;
 
     /**
-     * @param healthyVolumes set of healthy volumes. If the disk check is
-     *                       successful, add the volume here.
-     * @param failedVolumes  set of failed volumes. If the disk check fails,
-     *                       add the volume here.
-     * @param volumeCounter  volumeCounter used to trigger callback invocation.
-     * @param callback       invoked when the volumeCounter reaches 0.
+     * For batch checks, timeout accounting is deferred to
+     * {@link StorageVolumeChecker#checkAllVolumes(Collection)} so all pending
+     * volumes are processed in one place. For single-volume checks,
+     * {@link #onFailure(Throwable)} handles timeout accounting directly.
+     */
+    private final boolean timeoutHandledInCheckAllVolumes;
+    private final Object resultLock;
+
+    /**
+     * @param healthyVolumes    set of healthy volumes.
+     * @param failedVolumes     set of failed volumes.
+     * @param volumeCounter     triggers callback when it reaches 0.
+     * @param callback          invoked when volumeCounter reaches 0.
+     * @param timeoutHandledInCheckAllVolumes true when timeout accounting is
+     *                                        deferred to checkAllVolumes.
+     * @param resultLock lock shared with checkAllVolumes result snapshotting.
      */
     ResultHandler(StorageVolume volume,
         Set<StorageVolume> healthyVolumes,
         Set<StorageVolume> failedVolumes,
         AtomicLong volumeCounter,
-        @Nullable Callback callback) {
+        @Nullable Callback callback,
+        boolean timeoutHandledInCheckAllVolumes,
+        Object resultLock) {
       this.volume = volume;
       this.healthyVolumes = healthyVolumes;
       this.failedVolumes = failedVolumes;
       this.volumeCounter = volumeCounter;
       this.callback = callback;
+      this.timeoutHandledInCheckAllVolumes = timeoutHandledInCheckAllVolumes;
+      this.resultLock = resultLock;
     }
 
     @Override
@@ -362,18 +416,44 @@ public class StorageVolumeChecker {
           volume, exception);
       // If the scan was interrupted, do not count it as a volume failure.
       // This should only happen if the volume checker is being shut down.
-      if (!(t instanceof InterruptedException)) {
-        markFailed();
-        cleanup();
+      if (t instanceof InterruptedException) {
+        return;
       }
+      // Detect a per-check timeout from ThrottledAsyncChecker.
+      // Guava 28+ (including 33.5.0-jre used here) fails the TimeoutFuture
+      // with TimeoutException on timeout.
+      boolean isTimeout = exception instanceof TimeoutException;
+      if (isTimeout) {
+        if (timeoutHandledInCheckAllVolumes) {
+          cleanup();
+          return;
+        }
+        markFailed(true);
+        cleanup();
+        return;
+      }
+      markFailed();
+      cleanup();
     }
 
     private void markHealthy() {
-      healthyVolumes.add(volume);
+      synchronized (resultLock) {
+        healthyVolumes.add(volume);
+      }
     }
 
     private void markFailed() {
-      failedVolumes.add(volume);
+      markFailed(false);
+    }
+
+    private void markFailed(boolean checkTimeoutFailureTolerance) {
+      synchronized (resultLock) {
+        if (checkTimeoutFailureTolerance
+            && !volume.recordTimeoutAndCheckFailure()) {
+          return;
+        }
+        failedVolumes.add(volume);
+      }
     }
 
     private void cleanup() {
@@ -404,6 +484,7 @@ public class StorageVolumeChecker {
       periodicDiskChecker.cancel(true);
       diskCheckerservice.shutdownNow();
       checkVolumeResultHandlerExecutorService.shutdownNow();
+      metrics.unregister();
       try {
         delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
       } catch (InterruptedException e) {
@@ -425,32 +506,8 @@ public class StorageVolumeChecker {
     delegateChecker = testDelegate;
   }
 
-  /**
-   * Return the number of {@link #checkVolume} invocations.
-   */
-  public long getNumVolumeChecks() {
-    return numVolumeChecks.get();
-  }
-
-  /**
-   * Return the number of {@link #checkAllVolumes(Collection)} ()} invocations.
-   */
-  public long getNumAllVolumeChecks() {
-    return numAllVolumeChecks.get();
-  }
-
-  /**
-   * Return the number of {@link #checkAllVolumeSets()} invocations.
-   */
-  public long getNumAllVolumeSetsChecks() {
-    return numAllVolumeSetsChecks.get();
-  }
-
-  /**
-   * Return the number of checks skipped because the minimum gap since the
-   * last check had not elapsed.
-   */
-  public long getNumSkippedChecks() {
-    return numSkippedChecks.get();
+  @VisibleForTesting
+  public BackgroundVolumeScannerMetrics getMetrics() {
+    return metrics;
   }
 }

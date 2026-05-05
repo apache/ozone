@@ -1,18 +1,18 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.protocolPB;
@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.protocolPB;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
-
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
@@ -29,6 +28,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.ErrorCode;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -39,14 +39,12 @@ public class OMInterServiceProtocolServerSideImpl implements
     OMInterServiceProtocolPB {
 
   private final OzoneManagerRatisServer omRatisServer;
-  private final boolean isRatisEnabled;
   private final OzoneManager ozoneManager;
 
   public OMInterServiceProtocolServerSideImpl(OzoneManager ozoneMgr,
-      OzoneManagerRatisServer ratisServer, boolean enableRatis) {
+      OzoneManagerRatisServer ratisServer) {
     this.ozoneManager = ozoneMgr;
     this.omRatisServer = ratisServer;
-    this.isRatisEnabled = enableRatis;
   }
 
   @Override
@@ -55,14 +53,6 @@ public class OMInterServiceProtocolServerSideImpl implements
     if (request == null) {
       return null;
     }
-    if (!isRatisEnabled) {
-      return BootstrapOMResponse.newBuilder()
-          .setSuccess(false)
-          .setErrorCode(ErrorCode.RATIS_NOT_ENABLED)
-          .setErrorMsg("New OM node cannot be bootstrapped as Ratis " +
-              "is not enabled on existing OM")
-          .build();
-    }
 
     OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
 
@@ -70,6 +60,7 @@ public class OMInterServiceProtocolServerSideImpl implements
         .setOMNodeId(request.getNodeId())
         .setHostAddress(request.getHostAddress())
         .setRatisPort(request.getRatisPort())
+        .setIsListener(request.getIsListener())
         .build();
 
     try {
@@ -78,7 +69,7 @@ public class OMInterServiceProtocolServerSideImpl implements
       return BootstrapOMResponse.newBuilder()
           .setSuccess(false)
           .setErrorCode(ErrorCode.RATIS_BOOTSTRAP_ERROR)
-          .setErrorMsg(ex.getMessage())
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
 

@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,11 +17,9 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.DeleteContainerCommandProto;
+import java.util.Objects;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeleteContainerCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 
 /**
@@ -91,7 +88,7 @@ public class DeleteContainerCommand extends
 
   public static DeleteContainerCommand getFromProtobuf(
       DeleteContainerCommandProto protoMessage) {
-    Preconditions.checkNotNull(protoMessage);
+    Objects.requireNonNull(protoMessage, "protoMessage == null");
 
     DeleteContainerCommand cmd =
         new DeleteContainerCommand(protoMessage.getContainerID(),
@@ -110,7 +107,11 @@ public class DeleteContainerCommand extends
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
-        .append(": containerID: ").append(getContainerID())
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", containerID: ").append(getContainerID())
         .append(", replicaIndex: ").append(getReplicaIndex())
         .append(", force: ").append(force);
     return sb.toString();

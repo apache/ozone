@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,7 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.scm.events;
@@ -63,6 +61,13 @@ public final class SCMEvents {
       NODE_REGISTRATION_CONT_REPORT = new TypedEvent<>(
       NodeRegistrationContainerReport.class,
       "Node_Registration_Container_Report");
+
+  /**
+   * Event generated on DataNode Registration Container Report.
+   */
+  public static final TypedEvent<NodeRegistrationContainerReport>
+      CONTAINER_REGISTRATION_REPORT = new TypedEvent<>(
+      NodeRegistrationContainerReport.class, "Container_Registration_Report");
 
   /**
    * ContainerReports are sent out by Datanodes. This report is received by
@@ -206,6 +211,22 @@ public final class SCMEvents {
       DELETE_BLOCK_STATUS =
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
+
+  public static final TypedEvent<DatanodeDetails>
+      REPLICATION_MANAGER_NOTIFY =
+      new TypedEvent<>(DatanodeDetails.class, "Replication_Manager_Notify");
+
+  /**
+   * This event will be triggered whenever a datanode needs to reconcile its replica of a container with other
+   * replicas in the cluster.
+   */
+  public static final TypedEvent<ContainerID>
+      RECONCILE_CONTAINER = new TypedEvent<>(ContainerID.class, "Reconcile_Container");
+
+  /**
+   * This event will be triggered from SCM State Machine when ready.
+   */
+  public static final TypedEvent<Boolean> STATEMACHINE_READY = new TypedEvent<>(Boolean.class, "STATEMACHINE_READY");
 
   /**
    * Private Ctor. Never Constructed.

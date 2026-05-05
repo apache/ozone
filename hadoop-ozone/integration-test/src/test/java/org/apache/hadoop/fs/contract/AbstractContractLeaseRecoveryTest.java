@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,18 +17,16 @@
 
 package org.apache.hadoop.fs.contract;
 
+import static org.apache.hadoop.fs.CommonPathCapabilities.LEASE_RECOVERABLE;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
-
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.test.LambdaTestUtils;
-
-import static org.apache.hadoop.fs.CommonPathCapabilities.LEASE_RECOVERABLE;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test lease recovery contract.
@@ -59,11 +56,13 @@ public abstract class AbstractContractLeaseRecoveryTest extends
     final FileSystem fs = getFileSystem();
     LeaseRecoverable leaseRecoverableFs = verifyAndGetLeaseRecoverableInstance(fs, path);
 
-    LambdaTestUtils.intercept(FileNotFoundException.class, "File does not exist",
+    Exception e = assertThrows(FileNotFoundException.class,
         () -> leaseRecoverableFs.recoverLease(path));
+    Assertions.assertThat(e).hasMessageContaining("File does not exist");
 
-    LambdaTestUtils.intercept(FileNotFoundException.class, "File does not exist",
+    e = assertThrows(FileNotFoundException.class,
         () -> leaseRecoverableFs.isFileClosed(path));
+    Assertions.assertThat(e).hasMessageContaining("File does not exist");
   }
 
   @Test
@@ -73,11 +72,13 @@ public abstract class AbstractContractLeaseRecoveryTest extends
     LeaseRecoverable leaseRecoverableFs = verifyAndGetLeaseRecoverableInstance(fs, path);
     final Path parentDirectory = path.getParent();
 
-    LambdaTestUtils.intercept(FileNotFoundException.class, "Path is not a file",
+    Exception e = assertThrows(FileNotFoundException.class,
         () -> leaseRecoverableFs.recoverLease(parentDirectory));
+    Assertions.assertThat(e).hasMessageContaining("Path is not a file");
 
-    LambdaTestUtils.intercept(FileNotFoundException.class, "Path is not a file",
+    e = assertThrows(FileNotFoundException.class,
         () -> leaseRecoverableFs.isFileClosed(parentDirectory));
+    Assertions.assertThat(e).hasMessageContaining("Path is not a file");
   }
 
   private LeaseRecoverable verifyAndGetLeaseRecoverableInstance(FileSystem fs, Path path)

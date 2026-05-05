@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,26 +17,25 @@
 
 package org.apache.hadoop.ozone.client;
 
+import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
+
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-
-import org.apache.commons.collections.ListUtils;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-
-import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 
 /**
  * A class that encapsulates OzoneVolume.
@@ -124,7 +122,7 @@ public class OzoneVolume extends WithMetadata {
             this.creationTime.getEpochSecond(), this.creationTime.getNano());
       }
     }
-    this.acls = builder.acls;
+    this.acls = new ArrayList<>(builder.acls);
     if (builder.conf != null) {
       this.listCacheSize = HddsClientUtils.getListCacheSize(builder.conf);
     }
@@ -179,6 +177,7 @@ public class OzoneVolume extends WithMetadata {
   public long getQuotaInNamespace() {
     return quotaInNamespace;
   }
+
   /**
    * Returns creation time of the volume.
    *
@@ -203,7 +202,7 @@ public class OzoneVolume extends WithMetadata {
    * @return aclMap
    */
   public List<OzoneAcl> getAcls() {
-    return ListUtils.unmodifiableList(acls);
+    return Collections.unmodifiableList(acls);
   }
 
    /**
@@ -402,7 +401,7 @@ public class OzoneVolume extends WithMetadata {
 
   public static Builder newBuilder(ConfigurationSource conf,
       ClientProtocol proxy) {
-    Preconditions.checkNotNull(proxy, "Client proxy is not set.");
+    Objects.requireNonNull(proxy, "Client proxy is not set.");
     return new Builder(conf, proxy);
   }
 

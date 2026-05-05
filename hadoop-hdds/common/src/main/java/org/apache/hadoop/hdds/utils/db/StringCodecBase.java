@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,17 +13,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.ratis.util.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
@@ -34,6 +27,10 @@ import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.util.Objects;
 import java.util.function.Function;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.ratis.util.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An abstract {@link Codec} to serialize/deserialize {@link String}
@@ -57,6 +54,11 @@ abstract class StringCodecBase implements Codec<String> {
           + ": maxBytesPerChar = " + max + " is not an integer.");
     }
     this.fixedLength = max == encoder.averageBytesPerChar();
+  }
+
+  @Override
+  public final Class<String> getTypeClass() {
+    return String.class;
   }
 
   CharsetEncoder newEncoder() {
@@ -166,12 +168,11 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   @Override
-  public CodecBuffer toCodecBuffer(@Nonnull String object,
-      CodecBuffer.Allocator allocator) throws IOException {
+  public CodecBuffer toCodecBuffer(@Nonnull String object, CodecBuffer.Allocator allocator) throws CodecException {
     // allocate a larger buffer to avoid encoding twice.
     final int upperBound = getSerializedSizeUpperBound(object);
     final CodecBuffer buffer = allocator.apply(upperBound);
-    buffer.putFromSource(encode(object, null, IOException::new));
+    buffer.putFromSource(encode(object, null, CodecException::new));
     return buffer;
   }
 
@@ -181,8 +182,8 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   @Override
-  public byte[] toPersistedFormat(String object) throws IOException {
-    return string2Bytes(object, IOException::new);
+  public byte[] toPersistedFormat(String object) throws CodecException {
+    return string2Bytes(object, CodecException::new);
   }
 
   @Override

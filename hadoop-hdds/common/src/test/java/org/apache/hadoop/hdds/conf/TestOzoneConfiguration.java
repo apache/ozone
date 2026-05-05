@@ -1,36 +1,47 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.conf;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,18 +52,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test class for OzoneConfiguration.
@@ -85,7 +84,7 @@ public class TestOzoneConfiguration {
       throws Exception {
     File coreDefault = new File(tempDir, "core-default-test.xml");
     File coreSite = new File(tempDir, "core-site-test.xml");
-    FileOutputStream coreDefaultStream = new FileOutputStream(coreDefault);
+    OutputStream coreDefaultStream = Files.newOutputStream(coreDefault.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         coreDefaultStream, StandardCharsets.UTF_8))) {
       startConfig(out);
@@ -104,7 +103,7 @@ public class TestOzoneConfiguration {
           .getProperty("dfs.random.key"));
     }
 
-    FileOutputStream coreSiteStream = new FileOutputStream(coreSite);
+    OutputStream coreSiteStream = Files.newOutputStream(coreSite.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         coreSiteStream, StandardCharsets.UTF_8))) {
       startConfig(out);
@@ -144,7 +143,6 @@ public class TestOzoneConfiguration {
 
     assertEquals("host", configuration.getBindHost());
     assertEquals("address", configuration.getClientAddress());
-    assertTrue(configuration.isEnabled());
     assertEquals(5555, configuration.getPort());
     assertEquals(600, configuration.getWaitTime());
     assertSame(Integer.class, configuration.getMyClass());
@@ -220,7 +218,6 @@ public class TestOzoneConfiguration {
     SimpleConfiguration configuration =
         ozoneConfiguration.getObject(SimpleConfiguration.class);
 
-    assertTrue(configuration.isEnabled());
     assertEquals(9878, configuration.getPort());
     assertSame(Object.class, configuration.getMyClass());
     assertEquals(10, configuration.getThreshold());
@@ -233,7 +230,6 @@ public class TestOzoneConfiguration {
     SimpleConfiguration object = new SimpleConfiguration();
     object.setBindHost("host");
     object.setClientAddress("address");
-    object.setEnabled(true);
     object.setPort(5555);
     object.setWaitTime(600);
     object.setMyClass(this.getClass());
@@ -248,7 +244,6 @@ public class TestOzoneConfiguration {
     // THEN
     assertEquals(object.getBindHost(), subject.get("test.scm.client.bind.host"));
     assertEquals(object.getClientAddress(), subject.get("test.scm.client.address"));
-    assertEquals(object.isEnabled(), subject.getBoolean("test.scm.client.enabled", false));
     assertEquals(object.getPort(), subject.getInt("test.scm.client.port", 0));
     assertEquals(TimeUnit.SECONDS.toMinutes(object.getWaitTime()),
         subject.getTimeDuration("test.scm.client.wait", 0, TimeUnit.MINUTES));
@@ -273,7 +268,6 @@ public class TestOzoneConfiguration {
     // THEN
     assertEquals("0.0.0.0", subject.get("test.scm.client.bind.host"));
     assertEquals("localhost", subject.get("test.scm.client.address"));
-    assertTrue(subject.getBoolean("test.scm.client.enabled", false));
     assertEquals(9878, subject.getInt("test.scm.client.port", 123));
     assertEquals(TimeUnit.MINUTES.toSeconds(30),
         subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
@@ -288,7 +282,7 @@ public class TestOzoneConfiguration {
     Configuration configuration = new Configuration(true);
 
     File ozoneSite = new File(tempDir, "ozone-site.xml");
-    FileOutputStream ozoneSiteStream = new FileOutputStream(ozoneSite);
+    OutputStream ozoneSiteStream = Files.newOutputStream(ozoneSite.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         ozoneSiteStream, StandardCharsets.UTF_8))) {
       startConfig(out);

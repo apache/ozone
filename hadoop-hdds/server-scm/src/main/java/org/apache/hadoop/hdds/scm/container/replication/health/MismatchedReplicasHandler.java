@@ -1,22 +1,23 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
+import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -26,8 +27,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Set;
-
 /**
  * Handler to process containers which are closed or quasi-closed, but some
  * replicas are still open or closing. This handler will send a command to
@@ -35,7 +34,7 @@ import java.util.Set;
  */
 public class MismatchedReplicasHandler extends AbstractCheck {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MismatchedReplicasHandler.class);
 
   private final ReplicationManager replicationManager;
@@ -58,8 +57,13 @@ public class MismatchedReplicasHandler extends AbstractCheck {
    */
   @Override
   public boolean handle(ContainerCheckRequest request) {
-    ContainerInfo containerInfo = request.getContainerInfo();
-    Set<ContainerReplica> replicas = request.getContainerReplicas();
+    if (request.isReadOnly()) {
+      return false;
+    }
+
+    final ContainerInfo containerInfo = request.getContainerInfo();
+    final Set<ContainerReplica> replicas = request.getContainerReplicas();
+
     if (containerInfo.getState() != HddsProtos.LifeCycleState.CLOSED &&
         containerInfo.getState() != HddsProtos.LifeCycleState.QUASI_CLOSED) {
       // Handler is only relevant for CLOSED or QUASI-CLOSED containers.
@@ -67,24 +71,14 @@ public class MismatchedReplicasHandler extends AbstractCheck {
     }
     LOG.debug("Checking container {} in MismatchedReplicasHandler",
         containerInfo);
-
-    if (request.isReadOnly()) {
-      return false;
-    }
     // close replica if needed
     for (ContainerReplica replica : replicas) {
-      if (shouldBeClosed(containerInfo, replica)) {
+      ContainerReplicaProto.State replicaState = getTransitionState(containerInfo, replica);
+      if (replicaState != null) {
         LOG.debug("Sending close command for mismatched replica {} of " +
             "container {}.", replica, containerInfo);
-
-        if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
-          replicationManager.sendCloseContainerReplicaCommand(
-              containerInfo, replica.getDatanodeDetails(), true);
-        } else if (containerInfo.getState() ==
-            HddsProtos.LifeCycleState.QUASI_CLOSED) {
-          replicationManager.sendCloseContainerReplicaCommand(
-              containerInfo, replica.getDatanodeDetails(), false);
-        }
+        replicationManager.sendCloseContainerReplicaCommand(
+            containerInfo, replica.getDatanodeDetails(), ContainerReplicaProto.State.CLOSED.equals(replicaState));
       }
     }
 
@@ -96,23 +90,24 @@ public class MismatchedReplicasHandler extends AbstractCheck {
   }
 
   /**
-   * If a CLOSED or QUASI-CLOSED container has an OPEN or CLOSING replica,
-   * there is a state mismatch. QUASI_CLOSED replica of a CLOSED container
-   * should be closed if their sequence IDs match.
+   * Returns the final expected closed state type based on the scm container state and the replica state.
    * @param replica replica to check for mismatch and if it should be closed
-   * @return true if the replica should be closed, else false
+   * @return null if the replica should not be closed, else CLOSED/QUASI_CLOSED based on the replica's
+   * state.
    */
-  private boolean shouldBeClosed(ContainerInfo container,
-      ContainerReplica replica) {
+  private ContainerReplicaProto.State getTransitionState(ContainerInfo container,
+                                                         ContainerReplica replica) {
     if (replica.getState() == ContainerReplicaProto.State.OPEN ||
         replica.getState() == ContainerReplicaProto.State.CLOSING) {
-      return true;
+      return HddsProtos.ReplicationType.RATIS == container.getReplicationType() ?
+          ContainerReplicaProto.State.QUASI_CLOSED : ContainerReplicaProto.State.CLOSED;
     }
 
     // a quasi closed replica of a closed container should be closed if their
     // sequence IDs match
     return container.getState() == HddsProtos.LifeCycleState.CLOSED &&
         replica.getState() == ContainerReplicaProto.State.QUASI_CLOSED &&
-        container.getSequenceId() == replica.getSequenceId();
+        container.getSequenceId() == replica.getSequenceId() ? ContainerReplicaProto.State.CLOSED
+        : null;
   }
 }

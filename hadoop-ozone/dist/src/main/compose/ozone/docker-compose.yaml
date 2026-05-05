@@ -73,9 +73,11 @@ services:
       <<: *replication
     ports:
       - 9878:9878
+      - 19878:19878
     command: ["ozone","s3g"]
   recon:
     <<: *common-config
+    hostname: recon
     ports:
       - 9888:9888
     environment:

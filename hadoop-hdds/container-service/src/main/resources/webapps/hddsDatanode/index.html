@@ -49,11 +49,10 @@
             <a class="navbar-brand" href="#">HDDS Datanode Service</a>
         </div>
 
-
-        <navmenu
-                metrics="{ 'Rpc metrics' : '#!/metrics/rpc'}"></navmenu>
-
-
+        <navmenu metrics="{ 'Rpc metrics' : '#!/metrics/rpc'}"
+             iostatus="true" io-link-href="#!/iostatus"
+             scanner="true" scanner-link-href="#!/dn-scanner"
+        />
     </div>
 </header>
 

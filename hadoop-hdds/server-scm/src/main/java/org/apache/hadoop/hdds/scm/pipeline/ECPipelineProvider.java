@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -30,15 +38,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 /**
  * Class to create pipelines for EC containers.
  */
@@ -46,6 +45,15 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ECPipelineProvider.class);
+
+  static final Comparator<NodeStatus> CREATE_FOR_READ_COMPARATOR = (left, right) -> {
+    final int healthy = Boolean.compare(right.isHealthy(), left.isHealthy());
+    if (healthy != 0) {
+      return healthy;
+    }
+    final int dead = Boolean.compare(left.isDead(), right.isDead());
+    return dead != 0 ? dead : left.getOperationalState().compareTo(right.getOperationalState());
+  };
 
   // TODO - EC Placement Policy. Standard Network Aware topology will not work
   //        for EC as it stands. We may want an "as many racks as possible"
@@ -116,11 +124,11 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
           nodeStatusMap.put(dn, nodeStatus);
         }
       } catch (NodeNotFoundException e) {
-        LOG.error("Node not found", e);
+        LOG.error("Failed to getNodeStatus for {}", dn, e);
       }
     }
 
-    dns.sort(Comparator.comparing(nodeStatusMap::get));
+    dns.sort(Comparator.comparing(nodeStatusMap::get, CREATE_FOR_READ_COMPARATOR));
 
     return createPipelineInternal(replicationConfig, dns, map);
   }
@@ -138,10 +146,6 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
   @Override
   protected void close(Pipeline pipeline) throws IOException {
-  }
-
-  @Override
-  protected void shutdown() {
   }
 
 }

@@ -52,11 +52,11 @@ Port used for below examples : 9862
 
 <property>
    <name>ipc.9862.callqueue.impl</name>
-   <value>org.apache.hadoop.ipc.FairCallQueue</value>
+   <value>org.apache.hadoop.ipc_.FairCallQueue</value>
 </property>
 <property>
    <name>ipc.9862.scheduler.impl</name>
-   <value>org.apache.hadoop.ipc.DecayRpcScheduler</value>
+   <value>org.apache.hadoop.ipc_.DecayRpcScheduler</value>
 </property>
 <property>
    <name>ipc.9862.identity-provider.impl</name>

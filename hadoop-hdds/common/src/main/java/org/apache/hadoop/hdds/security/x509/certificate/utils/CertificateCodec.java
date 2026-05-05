@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,22 +13,17 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE;
+import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
+import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.PEM_ENCODE_FAILED;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -51,14 +45,14 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static java.nio.file.attribute.PosixFilePermission.OWNER_EXECUTE;
-import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
-import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.PEM_ENCODE_FAILED;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A class used to read and write X.509 certificates  PEM encoded Streams.
@@ -75,6 +69,7 @@ public class CertificateCodec {
   private final Set<PosixFilePermission> permissionSet =
       Stream.of(OWNER_READ, OWNER_WRITE, OWNER_EXECUTE)
           .collect(Collectors.toSet());
+
   /**
    * Creates a CertificateCodec with component name.
    *
@@ -142,10 +137,8 @@ public class CertificateCodec {
     try {
       return writePEMEncoded(certificate, new StringWriter()).toString();
     } catch (IOException e) {
-      LOG.error("Error in encoding certificate." + certificate
-          .getSubjectDN().toString(), e);
-      throw new SCMSecurityException("PEM Encoding failed for certificate." +
-          certificate.getSubjectDN().toString(), e, PEM_ENCODE_FAILED);
+      throw new SCMSecurityException("Failed to getPEMEncodedString for certificate with subject "
+          + certificate.getSubjectDN(), e, PEM_ENCODE_FAILED);
     }
   }
 
@@ -154,41 +147,36 @@ public class CertificateCodec {
    * containing multiple certificates. To get all certificates, use
    * {@link #getCertPathFromPemEncodedString(String)}.
    *
-   * @param pemEncodedString - PEM encoded String.
+   * @param pemEncoded - PEM encoded String.
    * @return X509Certificate  - Certificate.
    * @throws CertificateException - Thrown on Failure.
    */
-  public static X509Certificate getX509Certificate(String pemEncodedString)
+  public static X509Certificate getX509Certificate(String pemEncoded)
       throws CertificateException {
-    return getX509Certificate(pemEncodedString, Function.identity());
+    return getX509Certificate(pemEncoded.getBytes(DEFAULT_CHARSET));
   }
 
-  public static <E extends Exception> X509Certificate getX509Certificate(
-      String pemEncoded, Function<CertificateException, E> convertor)
-      throws E {
+  public static X509Certificate getX509Certificate(byte[] pemEncoded)
+      throws CertificateException {
     // ByteArrayInputStream.close(), which is a noop, can be safely ignored.
-    final ByteArrayInputStream input = new ByteArrayInputStream(
-        pemEncoded.getBytes(DEFAULT_CHARSET));
-    return readX509Certificate(input, convertor);
+    final ByteArrayInputStream input = new ByteArrayInputStream(pemEncoded);
+    return readX509Certificate(input);
   }
 
-  private static <E extends Exception> X509Certificate readX509Certificate(
-      InputStream input, Function<CertificateException, E> convertor)
-      throws E {
-    try {
-      return (X509Certificate) getCertFactory().generateCertificate(input);
-    } catch (CertificateException e) {
-      throw convertor.apply(e);
+  public static X509Certificate readX509Certificate(InputStream input) throws CertificateException {
+    final Certificate cert = getCertFactory().generateCertificate(input);
+    if (cert instanceof X509Certificate) {
+      return (X509Certificate) cert;
     }
+    throw new CertificateException("Certificate is not a X509Certificate: " + cert.getClass() + ", " + cert);
   }
 
-  public static X509Certificate readX509Certificate(InputStream input)
-      throws IOException {
-    return readX509Certificate(input, CertificateCodec::toIOException);
-  }
-
-  public static IOException toIOException(CertificateException e) {
-    return new IOException("Failed to engineGenerateCertificate", e);
+  public static X509Certificate readX509Certificate(String pemEncoded) throws IOException {
+    try {
+      return getX509Certificate(pemEncoded);
+    } catch (CertificateException e) {
+      throw new IOException("Failed to getX509Certificate from " + pemEncoded, e);
+    }
   }
 
   public static X509Certificate firstCertificateFrom(CertPath certificatePath) {
@@ -247,7 +235,7 @@ public class CertificateCodec {
     File certificateFile =
         Paths.get(basePath.toString(), fileName).toFile();
 
-    try (FileOutputStream file = new FileOutputStream(certificateFile)) {
+    try (OutputStream file = Files.newOutputStream(certificateFile.toPath())) {
       file.write(pemEncodedCertificate.getBytes(DEFAULT_CHARSET));
     }
     LOG.info("Save certificate to {}", certificateFile.getAbsolutePath());
@@ -274,7 +262,7 @@ public class CertificateCodec {
       throw new IOException("Unable to find the requested certificate file. " +
           "Path: " + certFile);
     }
-    try (FileInputStream is = new FileInputStream(certFile)) {
+    try (InputStream is = Files.newInputStream(certFile.toPath())) {
       return generateCertPathFromInputStream(is);
     }
   }

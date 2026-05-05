@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +18,6 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -32,6 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Message;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
@@ -42,35 +42,35 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
-
-import com.google.protobuf.Message;
 
 /**
  * Test class for Datanode StateContext.
@@ -575,9 +575,11 @@ public class TestStateContext {
 
     // task num greater than pool size
     for (int i = 0; i < threadPoolSize; i++) {
-      executorService.submit((Callable<String>) futureOne::get);
+      Future<String> future = executorService.submit((Callable<String>) futureOne::get);
+      assertFalse(future.isDone());
     }
-    executorService.submit((Callable<String>) futureTwo::get);
+    Future<String> future = executorService.submit((Callable<String>) futureTwo::get);
+    assertFalse(future.isDone());
 
     assertFalse(stateContext.isThreadPoolAvailable(executorService));
 
@@ -595,9 +597,11 @@ public class TestStateContext {
     final AtomicInteger awaited = new AtomicInteger();
 
     ExecutorService executorService = Executors.newFixedThreadPool(1);
-    CompletableFuture<String> future = new CompletableFuture<>();
-    executorService.submit((Callable<String>) future::get);
-    executorService.submit((Callable<String>) future::get);
+    CompletableFuture<String> task = new CompletableFuture<>();
+    Future<String> future = executorService.submit((Callable<String>) task::get);
+    assertFalse(future.isDone());
+    future = executorService.submit((Callable<String>) task::get);
+    assertFalse(future.isDone());
 
     StateContext subject = new StateContext(new OzoneConfiguration(),
         DatanodeStates.INIT, mock(DatanodeStateMachine.class), "") {
@@ -634,7 +638,7 @@ public class TestStateContext {
     assertEquals(0, awaited.get());
     assertEquals(0, executed.get());
 
-    future.complete("any");
+    task.complete("any");
     LambdaTestUtils.await(1000, 100, () ->
         subject.isThreadPoolAvailable(executorService));
 
@@ -704,14 +708,17 @@ public class TestStateContext {
     ctx.addCommand(ReplicateContainerCommand.forTest(3));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
+    ctx.addCommand(new ReconcileContainerCommand(4, Collections.emptySet()));
 
-    Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
+    EnumCounters<SCMCommandProto.Type> summary = ctx.getCommandQueueSummary();
     assertEquals(3,
-        summary.get(SCMCommandProto.Type.replicateContainerCommand).intValue());
+        summary.get(SCMCommandProto.Type.replicateContainerCommand));
     assertEquals(2,
-        summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
+        summary.get(SCMCommandProto.Type.closePipelineCommand));
     assertEquals(1,
-        summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
+        summary.get(SCMCommandProto.Type.closeContainerCommand));
+    assertEquals(1,
+        summary.get(SCMCommandProto.Type.reconcileContainerCommand));
   }
 
   @Test

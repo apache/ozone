@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -80,7 +79,6 @@ public final class SCMUpgradeFinalizationContext {
   /**
    * Builds an {@link SCMUpgradeFinalizationContext}.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private PipelineManager pipelineManager;
     private NodeManager nodeManager;
@@ -120,24 +118,24 @@ public final class SCMUpgradeFinalizationContext {
     }
 
     public Builder setLayoutVersionManager(
-        HDDSLayoutVersionManager versionManager) {
-      this.versionManager = versionManager;
+        HDDSLayoutVersionManager layoutVersionManager) {
+      this.versionManager = layoutVersionManager;
       return this;
     }
 
-    public Builder setConfiguration(OzoneConfiguration conf) {
-      this.conf = conf;
+    public Builder setConfiguration(OzoneConfiguration configuration) {
+      this.conf = configuration;
       return this;
     }
 
     public SCMUpgradeFinalizationContext build() {
-      Preconditions.checkNotNull(scmContext);
-      Preconditions.checkNotNull(pipelineManager);
-      Preconditions.checkNotNull(nodeManager);
-      Preconditions.checkNotNull(storage);
-      Preconditions.checkNotNull(versionManager);
-      Preconditions.checkNotNull(conf);
-      Preconditions.checkNotNull(finalizationStateManager);
+      Objects.requireNonNull(scmContext, "scmContext == null");
+      Objects.requireNonNull(pipelineManager, "pipelineManager == null");
+      Objects.requireNonNull(nodeManager, "nodeManager == null");
+      Objects.requireNonNull(storage, "storage == null");
+      Objects.requireNonNull(versionManager, "versionManager == null");
+      Objects.requireNonNull(conf, "conf == null");
+      Objects.requireNonNull(finalizationStateManager, "finalizationStateManager == null");
       return new SCMUpgradeFinalizationContext(this);
     }
   }

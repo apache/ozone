@@ -1,33 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.Map;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.Map;
-import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Cache for all per-disk DB handles under schema v3.
@@ -66,7 +65,6 @@ public final class DatanodeStoreCache {
     getInstance().miniClusterMode = isMiniCluster;
   }
 
-
   public void addDB(String containerDBPath, RawDB db) {
     datanodeStoreMap.putIfAbsent(containerDBPath, db);
     LOG.info("Added db {} to cache", containerDBPath);
@@ -102,11 +100,7 @@ public final class DatanodeStoreCache {
       return;
     }
 
-    try {
-      db.getStore().stop();
-    } catch (Exception e) {
-      LOG.error("Stop DatanodeStore: {} failed", containerDBPath, e);
-    }
+    db.getStore().stop();
     LOG.info("Removed db {} from cache", containerDBPath);
   }
 
@@ -119,12 +113,8 @@ public final class DatanodeStoreCache {
       return;
     }
 
-    for (Map.Entry<String, RawDB> entry : datanodeStoreMap.entrySet()) {
-      try {
-        entry.getValue().getStore().stop();
-      } catch (Exception e) {
-        LOG.warn("Stop DatanodeStore: {} failed", entry.getKey(), e);
-      }
+    for (RawDB db : datanodeStoreMap.values()) {
+      db.getStore().stop();
     }
     datanodeStoreMap.clear();
   }

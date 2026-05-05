@@ -1,60 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om.ratis;
-
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.nio.file.Path;
-import java.util.Collections;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.security.OMCertificateClient;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.protocol.RaftGroupId;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.ratis.statemachine.SnapshotInfo;
-import org.apache.ratis.util.ExitUtils;
-import org.apache.ratis.util.LifeCycle;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -63,24 +24,56 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.security.OMCertificateClient;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.statemachine.SnapshotInfo;
+import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.LifeCycle;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
 /**
  * Test OM Ratis server.
  */
 public class TestOzoneManagerRatisServer {
-
-
   @TempDir
   private Path folder;
 
   private OzoneConfiguration conf;
   private OzoneManagerRatisServer omRatisServer;
-  private String omID;
   private String clientId = UUID.randomUUID().toString();
   private static final long RATIS_RPC_TIMEOUT = 500L;
   private OMMetadataManager omMetadataManager;
   private OzoneManager ozoneManager;
   private OMNodeDetails omNodeDetails;
-  private TermIndex initialTermIndex;
   private SecurityConfig secConfig;
   private OMCertificateClient certClient;
 
@@ -92,7 +85,7 @@ public class TestOzoneManagerRatisServer {
   @BeforeEach
   public void init(@TempDir Path metaDirPath) throws Exception {
     conf = new OzoneConfiguration();
-    omID = UUID.randomUUID().toString();
+    String omID = UUID.randomUUID().toString();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
@@ -119,9 +112,10 @@ public class TestOzoneManagerRatisServer {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    initialTermIndex = TermIndex.valueOf(0, 0);
     when(ozoneManager.getTransactionInfo()).thenReturn(TransactionInfo.DEFAULT_VALUE);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
+    final OmConfig omConfig = conf.getObject(OmConfig.class);
+    when(ozoneManager.getConfig()).thenReturn(omConfig);
     secConfig = new SecurityConfig(conf);
     HddsProtos.OzoneManagerDetailsProto omInfo =
         OzoneManager.getOmDetailsProto(conf, omID);
@@ -183,8 +177,7 @@ public class TestOzoneManagerRatisServer {
    */
   @Test
   public void testIsReadOnlyCapturesAllCmdTypeEnums() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(LoggerFactory.getLogger(OmUtils.class));
+    LogCapturer logCapturer = LogCapturer.captureLogs(OmUtils.class);
     OzoneManagerProtocolProtos.Type[] cmdTypes =
         OzoneManagerProtocolProtos.Type.values();
 
@@ -242,6 +235,4 @@ public class TestOzoneManagerRatisServer {
     assertEquals(raftGroupId.toByteString().size(), 16);
     newOmRatisServer.stop();
   }
-
-
 }

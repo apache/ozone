@@ -1,29 +1,32 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.block;
 
-import javax.management.ObjectName;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
+import javax.management.ObjectName;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -43,14 +46,10 @@ import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.util.StringUtils;
-
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /** Block Manager manages the block access for SCM. */
 public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
@@ -72,6 +71,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private ObjectName mxBean;
   private final SequenceIdGenerator sequenceIdGen;
   private ScmBlockDeletingServiceMetrics metrics;
+
   /**
    * Constructor.
    *
@@ -93,13 +93,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     this.writableContainerFactory = scm.getWritableContainerFactory();
 
     mxBean = MBeans.register("BlockManager", "BlockManagerImpl", this);
-    metrics = ScmBlockDeletingServiceMetrics.create();
+    metrics = ScmBlockDeletingServiceMetrics.create(this);
 
     // SCM block deleting transaction log and deleting service.
     deletedBlockLog = new DeletedBlockLogImpl(conf,
         scm,
         scm.getContainerManager(),
-        scm.getScmHAManager().getDBTransactionBuffer(),
+        scm.getScmHAManager().asSCMHADBTransactionBuffer(),
         metrics);
 
 
@@ -220,21 +220,20 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       throw new SCMException("SafeModePrecheck failed for deleteBlocks",
           SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
     }
-    Map<Long, List<Long>> containerBlocks = new HashMap<>();
-    // TODO: track the block size info so that we can reclaim the container
-    // TODO: used space when the block is deleted.
+    Map<Long, List<DeletedBlock>> containerBlocks = new HashMap<>();
     for (BlockGroup bg : keyBlocksInfoList) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Deleting blocks {}",
-            StringUtils.join(",", bg.getBlockIDList()));
+            StringUtils.join(",", bg.getDeletedBlocks()));
       }
-      for (BlockID block : bg.getBlockIDList()) {
+      for (DeletedBlock deletedBlock : bg.getDeletedBlocks()) {
+        BlockID block = deletedBlock.getBlockID();
         long containerID = block.getContainerID();
         if (containerBlocks.containsKey(containerID)) {
-          containerBlocks.get(containerID).add(block.getLocalID());
+          containerBlocks.get(containerID).add(deletedBlock);
         } else {
-          List<Long> item = new ArrayList<>();
-          item.add(block.getLocalID());
+          List<DeletedBlock> item = new ArrayList<>();
+          item.add(deletedBlock);
           containerBlocks.put(containerID, item);
         }
       }
@@ -281,12 +280,5 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public SCMBlockDeletingService getSCMBlockDeletingService() {
     return this.blockDeletingService;
-  }
-
-  /**
-   * Get class logger.
-   * */
-  public static Logger getLogger() {
-    return LOG;
   }
 }

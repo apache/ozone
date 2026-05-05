@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -15,27 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.InOrder;
-import org.mockito.stubbing.Answer;
-import org.rocksdb.RocksIterator;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.concurrent.ThreadLocalRandom;
-
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -49,6 +31,23 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
+import org.mockito.stubbing.Answer;
+import org.rocksdb.RocksIterator;
 
 /**
  * This test is similar to {@link TestRDBStoreByteArrayIterator}
@@ -74,12 +73,11 @@ public class TestRDBStoreCodecBufferIterator {
   }
 
   RDBStoreCodecBufferIterator newIterator() {
-    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null);
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
   }
 
   RDBStoreCodecBufferIterator newIterator(CodecBuffer prefix) {
-    return new RDBStoreCodecBufferIterator(
-        managedRocksIterator, rdbTableMock, prefix);
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, rdbTableMock, prefix, KEY_AND_VALUE);
   }
 
   Answer<Integer> newAnswerInt(String name, int b) {
@@ -117,14 +115,8 @@ public class TestRDBStoreCodecBufferIterator {
 
     List<Table.KeyValue<byte[], byte[]>> remaining = new ArrayList<>();
     try (RDBStoreCodecBufferIterator i = newIterator()) {
-      i.forEachRemaining(kv -> {
-        try {
-          remaining.add(RawKeyValue.create(
-              kv.getKey().getArray(), kv.getValue().getArray()));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      });
+      i.forEachRemaining(kv ->
+          remaining.add(Table.newKeyValue(kv.getKey().getArray(), kv.getValue().getArray())));
 
       System.out.println("remaining: " + remaining);
       assertArrayEquals(new byte[]{0x00}, remaining.get(0).getKey());

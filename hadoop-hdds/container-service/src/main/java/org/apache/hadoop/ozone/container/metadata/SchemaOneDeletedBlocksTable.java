@@ -1,31 +1,30 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.metadata;
 
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
 /**
  * For RocksDB instances written using DB schema version 1, all data is
@@ -47,83 +46,66 @@ import java.util.List;
 public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
         ChunkInfoList> {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
+  private static final KeyPrefixFilter DELETED_FILTER = KeyPrefixFilter.newFilter(DELETED_KEY_PREFIX);
 
   public SchemaOneDeletedBlocksTable(Table<String, ChunkInfoList> table) {
     super(table);
   }
 
   @Override
-  public void put(String key, ChunkInfoList value) throws IOException {
+  public void put(String key, ChunkInfoList value) throws RocksDatabaseException, CodecException {
     super.put(prefix(key), value);
   }
 
   @Override
-  public void putWithBatch(BatchOperation batch, String key,
-                           ChunkInfoList value)
-          throws IOException {
+  public void putWithBatch(BatchOperation batch, String key, ChunkInfoList value)
+      throws RocksDatabaseException, CodecException {
     super.putWithBatch(batch, prefix(key), value);
   }
 
   @Override
-  public void delete(String key) throws IOException {
+  public void delete(String key) throws RocksDatabaseException, CodecException {
     super.delete(prefix(key));
   }
 
   @Override
-  public void deleteWithBatch(BatchOperation batch, String key)
-          throws IOException {
+  public void deleteWithBatch(BatchOperation batch, String key) throws CodecException {
     super.deleteWithBatch(batch, prefix(key));
   }
 
   @Override
-  public void deleteRange(String beginKey, String endKey) throws IOException {
+  public void deleteRange(String beginKey, String endKey) throws RocksDatabaseException, CodecException {
     super.deleteRange(prefix(beginKey), prefix(endKey));
   }
 
   @Override
-  public boolean isExist(String key) throws IOException {
+  public boolean isExist(String key) throws RocksDatabaseException, CodecException {
     return super.isExist(prefix(key));
   }
 
   @Override
-  public ChunkInfoList get(String key) throws IOException {
+  public ChunkInfoList get(String key) throws RocksDatabaseException, CodecException {
     return super.get(prefix(key));
   }
 
   @Override
-  public ChunkInfoList getIfExist(String key) throws IOException {
+  public ChunkInfoList getIfExist(String key) throws RocksDatabaseException, CodecException {
     return super.getIfExist(prefix(key));
   }
 
   @Override
-  public ChunkInfoList getReadCopy(String key) throws IOException {
+  public ChunkInfoList getReadCopy(String key) throws RocksDatabaseException, CodecException {
     return super.getReadCopy(prefix(key));
   }
 
   @Override
-  public List<? extends KeyValue<String, ChunkInfoList>> getRangeKVs(
-          String startKey, int count, String prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws IOException, IllegalArgumentException {
-
+  public List<KeyValue<String, ChunkInfoList>> getRangeKVs(
+      String startKey, int count, String prefix, KeyPrefixFilter filter, boolean isSequential)
+      throws RocksDatabaseException, CodecException {
     // Deleted blocks will always have the #deleted# key prefix and nothing
     // else in this schema version. Ignore any user passed prefixes that could
     // collide with this and return results that are not deleted blocks.
-    return unprefix(super.getRangeKVs(prefix(startKey), count,
-        prefix, getDeletedFilter()));
-  }
-
-  @Override
-  public List<? extends KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
-          String startKey, int count, String prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws IOException, IllegalArgumentException {
-
-    // Deleted blocks will always have the #deleted# key prefix and nothing
-    // else in this schema version. Ignore any user passed prefixes that could
-    // collide with this and return results that are not deleted blocks.
-    return unprefix(super.getSequentialRangeKVs(prefix(startKey), count,
-        prefix, getDeletedFilter()));
+    return unprefix(super.getRangeKVs(prefix(startKey), count, prefix, DELETED_FILTER, isSequential));
   }
 
   private static String prefix(String key) {
@@ -145,41 +127,10 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   private static List<KeyValue<String, ChunkInfoList>> unprefix(
-      List<? extends KeyValue<String, ChunkInfoList>> kvs) {
+      List<KeyValue<String, ChunkInfoList>> kvs) {
 
-    List<KeyValue<String, ChunkInfoList>> processedKVs = new ArrayList<>();
-    kvs.forEach(kv -> processedKVs.add(new UnprefixedKeyValue(kv)));
-
-    return processedKVs;
-  }
-
-  private static MetadataKeyFilters.KeyPrefixFilter getDeletedFilter() {
-    return (new MetadataKeyFilters.KeyPrefixFilter())
-            .addFilter(DELETED_KEY_PREFIX);
-  }
-
-  /**
-   * {@link KeyValue} implementation that removes the deleted key prefix from
-   * an existing {@link KeyValue}.
-   */
-  private static class UnprefixedKeyValue implements KeyValue<String,
-        ChunkInfoList> {
-
-    private final KeyValue<String, ChunkInfoList> prefixedKeyValue;
-
-    UnprefixedKeyValue(
-            KeyValue<String, ChunkInfoList> prefixedKeyValue) {
-      this.prefixedKeyValue = prefixedKeyValue;
-    }
-
-    @Override
-    public String getKey() throws IOException {
-      return unprefix(prefixedKeyValue.getKey());
-    }
-
-    @Override
-    public ChunkInfoList getValue() throws IOException {
-      return prefixedKeyValue.getValue();
-    }
+    return kvs.stream()
+        .map(kv -> Table.newKeyValue(unprefix(kv.getKey()), kv.getValue()))
+        .collect(Collectors.toList());
   }
 }

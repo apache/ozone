@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,23 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import net.jcip.annotations.NotThreadSafe;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -40,29 +56,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class is to test audit logs for xxxACL APIs of Ozone Client.
@@ -82,10 +80,10 @@ public class TestOzoneRpcClientForAclAuditLog {
       LoggerFactory.getLogger(TestOzoneRpcClientForAclAuditLog.class);
   private static UserGroupInformation ugi;
   private static final OzoneAcl USER_ACL =
-      new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
+      OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER,
           "johndoe", ACCESS, IAccessAuthorizer.ACLType.ALL);
   private static final OzoneAcl USER_ACL_2 =
-      new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
+      OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.USER,
           "jane", ACCESS, IAccessAuthorizer.ACLType.ALL);
   private static List<OzoneAcl> aclListToAdd = new ArrayList<>();
   private static MiniOzoneCluster cluster = null;
@@ -94,13 +92,6 @@ public class TestOzoneRpcClientForAclAuditLog {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
@@ -116,11 +107,6 @@ public class TestOzoneRpcClientForAclAuditLog {
     emptyAuditLog();
   }
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * @param conf Configurations to start the cluster.
-   * @throws Exception
-   */
   private static void startCluster(OzoneConfiguration conf) throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -177,7 +163,7 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     String userName = ugi.getUserName();
     String adminName = ugi.getUserName();
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)
@@ -225,7 +211,7 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     String userName = "bilbo";
     String adminName = "bilbo";
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)
@@ -287,7 +273,7 @@ public class TestOzoneRpcClientForAclAuditLog {
       }
     } catch (AssertionError ex) {
       LOG.error("Error occurred in log verification", ex);
-      if (lines.size() != 0) {
+      if (!lines.isEmpty()) {
         LOG.error("Actual line ::: " + lines.get(0));
         LOG.error("Expected tokens ::: " + Arrays.toString(expected));
       }

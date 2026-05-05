@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,55 +17,33 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.apache.hadoop.ozone.om.helpers.OmKeyInfo.isKeyEmpty;
+
+import jakarta.annotation.Nonnull;
+import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-        .OMResponse;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-
-import java.io.IOException;
-import jakarta.annotation.Nullable;
-import jakarta.annotation.Nonnull;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Base class for responses that need to move keys from an arbitrary table to
  * the deleted table.
  */
-@CleanupTableInfo(cleanupTables = {DELETED_TABLE})
 public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
 
-  private boolean isRatisEnabled;
-
   public AbstractOMKeyDeleteResponse(
-      @Nonnull OMResponse omResponse, boolean isRatisEnabled) {
-
+      @Nonnull OMResponse omResponse) {
     super(omResponse);
-    this.isRatisEnabled = isRatisEnabled;
   }
 
-  public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-      boolean isRatisEnabled, BucketLayout bucketLayout) {
-
-    super(omResponse, bucketLayout);
-    this.isRatisEnabled = isRatisEnabled;
-  }
-
-  /**
-   * For when the request is not successful.
-   * For a successful request, the other constructor should be used.
-   */
   public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
                                      @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
-    checkStatusNotOK();
   }
 
   /**
@@ -81,7 +58,9 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       BatchOperation batchOperation,
       Table<String, ?> fromTable,
       String keyName,
-      OmKeyInfo omKeyInfo) throws IOException {
+      OmKeyInfo omKeyInfo,
+      long bucketId,
+      boolean isCommittedKey) throws IOException {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
@@ -98,9 +77,10 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // if RepeatedOMKeyInfo structure is null, we create a new instance,
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
+      omKeyInfo = omKeyInfo.withCommittedKeyDeletedFlag(isCommittedKey);
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, omKeyInfo.getUpdateID(),
-          isRatisEnabled);
+          bucketId, omKeyInfo, omKeyInfo.getUpdateID()
+      );
       String delKeyName = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), keyName);
       omMetadataManager.getDeletedTable().putWithBatch(
@@ -119,12 +99,15 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
    * @param omKeyInfo
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected void addDeletionToBatch(
       OMMetadataManager omMetadataManager,
       BatchOperation batchOperation,
       Table<String, ?> fromTable,
       String keyName, String deleteKeyName,
-      OmKeyInfo omKeyInfo) throws IOException {
+      OmKeyInfo omKeyInfo,
+      long bucketId,
+      boolean isCommittedKey) throws IOException {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
@@ -141,36 +124,16 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // if RepeatedOMKeyInfo structure is null, we create a new instance,
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
+      omKeyInfo = omKeyInfo.withCommittedKeyDeletedFlag(isCommittedKey);
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, omKeyInfo.getUpdateID(),
-          isRatisEnabled);
+          bucketId, omKeyInfo, omKeyInfo.getUpdateID()
+      );
       omMetadataManager.getDeletedTable().putWithBatch(
           batchOperation, deleteKeyName, repeatedOmKeyInfo);
     }
   }
 
-
   @Override
   public abstract void addToDBBatch(OMMetadataManager omMetadataManager,
         BatchOperation batchOperation) throws IOException;
-
-  /**
-   * Check if the key is empty or not. Key will be empty if it does not have
-   * blocks.
-   *
-   * @param keyInfo
-   * @return if empty true, else false.
-   */
-  private boolean isKeyEmpty(@Nullable OmKeyInfo keyInfo) {
-    if (keyInfo == null) {
-      return true;
-    }
-    for (OmKeyLocationInfoGroup keyLocationList : keyInfo
-            .getKeyLocationVersions()) {
-      if (keyLocationList.getLocationListCount() != 0) {
-        return false;
-      }
-    }
-    return true;
-  }
 }

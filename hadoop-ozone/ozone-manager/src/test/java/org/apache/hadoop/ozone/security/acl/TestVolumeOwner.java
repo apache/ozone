@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,21 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -40,34 +54,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-
 /**
  * Test Ozone owner check from OzoneNativeAuthorizer.
  */
 public class TestVolumeOwner {
 
-  private static OzoneConfiguration ozoneConfig;
   private static OzoneNativeAuthorizer nativeAuthorizer;
-  private static KeyManager keyManager;
-  private static VolumeManager volumeManager;
-  private static BucketManager bucketManager;
-  private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static UserGroupInformation testUgi;
   private static OzoneManagerProtocol writeClient;
@@ -76,7 +68,7 @@ public class TestVolumeOwner {
 
   @BeforeAll
   static void setup() throws Exception {
-    ozoneConfig = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     ozoneConfig.set(OZONE_METADATA_DIRS, testDir.toString());
@@ -84,10 +76,10 @@ public class TestVolumeOwner {
     OmTestManagers omTestManagers =
         new OmTestManagers(ozoneConfig);
     metadataManager = omTestManagers.getMetadataManager();
-    volumeManager = omTestManagers.getVolumeManager();
-    bucketManager = omTestManagers.getBucketManager();
-    keyManager = omTestManagers.getKeyManager();
-    prefixManager = omTestManagers.getPrefixManager();
+    VolumeManager volumeManager = omTestManagers.getVolumeManager();
+    BucketManager bucketManager = omTestManagers.getBucketManager();
+    KeyManager keyManager = omTestManagers.getKeyManager();
+    PrefixManager prefixManager = omTestManagers.getPrefixManager();
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
@@ -142,11 +134,9 @@ public class TestVolumeOwner {
                   UserGroupInformation.getCurrentUser().getShortUserName())
               .setDataSize(0);
           if (k == 0) {
-            keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(
-                testUgi.getUserName(), testUgi.getGroupNames(), ALL, ALL));
+            keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(testUgi, ALL, ALL));
           } else {
-            keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(
-                testUgi.getUserName(), testUgi.getGroupNames(), NONE, NONE));
+            keyArgsBuilder.setAcls(OzoneAclUtil.getAclList(testUgi, NONE, NONE));
           }
           OmKeyArgs keyArgs = keyArgsBuilder.build();
           OpenKeySession keySession = writeClient.createFile(keyArgs, true,
@@ -255,9 +245,12 @@ public class TestVolumeOwner {
 
   private RequestContext getUserRequestContext(String username,
       IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName) {
-    return RequestContext.getBuilder(
-        UserGroupInformation.createRemoteUser(username), null, null,
-        type, ownerName).build();
+    return RequestContext.newBuilder()
+        .setClientUgi(UserGroupInformation.createRemoteUser(username))
+        .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
+        .setAclRights(type)
+        .setOwnerName(ownerName)
+        .build();
   }
 
   private static String getTestVolumeName(int index) {

@@ -1,23 +1,27 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -26,15 +30,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Uploads container to target datanode via gRPC.
@@ -46,17 +47,29 @@ public class GrpcContainerUploader implements ContainerUploader {
 
   private final SecurityConfig securityConfig;
   private final CertificateClient certClient;
+  private final ContainerController containerController;
 
   public GrpcContainerUploader(
-      ConfigurationSource conf, CertificateClient certClient) {
+      ConfigurationSource conf, CertificateClient certClient, 
+      ContainerController containerController) {
     this.certClient = certClient;
+    this.containerController = containerController;
     securityConfig = new SecurityConfig(conf);
   }
 
   @Override
   public OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback, CopyContainerCompression compression)
-      throws IOException {
+      CompletableFuture<Void> callback, CopyContainerCompression compression) throws IOException {
+    
+    // Get container size from local datanode instead of using passed replicateSize
+    Long containerSize = null;
+    Container<?> container = containerController.getContainer(containerId);
+    if (container != null) {
+      LOG.debug("Starting upload of container {} to {} with size {}",
+          containerId, target, container.getContainerData().getBytesUsed());
+      containerSize = container.getContainerData().getBytesUsed();
+    }
+    
     GrpcReplicationClient client = createReplicationClient(target, compression);
     try {
       // gRPC runtime always provides implementation of CallStreamObserver
@@ -69,7 +82,7 @@ public class GrpcContainerUploader implements ContainerUploader {
               (CallStreamObserver<SendContainerRequest>) client.upload(
               responseObserver), responseObserver);
       return new SendContainerOutputStream(requestStream, containerId,
-          GrpcReplicationService.BUFFER_SIZE, compression) {
+          GrpcReplicationService.BUFFER_SIZE, compression, containerSize) {
         @Override
         public void close() throws IOException {
           try {
@@ -157,6 +170,7 @@ public class GrpcContainerUploader implements ContainerUploader {
       this.observer = observer;
       this.responseObserver = responseObserver;
     }
+
     @Override
     public boolean isReady() {
       if (responseObserver.isError()) {

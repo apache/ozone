@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,17 +17,17 @@
 
 package org.apache.ozone.compaction.log;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionFileInfoProto;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.util.stream.Stream;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.stream.Stream;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionFileInfoProto;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test class for CompactionFileInfo.
@@ -48,6 +47,12 @@ public class TestCompactionFileInfo {
             null,
             null,
             null
+        ),
+        Arguments.of("Only fileName is present.",
+            "fileName",
+            null,
+            null,
+            null
         )
     );
   }
@@ -60,10 +65,15 @@ public class TestCompactionFileInfo {
                                                   String endRange,
                                                   String columnFamily) {
 
-    CompactionFileInfo compactionFileInfo =
-        new CompactionFileInfo.Builder(fileName).setStartRange(startRange)
-            .setEndRange(endRange).setColumnFamily(columnFamily).build();
+    CompactionFileInfo.Builder builder = new CompactionFileInfo.Builder(fileName).setStartRange(startRange)
+        .setEndRange(endRange).setColumnFamily(columnFamily);
+    CompactionFileInfo compactionFileInfo = builder.build();
     assertNotNull(compactionFileInfo);
+    CompactionFileInfo prunedCompactionFileInfo = builder.setPruned().build();
+    assertFalse(compactionFileInfo.isPruned());
+    compactionFileInfo.setPruned();
+    assertTrue(compactionFileInfo.isPruned());
+    assertTrue(prunedCompactionFileInfo.isPruned());
   }
 
   private static Stream<Arguments> compactionFileInfoInvalidScenarios() {
@@ -217,5 +227,16 @@ public class TestCompactionFileInfo {
     assertEquals(startRange, compactionFileInfo.getStartKey());
     assertEquals(endRange, compactionFileInfo.getEndKey());
     assertEquals(columnFamily, compactionFileInfo.getColumnFamily());
+    assertFalse(compactionFileInfo.isPruned());
+
+    CompactionFileInfoProto unPrunedProtobuf = builder.setPruned(false).build();
+    CompactionFileInfo unPrunedCompactionFileInfo =
+        CompactionFileInfo.getFromProtobuf(unPrunedProtobuf);
+    assertFalse(unPrunedCompactionFileInfo.isPruned());
+
+    CompactionFileInfoProto prunedProtobuf = builder.setPruned(true).build();
+    CompactionFileInfo prunedCompactionFileInfo =
+        CompactionFileInfo.getFromProtobuf(prunedProtobuf);
+    assertTrue(prunedCompactionFileInfo.isPruned());
   }
 }

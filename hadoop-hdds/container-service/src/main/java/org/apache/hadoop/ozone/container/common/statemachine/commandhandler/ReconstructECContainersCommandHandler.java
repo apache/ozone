@@ -1,20 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -36,6 +36,7 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   private final ReplicationSupervisor supervisor;
   private final ECReconstructionCoordinator coordinator;
   private final ConfigurationSource conf;
+  private static final String METRIC_NAME = ECReconstructionCoordinatorTask.METRIC_NAME;
 
   public ReconstructECContainersCommandHandler(ConfigurationSource conf,
       ReplicationSupervisor supervisor,
@@ -46,14 +47,19 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     ReconstructECContainersCommand ecContainersCommand =
         (ReconstructECContainersCommand) command;
     ECReconstructionCommandInfo reconstructionCommandInfo =
         new ECReconstructionCommandInfo(ecContainersCommand);
-    this.supervisor.addTask(new ECReconstructionCoordinatorTask(
-        coordinator, reconstructionCommandInfo));
+    ECReconstructionCoordinatorTask task = new ECReconstructionCoordinatorTask(
+        coordinator, reconstructionCommandInfo);
+    this.supervisor.addTask(task);
+  }
+
+  public String getMetricsName() {
+    return METRIC_NAME;
   }
 
   @Override
@@ -63,23 +69,22 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return 0;
+    return (int) this.supervisor.getReplicationRequestCount(METRIC_NAME);
   }
 
   @Override
   public long getAverageRunTime() {
-    return 0;
+    return this.supervisor.getReplicationRequestAvgTime(METRIC_NAME);
   }
 
   @Override
   public long getTotalRunTime() {
-    return 0;
+    return this.supervisor.getReplicationRequestTotalTime(METRIC_NAME);
   }
 
   @Override
   public int getQueuedCount() {
-    return supervisor
-        .getInFlightReplications(ECReconstructionCoordinatorTask.class);
+    return (int) this.supervisor.getReplicationQueuedCount(METRIC_NAME);
   }
 
   public ConfigurationSource getConf() {

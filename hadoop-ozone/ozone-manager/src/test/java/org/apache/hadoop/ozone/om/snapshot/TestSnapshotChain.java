@@ -1,23 +1,43 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.common.collect.ImmutableMap;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -33,25 +53,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests SnapshotChain that stores in chronological order
@@ -92,7 +93,6 @@ public class TestSnapshotChain {
         .setPathPreviousSnapshotId(pathPrevID)
         .setGlobalPreviousSnapshotId(globalPrevID)
         .setSnapshotPath(String.join("/", "vol1", "bucket1"))
-        .setCheckpointDir("checkpoint.testdir")
         .build();
   }
 
@@ -168,6 +168,7 @@ public class TestSnapshotChain {
     }
 
     assertEquals(snapshotID3, chainManager.getLatestGlobalSnapshotId());
+    assertEquals(snapshotID1, chainManager.getOldestGlobalSnapshotId());
     assertEquals(snapshotID3, chainManager.getLatestPathSnapshotId(
         String.join("/", "vol1", "bucket1")));
 
@@ -285,6 +286,7 @@ public class TestSnapshotChain {
     assertFalse(chainManager.isSnapshotChainCorrupted());
     // check if snapshots loaded correctly from snapshotInfoTable
     assertEquals(snapshotID2, chainManager.getLatestGlobalSnapshotId());
+    assertEquals(snapshotID1, chainManager.getOldestGlobalSnapshotId());
     assertEquals(snapshotID2, chainManager.nextGlobalSnapshot(snapshotID1));
     assertEquals(snapshotID1, chainManager.previousPathSnapshot(String
         .join("/", "vol1", "bucket1"), snapshotID2));
@@ -303,6 +305,34 @@ public class TestSnapshotChain {
     assertEquals(snapshotID3, chainManager.getLatestGlobalSnapshotId());
     assertThrows(NoSuchElementException.class,
         () -> chainManager.nextGlobalSnapshot(snapshotID1));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 5, 10})
+  public void testSnapshotChainIterator(int numberOfSnapshots) throws IOException {
+    Table<String, SnapshotInfo> snapshotInfo = omMetadataManager.getSnapshotInfoTable();
+    List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
+
+    UUID prevSnapshotID = null;
+    long time = System.currentTimeMillis();
+    for (int i = 0; i < numberOfSnapshots; i++) {
+      UUID snapshotID = UUID.randomUUID();
+      SnapshotInfo snapInfo = createSnapshotInfo(snapshotID, prevSnapshotID,
+          prevSnapshotID, time++);
+      snapshotInfo.put(snapshotID.toString(), snapInfo);
+      prevSnapshotID = snapshotID;
+      snapshotInfoList.add(snapInfo);
+    }
+    chainManager = new SnapshotChainManager(omMetadataManager);
+    assertFalse(chainManager.isSnapshotChainCorrupted());
+    List<UUID> reverseChain = Lists.newArrayList(chainManager.iterator(true));
+    Collections.reverse(reverseChain);
+    List<UUID> forwardChain = Lists.newArrayList(chainManager.iterator(false));
+    List<UUID> expectedChain = snapshotInfoList.stream().map(SnapshotInfo::getSnapshotId).collect(Collectors.toList());
+    assertEquals(expectedChain, reverseChain);
+    assertEquals(expectedChain, forwardChain);
+    assertEquals(forwardChain, reverseChain);
+
   }
 
   private static Stream<? extends Arguments> invalidSnapshotChain() {

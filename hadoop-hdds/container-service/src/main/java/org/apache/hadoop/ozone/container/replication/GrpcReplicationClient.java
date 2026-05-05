@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,16 +17,15 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
@@ -35,11 +33,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -75,18 +70,18 @@ public class GrpcReplicationClient implements AutoCloseable {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port)
             .usePlaintext()
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+            .proxyDetector(uri -> null);
 
     if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       channelBuilder.useTransportSecurity();
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (certClient != null) {
-        KeyStoresFactory factory = certClient.getClientKeyStoresFactory();
         sslContextBuilder
-            .trustManager(factory.getTrustManagers()[0])
+            .trustManager(certClient.getTrustManager())
             .clientAuth(ClientAuth.REQUIRE)
-            .keyManager(factory.getKeyManagers()[0]);
+            .keyManager(certClient.getKeyManager());
       }
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");
@@ -165,15 +160,19 @@ public class GrpcReplicationClient implements AutoCloseable {
         Path outputPath) {
       this.response = response;
       this.containerId = containerId;
-      this.outputPath = outputPath;
+      this.outputPath = Objects.requireNonNull(outputPath, "outputPath == null");
+
+      final Path parentPath = this.outputPath.getParent();
+      if (parentPath == null) {
+        throw new NullPointerException("Output path has no parent: " + this.outputPath);
+      }
+
       try {
-        Preconditions.checkNotNull(outputPath, "Output path cannot be null");
-        Path parentPath = Preconditions.checkNotNull(outputPath.getParent());
         Files.createDirectories(parentPath);
-        stream = new FileOutputStream(outputPath.toFile());
+        stream = Files.newOutputStream(this.outputPath);
       } catch (IOException e) {
         throw new UncheckedIOException(
-            "Output path can't be used: " + outputPath, e);
+            "Output path can't be used: " + this.outputPath, e);
       }
     }
 

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,45 +17,47 @@
 
 package org.apache.ozone.test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
-
-import com.google.common.base.Preconditions;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.CharSequenceInputStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BooleanSupplier;
-import java.util.stream.Collectors;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
-import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
-  public static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
-  public static final String DEFAULT_TEST_DATA_DIR;
-  public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
+
   /**
    * Error string used in
    * {@link GenericTestUtils#waitFor(BooleanSupplier, int, int)}.
@@ -66,15 +67,7 @@ public abstract class GenericTestUtils {
   public static final String ERROR_INVALID_ARGUMENT =
       "Total wait time should be greater than check interval time";
 
-  public static final boolean WINDOWS =
-      System.getProperty("os.name").startsWith("Windows");
-
   private static final long NANOSECONDS_PER_MILLISECOND = 1_000_000;
-
-  static {
-    DEFAULT_TEST_DATA_DIR =
-        "target" + File.separator + "test" + File.separator + "data";
-  }
 
   /**
    * Return current time in millis as an {@code Instant}.  This may be
@@ -89,82 +82,22 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Get the (created) base directory for tests.
-   *
-   * @return the absolute directory
+   * Waits for a condition specified by the given {@code check} to return {@code true}.
+   * If the condition throws an exception, the operation would be retried assuming the condition didn't get satisfied.
+   * The condition will be checked initially and then at intervals specified by
+   * {@code checkEveryMillis}, until the total time exceeds {@code waitForMillis}.
+   * If the condition is not satisfied within the allowed time, a {@link TimeoutException}
+   * is thrown. If interrupted while waiting, an {@link InterruptedException} is thrown.
    */
-  public static File getTestDir() {
-    String prop =
-        System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_DIR);
-    if (prop.isEmpty()) {
-      // corner case: property is there but empty
-      prop = DEFAULT_TEST_DATA_DIR;
-    }
-    File dir = new File(prop).getAbsoluteFile();
-    assertDirCreation(dir);
-    return dir;
-  }
-
-  /**
-   * Get an uncreated directory for tests.
-   *
-   * @return the absolute directory for tests. Caller is expected to create it.
-   */
-  public static File getTestDir(String subdir) {
-    return new File(getTestDir(), subdir).getAbsoluteFile();
-  }
-
-  /**
-   * Get an uncreated directory for tests with a randomized alphanumeric
-   * name. This is likely to provide a unique path for tests run in parallel
-   *
-   * @return the absolute directory for tests. Caller is expected to create it.
-   */
-  public static File getRandomizedTestDir() {
-    return new File(getRandomizedTempPath());
-  }
-
-  /**
-   * Get a temp path. This may or may not be relative; it depends on what the
-   * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
-   * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
-   *
-   * @param subpath sub path, with no leading "/" character
-   * @return a string to use in paths
-   */
-  public static String getTempPath(String subpath) {
-    String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
-        : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
-
-    if (prop.isEmpty()) {
-      // corner case: property is there but empty
-      prop = DEFAULT_TEST_DATA_PATH;
-    }
-    if (!prop.endsWith("/")) {
-      prop = prop + "/";
-    }
-    return prop + subpath;
-  }
-
-  /**
-   * Get a temp path. This may or may not be relative; it depends on what the
-   * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
-   * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
-   *
-   * @return a string to use in paths
-   */
-  @SuppressWarnings("java:S2245") // no need for secure random
-  public static String getRandomizedTempPath() {
-    return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
-        + "-" + randomAlphanumeric(10));
-  }
-
-  /**
-   * Assert that a given dir can be created or it already exists.
-   */
-  public static void assertDirCreation(File f) {
-    Assertions.assertTrue(f.mkdirs() || f.exists(),
-        "Could not create dir " + f + ", nor does it exist");
+  public static <E extends Exception> void waitFor(CheckedSupplier<Boolean, E> check, int checkEveryMillis,
+      int waitForMillis) throws InterruptedException, TimeoutException {
+    waitFor((BooleanSupplier) () -> {
+      try {
+        return check.get();
+      } catch (Exception e) {
+        return false;
+      }
+    }, checkEveryMillis, waitForMillis);
   }
 
   /**
@@ -186,7 +119,7 @@ public abstract class GenericTestUtils {
    */
   public static void waitFor(BooleanSupplier check, int checkEveryMillis,
       int waitForMillis) throws TimeoutException, InterruptedException {
-    Preconditions.checkNotNull(check, ERROR_MISSING_ARGUMENT);
+    Objects.requireNonNull(check, ERROR_MISSING_ARGUMENT);
     Preconditions.checkArgument(waitForMillis >= checkEveryMillis,
         ERROR_INVALID_ARGUMENT);
 
@@ -205,6 +138,20 @@ public abstract class GenericTestUtils {
     }
   }
 
+  public static <T extends Throwable> T assertThrows(
+      Class<T> expectedType,
+      Callable<? extends AutoCloseable> func) {
+    return Assertions.assertThrows(expectedType, () -> {
+      final AutoCloseable closeable = func.call();
+      try {
+        if (closeable != null) {
+          closeable.close();
+        }
+      } catch (Exception ignored) {
+      }
+    });
+  }
+
   /**
    * @deprecated use sl4fj based version
    */
@@ -216,6 +163,22 @@ public abstract class GenericTestUtils {
   public static void setLogLevel(org.slf4j.Logger logger,
       org.slf4j.event.Level level) {
     setLogLevel(toLog4j(logger), Level.toLevel(level.toString()));
+  }
+
+  public static void setLogLevel(Class<?> clazz, org.slf4j.event.Level level) {
+    setLogLevel(LoggerFactory.getLogger(clazz), level);
+  }
+
+  public static void withLogDisabled(Class<?> clazz, Runnable task) {
+    org.slf4j.Logger logger = LoggerFactory.getLogger(clazz);
+    final Logger log4j = toLog4j(logger);
+    final Level level = log4j.getLevel();
+    setLogLevel(log4j, Level.OFF);
+    try {
+      task.run();
+    } finally {
+      setLogLevel(log4j, level);
+    }
   }
 
   public static <T> T mockFieldReflection(Object object, String fieldName)
@@ -262,21 +225,6 @@ public abstract class GenericTestUtils {
             .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 
-  /***
-   * Removed all files and dirs in the given dir recursively.
-   */
-  public static boolean deleteDirectory(File dir) {
-    File[] allContents = dir.listFiles();
-    if (allContents != null) {
-      for (File content : allContents) {
-        if (!deleteDirectory(content)) {
-          return false;
-        }
-      }
-    }
-    return dir.delete();
-  }
-
   /**
    * Class to capture logs for doing assertions.
    */
@@ -289,6 +237,10 @@ public abstract class GenericTestUtils {
 
     public static LogCapturer captureLogs(Logger logger, Layout layout) {
       return new Log4j1Capturer(logger, layout);
+    }
+
+    public static LogCapturer captureLogs(Class<?> clazz) {
+      return captureLogs(LoggerFactory.getLogger(clazz));
     }
 
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
@@ -314,6 +266,7 @@ public abstract class GenericTestUtils {
       writer().getBuffer().setLength(0);
     }
   }
+
   @Deprecated
   public static Logger toLog4j(org.slf4j.Logger logger) {
     return LogManager.getLogger(logger.getName());
@@ -323,44 +276,71 @@ public abstract class GenericTestUtils {
     return System.nanoTime() / NANOSECONDS_PER_MILLISECOND;
   }
 
-  /**
-   * Capture output printed to {@link System#err}.
-   * <p>
-   * Usage:
-   * <pre>
-   *   try (SystemErrCapturer capture = new SystemErrCapturer()) {
-   *     ...
-   *     // Call capture.getOutput() to get the output string
-   *   }
-   * </pre>
-   * <p>
-   * TODO: Add lambda support once Java 8 is common.
-   * <pre>
-   *   SystemErrCapturer.withCapture(capture -> {
-   *     ...
-   *   })
-   * </pre>
-   */
-  public static class SystemErrCapturer implements AutoCloseable {
+  public static PrintStreamCapturer captureOut() {
+    return new SystemOutCapturer();
+  }
+
+  public static PrintStreamCapturer captureErr() {
+    return new SystemErrCapturer();
+  }
+
+  /** Capture contents of a {@code PrintStream}, until {@code close()}d. */
+  public abstract static class PrintStreamCapturer implements AutoCloseable, Supplier<String> {
     private final ByteArrayOutputStream bytes;
     private final PrintStream bytesPrintStream;
-    private final PrintStream oldErr;
+    private final PrintStream old;
+    private final Consumer<PrintStream> restore;
 
-    public SystemErrCapturer() throws UnsupportedEncodingException {
+    protected PrintStreamCapturer(PrintStream out, Consumer<PrintStream> install) {
+      old = out;
       bytes = new ByteArrayOutputStream();
-      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
-      oldErr = System.err;
-      System.setErr(new TeePrintStream(oldErr, bytesPrintStream));
+      try {
+        bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
+        install.accept(new TeePrintStream(out, bytesPrintStream));
+        restore = install;
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalStateException(e);
+      }
     }
 
-    public String getOutput() throws UnsupportedEncodingException {
-      return bytes.toString(UTF_8.name());
+    @Override
+    public String get() {
+      return getOutput();
+    }
+
+    public String getOutput() {
+      try {
+        return bytes.toString(UTF_8.name());
+      } catch (UnsupportedEncodingException e) {
+        throw new IllegalStateException(e);
+      }
+    }
+
+    public void reset() {
+      bytes.reset();
     }
 
     @Override
     public void close() throws Exception {
       IOUtils.closeQuietly(bytesPrintStream);
-      System.setErr(oldErr);
+      restore.accept(old);
+    }
+  }
+
+  /**
+   * Capture output printed to {@link System#err}.
+   * <p>
+   * Usage:
+   * <pre>
+   *   try (PrintStreamCapturer capture = captureErr()) {
+   *     ...
+   *     // Call capture.getOutput() to get the output string
+   *   }
+   * </pre>
+   */
+  public static class SystemErrCapturer extends PrintStreamCapturer {
+    public SystemErrCapturer() {
+      super(System.err, System::setErr);
     }
   }
 
@@ -369,41 +349,29 @@ public abstract class GenericTestUtils {
    * <p>
    * Usage:
    * <pre>
-   *   try (SystemOutCapturer capture = new SystemOutCapturer()) {
+   *   try (PrintStreamCapturer capture = captureOut()) {
    *     ...
    *     // Call capture.getOutput() to get the output string
    *   }
    * </pre>
-   * <p>
-   * TODO: Add lambda support once Java 8 is common.
-   * <pre>
-   *   SystemOutCapturer.withCapture(capture -> {
-   *     ...
-   *   })
-   * </pre>
    */
-  public static class SystemOutCapturer implements AutoCloseable {
-    private final ByteArrayOutputStream bytes;
-    private final PrintStream bytesPrintStream;
-    private final PrintStream oldOut;
-
-    public SystemOutCapturer() throws
-        UnsupportedEncodingException {
-      bytes = new ByteArrayOutputStream();
-      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
-      oldOut = System.out;
-      System.setOut(new TeePrintStream(oldOut, bytesPrintStream));
+  public static class SystemOutCapturer extends PrintStreamCapturer {
+    public SystemOutCapturer() {
+      super(System.out, System::setOut);
     }
+  }
 
-    public String getOutput() throws UnsupportedEncodingException {
-      return bytes.toString(UTF_8.name());
-    }
-
-    @Override
-    public void close() throws Exception {
-      IOUtils.closeQuietly(bytesPrintStream);
-      System.setOut(oldOut);
-    }
+  /**
+   * Replaces {@link System#in} with a stream that provides {@code lines} as input.
+   * @return an {@code AutoCloseable} to restore the original {@link System#in} stream
+   */
+  public static AutoCloseable supplyOnSystemIn(String... lines) {
+    final InputStream original = System.in;
+    final InputStream in = CharSequenceInputStream.builder()
+        .setCharSequence(String.join("\n", lines))
+        .get();
+    System.setIn(in);
+    return () -> System.setIn(original);
   }
 
   /**
@@ -475,8 +443,8 @@ public abstract class GenericTestUtils {
      * This method provides the modifiers field using reflection approach which is compatible
      * for both pre Java 9 and post java 9 versions.
      * @return modifiers field
-     * @throws IllegalAccessException
-     * @throws NoSuchFieldException
+     * @throws IllegalAccessException illegalAccessException,
+     * @throws NoSuchFieldException noSuchFieldException.
      */
     public static Field getModifiersField() throws IllegalAccessException, NoSuchFieldException {
       Field modifiersField = null;

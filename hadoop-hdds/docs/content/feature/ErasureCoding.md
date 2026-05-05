@@ -31,7 +31,7 @@ approach which is expensive. The Apache Ozone supports `RATIS/THREE` replication
 The Ozone default replication scheme `RATIS/THREE` has 200% overhead in storage
 space and other resources (e.g., network bandwidth).
 However, for warm and cold datasets with relatively low I/O activities, additional
-block replicas rarely accessed during normal operations, but still consume the same
+block replicas are rarely accessed during normal operations, but still consume the same
 amount of resources as the first replica.
 
 Therefore, a natural improvement is to use Erasure Coding (EC) in place of replication,
@@ -200,7 +200,7 @@ We can also reset the EC Replication Config with the following command.
 ozone sh bucket set-replication-config <bucket path> --type EC --replication rs-3-2-1024k
 ```
 
-Once we reset, only newly created keys take effect of this new setting. Prior created keys in the bucket stay with same older setting.
+Once we reset, only newly created keys will take effect of this new setting. Prior created keys in the bucket stay with same older setting.
 
 #### Setting EC Replication Config While Creating Keys/Files
 
@@ -228,6 +228,41 @@ When using ofs/o3fs, we can pass the EC Replication Config by setting the config
 
 In the case bucket already has default EC Replication Config, there is no need of passing EC Replication Config while creating key.
 
+#### Calculating EC Pipeline Limits
+
+The target number of open EC pipelines SCM aims to maintain is calculated dynamically for each EC replication configuration (e.g., RS-6-3, RS-3-2). The calculation is based on the following two properties, with the final target being the greater of the two resulting values.
+
+*   `ozone.scm.ec.pipeline.minimum`
+    *   **Description**: The guaranteed minimum number of open pipelines to maintain for each EC configuration, regardless of other factors.
+    *   **Default Value**: `5`
+
+*   `ozone.scm.ec.pipeline.per.volume.factor`
+    *   **Description**: A factor used to calculate a target number of pipelines based on the total number of healthy volumes across all datanodes in the cluster.
+    *   **Default Value**: `1.0`
+
+**Calculation Logic:**
+
+SCM first calculates a volume-based target using the formula:
+`(<pipeline.per.volume.factor> * <total healthy volumes>) / <required nodes for EC config>`
+
+The final target number of pipelines is then determined by:
+`max(<volume-based target>, <pipeline.minimum>)`
+
+**Example:**
+
+Consider a cluster with **200 total healthy volumes** across all datanodes and an EC policy of **RS-6-3** (which requires 9 nodes).
+*   `ozone.scm.ec.pipeline.minimum` = **5** (default)
+*   `ozone.scm.ec.pipeline.per.volume.factor` = **1.0** (default)
+
+1.  The volume-based target is: `(1.0 * 200) / 9 = 22`
+2.  The final target is: `max(22, 5) = 22`
+
+SCM will attempt to create and maintain approximately **22** open, RS-6-3 EC pipelines.
+
+**Production Recommendation:**
+
+The default values are a good starting point for most clusters. If you have a very high number of volumes and a write-heavy EC workload, you might consider slightly increasing the `pipeline.per.volume.factor`. Conversely, for read-heavy workloads, the default minimum of 5 pipelines is often sufficient.
+
 ### Enable Intel ISA-L
 
 Intel Intelligent Storage Acceleration Library (ISA-L) is an open-source collection of optimized low-level functions used for
@@ -238,7 +273,7 @@ storage applications. Enabling ISA-L allows significantly improve EC performance
 To enable ISA-L you will also require Hadoop native libraries (libhadoop.so). 
 
 #### Installation
-Both libraries should be placed to the directory specified by the java.library.path property or set by  `LD_LIBRARY_PATH` environment variable.
+Both libraries should be placed in the directory specified by the java.library.path property or set by  `LD_LIBRARY_PATH` environment variable.
 The default value of java.library.path depends on the OS and Java version. For example, on Linux with OpenJDK 8 it is `/usr/java/packages/lib/amd64:/usr/lib64:/lib64:/lib:/usr/lib`.
 
 #### Verification
@@ -246,7 +281,7 @@ The default value of java.library.path depends on the OS and Java version. For e
 You can check if ISA-L is accessible to Ozone by running the following command:
 
 ```shell
-ozone checknative
+ozone debug checknative
 ```
 
 

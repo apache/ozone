@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
+import java.util.LinkedList;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -24,6 +27,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class is for maintaining StorageContainerManager statistics.
@@ -32,6 +36,9 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 public class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
+
+  private final LinkedList<String> ratisEvents = new LinkedList<>();
+  private final int maxRatisEvents;
 
   /**
    * Container stat metrics, the meaning of following metrics
@@ -59,14 +66,23 @@ public class SCMMetrics {
     return dbCheckpointMetrics;
   }
 
-  public SCMMetrics() {
+  public SCMMetrics(int maxRatisEvents) {
     dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics");
+    this.maxRatisEvents = maxRatisEvents;
   }
 
   public static SCMMetrics create() {
+    return create(null);
+  }
+
+  public static SCMMetrics create(ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
+    int maxRatisEvents = conf == null
+        ? ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
+        : conf.getInt(ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT,
+        ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
     return ms.register(SOURCE_NAME, "Storage Container Manager Metrics",
-        new SCMMetrics());
+        new SCMMetrics(maxRatisEvents));
   }
 
   public void setLastContainerReportSize(long size) {
@@ -153,6 +169,22 @@ public class SCMMetrics {
     this.containerReportWriteBytes.incr(-1 * deltaStat.getWriteBytes().get());
     this.containerReportReadCount.incr(-1 * deltaStat.getReadCount().get());
     this.containerReportWriteCount.incr(-1 * deltaStat.getWriteCount().get());
+  }
+
+  public void addRatisEvent(String event) {
+    synchronized (ratisEvents) {
+      if (ratisEvents.size() >= maxRatisEvents) {
+        ratisEvents.removeFirst();
+      }
+      ratisEvents.add(Time.formatTime(Time.now()) + "|" + event);
+    }
+  }
+
+  @Metric("Ratis state machine events")
+  public String getRatisEvents() {
+    synchronized (ratisEvents) {
+      return String.join("\n", ratisEvents);
+    }
   }
 
   public void unRegister() {

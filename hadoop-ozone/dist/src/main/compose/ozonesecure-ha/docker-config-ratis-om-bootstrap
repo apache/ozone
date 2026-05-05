@@ -18,3 +18,8 @@ OZONE-SITE.XML_ozone.om.ratis.log.purge.gap=50
 OZONE-SITE.XML_ozone.om.ratis.segment.size=16KB
 OZONE-SITE.XML_ozone.om.ratis.segment.preallocated.size=16KB
 OZONE-SITE.XML_ozone.om.ratis.snapshot.auto.trigger.threshold=500
+
+OZONE-SITE.XML_ozone.om.nodes.omservice=om1,om2,om3,om4
+OZONE-SITE.XML_ozone.om.address.omservice.om4=om4
+OZONE-SITE.XML_ozone.om.http-address.omservice.om4=om4
+OZONE-SITE.XML_ozone.om.listener.nodes.omservice=om4

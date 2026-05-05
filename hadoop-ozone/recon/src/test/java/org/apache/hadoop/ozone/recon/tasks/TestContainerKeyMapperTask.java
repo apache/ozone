@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,25 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
-
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -47,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -67,7 +65,6 @@ public class TestContainerKeyMapperTask {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
   private OzoneConfiguration omConfiguration;
 
   private static final String FSO_KEY_NAME = "dir1/file7";
@@ -85,7 +82,7 @@ public class TestContainerKeyMapperTask {
   public void setUp() throws Exception {
     omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.resolve("JunitOmDBDir").toFile());
-    ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.resolve("JunitOmMetadataDir").toFile());
     omConfiguration = new OzoneConfiguration();
@@ -99,6 +96,10 @@ public class TestContainerKeyMapperTask {
             .build();
     reconContainerMetadataManager =
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
+    
+    // Clear shared container count map and reset flags for clean test state
+    ContainerKeyMapperHelper.clearSharedContainerCountMap();
+    ReconConstants.resetTableTruncatedFlags();
   }
 
   @Test
@@ -135,10 +136,10 @@ public class TestContainerKeyMapperTask {
         VOLUME_NAME,
         Collections.singletonList(omKeyLocationInfoGroup));
 
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);
@@ -208,10 +209,10 @@ public class TestContainerKeyMapperTask {
         KEY_ONE_SIZE);
 
     // Reprocess container key mappings
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager);
 
     // Check the key prefixes for container 1
     keyPrefixesForContainer =
@@ -315,12 +316,12 @@ public class TestContainerKeyMapperTask {
         ArrayList<OMDBUpdateEvent>() {{
           add(keyEvent1);
           add(keyEvent2);
-        }});
+        }}, 0L);
 
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager,
             omConfiguration);
-    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -339,7 +340,7 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(3L));
 
     // Process PUT & DELETE event.
-    containerKeyMapperTask.process(omUpdateEventBatch);
+    containerKeyMapperTaskOBS.process(omUpdateEventBatch, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -387,8 +388,8 @@ public class TestContainerKeyMapperTask {
         new OmKeyLocationInfoGroup(0L, omKeyLocationInfoList);
 
     // Reprocess container key mappings
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager,
             omConfiguration);
 
     String bucket = BUCKET_NAME;
@@ -427,10 +428,10 @@ public class TestContainerKeyMapperTask {
             add(keyEvent1);
             add(keyEvent2);
           }
-        });
+        }, 0L);
 
     // Process PUT event for both the keys
-    containerKeyMapperTask.process(omUpdateEventBatch);
+    containerKeyMapperTaskFSO.process(omUpdateEventBatch, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -460,10 +461,10 @@ public class TestContainerKeyMapperTask {
           {
             add(keyEvent3);
           }
-        });
+        }, 0L);
 
     // Process DELETE event for key2
-    containerKeyMapperTask.process(omUpdateEventBatch2);
+    containerKeyMapperTaskFSO.process(omUpdateEventBatch2, Collections.emptyMap());
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(1);
@@ -473,6 +474,122 @@ public class TestContainerKeyMapperTask {
     firstKeyPrefix = iterator.next();
     assertEquals("/" + VOLUME_NAME + "/" + BUCKET_NAME + "/" + INSERTED_KEY,
         firstKeyPrefix.getKeyPrefix());
+  }
+
+  @Test
+  public void testDuplicateFSOKeysInDifferentDirectories() throws Exception {
+    // Ensure container 1 is initially empty.
+    Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
+        reconContainerMetadataManager.getKeyPrefixesForContainer(1L);
+    assertThat(keyPrefixesForContainer).isEmpty();
+
+    Pipeline pipeline = getRandomPipeline();
+    // Create a common OmKeyLocationInfoGroup for all keys.
+    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+    BlockID blockID = new BlockID(1L, 1L);
+    OmKeyLocationInfo omKeyLocationInfo = getOmKeyLocationInfo(blockID, pipeline);
+    omKeyLocationInfoList.add(omKeyLocationInfo);
+    OmKeyLocationInfoGroup omKeyLocationInfoGroup =
+        new OmKeyLocationInfoGroup(0L, omKeyLocationInfoList);
+
+    // Define file names.
+    String file1Key = "file1";
+    String file2Key = "file2";
+
+    // Define directory (parent) object IDs with shorter values.
+    long dir1Id = -101L;
+    long dir2Id = -102L;
+    long dir3Id = -103L;
+
+    // Write three FSO keys for "file1" with different parent object IDs.
+    writeKeyToOm(reconOMMetadataManager,
+        file1Key,                // keyName
+        BUCKET_NAME,             // bucketName
+        VOLUME_NAME,             // volName
+        file1Key,                // fileName
+        KEY_ONE_OBJECT_ID,       // objectId
+        dir1Id,                  // ObjectId for first directory
+        BUCKET_ONE_OBJECT_ID,    // bucketObjectId
+        VOL_OBJECT_ID,           // volumeObjectId
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        file1Key,
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file1Key,
+        KEY_ONE_OBJECT_ID,
+        dir2Id,            // ObjectId for second directory
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        file1Key,
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file1Key,
+        KEY_ONE_OBJECT_ID,
+        dir3Id,            // ObjectId for third directory
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    // Write three FSO keys for "file2" with different parent object IDs.
+    writeKeyToOm(reconOMMetadataManager,
+        "fso-file2",
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file2Key,
+        KEY_ONE_OBJECT_ID,
+        dir1Id,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        "fso-file2",
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file2Key,
+        KEY_ONE_OBJECT_ID,
+        dir2Id,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    writeKeyToOm(reconOMMetadataManager,
+        "fso-file2",
+        BUCKET_NAME,
+        VOLUME_NAME,
+        file2Key,
+        KEY_ONE_OBJECT_ID,
+        dir3Id,
+        BUCKET_ONE_OBJECT_ID,
+        VOL_OBJECT_ID,
+        Collections.singletonList(omKeyLocationInfoGroup),
+        BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        KEY_ONE_SIZE);
+
+    // Reprocess container key mappings.
+    ContainerKeyMapperTaskFSO containerKeyMapperTask =
+        new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration);
+    containerKeyMapperTask.reprocess(reconOMMetadataManager);
+
+    // With our changes using the raw key prefix as the unique identifier,
+    // we expect six distinct entries in container 1.
+    keyPrefixesForContainer = reconContainerMetadataManager.getKeyPrefixesForContainer(1L);
+    assertEquals(6, keyPrefixesForContainer.size());
   }
 
   private OmKeyInfo buildOmKeyInfo(String volume,

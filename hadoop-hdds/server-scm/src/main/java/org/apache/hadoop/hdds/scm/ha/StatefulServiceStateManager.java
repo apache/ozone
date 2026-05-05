@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,16 +18,16 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.ByteString;
+import java.io.IOException;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
-
-import java.io.IOException;
 
 /**
  * This interface defines an API for saving and reading configurations of a
  * {@link StatefulService}.
  */
-public interface StatefulServiceStateManager {
+public interface StatefulServiceStateManager extends SCMHandler {
 
   /**
    * Persists the specified configurations bytes to RocksDB and replicates
@@ -67,4 +66,9 @@ public interface StatefulServiceStateManager {
    * {@link org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore}
    */
   void reinitialize(Table<String, ByteString> statefulServiceConfig);
+
+  @Override
+  default RequestType getType() {
+    return RequestType.STATEFUL_SERVICE_CONFIG;
+  }
 }

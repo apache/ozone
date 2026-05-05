@@ -1,34 +1,34 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.ha;
+
+import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.base.Preconditions;
-import com.google.protobuf.InvalidProtocolBufferException;
+import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -42,8 +42,8 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 
 /**
@@ -95,7 +95,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   @Override
   public void close() {
-    IOUtils.closeQuietly(transactionBuffer);
+    IOUtils.closeQuietly(transactionBuffer::close);
   }
 
   /**
@@ -140,7 +140,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
   }
 
   @Override
-  public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+  public boolean removeSCM(RemoveSCMRequest request) {
     return false;
   }
 
@@ -170,6 +170,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
     private Map<RequestType, Object> handlers =
         new EnumMap<>(RequestType.class);
 
+    private Map<RequestType, ScmInvoker<?>> invokers =
+        new EnumMap<>(RequestType.class);
+
+    private RaftPeerId leaderId = RaftPeerId.valueOf(UUID.randomUUID().toString());
+
     @Override
     public void start() {
     }
@@ -177,7 +182,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
     @Override
     public void registerStateMachineHandler(final RequestType handlerType,
         final Object handler) {
-      handlers.put(handlerType, handler);
+      if (handler instanceof ScmInvoker) {
+        invokers.put(handlerType, (ScmInvoker<?>) handler);
+      } else {
+        handlers.put(handlerType, handler);
+      }
     }
 
     @Override
@@ -215,26 +224,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     private Message process(final SCMRatisRequest request) throws Exception {
-      try {
-        final Object handler = handlers.get(request.getType());
-
-        if (handler == null) {
-          throw new IOException(
-              "No handler found for request type " + request.getType());
-        }
-
-        final Object result = handler.getClass()
-            .getMethod(request.getOperation(),
-                request.getParameterTypes())
-            .invoke(handler, request.getArguments());
-
-        return SCMRatisResponse.encode(result);
-      } catch (NoSuchMethodException | SecurityException ex) {
-        throw new InvalidProtocolBufferException(ex.getMessage());
-      } catch (InvocationTargetException e) {
-        final Throwable target = e.getTargetException();
-        throw target instanceof Exception ? (Exception) target : e;
+      final ScmInvoker<?> invoker = invokers.get(request.getType());
+      if (invoker != null) {
+        return invoker.invokeLocal(request.getOperation(), request.getArguments());
       }
+      return SCMStateMachine.process(request, handlers.get(request.getType()));
     }
 
     @Override
@@ -270,18 +264,23 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     @Override
-    public boolean addSCM(AddSCMRequest request) throws IOException {
+    public boolean addSCM(AddSCMRequest request) {
       return false;
     }
 
     @Override
-    public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+    public boolean removeSCM(RemoveSCMRequest request) {
       return false;
     }
 
     @Override
     public GrpcTlsConfig getGrpcTlsConfig() {
       return null;
+    }
+
+    @Override
+    public RaftPeerId getLeaderId() {
+      return leaderId;
     }
   }
 }

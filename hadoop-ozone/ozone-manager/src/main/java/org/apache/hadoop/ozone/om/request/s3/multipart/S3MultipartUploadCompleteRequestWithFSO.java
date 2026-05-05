@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,14 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -32,26 +39,12 @@ import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadComplet
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
 
 /**
  * Handle Multipart upload complete request.
  */
 public class S3MultipartUploadCompleteRequestWithFSO
         extends S3MultipartUploadCompleteRequest {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(S3MultipartUploadCompleteRequestWithFSO.class);
 
   public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -96,16 +89,15 @@ public class S3MultipartUploadCompleteRequestWithFSO
   protected void addMultiPartToCache(
       OMMetadataManager omMetadataManager, String multipartOpenKey,
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO, OmKeyInfo omKeyInfo,
-      long transactionLogIndex
+      String keyName, long transactionLogIndex
   ) throws IOException {
 
     // Add multi part to cache
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-        multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
-        transactionLogIndex);
+        multipartOpenKey, omKeyInfo,
+        keyName, transactionLogIndex);
 
   }
-
 
   @Override
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneFileKey,
@@ -129,14 +121,6 @@ public class S3MultipartUploadCompleteRequestWithFSO
     // Add key entry to file table.
     OMFileRequest.addFileTableCacheEntry(omMetadataManager, ozoneKey, omKeyInfo,
         omKeyInfo.getFileName(), transactionLogIndex);
-  }
-
-  @Override
-  protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
-                                     OmKeyInfo.Builder builder) {
-    // updates parentID and fileName
-    builder.setParentObjectID(dbOpenKeyInfo.getParentObjectID());
-    builder.setFileName(dbOpenKeyInfo.getFileName());
   }
 
   @Override

@@ -76,10 +76,6 @@
     <value>0</value>
   </property>
   <property>
-    <name>ozone.scm.ratis.enable</name>
-    <value>false</value>
-  </property>
-  <property>
     <name>hdds.container.report.interval</name>
     <value>60m</value>
   </property>

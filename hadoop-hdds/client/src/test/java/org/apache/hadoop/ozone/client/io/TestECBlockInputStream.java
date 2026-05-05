@@ -1,22 +1,38 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.EOFException;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -35,22 +51,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.io.EOFException;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for ECBlockInputStream.
@@ -555,6 +556,48 @@ public class TestECBlockInputStream {
     }
   }
 
+  @Test
+  @Timeout(value = 5, unit = TimeUnit.SECONDS)
+  public void testZeroByteReadThrowsBadDataLocationException() throws Exception {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, ONEMB);
+    Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
+      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+    }
+
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 8 * ONEMB, datanodes);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
+
+    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
+        keyInfo, null, null, streamFactory, clientConfig)) {
+
+      // Read a full stripe first to initialize and create streams in the factory
+      ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
+      int read = ecb.read(buf);
+      assertEquals(3 * ONEMB, read);
+
+      // Simulate the Bug: Force the underlying stream to return 0 bytes (Short Read).
+      // Note: If the test stub `TestBlockInputStream` does not currently have
+      // a method to simulate a 0-byte read, you should add a simple boolean flag
+      // like `simulateZeroByteRead` to that stub class, making its read() return 0.
+      streamFactory.getBlockStreams().get(0).setSimulateZeroByteRead(true);
+
+      buf.clear();
+
+      // Assert that instead of spinning infinitely, the short read (0 bytes)
+      // immediately triggers the strict validation and throws BadDataLocationException.
+      // This exception is essential for the Proxy to initiate the Failover to Reconstruction.
+      BadDataLocationException e = assertThrows(BadDataLocationException.class, () -> ecb.read(buf));
+      List<DatanodeDetails> failed = e.getFailedLocations();
+
+      // Expect exactly 1 DN reported as failure due to the inconsistent read
+      assertEquals(1, failed.size());
+      // The failure should map to index = 1 (stream 0)
+      assertEquals(1, datanodes.get(failed.get(0)));
+    }
+  }
+
   private void validateBufferContents(ByteBuffer buf, int from, int to,
       byte val) {
     for (int i = from; i < to; i++) {
@@ -571,6 +614,7 @@ public class TestECBlockInputStream {
       return blockStreams;
     }
 
+    @Override
     public synchronized BlockExtendedInputStream create(
         ReplicationConfig repConfig, BlockLocationInfo blockInfo,
         Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
@@ -593,6 +637,7 @@ public class TestECBlockInputStream {
     private BlockID blockID;
     private long length;
     private boolean throwException = false;
+    private boolean simulateZeroByteRead = false;
     private static final byte EOF = -1;
 
     @SuppressWarnings("checkstyle:parameternumber")
@@ -608,6 +653,10 @@ public class TestECBlockInputStream {
 
     public void setThrowException(boolean shouldThrow) {
       this.throwException = shouldThrow;
+    }
+
+    public void setSimulateZeroByteRead(boolean simulateZeroByteRead) {
+      this.simulateZeroByteRead = simulateZeroByteRead;
     }
 
     @Override
@@ -636,13 +685,17 @@ public class TestECBlockInputStream {
         throw new IOException("Simulated exception");
       }
 
+      if (simulateZeroByteRead) {
+        return 0;
+      }
+
       int toRead = Math.min(buf.remaining(), (int)getRemaining());
       for (int i = 0; i < toRead; i++) {
         buf.put(dataVal);
       }
       position += toRead;
       return toRead;
-    };
+    }
 
     @Override
     protected int readWithStrategy(ByteReaderStrategy strategy) throws

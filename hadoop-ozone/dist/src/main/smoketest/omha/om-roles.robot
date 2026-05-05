@@ -17,6 +17,7 @@
 Documentation       Smoke test for listing om roles.
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Keywords ***
@@ -28,6 +29,9 @@ Assert Leader Present in JSON
      [Arguments]                     ${output}
      ${leader} =                     Execute                        echo '${output}' | jq '.[] | select(.[] | .serverRole == "LEADER")'
                                      Should Not Be Equal            ${leader}       ${EMPTY}
+Assert Leader Present in TABLE
+     [Arguments]                     ${output}
+     Should Match Regexp             ${output}                      \\|.*LEADER.*
 
 *** Test Cases ***
 List om roles with OM service ID passed
@@ -52,4 +56,16 @@ List om roles as JSON without OM service ID passed
     ${output_without_id_passed} =   Execute                         ozone admin om roles --json
                                     Assert Leader Present in JSON   ${output_without_id_passed}
     ${output_without_id_passed} =   Execute And Ignore Error        ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --json
+                                    Should Contain                  ${output_without_id_passed}      no Ozone Manager service ID specified
+
+List om roles as TABLE with OM service ID passed
+    ${output_with_id_passed} =      Execute                         ozone admin om roles --service-id=omservice --table
+                                    Assert Leader Present in TABLE  ${output_with_id_passed}
+    ${output_with_id_passed} =      Execute                         ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --service-id=omservice --table
+                                    Assert Leader Present in TABLE  ${output_with_id_passed}
+
+List om roles as TABLE without OM service ID passed
+    ${output_without_id_passed} =   Execute                         ozone admin om roles --table
+                                    Assert Leader Present in TABLE  ${output_without_id_passed}
+    ${output_without_id_passed} =   Execute And Ignore Error        ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --table
                                     Should Contain                  ${output_without_id_passed}      no Ozone Manager service ID specified

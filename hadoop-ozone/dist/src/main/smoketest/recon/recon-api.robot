@@ -21,6 +21,7 @@ Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${ENDPOINT_URL}       http://recon:9888
@@ -28,6 +29,8 @@ ${API_ENDPOINT_URL}   ${ENDPOINT_URL}/api/v1
 ${ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers
 ${UNHEALTHY_ENDPOINT_URL}   ${API_ENDPOINT_URL}/containers/unhealthy
 ${NON_ADMIN_API_ENDPOINT_URL}   ${API_ENDPOINT_URL}/clusterState
+${VOLUME}     vol1
+${BUCKET}     bucket1
 
 *** Keywords ***
 Check if Recon picks up container from OM
@@ -57,6 +60,15 @@ Check http return code
                             Should contain      ${result}       200
                         END
 
+Check if the listKeys api responds OK
+    [Arguments]     ${volume}    ${bucket}
+    Run Keyword if     '${SECURITY_ENABLED}' == 'true'     Kinit as ozone admin
+    ${result} =        Execute         curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/keys/listKeys?startPrefix=/${volume}/${bucket}&limit=1000
+    Should contain  ${result}   "OK"
+    Should contain  ${result}   "keys"
+    Should contain  ${result}   "${volume}"
+    Should contain  ${result}   "${bucket}"
+
 *** Test Cases ***
 Check if Recon picks up OM data
     Execute    ozone sh volume create recon
@@ -67,6 +79,7 @@ Check if Recon picks up OM data
     Execute    ozone sh bucket create recon/api --layout=LEGACY
     Freon OCKG    n=10    args=-s 1025 -v recon -b api
     Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container from OM
+    Wait Until Keyword Succeeds     90sec      10sec        Check if the listKeys api responds OK       recon   api
 
 Check if Recon picks up DN heartbeats
     ${result} =         Execute                             curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/datanodes

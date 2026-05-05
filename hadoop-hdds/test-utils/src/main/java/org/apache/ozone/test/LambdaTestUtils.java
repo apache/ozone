@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,11 +18,12 @@
 package org.apache.ozone.test;
 
 import com.google.common.base.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class to make the most of Lambda expressions in Ozone tests.
@@ -37,13 +37,13 @@ import java.util.concurrent.TimeoutException;
  * with jitter: test author gets to choose).
  */
 public final class LambdaTestUtils {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(LambdaTestUtils.class);
+
+  private static final Logger LOG = LoggerFactory.getLogger(LambdaTestUtils.class);
+
+  public static final String NULL_RESULT = "(null)";
 
   private LambdaTestUtils() {
   }
-
-  public static final String NULL_RESULT = "(null)";
 
   /**
    * Interface to implement for converting a timeout into some form
@@ -77,11 +77,13 @@ public final class LambdaTestUtils {
    * is called. This returns the exception passed in (if any),
    * or generates a new one.
    * <pre>
+   * {@code
    * await(
    *   30 * 1000,
    *   () -> { return 0 == filesystem.listFiles(new Path("/")).length); },
    *   () -> 500),
    *   (timeout, ex) -> ex != null ? ex : new TimeoutException("timeout"));
+   * }
    * </pre>
    *
    * @param timeoutMillis timeout in milliseconds.
@@ -103,9 +105,9 @@ public final class LambdaTestUtils {
       throws Exception {
     Preconditions.checkArgument(timeoutMillis >= 0,
         "timeoutMillis must be >= 0");
-    Preconditions.checkNotNull(timeoutHandler);
+    Objects.requireNonNull(timeoutHandler, "timeoutHandler == null");
 
-    final long endTime = System.currentTimeMillis() + timeoutMillis;
+    final long endTime = Time.monotonicNow() + timeoutMillis;
     Throwable ex = null;
     boolean running = true;
     int iterations = 0;
@@ -126,7 +128,7 @@ public final class LambdaTestUtils {
         LOG.debug("await() iteration {}", iterations, e);
         ex = e;
       }
-      running = System.currentTimeMillis() < endTime;
+      running = Time.monotonicNow() < endTime;
       if (running) {
         int sleeptime = retry.call();
         if (sleeptime >= 0) {
@@ -160,9 +162,11 @@ public final class LambdaTestUtils {
    * <p>
    * Example: await for probe to succeed:
    * <pre>
+   * {@code
    * await(
    *   30 * 1000, 500,
    *   () -> { return 0 == filesystem.listFiles(new Path("/")).length); });
+   * }
    * </pre>
    *
    * @param timeoutMillis timeout in milliseconds.
@@ -219,42 +223,6 @@ public final class LambdaTestUtils {
         LOG.info("Exception calling toString()", e);
         return o.getClass().toString();
       }
-    }
-  }
-
-  /**
-   * Invoke a callable; wrap all checked exceptions with an
-   * AssertionError.
-   * @param closure closure to execute
-   * @param <T> return type of closure
-   * @return the value of the closure
-   * @throws AssertionError if the operation raised an IOE or
-   * other checked exception.
-   */
-  public static <T> T eval(Callable<T> closure) {
-    try {
-      return closure.call();
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new AssertionError(e.toString(), e);
-    }
-  }
-
-  /**
-   * Invoke a callable; wrap all checked exceptions with an
-   * AssertionError.
-   * @param closure closure to execute
-   * @throws AssertionError if the operation raised an IOE or
-   * other checked exception.
-   */
-  public static void eval(VoidCallable closure) {
-    try {
-      closure.call();
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new AssertionError(e.toString(), e);
     }
   }
 
@@ -318,9 +286,9 @@ public final class LambdaTestUtils {
     public String toString() {
       final StringBuilder sb = new StringBuilder(
           "FixedRetryInterval{");
-      sb.append("interval=").append(intervalMillis);
-      sb.append(", invocationCount=").append(invocationCount);
-      sb.append('}');
+      sb.append("interval=").append(intervalMillis)
+          .append(", invocationCount=").append(invocationCount)
+          .append('}');
       return sb.toString();
     }
   }

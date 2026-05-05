@@ -12,26 +12,25 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds</artifactId>
-        <version>1.5.0-SNAPSHOT</version>
-    </parent>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
+    <version>2.2.0-SNAPSHOT</version>
+  </parent>
 
-    <artifactId>hdds-crypto-default</artifactId>
-    <version>1.5.0-SNAPSHOT</version>
-    <description>Default implementation of Apache Ozone Distributed Data Store's cryptographic functions</description>
-    <name>Apache Ozone HDDS Crypto - Default</name>
+  <artifactId>hdds-crypto-default</artifactId>
+  <version>2.2.0-SNAPSHOT</version>
+  <name>Apache Ozone HDDS Crypto - Default</name>
+  <description>Default implementation of Apache Ozone Distributed Data Store's cryptographic functions</description>
 
-    <properties>
-        <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
-    </properties>
+  <properties>
+    <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
+  </properties>
 
-    <dependencies>
+  <dependencies>
 
-    </dependencies>
+  </dependencies>
 </project>

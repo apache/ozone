@@ -1,27 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container;
 
+import static java.lang.Math.max;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -29,11 +34,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import static java.lang.Math.max;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.ratis.util.Preconditions;
 
 /**
@@ -46,11 +46,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   private static final Codec<ContainerInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(HddsProtos.ContainerInfoProto.getDefaultInstance()),
       ContainerInfo::fromProtobuf,
-      ContainerInfo::getProtobuf);
-
-  public static Codec<ContainerInfo> getCodec() {
-    return CODEC;
-  }
+      ContainerInfo::getProtobuf,
+      ContainerInfo.class);
 
   private HddsProtos.LifeCycleState state;
   // The wall-clock ms since the epoch at which the current state enters.
@@ -89,6 +86,9 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
   private long sequenceId;
+  // Health state of the container (determined by ReplicationManager)
+  private ContainerHealthState healthState;
+  private boolean suppressed;
 
   private ContainerInfo(Builder b) {
     containerID = ContainerID.valueOf(b.containerID);
@@ -103,6 +103,12 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     sequenceId = b.sequenceId;
     replicationConfig = b.replicationConfig;
     clock = b.clock;
+    healthState = b.healthState != null ? b.healthState : ContainerHealthState.HEALTHY;
+    suppressed = b.suppressed;
+  }
+
+  public static Codec<ContainerInfo> getCodec() {
+    return CODEC;
   }
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
@@ -118,8 +124,11 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setContainerID(info.getContainerID())
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationConfig(config)
-        .setSequenceId(info.getSequenceId())
-        .build();
+        .setSequenceId(info.getSequenceId());
+
+    if (info.hasSuppressed()) {
+      builder.setSuppressed(info.getSuppressed());
+    }
 
     if (info.hasPipelineID()) {
       builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));
@@ -243,6 +252,44 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     lastUsed = clock.instant();
   }
 
+  /**
+   * Get the health state of the container.
+   *
+   * @return ContainerHealthState
+   */
+  public ContainerHealthState getHealthState() {
+    return healthState;
+  }
+
+  /**
+   * Set the health state of the container.
+   *
+   * @param newHealthState The new health state
+   */
+  public void setHealthState(ContainerHealthState newHealthState) {
+    this.healthState = newHealthState;
+  }
+
+  /**
+   * Check if container is suppressed.
+   * Only included in JSON output when true.
+   *
+   * @return boolean
+   */
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+  public boolean isSuppressed() {
+    return suppressed;
+  }
+
+  /**
+   * Set the boolean for suppressed.
+   *
+   * @param suppressed checks if container is suppressed or not
+   */
+  public void setSuppressed(boolean suppressed) {
+    this.suppressed = suppressed;
+  }
+
   @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
@@ -251,7 +298,6 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setUsedBytes(getUsedBytes())
         .setNumberOfKeys(getNumberOfKeys()).setState(getState())
         .setStateEnterTime(getStateEnterTime().toEpochMilli())
-        .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setOwner(getOwner())
         .setSequenceId(getSequenceId())
@@ -265,11 +311,14 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
           ReplicationConfig.getLegacyFactor(replicationConfig));
     }
 
-    builder.setReplicationType(replicationConfig.getReplicationType());
-
     if (getPipelineID() != null) {
       builder.setPipelineID(getPipelineID().getProtobuf());
     }
+
+    if (suppressed) {
+      builder.setSuppressed(true);
+    }
+
     return builder.build();
   }
 
@@ -371,6 +420,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     private long sequenceId;
     private PipelineID pipelineID;
     private ReplicationConfig replicationConfig;
+    private ContainerHealthState healthState;
+    private boolean suppressed;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
@@ -420,6 +471,16 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     public Builder setSequenceId(long sequenceID) {
       this.sequenceId = sequenceID;
+      return this;
+    }
+
+    public Builder setHealthState(ContainerHealthState healthState) {
+      this.healthState = healthState;
+      return this;
+    }
+
+    public Builder setSuppressed(boolean suppressed) {
+      this.suppressed = suppressed;
       return this;
     }
 

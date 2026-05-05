@@ -86,6 +86,18 @@
               {
                 "name": "StreamWrite",
                 "integer": 20
+              },
+              {
+                "name": "FinalizeBlock",
+                "integer": 21
+              },
+              {
+                "name": "Echo",
+                "integer": 22
+              },
+              {
+                "name": "GetContainerChecksumInfo",
+                "integer": 23
               }
             ]
           },
@@ -271,6 +283,14 @@
               {
                 "name": "IMPORT_CONTAINER_METADATA_FAILED",
                 "integer": 46
+              },
+              {
+                "name": "BLOCK_ALREADY_FINALIZED",
+                "integer": 47
+              },
+              {
+                "name": "CONTAINER_ID_MISMATCH",
+                "integer": 48
               }
             ]
           },
@@ -594,6 +614,24 @@
                 "name": "version",
                 "type": "uint32",
                 "optional": true
+              },
+              {
+                "id": 25,
+                "name": "finalizeBlock",
+                "type": "FinalizeBlockRequestProto",
+                "optional": true
+              },
+              {
+                "id": 26,
+                "name": "echo",
+                "type": "EchoRequestProto",
+                "optional": true
+              },
+              {
+                "id": 27,
+                "name": "getContainerChecksumInfo",
+                "type": "GetContainerChecksumInfoRequestProto",
+                "optional": true
               }
             ]
           },
@@ -724,6 +762,24 @@
                 "id": 21,
                 "name": "getCommittedBlockLength",
                 "type": "GetCommittedBlockLengthResponseProto",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "finalizeBlock",
+                "type": "FinalizeBlockResponseProto",
+                "optional": true
+              },
+              {
+                "id": 23,
+                "name": "echo",
+                "type": "EchoResponseProto",
+                "optional": true
+              },
+              {
+                "id": 24,
+                "name": "getContainerChecksumInfo",
+                "type": "GetContainerChecksumInfoResponseProto",
                 "optional": true
               }
             ]
@@ -1010,6 +1066,28 @@
             ]
           },
           {
+            "name": "FinalizeBlockRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "FinalizeBlockResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockData",
+                "type": "BlockData",
+                "required": true
+              }
+            ]
+          },
+          {
             "name": "GetBlockRequestProto",
             "fields": [
               {
@@ -1098,6 +1176,74 @@
                 "name": "blockData",
                 "type": "BlockData",
                 "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "EchoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "payload",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "payloadSizeResp",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "sleepTimeMs",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "readOnly",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "EchoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "payload",
+                "type": "bytes",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerChecksumInfoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetContainerChecksumInfoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerChecksumInfo",
+                "type": "bytes",
+                "optional": true
               }
             ]
           },
@@ -1196,11 +1342,25 @@
                 "name": "data",
                 "type": "bytes",
                 "optional": true
+              },
+              {
+                "id": 4,
+                "name": "block",
+                "type": "PutBlockRequestProto",
+                "optional": true
               }
             ]
           },
           {
-            "name": "WriteChunkResponseProto"
+            "name": "WriteChunkResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "committedBlockLength",
+                "type": "GetCommittedBlockLengthResponseProto",
+                "optional": true
+              }
+            ]
           },
           {
             "name": "ReadChunkRequestProto",
@@ -1489,11 +1649,132 @@
                 "name": "compression",
                 "type": "CopyContainerCompressProto",
                 "optional": true
+              },
+              {
+                "id": 6,
+                "name": "size",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
           {
             "name": "SendContainerResponse"
+          },
+          {
+            "name": "ChunkMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "offset",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "length",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "checksumMatches",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "BlockMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "chunkMerkleTree",
+                "type": "ChunkMerkleTree",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "deleted",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerMerkleTree",
+            "fields": [
+              {
+                "id": 1,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "blockMerkleTree",
+                "type": "BlockMerkleTree",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerChecksumInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "containerMerkleTree",
+                "type": "ContainerMerkleTree",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerCreateInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "state",
+                "type": "ContainerDataProto.State",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "replicaIndex",
+                "type": "int32",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-1"
+                  }
+                ]
+              }
+            ]
           }
         ],
         "services": [
@@ -1712,6 +1993,31 @@
               {
                 "name": "PIPELINE_CLOSED",
                 "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "StorageTypeProto",
+            "enum_fields": [
+              {
+                "name": "DISK",
+                "integer": 1
+              },
+              {
+                "name": "SSD",
+                "integer": 2
+              },
+              {
+                "name": "ARCHIVE",
+                "integer": 3
+              },
+              {
+                "name": "RAM_DISK",
+                "integer": 4
+              },
+              {
+                "name": "PROVIDED",
+                "integer": 5
               }
             ]
           },
@@ -2013,6 +2319,17 @@
             ]
           },
           {
+            "name": "DatanodeIDProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "uuid",
+                "type": "UUID",
+                "required": true
+              }
+            ]
+          },
+          {
             "name": "DatanodeDetailsProto",
             "fields": [
               {
@@ -2070,9 +2387,27 @@
                 "optional": true
               },
               {
+                "id": 10,
+                "name": "currentVersion",
+                "type": "int32",
+                "optional": true
+              },
+              {
                 "id": 100,
                 "name": "uuid128",
                 "type": "UUID",
+                "optional": true
+              },
+              {
+                "id": 101,
+                "name": "level",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 102,
+                "name": "id",
+                "type": "DatanodeIDProto",
                 "optional": true
               }
             ]
@@ -2347,6 +2682,18 @@
                 "name": "leaderID128",
                 "type": "UUID",
                 "optional": true
+              },
+              {
+                "id": 101,
+                "name": "leaderDatanodeID",
+                "type": "DatanodeIDProto",
+                "optional": true
+              },
+              {
+                "id": 102,
+                "name": "suggestedLeaderDatanodeID",
+                "type": "DatanodeIDProto",
+                "optional": true
               }
             ]
           },
@@ -2431,6 +2778,24 @@
               {
                 "id": 5,
                 "name": "containerCount",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "committed",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "freeSpaceToSpare",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "pipelineCount",
                 "type": "int64",
                 "optional": true
               }
@@ -2970,6 +3335,12 @@
                 "name": "state",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 6,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -3021,6 +3392,12 @@
               {
                 "id": 8,
                 "name": "replicaIndex",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "dataChecksum",
                 "type": "int64",
                 "optional": true
               }
@@ -3253,6 +3630,12 @@
                 "name": "columnFamily",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 5,
+                "name": "pruned",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -3288,6 +3671,92 @@
                 "name": "compactionReason",
                 "type": "string",
                 "optional": true
+              }
+            ]
+          },
+          {
+            "name": "NodeTopology",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "location",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "cost",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "level",
+                "type": "uint32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "NetworkNode",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanodeDetails",
+                "type": "DatanodeDetailsProto",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "innerNode",
+                "type": "InnerNode",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ChildrenMap",
+            "fields": [
+              {
+                "id": 1,
+                "name": "networkName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "networkNode",
+                "type": "NetworkNode",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "InnerNode",
+            "fields": [
+              {
+                "id": 1,
+                "name": "nodeTopology",
+                "type": "NodeTopology",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "numOfLeaves",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "childrenMap",
+                "type": "ChildrenMap",
+                "is_repeated": true
               }
             ]
           }

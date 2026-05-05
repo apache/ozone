@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,39 +17,44 @@
 
 package org.apache.hadoop.ozone.om.ratis_snapshot;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
-import org.apache.hadoop.hdds.server.http.HttpConfig;
-import org.apache.hadoop.hdds.utils.HAUtils;
-import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.hdfs.web.URLConnectionFactory;
-import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
-import org.apache.commons.io.FileUtils;
-
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_KEY;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +85,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
+  private final boolean useV2CheckpointApi;
 
   public OmRatisSnapshotProvider(File snapshotDir,
       Map<String, OMNodeDetails> peerNodesMap, HttpConfig.Policy httpPolicy,
@@ -90,8 +95,8 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     this.httpPolicy = httpPolicy;
     this.spnegoEnabled = spnegoEnabled;
     this.connectionFactory = connectionFactory;
+    this.useV2CheckpointApi = OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
   }
-
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
@@ -99,6 +104,8 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     LOG.info("Initializing OM Snapshot Provider");
     this.peerNodesMap = new ConcurrentHashMap<>();
     peerNodesMap.putAll(peerNodeDetails);
+    this.useV2CheckpointApi = conf.getBoolean(OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY,
+        OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
     this.spnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
@@ -142,9 +149,9 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       throws IOException {
     OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
     URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
-        httpPolicy.isHttpEnabled(), true);
-    LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint " +
-        "URL: {}", leaderNodeID, omCheckpointUrl);
+        useV2CheckpointApi, httpPolicy.isHttpEnabled(), true);
+    LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint: {} URL: {}",
+        leaderNodeID, targetFile.getName(), omCheckpointUrl);
     SecurityUtil.doAsCurrentUser(() -> {
       HttpURLConnection connection = (HttpURLConnection)
           connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
@@ -154,8 +161,10 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
           MULTIPART_FORM_DATA_BOUNDARY;
       connection.setRequestProperty("Content-Type", contentTypeValue);
       connection.setDoOutput(true);
-      writeFormData(connection,
-          HAUtils.getExistingSstFiles(getCandidateDir()));
+
+      List<String> existingFiles = useV2CheckpointApi ? HAUtils.getExistingFiles(getCandidateDir())
+          : HAUtils.getExistingSstFilesRelativeToDbDir(getCandidateDir());
+      writeFormData(connection, existingFiles);
 
       connection.connect();
       int errorCode = connection.getResponseCode();
@@ -166,7 +175,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       }
 
       try (InputStream inputStream = connection.getInputStream()) {
-        FileUtils.copyInputStreamToFile(inputStream, targetFile);
+        downloadFileWithProgress(inputStream, targetFile);
       } catch (IOException ex) {
         boolean deleted = FileUtils.deleteQuietly(targetFile);
         if (!deleted) {
@@ -182,6 +191,39 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   }
 
   /**
+   * Writes data from the given InputStream to the target file while logging download progress every 30 seconds.
+   */
+  public static void downloadFileWithProgress(InputStream inputStream, File targetFile)
+          throws IOException {
+    try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
+      byte[] buffer = new byte[8 * 1024];
+      long totalBytesRead = 0;
+      int bytesRead;
+      long lastLoggedTime = Time.monotonicNow();
+
+      while ((bytesRead = inputStream.read(buffer)) != -1) {
+        outputStream.write(buffer, 0, bytesRead);
+        totalBytesRead += bytesRead;
+
+        // Log progress every 30 seconds
+        if (Time.monotonicNow() - lastLoggedTime >= 30000) {
+          LOG.info("Downloading '{}': {} KB downloaded so far...",
+              targetFile.getName(), totalBytesRead / (1024));
+          lastLoggedTime = Time.monotonicNow();
+        }
+      }
+
+      LOG.info("Download completed for '{}'. Total size: {} KB",
+          targetFile.getName(), totalBytesRead / (1024));
+    }
+  }
+
+  @Override
+  public DBCheckpoint getCheckpointFromUntarredDb(Path untarredDbDir) throws IOException {
+    return new InodeMetadataRocksDBCheckpoint(untarredDbDir, useV2CheckpointApi);
+  }
+
+  /**
    * Writes form data to output stream as any HTTP client would for a
    * multipart/form-data request.
    * Proper form data includes separator, content disposition and value
@@ -194,7 +236,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
    * value1</pre>
    * @param connection HTTP URL connection which output stream is used.
    * @param sstFiles SST files for exclusion.
-   * @throws IOException if an exception occured during writing to output
+   * @throws IOException if an exception occurred during writing to output
    * stream.
    */
   public static void writeFormData(HttpURLConnection connection,

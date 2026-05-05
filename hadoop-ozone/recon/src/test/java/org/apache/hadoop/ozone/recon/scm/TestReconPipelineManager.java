@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,21 +17,34 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -42,6 +54,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -50,27 +63,10 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineFactory.ReconPipelineProvider;
-
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Class to test Recon Pipeline Manager.
@@ -83,7 +79,6 @@ public class TestReconPipelineManager {
   private OzoneConfiguration conf;
   private SCMStorageConfig scmStorageConfig;
   private DBStore store;
-  private HDDSLayoutVersionManager versionManager;
   private SCMHAManager scmhaManager;
   private SCMContext scmContext;
 
@@ -94,7 +89,7 @@ public class TestReconPipelineManager {
         temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
     scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
-    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMHADBTransactionBufferStub(store));
     scmContext = SCMContext.emptyContext();
@@ -134,7 +129,7 @@ public class TestReconPipelineManager {
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())
@@ -153,8 +148,9 @@ public class TestReconPipelineManager {
       StorageContainerManager mock = mock(StorageContainerManager.class);
       when(mock.getScmNodeDetails())
           .thenReturn(mock(SCMNodeDetails.class));
-      scmContext = new SCMContext.Builder().setIsInSafeMode(true)
-              .setLeader(true).setIsPreCheckComplete(true)
+      scmContext = new SCMContext.Builder()
+              .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.PRE_CHECKS_PASSED)
+              .setLeader(true)
               .setSCM(mock).build();
       reconPipelineManager.setScmContext(scmContext);
       reconPipelineManager.addPipeline(validPipeline);
@@ -187,7 +183,7 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())
@@ -214,7 +210,7 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     NodeManager nodeManager =
@@ -234,7 +230,6 @@ public class TestReconPipelineManager {
       reconPipelineManager.addPipeline(pipeline);
     }, "Exception was thrown when adding a duplicate pipeline.");
   }
-
 
   @Test
   public void testStubbedReconPipelineFactory() throws IOException {

@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,11 +51,13 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The total number of blocks pending for processing.")
   private MutableGaugeLong totalPendingBlockCount;
 
+  @Metric(about = "The total bytes used by blocks pending for deletion.")
+  private MutableGaugeLong totalPendingBlockBytes;
+
   @Metric(about = "The total number of DeleteBlockTransaction received")
   private MutableCounterLong receivedTransactionCount;
 
-  @Metric(about = "The total number of DeleteBlockTransaction" +
-      " that is a retry Transaction")
+  @Metric(about = "The total number of DeleteBlockTransaction that is a retry Transaction")
   private MutableCounterLong receivedRetryTransactionCount;
 
   @Metric(about = "The total number of Container received to be processed")
@@ -74,9 +75,14 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The total number of Container chosen to be deleted.")
   private MutableGaugeLong totalContainerChosenCount;
 
-  @Metric(about = "The total number of transactions which failed due" +
-      " to container lock wait timeout.")
+  @Metric(about = "The total number of transactions which failed due to container lock wait timeout.")
   private MutableGaugeLong totalLockTimeoutTransactionCount;
+
+  @Metric(about = "The number of delete block transactions successful.")
+  private MutableCounterLong processedTransactionSuccessCount;
+
+  @Metric(about = "The number of delete block transactions failed.")
+  private MutableGaugeLong processedTransactionFailCount;
 
   private BlockDeletingServiceMetrics() {
   }
@@ -112,6 +118,14 @@ public final class BlockDeletingServiceMetrics {
     this.failureCount.incr();
   }
 
+  public void incrProcessedTransactionSuccessCount(long count) {
+    processedTransactionSuccessCount.incr(count);
+  }
+
+  public void incrProcessedTransactionFailCount(long count) {
+    processedTransactionFailCount.incr(count);
+  }
+
   public void incrReceivedTransactionCount(long count) {
     receivedTransactionCount.incr(count);
   }
@@ -144,6 +158,10 @@ public final class BlockDeletingServiceMetrics {
     this.totalPendingBlockCount.set(count);
   }
 
+  public void setTotalPendingBlockBytes(long bytes) {
+    this.totalPendingBlockBytes.set(bytes);
+  }
+
   public void incrTotalLockTimeoutTransactionCount() {
     totalLockTimeoutTransactionCount.incr();
   }
@@ -172,6 +190,10 @@ public final class BlockDeletingServiceMetrics {
     return totalPendingBlockCount.value();
   }
 
+  public long getTotalPendingBlockBytes() {
+    return totalPendingBlockBytes.value();
+  }
+
   public long getTotalBlockChosenCount() {
     return totalBlockChosenCount.value();
   }
@@ -184,32 +206,34 @@ public final class BlockDeletingServiceMetrics {
     return totalLockTimeoutTransactionCount.value();
   }
 
+  public long getProcessedTransactionSuccessCount() {
+    return processedTransactionSuccessCount.value();
+  }
+
+  public long getProcessedTransactionFailCount() {
+    return processedTransactionFailCount.value();
+  }
+
   @Override
   public String toString() {
-    StringBuffer buffer = new StringBuffer();
-    buffer.append("successCount = " + successCount.value()).append("\t")
-        .append("successBytes = " + successBytes.value()).append("\t")
-        .append("failureCount = " + failureCount.value()).append("\t")
-        .append("outOfOrderDeleteBlockTransactionCount = "
-            + outOfOrderDeleteBlockTransactionCount.value()).append("\t")
-        .append("totalPendingBlockCount = "
-            + totalPendingBlockCount.value()).append("\t")
-        .append("totalBlockChosenCount = "
-            + totalBlockChosenCount.value()).append("\t")
-        .append("totalContainerChosenCount = "
-            + totalContainerChosenCount.value()).append("\t")
-        .append("receivedTransactionCount = "
-            + receivedTransactionCount.value()).append("\t")
-        .append("receivedRetryTransactionCount = "
-            + receivedRetryTransactionCount.value()).append("\t")
-        .append("receivedContainerCount = "
-            + receivedContainerCount.value()).append("\t")
-        .append("receivedBlockCount = "
-            + receivedBlockCount.value()).append("\t")
-        .append("markedBlockCount = "
-            + markedBlockCount.value()).append("\t")
-        .append("totalLockTimeoutTransactionCount = "
-            + totalLockTimeoutTransactionCount.value()).append("\t");
+    StringBuilder buffer = new StringBuilder()
+        .append("successCount = ").append(successCount.value()).append('\t')
+        .append("successBytes = ").append(successBytes.value()).append('\t')
+        .append("failureCount = ").append(failureCount.value()).append('\t')
+        .append("outOfOrderDeleteBlockTransactionCount = ")
+        .append(outOfOrderDeleteBlockTransactionCount.value()).append('\t')
+        .append("totalPendingBlockCount = ").append(totalPendingBlockCount.value()).append('\t')
+        .append("totalPendingBlockBytes = ").append(totalPendingBlockBytes.value()).append('\t')
+        .append("totalBlockChosenCount = ").append(totalBlockChosenCount.value()).append('\t')
+        .append("totalContainerChosenCount = ").append(totalContainerChosenCount.value()).append('\t')
+        .append("receivedTransactionCount = ").append(receivedTransactionCount.value()).append('\t')
+        .append("receivedRetryTransactionCount = ").append(receivedRetryTransactionCount.value()).append('\t')
+        .append("processedTransactionSuccessCount = ").append(processedTransactionSuccessCount.value()).append('\t')
+        .append("processedTransactionFailCount = ").append(processedTransactionFailCount.value()).append('\t')
+        .append("receivedContainerCount = ").append(receivedContainerCount.value()).append('\t')
+        .append("receivedBlockCount = ").append(receivedBlockCount.value()).append('\t')
+        .append("markedBlockCount = ").append(markedBlockCount.value()).append('\t')
+        .append("totalLockTimeoutTransactionCount = ").append(totalLockTimeoutTransactionCount.value()).append('\t');
     return buffer.toString();
   }
 }

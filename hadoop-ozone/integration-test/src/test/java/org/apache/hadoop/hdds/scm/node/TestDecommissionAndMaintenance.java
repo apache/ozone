@@ -1,77 +1,23 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.node;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachHealthState;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachPersistedOpState;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -88,11 +34,63 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachHealthState;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
+import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachPersistedOpState;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test from the scmclient for decommission and maintenance.
  */
-@Flaky({"HDDS-6028", "HDDS-6049"})
 public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
@@ -205,10 +203,10 @@ public class TestDecommissionAndMaintenance {
     // Once we have a DN id, look it up in the NM, as the datanodeDetails
     // instance in the pipeline may not be the same as the one stored in the
     // NM.
-    final UUID dnID = pipeline.getNodes().stream()
+    final DatanodeID dnID = pipeline.getNodes().stream()
         .filter(node -> ecPipeline.getNodes().contains(node))
-        .findFirst().get().getUuid();
-    final DatanodeDetails toDecommission = nm.getNodeByUuid(dnID.toString());
+        .findFirst().get().getID();
+    final DatanodeDetails toDecommission = nm.getNode(dnID);
 
     scmClient.decommissionNodes(Arrays.asList(
         getDNHostAndPort(toDecommission)), false);
@@ -275,14 +273,14 @@ public class TestDecommissionAndMaintenance {
 
     // After the SCM restart, the DN should report as DECOMMISSIONING, then
     // it should re-enter the decommission workflow and move to DECOMMISSIONED
-    DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
+    DatanodeDetails newDn = nm.getNode(dn.getID());
     waitForDnToReachOpState(nm, newDn, DECOMMISSIONED);
     waitForDnToReachPersistedOpState(newDn, DECOMMISSIONED);
 
     // Now the node is decommissioned, so restart SCM again
     cluster.restartStorageContainerManager(true);
     setManagers();
-    newDn = nm.getNodeByUuid(dn.getUuid().toString());
+    newDn = nm.getNode(dn.getID());
 
     // On initial registration, the DN should report its operational state
     // and if it is decommissioned, that should be updated in the NodeStatus
@@ -300,7 +298,7 @@ public class TestDecommissionAndMaintenance {
     scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(dn)));
     // Now restart it and ensure it remains IN_SERVICE
     cluster.restartHddsDatanode(dnIndex, true);
-    newDn = nm.getNodeByUuid(dn.getUuid().toString());
+    newDn = nm.getNode(dn.getID());
 
     // As this is not an initial registration since SCM was started, the DN
     // should report its operational state and if it differs from what SCM
@@ -318,7 +316,7 @@ public class TestDecommissionAndMaintenance {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ratisRepConfig);
 
-    final List<DatanodeDetails> toDecommission = nm.getAllNodes();
+    final List<? extends DatanodeDetails> toDecommission = nm.getAllNodes();
 
     // trying to decommission 5 nodes should leave the cluster with 2 nodes,
     // which is not sufficient for RATIS.THREE replication. It should not be allowed.
@@ -429,10 +427,10 @@ public class TestDecommissionAndMaintenance {
     // Once we have a DN id, look it up in the NM, as the datanodeDetails
     // instance in the pipeline may not be the same as the one stored in the
     // NM.
-    final UUID dnID = pipeline.getNodes().stream()
+    final DatanodeID dnID = pipeline.getNodes().stream()
         .filter(node -> ecPipeline.getNodes().contains(node))
-        .findFirst().get().getUuid();
-    final DatanodeDetails dn = nm.getNodeByUuid(dnID.toString());
+        .findFirst().get().getID();
+    final DatanodeDetails dn = nm.getNode(dnID);
 
     scmClient.startMaintenanceNodes(Arrays.asList(
         getDNHostAndPort(dn)), 0, true);
@@ -462,7 +460,7 @@ public class TestDecommissionAndMaintenance {
 
     // Restart the DN and it should keep the IN_MAINTENANCE state
     cluster.restartHddsDatanode(dn, true);
-    DatanodeDetails newDN = nm.getNodeByUuid(dn.getUuid().toString());
+    DatanodeDetails newDN = nm.getNode(dn.getID());
     waitForDnToReachHealthState(nm, newDN, HEALTHY);
     waitForDnToReachPersistedOpState(newDN, IN_MAINTENANCE);
 
@@ -476,7 +474,7 @@ public class TestDecommissionAndMaintenance {
 
     // Now restart it and ensure it remains IN_SERVICE
     cluster.restartHddsDatanode(dnIndex, true);
-    DatanodeDetails newDn = nm.getNodeByUuid(dn.getUuid().toString());
+    DatanodeDetails newDn = nm.getNode(dn.getID());
 
     // As this is not an initial registration since SCM was started, the DN
     // should report its operational state and if it differs from what SCM
@@ -585,7 +583,7 @@ public class TestDecommissionAndMaintenance {
 
     List<DatanodeDetails> newDns = new ArrayList<>();
     for (DatanodeDetails dn : forMaintenance) {
-      newDns.add(nm.getNodeByUuid(dn.getUuid().toString()));
+      newDns.add(nm.getNode(dn.getID()));
     }
 
     // Ensure all 3 DNs go to maintenance
@@ -708,7 +706,7 @@ public class TestDecommissionAndMaintenance {
       throws Exception {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ratisRepConfig);
-    final List<DatanodeDetails> toMaintenance = nm.getAllNodes();
+    final List<? extends DatanodeDetails> toMaintenance = nm.getAllNodes();
 
     // trying to move 6 nodes to maintenance should leave the cluster with 1 node,
     // which is not sufficient for RATIS.THREE replication (3 - maintenanceReplicaMinimum = 2).
@@ -834,7 +832,7 @@ public class TestDecommissionAndMaintenance {
       ReplicationConfig replicationConfig) throws IOException {
     for (int i = 0; i < keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, replicationConfig,
-          "this is the content");
+          "this is the content".getBytes(StandardCharsets.UTF_8));
     }
   }
 

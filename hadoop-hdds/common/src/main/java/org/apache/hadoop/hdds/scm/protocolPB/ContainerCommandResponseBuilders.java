@@ -1,27 +1,28 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.protocolPB;
 
-import com.google.common.base.Preconditions;
+import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
-
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
@@ -35,18 +36,18 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetCommittedBlockLengthResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkResponseProto;
+import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
-
-import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 
 /**
  * A set of helper functions to create responses to container commands.
@@ -168,6 +169,7 @@ public final class ContainerCommandResponseBuilders {
         .setListBlock(builder)
         .build();
   }
+
   /**
    * Returns successful getCommittedBlockLength Response.
    * @param msg - Request.
@@ -214,6 +216,28 @@ public final class ContainerCommandResponseBuilders {
   }
 
   /**
+   * Gets a response for the WriteChunk RPC.
+   * @param msg - ContainerCommandRequestProto
+   * @return - ContainerCommandResponseProto
+   */
+  public static ContainerCommandResponseProto getWriteChunkResponseSuccess(
+      ContainerCommandRequestProto msg, BlockData blockData) {
+
+    WriteChunkResponseProto.Builder writeChunk =
+        WriteChunkResponseProto.newBuilder();
+    if (blockData != null) {
+      writeChunk.setCommittedBlockLength(
+          getCommittedBlockLengthResponseBuilder(
+              blockData.getSize(), blockData.getBlockID()));
+
+    }
+    return getSuccessResponseBuilder(msg)
+        .setCmdType(Type.WriteChunk)
+        .setWriteChunk(writeChunk)
+        .build();
+  }
+
+  /**
    * Gets a response to the read small file call.
    * @param request - Msg
    * @param dataBuffers  - Data
@@ -224,7 +248,7 @@ public final class ContainerCommandResponseBuilders {
       ContainerCommandRequestProto request, List<ByteString> dataBuffers,
       ChunkInfo info) {
 
-    Preconditions.checkNotNull(request);
+    Objects.requireNonNull(request, "request == null");
 
     boolean isReadChunkV0 = getReadChunkVersion(request.getGetSmallFile())
         .equals(ContainerProtos.ReadChunkVersion.V0);
@@ -259,6 +283,7 @@ public final class ContainerCommandResponseBuilders {
         .setGetSmallFile(getSmallFile)
         .build();
   }
+
   /**
    * Returns a ReadContainer Response.
    *
@@ -269,7 +294,7 @@ public final class ContainerCommandResponseBuilders {
   public static ContainerCommandResponseProto getReadContainerResponse(
       ContainerCommandRequestProto request, ContainerDataProto containerData) {
 
-    Preconditions.checkNotNull(containerData);
+    Objects.requireNonNull(containerData, "containerData == null");
 
     ReadContainerResponseProto.Builder response =
         ReadContainerResponseProto.newBuilder()
@@ -281,7 +306,7 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getReadChunkResponse(
-      ContainerCommandRequestProto request, ChunkBuffer data,
+      ContainerCommandRequestProto request, ChunkBufferToByteString data,
       Function<ByteBuffer, ByteString> byteBufferToByteString) {
 
     boolean isReadChunkV0 = getReadChunkVersion(request.getReadChunk())
@@ -310,6 +335,32 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
+  public static ContainerCommandResponseProto getReadBlockResponse(
+      ContainerCommandRequestProto request, ChecksumData checksumData, ByteBuffer data, long offset) {
+
+    ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
+        .setChecksumData(checksumData.getProtoBufMessage())
+        .setData(ByteString.copyFrom(data))
+        .setOffset(offset)
+        .build();
+
+    return getSuccessResponseBuilder(request)
+        .setReadBlock(response)
+        .build();
+  }
+
+  public static ContainerCommandResponseProto getFinalizeBlockResponse(
+      ContainerCommandRequestProto msg, BlockData data) {
+
+    ContainerProtos.FinalizeBlockResponseProto.Builder blockData =
+        ContainerProtos.FinalizeBlockResponseProto.newBuilder()
+        .setBlockData(data);
+
+    return getSuccessResponseBuilder(msg)
+        .setFinalizeBlock(blockData)
+        .build();
+  }
+
   public static ContainerCommandResponseProto getEchoResponse(
       ContainerCommandRequestProto msg) {
 
@@ -328,11 +379,22 @@ public final class ContainerCommandResponseBuilders {
     ContainerProtos.EchoResponseProto.Builder echo =
         ContainerProtos.EchoResponseProto
             .newBuilder()
-            .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.nextBytes(responsePayload)));
+            .setPayload(UnsafeByteOperations.unsafeWrap(RandomUtils.secure().randomBytes(responsePayload)));
 
     return getSuccessResponseBuilder(msg)
         .setEcho(echo)
         .build();
+  }
+
+  public static ContainerCommandResponseProto getGetContainerMerkleTreeResponse(
+      ContainerCommandRequestProto request, ByteString checksumInfo) {
+
+    ContainerProtos.GetContainerChecksumInfoResponseProto.Builder containerMerkleTree =
+        ContainerProtos.GetContainerChecksumInfoResponseProto.newBuilder()
+            .setContainerID(request.getContainerID())
+            .setContainerChecksumInfo(checksumInfo);
+    return getSuccessResponseBuilder(request)
+        .setGetContainerChecksumInfo(containerMerkleTree).build();
   }
 
   private ContainerCommandResponseBuilders() {

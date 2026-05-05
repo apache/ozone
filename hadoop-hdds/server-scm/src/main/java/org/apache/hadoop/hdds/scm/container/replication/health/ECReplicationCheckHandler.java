@@ -1,23 +1,28 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+
+import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
@@ -27,11 +32,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
-import java.util.Set;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 
 /**
  * Container Check handler to check the under / over replication state for
@@ -51,7 +51,6 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     }
     ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
-    ContainerID containerID = container.containerID();
     ContainerHealthResult health = checkHealth(request);
     LOG.debug("Checking container {} in ECReplicationCheckHandler", container);
     if (health.getHealthState() == ContainerHealthResult.HealthState.HEALTHY) {
@@ -63,26 +62,32 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
+      ContainerHealthState healthState;
       if (underHealth.isUnrecoverable()) {
-        if (underHealth.isMissing()) {
-          report.incrementAndSample(
-              ReplicationManagerReport.HealthState.MISSING, containerID);
-        } else {
-          // A container which is unrecoverable but not missing must have too
-          // many unhealthy replicas. Therefore it is UNHEALTHY rather than
-          // missing.
-          report.incrementAndSample(
-              ReplicationManagerReport.HealthState.UNHEALTHY, containerID);
-        }
         // An EC container can be both unrecoverable and have offline replicas. In this case, we need
         // to report both states as the decommission monitor needs to wait for an extra copy to be
         // made of the offline replica before decommission can complete.
         if (underHealth.hasUnreplicatedOfflineIndexes()) {
-          report.incrementAndSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
+          // Container has BOTH unrecoverable state AND unreplicated offline indexes
+          if (underHealth.isMissing()) {
+            healthState = ContainerHealthState.MISSING_UNDER_REPLICATED;
+          } else {
+            // A container which is unrecoverable but not missing must have too
+            // many unhealthy replicas. Therefore it is UNHEALTHY + UNDER_REPLICATED
+            healthState = ContainerHealthState.UNHEALTHY_UNDER_REPLICATED;
+          }
+        } else {
+          // Only unrecoverable, no offline indexes
+          if (underHealth.isMissing()) {
+            healthState = ContainerHealthState.MISSING;
+          } else {
+            healthState = ContainerHealthState.UNHEALTHY;
+          }
         }
+        report.incrementAndSample(healthState, container);
       } else {
-        report.incrementAndSample(
-            ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
+        healthState = ContainerHealthState.UNDER_REPLICATED;
+        report.incrementAndSample(healthState, container);
       }
       if (!underHealth.isReplicatedOkAfterPending() &&
           (!underHealth.isUnrecoverable()
@@ -98,8 +103,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       return true;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.OVER_REPLICATED, containerID);
+      report.incrementAndSample(ContainerHealthState.OVER_REPLICATED, container);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending()) {
@@ -132,7 +136,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(false);
       int remainingRedundancy = repConfig.getParity();
       boolean dueToOutOfService = true;
-      if (missingIndexes.size() > 0) {
+      if (!missingIndexes.isEmpty()) {
         // The container has reduced redundancy and will need reconstructed
         // via an EC reconstruction command. Note that it may also have some
         // replicas in decommission / maintenance states, but as the under

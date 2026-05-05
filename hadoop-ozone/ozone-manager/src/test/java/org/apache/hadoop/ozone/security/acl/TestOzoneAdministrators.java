@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,19 +17,20 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
-import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
-import java.util.Collections;
-
 import static java.util.Arrays.asList;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Predicate;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test Ozone Administrators from OzoneNativeAuthorizer.
@@ -59,6 +59,22 @@ public class TestOzoneAdministrators {
     }
   }
 
+  static Predicate<UserGroupInformation> newAdminUserPredicate(List<String> adminUsernames) {
+    return new OzoneAdmins(adminUsernames, null)::isAdmin;
+  }
+
+  static Predicate<UserGroupInformation> newAdminUserPredicate(String adminUsername) {
+    return newAdminUserPredicate(Collections.singletonList(adminUsername));
+  }
+
+  static Predicate<UserGroupInformation> newAdminGroupPredicate(List<String> adminGroupNames) {
+    return new OzoneAdmins(null, adminGroupNames)::isAdmin;
+  }
+
+  static Predicate<UserGroupInformation> newAdminGroupPredicate(String adminGroupName) {
+    return newAdminGroupPredicate(Collections.singletonList(adminGroupName));
+  }
+
   @Test
   public void testBucketOperation() throws OMException {
     UserGroupInformation.createUserForTesting("testuser",
@@ -67,8 +83,7 @@ public class TestOzoneAdministrators {
       OzoneObj obj = getTestBucketobj("testbucket");
       RequestContext context = getUserRequestContext("testuser",
           IAccessAuthorizer.ACLType.LIST);
-      nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
-          Collections.singletonList("testuser"), null));
+      nativeAuthorizer.setReadOnlyAdminCheck(newAdminUserPredicate("testuser"));
       assertTrue(nativeAuthorizer.checkAccess(obj, context),
           "matching read only admins are allowed to preform" +
           "read operations");
@@ -93,8 +108,7 @@ public class TestOzoneAdministrators {
       assertThrows(NullPointerException.class,
           () -> nativeAuthorizer.checkAccess(obj, finalContext));
 
-      nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
-          null, Collections.singletonList("testgroup")));
+      nativeAuthorizer.setReadOnlyAdminCheck(newAdminGroupPredicate("testgroup"));
       context = getUserRequestContext("testuser",
           IAccessAuthorizer.ACLType.READ_ACL);
       assertTrue(nativeAuthorizer.checkAccess(obj, context),
@@ -122,37 +136,34 @@ public class TestOzoneAdministrators {
 
   private void testAdminOperations(OzoneObj obj, RequestContext context)
       throws OMException {
-    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(Collections.emptyList()));
+    nativeAuthorizer.setAdminCheck(newAdminUserPredicate(Collections.emptyList()));
     assertFalse(nativeAuthorizer.checkAccess(obj, context), "empty" +
         " admin list disallow anyone to perform " +
             "admin operations");
 
-    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
-        Collections.singletonList(OZONE_ADMINISTRATORS_WILDCARD)));
+    nativeAuthorizer.setAdminCheck(newAdminUserPredicate(OZONE_ADMINISTRATORS_WILDCARD));
     assertTrue(nativeAuthorizer.checkAccess(obj, context),
         "wildcard admin allows everyone to perform admin" +
         " operations");
 
-    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
-        Collections.singletonList("testuser")));
+    nativeAuthorizer.setAdminCheck(newAdminUserPredicate("testuser"));
     assertTrue(nativeAuthorizer.checkAccess(obj, context),
         "matching admins are allowed to perform admin " +
             "operations");
 
-    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
-        asList(new String[]{"testuser2", "testuser"})));
+    nativeAuthorizer.setAdminCheck(newAdminUserPredicate(
+        asList("testuser2", "testuser")));
     assertTrue(nativeAuthorizer.checkAccess(obj, context),
         "matching admins are allowed to perform admin " +
             "operations");
 
-    nativeAuthorizer.setOzoneAdmins(new OzoneAdmins(
-        asList(new String[]{"testuser2", "testuser3"})));
+    nativeAuthorizer.setAdminCheck(newAdminUserPredicate(
+        asList("testuser2", "testuser3")));
     assertFalse(nativeAuthorizer.checkAccess(obj, context),
         "mismatching admins are not allowed perform " +
         "admin operations");
 
-    nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
-        Collections.singletonList("testuser"), null));
+    nativeAuthorizer.setReadOnlyAdminCheck(newAdminUserPredicate("testuser"));
     if (context.getAclRights() == IAccessAuthorizer.ACLType.LIST) {
       assertTrue(nativeAuthorizer.checkAccess(obj, context),
           "matching read only user are allowed to preform" +
@@ -163,8 +174,7 @@ public class TestOzoneAdministrators {
           "read operations");
     }
 
-    nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
-        Collections.singletonList("testuser1"), null));
+    nativeAuthorizer.setReadOnlyAdminCheck(newAdminUserPredicate("testuser1"));
     assertFalse(nativeAuthorizer.checkAccess(obj, context),
         "mismatching read only user are allowed to preform" +
         "read operations");
@@ -172,20 +182,17 @@ public class TestOzoneAdministrators {
 
   private void testGroupAdminOperations(OzoneObj obj, RequestContext context)
       throws OMException {
-    nativeAuthorizer.setOzoneAdmins(
-        new OzoneAdmins(null, asList("testgroup", "anothergroup")));
+    nativeAuthorizer.setAdminCheck(newAdminGroupPredicate(asList("testgroup", "anothergroup")));
     assertTrue(nativeAuthorizer.checkAccess(obj, context), "Users " +
             "from matching admin groups " +
         "are allowed to perform admin operations");
 
-    nativeAuthorizer.setOzoneAdmins(
-            new OzoneAdmins(null, asList("wronggroup")));
+    nativeAuthorizer.setAdminCheck(newAdminGroupPredicate("wronggroup"));
     assertFalse(nativeAuthorizer.checkAccess(obj, context), "Users" +
             " from mismatching admin groups " +
         "are allowed to perform admin operations");
 
-    nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
-        null, Collections.singletonList("testgroup")));
+    nativeAuthorizer.setReadOnlyAdminCheck(newAdminGroupPredicate("testgroup"));
     if (context.getAclRights() == IAccessAuthorizer.ACLType.LIST) {
       assertTrue(nativeAuthorizer.checkAccess(obj, context),
           "matching read only groups are allowed to preform" +
@@ -196,8 +203,7 @@ public class TestOzoneAdministrators {
           "preform read operations");
     }
 
-    nativeAuthorizer.setOzoneReadOnlyAdmins(new OzoneAdmins(
-        null, Collections.singletonList("testgroup1")));
+    nativeAuthorizer.setReadOnlyAdminCheck(newAdminGroupPredicate("testgroup1"));
     assertFalse(nativeAuthorizer.checkAccess(obj, context),
         "mismatching read only groups are allowed to preform" +
         "read operations");

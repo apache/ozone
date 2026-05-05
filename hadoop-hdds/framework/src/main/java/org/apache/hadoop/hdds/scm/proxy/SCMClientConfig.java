@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,35 +13,26 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.scm.proxy;
 
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
-
-import java.util.concurrent.TimeUnit;
-
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigType;
 
 /**
  * Config for SCM Block Client.
  */
 @ConfigGroup(prefix = "hdds.scmclient")
 public class SCMClientConfig {
-  public static final String SCM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
-  public static final String SCM_CLIENT_FAILOVER_MAX_RETRY =
-      "failover.max.retry";
-  public static final String SCM_CLIENT_MAX_RETRY_TIMEOUT =
-      "max.retry.timeout";
-  public static final String SCM_CLIENT_RETRY_INTERVAL =
-      "failover.retry.interval";
 
-  @Config(key = SCM_CLIENT_RPC_TIME_OUT,
+  @Config(key = "hdds.scmclient.rpc.timeout",
       defaultValue = "15m",
       type = ConfigType.TIME,
       tags = {OZONE, SCM, CLIENT},
@@ -56,7 +46,7 @@ public class SCMClientConfig {
   )
   private long rpcTimeOut = 15 * 60 * 1000;
 
-  @Config(key = SCM_CLIENT_MAX_RETRY_TIMEOUT,
+  @Config(key = "hdds.scmclient.max.retry.timeout",
       defaultValue = "10m",
       type = ConfigType.TIME,
       timeUnit = TimeUnit.MILLISECONDS,
@@ -66,7 +56,7 @@ public class SCMClientConfig {
 
   private long maxRetryTimeout = 10 * 60 * 1000;
 
-  @Config(key = SCM_CLIENT_FAILOVER_MAX_RETRY,
+  @Config(key = "hdds.scmclient.failover.max.retry",
       defaultValue = "15",
       type = ConfigType.INT,
       tags = {OZONE, SCM, CLIENT},
@@ -74,7 +64,7 @@ public class SCMClientConfig {
   )
   private int retryCount = 15;
 
-  @Config(key = SCM_CLIENT_RETRY_INTERVAL,
+  @Config(key = "hdds.scmclient.failover.retry.interval",
       defaultValue = "2s",
       type = ConfigType.TIME,
       tags = {OZONE, SCM, CLIENT},

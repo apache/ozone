@@ -1,22 +1,28 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
+
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,9 +34,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -47,7 +50,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
@@ -55,19 +57,13 @@ import org.apache.hadoop.ozone.om.multitenant.InMemoryMultiTenantAccessControlle
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_TENANT_RANGER_POLICY_LABEL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
-import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 
 /**
  * Background Sync thread that reads Multi-Tenancy state from OM DB
@@ -87,7 +83,7 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENAN
  */
 public class OMRangerBGSyncService extends BackgroundService {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMRangerBGSyncService.class);
   private static final ClientId CLIENT_ID = ClientId.randomId();
 
@@ -102,85 +98,6 @@ public class OMRangerBGSyncService extends BackgroundService {
   private final AtomicLong runCount = new AtomicLong(0);
 
   private volatile boolean isServiceStarted = false;
-
-  static class BGRole {
-    private final String name;
-    private String id;
-    private final HashSet<String> userSet;
-
-    BGRole(String n) {
-      this.name = n;
-      userSet = new HashSet<>();
-    }
-
-    public void setId(String id) {
-      this.id = id;
-    }
-
-    public String getId() {
-      return id;
-    }
-
-    public void addUserPrincipal(String userPrincipal) {
-      userSet.add(userPrincipal);
-    }
-
-    public HashSet<String> getUserSet() {
-      return userSet;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(name, id, userSet);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      BGRole bgRole = (BGRole) o;
-      return name.equals(bgRole.name)
-          && id.equals(bgRole.id)
-          && userSet.equals(bgRole.userSet);
-    }
-  }
-
-  enum PolicyType {
-    BUCKET_NAMESPACE_POLICY,
-    BUCKET_POLICY
-  }
-
-  /**
-   * Helper class that stores the tenant name and policy type.
-   */
-  static class PolicyInfo {
-
-    private final String tenantId;
-    private final PolicyType policyType;
-
-    PolicyInfo(String tenantId, PolicyType policyType) {
-      this.tenantId = tenantId;
-      this.policyType = policyType;
-    }
-
-    public String getTenantId() {
-      return tenantId;
-    }
-
-    public PolicyType getPolicyType() {
-      return policyType;
-    }
-
-    @Override
-    public String toString() {
-      return "PolicyInfo{" +
-          "tenantId='" + tenantId + '\'' + ", policyType=" + policyType + '}';
-    }
-  }
 
   // This map keeps all the policies found in OM DB. These policies should be
   // in Ranger. If not, the default policy will be (re)created.
@@ -260,8 +177,7 @@ public class OMRangerBGSyncService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
-    if (ozoneManager.isRatisEnabled() &&
-        (ozoneManager.getOmRatisServer() == null)) {
+    if (ozoneManager.getOmRatisServer() == null) {
       LOG.warn("OzoneManagerRatisServer is not initialized yet");
       return false;
     }
@@ -375,19 +291,6 @@ public class OMRangerBGSyncService extends BackgroundService {
     return policyVersion;
   }
 
-  private RaftClientRequest newRaftClientRequest(OMRequest omRequest) {
-    return RaftClientRequest.newBuilder()
-        .setClientId(CLIENT_ID)
-        .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
-        .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
-        .setCallId(runCount.get())
-        .setMessage(
-            Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
-        .build();
-  }
-
   public void setOMDBRangerServiceVersion(long version)
           throws ServiceException {
     // OM DB update goes through Ratis
@@ -402,12 +305,10 @@ public class OMRangerBGSyncService extends BackgroundService {
         .build();
 
     try {
-      RaftClientRequest raftClientRequest = newRaftClientRequest(omRequest);
-      ozoneManager.getOmRatisServer().submitRequest(omRequest,
-          raftClientRequest);
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.get());
     } catch (ServiceException e) {
       LOG.error("SetRangerServiceVersion request failed. "
-          + "Will retry at next run.");
+          + "Will retry at next run.", e);
       throw e;
     }
   }
@@ -617,7 +518,7 @@ public class OMRangerBGSyncService extends BackgroundService {
         final OmDBTenantState dbTenantState = tableKeyValue.getValue();
         final String tenantId = dbTenantState.getTenantId();
         final String volumeName = dbTenantState.getBucketNamespaceName();
-        Preconditions.checkNotNull(volumeName);
+        Objects.requireNonNull(volumeName, "volumeName == null");
 
         mtRangerPoliciesOpHelper(dbTenantState.getBucketNamespacePolicyName(),
             new PolicyInfo(tenantId, PolicyType.BUCKET_NAMESPACE_POLICY));
@@ -886,5 +787,83 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   public long getRangerSyncRunCount() {
     return runCount.get();
+  }
+
+  static class BGRole {
+    private final String name;
+    private String id;
+    private final HashSet<String> userSet;
+
+    BGRole(String n) {
+      this.name = n;
+      userSet = new HashSet<>();
+    }
+
+    public void setId(String id) {
+      this.id = id;
+    }
+
+    public String getId() {
+      return id;
+    }
+
+    public void addUserPrincipal(String userPrincipal) {
+      userSet.add(userPrincipal);
+    }
+
+    public HashSet<String> getUserSet() {
+      return userSet;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, id, userSet);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      BGRole bgRole = (BGRole) o;
+      return name.equals(bgRole.name)
+                 && id.equals(bgRole.id)
+                 && userSet.equals(bgRole.userSet);
+    }
+  }
+
+  enum PolicyType {
+    BUCKET_NAMESPACE_POLICY,
+    BUCKET_POLICY
+  }
+
+  /**
+   * Helper class that stores the tenant name and policy type.
+   */
+  static class PolicyInfo {
+
+    private final String tenantId;
+    private final PolicyType policyType;
+
+    PolicyInfo(String tenantId, PolicyType policyType) {
+      this.tenantId = tenantId;
+      this.policyType = policyType;
+    }
+
+    public String getTenantId() {
+      return tenantId;
+    }
+
+    public PolicyType getPolicyType() {
+      return policyType;
+    }
+
+    @Override
+    public String toString() {
+      return "PolicyInfo{tenantId='" + tenantId + '\'' + ", policyType=" + policyType + '}';
+    }
   }
 }

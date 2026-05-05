@@ -1,24 +1,33 @@
-
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Objects;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -34,40 +43,33 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.time.Clock;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-
 /**
  * This class manages the stream entries list and handles block allocation
  * from OzoneManager.
  */
 public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutputEntryPool.class);
 
   private final List<BlockDataStreamOutputEntry> streamEntries;
   private final OzoneClientConfig config;
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
-  private final OmKeyArgs keyArgs;
+  private final OmKeyArgs.Builder keyArgs;
+  private final Map<String, String> metadata = new HashMap<>();
   private final XceiverClientFactory xceiverClientFactory;
-  private final String requestID;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
   private List<StreamBuffer> bufferList;
+  private ContainerBlockID lastUpdatedBlockId = new ContainerBlockID(-1, -1);
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockDataStreamOutputEntryPool(
       OzoneClientConfig config,
       OzoneManagerProtocol omClient,
-      String requestId, ReplicationConfig replicationConfig,
+      ReplicationConfig replicationConfig,
       String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
@@ -83,8 +85,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         .setReplicationConfig(replicationConfig).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber)
-        .setSortDatanodesInPipeline(true).build();
-    this.requestID = requestId;
+        .setSortDatanodesInPipeline(true);
     this.openID = openID;
     this.excludeList = createExcludeList();
     this.bufferList = new ArrayList<>();
@@ -114,7 +115,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
   }
 
   private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
-    Preconditions.checkNotNull(subKeyInfo.getPipeline());
+    Objects.requireNonNull(subKeyInfo.getPipeline(), "subKeyInfo.getPipeline() == null");
     BlockDataStreamOutputEntry.Builder builder =
         new BlockDataStreamOutputEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
@@ -150,6 +151,33 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       }
     }
     return locationInfoList;
+  }
+
+  void hsyncKey(long offset) throws IOException {
+    if (keyArgs != null) {
+      // in test, this could be null
+      keyArgs.setDataSize(offset);
+      keyArgs.setLocationInfoList(getLocationInfoList());
+      // When the key is multipart upload part file upload, we should not
+      // commit the key, as this is not an actual key, this is a just a
+      // partial key of a large file.
+      if (keyArgs.getIsMultipartKey()) {
+        throw new IOException("Hsync is unsupported for multipart keys.");
+      } else {
+        if (keyArgs.getLocationInfoList().isEmpty()) {
+          omClient.hsyncKey(buildKeyArgs(), openID);
+        } else {
+          ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
+              .getBlockID().getContainerBlockID();
+          if (!lastUpdatedBlockId.equals(lastBLockId)) {
+            omClient.hsyncKey(buildKeyArgs(), openID);
+            lastUpdatedBlockId = lastBLockId;
+          }
+        }
+      }
+    } else {
+      LOG.warn("Closing KeyOutputStream, but key args is null");
+    }
   }
 
   /**
@@ -195,6 +223,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
     return streamEntries.stream().mapToLong(
         BlockDataStreamOutputEntry::getCurrentPosition).sum();
   }
+
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
    * first block has index = 0, second has index = 1 etc.)
@@ -208,10 +237,9 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       LOG.debug("Allocating block with {}", excludeList);
     }
     OmKeyLocationInfo subKeyInfo =
-        omClient.allocateBlock(keyArgs, openID, excludeList);
+        omClient.allocateBlock(buildKeyArgs(), openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
   }
-
 
   void commitKey(long offset) throws IOException {
     if (keyArgs != null) {
@@ -225,9 +253,9 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       // partial key of a large file.
       if (keyArgs.getIsMultipartKey()) {
         commitUploadPartInfo =
-            omClient.commitMultipartUploadPart(keyArgs, openID);
+            omClient.commitMultipartUploadPart(buildKeyArgs(), openID);
       } else {
-        omClient.commitKey(keyArgs, openID);
+        omClient.commitKey(buildKeyArgs(), openID);
       }
     } else {
       LOG.warn("Closing KeyDataStreamOutput, but key args is null");
@@ -251,7 +279,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       currentStreamIndex++;
     }
     if (streamEntries.size() <= currentStreamIndex) {
-      Preconditions.checkNotNull(omClient);
+      Objects.requireNonNull(omClient, "omClient == null");
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
       allocateNewBlock();
@@ -307,6 +335,11 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
 
   @Override
   public Map<String, String> getMetadata() {
-    return this.keyArgs.getMetadata();
+    return metadata;
+  }
+
+  private OmKeyArgs buildKeyArgs() {
+    keyArgs.addAllMetadata(metadata);
+    return keyArgs.build();
   }
 }

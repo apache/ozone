@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,7 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
@@ -45,19 +44,27 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
 
+  private final AtomicBoolean closed = new AtomicBoolean(false);
+
   private Map<Integer, String> tablesNames;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
-  private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
-      = new HashMap<>();
-  private OMDBDefinition omdbDefinition;
-  private OmUpdateEventValidator omUpdateEventValidator;
+  private Map<String, Map<Object, OMDBUpdateEvent>> omdbLatestUpdateEvents = new HashMap<>();
+  private final OMDBDefinition omdbDefinition = OMDBDefinition.get();
+  private final OmUpdateEventValidator omUpdateEventValidator = new OmUpdateEventValidator(omdbDefinition);
+  private long batchSequenceNumber; // Store the current sequence number for the batch
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
     omMetadataManager = metadataManager;
     tablesNames = metadataManager.getStore().getTableNames();
-    omdbDefinition = new OMDBDefinition();
-    omUpdateEventValidator = new OmUpdateEventValidator(omdbDefinition);
+  }
+
+  public void setLatestSequenceNumber(long sequenceNumber) {
+    this.batchSequenceNumber = sequenceNumber;
+  }
+
+  public long getLatestSequenceNumber() {
+    return this.batchSequenceNumber;
   }
 
   @Override
@@ -92,6 +99,11 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private void processEvent(int cfIndex, byte[] keyBytes, byte[]
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
+
+    if (closed.get()) {
+      throw new IllegalStateException("OMDBUpdatesHandler has been closed");
+    }
+
     String tableName = tablesNames.get(cfIndex);
     // DTOKEN_TABLE is using OzoneTokenIdentifier as key instead of String
     // and assuming to typecast as String while de-serializing will throw error.
@@ -112,6 +124,10 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       final Object key = cf.getKeyCodec().fromPersistedFormat(keyBytes);
       builder.setKey(key);
 
+      // Initialize table-specific event map if it does not exist
+      omdbLatestUpdateEvents.putIfAbsent(tableName, new HashMap<>());
+      Map<Object, OMDBUpdateEvent> tableEventsMap = omdbLatestUpdateEvents.get(tableName);
+
       // Handle the event based on its type:
       // - PUT with a new key: Insert the new value.
       // - PUT with an existing key: Update the existing value.
@@ -120,7 +136,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       // necessary.
       Table table = omMetadataManager.getTable(tableName);
 
-      OMDBUpdateEvent latestEvent = omdbLatestUpdateEvents.get(key);
+      OMDBUpdateEvent latestEvent = tableEventsMap.get(key);
       Object oldValue;
       if (latestEvent != null) {
         oldValue = latestEvent.getValue();
@@ -165,7 +181,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
                     "event is on {} table which is not useful for Recon to " +
                     "capture.", tableName);
           }
-          LOG.warn("Old Value of Key: {} in table: {} should not be null " +
+          LOG.debug("Old Value of Key: {} in table: {} should not be null " +
               "for DELETE event ", keyStr, tableName);
           return;
         }
@@ -184,7 +200,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
                 "action = %s", tableName, action));
       }
       omdbUpdateEvents.add(event);
-      omdbLatestUpdateEvents.put(key, event);
+      tableEventsMap.put(key, event);
     } else {
       // Log and ignore events if key or value types are undetermined.
       if (LOG.isWarnEnabled()) {
@@ -317,6 +333,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
      */
   }
 
+  @Override
   public void markCommitWithTimestamp(final byte[] xid, final byte[] ts)
       throws RocksDBException {
     /**
@@ -324,6 +341,26 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
      * implemented as and when need arises.
      */
 
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    if (closed.compareAndSet(false, true)) {
+      LOG.debug("Closing OMDBUpdatesHandler");
+
+      // Clear internal tracking map to help GC
+      // Note: We do NOT close tables obtained from omMetadataManager as they
+      // are owned and managed by the OMMetadataManager, not by this handler.
+      // Note: omdbUpdateEvents is intentionally NOT cleared here because
+      // getEvents() may be called after close() to retrieve the events
+      // for processing by ReconOmTasks
+      if (omdbLatestUpdateEvents != null) {
+        omdbLatestUpdateEvents.clear();
+      }
+
+      LOG.debug("OMDBUpdatesHandler cleanup completed");
+    }
   }
 
   /**

@@ -1,26 +1,40 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
+import static org.apache.hadoop.ozone.om.OzoneManager.getS3Auth;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
+
 import java.io.IOException;
+import java.net.InetAddress;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
@@ -31,32 +45,15 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
-import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import java.net.InetAddress;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
-import static org.apache.hadoop.ozone.om.OzoneManager.getS3Auth;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -64,8 +61,11 @@ import org.apache.hadoop.ozone.security.acl.OzoneAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
 
 /**
  * OM Metadata Reading class for the OM and Snapshot managers.
@@ -275,9 +275,13 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (isAclEnabled) {
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+            bucket, args.getKeyName());
+      }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
       audit.logReadFailure(
@@ -382,6 +386,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @param obj Ozone object.
    * @throws IOException if there is error.
    */
+  @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
 
     String volumeName = obj.getVolumeName();
@@ -425,6 +430,45 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         audit.logReadSuccess(
             buildAuditMessageForSuccess(OMAction.GET_ACL, obj.toAuditMap()));
       }
+    }
+  }
+
+  @Override
+  public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
+    long start = Time.monotonicNowNanos();
+
+    ResolvedBucket bucket = captureLatencyNs(
+        perfMetrics.getLookupResolveBucketLatencyNs(),
+        () -> ozoneManager.resolveBucketLink(args));
+
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = bucket.audit(args.toAuditMap());
+
+    OmKeyArgs resolvedArgs = bucket.update(args);
+
+    try {
+      if (isAclEnabled) {
+        captureLatencyNs(perfMetrics.getGetObjectTaggingAclCheckLatencyNs(),
+            () -> checkAcls(ResourceType.KEY, StoreType.OZONE,
+                ACLType.READ, bucket,
+                args.getKeyName())
+        );
+      }
+      metrics.incNumGetObjectTagging();
+      return keyManager.getObjectTagging(resolvedArgs, bucket);
+    } catch (Exception ex) {
+      metrics.incNumGetObjectTaggingFails();
+      auditSuccess = false;
+      audit.logReadFailure(buildAuditMessageForFailure(OMAction.GET_OBJECT_TAGGING,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        audit.logReadSuccess(buildAuditMessageForSuccess(OMAction.GET_OBJECT_TAGGING,
+            auditMap));
+      }
+
+      perfMetrics.addGetObjectTaggingLatencyNs(Time.monotonicNowNanos() - start);
     }
   }
 
@@ -618,7 +662,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   }
 
   private ResourceType getResourceType(OmKeyArgs args) {
-    if (args.getKeyName() == null || args.getKeyName().length() == 0) {
+    if (args.getKeyName() == null || args.getKeyName().isEmpty()) {
       return ResourceType.BUCKET;
     }
     return ResourceType.KEY;

@@ -1,31 +1,30 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.client.io;
-
-import org.apache.hadoop.crypto.CryptoOutputStream;
-import org.apache.hadoop.fs.Syncable;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import org.apache.hadoop.crypto.CryptoOutputStream;
+import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
@@ -105,6 +104,12 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
     outputStream.close();
   }
 
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
   public void hsync() throws IOException {
     // Disable the feature flag restores the prior behavior.
     if (!enableHsync) {
@@ -134,36 +139,28 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   public OutputStream getOutputStream() {
     return outputStream;
   }
-
+  
   public KeyOutputStream getKeyOutputStream() {
-    if (outputStream instanceof KeyOutputStream) {
-      return ((KeyOutputStream) outputStream);
-    } else  if (outputStream instanceof CryptoOutputStream) {
-      OutputStream wrappedStream =
-          ((CryptoOutputStream) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyOutputStream) {
-        return ((KeyOutputStream) wrappedStream);
-      }
-    } else if (outputStream instanceof CipherOutputStreamOzone) {
-      OutputStream wrappedStream =
-          ((CipherOutputStreamOzone) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyOutputStream) {
-        return ((KeyOutputStream)wrappedStream);
-      }
-    }
-    // Otherwise return null.
-    return null;
+    OutputStream base = unwrap(outputStream);
+    return base instanceof KeyOutputStream ? (KeyOutputStream) base : null;
   }
 
   @Override
   public Map<String, String> getMetadata() {
-    if (outputStream instanceof CryptoOutputStream) {
-      return ((KeyMetadataAware)((CryptoOutputStream) outputStream)
-          .getWrappedStream()).getMetadata();
-    } else if (outputStream instanceof CipherOutputStreamOzone) {
-      return ((KeyMetadataAware)((CipherOutputStreamOzone) outputStream)
-          .getWrappedStream()).getMetadata();
+    OutputStream base = unwrap(outputStream);
+    if (base instanceof KeyMetadataAware) {
+      return ((KeyMetadataAware) base).getMetadata();
     }
-    return ((KeyMetadataAware) outputStream).getMetadata();
+    throw new IllegalStateException(
+        "OutputStream is not KeyMetadataAware: " + base.getClass());
+  }
+
+  private static OutputStream unwrap(OutputStream out) {
+    if (out instanceof CryptoOutputStream) {
+      return ((CryptoOutputStream) out).getWrappedStream();
+    } else if (out instanceof CipherOutputStreamOzone) {
+      return ((CipherOutputStreamOzone) out).getWrappedStream();
+    }
+    return out;
   }
 }

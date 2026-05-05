@@ -38,3 +38,9 @@ Head Bucket not existent
                         Should contain          ${result}    404
                         Should contain          ${result}    Not Found
 
+Check bucket ownership verification
+    ${result} =  Execute AWSS3APICli and checkrc              head-bucket --bucket ${BUCKET} --expected-bucket-owner wrong-owner  255
+                 Should contain                               ${result}  403
+
+    ${correct_owner} =    Get bucket owner                    ${BUCKET}
+    Execute AWSS3APICli using bucket ownership verification   head-bucket --bucket ${BUCKET}    ${correct_owner}

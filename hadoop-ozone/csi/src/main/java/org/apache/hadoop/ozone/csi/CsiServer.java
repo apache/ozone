@@ -1,24 +1,28 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.csi;
 
+import io.grpc.Server;
+import io.grpc.netty.NettyServerBuilder;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerDomainSocketChannel;
+import io.netty.channel.unix.DomainSocketAddress;
 import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.Config;
@@ -29,12 +33,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
-
-import io.grpc.Server;
-import io.grpc.netty.NettyServerBuilder;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollServerDomainSocketChannel;
-import io.netty.channel.unix.DomainSocketAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -54,7 +52,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
   public Void call() throws Exception {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
             .toArray(new String[0]);
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = getOzoneConf();
     HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
             CsiServer.class, originalArgs, LOG, ozoneConfiguration);
     CsiConfig csiConfig = ozoneConfiguration.getObject(CsiConfig.class);
@@ -98,28 +96,28 @@ public class CsiServer extends GenericCli implements Callable<Void> {
   @ConfigGroup(prefix = "ozone.csi")
   public static class CsiConfig {
 
-    @Config(key = "socket",
+    @Config(key = "ozone.csi.socket",
         defaultValue = "/var/lib/csi.sock",
         description =
             "The socket where all the CSI services will listen (file name).",
         tags = ConfigTag.STORAGE)
     private String socketPath;
 
-    @Config(key = "default-volume-size",
+    @Config(key = "ozone.csi.default-volume-size",
         defaultValue = "1000000000",
         description =
             "The default size of the create volumes (if not specified).",
         tags = ConfigTag.STORAGE)
     private long defaultVolumeSize;
 
-    @Config(key = "s3g.address",
+    @Config(key = "ozone.csi.s3g.address",
         defaultValue = "http://localhost:9878",
         description =
             "The address of S3 Gateway endpoint.",
         tags = ConfigTag.STORAGE)
     private String s3gAddress;
 
-    @Config(key = "owner",
+    @Config(key = "ozone.csi.owner",
         defaultValue = "",
         description =
             "This is the username which is used to create the requested "
@@ -131,7 +129,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
         tags = ConfigTag.STORAGE)
     private String volumeOwner;
 
-    @Config(key = "mount.command",
+    @Config(key = "ozone.csi.mount.command",
         defaultValue = "goofys --endpoint %s %s %s",
         description =
             "This is the mount command which is used to publish volume."

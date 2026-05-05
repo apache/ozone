@@ -1,31 +1,33 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container;
 
-import java.io.Closeable;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
@@ -34,8 +36,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
  * ContainerManager is responsible for keeping track of all Containers and
  * managing all containers operations like creating, deleting etc.
  */
-public interface ContainerManager extends Closeable {
-
+public interface ContainerManager {
   /**
    * Reinitialize the containerManager with the updated container store.
    * @param containerStore Container Table
@@ -51,26 +52,44 @@ public interface ContainerManager extends Closeable {
   ContainerInfo getContainer(ContainerID containerID)
       throws ContainerNotFoundException;
 
-
   default List<ContainerInfo> getContainers() {
     return getContainers(ContainerID.valueOf(0), Integer.MAX_VALUE);
   }
+
   /**
-   * Returns containers under certain conditions.
-   * Search container IDs from start ID(exclusive),
+   * Returns container IDs under certain conditions.
+   * Search container IDs from start ID(inclusive),
    * The max size of the searching range cannot exceed the
    * value of count.
    *
-   * @param startID start containerID, >=0,
+   * @param startID start containerID, &gt;=0,
    * start searching at the head if 0.
-   * @param count count must be >= 0
-   *              Usually the count will be replace with a very big
+   * @param count count must be &gt;= 0
+   *              Usually the count will be replaced with a very big
+   *              value instead of being unlimited in case the db is very big.
+   * @param state container state
+   *
+   * @return a list of container IDs.
+   */
+  List<ContainerID> getContainerIDs(ContainerID startID, int count, LifeCycleState state);
+
+  /**
+   * Returns containers under certain conditions.
+   * Search container IDs from start ID(inclusive),
+   * The max size of the searching range cannot exceed the
+   * value of count.
+   *
+   * @param startID start containerID, &gt;=0,
+   * start searching at the head if 0.
+   * @param count count must be &gt;= 0
+   *              Usually the count will be replaced with a very big
    *              value instead of being unlimited in case the db is very big.
    *
    * @return a list of container.
    */
   List<ContainerInfo> getContainers(ContainerID startID, int count);
 
+  List<ContainerInfo> getContainers(ReplicationType type);
 
   /**
    * Returns all the containers which are in the specified state.
@@ -79,15 +98,16 @@ public interface ContainerManager extends Closeable {
    */
   List<ContainerInfo> getContainers(LifeCycleState state);
 
+
   /**
    * Returns containers under certain conditions.
    * Search container IDs from start ID(exclusive),
    * The max size of the searching range cannot exceed the
    * value of count.
    *
-   * @param startID start containerID, >=0,
+   * @param startID start containerID, &gt;=0,
    * start searching at the head if 0.
-   * @param count count must be >= 0
+   * @param count count must be &gt;= 0
    *              Usually the count will be replace with a very big
    *              value instead of being unlimited in case the db is very big.
    * @param state container state
@@ -132,6 +152,15 @@ public interface ContainerManager extends Closeable {
       throws IOException, InvalidStateTransitionException;
 
   /**
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
+   *
+   * @param containerID id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
+   * @throws IOException
+   */
+  void transitionDeletingOrDeletedToTargetState(ContainerID containerID, LifeCycleState targetState) throws IOException;
+
+  /**
    * Returns the latest list of replicas for given containerId.
    *
    * @param containerID Container ID
@@ -154,7 +183,6 @@ public interface ContainerManager extends Closeable {
    *
    * @param containerID Container ID
    * @param replica ContainerReplica
-   * @return True of dataNode is removed successfully else false.
    */
   void removeContainerReplica(ContainerID containerID, ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException;
@@ -180,8 +208,10 @@ public interface ContainerManager extends Closeable {
    * @param owner - the user which requires space in its owned container
    * @param pipeline - pipeline to which the container should belong.
    * @param excludedContainerIDS - containerIds to be excluded.
-   * @return ContainerInfo for the matching container.
+   * @return ContainerInfo for the matching container, or null if a container could not be found and could not be
+   * allocated
    */
+  @Nullable
   ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline,
                                      Set<ContainerID> excludedContainerIDS);
@@ -209,4 +239,14 @@ public interface ContainerManager extends Closeable {
    * @return containerStateManger
    */
   ContainerStateManager getContainerStateManager();
+
+  /**
+   * Update container info in the container manager.
+   * This is used for updating container metadata like ackMissing flag.
+   *
+   * @param containerInfo Updated container info proto
+   * @throws IOException
+   */
+  void updateContainerInfo(ContainerID containerID, ContainerInfoProto containerInfo)
+      throws IOException;
 }

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,18 +17,15 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
-
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
-
-import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
 import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.UUID;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
+import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests SnapshotInfo metadata data structure holding state info for
@@ -49,8 +45,6 @@ public class TestOmSnapshotInfo {
   private static final UUID GLOBAL_PREVIOUS_SNAPSHOT_ID =
       PATH_PREVIOUS_SNAPSHOT_ID;
   private static final String SNAPSHOT_PATH = "test/path";
-  private static final String CHECKPOINT_DIR = "checkpoint.testdir";
-  private static final long DB_TX_SEQUENCE_NUMBER = 12345L;
 
   private SnapshotInfo createSnapshotInfo() {
     return new SnapshotInfo.Builder()
@@ -64,14 +58,14 @@ public class TestOmSnapshotInfo {
         .setPathPreviousSnapshotId(PATH_PREVIOUS_SNAPSHOT_ID)
         .setGlobalPreviousSnapshotId(GLOBAL_PREVIOUS_SNAPSHOT_ID)
         .setSnapshotPath(SNAPSHOT_PATH)
-        .setCheckpointDir(CHECKPOINT_DIR)
-        .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(false)
         .setSstFiltered(false)
         .setReferencedSize(2000L)
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
+        .setExclusiveSizeDeltaFromDirDeepCleaning(2000L)
         .setExclusiveReplicatedSize(3000L)
+        .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(6000L)
         .setDeepCleanedDeletedDir(false)
         .build();
   }
@@ -88,14 +82,14 @@ public class TestOmSnapshotInfo {
         .setPathPreviousSnapshotID(toProtobuf(PATH_PREVIOUS_SNAPSHOT_ID))
         .setGlobalPreviousSnapshotID(toProtobuf(GLOBAL_PREVIOUS_SNAPSHOT_ID))
         .setSnapshotPath(SNAPSHOT_PATH)
-        .setCheckpointDir(CHECKPOINT_DIR)
-        .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(false)
         .setSstFiltered(false)
         .setReferencedSize(2000L)
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
         .setExclusiveReplicatedSize(3000L)
+        .setExclusiveSizeDeltaFromDirDeepCleaning(2000L)
+        .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(6000L)
         .setDeepCleanedDeletedDir(false)
         .build();
   }
@@ -167,10 +161,8 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getBucketName());
     assertEquals(snapshotInfoExpected.getSnapshotStatus(),
         snapshotInfoActual.getSnapshotStatus());
-    assertEquals(snapshotInfoExpected.getDbTxSequenceNumber(),
-        snapshotInfoActual.getDbTxSequenceNumber());
-    assertEquals(snapshotInfoExpected.getDeepClean(),
-        snapshotInfoActual.getDeepClean());
+    assertEquals(snapshotInfoExpected.isDeepCleaned(),
+        snapshotInfoActual.isDeepCleaned());
     assertEquals(snapshotInfoExpected.isSstFiltered(),
         snapshotInfoActual.isSstFiltered());
     assertEquals(snapshotInfoExpected.getReferencedSize(),
@@ -181,9 +173,12 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getExclusiveSize());
     assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
         snapshotInfoActual.getExclusiveReplicatedSize());
-    assertEquals(snapshotInfoExpected.getDeepCleanedDeletedDir(),
-        snapshotInfoActual.getDeepCleanedDeletedDir());
-
+    assertEquals(snapshotInfoExpected.isDeepCleanedDeletedDir(),
+        snapshotInfoActual.isDeepCleanedDeletedDir());
+    assertEquals(snapshotInfoExpected.getExclusiveSizeDeltaFromDirDeepCleaning(),
+        snapshotInfoActual.getExclusiveSizeDeltaFromDirDeepCleaning());
+    assertEquals(snapshotInfoExpected.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning(),
+        snapshotInfoActual.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning());
     assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
 

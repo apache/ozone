@@ -1,23 +1,26 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
+
+import io.opentelemetry.api.trace.Span;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,10 +31,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
-
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -43,6 +42,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CloseConta
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.EchoRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.EchoResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.FinalizeBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
@@ -53,14 +55,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.EchoRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.EchoResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
@@ -73,23 +74,20 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
-
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
-
 /**
  * Implementation of all container protocol calls performed by Container
  * clients.
  */
 public final class ContainerProtocolCalls  {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerProtocolCalls.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerProtocolCalls.class);
+
+  private static final List<Validator> VALIDATORS = createValidators();
 
   /**
    * There is no need to instantiate this class.
@@ -156,17 +154,17 @@ public final class ContainerProtocolCalls  {
       try {
         return op.apply(d);
       } catch (IOException e) {
-        Span span = GlobalTracer.get().activeSpan();
+        Span span = TracingUtil.getActiveSpan();
         if (e instanceof StorageContainerException) {
           StorageContainerException sce = (StorageContainerException)e;
           // Block token expired. There's no point retrying other DN.
           // Throw the exception to request a new block token right away.
           if (sce.getResult() == BLOCK_TOKEN_VERIFICATION_FAILED) {
-            span.log("block token verification failed at DN " + d);
+            span.addEvent("block token verification failed at DN " + d);
             throw e;
           }
         }
-        span.log("failed to connect to DN " + d);
+        span.addEvent("failed to connect to DN " + d);
         excluded.add(d);
         if (excluded.size() < pipeline.size()) {
           LOG.warn(toErrorMessage.apply(d)
@@ -296,6 +294,36 @@ public final class ContainerProtocolCalls  {
     return xceiverClient.sendCommandAsync(request);
   }
 
+  /**
+   * Calls the container protocol to finalize a container block.
+   *
+   * @param xceiverClient client to perform call
+   * @param blockID block ID to identify block
+   * @param token a token for this block (may be null)
+   * @return FinalizeBlockResponseProto
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static ContainerProtos.FinalizeBlockResponseProto finalizeBlock(
+      XceiverClientSpi xceiverClient, DatanodeBlockID blockID,
+      Token<OzoneBlockTokenIdentifier> token)
+      throws IOException {
+    FinalizeBlockRequestProto.Builder finalizeBlockRequest =
+        FinalizeBlockRequestProto.newBuilder().setBlockID(blockID);
+    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
+    ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder().setCmdType(Type.FinalizeBlock)
+            .setContainerID(blockID.getContainerID())
+            .setDatanodeUuid(id)
+            .setFinalizeBlock(finalizeBlockRequest);
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response =
+        xceiverClient.sendCommand(request, getValidatorList());
+    return response.getFinalizeBlock();
+  }
+
   public static ContainerCommandRequestProto getPutBlockRequest(
       Pipeline pipeline, BlockData containerBlockData, boolean eof,
       String tokenString) throws IOException {
@@ -343,18 +371,15 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    Span span = GlobalTracer.get()
-        .buildSpan("readChunk").start();
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
-      span.setTag("offset", chunk.getOffset())
-          .setTag("length", chunk.getLen())
-          .setTag("block", blockID.toString());
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("readChunk")) {
+      Span span = TracingUtil.getActiveSpan();
+      span.setAttribute("offset", chunk.getOffset())
+          .setAttribute("length", chunk.getLen())
+          .setAttribute("block", blockID.toString());
       return tryEachDatanode(xceiverClient.getPipeline(),
           d -> readChunk(xceiverClient, chunk, blockID,
               validators, builder, d),
           d -> toErrorMessage(chunk, blockID, d));
-    } finally {
-      span.finish();
     }
   }
 
@@ -365,8 +390,7 @@ public final class ContainerProtocolCalls  {
       DatanodeDetails d) throws IOException {
     ContainerCommandRequestProto.Builder requestBuilder = builder
         .setDatanodeUuid(d.getUuidString());
-    Span span = GlobalTracer.get().activeSpan();
-    String traceId = TracingUtil.exportSpan(span);
+    String traceId = TracingUtil.exportCurrentSpan();
     if (traceId != null) {
       requestBuilder = requestBuilder.setTraceID(traceId);
     }
@@ -408,10 +432,13 @@ public final class ContainerProtocolCalls  {
    * @param tokenString serialized block token
    * @throws IOException if there is an I/O error while performing the call
    */
+  @SuppressWarnings("parameternumber")
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      ByteString data, String tokenString, int replicationIndex)
+      ByteString data, String tokenString,
+      int replicationIndex, BlockData blockData, boolean close)
       throws IOException, ExecutionException, InterruptedException {
+
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
             .setBlockID(DatanodeBlockID.newBuilder()
@@ -422,6 +449,13 @@ public final class ContainerProtocolCalls  {
                 .build())
             .setChunkData(chunk)
             .setData(data);
+    if (blockData != null) {
+      PutBlockRequestProto.Builder createBlockRequest =
+          PutBlockRequestProto.newBuilder()
+              .setBlockData(blockData)
+              .setEof(close);
+      writeChunkRequest.setBlock(createBlockRequest);
+    }
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder()
@@ -524,6 +558,7 @@ public final class ContainerProtocolCalls  {
       String encodedToken) throws IOException {
     createContainer(client, containerID, encodedToken, null, 0);
   }
+
   /**
    * createContainer call that creates a container on the datanode.
    * @param client  - client
@@ -727,6 +762,45 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
+   * Gets the container checksum info for a container from a datanode. This method does not deserialize the checksum
+   * info.
+   *
+   * @param client - client that communicates with the container
+   * @param containerID - Container Id of the container
+   * @param encodedContainerID - Encoded token if security is enabled
+   *
+   * @throws IOException For errors communicating with the datanode.
+   * @throws StorageContainerException For errors obtaining the checksum info, including the file being missing or
+   * empty on the datanode, or the datanode not having a replica of the container.
+   */
+  public static ContainerProtos.GetContainerChecksumInfoResponseProto getContainerChecksumInfo(
+      XceiverClientSpi client, long containerID, String encodedContainerID) throws IOException {
+    ContainerProtos.GetContainerChecksumInfoRequestProto containerChecksumRequestProto =
+        ContainerProtos.GetContainerChecksumInfoRequestProto
+            .newBuilder()
+            .setContainerID(containerID)
+            .build();
+    String id = client.getPipeline().getClosestNode().getUuidString();
+
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+        .newBuilder()
+        .setCmdType(Type.GetContainerChecksumInfo)
+        .setContainerID(containerID)
+        .setDatanodeUuid(id)
+        .setGetContainerChecksumInfo(containerChecksumRequestProto);
+    if (encodedContainerID != null) {
+      builder.setEncodedToken(encodedContainerID);
+    }
+    String traceId = TracingUtil.exportCurrentSpan();
+    if (traceId != null) {
+      builder.setTraceID(traceId);
+    }
+    ContainerCommandRequestProto request = builder.build();
+    ContainerCommandResponseProto response = client.sendCommand(request, getValidatorList());
+    return response.getGetContainerChecksumInfo();
+  }
+
+  /**
    * Validates a response from a container protocol call.  Any non-successful
    * return code is mapped to a corresponding exception and thrown.
    *
@@ -752,8 +826,6 @@ public final class ContainerProtocolCalls  {
   private static List<Validator> getValidatorList() {
     return VALIDATORS;
   }
-
-  private static final List<Validator> VALIDATORS = createValidators();
 
   private static List<Validator> createValidators() {
     return singletonList(
@@ -833,4 +905,36 @@ public final class ContainerProtocolCalls  {
     return datanodeToResponseMap;
   }
 
+  public static ContainerCommandRequestProto buildReadBlockCommandProto(
+      BlockID blockID, long offset, long length, int responseDataSize,
+      Token<? extends TokenIdentifier> token, Pipeline pipeline)
+      throws IOException {
+    final DatanodeDetails datanode = pipeline.getClosestNode();
+    final DatanodeBlockID datanodeBlockID = getDatanodeBlockID(blockID, datanode, pipeline.getReplicaIndexes());
+    final ReadBlockRequestProto.Builder readBlockRequest = ReadBlockRequestProto.newBuilder()
+        .setOffset(offset)
+        .setLength(length)
+        .setResponseDataSize(responseDataSize)
+        .setBlockID(datanodeBlockID);
+    final ContainerCommandRequestProto.Builder builder =
+        ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)
+            .setContainerID(blockID.getContainerID());
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
+    return builder.setDatanodeUuid(datanode.getUuidString())
+        .setReadBlock(readBlockRequest)
+        .build();
+  }
+
+  static DatanodeBlockID getDatanodeBlockID(BlockID blockID, DatanodeDetails datanode,
+      Map<DatanodeDetails, Integer> replicaIndexes) {
+    final DatanodeBlockID.Builder b = blockID.getDatanodeBlockIDProtobufBuilder();
+    final int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
+    if (replicaIndex > 0) {
+      b.setReplicaIndex(replicaIndex);
+    }
+    return b.build();
+  }
 }
