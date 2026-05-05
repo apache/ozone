@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.ozone.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,11 +74,11 @@ class TestRewriteTablePathOzoneAction {
   private Table table = null;
 
   @TempDir
-  private java.nio.file.Path tableDir;
+  private Path tableDir;
   @TempDir
-  private java.nio.file.Path targetDir;
+  private Path targetDir;
   @TempDir
-  private java.nio.file.Path stagingDir;
+  private Path stagingDir;
 
   @BeforeEach
   public void setupTableLocation() {
@@ -233,8 +235,20 @@ class TestRewriteTablePathOzoneAction {
 
     assertTrue(targetPath.startsWith(target),
         "Target path in CSV should start with target prefix: " + targetPath);
+    assertEquals(RewriteTablePathUtil.fileName(stagingPath), RewriteTablePathUtil.fileName(targetPath),
+        "original and target metadata file should have the same filename");
 
     TableMetadata rewritten = new StaticTableOperations(stagingPath, table.io()).current();
+    TableMetadata original = new StaticTableOperations(
+        targetPath.replace(targetPrefix, sourcePrefix), table.io()).current();
+    Set<String> expectedMetadata = original.previousFiles().stream()
+        .map(e -> RewriteTablePathUtil.fileName(e.file()))
+        .collect(Collectors.toSet());
+    Set<String> expectedManifestLists = original.snapshots().stream()
+        .map(s -> RewriteTablePathUtil.fileName(s.manifestListLocation()))
+        .collect(Collectors.toSet());
+    Set<String> actualMetadata = new HashSet<>();
+    Set<String> actualManifestLists = new HashSet<>();
 
     assertTrue(rewritten.location().startsWith(target),
         "Metadata location should start with target: " + rewritten.location());
@@ -242,19 +256,40 @@ class TestRewriteTablePathOzoneAction {
     for (MetadataLogEntry entry : rewritten.previousFiles()) {
       assertTrue(entry.file().startsWith(target),
           "Metadata log entry should start with target: " + entry.file());
+      actualMetadata.add(RewriteTablePathUtil.fileName(entry.file()));
     }
+
+    assertEquals(expectedMetadata, actualMetadata, 
+        "Rewritten metadata file should reference the same metadata files as the original");
 
     for (Snapshot snapshot : rewritten.snapshots()) {
       String manifestList = snapshot.manifestListLocation();
       assertTrue(manifestList.startsWith(target),
-          "Snapshot manifest-list should start with target: " + manifestList);
+          "Snapshot's manifest-list should start with target: " + manifestList);
+      actualManifestLists.add(RewriteTablePathUtil.fileName(manifestList));
     }
+    assertEquals(expectedManifestLists, actualManifestLists,
+        "Rewritten metadata file should reference the same manifest-lists as the original");
   }
 
   private void assertManifestListRewritten(String stagingPath, String targetPath, String target) throws Exception {
 
     assertTrue(targetPath.startsWith(target),
         "Manifest list target path should start with target prefix: " + targetPath);
+    assertEquals(RewriteTablePathUtil.fileName(stagingPath), RewriteTablePathUtil.fileName(targetPath),
+        "original and target manifest list should have the same filename");
+
+    Set<String> expectedManifests = new HashSet<>();
+    Set<String> actualManifests = new HashSet<>();
+    for (Snapshot s : table.snapshots()) {
+      if (RewriteTablePathUtil.fileName(s.manifestListLocation()).equals(RewriteTablePathUtil.fileName(stagingPath))) {
+        expectedManifests = s.allManifests(table.io())
+            .stream()
+            .map(m -> RewriteTablePathUtil.fileName(m.path()))
+            .collect(Collectors.toSet());
+        break;
+      }
+    }
 
     try (CloseableIterable<ManifestFile> manifests =
              InternalData.read(FileFormat.AVRO, table.io().newInputFile(stagingPath))
@@ -266,10 +301,12 @@ class TestRewriteTablePathOzoneAction {
                  .build()) {
       for (ManifestFile manifest : manifests) {
         assertTrue(manifest.path().startsWith(target),
-            "Manifest path inside staged manifest list should start with target prefix: "
-                + manifest.path());
+            "Manifest path inside staged manifest list should start with target prefix: " + manifest.path());
+        actualManifests.add(RewriteTablePathUtil.fileName(manifest.path()));
       }
     }
+    assertEquals(expectedManifests, actualManifests,
+        "Rewritten manifest list should reference the same manifest files as the original");
   }
 
   private static List<String> metadataLogEntryPaths(Table tbl) {
