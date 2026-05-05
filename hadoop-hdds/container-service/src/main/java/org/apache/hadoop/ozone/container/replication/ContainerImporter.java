@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -101,10 +102,18 @@ public class ContainerImporter {
       doImportContainer(containerID, tarFilePath, targetVolume, compression);
     } finally {
       importContainerProgress.remove(containerID);
-      deleteFileQuietely(tarFilePath);
+      FileUtils.deleteQuietly(tarFilePath.toFile());
     }
   }
 
+  /**
+   * Imports a container and retries on alternate volumes only when the selected
+   * volume already has the container directory.
+   *
+   * The caller is responsible for releasing committed bytes on
+   * initialTargetVolume. This method releases committed bytes only for
+   * retry-selected volumes.
+   */
   public void importContainerWithVolumeRetry(long containerID, Path tarFilePath,
       HddsVolume initialTargetVolume, CopyContainerCompression compression,
       long spaceToReserve) throws IOException {
@@ -145,14 +154,14 @@ public class ContainerImporter {
           lastException, ContainerProtos.Result.CONTAINER_ALREADY_EXISTS);
     } finally {
       importContainerProgress.remove(containerID);
-      deleteFileQuietely(tarFilePath);
+      FileUtils.deleteQuietly(tarFilePath.toFile());
     }
   }
 
   private void markContainerImportInProgress(long containerID, Path tarFilePath)
       throws StorageContainerException {
     if (!importContainerProgress.add(containerID)) {
-      deleteFileQuietely(tarFilePath);
+      FileUtils.deleteQuietly(tarFilePath.toFile());
       String log = "Container import in progress with container Id " + containerID;
       LOG.warn(log);
       throw new StorageContainerException(log,
@@ -256,15 +265,6 @@ public class ContainerImporter {
     return ex instanceof StorageContainerException &&
         ((StorageContainerException) ex).getResult() ==
             ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
-  }
-
-  private static void deleteFileQuietely(Path tarFilePath) {
-    try {
-      Files.delete(tarFilePath);
-    } catch (Exception ex) {
-      LOG.error("Got exception while deleting temporary container file: "
-          + tarFilePath.toAbsolutePath(), ex);
-    }
   }
 
   HddsVolume chooseNextVolume(long spaceToReserve) throws IOException {

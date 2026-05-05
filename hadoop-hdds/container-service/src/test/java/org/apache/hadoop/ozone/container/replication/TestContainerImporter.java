@@ -240,6 +240,91 @@ class TestContainerImporter {
   @Test
   public void testImportWithVolumeRetrySkipsSelectedVolumeWithContainerDir()
       throws Exception {
+    List<HddsVolume> volumes = setupTwoVolumeImporterWithMockPolicy();
+    HddsVolume firstVolume = volumes.get(0);
+    HddsVolume secondVolume = volumes.get(1);
+    long secondInitialCommittedBytes = secondVolume.getCommittedBytes();
+
+    File staleContainerDir = createStaleContainerDir(firstVolume, containerId);
+
+    File tarFile = containerTarFile(containerId, containerData);
+    containerImporter.importContainerWithVolumeRetry(containerId,
+        tarFile.toPath(), firstVolume, NO_COMPRESSION,
+        containerImporter.getDefaultReplicationSpace());
+
+    assertEquals(secondVolume, containerData.getVolume());
+    assertThat(staleContainerDir).exists();
+    assertEquals(secondInitialCommittedBytes, secondVolume.getCommittedBytes());
+    verify(containerSet, atLeastOnce()).scanContainer(containerId,
+        "Imported container");
+  }
+
+  @Test
+  public void testImportWithVolumeRetryFailsWhenAllVolumesHaveContainerDir()
+      throws Exception {
+    List<HddsVolume> volumes = setupTwoVolumeImporterWithMockPolicy();
+    HddsVolume firstVolume = volumes.get(0);
+    HddsVolume secondVolume = volumes.get(1);
+    long spaceToReserve = containerImporter.getDefaultReplicationSpace();
+    long firstInitialCommittedBytes = firstVolume.getCommittedBytes();
+    long secondInitialCommittedBytes = secondVolume.getCommittedBytes();
+
+    firstVolume.incCommittedBytes(spaceToReserve);
+    createStaleContainerDir(firstVolume, containerId);
+    createStaleContainerDir(secondVolume, containerId);
+
+    File tarFile = containerTarFile(containerId, containerData);
+    StorageContainerException exception =
+        assertThrows(StorageContainerException.class,
+            () -> containerImporter.importContainerWithVolumeRetry(containerId,
+                tarFile.toPath(), firstVolume, NO_COMPRESSION,
+                spaceToReserve));
+
+    assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS,
+        exception.getResult());
+    assertThat(exception).hasMessageContaining(
+        "already exists on all candidate volumes");
+    assertThat(tarFile).doesNotExist();
+    assertEquals(firstInitialCommittedBytes + spaceToReserve,
+        firstVolume.getCommittedBytes());
+    firstVolume.incCommittedBytes(-spaceToReserve);
+    assertEquals(firstInitialCommittedBytes, firstVolume.getCommittedBytes());
+    assertEquals(secondInitialCommittedBytes, secondVolume.getCommittedBytes());
+    assertEquals(0, containerSet.containerCount());
+    verify(controllerMock, times(0)).importContainer(any(ContainerData.class),
+        any(), any());
+  }
+
+  @Test
+  public void testImportWithVolumeRetryDoesNotRetryNonContainerExistsFailure()
+      throws Exception {
+    List<HddsVolume> volumes = setupTwoVolumeImporterWithMockPolicy();
+    HddsVolume firstVolume = volumes.get(0);
+    long spaceToReserve = containerImporter.getDefaultReplicationSpace();
+    long firstInitialCommittedBytes = firstVolume.getCommittedBytes();
+    firstVolume.incCommittedBytes(spaceToReserve);
+
+    when(controllerMock.importContainer(any(ContainerData.class), any(), any()))
+        .thenThrow(new IOException("non-retriable"));
+
+    File tarFile = containerTarFile(containerId, containerData);
+    IOException exception = assertThrows(IOException.class,
+        () -> containerImporter.importContainerWithVolumeRetry(containerId,
+            tarFile.toPath(), firstVolume, NO_COMPRESSION, spaceToReserve));
+
+    assertThat(exception).hasMessageContaining("non-retriable");
+    assertThat(tarFile).doesNotExist();
+    assertEquals(firstInitialCommittedBytes + spaceToReserve,
+        firstVolume.getCommittedBytes());
+    firstVolume.incCommittedBytes(-spaceToReserve);
+    assertEquals(firstInitialCommittedBytes, firstVolume.getCommittedBytes());
+    verify(controllerMock, times(1)).importContainer(any(ContainerData.class),
+        any(), any());
+    verify(volumeChoosingPolicy, times(0)).chooseVolume(any(), anyLong());
+  }
+
+  private List<HddsVolume> setupTwoVolumeImporterWithMockPolicy()
+      throws IOException {
     File volume2 = Files.createDirectory(tempDir.toPath().resolve("volume2"))
         .toFile();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
@@ -259,29 +344,18 @@ class TestContainerImporter {
     containerImporter = new ContainerImporter(conf,
         containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
 
-    List<HddsVolume> volumes =
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
-    HddsVolume firstVolume = volumes.get(0);
-    HddsVolume secondVolume = volumes.get(1);
-    long secondInitialCommittedBytes = secondVolume.getCommittedBytes();
+    return StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+  }
 
+  private File createStaleContainerDir(HddsVolume volume, long id)
+      throws IOException {
     String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
-        firstVolume, firstVolume.getClusterID());
+        volume, volume.getClusterID());
     File staleContainerDir = new File(KeyValueContainerLocationUtil
-        .getBaseContainerLocation(firstVolume.getHddsRootDir().toString(),
-            idDir, containerId));
+        .getBaseContainerLocation(volume.getHddsRootDir().toString(),
+            idDir, id));
     assertThat(staleContainerDir.mkdirs()).isTrue();
-
-    File tarFile = containerTarFile(containerId, containerData);
-    containerImporter.importContainerWithVolumeRetry(containerId,
-        tarFile.toPath(), firstVolume, NO_COMPRESSION,
-        containerImporter.getDefaultReplicationSpace());
-
-    assertEquals(secondVolume, containerData.getVolume());
-    assertThat(staleContainerDir).exists();
-    assertEquals(secondInitialCommittedBytes, secondVolume.getCommittedBytes());
-    verify(containerSet, atLeastOnce()).scanContainer(containerId,
-        "Imported container");
+    return staleContainerDir;
   }
 
   private File containerTarFile(long id, ContainerData data) throws IOException {
