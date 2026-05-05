@@ -31,6 +31,8 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.GRPC_MAX_CONNECTIONS_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.GRPC_MAX_CONNECTIONS_KEY;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.GRPC_SO_BACKLOG_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.GRPC_SO_BACKLOG_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
@@ -324,5 +326,35 @@ public class TestDatanodeConfiguration {
     subject.setGrpcMaxConnections(8000);
 
     assertEquals(8000, subject.getGrpcMaxConnections());
+  }
+
+  @Test
+  void testGrpcSoBacklogDefault() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(GRPC_SO_BACKLOG_DEFAULT, subject.getGrpcSoBacklog());
+  }
+
+  @Test
+  void testGrpcSoBacklogCustomValue() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    int customSoBacklog = 256;
+    conf.setInt(GRPC_SO_BACKLOG_KEY, customSoBacklog);
+
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    assertEquals(customSoBacklog, subject.getGrpcSoBacklog());
+  }
+
+  @Test
+  void testGrpcSoBacklogSetter() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+
+    subject.setGrpcSoBacklog(512);
+
+    assertEquals(512, subject.getGrpcSoBacklog());
   }
 }
