@@ -52,13 +52,10 @@ public class TestPendingContainerTrackerIntegration {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestPendingContainerTrackerIntegration.class);
   private MiniOzoneCluster cluster;
-  private StorageContainerManager scm;
   private OzoneClient client;
   private ContainerManager containerManager;
-  private PendingContainerTracker pendingTracker;
   private SCMNodeMetrics metrics;
   private OzoneBucket bucket;
-  private SCMNodeManager nodeManager;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -80,16 +77,16 @@ public class TestPendingContainerTrackerIntegration {
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
     
-    scm = cluster.getStorageContainerManager();
+    StorageContainerManager scm = cluster.getStorageContainerManager();
     containerManager = scm.getContainerManager();
     client = cluster.newClient();
-    
+
     // Create bucket for testing
     bucket = TestDataUtil.createVolumeAndBucket(client);
-    
-    nodeManager = (SCMNodeManager) scm.getScmNodeManager();
+
+    SCMNodeManager nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     assertNotNull(nodeManager);
-    pendingTracker = nodeManager.getPendingContainerTracker();
+    PendingContainerTracker pendingTracker = nodeManager.getPendingContainerTracker();
     assertNotNull(pendingTracker, "PendingContainerTracker should be initialized");
     metrics = pendingTracker.getMetrics();
     
