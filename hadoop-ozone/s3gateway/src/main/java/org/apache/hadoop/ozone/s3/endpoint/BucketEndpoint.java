@@ -64,7 +64,6 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -286,19 +285,19 @@ public class BucketEndpoint extends BucketOperationHandler {
   @HEAD
   public Response head(@PathParam(BUCKET) String bucketName)
       throws OS3Exception, IOException {
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.HEAD_BUCKET;
+    S3RequestContext context = new S3RequestContext(this, S3GAction.HEAD_BUCKET);
+    long startNanos = context.getStartNanos();
     try {
       OzoneBucket bucket = getVolume().getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-      auditReadSuccess(s3GAction);
+      auditReadSuccess(context.getAction());
       getMetrics().updateHeadBucketSuccessStats(startNanos);
       return Response.ok().build();
     } catch (OMException e) {
-      auditReadFailure(s3GAction, e);
+      auditReadFailure(context.getAction(), e);
       throw newError(bucketName, e);
     } catch (Exception e) {
-      auditReadFailure(s3GAction, e);
+      auditReadFailure(context.getAction(), e);
       throw e;
     }
   }
@@ -338,7 +337,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       @QueryParam(QueryParams.DELETE) String delete,
       MultiDeleteRequest request
   ) throws OS3Exception, IOException {
-    S3GAction s3GAction = S3GAction.MULTI_DELETE;
+    S3RequestContext context = new S3RequestContext(this, S3GAction.MULTI_DELETE);
 
     OzoneBucket bucket = getVolume().getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
@@ -349,7 +348,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       for (DeleteObject keyToDelete : request.getObjects()) {
         deleteKeys.add(keyToDelete.getKey());
       }
-      long startNanos = Time.monotonicNowNanos();
+      long startNanos = context.getStartNanos();
       try {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
@@ -377,7 +376,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       }
     }
 
-    AuditMessage.Builder message = auditMessageFor(s3GAction);
+    AuditMessage.Builder message = auditMessageFor(context.getAction());
     message.getParams().put("failedDeletes", deleteKeys.toString());
 
     if (!result.getErrors().isEmpty()) {

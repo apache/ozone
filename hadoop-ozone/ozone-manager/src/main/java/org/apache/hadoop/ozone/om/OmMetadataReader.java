@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -236,9 +237,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     try {
       if (isAclEnabled) {
         if (isStsS3Request()) {
-          // We need to be able to tell the difference between being able to download a file and merely seeing the file
-          // name in a list.  Use READ for download ability and LIST (here) for listing.
-          // When listPrefix is set (original S3 ListObjects prefix), authorize LIST on that prefix for the whole
+          // When listPrefix is set (original S3 ListObjects prefix), authorize READ on that prefix for the whole
           // listing, including FSO traversal where keyName is an internal directory (e.g. userA) under prefix user.
           final String listPrefix = args.getListPrefix();
           final String keyName = args.getKeyName();
@@ -258,7 +257,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
           } else {
             aclKey = "*";
           }
-          checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey);
+          checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(), aclKey);
         } else {
           checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
               bucket, args.getKeyName());
@@ -304,12 +303,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     try {
       if (isAclEnabled) {
-        if (isStsS3Request()) {
-          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.LIST, bucket, args.getKeyName());
-        } else {
-          checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-              bucket, args.getKeyName());
-        }
+        checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
       }
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args, getClientAddress());
@@ -384,7 +378,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
           final String aclKey = (keyPrefix == null || keyPrefix.isEmpty()) ? "*" : keyPrefix;
           captureLatencyNs(
               perfMetrics.getListKeysAclCheckLatencyNs(), () -> checkAcls(
-                  ResourceType.KEY, StoreType.OZONE, ACLType.LIST, bucket.realVolume(), bucket.realBucket(), aclKey));
+                  ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(), aclKey));
         } else {
           captureLatencyNs(perfMetrics.getListKeysAclCheckLatencyNs(), () ->
               checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
@@ -634,7 +628,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public boolean checkAcls(OzoneObj obj, RequestContext context,
       boolean throwIfPermissionDenied) throws OMException {
 
-    final RequestContext normalizedRequestContext = maybeAttachSessionPolicyFromThreadLocal(context);
+    final RequestContext normalizedRequestContext = maybeAttachS3ActionFromThreadLocal(
+        maybeAttachSessionPolicyFromThreadLocal(context));
 
     if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
         () -> accessAuthorizer.checkAccess(obj, normalizedRequestContext))) {
@@ -689,6 +684,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
 
     return context.toBuilder()
         .setSessionPolicy(stsTokenIdentifier.getSessionPolicy())
+        .build();
+  }
+
+  /**
+   * Attaches s3 action to RequestContext if an S3Authentication is found in the Ozone Manager thread local,
+   * and it has an s3 action.  Otherwise, returns the RequestContext as it was before.
+   * @param context the original RequestContext
+   * @return RequestContext as before or with s3 action embedded
+   */
+  private RequestContext maybeAttachS3ActionFromThreadLocal(RequestContext context) {
+    final S3Authentication s3Authentication = OzoneManager.getS3Auth();
+    if (s3Authentication == null || !s3Authentication.hasS3Action()) {
+      return context;
+    }
+    return context.toBuilder()
+        .setS3Action(s3Authentication.getS3Action())
         .build();
   }
 

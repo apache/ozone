@@ -332,6 +332,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       if (threadLocalS3Auth.get().getSessionToken() != null) {
         s3AuthBuilder.setSessionToken(threadLocalS3Auth.get().getSessionToken());
       }
+      if (threadLocalS3Auth.get().getS3Action() != null) {
+        s3AuthBuilder.setS3Action(threadLocalS3Auth.get().getS3Action());
+      }
 
       builder.setS3Authentication(s3AuthBuilder.build());
     }
@@ -1788,10 +1791,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest))
         .getCommitMultiPartUploadResponse();
 
-    OmMultipartCommitUploadPartInfo info = new
-        OmMultipartCommitUploadPartInfo(response.getPartName(),
-          response.getETag());
-    return info;
+    return new OmMultipartCommitUploadPartInfo(response.getPartName(), response.getETag());
   }
 
   @Override

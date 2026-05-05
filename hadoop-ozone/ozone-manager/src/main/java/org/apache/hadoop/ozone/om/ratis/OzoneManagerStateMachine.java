@@ -664,6 +664,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+    boolean isS3AuthThreadLocalSet = false;
     boolean isStsThreadLocalSet = false;
     try {
       if (ozoneManager.isSecurityEnabled() && request.hasS3Authentication()) {
@@ -672,6 +673,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
 
         final OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
+        // ThreadLocal carries S3 action for OmMetadataReader.
+        OzoneManager.setS3Auth(s3Auth);
+        isS3AuthThreadLocalSet = true;
+
         if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
           // ThreadLocal carries session policy for OmMetadataReader
           final STSTokenIdentifier rehydratedTokenIdentifier = new STSTokenIdentifier(
@@ -706,6 +711,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
     } finally {
+      if (isS3AuthThreadLocalSet) {
+        OzoneManager.setS3Auth(null);
+      }
       if (isStsThreadLocalSet) {
         OzoneManager.setStsTokenIdentifier(null);
       }
