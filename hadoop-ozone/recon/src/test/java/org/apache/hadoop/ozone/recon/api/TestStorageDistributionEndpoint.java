@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
@@ -208,16 +207,16 @@ public class TestStorageDistributionEndpoint {
     List<String> headers = Arrays.asList(
         "HostName",
         "Datanode UUID",
-        "Filesystem Capacity (GB)",
-        "Filesystem Used Space (GB)",
-        "Filesystem Remaining Space (GB)",
-        "Ozone Capacity (GB)",
-        "Ozone Used Space (GB)",
-        "Ozone Remaining Space (GB)",
-        "PreAllocated Container Space (GB)",
-        "Reserved Space (GB)",
-        "Minimum Free Space (GB)",
-        "Pending Block Size (GB)");
+        "Filesystem Capacity (Bytes)",
+        "Filesystem Used Space (Bytes)",
+        "Filesystem Remaining Space (Bytes)",
+        "Ozone Capacity (Bytes)",
+        "Ozone Used Space (Bytes)",
+        "Ozone Remaining Space (Bytes)",
+        "PreAllocated Container Space (Bytes)",
+        "Reserved Space (Bytes)",
+        "Minimum Free Space (Bytes)",
+        "Pending Block Size (Bytes)");
     csvRows.add(String.join(",", headers));
 
     List<DatanodePendingDeletionMetrics> pendingDeletionMetrics = new ArrayList<>();
@@ -242,16 +241,17 @@ public class TestStorageDistributionEndpoint {
       csvRows.add(String.join(CSV_SEPARATOR,
           Arrays.asList(hostName,
               uuid.toString(),
-              String.format("%.2f", (double) FS_CAPACITY / OzoneConsts.GB),
-              String.format("%.2f", (double) FS_USED / OzoneConsts.GB),
-              String.format("%.2f", (double) FS_AVAILABLE / OzoneConsts.GB),
-              String.format("%.2f", (double) OZONE_CAPACITY / OzoneConsts.GB),
-              String.format("%.2f", (double) OZONE_USED / OzoneConsts.GB),
-              String.format("%.2f", (double) OZONE_REMAINING / OzoneConsts.GB),
-              String.format("%.2f", (double) COMMITTED / OzoneConsts.GB),
-              String.format("%.2f", (double) RESERVED / OzoneConsts.GB),
-              String.format("%.2f", (double) MIN_FREE_SPACE / OzoneConsts.GB),
-              String.format("%.2f", (double) PENDING_DELETION_SIZE / OzoneConsts.GB))));
+              String.valueOf(FS_CAPACITY),
+              String.valueOf(FS_USED),
+              String.valueOf(FS_AVAILABLE),
+              String.valueOf(OZONE_CAPACITY),
+              String.valueOf(OZONE_USED),
+              String.valueOf(OZONE_REMAINING),
+              String.valueOf(COMMITTED),
+              String.valueOf(RESERVED),
+              String.valueOf(MIN_FREE_SPACE),
+              String.valueOf(PENDING_DELETION_SIZE))));
+
     }
     when(nodeManager.getAllNodes()).thenReturn(dataNodes);
 

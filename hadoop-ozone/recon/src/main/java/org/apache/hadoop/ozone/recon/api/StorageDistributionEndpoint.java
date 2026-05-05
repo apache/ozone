@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -200,32 +199,32 @@ public class StorageDistributionEndpoint {
     List<String> headers = Arrays.asList(
         "HostName",
         "Datanode UUID",
-        "Filesystem Capacity (GB)",
-        "Filesystem Used Space (GB)",
-        "Filesystem Remaining Space (GB)",
-        "Ozone Capacity (GB)",
-        "Ozone Used Space (GB)",
-        "Ozone Remaining Space (GB)",
-        "PreAllocated Container Space (GB)",
-        "Reserved Space (GB)",
-        "Minimum Free Space (GB)",
-        "Pending Block Size (GB)"
+        "Filesystem Capacity (Bytes)",
+        "Filesystem Used Space (Bytes)",
+        "Filesystem Remaining Space (Bytes)",
+        "Ozone Capacity (Bytes)",
+        "Ozone Used Space (Bytes)",
+        "Ozone Remaining Space (Bytes)",
+        "PreAllocated Container Space (Bytes)",
+        "Reserved Space (Bytes)",
+        "Minimum Free Space (Bytes)",
+        "Pending Block Size (Bytes)"
     );
 
     List<Function<DataNodeStoragePendingDeletionView, Object>> columns =
         Arrays.asList(
             v -> v.getMetric() != null ? v.getMetric().getHostName() : "Unknown",
             v -> v.getMetric() != null ? v.getMetric().getDatanodeUuid() : "Unknown",
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getFilesystemCapacity()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getFilesystemUsed()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getFilesystemAvailable()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getCapacity()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getUsed()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getRemaining()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getCommitted()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getReserved()) : -1,
-            v -> v.getReport() != null ? formatBytesToGB(v.getReport().getMinimumFreeSpace()) : -1,
-            v -> v.getMetric() != null ? formatBytesToGB(v.getMetric().getPendingBlockSize()) : -1
+            v -> v.getReport() != null ? v.getReport().getFilesystemCapacity() : -1,
+            v -> v.getReport() != null ? v.getReport().getFilesystemUsed() : -1,
+            v -> v.getReport() != null ? v.getReport().getFilesystemAvailable() : -1,
+            v -> v.getReport() != null ? v.getReport().getCapacity() : -1,
+            v -> v.getReport() != null ? v.getReport().getUsed() : -1,
+            v -> v.getReport() != null ? v.getReport().getRemaining() : -1,
+            v -> v.getReport() != null ? v.getReport().getCommitted() : -1,
+            v -> v.getReport() != null ? v.getReport().getReserved() : -1,
+            v -> v.getReport() != null ? v.getReport().getMinimumFreeSpace() : -1,
+            v -> v.getMetric() != null ? v.getMetric().getPendingBlockSize() : -1
         );
 
     String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMATTER);
@@ -419,12 +418,5 @@ public class StorageDistributionEndpoint {
     DatanodeStorageReport getReport() {
       return report;
     }
-  }
-
-  /**
-   * Converts a raw byte count into a GB string formatted to 2 decimal places.
-   */
-  private String formatBytesToGB(long bytes) {
-    return String.format("%.2f", (double) bytes / OzoneConsts.GB);
   }
 }
