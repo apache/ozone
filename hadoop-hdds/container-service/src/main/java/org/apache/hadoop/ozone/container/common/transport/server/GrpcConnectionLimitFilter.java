@@ -53,6 +53,9 @@ public class GrpcConnectionLimitFilter extends ServerTransportFilter {
     this.maxConnections = maxConnections;
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public Attributes transportReady(Attributes transportAttrs) {
     if (maxConnections <= 0) {
@@ -78,6 +81,9 @@ public class GrpcConnectionLimitFilter extends ServerTransportFilter {
     return super.transportReady(transportAttrs);
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public void transportTerminated(Attributes transportAttrs) {
     if (maxConnections > 0) {
@@ -90,18 +96,34 @@ public class GrpcConnectionLimitFilter extends ServerTransportFilter {
     super.transportTerminated(transportAttrs);
   }
 
+  /**
+   * Returns the current number of active connections.
+   * @return the number of active connections
+   */
   public int getActiveConnections() {
     return activeConnections.get();
   }
 
+  /**
+   * Returns the total number of connections accepted since server start.
+   * @return the total accepted connections count
+   */
   public long getTotalAcceptedConnections() {
     return totalAcceptedConnections.get();
   }
 
+  /**
+   * Returns the total number of connections rejected since server start.
+   * @return the total rejected connections count
+   */
   public long getTotalRejectedConnections() {
     return totalRejectedConnections.get();
   }
 
+  /**
+   * Returns the configured maximum number of connections.
+   * @return the maximum connections limit
+   */
   public int getMaxConnections() {
     return maxConnections;
   }
