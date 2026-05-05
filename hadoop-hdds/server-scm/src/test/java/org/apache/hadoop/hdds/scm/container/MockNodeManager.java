@@ -454,15 +454,6 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
-    DatanodeDetails dd = nodeMetricMap.keySet().stream()
-        .filter(d -> d.getID().equals(datanodeID))
-        .findFirst().orElse(null);
-    DatanodeInfo info = getDatanodeInfo(dd);
-    pendingContainerTracker.recordPendingAllocationForDatanode(info, containerID);
-  }
-
-  @Override
   public boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID) {
     DatanodeDetails dd = nodeMetricMap.keySet().stream()
         .filter(d -> d.getID().equals(datanodeID))
@@ -979,18 +970,6 @@ public class MockNodeManager implements NodeManager {
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
-  }
-
-  @Override
-  public boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID) {
-    DatanodeDetails dd = nodeMetricMap.keySet().stream()
-        .filter(d -> d.getID().equals(datanodeID))
-        .findFirst().orElse(null);
-    DatanodeInfo info = getDatanodeInfo(dd);
-    if (info == null) {
-      return false;
-    }
-    return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(info);
   }
 
   /**

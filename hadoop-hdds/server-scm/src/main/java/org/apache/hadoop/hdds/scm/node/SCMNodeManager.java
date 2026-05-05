@@ -1079,30 +1079,6 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  /**
-   * Effective space check aligned with container allocation: per-disk slot model minus
-   * SCM pending allocations.
-   */
-  @Override
-  public boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID) {
-    DatanodeInfo datanodeInfo = getNode(datanodeID);
-    if (datanodeInfo == null) {
-      LOG.warn("DatanodeInfo not found for node {}", datanodeID);
-      return false;
-    }
-    return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(datanodeInfo);
-  }
-
-  @Override
-  public void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
-    DatanodeInfo datanodeInfo = getNode(datanodeID);
-    if (datanodeInfo == null) {
-      LOG.warn("DatanodeInfo not found for node {}", datanodeID);
-      return;
-    }
-    pendingContainerTracker.recordPendingAllocationForDatanode(datanodeInfo, containerID);
-  }
-
   @Override
   public boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID) {
     DatanodeInfo datanodeInfo = getNode(datanodeID);

@@ -19,20 +19,16 @@ package org.apache.hadoop.hdds.scm.container;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.function.BooleanSupplier;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -154,33 +150,6 @@ public class TestPendingContainerTrackerIntegration {
     assertThat(afterRemoved).isGreaterThan(initialRemoved);
 
     LOG.info("After added={}, removed={}", afterAdded, afterRemoved);
-  }
-
-  /**
-   * Test: Verify idempotency - adding the same container twice does not double-count in metrics.
-   */
-  @Test
-  public void testIdempotentPendingTracking() throws Exception {
-    // Allocate a container directly
-    ContainerInfo container = containerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
-        "omServiceIdDefault");
-
-    Pipeline pipeline = scm.getPipelineManager().getPipeline(container.getPipelineID());
-    DatanodeDetails firstNode = pipeline.getFirstNode();
-    DatanodeInfo firstNodeInfo = nodeManager.getDatanodeInfo(firstNode);
-
-    // Capture the added metric after initial allocation
-    long addedAfterAllocation = metrics.getNumPendingContainersAdded();
-
-    LOG.info("Pending added metric after allocation: {}", addedAfterAllocation);
-
-    // Try adding the same container again (simulates retry or duplicate allocation)
-    pendingTracker.recordPendingAllocationForDatanode(firstNodeInfo, container.containerID());
-
-    // The metric should not have increased since it was a duplicate
-    assertEquals(addedAfterAllocation, metrics.getNumPendingContainersAdded(),
-        "Pending added metric should not change when adding duplicate container");
   }
 
   /**

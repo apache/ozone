@@ -185,19 +185,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
 
   /**
-   * True if the node can accept another container of the given size.
-   */
-  boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID);
-
-  /**
-   * Records a pending container allocation for a single DataNode identified by its ID.
-   *
-   * @param datanodeID  the ID of the DataNode receiving the allocation
-   * @param containerID the container being allocated
-   */
-  void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID);
-
-  /**
    * Atomically checks if the datanode has space for a new container and records the allocation
    * if space is available. This prevents race conditions where multiple threads check space
    * concurrently and over-allocate.

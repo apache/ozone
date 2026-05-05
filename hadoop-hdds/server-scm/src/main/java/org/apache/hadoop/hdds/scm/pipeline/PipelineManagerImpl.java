@@ -636,23 +636,6 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public boolean hasEnoughSpace(Pipeline pipeline) {
-    for (DatanodeDetails node : pipeline.getNodes()) {
-      if (!nodeManager.hasSpaceForNewContainerAllocation(node.getID())) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  @Override
-  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
-    }
-  }
-
-  @Override
   public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
     List<DatanodeDetails> successfulNodes = new ArrayList<>();
     for (DatanodeDetails dn : pipeline.getNodes()) {

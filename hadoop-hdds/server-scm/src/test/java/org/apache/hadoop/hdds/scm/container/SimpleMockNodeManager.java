@@ -252,21 +252,12 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
-  }
-
-  @Override
   public boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID) {
     return true;
   }
 
   @Override
   public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
-  }
-
-  @Override
-  public boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID) {
-    return true;
   }
 
   @Override
