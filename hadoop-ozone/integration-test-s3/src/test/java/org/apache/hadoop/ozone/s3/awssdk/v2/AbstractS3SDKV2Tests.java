@@ -225,10 +225,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
   private static final String READ_CONSISTENCY_HEADER =
       "x-ozone-read-consistency";
-  private static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
-      "x-ozone-local-lease-log-limit";
-  private static final String LOCAL_LEASE_TIME_MS_HEADER =
-      "x-ozone-local-lease-time-ms";
+  private static final String FOLLOWER_STALE_LOG_LIMIT_HEADER =
+      "x-ozone-follower-stale-log-limit";
+  private static final String FOLLOWER_STALE_TIME_MS_HEADER =
+      "x-ozone-follower-stale-time-ms";
 
   private MiniOzoneCluster cluster;
   private S3Client s3Client;
@@ -309,7 +309,8 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"local-lease", "linearizable-follower"})
+  @ValueSource(strings = {"follower-stale", "follower-linearizable",
+      "leader-only"})
   public void testGetObjectWithReadConsistencyHeader(String readConsistency) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -323,9 +324,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .key(keyName)
             .overrideConfiguration(c -> {
               c.putHeader(READ_CONSISTENCY_HEADER, readConsistency);
-              if ("local-lease".equals(readConsistency)) {
-                c.putHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
-                c.putHeader(LOCAL_LEASE_TIME_MS_HEADER, "100");
+              if ("follower-stale".equals(readConsistency)) {
+                c.putHeader(FOLLOWER_STALE_LOG_LIMIT_HEADER, "10");
+                c.putHeader(FOLLOWER_STALE_TIME_MS_HEADER, "100");
               }
             }));
 
@@ -456,6 +457,24 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         () -> s3Client.getBucketTagging(GetBucketTaggingRequest.builder().bucket(bucketName).build()));
     assertEquals(404, afterDelete.statusCode());
     assertEquals("NoSuchTagSet", afterDelete.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testGetObjectWithMalformedReadConsistencyHeader() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName),
+        RequestBody.fromString("bar"));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(b -> b.bucket(bucketName)
+            .key(keyName)
+            .overrideConfiguration(c -> c.putHeader(
+                READ_CONSISTENCY_HEADER, "follower-stale;logLimit=10"))));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals("InvalidArgument", exception.awsErrorDetails().errorCode());
   }
 
   @Test

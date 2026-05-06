@@ -185,10 +185,10 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   private static final int MAX_UPLOADS_LIMIT = 1000;
   private static final String READ_CONSISTENCY_HEADER =
       "x-ozone-read-consistency";
-  private static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
-      "x-ozone-local-lease-log-limit";
-  private static final String LOCAL_LEASE_TIME_MS_HEADER =
-      "x-ozone-local-lease-time-ms";
+  private static final String FOLLOWER_STALE_LOG_LIMIT_HEADER =
+      "x-ozone-follower-stale-log-limit";
+  private static final String FOLLOWER_STALE_TIME_MS_HEADER =
+      "x-ozone-follower-stale-time-ms";
 
   /**
    * There are still some unsupported S3 operations.
@@ -583,7 +583,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"local-lease", "linearizable-follower"})
+  @ValueSource(strings = {"follower-stale", "follower-linearizable",
+      "leader-only"})
   public void testGetObjectWithReadConsistencyHeader(String readConsistency)
       throws IOException {
     final String bucketName = getBucketName();
@@ -595,9 +596,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     GetObjectRequest request = new GetObjectRequest(bucketName, keyName);
     request.putCustomRequestHeader(READ_CONSISTENCY_HEADER,
         readConsistency);
-    if ("local-lease".equals(readConsistency)) {
-      request.putCustomRequestHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
-      request.putCustomRequestHeader(LOCAL_LEASE_TIME_MS_HEADER, "100");
+    if ("follower-stale".equals(readConsistency)) {
+      request.putCustomRequestHeader(FOLLOWER_STALE_LOG_LIMIT_HEADER, "10");
+      request.putCustomRequestHeader(FOLLOWER_STALE_TIME_MS_HEADER, "100");
     }
 
     try (S3Object object = s3Client.getObject(request);
@@ -642,6 +643,25 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
         bucketName, keyName, inputStream, metadata);
     assertEquals("37b51d194a7513e45b56f6524f2d51f2",
         putObjectResult.getETag());
+  }
+
+  @Test
+  public void testGetObjectWithMalformedReadConsistencyHeader() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "bar");
+
+    GetObjectRequest request = new GetObjectRequest(bucketName, keyName);
+    request.putCustomRequestHeader(READ_CONSISTENCY_HEADER,
+        "follower-stale;logLimit=10");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(request));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(400, ase.getStatusCode());
+    assertEquals("InvalidArgument", ase.getErrorCode());
   }
 
   @Test
