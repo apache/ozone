@@ -203,7 +203,7 @@ class TestRewriteTablePathOzoneAction {
   void statsFileCopyPlanRejectsMismatchedStatsCount() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> RewriteTablePathOzoneUtils.statsFileCopyPlan(
-            List.of(statisticsFile("before-1.puffin", 100)),
+            List.of(statisticsFile("before-1.stats", 100)),
             List.of()));
 
     assertEquals("Before and after path rewrite, statistic files count should be same",
@@ -214,8 +214,8 @@ class TestRewriteTablePathOzoneAction {
   void statsFileCopyPlanRejectsMismatchedStatsFileSize() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> RewriteTablePathOzoneUtils.statsFileCopyPlan(
-            List.of(statisticsFile("before-1.puffin", 100)),
-            List.of(statisticsFile("after-1.puffin", 200))));
+            List.of(statisticsFile("before-1.stats", 100)),
+            List.of(statisticsFile("after-1.stats", 200))));
 
     assertEquals("Before and after path rewrite, statistic files size should be same",
         exception.getMessage());
@@ -225,15 +225,15 @@ class TestRewriteTablePathOzoneAction {
   void statsFileCopyPlanReturnsBeforeToAfterPathPairs() {
     Set<Pair<String, String>> copyPlan = RewriteTablePathOzoneUtils.statsFileCopyPlan(
         List.of(
-            statisticsFile("before-1.puffin", 100),
-            statisticsFile("before-2.puffin", 200)),
+            statisticsFile("before-1.stats", 100),
+            statisticsFile("before-2.stats", 200)),
         List.of(
-            statisticsFile("after-1.puffin", 100),
-            statisticsFile("after-2.puffin", 200)));
+            statisticsFile("after-1.stats", 100),
+            statisticsFile("after-2.stats", 200)));
 
     assertEquals(Set.of(
-        Pair.of("before-1.puffin", "after-1.puffin"),
-        Pair.of("before-2.puffin", "after-2.puffin")), copyPlan);
+        Pair.of("before-1.stats", "after-1.stats"),
+        Pair.of("before-2.stats", "after-2.stats")), copyPlan);
   }
 
   /**
