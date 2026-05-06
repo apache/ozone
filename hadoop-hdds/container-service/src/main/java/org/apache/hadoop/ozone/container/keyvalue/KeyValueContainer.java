@@ -664,13 +664,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
         BlockUtils.removeContainerFromDB(containerData, config);
       }
-      FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
-      FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-      FileUtils.deleteDirectory(new File(getContainerData().getContainerPath()));
+      deleteDirectory(new File(containerData.getChunksPath()));
+      deleteDirectory(new File(containerData.getMetadataPath()));
+      deleteDirectory(new File(getContainerData().getContainerPath()));
     } catch (Exception ex) {
       LOG.error("Failed to cleanup destination directories for container {}",
           containerData.getContainerID(), ex);
     }
+  }
+
+  @VisibleForTesting
+  void deleteDirectory(File directory) throws IOException {
+    FileUtils.deleteDirectory(directory);
   }
 
   @Override

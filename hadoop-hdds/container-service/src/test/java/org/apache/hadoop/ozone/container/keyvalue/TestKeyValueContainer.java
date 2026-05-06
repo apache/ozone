@@ -44,6 +44,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -79,6 +80,8 @@ import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -490,6 +493,58 @@ public class TestKeyValueContainer {
         }
       });
     }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testFailedImportCleanupDeletesChunksBeforeMetadata(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+
+    KeyValueContainer container = new KeyValueContainer(
+        keyValueContainerData, CONF) {
+      @Override
+      void deleteDirectory(File directory) throws IOException {
+        if (directory.equals(new File(getContainerData().getMetadataPath()))) {
+          throw new IOException("Injected metadata cleanup failure");
+        }
+        super.deleteDirectory(directory);
+      }
+    };
+    container.populatePathFields(scmId, containerVolume);
+
+    ContainerPacker<KeyValueContainerData> failingPacker =
+        new ContainerPacker<KeyValueContainerData>() {
+          @Override
+          public byte[] unpackContainerData(
+              Container<KeyValueContainerData> containerToUnpack,
+              InputStream inputStream, Path tmpDir, Path destContainerDir)
+              throws IOException {
+            Files.createDirectories(new File(containerToUnpack
+                .getContainerData().getChunksPath()).toPath());
+            Files.createDirectories(new File(containerToUnpack
+                .getContainerData().getMetadataPath()).toPath());
+            throw new IOException("Injected import failure");
+          }
+
+          @Override
+          public void pack(Container<KeyValueContainerData> containerToPack,
+              OutputStream destination) {
+          }
+
+          @Override
+          public byte[] unpackContainerDescriptor(InputStream inputStream) {
+            return null;
+          }
+        };
+
+    assertThrows(IOException.class, () -> container.importContainerData(
+        new ByteArrayInputStream(new byte[0]), failingPacker));
+
+    assertFalse(new File(container.getContainerData().getChunksPath()).exists());
+    assertTrue(new File(container.getContainerData().getMetadataPath()).exists());
   }
 
   private void checkContainerFilesPresent(KeyValueContainerData data,
