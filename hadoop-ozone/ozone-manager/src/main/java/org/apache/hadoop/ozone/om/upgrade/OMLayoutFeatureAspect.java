@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
-import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 
 /**
@@ -76,30 +75,6 @@ public class OMLayoutFeatureAspect {
           omVersionManager.getApparentVersion()),
           NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
-  }
-
-  @Pointcut("execution(* " +
-      "org.apache.hadoop.ozone.om.request.OMClientRequest+.preExecute(..)) " +
-      "&& @this(org.apache.hadoop.ozone.om.upgrade.BelongsToLayoutVersion)")
-  public void omRequestPointCut() {
-  }
-
-  @Before("omRequestPointCut()")
-  public void beforeRequestApplyTxn(final JoinPoint joinPoint)
-      throws OMException {
-
-    BelongsToLayoutVersion annotation = joinPoint.getTarget().getClass()
-        .getAnnotation(BelongsToLayoutVersion.class);
-    if (annotation == null) {
-      return;
-    }
-
-    Object[] args = joinPoint.getArgs();
-    OzoneManager om = (OzoneManager) args[0];
-
-    LayoutFeature lf = annotation.value();
-    checkIsAllowed(joinPoint.getTarget().getClass().getSimpleName(),
-        om.getVersionManager(), lf);
   }
 
   /**
