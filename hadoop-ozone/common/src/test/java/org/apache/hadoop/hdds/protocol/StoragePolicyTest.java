@@ -18,9 +18,11 @@
 package org.apache.hadoop.hdds.protocol;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StorageTier;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StoragePolicyProto;
 import org.junit.jupiter.api.Test;
 
 class StoragePolicyTest {
@@ -44,5 +46,17 @@ class StoragePolicyTest {
     assertEquals("Cold", coldPolicy.getName());
     assertEquals(StorageTier.ARCHIVE, coldPolicy.getCreationTier());
     assertEquals(StorageTier.EMPTY, coldPolicy.getCreationFallbackTier());
+  }
+
+  @Test
+  void testStoragePolicyConversion() {
+    // OzoneStoragePolicy -> StoragePolicyProto
+    assertSame(StoragePolicyProto.HOT, OzoneStoragePolicy.HOT.toProto());
+    assertSame(StoragePolicyProto.WARM, OzoneStoragePolicy.WARM.toProto());
+    assertSame(StoragePolicyProto.COLD, OzoneStoragePolicy.COLD.toProto());
+    // StoragePolicyProto -> OzoneStoragePolicy
+    assertSame(OzoneStoragePolicy.HOT, OzoneStoragePolicy.fromProto(StoragePolicyProto.HOT));
+    assertSame(OzoneStoragePolicy.WARM, OzoneStoragePolicy.fromProto(StoragePolicyProto.WARM));
+    assertSame(OzoneStoragePolicy.COLD, OzoneStoragePolicy.fromProto(StoragePolicyProto.COLD));
   }
 }

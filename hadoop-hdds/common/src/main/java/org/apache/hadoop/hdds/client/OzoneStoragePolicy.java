@@ -73,9 +73,9 @@ public enum OzoneStoragePolicy implements StoragePolicy {
   }
 
   /**
-   * Converts a protobuf StoragePolicyProto to the corresponding StoragePolicyType.
+   * Converts a protobuf StoragePolicyProto to the corresponding OzoneStoragePolicy.
    * @param proto the StoragePolicyProto to convert.
-   * @return the corresponding StoragePolicyType.
+   * @return the corresponding OzoneStoragePolicy.
    */
   public static OzoneStoragePolicy fromProto(StoragePolicyProto proto) {
     if (proto == null) {
