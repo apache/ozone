@@ -39,7 +39,6 @@ import picocli.CommandLine.Option;
 public abstract class GenericCli implements GenericParentCommand {
 
   public static final int EXECUTION_ERROR_EXIT_CODE = -1;
-  public static final String INTERACTIVE_SHELL_PROPERTY = "ozone.interactive.shell";
 
   private final OzoneConfiguration config = new OzoneConfiguration();
   private final CommandLine cmd;
