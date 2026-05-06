@@ -104,8 +104,7 @@ public class TestTarExtractor {
   private static boolean isInTarExtractorWritePath(StackTraceElement[] stackTrace) {
     for (StackTraceElement stackElement : stackTrace) {
       if (TarExtractor.class.getName().equals(stackElement.getClassName())
-          && ("writeFile".equals(stackElement.getMethodName())
-          || "lambda$extractTar$0".equals(stackElement.getMethodName()))) {
+          && "writeFile".equals(stackElement.getMethodName())) {
         return true;
       }
     }

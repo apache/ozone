@@ -3660,6 +3660,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.dn.metrics.collection.thread.count</name>
+    <value>0</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Size of the thread pool Recon uses to collect JMX metrics from DataNodes.
+      A value of 0 (or any non-positive value) means "auto" and selects
+      2 x Runtime.availableProcessors() at startup.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
