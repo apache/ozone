@@ -79,6 +79,47 @@ final class S3ConditionalRequest {
     return null;
   }
 
+  /**
+   * Evaluates copy source preconditions for CopyObject operation.
+   * Checks x-amz-copy-source-if-match, x-amz-copy-source-if-none-match,
+   * x-amz-copy-source-if-modified-since, x-amz-copy-source-if-unmodified-since.
+   *
+   * @param headers HTTP headers containing the conditional headers
+   * @param sourceKeyPath path of the source key for error messages
+   * @param sourceKey the source key metadata
+   * @throws OS3Exception with 412 Precondition Failed if conditions are not met
+   */
+  static void evaluateCopySourcePreconditions(HttpHeaders headers,
+      String sourceKeyPath, OzoneKey sourceKey) throws OS3Exception {
+    String currentETag = sourceKey.getMetadata().get(OzoneConsts.ETAG);
+
+    String ifMatch = headers.getHeaderString(S3Consts.COPY_SOURCE_IF_MATCH);
+    if (ifMatch != null && !eTagMatches(ifMatch, currentETag)) {
+      throw newError(PRECOND_FAILED, sourceKeyPath);
+    }
+
+    String ifUnmodifiedSince = headers.getHeaderString(
+        S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE);
+    if (ifMatch == null && ifUnmodifiedSince != null
+        && !matchesIfUnmodifiedSince(sourceKey, ifUnmodifiedSince)) {
+      throw newError(PRECOND_FAILED, sourceKeyPath);
+    }
+
+    String ifNoneMatch = headers.getHeaderString(
+        S3Consts.COPY_SOURCE_IF_NONE_MATCH);
+    if (ifNoneMatch != null && eTagMatches(ifNoneMatch, currentETag)) {
+      throw newError(PRECOND_FAILED, sourceKeyPath);
+    }
+
+    String ifModifiedSince = headers.getHeaderString(
+        S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE);
+    if (ifNoneMatch == null && ifModifiedSince != null
+        && !matchesIfModifiedSince(sourceKey, ifModifiedSince)) {
+      throw newError(PRECOND_FAILED, sourceKeyPath);
+    }
+  }
+
+
   static boolean checkCopySourceModificationTime(Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
       String copySourceIfUnmodifiedSinceStr) {
