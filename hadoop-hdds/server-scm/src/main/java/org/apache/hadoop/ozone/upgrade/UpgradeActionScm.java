@@ -24,23 +24,10 @@ import java.lang.annotation.Target;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 
 /**
- * Annotation to specify upgrade action run during HDDS (SCM or Datanode) finalization.
+ * Annotation to specify an SCM upgrade action.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface UpgradeActionHdds {
+public @interface UpgradeActionScm {
   HDDSLayoutFeature feature();
-
-  Component component();
-
-  /**
-   * Simple enum to denote if an action is for the SCM or the DN.
-   */
-  enum Component {
-    SCM,
-    DATANODE;
-  }
 }
-
-
-

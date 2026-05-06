@@ -31,6 +31,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeAction;
+import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockDnUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockScmUpgradeAction;
@@ -52,10 +54,10 @@ public class TestHDDSLayoutVersionManager {
     lvm.registerUpgradeActions(UPGRADE_ACTIONS_TEST_PACKAGES);
 
     //Cluster is finalized, hence should not register.
-    Optional<HDDSUpgradeAction> action = INITIAL_VERSION.scmAction();
+    Optional<ScmUpgradeAction> action = INITIAL_VERSION.scmAction();
     assertFalse(action.isPresent());
-    action = DATANODE_SCHEMA_V2.datanodeAction();
-    assertFalse(action.isPresent());
+    Optional<DatanodeUpgradeAction> dnAction = DATANODE_SCHEMA_V2.datanodeAction();
+    assertFalse(dnAction.isPresent());
 
     // Start from an unfinalized version manager.
     lvm = mock(HDDSLayoutVersionManager.class);
@@ -73,12 +75,12 @@ public class TestHDDSLayoutVersionManager {
     verify(mockObj, times(1)).mockMethodScm();
     verify(mockObj, times(0)).mockMethodDn();
 
-    action = DATANODE_SCHEMA_V2.datanodeAction();
-    assertTrue(action.isPresent());
-    assertEquals(MockDnUpgradeAction.class, action.get().getClass());
+    dnAction = DATANODE_SCHEMA_V2.datanodeAction();
+    assertTrue(dnAction.isPresent());
+    assertEquals(MockDnUpgradeAction.class, dnAction.get().getClass());
     assertFalse(DATANODE_SCHEMA_V2.scmAction().isPresent());
     mockObj = mock(MockComponent.class);
-    action.get().execute(mockObj);
+    dnAction.get().execute(mockObj);
     verify(mockObj, times(0)).mockMethodScm();
     verify(mockObj, times(1)).mockMethodDn();
   }

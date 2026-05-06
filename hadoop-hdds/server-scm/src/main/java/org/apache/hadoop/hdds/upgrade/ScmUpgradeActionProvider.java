@@ -15,29 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.upgrade;
+package org.apache.hadoop.hdds.upgrade;
 
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
+import org.apache.hadoop.ozone.upgrade.UpgradeActionScm;
 
 /**
- * Loads {@link OmUpgradeAction} implementations annotated with {@link UpgradeActionOm} from
- * {@link #OM_UPGRADE_CLASS_PACKAGE} only.
+ * Loads {@link ScmUpgradeAction} implementations annotated with {@link UpgradeActionScm}.
  */
-public final class OMUpgradeActionProvider extends AbstractUpgradeActionProvider<OmUpgradeAction> {
+public final class ScmUpgradeActionProvider extends AbstractUpgradeActionProvider<ScmUpgradeAction> {
 
-  /**
-   * Package scanned for {@link UpgradeActionOm}-annotated classes (production OM upgrade actions).
-   */
-  public static final String OM_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.om.upgrade";
-
-  public OMUpgradeActionProvider() {
-    super(UpgradeActionOm.class, OmUpgradeAction.class, OM_UPGRADE_CLASS_PACKAGE);
+  public ScmUpgradeActionProvider(String... packagesToScan) {
+    super(UpgradeActionScm.class, ScmUpgradeAction.class, packagesToScan);
   }
 
   @Override
   protected ComponentVersion extractVersion(Class<?> clazz) {
-    UpgradeActionOm annotation = clazz.getAnnotation(UpgradeActionOm.class);
+    UpgradeActionScm annotation = clazz.getAnnotation(UpgradeActionScm.class);
     return annotation.feature();
   }
 }

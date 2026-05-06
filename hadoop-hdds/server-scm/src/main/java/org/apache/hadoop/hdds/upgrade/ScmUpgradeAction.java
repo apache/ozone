@@ -20,7 +20,8 @@ package org.apache.hadoop.hdds.upgrade;
 import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
- * Upgrade Action for SCM and DataNodes.
+ * Storage Container Manager Upgrade Action interface. An upgrade action is an operation that
+ * needs to be executed during finalization.
  */
-public interface HDDSUpgradeAction<T> extends UpgradeAction<T> {
+public interface ScmUpgradeAction<T> extends UpgradeAction<T> {
 }

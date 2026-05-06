@@ -15,29 +15,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.upgrade;
+package org.apache.hadoop.hdds.upgrade;
 
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
+import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
 
 /**
- * Loads {@link OmUpgradeAction} implementations annotated with {@link UpgradeActionOm} from
- * {@link #OM_UPGRADE_CLASS_PACKAGE} only.
+ * Loads {@link DatanodeUpgradeAction} implementations annotated with {@link UpgradeActionDatanode}.
  */
-public final class OMUpgradeActionProvider extends AbstractUpgradeActionProvider<OmUpgradeAction> {
+public final class DatanodeUpgradeActionProvider extends AbstractUpgradeActionProvider<DatanodeUpgradeAction> {
 
-  /**
-   * Package scanned for {@link UpgradeActionOm}-annotated classes (production OM upgrade actions).
-   */
-  public static final String OM_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.om.upgrade";
-
-  public OMUpgradeActionProvider() {
-    super(UpgradeActionOm.class, OmUpgradeAction.class, OM_UPGRADE_CLASS_PACKAGE);
+  public DatanodeUpgradeActionProvider(String... packagesToScan) {
+    super(UpgradeActionDatanode.class, DatanodeUpgradeAction.class, packagesToScan);
   }
 
   @Override
   protected ComponentVersion extractVersion(Class<?> clazz) {
-    UpgradeActionOm annotation = clazz.getAnnotation(UpgradeActionOm.class);
+    UpgradeActionDatanode annotation = clazz.getAnnotation(UpgradeActionDatanode.class);
     return annotation.feature();
   }
 }

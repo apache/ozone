@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.upgrade;
 
 import java.io.IOException;
 import java.util.Optional;
-import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent;
 
 /**
@@ -112,7 +112,7 @@ public class TestUpgradeFinalizerActions {
    * Mock DN Upgrade Action that fails.
    */
   public static class MockFailingUpgradeAction implements
-      HDDSUpgradeAction<MockComponent> {
+      ScmUpgradeAction<MockComponent> {
     @Override
     public void execute(MockComponent arg) throws Exception {
       throw new IllegalStateException("Failed action!!");
