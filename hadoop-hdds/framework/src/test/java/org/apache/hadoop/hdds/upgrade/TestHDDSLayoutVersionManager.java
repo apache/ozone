@@ -89,9 +89,6 @@ public class TestHDDSLayoutVersionManager {
       return map;
     };
 
-    HDDSLayoutVersionManager lvm =
-        new HDDSLayoutVersionManager(maxLayoutVersion(), scmProvider, dnProvider);
-
     //Cluster is finalized, hence should not register.
     Optional<UpgradeAction<?>> action = INITIAL_VERSION.scmAction();
     assertFalse(action.isPresent());
@@ -99,7 +96,7 @@ public class TestHDDSLayoutVersionManager {
     assertFalse(dnAction.isPresent());
 
     // Start from an unfinalized version manager.
-    lvm = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager lvm = mock(HDDSLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(-1);
 
     doCallRealMethod().when(lvm).registerUpgradeActions(any(), any());
