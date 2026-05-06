@@ -26,8 +26,10 @@ import org.apache.hadoop.ozone.upgrade.UpgradeActionScm;
  */
 public final class ScmUpgradeActionProvider extends AbstractUpgradeActionProvider<ScmUpgradeAction> {
 
-  public ScmUpgradeActionProvider(String... packagesToScan) {
-    super(UpgradeActionScm.class, ScmUpgradeAction.class, packagesToScan);
+  public static final String SCM_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.hdds.scm.server";
+
+  public ScmUpgradeActionProvider() {
+    super(UpgradeActionScm.class, ScmUpgradeAction.class, SCM_UPGRADE_CLASS_PACKAGE);
   }
 
   @Override

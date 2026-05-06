@@ -26,8 +26,10 @@ import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
  */
 public final class DatanodeUpgradeActionProvider extends AbstractUpgradeActionProvider<DatanodeUpgradeAction> {
 
-  public DatanodeUpgradeActionProvider(String... packagesToScan) {
-    super(UpgradeActionDatanode.class, DatanodeUpgradeAction.class, packagesToScan);
+  public static final String DATANODE_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.container";
+
+  public DatanodeUpgradeActionProvider() {
+    super(UpgradeActionDatanode.class, DatanodeUpgradeAction.class, DATANODE_UPGRADE_CLASS_PACKAGE);
   }
 
   @Override

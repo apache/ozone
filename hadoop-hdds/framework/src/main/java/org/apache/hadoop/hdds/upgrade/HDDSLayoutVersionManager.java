@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.upgrade;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,14 +35,9 @@ public class HDDSLayoutVersionManager extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HDDSLayoutVersionManager.class);
-  private static final String[] HDDS_CLASS_UPGRADE_PACKAGES = new String[] {
-      "org.apache.hadoop.hdds.scm.server",
-      "org.apache.hadoop.ozone.container",
-  };
-
-  public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
+  public HDDSLayoutVersionManager(int layoutVersion, ComponentUpgradeActionProvider<?> scmProvider, ComponentUpgradeActionProvider<?> dnProvider) throws IOException {
     init(layoutVersion, HDDSLayoutFeature.values());
-    registerUpgradeActions(HDDS_CLASS_UPGRADE_PACKAGES);
+    registerUpgradeActions(scmProvider, dnProvider);
   }
 
   public static int maxLayoutVersion() {
@@ -49,25 +46,27 @@ public class HDDSLayoutVersionManager extends
   }
 
   @VisibleForTesting
-  void registerUpgradeActions(String... packages) {
-    ScmUpgradeActionProvider scmProvider = new ScmUpgradeActionProvider(packages);
-    scmProvider.load().forEach((feature, action) -> {
-      HDDSLayoutFeature hddsFeature = (HDDSLayoutFeature) feature;
-      if (hddsFeature.layoutVersion() > getMetadataLayoutVersion()) {
-        hddsFeature.addScmAction(action);
-      } else {
-        LOG.debug("Skipping SCM Upgrade Action {} since it has been finalized.", action.name());
-      }
-    });
+  void registerUpgradeActions(ComponentUpgradeActionProvider<?> scmProvider, ComponentUpgradeActionProvider<?> dnProvider) {
+    if (scmProvider != null) {
+      scmProvider.load().forEach((feature, action) -> {
+        HDDSLayoutFeature hddsFeature = (HDDSLayoutFeature) feature;
+        if (hddsFeature.layoutVersion() > getMetadataLayoutVersion()) {
+          hddsFeature.addScmAction(action);
+        } else {
+          LOG.debug("Skipping SCM Upgrade Action {} since it has been finalized.", action.name());
+        }
+      });
+    }
 
-    DatanodeUpgradeActionProvider dnProvider = new DatanodeUpgradeActionProvider(packages);
-    dnProvider.load().forEach((feature, action) -> {
-      HDDSLayoutFeature hddsFeature = (HDDSLayoutFeature) feature;
-      if (hddsFeature.layoutVersion() > getMetadataLayoutVersion()) {
-        hddsFeature.addDatanodeAction(action);
-      } else {
-        LOG.debug("Skipping Datanode Upgrade Action {} since it has been finalized.", action.name());
-      }
-    });
+    if (dnProvider != null) {
+      dnProvider.load().forEach((feature, action) -> {
+        HDDSLayoutFeature hddsFeature = (HDDSLayoutFeature) feature;
+        if (hddsFeature.layoutVersion() > getMetadataLayoutVersion()) {
+          hddsFeature.addDatanodeAction(action);
+        } else {
+          LOG.debug("Skipping Datanode Upgrade Action {} since it has been finalized.", action.name());
+        }
+      });
+    }
   }
 }

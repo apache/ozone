@@ -19,37 +19,17 @@ package org.apache.hadoop.ozone.upgrade;
 
 import java.io.IOException;
 import java.util.Optional;
-import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
-import org.apache.hadoop.hdds.upgrade.test.MockComponent;
 
 /**
  * Class to test upgrade related actions.
  */
 public class TestUpgradeFinalizerActions {
 
-  /**
-   * Mock upgrade finalizer.
-   */
-  static class MockUpgradeFinalizer extends
-      BasicUpgradeFinalizer<MockComponent, MockLayoutVersionManager> {
-
-    MockUpgradeFinalizer(MockLayoutVersionManager versionManager) {
-      super(versionManager);
+  static class MockComponent {
+    public void mockMethodScm() {
     }
 
-    @Override
-    public void postFinalizeUpgrade(MockComponent c) {
-      return;
-    }
-
-    @Override
-    public void finalizeLayoutFeature(LayoutFeature lf, MockComponent c) {
-      return;
-    }
-
-    @Override
-    public void preFinalizeUpgrade(MockComponent c) {
-      return;
+    public void mockMethodDn() {
     }
   }
 
@@ -70,7 +50,6 @@ public class TestUpgradeFinalizerActions {
     VERSION_3(3);
 
     private int layoutVersion;
-    private UpgradeAction action;
 
     MockLayoutFeature(final int layoutVersion) {
       this.layoutVersion = layoutVersion;
@@ -96,26 +75,6 @@ public class TestUpgradeFinalizerActions {
     @Override
     public String toString() {
       return name() + " (" + serialize() + ")";
-    }
-
-    public void addAction(UpgradeAction upgradeAction) {
-      this.action = upgradeAction;
-    }
-
-    @Override
-    public Optional<? extends UpgradeAction> action() {
-      return Optional.ofNullable(action);
-    }
-  }
-
-  /**
-   * Mock DN Upgrade Action that fails.
-   */
-  public static class MockFailingUpgradeAction implements
-      ScmUpgradeAction<MockComponent> {
-    @Override
-    public void execute(MockComponent arg) throws Exception {
-      throw new IllegalStateException("Failed action!!");
     }
   }
 }

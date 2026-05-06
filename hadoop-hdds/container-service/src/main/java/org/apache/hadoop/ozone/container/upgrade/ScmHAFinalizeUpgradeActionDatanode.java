@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
  */
 @UpgradeActionDatanode(feature = SCM_HA)
 public class ScmHAFinalizeUpgradeActionDatanode
-    implements DatanodeUpgradeAction<DatanodeStateMachine> {
+    implements DatanodeUpgradeAction {
   private static final Logger LOG =
       LoggerFactory.getLogger(ScmHAFinalizeUpgradeActionDatanode.class);
 

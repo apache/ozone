@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
  * Datanode Upgrade Action interface. An upgrade action is an operation that
  * needs to be executed during finalization.
  */
-public interface DatanodeUpgradeAction<T> extends UpgradeAction<T> {
+public interface DatanodeUpgradeAction extends UpgradeAction<DatanodeStateMachine> {
 }

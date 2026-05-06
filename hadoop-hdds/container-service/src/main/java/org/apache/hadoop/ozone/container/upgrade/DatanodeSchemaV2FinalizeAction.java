@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  */
 @UpgradeActionDatanode(feature = DATANODE_SCHEMA_V2)
 public class DatanodeSchemaV2FinalizeAction
-    implements DatanodeUpgradeAction<DatanodeStateMachine> {
+    implements DatanodeUpgradeAction {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeSchemaV2FinalizeAction.class);

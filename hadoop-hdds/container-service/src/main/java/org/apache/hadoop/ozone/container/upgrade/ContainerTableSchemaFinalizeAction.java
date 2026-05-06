@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  */
 @UpgradeActionDatanode(feature = WITNESSED_CONTAINER_DB_PROTO_VALUE)
 public class ContainerTableSchemaFinalizeAction
-    implements DatanodeUpgradeAction<DatanodeStateMachine> {
+    implements DatanodeUpgradeAction {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerTableSchemaFinalizeAction.class);

@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  */
 @UpgradeActionScm(feature = DATANODE_SCHEMA_V2)
 public class ScmOnFinalizeActionForDatanodeSchemaV2 implements
-    ScmUpgradeAction<SCMUpgradeFinalizationContext> {
+    ScmUpgradeAction {
   private static final Logger LOG =
       LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
 

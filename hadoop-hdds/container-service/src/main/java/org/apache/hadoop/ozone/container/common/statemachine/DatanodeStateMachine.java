@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeActionProvider;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -168,7 +169,7 @@ public class DatanodeStateMachine implements Closeable {
         datanodeDetails.getUuidString());
 
     layoutVersionManager = new HDDSLayoutVersionManager(
-        layoutStorage.getApparentVersion());
+        layoutStorage.getApparentVersion(), null, new DatanodeUpgradeActionProvider());
     upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager);
     VersionedDatanodeFeatures.initialize(layoutVersionManager);
 

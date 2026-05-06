@@ -445,7 +445,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
         UUID.randomUUID().toString());
 
     HDDSLayoutVersionManager layoutVersionManager =
-        new HDDSLayoutVersionManager(layoutStorage.getApparentVersion());
+        new HDDSLayoutVersionManager(layoutStorage.getApparentVersion(), null, null);
 
     return LayoutVersionProto.newBuilder()
         .setMetadataLayoutVersion(

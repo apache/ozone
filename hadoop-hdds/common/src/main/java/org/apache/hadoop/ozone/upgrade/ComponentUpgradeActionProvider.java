@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.ComponentVersion;
  * @param <A> concrete upgrade action type (for example OM-specific or HDDS-specific)
  */
 @FunctionalInterface
-public interface ComponentUpgradeActionProvider<A> {
+public interface ComponentUpgradeActionProvider<A extends UpgradeAction<?>> {
 
   /**
    * Returns all upgrade actions from this provider, keyed by component version.

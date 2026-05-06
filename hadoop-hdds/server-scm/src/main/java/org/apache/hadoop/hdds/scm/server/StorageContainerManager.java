@@ -170,6 +170,7 @@ import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.ScmUpgradeActionProvider;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -703,7 +704,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
-        scmStorageConfig.getApparentVersion());
+        scmStorageConfig.getApparentVersion(), new ScmUpgradeActionProvider(), null);
     VersionedDatanodeFeatures.initialize(scmLayoutVersionManager);
 
     UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
