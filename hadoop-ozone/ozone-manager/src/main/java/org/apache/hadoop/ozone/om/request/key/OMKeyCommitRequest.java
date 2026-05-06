@@ -130,10 +130,45 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     KeyArgs resolvedKeyArgs =
         resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
             IAccessAuthorizer.ACLType.WRITE, commitKeyRequest.getClientID());
+    validateConditionalCommitAtAdmission(ozoneManager.getMetadataManager(),
+        resolvedKeyArgs, commitKeyRequest.getClientID());
 
     return request.toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
             .setKeyArgs(resolvedKeyArgs)).build();
+  }
+
+  protected void validateConditionalCommitAtAdmission(
+      OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
+      throws IOException {
+    OmKeyInfo openKeyInfo = getOpenKeyInfoForCommitAdmission(
+        omMetadataManager, keyArgs, clientId);
+    if (openKeyInfo == null) {
+      return;
+    }
+
+    validateAtomicRewriteAtAdmission(
+        getCommittedKeyInfoForCommitAdmission(omMetadataManager, keyArgs),
+        openKeyInfo.getExpectedDataGeneration(), null);
+  }
+
+  protected OmKeyInfo getOpenKeyInfoForCommitAdmission(
+      OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
+      throws IOException {
+    String dbOpenKey = omMetadataManager.getOpenKey(
+        keyArgs.getVolumeName(), keyArgs.getBucketName(),
+        keyArgs.getKeyName(), clientId);
+    return omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(dbOpenKey);
+  }
+
+  protected OmKeyInfo getCommittedKeyInfoForCommitAdmission(
+      OMMetadataManager omMetadataManager, KeyArgs keyArgs)
+      throws IOException {
+    String dbOzoneKey = omMetadataManager.getOzoneKey(
+        keyArgs.getVolumeName(), keyArgs.getBucketName(),
+        keyArgs.getKeyName());
+    return omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
   }
 
   @Override

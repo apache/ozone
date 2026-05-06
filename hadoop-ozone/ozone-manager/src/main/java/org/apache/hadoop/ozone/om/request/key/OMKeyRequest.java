@@ -1401,8 +1401,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (!keyArgs.hasExpectedDataGeneration()) {
       return;
     }
-    validateExpectedDataGeneration(dbKeyInfo,
-        keyArgs.getExpectedDataGeneration(), auditMap,
+    validateAtomicRewriteAtAdmission(dbKeyInfo,
+        keyArgs.getExpectedDataGeneration(), auditMap);
+  }
+
+  /**
+   * Validates the condition at request admission time.
+   *
+   * This form is for callers that resolve the admitted generation from
+   * persisted open-key state rather than from request key arguments.
+   */
+  protected void validateAtomicRewriteAtAdmission(OmKeyInfo dbKeyInfo,
+      Long expectedGen, Map<String, String> auditMap) throws OMException {
+    if (expectedGen == null) {
+      return;
+    }
+    validateExpectedDataGeneration(dbKeyInfo, expectedGen, auditMap,
         AtomicRewritePhase.ADMISSION);
   }
 
