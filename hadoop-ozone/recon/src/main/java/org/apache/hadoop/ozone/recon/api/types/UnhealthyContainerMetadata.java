@@ -75,6 +75,22 @@ public class UnhealthyContainerMetadata {
     this.keys = keyCount;
   }
 
+  public UnhealthyContainerMetadata(long containerID, String containerState,
+      long unhealthySince, long expectedReplicaCount, long actualReplicaCount,
+      long replicaDeltaCount, String reason, long keys, UUID pipelineID,
+      List<ContainerHistory> replicas) {
+    this.containerID = containerID;
+    this.containerState = containerState;
+    this.unhealthySince = unhealthySince;
+    this.expectedReplicaCount = expectedReplicaCount;
+    this.actualReplicaCount = actualReplicaCount;
+    this.replicaDeltaCount = replicaDeltaCount;
+    this.reason = reason;
+    this.keys = keys;
+    this.pipelineID = pipelineID;
+    this.replicas = replicas;
+  }
+
   // Default constructor, used by jackson lib for object deserialization.
   public UnhealthyContainerMetadata() {
   }

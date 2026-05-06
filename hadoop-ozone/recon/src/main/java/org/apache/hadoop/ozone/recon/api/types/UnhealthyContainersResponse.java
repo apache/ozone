@@ -56,6 +56,12 @@ public class UnhealthyContainersResponse {
   private long replicaMismatchCount = 0;
 
   /**
+   * Total count of quasi-closed containers.
+   */
+  @JsonProperty("quasiClosedCount")
+  private long quasiClosedCount = 0;
+
+  /**
    * The smallest container ID in the current response batch.
    * Used for pagination to determine the lower bound for the next page.
    */
@@ -123,6 +129,14 @@ public class UnhealthyContainersResponse {
 
   public long getReplicaMismatchCount() {
     return replicaMismatchCount;
+  }
+
+  public long getQuasiClosedCount() {
+    return quasiClosedCount;
+  }
+
+  public void setQuasiClosedCount(long quasiClosedCount) {
+    this.quasiClosedCount = quasiClosedCount;
   }
 
   public long getLastKey() {

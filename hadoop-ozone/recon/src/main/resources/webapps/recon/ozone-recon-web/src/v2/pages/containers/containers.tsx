@@ -50,6 +50,7 @@ const TAB_STATE_MAP: Record<string, string> = {
   '3': 'OVER_REPLICATED',
   '4': 'MIS_REPLICATED',
   '5': 'REPLICA_MISMATCH',
+  '6': 'QUASI_CLOSED',
 };
 
 const SearchableColumnOpts = [{
@@ -85,6 +86,7 @@ const Containers: React.FC<{}> = () => {
     overReplicatedCount: 0,
     misReplicatedCount: 0,
     replicaMismatchCount: 0,
+    quasiClosedCount: 0,
   });
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [tabStates, setTabStates] = useState<Record<string, TabPaginationState>>({
@@ -93,6 +95,7 @@ const Containers: React.FC<{}> = () => {
     '3': { ...DEFAULT_TAB_STATE },
     '4': { ...DEFAULT_TAB_STATE },
     '5': { ...DEFAULT_TAB_STATE },
+    '6': { ...DEFAULT_TAB_STATE },
   });
   const [expandedRow, setExpandedRow] = useState<ExpandedRow>({});
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
@@ -140,8 +143,12 @@ const Containers: React.FC<{}> = () => {
     }));
 
     try {
+      const endpoint = tabKey === '6' 
+        ? `/api/v1/containers/quasiClosed` 
+        : `/api/v1/containers/unhealthy/${containerStateName}`;
+        
       const response = await fetchData<ContainersPaginationResponse>(
-        `/api/v1/containers/unhealthy/${containerStateName}`,
+        endpoint,
         'GET',
         { limit: fetchSize, minContainerId }
       );
@@ -176,11 +183,12 @@ const Containers: React.FC<{}> = () => {
       // Summary counts are returned by every tab endpoint.
       setState(prev => ({
         ...prev,
-        missingCount: response.missingCount ?? 0,
-        underReplicatedCount: response.underReplicatedCount ?? 0,
-        overReplicatedCount: response.overReplicatedCount ?? 0,
-        misReplicatedCount: response.misReplicatedCount ?? 0,
-        replicaMismatchCount: response.replicaMismatchCount ?? 0,
+        missingCount: response.missingCount ?? prev.missingCount,
+        underReplicatedCount: response.underReplicatedCount ?? prev.underReplicatedCount,
+        overReplicatedCount: response.overReplicatedCount ?? prev.overReplicatedCount,
+        misReplicatedCount: response.misReplicatedCount ?? prev.misReplicatedCount,
+        replicaMismatchCount: response.replicaMismatchCount ?? prev.replicaMismatchCount,
+        quasiClosedCount: response.quasiClosedCount ?? prev.quasiClosedCount,
         lastUpdated: Number(moment()),
       }));
     } catch (error) {
@@ -247,6 +255,7 @@ const Containers: React.FC<{}> = () => {
       '3': { ...DEFAULT_TAB_STATE },
       '4': { ...DEFAULT_TAB_STATE },
       '5': { ...DEFAULT_TAB_STATE },
+      '6': { ...DEFAULT_TAB_STATE },
     };
     setTabStates(reset);
     fetchTabData(selectedTab, 0, newSize);
@@ -260,6 +269,7 @@ const Containers: React.FC<{}> = () => {
       '3': { ...DEFAULT_TAB_STATE },
       '4': { ...DEFAULT_TAB_STATE },
       '5': { ...DEFAULT_TAB_STATE },
+      '6': { ...DEFAULT_TAB_STATE },
     });
     fetchTabData(selectedTab, 0, pageSize);
     clusterState.refetch();
@@ -276,6 +286,7 @@ const Containers: React.FC<{}> = () => {
     overReplicatedCount,
     misReplicatedCount,
     replicaMismatchCount,
+    quasiClosedCount,
   } = state;
 
   const currentTabState = tabStates[selectedTab];
@@ -309,6 +320,10 @@ const Containers: React.FC<{}> = () => {
       <div className='highlight-content'>
         Mismatched Replicas <br/>
         <span className='highlight-content-value'>{replicaMismatchCount ?? 'N/A'}</span>
+      </div>
+      <div className='highlight-content'>
+        Quasi Closed <br/>
+        <span className='highlight-content-value'>{quasiClosedCount ?? 'N/A'}</span>
       </div>
     </div>
   );
@@ -363,10 +378,10 @@ const Containers: React.FC<{}> = () => {
           </div>
           <Tabs defaultActiveKey='1'
             onChange={(activeKey: string) => handleTabChange(activeKey)}>
-            {(['1','2','3','4','5'] as const).map((key) => (
+            {(['1','2','3','4','5','6'] as const).map((key) => (
               <Tabs.TabPane
                 key={key}
-                tab={['Missing','Under-Replicated','Over-Replicated','Mis-Replicated','Mismatched Replicas'][Number(key)-1]}>
+                tab={['Missing','Under-Replicated','Over-Replicated','Mis-Replicated','Mismatched Replicas','Quasi Closed'][Number(key)-1]}>
                 <ContainerTable
                   data={tabStates[key].data}
                   loading={tabStates[key].loading}
@@ -381,6 +396,7 @@ const Containers: React.FC<{}> = () => {
                   hasPrevPage={tabStates[key].pageHistory.length > 0}
                   pageSize={pageSize}
                   onPageSizeChange={handlePageSizeChange}
+                  sinceColumnTitle={key === '6' ? 'State Enter Time' : 'Unhealthy Since'}
                 />
               </Tabs.TabPane>
             ))}

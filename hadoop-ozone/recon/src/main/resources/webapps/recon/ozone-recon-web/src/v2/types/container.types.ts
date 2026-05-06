@@ -72,6 +72,8 @@ export type ContainersPaginationResponse = {
   overReplicatedCount: number;
   misReplicatedCount: number;
   replicaMismatchCount: number;
+  quasiClosedCount?: number;
+  totalCount?: number;
 }
 
 export type TabPaginationState = {
@@ -98,6 +100,7 @@ export type ContainerTableProps = {
   hasPrevPage: boolean;
   pageSize: number;
   onPageSizeChange: (newSize: number) => void;
+  sinceColumnTitle?: string;
 }
 
 
@@ -121,4 +124,5 @@ export type ContainerState = {
   overReplicatedCount: number;
   misReplicatedCount: number;
   replicaMismatchCount: number;
+  quasiClosedCount: number;
 }
