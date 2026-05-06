@@ -119,7 +119,6 @@ final class S3ConditionalRequest {
     }
   }
 
-
   static boolean checkCopySourceModificationTime(Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
       String copySourceIfUnmodifiedSinceStr) {
