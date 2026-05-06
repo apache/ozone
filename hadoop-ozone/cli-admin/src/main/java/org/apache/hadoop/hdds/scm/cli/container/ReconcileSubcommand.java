@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -128,8 +129,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
         System.out.println("Reconciliation has been triggered for container " + containerID);
         successCount++;
       } catch (Exception ex) {
-        System.err.println("Failed to trigger reconciliation for container " + containerID + ": " +
-            getExceptionMessage(ex));
+        System.err.println(getExceptionMessage(ex));
         failureCount++;
       }
     }
@@ -150,7 +150,12 @@ public class ReconcileSubcommand extends ScmSubcommand {
    * display that to the user.
    */
   private String getExceptionMessage(Exception ex) {
+    String aclLine = HddsUtils.formatAccessControlExceptionLine(ex);
+    if (aclLine != null) {
+      return aclLine;
+    }
     return ex.getMessage().split("\n", 2)[0];
+
   }
 
   /**

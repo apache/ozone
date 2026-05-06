@@ -112,7 +112,7 @@ public class InfoSubcommand extends ScmSubcommand {
       container = scmClient.getContainerWithPipeline(containerID);
       Objects.requireNonNull(container, "Container cannot be null");
     } catch (IOException e) {
-      printError("Unable to retrieve the container details for " + containerID + ". " + e.getMessage());
+      rootCommand().printError(e);
       return;
     }
 
@@ -120,7 +120,7 @@ public class InfoSubcommand extends ScmSubcommand {
     try {
       replicas = scmClient.getContainerReplicas(containerID);
     } catch (IOException e) {
-      printError("Unable to retrieve the replica details: " + e.getMessage());
+      rootCommand().printError(e);
     }
 
     if (json) {

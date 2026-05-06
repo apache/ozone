@@ -232,7 +232,7 @@ public class TestReconcileSubcommand {
 
     RuntimeException exception = assertThrows(RuntimeException.class, () -> executeReconcileFromArgs(1));
 
-    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + mockMessage);
+    assertThatOutput(errContent).contains(mockMessage);
 
     assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 container");
 
@@ -302,8 +302,8 @@ public class TestReconcileSubcommand {
     });
 
     // Should have error messages for EC containers
-    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + EC_CONTAINER_MESSAGE);
-    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 3: " + EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
     assertThatOutput(errContent).doesNotContain("Failed to trigger reconciliation for container 2");
 
     // Exception message should indicate 2 failed containers
@@ -367,7 +367,7 @@ public class TestReconcileSubcommand {
 
     assertThrows(RuntimeException.class, () -> parseArgsAndExecute("123", "456"));
     // Should have error message for unreachable container
-    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 456: " + exceptionMessage);
+    assertThatOutput(errContent).contains(exceptionMessage);
     assertThatOutput(errContent).doesNotContain("123");
     assertThatOutput(outContent).doesNotContain("Reconciliation has been triggered for container 456");
     validateReconcileOutput(123);
