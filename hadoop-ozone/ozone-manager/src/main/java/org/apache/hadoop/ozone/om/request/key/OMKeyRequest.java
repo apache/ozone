@@ -1324,7 +1324,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (keyArgs.hasExpectedDataGeneration()) {
       long expectedGen = keyArgs.getExpectedDataGeneration();
       // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         if (dbKeyInfo != null) {
           throw new OMException("Key already exists",
               OMException.ResultCodes.KEY_ALREADY_EXISTS);

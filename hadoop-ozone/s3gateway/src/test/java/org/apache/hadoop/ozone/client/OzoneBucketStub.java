@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.client;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
-import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS;
+import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
@@ -587,9 +587,9 @@ public final class OzoneBucketStub extends OzoneBucket {
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
       String uploadID, Map<Integer, String> partsMap,
       Long expectedDataGeneration, String expectedETag) throws IOException {
-    // Handle If-None-Match: * (expectedDataGeneration == -1 means create-if-absent)
+    // Handle If-None-Match: * (expectedDataGeneration == 0 means create-if-absent)
     if (expectedDataGeneration != null &&
-        expectedDataGeneration == EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+        expectedDataGeneration == EXPECTED_GEN_CREATE_IF_ABSENT) {
       if (keyContents.containsKey(key)) {
         throw new OMException("Key already exists", ResultCodes.KEY_ALREADY_EXISTS);
       }

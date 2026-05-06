@@ -744,7 +744,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Long expectedDataGeneration = null;
       String expectedETag = null;
       if (writeConditions.hasIfNoneMatch()) {
-        expectedDataGeneration = OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS;
+        expectedDataGeneration = OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
       } else if (writeConditions.hasIfMatch()) {
         expectedETag = writeConditions.getExpectedETag();
       }
