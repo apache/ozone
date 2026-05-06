@@ -147,7 +147,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       return;
     }
 
-    validateAtomicRewriteAtAdmission(
+    validateAtomicRewriteAtCommit(
         getCommittedKeyInfoForCommitAdmission(omMetadataManager, keyArgs),
         openKeyInfo.getExpectedDataGeneration(), null);
   }
