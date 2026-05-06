@@ -61,10 +61,11 @@ public enum StorageTier {
   // Constructor for non-uniform storage tiers
   StorageTier(String tierName, StorageType... storageTypes) {
     this.tierName = tierName;
+    long storageTypeCount = Arrays.stream(storageTypes).distinct().count();
     if (Arrays.stream(storageTypes).distinct().count() <= 1) {
       throw new IllegalArgumentException("StorageTier '" + tierName +
           "' requires at least two different StorageType instances." +
-          " but only " + Arrays.stream(storageTypes).distinct().count() +
+          " but only " + storageTypeCount +
           " StorageType were provided.");
     }
     this.storageTypes = Arrays.asList(storageTypes);
@@ -138,7 +139,7 @@ public enum StorageTier {
       if (storageTypes.isEmpty()) {
         return Collections.emptyList();
       }
-      return new ArrayList<>(Collections.nCopies(numberOfNodes, storageTypes.get(0)));
+      return Collections.nCopies(numberOfNodes, storageTypes.get(0));
     } else {
       throw new UnsupportedOperationException(
           "Unsupported not UniformStorage Storage Tier: " + replicationConfig);

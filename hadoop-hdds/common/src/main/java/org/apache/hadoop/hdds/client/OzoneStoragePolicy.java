@@ -55,7 +55,7 @@ public enum OzoneStoragePolicy implements StoragePolicy {
   }
 
   /**
-   * Converts the current StoragePolicyType to its protobuf representation.
+   * Converts the current OzoneStoragePolicy to its protobuf representation.
    * @return the corresponding StoragePolicyProto.
    */
   public StoragePolicyProto toProto() {
@@ -68,7 +68,7 @@ public enum OzoneStoragePolicy implements StoragePolicy {
       return StoragePolicyProto.COLD;
     default:
       throw new IllegalArgumentException(
-          "Error: StoragePolicyType not found, type=" + this);
+          "Error: OzoneStoragePolicy not found, type=" + this);
     }
   }
 
