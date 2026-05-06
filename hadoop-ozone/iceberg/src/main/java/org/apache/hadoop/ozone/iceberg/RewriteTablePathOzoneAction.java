@@ -276,7 +276,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     Set<Pair<String, String>> result = new HashSet<>();
     String stagingPath = RewriteTablePathUtil.stagingPath(versionFilePath, sourcePrefix, stagingDir);
     
-    LOG.info("Processing version file {}", versionFilePath);
+    LOG.debug("Processing version file {}", versionFilePath);
     TableMetadata newTableMetadata = RewriteTablePathUtil.replacePaths(metadata, sourcePrefix, targetPrefix);
     TableMetadataParser.overwrite(newTableMetadata, table.io().newOutputFile(stagingPath));
     
