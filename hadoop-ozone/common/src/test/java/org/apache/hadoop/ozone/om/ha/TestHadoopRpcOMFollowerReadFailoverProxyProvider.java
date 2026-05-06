@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
@@ -161,6 +162,47 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
 
     assertHandledBy(0);
     assertTrue(proxyProvider.isUseFollowerRead());
+  }
+
+  @Test
+  void testLinearizableAllowFollowerReadSticksToCurrentProxy()
+      throws Exception {
+    setupProxyProvider(3);
+    omNodeAnswers[2].isLeader = true;
+
+    doRead(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER);
+    assertHandledBy(0);
+    doRead(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER);
+    assertHandledBy(0);
+    doRead(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER);
+    assertHandledBy(0);
+  }
+
+  @Test
+  void testLocalLeaseReadSticksToFollowerBeforeLeader()
+      throws Exception {
+    setupProxyProvider(3);
+    omNodeAnswers[1].isLeader = true;
+    doWrite();
+
+    doRead(ReadConsistency.LOCAL_LEASE);
+    assertHandledBy(0);
+    doRead(ReadConsistency.LOCAL_LEASE);
+    assertHandledBy(0);
+    doRead(ReadConsistency.LOCAL_LEASE);
+    assertHandledBy(0);
+  }
+
+  @Test
+  void testLeaderOnlyReadBypassesFollowerReadProxy() throws Exception {
+    setupProxyProvider(3);
+    omNodeAnswers[2].isLeader = true;
+
+    doRead(ReadConsistency.LINEARIZABLE_LEADER_ONLY);
+
+    assertHandledBy(2);
+    assertTrue(proxyProvider.isUseFollowerRead());
+    assertEquals(proxyProvider.getCurrentProxy().getNodeId(), omNodeIds[0]);
   }
 
   @Test
@@ -451,6 +493,10 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doRead(retryProxy);
   }
 
+  private void doRead(ReadConsistency readConsistency) throws Exception {
+    doRead(retryProxy, readConsistency);
+  }
+
   private void doWrite() throws Exception {
     doWrite(retryProxy);
   }
@@ -475,6 +521,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   }
 
   private static void doRead(OzoneManagerProtocolPB client) throws Exception {
+    doRead(client, null);
+  }
+
+  private static void doRead(OzoneManagerProtocolPB client,
+      ReadConsistency readConsistency) throws Exception {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName("volume")
         .setBucketName("bucket")
@@ -483,14 +534,16 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     GetKeyInfoRequest.Builder req = GetKeyInfoRequest.newBuilder()
         .setKeyArgs(keyArgs);
 
-    OMRequest omRequest = OMRequest.newBuilder()
+    OMRequest.Builder omRequest = OMRequest.newBuilder()
         .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(ClientId.randomId().toString())
         .setCmdType(Type.GetKeyInfo)
-        .setGetKeyInfoRequest(req)
-        .build();
+        .setGetKeyInfoRequest(req);
+    if (readConsistency != null) {
+      omRequest.setReadConsistencyHint(readConsistency.getHint());
+    }
 
-    client.submitRequest(null, omRequest);
+    client.submitRequest(null, omRequest.build());
   }
 
   private void assertHandledBy(int omNodeIdx) {
@@ -545,6 +598,18 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
           break;
         case GetKeyInfo:
           if (!isLeader) {
+            if (omRequest.hasReadConsistencyHint()
+                && ReadConsistency.fromProto(omRequest
+                    .getReadConsistencyHint()
+                    .getReadConsistency()) ==
+                    ReadConsistency.LINEARIZABLE_LEADER_ONLY) {
+              throw new ServiceException(
+                  new RemoteException(
+                      OMNotLeaderException.class.getCanonicalName(),
+                      "Read can only be done on leader"
+                  )
+              );
+            }
             if (!isFollowerReadSupported) {
               throw new ServiceException(
                   new RemoteException(
