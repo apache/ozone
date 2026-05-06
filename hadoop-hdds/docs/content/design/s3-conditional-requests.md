@@ -301,13 +301,22 @@ public static final long EXPECTED_DATA_GENERATION_CREATE_IF_NOT_EXISTS = -1L;
    OzoneConsts.EXPECTED_DATA_GENERATION_CREATE_IF_NOT_EXISTS` in the
    outgoing `KeyArgs`.
 
-##### OM Create Phase
+##### OM CreateKey Admission Phase
+
+For conditional `PUT`, `CreateKey` admits the write and creates the
+open-key state, but it does not make the destination object visible.
+Both `CreateKey.preExecute(...)` and `CreateKey.validateAndUpdateCache(...)`
+belong to the admission side of the conditional write flow.
 
 1. OM receives request with `expectedDataGeneration == OzoneConsts.EXPECTED_DATA_GENERATION_CREATE_IF_NOT_EXISTS`.
 2. **Pre-check**: If key is already in the OpenKeyTable or KeyTable, throw `KEY_ALREADY_EXISTS`.
 3. If not exists, proceed to create the open key entry.
 
-##### OM Commit Phase (Atomicity)
+##### OM CommitKey Commit Phase (Atomicity)
+
+`CommitKey.preExecute(...)` is still admission-side request preparation.
+Only `CommitKey.validateAndUpdateCache(...)` performs commit-time
+conditional revalidation for `PutObject`.
 
 1. During the commit phase (or strict atomic create), the OM validates that the key still does not exist.
 2. If a concurrent client created the key between the Create and Commit
@@ -365,10 +374,13 @@ part of the normal write path.
    `expectedDataGeneration`, the normal output-stream commit path carries
    that generation on `commitKey`.
 
-##### OM Create Phase
+##### OM CreateKey Admission Phase
 
-Validation is performed within the `validateAndUpdateCache` method to
-ensure atomicity within the Ratis state machine application.
+For conditional `PUT`, the `CreateKey` request is the admission
+transaction. `CreateKey.preExecute(...)` performs admission-side request
+preparation, and `CreateKey.validateAndUpdateCache(...)` performs the
+serialized admission check that either opens the key or returns a
+precondition-style failure.
 
 1. **Locking**: The OM acquires the write lock for the bucket/key.
 2. **Key Lookup**: Retrieve the existing key from `KeyTable`.
@@ -390,10 +402,12 @@ ensure atomicity within the Ratis state machine application.
    metadata containing that generation, so the later `commitKey` request
    can carry the same resolved rewrite condition.
 
-##### OM Commit Phase
+##### OM CommitKey Commit Phase
 
-The commit phase reuses the existing atomic rewrite validation logic
-from HDDS-10656:
+`CommitKey.preExecute(...)` is also admission-side request preparation.
+Only `CommitKey.validateAndUpdateCache(...)` is the commit phase for the
+conditional write. This phase reuses the existing atomic rewrite
+validation logic from HDDS-10656:
 
 1. Read open key entry (contains `expectedDataGeneration` set during
    create phase from the ETag-validated key).
