@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +34,10 @@ public class HDDSLayoutVersionManager extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HDDSLayoutVersionManager.class);
-  public HDDSLayoutVersionManager(int layoutVersion, ComponentUpgradeActionProvider<?> scmProvider, ComponentUpgradeActionProvider<?> dnProvider) throws IOException {
+
+  public HDDSLayoutVersionManager(int layoutVersion,
+      ComponentUpgradeActionProvider<?> scmProvider,
+      ComponentUpgradeActionProvider<?> dnProvider) throws IOException {
     init(layoutVersion, HDDSLayoutFeature.values());
     registerUpgradeActions(scmProvider, dnProvider);
   }
@@ -46,7 +48,8 @@ public class HDDSLayoutVersionManager extends
   }
 
   @VisibleForTesting
-  void registerUpgradeActions(ComponentUpgradeActionProvider<?> scmProvider, ComponentUpgradeActionProvider<?> dnProvider) {
+  void registerUpgradeActions(ComponentUpgradeActionProvider<?> scmProvider,
+      ComponentUpgradeActionProvider<?> dnProvider) {
     if (scmProvider != null) {
       scmProvider.load().forEach((feature, action) -> {
         HDDSLayoutFeature hddsFeature = (HDDSLayoutFeature) feature;

@@ -43,6 +43,9 @@ import org.junit.jupiter.api.Test;
  */
 public class TestHDDSLayoutVersionManager {
 
+  /**
+   * Mock component for testing upgrade actions.
+   */
   public static class MockComponent {
     public void mockMethodScm() {
     }
@@ -51,6 +54,9 @@ public class TestHDDSLayoutVersionManager {
     }
   }
 
+  /**
+   * Mock SCM upgrade action for testing.
+   */
   public static class MockScmUpgradeAction implements UpgradeAction<MockComponent> {
     @Override
     public void execute(MockComponent arg) {
@@ -58,6 +64,9 @@ public class TestHDDSLayoutVersionManager {
     }
   }
 
+  /**
+   * Mock Datanode upgrade action for testing.
+   */
   public static class MockDnUpgradeAction implements UpgradeAction<MockComponent> {
     @Override
     public void execute(MockComponent arg) {
