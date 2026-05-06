@@ -268,7 +268,7 @@ Create Temp Bucket Access Policies
 
     Create Ranger Assume Role Policy  ${STS_TEMP_BUCKET_ROLE}   ${ICEBERG_SVC_CATALOG_USER}
 
-    ${bucket_policy} =            Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "sts temp bucket access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "sts-bucket-*" ], "isExcludes": false, "isRecursive": false } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${STS_TEMP_BUCKET_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ICEBERG_READ_ONLY_ROLE_OBS}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
+    ${bucket_policy} =            Set Variable                  { "isEnabled": true, "service": "dev_ozone", "name": "sts temp bucket access", "policyType": 0, "policyPriority": 0, "isAuditEnabled": true, "resources": { "volume": { "values": [ "s3v" ], "isExcludes": false, "isRecursive": false }, "bucket": { "values": [ "sts-bucket-*" ], "isExcludes": false, "isRecursive": false }, "key": { "values": [ "*" ], "isExcludes": false, "isRecursive": true } }, "policyItems": [ { "accesses": [ { "type": "all", "isAllowed": true } ], "roles": [ "${STS_TEMP_BUCKET_ROLE}" ], "delegateAdmin": false }, { "accesses": [ { "type": "read", "isAllowed": true } ], "roles": [ "${ICEBERG_READ_ONLY_ROLE_OBS}" ], "delegateAdmin": false } ], "serviceType": "ozone", "isDenyAllElse": false }
     Create Ranger Policy          ${bucket_policy}
 
 Create All Access Assume Role Policies
@@ -851,7 +851,7 @@ STS session policy DeleteObject must require key DELETE
     ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-object --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --profile sts
     Should Not Contain            ${output}                     AccessDenied
 
-STS session policy ListMultipartUploadParts must require key LIST
+STS session policy ListMultipartUploadParts must require key READ
     ${key_suffix} =               Generate Random String        8   [LOWER]
     ${key} =                      Set Variable                  sts-mpu-${key_suffix}.txt
     ${local_path} =               Set Variable                  ${TEMP_DIR}/${key}
@@ -870,8 +870,8 @@ STS session policy ListMultipartUploadParts must require key LIST
     ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-parts --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --upload-id ${upload_id} --profile sts
     Should Contain                ${output}                     PartNumber
 
-    # Negative: missing LIST
-    Assume Role And Configure STS Profile                       policy_json=${list_parts_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${READ_ONLY_ROLE_OBS_ARN}
+    # Negative: missing READ
+    Assume Role And Configure STS Profile                       policy_json=${list_parts_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${PARTIAL_BUCKET_LIST_ROLE_ARN}
     ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-parts --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --upload-id ${upload_id} --profile sts
     Should Contain                ${output}                     AccessDenied
 
@@ -920,6 +920,142 @@ STS session policy containing only PutObject must deny PutObjectTagging and Dele
     Should Contain                ${output}                     AccessDenied
     ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${key} --profile sts
     Should Contain                ${output}                     AccessDenied
+
+STS session policy CopyObject must require source GetObject and destination PutObject
+    ${src_key} =                  Set Variable                  ${ICEBERG_BUCKET_TESTFILE}
+    ${key_suffix} =               Generate Random String        8   [LOWER]
+    ${dest_key} =                 Set Variable                  sts-copy-dest-${key_suffix}.txt
+
+    # Positive: GetObject on source + PutObject on destination should allow CopyObject
+    ${copy_allow_policy} =        Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${src_key}"},{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${dest_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${copy_allow_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} copy-object --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
+    Should Contain                ${output}                     CopyObjectResult
+
+    # Negative A: missing source GetObject should deny CopyObject even with destination PutObject
+    ${copy_missing_source_get} =  Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${dest_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${copy_missing_source_get}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} copy-object --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: missing destination PutObject should deny CopyObject even with source GetObject
+    ${copy_missing_dest_put} =    Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${src_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${copy_missing_dest_put}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} copy-object --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+STS session policy UploadPartCopy must require source GetObject and destination PutObject
+    ${src_key} =                  Set Variable                  ${ICEBERG_BUCKET_TESTFILE}
+    ${key_suffix} =               Generate Random String        8   [LOWER]
+    ${dest_key} =                 Set Variable                  sts-mpu-copy-${key_suffix}.txt
+
+    # Positive: GetObject on source + PutObject on destination should allow UploadPartCopy
+    ${allow_policy} =             Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${src_key}"},{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${dest_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${allow_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --profile sts
+    ${upload_id} =                Execute                       echo '${output}' | jq -r '.UploadId'
+    Should Not Be Empty           ${upload_id}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} upload-part-copy --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --part-number 1 --upload-id ${upload_id} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
+    Should Contain                ${output}                     CopyPartResult
+
+    # Negative A: missing source GetObject should deny UploadPartCopy even with destination PutObject
+    ${missing_source_get} =       Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${dest_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${missing_source_get}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --profile sts
+    ${upload_id} =                Execute                       echo '${output}' | jq -r '.UploadId'
+    Should Not Be Empty           ${upload_id}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} upload-part-copy --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --part-number 1 --upload-id ${upload_id} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+    # Negative B: missing destination PutObject should deny UploadPartCopy even with source GetObject
+    # Create MPU under PutObject so we can get an upload ID first.
+    ${put_only_policy} =          Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:PutObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${dest_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${put_only_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute                       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --profile sts
+    ${upload_id} =                Execute                       echo '${output}' | jq -r '.UploadId'
+    Should Not Be Empty           ${upload_id}
+    # Switch to GetObject-only policy for the actual UploadPartCopy call.
+    ${missing_dest_put} =         Set Variable                  {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${src_key}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${missing_dest_put}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} upload-part-copy --bucket ${ICEBERG_BUCKET_OBS} --key ${dest_key} --part-number 1 --upload-id ${upload_id} --copy-source ${ICEBERG_BUCKET_OBS}/${src_key} --profile sts
+    Should Contain                ${output}                     AccessDenied
+
+STS session policy s3:* on bucket resource must allow bucket APIs but deny ListAllMyBuckets and object APIs
+    ${bucket_star_policy} =      Set Variable                   {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${bucket_star_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+
+    # Bucket APIs should work
+    List Object Keys Should Succeed  ${ICEBERG_BUCKET_OBS}
+
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-acl --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain               ${output}                      Owner
+
+    # ListAllMyBuckets should NOT work (needs Resource="*" or Resource="arn:aws:s3:::*")
+    ${output} =                  Execute And Ignore Error       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-buckets --profile sts
+    Should Contain               ${output}                      AccessDenied
+
+    # Object APIs should NOT work
+    Get Object Should Fail       ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+    ${key_suffix} =              Generate Random String         8   [LOWER]
+    ${key} =                     Set Variable                   sts-bucket-star-${key_suffix}.txt
+    ${local_path} =              Set Variable                   ${TEMP_DIR}/${key}
+    Create File                  ${local_path}                  bucket-star policy should deny PutObject
+    Put Object Should Fail       ${ICEBERG_BUCKET_OBS}  ${key}  AccessDenied  ${local_path}
+
+STS session policy s3:* on object resource must allow object APIs but deny ListAllMyBuckets and bucket APIs
+    ${key_suffix} =              Generate Random String         8   [LOWER]
+    ${local_path} =              Set Variable                   ${TEMP_DIR}/object-star-${key_suffix}.txt
+    Create File                  ${local_path}                  object-star policy content
+    ${object_star_policy} =      Set Variable                   {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::${ICEBERG_BUCKET_OBS}/${ICEBERG_BUCKET_TESTFILE}"}]}
+    Assume Role And Configure STS Profile                       policy_json=${object_star_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+
+    # Object APIs should work (on that single object ARN)
+    Get Object Should Succeed    ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}
+    Put Object Should Succeed    ${ICEBERG_BUCKET_OBS}  ${ICEBERG_BUCKET_TESTFILE}  ${local_path}
+    Get Object Should Fail       ${ICEBERG_BUCKET_OBS}  file1again.txt  AccessDenied
+
+    # ListAllMyBuckets should NOT work (needs Resource="*" or Resource="arn:aws:s3:::*")
+    ${output} =                  Execute And Ignore Error       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-buckets --profile sts
+    Should Contain               ${output}                      AccessDenied
+
+    # Bucket APIs should NOT work
+    List Object Keys Should Fail  ${ICEBERG_BUCKET_OBS}  list-objects  AccessDenied
+
+    ${output} =                  Execute And Ignore Error       aws s3api --endpoint-url ${S3G_ENDPOINT_URL} get-bucket-acl --bucket ${ICEBERG_BUCKET_OBS} --profile sts
+    Should Contain               ${output}                      AccessDenied
+
+STS session policy s3:* on * must allow ListAllMyBuckets, Create/ListBucket, and GetObject/PutObject
+    ${bucket_suffix} =           Generate Random String         8   [LOWER]
+    ${bucket} =                  Set Variable                   sts-bucket-${bucket_suffix}
+    ${key_suffix} =              Generate Random String         8   [LOWER]
+    ${key} =                     Set Variable                   sts-object-${key_suffix}.txt
+    ${local_path} =              Set Variable                   ${TEMP_DIR}/${key}
+    ${download_path} =           Set Variable                   ${TEMP_DIR}/${key}.download
+    Create File                  ${local_path}                  star-star policy content
+
+    ${star_policy} =             Set Variable                   {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:*","Resource":"*"}]}
+    Assume Role And Configure STS Profile                       policy_json=${star_policy}  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${STS_TEMP_BUCKET_ROLE_ARN}
+
+    # ListAllMyBuckets should work
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} list-buckets --profile sts
+    Should Contain               ${output}                      ${ICEBERG_BUCKET_OBS}
+
+    # Create/ListBucket should work
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket ${bucket} --profile sts
+    Should Contain               ${output}                      Location
+
+    List Object Keys Should Succeed  ${bucket}
+
+    # Object APIs should work
+    Put Object Should Succeed    ${bucket}  ${key}  ${local_path}
+    Get Object Should Succeed    ${bucket}  ${key}  ${download_path}
+
+    # Cleanup
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-object --bucket ${bucket} --key ${key} --profile sts
+    Should Not Contain           ${output}                      AccessDenied
+    ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
+    Should Not Contain           ${output}                      AccessDenied
 
 Revoking Permanent User Must Revoke Existing Session Token
     # Create session tokens for both buckets, verify they work, then revoke permanent user secret and verify both fail.

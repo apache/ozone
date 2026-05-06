@@ -168,12 +168,25 @@ def mutate_signature(password: bytearray) -> bytearray:
 
 
 def mutate_session_policy(identifier: bytearray) -> bytearray:
-    """Swap internal grant permission from read to write."""
-    old, new = b'"permissions":["read"]', b'"permissions":["write"]'
-    pos = identifier.find(old)
-    if pos < 0:
-        raise ValueError('Could not find \'"permissions":["read"]\' in identifier to mutate')
-    identifier[pos:pos + len(old)] = new
+    """Corrupt the first permission value in the embedded session policy.
+
+    The identifier contains the session policy JSON (UTF-8) as a substring.
+    """
+    marker = b'"permissions":["'
+    start = identifier.find(marker)
+    if start < 0:
+        raise ValueError('Could not find \'"permissions":["\' in identifier to mutate')
+
+    value_start = start + len(marker)
+    value_end = identifier.find(b'"', value_start)
+    if value_end < 0:
+        raise ValueError('Could not find end-quote for first permission to mutate')
+
+    if value_end == value_start:
+        raise ValueError("First permission value is empty; nothing to mutate")
+
+    # Flip one byte in the permission string to ensure token tampering is detected.
+    identifier[value_start] ^= 0x01
     return identifier
 
 
