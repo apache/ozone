@@ -41,8 +41,8 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_LOG_LIMIT_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_TIME_MS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.FOLLOWER_STALE_LOG_LIMIT_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.FOLLOWER_STALE_TIME_MS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -290,10 +290,10 @@ public abstract class EndpointBase {
 
   private void setReadConsistencyFromHeader(ClientProtocol clientProtocol) {
     ReadConsistency readConsistency = parseReadConsistencyHeader();
-    Long localLeaseLogLimit = parseLocalLeaseContextHeader(
-        LOCAL_LEASE_LOG_LIMIT_HEADER);
-    Long localLeaseTimeMs = parseLocalLeaseContextHeader(
-        LOCAL_LEASE_TIME_MS_HEADER);
+    Long localLeaseLogLimit = parseFollowerStaleContextHeader(
+        FOLLOWER_STALE_LOG_LIMIT_HEADER);
+    Long localLeaseTimeMs = parseFollowerStaleContextHeader(
+        FOLLOWER_STALE_TIME_MS_HEADER);
     if (readConsistency == null) {
       validateNoLocalLeaseContext(localLeaseLogLimit, localLeaseTimeMs);
       clientProtocol.clearThreadLocalReadConsistency();
@@ -312,9 +312,11 @@ public abstract class EndpointBase {
       return null;
     }
     switch (header.trim().toLowerCase(Locale.ROOT)) {
-    case "local-lease":
+    case "follower-stale":
       return ReadConsistency.LOCAL_LEASE;
-    case "linearizable-follower":
+    case "leader-only":
+      return ReadConsistency.LINEARIZABLE_LEADER_ONLY;
+    case "follower-linearizable":
       return ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER;
     default:
       OS3Exception ex = newError(INVALID_ARGUMENT, READ_CONSISTENCY_HEADER);
@@ -323,7 +325,7 @@ public abstract class EndpointBase {
     }
   }
 
-  private Long parseLocalLeaseContextHeader(String headerName) {
+  private Long parseFollowerStaleContextHeader(String headerName) {
     String header = getHeaders().getHeaderString(headerName);
     if (StringUtils.isBlank(header)) {
       return null;
@@ -343,8 +345,8 @@ public abstract class EndpointBase {
       Long localLeaseTimeMs) {
     if (localLeaseLogLimit != null || localLeaseTimeMs != null) {
       OS3Exception ex = newError(INVALID_ARGUMENT, READ_CONSISTENCY_HEADER);
-      ex.setErrorMessage("Local lease context requires read consistency: " +
-          "local-lease");
+      ex.setErrorMessage("Follower stale context requires read consistency: " +
+          "follower-stale");
       throw ex;
     }
   }
@@ -352,7 +354,7 @@ public abstract class EndpointBase {
   private OS3Exception invalidLocalLeaseContext(String headerName,
       String header) {
     OS3Exception ex = newError(INVALID_ARGUMENT, headerName);
-    ex.setErrorMessage("Invalid local lease context: " + header);
+    ex.setErrorMessage("Invalid follower stale context: " + header);
     return ex;
   }
 
