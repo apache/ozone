@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -86,15 +86,9 @@ public class TestReconContainerEndpoint {
   }
 
   @AfterEach
-  public void shutdown() throws IOException {
-    try {
-      IOUtils.closeQuietly(client);
-      if (cluster != null) {
-        cluster.shutdown();
-      }
-    } finally {
-      ContainerKeyMapperHelper.clearSharedContainerCountMap();
-    }
+  public void shutdown() {
+    IOUtils.closeQuietly(client, cluster);
+    ContainerKeyMapperHelper.clearSharedContainerCountMap();
   }
 
   @Test
