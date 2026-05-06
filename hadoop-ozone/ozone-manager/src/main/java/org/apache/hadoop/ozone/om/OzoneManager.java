@@ -3876,15 +3876,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final String realVolumeName = bucket.realVolume();
+    final String realBucketName = bucket.realBucket();
 
-    Map<String, String> auditMap = bucket.audit();
+    final Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.PREFIX, prefix);
 
-    metrics.incNumListMultipartUploads();
     try {
-      OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(bucket.realVolume(),
-          bucket.realBucket(), prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
+      if (getAclsEnabled()) {
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, null);
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, realVolumeName, realBucketName, null);
+      }
+
+      metrics.incNumListMultipartUploads();
+      final OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(
+          realVolumeName, realBucketName, prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_MULTIPART_UPLOADS, auditMap));
       return omMultipartUploadList;
 
