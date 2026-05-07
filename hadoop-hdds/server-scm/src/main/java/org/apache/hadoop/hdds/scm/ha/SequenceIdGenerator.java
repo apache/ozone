@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -64,19 +64,19 @@ public class SequenceIdGenerator {
   /**
    * Ids supported.
    */
-  public static final String LOCAL_ID = "localId";
-  public static final String DEL_TXN_ID = "delTxnId";
-  public static final String CONTAINER_ID = "containerId";
+  public static final String LOCAL_ID = SequenceIdType.LOCAL_ID.getDbKey();
+  public static final String DEL_TXN_ID = SequenceIdType.DEL_TXN_ID.getDbKey();
+  public static final String CONTAINER_ID = SequenceIdType.CONTAINER_ID.getDbKey();
 
   // Certificate ID for all services, including root certificates, whose ID
   // were using "rootCertificateId" before.
-  public static final String CERTIFICATE_ID = "CertificateId";
+  public static final String CERTIFICATE_ID = SequenceIdType.CERTIFICATE_ID.getDbKey();
   @Deprecated
-  public static final String ROOT_CERTIFICATE_ID = "rootCertificateId";
+  public static final String ROOT_CERTIFICATE_ID = SequenceIdType.ROOT_CERTIFICATE_ID.getDbKey();
 
   private static final long INVALID_SEQUENCE_ID = 0;
 
-  private final Map<String, Batch> sequenceIdToBatchMap;
+  private final Map<SequenceIdType, Batch> sequenceIdToBatchMap;
 
   private final Lock lock;
   private final long batchSize;
@@ -89,7 +89,7 @@ public class SequenceIdGenerator {
    */
   public SequenceIdGenerator(ConfigurationSource conf,
       SCMHAManager scmhaManager, Table<String, Long> sequenceIdTable) {
-    this.sequenceIdToBatchMap = new HashMap<>();
+    this.sequenceIdToBatchMap = new EnumMap<>(SequenceIdType.class);
     this.lock = new ReentrantLock();
     this.batchSize = conf.getInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE,
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
@@ -108,14 +108,14 @@ public class SequenceIdGenerator {
   }
 
   /**
-   * @param sequenceIdName : name of the sequenceId
-   * @return : next id of this sequenceId.
+   * @param idType : supported sequence ID type
+   * @return next id of this sequence ID.
    */
-  public long getNextId(String sequenceIdName) throws SCMException {
+  public long getNextId(SequenceIdType idType) throws SCMException {
     lock.lock();
     try {
       Batch batch = sequenceIdToBatchMap.computeIfAbsent(
-          sequenceIdName, key -> new Batch());
+          idType, key -> new Batch());
 
       if (batch.nextId <= batch.lastId) {
         return batch.nextId++;
@@ -128,18 +128,18 @@ public class SequenceIdGenerator {
 
         Preconditions.checkArgument(Long.MAX_VALUE - batch.lastId >= batchSize);
         long nextLastId = batch.lastId +
-            ((sequenceIdName.equals(CERTIFICATE_ID)) ? 1 : batchSize);
+            (idType == SequenceIdType.CERTIFICATE_ID ? 1 : batchSize);
 
-        if (stateManager.allocateBatch(sequenceIdName,
+        if (stateManager.allocateBatch(idType.getDbKey(),
             prevLastId, nextLastId)) {
           batch.lastId = nextLastId;
           LOG.info("Allocate a batch for {}, change lastId from {} to {}.",
-              sequenceIdName, prevLastId, batch.lastId);
+              idType, prevLastId, batch.lastId);
           break;
         }
 
         // reload lastId from RocksDB.
-        batch.lastId = stateManager.getLastId(sequenceIdName);
+        batch.lastId = stateManager.getLastId(idType.getDbKey());
       }
 
       Preconditions.checkArgument(batch.nextId <= batch.lastId);
