@@ -185,7 +185,7 @@ public class SaslRpcClient {
     }
     // do we know what it is?  is it using our mechanism?
     return authMethod != null &&
-           authMethod.getMechanismName().equals(authType.getMechanism());
+           getMechanismName(authMethod).equals(authType.getMechanism());
   }
 
   /**
@@ -242,7 +242,7 @@ public class SaslRpcClient {
         throw new IOException("Unknown authentication method " + method);
     }
 
-    String mechanism = method.getMechanismName();
+    String mechanism = getMechanismName(method);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Creating SASL " + mechanism + "(" + method + ") "
           + " client to authenticate to service at " + saslServerName);
@@ -710,6 +710,19 @@ public class SaslRpcClient {
       } else {
         return null;
       }
+    }
+  }
+
+  /** Helper to get actual mechanism name from config.  Required because {@code AuthMethod} is from Hadoop,
+   * not forked (because it is used in UGI, etc.). */
+  static String getMechanismName(AuthMethod authMethod) {
+    switch (authMethod) {
+    case DIGEST:
+    case TOKEN:
+      return SaslConstants.SASL_MECHANISM;
+    default:
+      return authMethod.getMechanismName();
+
     }
   }
 }

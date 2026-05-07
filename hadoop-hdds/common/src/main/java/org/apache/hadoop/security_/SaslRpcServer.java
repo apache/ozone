@@ -91,7 +91,7 @@ public class SaslRpcServer {
   
   public SaslRpcServer(AuthMethod authMethod) throws IOException {
     this.authMethod = authMethod;
-    mechanism = authMethod.getMechanismName();    
+    mechanism = SaslRpcClient.getMechanismName(authMethod);
     switch (authMethod) {
       case SIMPLE: {
         return; // no sasl for simple
@@ -214,7 +214,7 @@ public class SaslRpcServer {
     return fullName.split("[/@]");
   }
 
-  /** CallbackHandler for SASL DIGEST-MD5 mechanism */
+  /** CallbackHandler for SASL mechanism */
   public static class SaslDigestCallbackHandler implements CallbackHandler {
     private SecretManager<TokenIdentifier> secretManager;
     private Server.Connection connection; 
@@ -249,7 +249,7 @@ public class SaslRpcServer {
           continue; // realm is ignored
         } else {
           throw new UnsupportedCallbackException(callback,
-              "Unrecognized SASL DIGEST-MD5 Callback");
+              "Unrecognized SASL Callback");
         }
       }
       if (pc != null) {
@@ -259,11 +259,8 @@ public class SaslRpcServer {
         UserGroupInformation user = null;
         user = tokenIdentifier.getUser(); // may throw exception
         connection.attemptingUser = user;
-        
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("SASL server DIGEST-MD5 callback: setting password "
-              + "for client: " + tokenIdentifier.getUser());
-        }
+
+        LOG.debug("SASL server callback: setting password for client: {}", user);
         pc.setPassword(password);
       }
       if (ac != null) {
@@ -279,8 +276,7 @@ public class SaslRpcServer {
             UserGroupInformation logUser =
               getIdentifier(authzid, secretManager).getUser();
             String username = logUser == null ? null : logUser.getUserName();
-            LOG.debug("SASL server DIGEST-MD5 callback: setting "
-                + "canonicalized client ID: " + username);
+            LOG.debug("SASL server callback: setting authorizedID: {}", username);
           }
           ac.setAuthorizedID(authzid);
         }
