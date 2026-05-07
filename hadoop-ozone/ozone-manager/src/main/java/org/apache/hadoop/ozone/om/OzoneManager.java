@@ -3845,24 +3845,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final String realVolumeName = bucket.realVolume();
+    final String realBucketName = bucket.realBucket();
 
-    Map<String, String> auditMap = bucket.audit();
-    auditMap.put(OzoneConsts.KEY, keyName);
-    auditMap.put(OzoneConsts.UPLOAD_ID, uploadID);
-    auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
-        Integer.toString(partNumberMarker));
-    auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
-
-    metrics.incNumListMultipartUploadParts();
+    final Map<String, String> auditMap = bucket.audit();
     try {
-      OmMultipartUploadListParts omMultipartUploadListParts =
-          keyManager.listParts(bucket.realVolume(), bucket.realBucket(),
-              keyName, uploadID, partNumberMarker, maxParts);
+      auditMap.put(OzoneConsts.KEY, keyName);
+      auditMap.put(OzoneConsts.UPLOAD_ID, uploadID);
+      auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
+          Integer.toString(partNumberMarker));
+      auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
+
+      if (getAclsEnabled()) {
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, null);
+        omMetadataReader.checkAcls(
+            ResourceType.KEY, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, keyName);
+      }
+
+      metrics.incNumListMultipartUploadParts();
+      final OmMultipartUploadListParts omMultipartUploadListParts = keyManager.listParts(
+          realVolumeName, realBucketName, keyName, uploadID, partNumberMarker, maxParts);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap));
       return omMultipartUploadListParts;
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       metrics.incNumListMultipartUploadPartFails();
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap, ex));
