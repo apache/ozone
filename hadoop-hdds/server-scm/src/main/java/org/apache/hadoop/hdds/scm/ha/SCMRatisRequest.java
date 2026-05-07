@@ -169,8 +169,8 @@ public final class SCMRatisRequest {
           SCMRatisRequestProto.parseFrom(proto.getLogData().asReadOnlyByteBuffer())));
     } catch (Throwable ex) {
       LOG.error("smProtoToString failed", ex);
-      builder.append("smProtoToString failed with");
-      builder.append(ex.getMessage());
+      builder.append("smProtoToString failed with")
+          .append(ex.getMessage());
     }
     return builder.toString();
   }

@@ -26,6 +26,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -49,7 +52,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
  * 4. The declaration should throw RaftException
  *
  */
-public interface ContainerStateManager {
+public interface ContainerStateManager extends SCMHandler {
 
   /* **********************************************************************
    * Container Life Cycle                                                 *
@@ -219,4 +222,23 @@ public interface ContainerStateManager {
    */
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
+
+  @Override
+  default RequestType getType() {
+    return RequestType.CONTAINER;
+  }
+
+  /**
+   * Update container info.
+   *
+   * @param containerInfo Updated container info proto
+   * @throws IOException
+   */
+  @Replicate
+  void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
+      throws IOException;
+
+  static void main(String[] args) {
+    ScmInvokerCodeGenerator.generate(ContainerStateManager.class, true);
+  }
 }

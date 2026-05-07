@@ -69,7 +69,9 @@ public enum SCMAction implements AuditAction {
   GET_PIPELINE,
   RECONCILE_CONTAINER,
   GET_DELETED_BLOCK_SUMMARY,
-  LIST_CONTAINER_IDS;
+  LIST_CONTAINER_IDS,
+  SUPPRESS_CONTAINER,
+  UNSUPPRESS_CONTAINER;
 
   @Override
   public String getAction() {

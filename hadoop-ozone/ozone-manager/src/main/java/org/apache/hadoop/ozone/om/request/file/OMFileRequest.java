@@ -197,8 +197,8 @@ public final class OMFileRequest {
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {
       String fileName = elements.next().toString();
-      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
-      fullKeyPath.append(fileName);
+      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX)
+          .append(fileName);
       if (!missing.isEmpty()) {
         // Add all the sub-dirs to the missing list except the leaf element.
         // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.

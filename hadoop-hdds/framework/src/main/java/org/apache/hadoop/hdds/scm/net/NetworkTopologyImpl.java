@@ -891,20 +891,20 @@ public class NetworkTopologyImpl implements NetworkTopology {
   public String toString() {
     // print max level
     StringBuilder tree = new StringBuilder();
-    tree.append("Level: ");
-    tree.append(maxLevel);
-    tree.append('\n');
+    tree.append("Level: ")
+        .append(maxLevel)
+        .append('\n');
     netlock.readLock().lock();
     try {
       // print the number of leaves
       int numOfLeaves = clusterTree.getNumOfLeaves();
-      tree.append("Number of leaves:");
-      tree.append(numOfLeaves);
-      tree.append('\n');
+      tree.append("Number of leaves:")
+          .append(numOfLeaves)
+          .append('\n');
       // print all nodes
       for (int i = 0; i < numOfLeaves; i++) {
-        tree.append(clusterTree.getLeaf(i).getNetworkFullPath());
-        tree.append('\n');
+        tree.append(clusterTree.getLeaf(i).getNetworkFullPath())
+            .append('\n');
       }
     } finally {
       netlock.readLock().unlock();

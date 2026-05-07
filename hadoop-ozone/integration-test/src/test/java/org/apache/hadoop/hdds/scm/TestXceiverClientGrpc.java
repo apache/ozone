@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.scm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -146,6 +148,31 @@ public class TestXceiverClientGrpc {
       e.printStackTrace();
     }
     assertEquals(0, allDNs.size());
+  }
+
+  @Test
+  public void testInterruptedCommandThrowsInterruptedIOException()
+      throws IOException {
+    final CompletableFuture<ContainerProtos.ContainerCommandResponseProto> response =
+        new CompletableFuture<>();
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) {
+        return new XceiverClientReply(response);
+      }
+    }) {
+      Thread.currentThread().interrupt();
+      try {
+        InterruptedIOException ex = assertThrows(InterruptedIOException.class,
+            () -> invokeXceiverClientGetBlock(client));
+        assertThat(ex).hasCauseInstanceOf(InterruptedException.class);
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+      } finally {
+        Thread.interrupted();
+      }
+    }
   }
 
   @Test

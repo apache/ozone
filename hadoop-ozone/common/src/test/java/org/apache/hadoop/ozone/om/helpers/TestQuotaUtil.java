@@ -97,4 +97,28 @@ public class TestQuotaUtil {
     assertEquals(dataSize + ONE_MB * 2, replicatedSize);
   }
 
+  @Test
+  public void testGetSizePerReplicaRatisThree() {
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
+    // Each of the 3 DNs holds the full block, so per-replica == logical size.
+    assertEquals(123 * ONE_MB, QuotaUtil.getSizePerReplica(123 * ONE_MB, repConfig));
+  }
+
+  @Test
+  public void testGetSizePerReplicaRatisOne() {
+    ReplicationConfig repConfig = RatisReplicationConfig.getInstance(ONE);
+    assertEquals(123 * ONE_MB, QuotaUtil.getSizePerReplica(123 * ONE_MB, repConfig));
+  }
+
+  @Test
+  public void testGetSizePerReplicaEC() {
+    // EC(3,2): 5 nodes total. replicatedSize = dataSize + parity overhead.
+    // Per-replica = replicatedSize / 5.
+    ECReplicationConfig repConfig = new ECReplicationConfig(3, 2, RS, ONE_MB);
+    long dataSize = ONE_MB * 3 * 10; // 10 full stripes
+    long replicatedSize = QuotaUtil.getReplicatedSize(dataSize, repConfig);
+    long expected = replicatedSize / repConfig.getRequiredNodes(); // / 5
+    assertEquals(expected, QuotaUtil.getSizePerReplica(dataSize, repConfig));
+  }
+
 }

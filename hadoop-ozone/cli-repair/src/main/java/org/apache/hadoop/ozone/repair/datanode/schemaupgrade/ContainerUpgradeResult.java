@@ -89,31 +89,23 @@ class ContainerUpgradeResult {
   @Override
   public String toString() {
     final StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append("Result:{");
-    stringBuilder.append("containerID=");
-    stringBuilder.append(originContainerData.getContainerID());
-    stringBuilder.append(", originContainerSchemaVersion=");
-    stringBuilder.append(
-        ((KeyValueContainerData) originContainerData).getSchemaVersion());
+    stringBuilder.append("Result:{")
+        .append("containerID=")
+        .append(originContainerData.getContainerID())
+        .append(", originContainerSchemaVersion=")
+        .append(((KeyValueContainerData) originContainerData).getSchemaVersion());
 
     if (newContainerData != null) {
-      stringBuilder.append(", schemaV2ContainerFileBackupPath=");
-      stringBuilder.append(backupContainerFilePath);
-
-      stringBuilder.append(", newContainerSchemaVersion=");
-      stringBuilder.append(
-          ((KeyValueContainerData) newContainerData).getSchemaVersion());
-
-      stringBuilder.append(", schemaV3ContainerFilePath=");
-      stringBuilder.append(newContainerFilePath);
+      stringBuilder
+          .append(", schemaV2ContainerFileBackupPath=").append(backupContainerFilePath)
+          .append(", newContainerSchemaVersion=").append(((KeyValueContainerData) newContainerData).getSchemaVersion())
+          .append(", schemaV3ContainerFilePath=").append(newContainerFilePath);
     }
-    stringBuilder.append(", totalRow=");
-    stringBuilder.append(totalRow);
-    stringBuilder.append(", costMs=");
-    stringBuilder.append(getCostMs());
-    stringBuilder.append(", status=");
-    stringBuilder.append(status);
-    stringBuilder.append('}');
+    stringBuilder
+        .append(", totalRow=").append(totalRow)
+        .append(", costMs=").append(getCostMs())
+        .append(", status=").append(status)
+        .append('}');
     return stringBuilder.toString();
   }
 

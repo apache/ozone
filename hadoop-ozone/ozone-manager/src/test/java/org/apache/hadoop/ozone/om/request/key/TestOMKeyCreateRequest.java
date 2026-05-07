@@ -156,7 +156,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
         false, 0, 100L, replicationConfig,
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT));
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
 
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
@@ -166,6 +166,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     checkResponse(modifiedOmRequest, response, id, false, getBucketLayout());
+
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(id));
+    assertNotNull(openKeyInfo);
+    assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT,
+        openKeyInfo.getExpectedDataGeneration());
   }
 
   @ParameterizedTest
@@ -177,7 +183,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
         false, 0, 100L, replicationConfig,
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT));
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
 
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
@@ -340,11 +346,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(OK, response.getOMResponse().getStatus());
 
-    // Verify open key was created with expectedETag
+    // Verify open key was normalized onto the atomic rewrite generation.
     OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(getOpenKey(id));
     assertNotNull(openKeyInfo);
-    assertEquals(expectedETag, openKeyInfo.getExpectedETag());
+    assertEquals(existingKeyInfo.getUpdateID(),
+        openKeyInfo.getExpectedDataGeneration());
     // Creation time should remain the same on rewrite
     assertEquals(existingKeyInfo.getCreationTime(),
         openKeyInfo.getCreationTime());

@@ -59,7 +59,7 @@ public final class SpanSampler implements Sampler {
     // check if we have a valid parent span
     if (!parentSpan.getSpanContext().isValid()) {
       // Root span: always delegate to trace-level sampler
-      // This ensures OTEL_TRACES_SAMPLER_ARG is respected
+      // This ensures ozone.tracing.sampler is respected
       return rootSampler.shouldSample(parentContext, traceId, spanName,
           spanKind, attributes, parentLinks);
     }

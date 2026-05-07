@@ -136,8 +136,8 @@ public class DiskUsageSubCommand implements Callable {
       if (duResponse.path("subPathCount").asInt(-1) == 0) {
         if (totalSize == 0) {
           // the object is empty
-          System.out.println("The object is empty.\n" +
-              "Put more files into it to visualize DU");
+          System.out.println("The object is empty.");
+          System.out.println("Put more files into it to visualize DU");
         } else {
           System.out.println("There's no immediate " +
               "sub-path under this object.");
