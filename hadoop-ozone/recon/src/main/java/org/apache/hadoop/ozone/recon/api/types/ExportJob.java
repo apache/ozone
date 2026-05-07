@@ -26,17 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Represents an asynchronous CSV export job.
  */
 public class ExportJob {
-
-  /**
-   * Current execution state of the export job.
-   */
-  public enum JobStatus {
-    QUEUED,      // Waiting for worker thread
-    RUNNING,     // Actively exporting
-    COMPLETED,   // File ready for download
-    FAILED       // Error occurred
-  }
-  
   @JsonProperty("jobId")
   private String jobId;
   
@@ -147,9 +136,12 @@ public class ExportJob {
 
   public void setFilePath(String filePath) {
     this.filePath = filePath;
-    this.fileName = filePath != null
-        ? Paths.get(filePath).getFileName().toString()
-        : null;
+    if (filePath == null) {
+      this.fileName = null;
+      return;
+    }
+    java.nio.file.Path path = Paths.get(filePath).getFileName();
+    this.fileName = path != null ? path.toString() : filePath;
   }
 
   public String getFileName() {
@@ -216,5 +208,15 @@ public class ExportJob {
         return true;
       }
     }
+  }
+
+  /**
+   * Current execution state of the export job.
+   */
+  public enum JobStatus {
+    QUEUED,      // Waiting for worker thread
+    RUNNING,     // Actively exporting
+    COMPLETED,   // File ready for download
+    FAILED       // Error occurred
   }
 }

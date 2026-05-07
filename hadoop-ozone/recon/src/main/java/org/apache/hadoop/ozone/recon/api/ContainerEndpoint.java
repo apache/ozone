@@ -28,9 +28,10 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -631,7 +632,7 @@ public class ContainerEndpoint {
     LOG.info("Download {} of {} for job {}", job.getDownloadCount(), job.getMaxDownloads(), jobId);
 
     StreamingOutput stream = outputStream -> {
-      try (FileInputStream fis = new FileInputStream(file);
+      try (InputStream fis = Files.newInputStream(file.toPath());
            BufferedOutputStream bos = new BufferedOutputStream(outputStream, 256 * 1024)) {
         byte[] buffer = new byte[8192];
         int bytesRead;

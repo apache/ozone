@@ -21,8 +21,8 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -273,7 +273,7 @@ public class ExportJobManager {
         final int recordsPerFile = 500_000;
         
         BufferedWriter writer = null;
-        FileOutputStream fos = null;
+        OutputStream fos = null;
         try {
           while (cursor.hasNext()) {
             // Check for cancellation
@@ -291,7 +291,7 @@ public class ExportJobManager {
               
               String csvFileName = String.format("%s/unhealthy_containers_%s_part%03d.csv",
                   jobDirectory, job.getState().toLowerCase(), fileIndex);
-              fos = new FileOutputStream(csvFileName);
+              fos = Files.newOutputStream(Paths.get(csvFileName));
               try {
                 writer = new BufferedWriter(new OutputStreamWriter(fos, StandardCharsets.UTF_8));
               } finally {
@@ -379,7 +379,7 @@ public class ExportJobManager {
         Thread.currentThread().interrupt();
       }
       
-    } catch (Exception e) {
+    } catch (IOException | RuntimeException e) {
       job.setStatus(JobStatus.FAILED);
       job.setErrorMessage(e.getMessage());
       FileUtils.deleteQuietly(new File(exportDirectory + "/" + job.getJobId()));

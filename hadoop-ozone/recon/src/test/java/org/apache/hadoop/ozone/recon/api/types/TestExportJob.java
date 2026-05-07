@@ -79,17 +79,17 @@ class TestExportJob {
   void setFilePathDerivesFileName() {
     ExportJob job = new ExportJob("job-1", "MISSING", 3);
 
-    job.setFilePath("/var/recon/exports/export_missing_1736000000000.tar");
+    job.setFilePath("export_missing_1736000000000.tar");
 
     assertThat(job.getFilePath())
-        .isEqualTo("/var/recon/exports/export_missing_1736000000000.tar");
+        .isEqualTo("export_missing_1736000000000.tar");
     assertThat(job.getFileName()).isEqualTo("export_missing_1736000000000.tar");
   }
 
   @Test
   void setFilePathNullClearsFileName() {
     ExportJob job = new ExportJob("job-1", "MISSING", 3);
-    job.setFilePath("/foo/export_missing_1.tar");
+    job.setFilePath("export_missing_1.tar");
     assertThat(job.getFileName()).isEqualTo("export_missing_1.tar");
 
     job.setFilePath(null);

@@ -29,7 +29,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -406,7 +405,7 @@ class TestExportJobManager {
   private static List<String> listTarEntryNames(File tarFile) throws Exception {
     List<String> entries = new ArrayList<>();
     try (TarArchiveInputStream tis =
-             new TarArchiveInputStream(new FileInputStream(tarFile))) {
+             new TarArchiveInputStream(Files.newInputStream(tarFile.toPath()))) {
       TarArchiveEntry entry;
       while ((entry = tis.getNextTarEntry()) != null) {
         if (!entry.isDirectory()) {
