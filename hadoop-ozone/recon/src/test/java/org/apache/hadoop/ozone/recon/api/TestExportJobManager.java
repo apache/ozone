@@ -29,13 +29,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.api.types.ExportJob;
 import org.apache.hadoop.ozone.recon.api.types.ExportJob.JobStatus;
@@ -95,6 +99,28 @@ class TestExportJobManager {
     assertThat(job.getEstimatedTotal()).isEqualTo(5L);
     assertThat(new File(job.getFilePath())).exists().isFile();
     assertThat(job.getFilePath()).endsWith(".tar");
+  }
+
+  @Test
+  void submitLargeExportSplitsIntoMultipleCsvParts() throws Exception {
+    // Crosses one million records, which should produce 3 CSV chunks:
+    // part001 (500k), part002 (500k), part003 (remaining).
+    final int recordCount = 1_000_001;
+    stubExport(STATE_MISSING, recordCount);
+
+    String jobId = manager.submitJob(STATE_MISSING);
+    awaitStatus(jobId, JobStatus.COMPLETED, Duration.ofMinutes(2));
+
+    ExportJob job = manager.getJob(jobId);
+    assertThat(job.getTotalRecords()).isEqualTo(recordCount);
+    assertThat(new File(job.getFilePath())).exists().isFile();
+
+    List<String> tarEntries = listTarEntryNames(new File(job.getFilePath()));
+    assertThat(tarEntries).hasSize(3);
+    assertThat(tarEntries).contains(
+        "unhealthy_containers_missing_part001.csv",
+        "unhealthy_containers_missing_part002.csv",
+        "unhealthy_containers_missing_part003.csv");
   }
 
   @Test
@@ -375,6 +401,20 @@ class TestExportJobManager {
       }
     });
     return cursor;
+  }
+
+  private static List<String> listTarEntryNames(File tarFile) throws Exception {
+    List<String> entries = new ArrayList<>();
+    try (TarArchiveInputStream tis =
+             new TarArchiveInputStream(new FileInputStream(tarFile))) {
+      TarArchiveEntry entry;
+      while ((entry = tis.getNextTarEntry()) != null) {
+        if (!entry.isDirectory()) {
+          entries.add(entry.getName());
+        }
+      }
+    }
+    return entries;
   }
 
   private void awaitStatus(String jobId, JobStatus target, Duration timeout) throws Exception {
