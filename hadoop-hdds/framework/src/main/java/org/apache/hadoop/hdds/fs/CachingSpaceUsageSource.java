@@ -120,7 +120,11 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     if (usedSpace == 0) {
       return;
     }
-    Preconditions.assertTrue(usedSpace > 0, () -> usedSpace + " < 0");
+    if (usedSpace < 0) {
+      LOG.warn("Ignoring negative incrementUsedSpace({}) for {}", usedSpace, source);
+      return;
+    }
+
     final long current, change;
     try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
       current = cachedAvailable;
@@ -140,7 +144,11 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     if (reclaimedSpace == 0) {
       return;
     }
-    Preconditions.assertTrue(reclaimedSpace > 0, () -> reclaimedSpace + " < 0");
+    if (reclaimedSpace < 0) {
+      LOG.warn("Ignoring negative reclaimedSpace({}) for {}", reclaimedSpace, source);
+      return;
+    }
+
     final long current, change;
     try (AutoCloseableLock ignored = lock.writeLock(null, null)) {
       current = cachedUsedSpace;

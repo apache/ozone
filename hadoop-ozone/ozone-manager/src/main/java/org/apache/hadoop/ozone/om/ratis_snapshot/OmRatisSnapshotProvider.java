@@ -236,7 +236,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
    * value1</pre>
    * @param connection HTTP URL connection which output stream is used.
    * @param sstFiles SST files for exclusion.
-   * @throws IOException if an exception occured during writing to output
+   * @throws IOException if an exception occurred during writing to output
    * stream.
    */
   public static void writeFormData(HttpURLConnection connection,

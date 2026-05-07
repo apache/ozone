@@ -180,7 +180,8 @@ public class TestSCMContainerPlacementRackScatter {
     cluster.add(datanodeDetails);
     DatanodeInfo datanodeInfo = new DatanodeInfo(
         datanodeDetails, NodeStatus.inServiceHealthy(),
-        UpgradeUtils.defaultLayoutVersionProto());
+        UpgradeUtils.defaultLayoutVersionProto(),
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
     StorageReportProto storage1 = HddsTestUtils.createStorageReport(
         datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
@@ -490,7 +491,8 @@ public class TestSCMContainerPlacementRackScatter {
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(),
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           dnInfo.getID(), "/data1-" + dnInfo.getID(),

@@ -51,7 +51,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
         tagging = UNMARSHALLER.get().readFrom(body);
         tagging.validate();
       } catch (Exception ex) {
-        OS3Exception exception = S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, keyName);
+        OS3Exception exception = S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, keyName, ex);
         exception.setErrorMessage(exception.getErrorMessage() + ". " + ex.getMessage());
         throw exception;
       }
