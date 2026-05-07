@@ -2032,13 +2032,12 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     String ecBuck = UUID.randomUUID().toString();
     TestDataUtil.createVolumeAndBucket(client, ecVol, ecBuck, ecBucketArgs);
 
-    Path ecVolPath = new Path(OZONE_URI_DELIMITER, ecVol);
-    Path ecBucketPath = new Path(ecVolPath, ecBuck);
+    Path ecBucketPath = new Path(new Path(OZONE_URI_DELIMITER, ecVol), ecBuck);
     try {
       assertEquals(ecConfig.getReplication(),
           fs.getContentSummary(ecBucketPath).getErasureCodingPolicy());
     } finally {
-      fs.delete(ecVolPath, true);
+      fs.delete(ecBucketPath, true);
     }
   }
 
