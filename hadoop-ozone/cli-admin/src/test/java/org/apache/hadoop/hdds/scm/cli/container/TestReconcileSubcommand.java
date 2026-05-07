@@ -31,6 +31,8 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +60,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.security.AccessControlException;
 import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -303,7 +306,6 @@ public class TestReconcileSubcommand {
 
     // Should have error messages for EC containers
     assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
-    assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
     assertThatOutput(errContent).doesNotContain("Failed to trigger reconciliation for container 2");
 
     // Exception message should indicate 2 failed containers
@@ -313,6 +315,33 @@ public class TestReconcileSubcommand {
     validateReconcileOutput(2);
     assertThatOutput(outContent).doesNotContain("container 1");
     assertThatOutput(outContent).doesNotContain("container 3");
+  }
+
+  /**
+   * Tests that the reconciliation loop terminates immediately upon an
+   * authentication failure.
+   */
+  @Test
+  public void testReconcileStopsAfterAuthenticationFailure() throws Exception {
+    mockContainer(1, 3, RatisReplicationConfig.getInstance(THREE), true);
+    mockContainer(2, 3, RatisReplicationConfig.getInstance(THREE), true);
+
+    IOException authWrapped = new IOException(
+        "RPC failed",
+        new AccessControlException("Client cannot authenticate via:[KERBEROS]"));
+    doThrow(authWrapped).when(scmClient).reconcileContainer(1L);
+
+    RuntimeException thrown =
+        assertThrows(RuntimeException.class, () -> executeReconcileFromArgs(1, 2));
+
+    assertThat(thrown.getMessage()).contains("Failed to trigger reconciliation for 1 container");
+
+    verify(scmClient, times(1)).reconcileContainer(1L);
+    verify(scmClient, never()).reconcileContainer(2L);
+
+    assertThat(errContent.toString(DEFAULT_ENCODING))
+        .contains("AccessControlException")
+        .contains("Client cannot authenticate via:[KERBEROS]");
   }
 
   /**

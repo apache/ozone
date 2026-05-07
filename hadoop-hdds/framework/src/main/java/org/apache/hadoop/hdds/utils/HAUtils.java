@@ -413,26 +413,26 @@ public final class HAUtils {
     try {
       return retriableTask.call();
     } catch (Exception ex) {
-      if (containsAccessControlException(ex)) {
-        Throwable cause = ex;
-        while (cause != null && !(cause instanceof AccessControlException)) {
-          cause = cause.getCause();
-        }
-        throw new IOException(
-            cause != null ? cause.getMessage() : ex.getMessage(), ex);
+      AccessControlException ace = accessControlExceptionInCauseChain(ex);
+      if (ace != null) {
+        throw new IOException(ace.getMessage(), ex);
       }
       throw new SCMSecurityException("Unable to obtain complete CA list", ex);
     }
   }
 
-  private static boolean containsAccessControlException(Throwable e) {
+  private static AccessControlException accessControlExceptionInCauseChain(Throwable e) {
     while (e != null) {
       if (e instanceof AccessControlException) {
-        return true;
+        return (AccessControlException) e;
       }
       e = e.getCause();
     }
-    return false;
+    return null;
+  }
+
+  private static boolean containsAccessControlException(Throwable e) {
+    return accessControlExceptionInCauseChain(e) != null;
   }
 
   private static List<String> waitForCACerts(

@@ -102,9 +102,9 @@ public abstract class GenericCli implements GenericParentCommand {
     if (error instanceof FileSystemException) {
       String errorMessage = handleFileSystemException((FileSystemException) error);
       cmd.getErr().println(errorMessage);
-    } else {
-      cmd.getErr().println(rawMessage.split("\n")[0]);
+      return;
     }
+    cmd.getErr().println(rawMessage.split("\n")[0]);
   }
 
   @Override
