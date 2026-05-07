@@ -15,6 +15,10 @@
  * limitations under the License.
  */
 
+/*
+ * Some portions of this file Copyright (c) 2004-2006 Intel Corporation and licensed under the BSD license.
+ */
+
 package org.apache.hadoop.ozone.common;
 
 import java.nio.ByteBuffer;
