@@ -2676,6 +2676,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public void startQuotaRepair(List<String> buckets) throws IOException {
     OzoneManagerProtocolProtos.StartQuotaRepairRequest startQuotaRepairRequest =
         OzoneManagerProtocolProtos.StartQuotaRepairRequest.newBuilder()
+            .addAllBuckets(buckets)
             .build();
     OMRequest omRequest = createOMRequest(Type.StartQuotaRepair)
         .setStartQuotaRepairRequest(startQuotaRepairRequest).build();
