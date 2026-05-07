@@ -1580,6 +1580,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       applyEcPolicy(builder, status.getErasureCodingPolicy());
       return builder.build();
     }
+    // f is a directory
     long[] summary = {0, 0, 0, 1};
     for (FileStatusAdapter s : listStatusAdapter(f, true)) {
       long length = s.getLength();
