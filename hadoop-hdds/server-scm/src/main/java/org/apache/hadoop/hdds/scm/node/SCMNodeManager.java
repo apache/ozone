@@ -118,18 +118,6 @@ import org.slf4j.LoggerFactory;
  */
 public class SCMNodeManager implements NodeManager {
 
-  /**
-   * TODO HDDS-15129 Remove when SCM uses the new versioning framework
-   * Datanodes on {@link HDDSVersion} report {@link HDDSVersion#ZDU} as software layout version ({@code 100}), while
-   * SCM still on {@link org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature} reports the legacy maximum ({@code 10}
-   * today).
-   * Without this bridge, registration fails and heartbeats log {@code dnSlv > scmSlv} as an invalid node.
-   */
-  @VisibleForTesting
-  static boolean shouldAllowZduDatanode(int dnSoftwareVersion, int scmSoftwareLayoutVersion) {
-    return scmSoftwareLayoutVersion < dnSoftwareVersion && dnSoftwareVersion == HDDSVersion.ZDU.serialize();
-  }
-
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeManager.class);
 
@@ -167,6 +155,18 @@ public class SCMNodeManager implements NodeManager {
   private static final String TOTALCAPACITY = "CAPACITY";
   private static final String DNUUID = "UUID";
   private static final String VERSION = "VERSION";
+
+  /**
+   * TODO HDDS-15129 Remove when SCM uses the new versioning framework
+   * Datanodes on {@link HDDSVersion} report {@link HDDSVersion#ZDU} as software layout version ({@code 100}), while
+   * SCM still on {@link org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature} reports the legacy maximum ({@code 10}
+   * today).
+   * Without this bridge, registration fails and heartbeats log {@code dnSlv > scmSlv} as an invalid node.
+   */
+  @VisibleForTesting
+  static boolean shouldAllowZduDatanode(int dnSoftwareVersion, int scmSoftwareLayoutVersion) {
+    return scmSoftwareLayoutVersion < dnSoftwareVersion && dnSoftwareVersion == HDDSVersion.ZDU.serialize();
+  }
 
   /**
    * Constructs SCM machine Manager.

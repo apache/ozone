@@ -57,5 +57,6 @@ public abstract class HDDSVersionManager extends ComponentVersionManager {
         " after finalization");
   }
 
+  @Override
   protected abstract void runUpgradeAction(ComponentVersion version) throws UpgradeException;
 }
