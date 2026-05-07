@@ -173,8 +173,8 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
           }
         }
       } else {
-        line.append(showDeleted ? "No\t\tNo\t\t" : "No\t\t");
-        line.append(showOverwritten ? "No\t" : "");
+        line.append(showDeleted ? "No\t\tNo\t\t" : "No\t\t")
+            .append(showOverwritten ? "No\t" : "");
       }
 
       line.append(getFullPathFromKeyInfo(omKeyInfo));
