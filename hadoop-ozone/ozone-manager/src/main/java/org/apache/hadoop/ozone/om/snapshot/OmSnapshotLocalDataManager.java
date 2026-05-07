@@ -73,6 +73,7 @@ import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.Hierarchi
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.rocksdb.LiveFileMetaData;
@@ -876,6 +877,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       Optional<OmSnapshotLocalData> previousSnapshotLocalData = getPreviousSnapshotLocalData();
       this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles,
           previousSnapshotLocalData.map(OmSnapshotLocalData::getVersion).orElse(0));
+      this.getSnapshotLocalData().setLastDefragTime(Time.now());
       // Adding a new snapshot version means it has been defragged thus the flag needs to be reset.
       this.getSnapshotLocalData().setNeedsDefrag(false);
       // Set Dirty if a version is added.

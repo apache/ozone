@@ -183,18 +183,12 @@ public final class OmSnapshotLocalDataYaml {
 
         // Set other fields from parsed YAML
         snapshotLocalData.setSstFiltered((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_IS_SST_FILTERED, false));
-
-        // Handle potential Integer/Long type mismatch from YAML parsing
-        Object lastDefragTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME, -1L);
-        long lastDefragTime;
-        if (lastDefragTimeObj instanceof Number) {
-          lastDefragTime = ((Number) lastDefragTimeObj).longValue();
-        } else {
+        Object lastDefragTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME, 0L);
+        if (!(lastDefragTimeObj instanceof Number)) {
           throw new IllegalArgumentException("Invalid type for lastDefragTime: " +
               lastDefragTimeObj.getClass().getName() + ". Expected Number type.");
         }
-        snapshotLocalData.setLastDefragTime(lastDefragTime);
-
+        snapshotLocalData.setLastDefragTime(((Number) lastDefragTimeObj).longValue());
         snapshotLocalData.setNeedsDefrag((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_DEFRAG, false));
         Map<Integer, VersionMeta> versionMetaMap =
             (Map<Integer, VersionMeta>) nodes.get(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO);
