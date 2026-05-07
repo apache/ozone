@@ -16,8 +16,9 @@
 *** Settings ***
 Documentation       Basic checks that snapshots still look correct while the OM runs periodic
 ...                 snapshot defrag in the background (Jira HDDS-15181 / parent HDDS-13003).
-...                 Cluster setup: filesystem snapshots on; defrag interval on the OM only
-...                 (compose/ozone docker-compose).
+...                 Cluster setup: filesystem snapshots on; defrag interval in compose/ozone
+...                 docker-config. Default compose has one datanode: use replication 1 (OZONE_REPLICATION_FACTOR)
+...                 or scale datanodes to match replication.
 Library             OperatingSystem
 Resource            ../ozone-lib/shell.robot
 Resource            snapshot-setup.robot
@@ -78,13 +79,30 @@ Snapshot Diff Json Report Lists Added Keys
                     Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_TWO}
                     Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_THREE}
 
-Snapshot Diff Json Unchanged After Another Defrag Wait
-    [Documentation]     Run the same JSON diff again after waiting again; the reported key paths should still be there.
+After More Defrag Time Snapshot Info And Reads Stay Consistent
+    [Documentation]     Wait again so defrag can run. Re-check ozone sh snapshot info (OM metadata includes
+    ...                 checkpointDir / status) and re-read keys through snapshot paths. We do not rerun snapshot
+    ...                 diff --get-report here: a completed diff report is served from cache for
+    ...                 ozone.om.snapshot.diff.job.report.persistent.time, so that call would not retrigger work.
     Sleep                   ${DEFRAG_WAIT_SECONDS}
-    ${result} =     Execute             ozone sh snapshot diff --get-report --json /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
-                    Should contain      echo '${result}' | jq '.jobStatus'   DONE
-                    Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_TWO}
-                    Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_THREE}
+    ${info_one} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE}
+                        Should contain      echo '${info_one}' | jq '.volumeName'       ${VOLUME}
+                        Should contain      echo '${info_one}' | jq '.bucketName'       ${BUCKET}
+                        Should contain      echo '${info_one}' | jq '.name'             ${SNAPSHOT_ONE}
+                        Should contain      echo '${info_one}' | jq '.snapshotStatus'   SNAPSHOT_ACTIVE
+    ${snap_id_one} =    Execute             echo '${info_one}' | jq -r '.snapshotId'
+                        Should contain      echo '${info_one}' | jq -r '.checkpointDir'    ${snap_id_one}
+    ${info_two} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET} ${SNAPSHOT_TWO}
+                        Should contain      echo '${info_two}' | jq '.volumeName'       ${VOLUME}
+                        Should contain      echo '${info_two}' | jq '.bucketName'       ${BUCKET}
+                        Should contain      echo '${info_two}' | jq '.name'             ${SNAPSHOT_TWO}
+                        Should contain      echo '${info_two}' | jq '.snapshotStatus'   SNAPSHOT_ACTIVE
+    ${snap_id_two} =    Execute             echo '${info_two}' | jq -r '.snapshotId'
+                        Should contain      echo '${info_two}' | jq -r '.checkpointDir'    ${snap_id_two}
+    Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}       /etc/hosts
+    Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_ONE}       /etc/hosts
+    Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_TWO}       /etc/passwd
+    Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_THREE}     /etc/group
 
 Delete Older Snapshot Younger One Still Readable
     [Documentation]     Delete the first snapshot; it shows SNAPSHOT_DELETED; read all keys through the second snapshot path.

@@ -41,8 +41,6 @@ services:
     <<: *common-config
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      # OM-only: periodic snapshot defrag for smoketest snapshot/snapshot-defrag.robot (HDDS-15181)
-      OZONE-SITE.XML_ozone.snapshot.defrag.service.interval: 30s
       OZONE_OPTS:
       <<: *replication
     ports:
