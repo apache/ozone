@@ -65,5 +65,13 @@ public final class SaslMechanismFactory {
     return HADOOP_SECURITY_SASL_MECHANISM_DEFAULT.equals(SaslRpcClient.getMechanismName(authMethod));
   }
 
+  public static boolean isDigestMechanism(AuthMethod authMethod) {
+    return SaslRpcClient.getMechanismName(authMethod).startsWith("DIGEST-");
+  }
+
   private SaslMechanismFactory() {}
+
+  public static void main(String[] args) {
+    System.out.println("SASL_MECHANISM = " + getMechanism());
+  }
 }
