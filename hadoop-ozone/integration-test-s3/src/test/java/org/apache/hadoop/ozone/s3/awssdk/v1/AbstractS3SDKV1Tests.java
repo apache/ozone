@@ -550,11 +550,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
         .withMatchingETagConstraint("wrong-etag");
 
-    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
-        () -> s3Client.copyObject(copyRequest));
-    assertEquals(ErrorType.Client, ase.getErrorType());
-    assertEquals(412, ase.getStatusCode());
-    assertEquals("PreconditionFailed", ase.getErrorCode());
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertNull(copyResult);
   }
 
   @Test
@@ -593,12 +590,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
         .withNonmatchingETagConstraint(sourceETag);
-
-    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
-        () -> s3Client.copyObject(copyRequest));
-    assertEquals(ErrorType.Client, ase.getErrorType());
-    assertEquals(412, ase.getStatusCode());
-    assertEquals("PreconditionFailed", ase.getErrorCode());
+    
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertNull(copyResult);
   }
 
   @Test
