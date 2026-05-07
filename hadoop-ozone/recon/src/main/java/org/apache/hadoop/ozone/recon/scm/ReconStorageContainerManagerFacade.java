@@ -704,8 +704,6 @@ public class ReconStorageContainerManagerFacade
       LOG.error("Exception encountered while getting SCM DB.");
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
-    } finally {
-      isSyncDataFromSCMRunning.compareAndSet(true, false);
     }
   }
 
@@ -794,6 +792,9 @@ public class ReconStorageContainerManagerFacade
     try {
       synchronized (scmSnapshotLock) {
         scmSnapshotTaskStarted = true;
+        if (scmSnapshotStatus == ScmDbSnapshotSyncStatus.CANCELLED) {
+          return;
+        }
       }
       DBCheckpoint dbSnapshot = scmServiceProvider.getSCMDBSnapshot();
       if (Thread.currentThread().isInterrupted()) {
