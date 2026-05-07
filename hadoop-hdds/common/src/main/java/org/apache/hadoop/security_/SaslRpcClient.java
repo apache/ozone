@@ -728,7 +728,7 @@ public class SaslRpcClient {
     switch (authMethod) {
     case DIGEST:
     case TOKEN:
-      return SaslConstants.SASL_MECHANISM;
+      return SaslMechanismFactory.getMechanism();
     default:
       return authMethod.getMechanismName();
 
