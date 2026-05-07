@@ -53,4 +53,11 @@ public class OMEventListenerLedgerPollerSeekPosition {
     // reference to it
     seekPosition.set(val);
   }
+
+  @Override
+  public String toString() {
+    return "OMEventListenerLedgerPollerSeekPosition{" +
+        "seekPosition='" + seekPosition.get() + "'" +
+        '}';
+  }
 }

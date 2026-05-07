@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
@@ -40,7 +41,7 @@ import org.slf4j.LoggerFactory;
 public class OMEventListenerKafkaPublisher implements OMEventListener {
   public static final Logger LOG = LoggerFactory.getLogger(OMEventListenerKafkaPublisher.class);
 
-  private static final String KAFKA_CONFIG_PREFIX = "ozone.notify.kafka.";
+  private static final String KAFKA_CONFIG_PREFIX = "ozone.om.plugin.kafka.";
   private static final int COMPLETED_REQUEST_CONSUMER_CORE_POOL_SIZE = 1;
 
   private OMEventListenerLedgerPoller ledgerPoller;
@@ -59,19 +60,19 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
     long kafkaServiceInterval = 2 * 1000;
     long kafkaServiceTimeout = 300 * 1000;
 
+    this.seekPosition = new OMEventListenerLedgerPollerSeekPosition();
+
     LOG.info("Creating OMEventListenerLedgerPoller with serviceInterval={}," +
-             "serviceTimeout={}, seekPosition={}",
+        "serviceTimeout={}, seekPosition={}",
         kafkaServiceInterval, kafkaServiceTimeout,
         seekPosition);
 
-    this.seekPosition = new OMEventListenerLedgerPollerSeekPosition();
-
     this.ledgerPoller = new OMEventListenerLedgerPoller(
-          kafkaServiceInterval, TimeUnit.MILLISECONDS,
-          COMPLETED_REQUEST_CONSUMER_CORE_POOL_SIZE,
-          kafkaServiceTimeout, pluginContext, conf,
-          seekPosition,
-          this::handleCompletedRequest);
+        kafkaServiceInterval, TimeUnit.MILLISECONDS,
+        COMPLETED_REQUEST_CONSUMER_CORE_POOL_SIZE,
+        kafkaServiceTimeout, pluginContext, conf,
+        seekPosition,
+        this::handleCompletedRequest);
   }
 
   @Override
@@ -98,7 +99,7 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
   // callback called by OMEventListenerLedgerPoller
   public void handleCompletedRequest(OmCompletedRequestInfo completedRequestInfo) {
-    LOG.info("Processing {}", completedRequestInfo);
+    LOG.debug("Processing {}", completedRequestInfo);
 
     // stub event until we implement a strategy to convert the events to
     // a user facing schema (e.g. S3)
@@ -108,7 +109,7 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
         completedRequestInfo.getKeyName(),
         String.valueOf(completedRequestInfo.getCmdType()));
 
-    LOG.info("Sending {}", event);
+    LOG.debug("Sending {}", event);
 
     try {
       kafkaClient.send(event);
@@ -149,10 +150,20 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
     public void send(String message) throws IOException {
       if (producer != null) {
-        LOG.info("Producing event {}", message);
+        LOG.debug("Producing event {}", message);
         ProducerRecord<String, String> producerRecord =
-                new ProducerRecord<>(topic, message);
-        producer.send(producerRecord);
+            new ProducerRecord<>(topic, message);
+        try {
+          // TODO: Sequential blocking for every event ensures at-least-once delivery
+          // but limits throughput. Consider batching async sends and calling
+          // producer.flush() before updating the seek position for high-volume use cases.
+          producer.send(producerRecord).get();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException("Interrupted while sending message to Kafka", e);
+        } catch (ExecutionException e) {
+          throw new IOException("Failed to send message to Kafka", e);
+        }
       } else {
         LOG.warn("Producing event {} [KAFKA DOWN]", message);
       }
@@ -162,6 +173,7 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
       try (AdminClient adminClient = AdminClient.create(kafkaProps)) {
         LOG.info("Creating kafka topic: {}", this.topic);
         NewTopic newTopic = new NewTopic(this.topic, 1, (short) 1);
+        // TODO: handle topic already exists failure
         adminClient.createTopics(Collections.singleton(newTopic)).all().get();
         adminClient.close();
       } catch (Exception ex) {

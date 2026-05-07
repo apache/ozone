@@ -80,7 +80,7 @@ public class TestOMEventListenerKafkaPublisher {
   private List<String> captureEventsProducedByOperation(OmCompletedRequestInfo op, int expectEvents)
           throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("ozone.notify.kafka.topic", "abc");
+    conf.set("ozone.om.plugin.kafka.topic", "abc");
 
     List<String> events = new ArrayList<>();
 
