@@ -22,8 +22,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -48,7 +49,7 @@ final class DiskBalancerSubCommandUtil {
    * <p>The address can be provided in two formats:
    * <ul>
    *   <li>"hostname:port" - Uses the specified port</li>
-   *   <li>"hostname" - Uses the default CLIENT_RPC port (19864)</li>
+   *   <li>"hostname" - Uses the default CLIENT_RPC port (HDDS_DATANODE_CLIENT_PORT_DEFAULT)</li>
    * </ul>
    * 
    * @param address the datanode address in "host:port" or "host" format
@@ -61,45 +62,33 @@ final class DiskBalancerSubCommandUtil {
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     
     // Parse address and add default port if not specified
-    InetSocketAddress nodeAddr = parseAddress(address, HDDS_DATANODE_CLIENT_PORT_DEFAULT);
-    
+    InetSocketAddress nodeAddr;
+    if (address.contains(":")) {
+      // Port is specified, use NetUtils to parse
+      nodeAddr = NetUtils.createSocketAddr(address);
+    } else {
+      // Port not specified, use default
+      nodeAddr = NetUtils.createSocketAddr(address, HDDS_DATANODE_CLIENT_PORT_DEFAULT);
+    }
     return new DiskBalancerProtocolClientSideTranslatorPB(
         nodeAddr, user, ozoneConf);
   }
 
   /**
-   * Parses a datanode address string and returns an InetSocketAddress.
-   * If the address doesn't contain a port, uses the provided default port.
-   * 
-   * @param address the address string (e.g., "host:port" or "host")
-   * @param defaultPort the default port to use if not specified
-   * @return InetSocketAddress with the parsed or default port
-   */
-  private static InetSocketAddress parseAddress(String address, int defaultPort) {
-    if (address.contains(":")) {
-      // Port is specified, use NetUtils to parse
-      return NetUtils.createSocketAddr(address);
-    } else {
-      // Port not specified, use default
-      return NetUtils.createSocketAddr(address, defaultPort);
-    }
-  }
-
-  /**
-   * Retrieves all IN_SERVICE datanode addresses from SCM.
+   * Retrieves all IN_SERVICE datanode addresses with their hostnames from SCM.
    * Used for batch operations with --in-service-datanodes flag.
-   * 
+   *
    * @param scmClient the SCM client
-   * @return list of datanode addresses in "ip:port" format
+   * @return map of address (ip:port) to display string (hostname (ip:port) or ip:port)
    * @throws IOException if SCM query fails
    */
-  public static List<String> getAllOperableNodesClientRpcAddress(
+  public static Map<String, String> getAllOperableNodesClientRpcAddress(
       ScmClient scmClient) throws IOException {
     List<HddsProtos.Node> nodes = scmClient.queryNode(
         NodeOperationalState.IN_SERVICE, HddsProtos.NodeState.HEALTHY,
         HddsProtos.QueryScope.CLUSTER, "");
 
-    List<String> addresses = new ArrayList<>();
+    Map<String, String> addressToDisplay = new LinkedHashMap<>();
     for (HddsProtos.Node node : nodes) {
       DatanodeDetails details =
           DatanodeDetails.getFromProtoBuf(node.getNodeID());
@@ -108,8 +97,13 @@ final class DiskBalancerSubCommandUtil {
       }
       Port port = details.getPort(Port.Name.CLIENT_RPC);
       if (port != null) {
-        // Use IP address for reliable connection (hostnames with underscores may not be valid)
-        addresses.add(details.getIpAddress() + ":" + port.getValue());
+        String address = details.getIpAddress() + ":" + port.getValue();
+        // Format the display string: "hostname (ip:port)" or "ip:port"
+        String hostname = details.getHostName();
+        String display = (hostname != null && !hostname.isEmpty()
+            && !hostname.equals(details.getIpAddress())) ? hostname + " (" + address + ")"
+            : address;
+        addressToDisplay.put(address, display);
       } else {
         System.out.printf("host: %s(%s) %s port not found%n",
             details.getHostName(), details.getIpAddress(),
@@ -117,7 +111,31 @@ final class DiskBalancerSubCommandUtil {
       }
     }
 
-    return addresses;
+    return addressToDisplay;
+  }
+
+  /**
+   * Returns a formatted string combining hostname and IP address from DatanodeDetailsProto.
+   * If hostname is null or empty, returns just "ip:port".
+   * 
+   * @param nodeProto the DatanodeDetailsProto from the diskbalancer info
+   * @return formatted string "hostname (ip:port)" or "ip:port" if hostname is not available
+   */
+  public static String getDatanodeHostAndIp(HddsProtos.DatanodeDetailsProto nodeProto) {
+    String hostname = nodeProto.getHostName();
+    String ipAddress = nodeProto.getIpAddress();
+    int port = nodeProto.getPortsList().stream()
+        .filter(p -> p.getName().equals(
+            DatanodeDetails.Port.Name.CLIENT_RPC.name()))
+        .mapToInt(HddsProtos.Port::getValue)
+        .findFirst()
+        .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT); // Default port if not found
+
+    // Format the output string
+    String addressPort = ipAddress + ":" + port;
+    if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
+      return hostname + " (" + addressPort + ")";
+    }
+    return addressPort;
   }
 }
-

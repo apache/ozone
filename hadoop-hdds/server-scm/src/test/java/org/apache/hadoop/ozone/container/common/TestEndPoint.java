@@ -115,7 +115,6 @@ public class TestEndPoint {
 
   @BeforeAll
   static void setUp() throws Exception {
-    serverAddress = SCMTestUtils.getReuseableAddress();
     ozoneConf = SCMTestUtils.getConf(testDir);
     scmServerImpl = new ScmTestMock();
     dnDetails = randomDatanodeDetails();
@@ -123,8 +122,8 @@ public class TestEndPoint {
         UUID.randomUUID().toString(),
         HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
     layoutStorage.initialize();
-    scmServer = SCMTestUtils.startScmRpcServer(ozoneConf,
-        scmServerImpl, serverAddress, 10);
+    scmServer = SCMTestUtils.startScmRpcServer(ozoneConf, scmServerImpl);
+    serverAddress = scmServer.getListenerAddress();
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(ozoneConf);
   }
 

@@ -224,6 +224,7 @@ public class TestDeadNodeHandler {
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_MAINTENANCE);
+    setNodeHealthState(datanode1, HddsProtos.NodeState.DEAD);
     deadNodeHandler.onMessage(datanode1, publisher);
     // make sure the node is removed from
     // ClusterNetworkTopology when it is considered as dead
@@ -256,6 +257,7 @@ public class TestDeadNodeHandler {
     nodeManager.addDatanodeCommand(datanode1.getID(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
+    setNodeHealthState(datanode1, HddsProtos.NodeState.DEAD);
     deadNodeHandler.onMessage(datanode1, publisher);
     //datanode1 has been removed from ClusterNetworkTopology, another
     //deadNodeHandler.onMessage call will not change this
@@ -286,6 +288,15 @@ public class TestDeadNodeHandler {
     assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
+  }
+
+  private void setNodeHealthState(DatanodeDetails datanode,
+      HddsProtos.NodeState healthState) throws NodeNotFoundException {
+    DatanodeInfo dnInfo = nodeManager.getNodeStateManager()
+        .getNode(datanode);
+    NodeStatus current = dnInfo.getNodeStatus();
+    dnInfo.setNodeStatus(NodeStatus.valueOf(
+        current.getOperationalState(), healthState));
   }
 
   private void registerReplicas(ContainerManager contManager,

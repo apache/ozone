@@ -179,6 +179,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.data.dir.permissions</name>
+    <value>700</value>
+    <description>Permissions for the datanode data directories where actual file blocks are stored.
+      The permissions can be either octal or symbolic. If the default permissions are not set
+      then the default value of 700 will be used.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.container.db.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -674,11 +682,11 @@
   </property>
   <property>
     <name>ozone.om.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Ozone Manager. The
       permissions have to be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -705,7 +713,7 @@
   </property>
   <property>
     <name>ozone.metadata.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for fallback location for SCM, OM, Recon and DataNodes
       to store their metadata. The permissions have to be octal or symbolic. This is the fallback used in case the
@@ -750,11 +758,11 @@
   </property>
   <property>
     <name>ozone.scm.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Storage Container Manager. The
       permissions can either be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -780,16 +788,6 @@
     <tag>OZONE, SCM</tag>
     <description>
       The port number of the Ozone SCM block client service.
-    </description>
-  </property>
-  <property>
-    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
-    <value>8</value>
-    <tag>OZONE, SCM</tag>
-    <description>
-      Factor with which number of delete blocks sent to each datanode in every interval.
-      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
-      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
     </description>
   </property>
   <property>
@@ -1604,6 +1602,15 @@
   </property>
 
   <property>
+    <name>ozone.om.db.checkpoint.use.inode.based.transfer</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Denotes if the OM bootstrap inode based transfer implementation is set as default.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.datanode.plugins</name>
     <value/>
     <description>
@@ -1806,37 +1813,6 @@
   </property>
 
   <property>
-    <name>hdds.scm.kerberos.keytab.file</name>
-    <value>/etc/security/keytabs/SCM.keytab</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description> The keytab file used by SCM daemon to login as its service principal.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.kerberos.principal</name>
-    <value>SCM/_HOST@REALM</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>The SCM service principal. e.g. scm/_HOST@REALM.COM</description>
-  </property>
-  <property>
-    <name>hdds.scm.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@REALM</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>
-      SCM http server service principal if SPNEGO is enabled for SCM http server.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.http.auth.kerberos.keytab</name>
-    <value>/etc/security/keytabs/HTTP.keytab</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>
-      The keytab file used by SCM http server to login as its service
-      principal if SPNEGO is enabled for SCM http server.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.s3.administrators</name>
     <value/>
     <tag>OZONE, SECURITY</tag>
@@ -1883,6 +1859,46 @@
     <description>
       Ozone read only admin groups delimited by the comma.
       If set, This is the list of groups are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone blacklisted users delimited by the comma.
+      If set, This is the list of users that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone blacklisted groups delimited by the comma.
+      If set, This is the list of groups that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone read blacklist users delimited by the comma.
+      If set, This is the list of users are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone read blacklist groups delimited by the comma.
+      If set, This is the list of groups are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
     </description>
   </property>
 
@@ -2067,6 +2083,15 @@
     <description>Time interval used to store the omMetrics in to a
       file. Background thread periodically stores the OM metrics in to a
       file. Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.directory.metrics.update.interval</name>
+    <value>5m</value>
+    <tag>OZONE, OM</tag>
+    <description>Time interval used to update the space consumption stats of the
+      Ozone Manager snapshot directories. Background thread periodically calculates
+      and updates these stats. Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>
@@ -2377,6 +2402,20 @@
     <description>Key to enable/disable ozone acls.</description>
   </property>
   <property>
+    <name>ozone.authorization.enabled</name>
+    <value>true</value>
+    <tag>OZONE, SECURITY, AUTHORIZATION</tag>
+    <description>
+      Master switch to enable/disable authorization checks in Ozone
+      (admin privilege checks and ACL checks).
+      This property only takes effect when ozone.security.enabled is true.
+      When true: admin privilege checks are always performed, and object
+      ACL checks are controlled by ozone.acl.enabled.
+      When false: no authorization checks are performed.
+      Default is true.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.kerberos.keytab.file</name>
     <value>/etc/security/keytabs/OM.keytab</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
@@ -2506,6 +2545,24 @@
     <value>false</value>
     <tag>OZONE, HDDS, SECURITY, TLS</tag>
     <description>If HDDS GRPC server TLS is enabled.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.protocols</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS protocol versions for gRPC
+      server endpoints (e.g. "TLSv1.3" or "TLSv1.2,TLSv1.3"). When empty,
+      the TLS provider's defaults are used. Applies to server endpoints
+      only; clients are not restricted.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.ciphers</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS cipher suites for gRPC server
+      endpoints (e.g. "TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256").
+      When empty, the TLS provider's defaults are used. Applies to server
+      endpoints only; clients are not restricted.</description>
   </property>
   <property>
     <name>hdds.x509.default.duration</name>
@@ -3145,7 +3202,30 @@
     <name>ozone.client.follower.read.enabled</name>
     <value>false</value>
     <description>
-      Enable client to read from OM followers.
+      Enable client to read from OM followers. If false, all client
+      requests are sent to the OM leader.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.follower.read.default.consistency</name>
+    <value>LINEARIZABLE_ALLOW_FOLLOWER</value>
+    <description>
+      The default consistency when client enables follower read.
+      Currently, the supported follower read consistency are
+      LINEARIZABLE_ALLOW_FOLLOWER and LOCAL_LEASE
+      The default value is LINEARIZABLE_ALLOW_FOLLOWER to preserve the same strong
+      consistency behavior when switching from leader-only read to follower read.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.leader.read.default.consistency</name>
+    <value>DEFAULT</value>
+    <description>
+      The default consistency when client disables follower read.
+      Currently, the supported leader read consistency are
+      DEFAULT and LINEARIZABLE_LEADER_ONLY.
+      The default value is DEFAULT for backward compatibility reason
+      which is mostly strongly consistent.
     </description>
   </property>
   <property>
@@ -3337,11 +3417,11 @@
   </property>
   <property>
     <name>ozone.recon.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Recon. The
       permissions can either be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -3520,14 +3600,6 @@
     </description>
   </property>
   <property>
-    <name>hdds.tracing.enabled</name>
-    <value>false</value>
-    <tag>OZONE, HDDS</tag>
-    <description>
-      If enabled, tracing information is sent to tracing server.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.task.thread.count</name>
     <value>1</value>
     <tag>OZONE, RECON</tag>
@@ -3650,6 +3722,15 @@
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value/>
     <description>Keystore key password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ozone.ssl.enabled.protocols</name>
+    <tag>OZONE,SECURITY,CRYPTO_COMPLIANCE</tag>
+    <value/>
+    <description>
+      The supported SSL protocols used to restrict connections towards the WebUI of different components,
+      and the S3 GateWay.
     </description>
   </property>
   <property>
@@ -3870,6 +3951,16 @@
     <description>
       Enables Ozone filesystem snapshot feature if set to true on the OM side.
       Disables it otherwise.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.rename.allowed</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Allows the Ozone snapshot rename operation if set to true on the OM side.
+      Blocks it otherwise.
     </description>
   </property>
 
@@ -4131,7 +4222,7 @@
     <value>60000</value>
     <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
     <description>
-      OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
+      Ozone HTTP server connection timeout in milliseconds.
     </description>
   </property>
 
@@ -4192,18 +4283,6 @@
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.client.max.ec.stripe.write.retries</name>
-    <value>10</value>
-    <tag>CLIENT</tag>
-    <description>
-      When EC stripe write failed, client will request to allocate new block group and write the failed stripe into new
-      block group. If the same stripe failure continued in newly acquired block group also, then it will retry by
-      requesting to allocate new block group again. This configuration is used to limit these number of retries. By
-      default the number of retries are 10.
     </description>
   </property>
 
@@ -4287,18 +4366,6 @@
   </property>
 
   <property>
-    <name>ozone.client.fs.default.bucket.layout</name>
-    <value>FILE_SYSTEM_OPTIMIZED</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      Default bucket layout value used when buckets are created using OFS.
-      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
-      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
-      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
-      will create intermediate directories.
-    </description>
-  </property>
-    <property>
     <name>ozone.om.namespace.s3.strict</name>
     <value>true</value>
     <tag>OZONE, OM</tag>
@@ -4948,5 +5015,17 @@
     <name>ozone.om.snapshot.local.data.manager.service.interval</name>
     <value>5m</value>
     <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.events.max.limit</name>
+    <value>100</value>
+    <tag>OZONE, RATIS, SCM</tag>
+    <description>The maximum number of events that can be pending in SCM Ratis.</description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.events.max.limit</name>
+    <value>100</value>
+    <tag>OZONE, RATIS, OM</tag>
+    <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
 </configuration>

@@ -86,27 +86,27 @@ class VolumeUpgradeResult {
   @Override
   public String toString() {
     final StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append("Result:{");
-    stringBuilder.append("hddsRootDir=");
-    stringBuilder.append(getHddsVolume().getHddsRootDir());
-    stringBuilder.append(", resultList=");
+    stringBuilder.append("Result:{")
+        .append("hddsRootDir=")
+        .append(getHddsVolume().getHddsRootDir())
+        .append(", resultList=");
     AtomicLong total = new AtomicLong(0L);
     if (resultMap != null) {
       resultMap.forEach((k, r) -> {
-        stringBuilder.append(r.toString());
-        stringBuilder.append('\n');
+        stringBuilder.append(r.toString())
+            .append('\n');
         total.addAndGet(r.getTotalRow());
       });
     }
-    stringBuilder.append(", totalRow=");
-    stringBuilder.append(total.get());
-    stringBuilder.append(", costMs=");
-    stringBuilder.append(getCost());
-    stringBuilder.append(", status=");
-    stringBuilder.append(status);
+    stringBuilder.append(", totalRow=")
+        .append(total.get())
+        .append(", costMs=")
+        .append(getCost())
+        .append(", status=")
+        .append(status);
     if (e != null) {
-      stringBuilder.append(", Exception=");
-      stringBuilder.append(e);
+      stringBuilder.append(", Exception=")
+          .append(e);
     }
     stringBuilder.append('}');
     return stringBuilder.toString();

@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
@@ -89,8 +90,8 @@ import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.Hierarchi
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.WritableOmSnapshotLocalDataProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -137,8 +138,7 @@ public class TestOmSnapshotLocalDataManager {
   @TempDir
   private Path tempDir;
 
-  @Mock
-  private OMLayoutVersionManager layoutVersionManager;
+  private OMVersionManager omVersionManager;
 
   private OmSnapshotLocalDataManager localDataManager;
   private AutoCloseable mocks;
@@ -175,7 +175,8 @@ public class TestOmSnapshotLocalDataManager {
   @BeforeEach
   public void setUp() throws IOException {
     mocks = MockitoAnnotations.openMocks(this);
-    
+    omVersionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+
     // Setup mock behavior
     when(omMetadataManager.getStore()).thenReturn(rdbStore);
     when(omMetadataManager.getHierarchicalLockManager()).thenReturn(lockManager);
@@ -193,7 +194,6 @@ public class TestOmSnapshotLocalDataManager {
     purgedSnapshotIdMap.clear();
     snapshotUtilMock.when(() -> OmSnapshotManager.isSnapshotPurged(any(), any(), any(), any()))
         .thenAnswer(i -> purgedSnapshotIdMap.getOrDefault(i.getArgument(2), false));
-    when(layoutVersionManager.isAllowed(any(LayoutFeature.class))).thenReturn(true);
     conf.setInt(OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL, -1);
   }
 
@@ -262,7 +262,7 @@ public class TestOmSnapshotLocalDataManager {
 
   private OmSnapshotLocalDataManager getNewOmSnapshotLocalDataManager(
       CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> provider) throws IOException {
-    return new OmSnapshotLocalDataManager(omMetadataManager, null, layoutVersionManager, provider, conf);
+    return new OmSnapshotLocalDataManager(omMetadataManager, null, omVersionManager, provider, conf);
   }
 
   private OmSnapshotLocalDataManager getNewOmSnapshotLocalDataManager() throws IOException {
@@ -997,7 +997,7 @@ public class TestOmSnapshotLocalDataManager {
     table.put("snap3", createMockSnapshotInfo(snap3, null, SNAPSHOT_ACTIVE));
     table.put("snap2", createMockSnapshotInfo(snap2, snap3, SNAPSHOT_DELETED));
     table.put("snap1", createMockSnapshotInfo(snap1, snap2, SNAPSHOT_ACTIVE));
-    when(layoutVersionManager.isAllowed(eq(OMLayoutFeature.SNAPSHOT_DEFRAG))).thenReturn(!needsUpgrade);
+    when(omVersionManager.isAllowed(eq(OMLayoutFeature.SNAPSHOT_DEFRAG))).thenReturn(!needsUpgrade);
     localDataManager = getNewOmSnapshotLocalDataManager(mockedProvider);
     if (needsUpgrade) {
       assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMapUnmodifiable().keySet());
@@ -1024,6 +1024,48 @@ public class TestOmSnapshotLocalDataManager {
       }
     } else {
       assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMapUnmodifiable().keySet());
+    }
+  }
+
+  /**
+   * Regression test for NullPointerException in OmSnapshotManager#createCacheLoader.
+   * <p>
+   * isSnapshotPurged() now falls back to transactionInfo when getTableKey() returns null.
+   * A null transactionInfo means no purge was ever recorded for this snapshot in its YAML,
+   * so the snapshot is treated as active and the orphan check should correctly skip it.
+   */
+  @Test
+  public void testCheckOrphanSnapshotVersionsWithStaleSnapshotChain() throws IOException {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    UUID snapshotId = createSnapshotLocalData(localDataManager, 1).get(0);
+
+    // Snapshot must be in versionNodeMap before the orphan check.
+    assertNotNull(localDataManager.getVersionNodeMapUnmodifiable().get(snapshotId));
+
+    // Use the real isSnapshotPurged
+    snapshotUtilMock.when(() -> OmSnapshotManager.isSnapshotPurged(any(), any(), any(), any()))
+        .thenCallRealMethod();
+
+    // Simulate a stale SnapshotChainManager: getTableKey returns null for the
+    // snapshot because the snapshot chain has not been correctly updated
+    SnapshotChainManager staleChain = mock(SnapshotChainManager.class);
+    when(staleChain.getTableKey(snapshotId)).thenReturn(null);
+
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, staleChain, snapshotId);
+
+    // Before the fix: isSnapshotPurged returned true for any null tableKey, so the snapshot
+    // was removed from versionNodeMap. getMeta() then returned null, causing NullPointerException
+
+    // After the fix: null transactionInfo means no purge has been recorded, assuming active snapshot.
+    // versionNodeMap entry will survive the orphan check. getMeta() will be non-null.
+
+    assertNotNull(localDataManager.getVersionNodeMapUnmodifiable().get(snapshotId),
+        "Active snapshot was removed erroneously from versionNodeMap due to stale SnapshotChainManager");
+
+    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider provider =
+             localDataManager.getOmSnapshotLocalDataMeta(snapshotId)) {
+      assertNotNull(provider.getMeta(),
+          "getMeta() returned null. Calling getVersion() on it throws NullPointerException");
     }
   }
 
@@ -1106,5 +1148,39 @@ public class TestOmSnapshotLocalDataManager {
     // This is a simplified version - in real implementation, 
     // you would use the YamlSerializer
     snapshotLocalDataYamlSerializer.save(filePath.toFile(), localData);
+  }
+
+  /**
+   * Tests the fix for the NoSuchFileException : when a purged snapshot (last in chain)
+   * has all its versions removed and YAML deleted by orphan check, it must NOT be
+   * re-added to snapshotToBeCheckedForOrphans. Otherwise the next orphan check run
+   * would try to load the deleted YAML and throw NoSuchFileException.
+   *
+   */
+  @Test
+  public void testPurgedSnapshotNotReAddedAfterYamlDeleted() throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    UUID secondSnapId = snapshotIds.get(1);
+    // Simulate purge: set transactionInfo on S2's YAML (purge does this before orphan check runs)
+    try (WritableOmSnapshotLocalDataProvider writableProvider =
+             localDataManager.getWritableOmSnapshotLocalData(secondSnapId)) {
+      writableProvider.setTransactionInfo(TransactionInfo.valueOf(1, 1));
+      writableProvider.commit();
+    }
+    // S2 is last in chain - mark as purged so all versions get removed
+    purgedSnapshotIdMap.put(secondSnapId, true);
+    // Simulate purge adding S2 to orphan check list
+    localDataManager.getSnapshotToBeCheckedForOrphans().clear();
+    localDataManager.getSnapshotToBeCheckedForOrphans().put(secondSnapId, 1);
+    // Run full orphan check
+    java.lang.reflect.Method method = OmSnapshotLocalDataManager.class.getDeclaredMethod(
+        "checkOrphanSnapshotVersions", OMMetadataManager.class,
+        org.apache.hadoop.ozone.om.SnapshotChainManager.class);
+    method.setAccessible(true);
+    method.invoke(localDataManager, omMetadataManager, null);
+    // S2 should NOT be in the map
+    assertFalse(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId),
+        "Purged snapshot should not be re-added after YAML deleted");
   }
 }

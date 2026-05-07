@@ -70,7 +70,7 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -119,7 +119,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private volatile boolean closed;
 
   public OmSnapshotLocalDataManager(OMMetadataManager omMetadataManager,
-      SnapshotChainManager snapshotChainManager, OMLayoutVersionManager omLayoutVersionManager,
+      SnapshotChainManager snapshotChainManager, OMVersionManager omVersionManager,
       CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> defaultSnapProvider,
       OzoneConfiguration configuration) throws IOException {
     this.localDataGraph = GraphBuilder.directed().build();
@@ -134,7 +134,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     };
     this.versionNodeMap = new ConcurrentHashMap<>();
     this.internalLock = new ReentrantReadWriteLock();
-    init(configuration, snapshotChainManager, omLayoutVersionManager, defaultSnapProvider);
+    init(configuration, snapshotChainManager, omVersionManager, defaultSnapProvider);
   }
 
   public Map<UUID, SnapshotVersionsMeta> getVersionNodeMapUnmodifiable() {
@@ -342,14 +342,14 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   private void init(OzoneConfiguration configuration, SnapshotChainManager chainManager,
-      OMLayoutVersionManager layoutVersionManager,
+      OMVersionManager omVersionManager,
       CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> defaultSnapProvider) throws IOException {
     this.locks = omMetadataManager.getHierarchicalLockManager();
     this.snapshotToBeCheckedForOrphans = new ConcurrentHashMap<>();
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     File snapshotDir = new File(store.getSnapshotsParentDir());
-    boolean upgradeNeeded = !layoutVersionManager.isAllowed(SNAPSHOT_DEFRAG);
+    boolean upgradeNeeded = !omVersionManager.isAllowed(SNAPSHOT_DEFRAG);
     if (upgradeNeeded) {
       addMissingSnapshotYamlFiles(defaultSnapProvider);
     }
@@ -947,7 +947,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         // become an orphan. Otherwise if the version is updated it
         // could mean that there could be some orphan version present within the
         // same snapshot.
-        if (isPurgeTransactionSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion()) {
+        // Do not increment for snapshotId when the YAML was just deleted (empty versions).
+        if (!currentVersionMeta.getSnapshotVersions().isEmpty() &&
+                (isPurgeTransactionSet || previousVersionsMeta.getVersion() != currentVersionMeta.getVersion())) {
           incrementOrphanCheckCount(snapshotId);
         }
       }

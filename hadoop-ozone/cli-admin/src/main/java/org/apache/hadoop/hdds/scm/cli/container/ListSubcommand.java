@@ -86,6 +86,11 @@ public class ListSubcommand extends ScmSubcommand {
           "rs-6-3-1024k for EC)")
   private String replication;
 
+  @Option(names = {"--suppressed"},
+      description = "Filter by suppression status. Set to 'true' to list only suppressed containers " +
+          "or 'false' to list only those that are not suppressed.")
+  private Boolean suppressed;
+
   private static final ObjectWriter WRITER;
 
   static {
@@ -129,7 +134,7 @@ public class ListSubcommand extends ScmSubcommand {
       }
 
       ContainerListResult containerListResult =
-          scmClient.listContainer(startId, count, state, type, repConfig);
+          scmClient.listContainer(startId, count, state, type, repConfig, suppressed);
 
       writeContainers(sequenceWriter, containerListResult.getContainerInfoList());
 
@@ -169,7 +174,7 @@ public class ListSubcommand extends ScmSubcommand {
 
     do {
       ContainerListResult result =
-          scmClient.listContainer(currentStartId, batchSize, state, type, repConfig);
+          scmClient.listContainer(currentStartId, batchSize, state, type, repConfig, suppressed);
       fetchedCount = result.getContainerInfoList().size();
 
       writeContainers(writer, result.getContainerInfoList());

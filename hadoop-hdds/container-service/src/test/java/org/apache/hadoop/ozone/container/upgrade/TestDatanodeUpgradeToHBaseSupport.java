@@ -27,13 +27,11 @@ import java.util.Collections;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -50,10 +48,8 @@ public class TestDatanodeUpgradeToHBaseSupport {
 
   private DatanodeStateMachine dsm;
   private OzoneConfiguration conf;
-  private static final String CLUSTER_ID = "clusterID";
 
   private RPC.Server scmRpcServer;
-  private InetSocketAddress address;
 
   private void initTests() throws Exception {
     conf = new OzoneConfiguration();
@@ -61,8 +57,6 @@ public class TestDatanodeUpgradeToHBaseSupport {
   }
 
   private void setup() throws Exception {
-    address = SCMTestUtils.getReuseableAddress();
-    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.toString());
   }
@@ -85,8 +79,8 @@ public class TestDatanodeUpgradeToHBaseSupport {
   public void testIncrementalChunkListBeforeAndAfterUpgrade() throws Exception {
     initTests();
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
@@ -120,8 +114,8 @@ public class TestDatanodeUpgradeToHBaseSupport {
   public void testBlockFinalizationBeforeAndAfterUpgrade() throws Exception {
     initTests();
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());

@@ -65,10 +65,10 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -142,9 +142,9 @@ public class TestSnapshotRequestAndResponse {
   @BeforeEach
   public void baseSetup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
-    omMetrics = OMMetrics.create();
-    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    omMetrics = OMMetrics.create(ozoneConfiguration);
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         testDir.getAbsolutePath());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
@@ -166,9 +166,8 @@ public class TestSnapshotRequestAndResponse {
     IAccessAuthorizer accessAuthorizer = mock(IAccessAuthorizer.class);
     when(ozoneManager.getAccessAuthorizer()).thenReturn(accessAuthorizer);
     when(accessAuthorizer.isNative()).thenReturn(false);
-    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
-    when(lvm.isAllowed(any(LayoutFeature.class))).thenReturn(true);
-    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
     AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));

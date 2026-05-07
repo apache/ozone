@@ -31,6 +31,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
+        FinalizeSubCommand.class,
         StatusSubCommand.class
     })
 @MetaInfServices(AdminSubcommand.class)

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.upgrade;
 
-import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 
 import java.io.IOException;
@@ -52,7 +52,7 @@ public class OMFinalizeUpgradeResponse extends OMClientResponse {
       LOG.info("Serialized apparent component version to persist to DB : {}",
           serializedApparentVersion);
       omMetadataManager.getMetaTable().putWithBatch(batchOperation,
-          LAYOUT_VERSION_KEY,
+          APPARENT_VERSION_KEY,
           String.valueOf(serializedApparentVersion));
     }
   }

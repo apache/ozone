@@ -30,7 +30,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -215,8 +214,7 @@ public final class SCMCertStore implements CertificateStore {
 
     public CertificateStore build() {
       final SCMCertStore scmCertStore = new SCMCertStore(metadataStore);
-      return scmRatisServer.getProxyHandler(SCMRatisProtocol.RequestType.CERT_STORE,
-         CertificateStore.class, scmCertStore);
+      return scmRatisServer.getProxyHandler(CertificateStore.class, scmCertStore);
     }
   }
 }

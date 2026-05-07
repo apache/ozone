@@ -42,14 +42,14 @@ import picocli.CommandLine.Command;
  */
 @Command(
     name = "usageinfo",
-    description = "List usage information of a datanode by IP address, hostname or UUID.\n\n" +
-        "Legend (bytes):\n" +
-        "  Filesystem Capacity/Used/Available: raw filesystem stats for the Datanode, aggregated across volumes.\n" +
+    description = "List usage information of a datanode by IP address, hostname or UUID.%n%n" +
+        "Legend (bytes):%n" +
+        "  Filesystem Capacity/Used/Available: raw filesystem stats for the Datanode, aggregated across volumes.%n" +
         "  Ozone Capacity/Used/Available: Ozone-usable stats after reserved-space adjustment, aggregated across " +
-        "  volumes (see hdds.datanode.dir.du.reserved / hdds.datanode.dir.du.reserved.percent).\n" +
-        "  Reserved: hdds.datanode.dir.du.reserved: configured reserved space for non-Ozone usage.\n" +
-        "  Committed: space pre-allocated for containers.\n" +
-        "  Free Space To Spare: minimum free space to keep before closing containers.\n",
+        "  volumes (see hdds.datanode.dir.du.reserved / hdds.datanode.dir.du.reserved.percent).%n" +
+        "  Reserved: hdds.datanode.dir.du.reserved: configured reserved space for non-Ozone usage.%n" +
+        "  Committed: space pre-allocated for containers.%n" +
+        "  Free Space To Spare: minimum free space to keep before closing containers.%n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class UsageInfoSubcommand extends ScmSubcommand {

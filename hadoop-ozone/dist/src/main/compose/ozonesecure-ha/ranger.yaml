@@ -27,8 +27,8 @@ x-om-ranger-config:
       OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger: "false"
       RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.forceNonKerberos: "true"
       RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.policy.rest.url: "http://ranger:6080"
-      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.policy.rest.client.username: "hdfs"
-      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.policy.rest.client.password: "hdfs"
+      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.policy.rest.client.username: "admin"
+      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.policy.rest.client.password: "rangerR0cks!"
       RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.service.name: "dev_ozone"
     volumes:
       - ../..:/opt/hadoop

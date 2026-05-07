@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.slf4j.Logger;
@@ -40,9 +41,14 @@ abstract class RDBStoreAbstractIterator<RAW>
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private final RAW prefix;
-
   private final IteratorType type;
+  private final AtomicBoolean isIteratorClosed = new AtomicBoolean(false);
 
+  /**
+   * Constructor for RDBStoreAbstractIterator.
+   * Callers must ensure that the iterator is always obtained using try-with-resources
+   * or always closed in a finally block to ensure accurate refcounting.
+   */
   RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
@@ -89,6 +95,10 @@ abstract class RDBStoreAbstractIterator<RAW>
     }
   }
 
+  private boolean isDbClosed() {
+    return rocksDBTable != null && rocksDBTable.isClosed();
+  }
+
   private void setCurrentEntry() {
     if (rocksDBIterator.get().isValid()) {
       currentEntry = getKeyValue();
@@ -99,6 +109,9 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final boolean hasNext() {
+    if (isDbClosed()) {
+      return false;
+    }
     return rocksDBIterator.get().isValid() &&
         (prefix == null || startsWithPrefix(key()));
   }
@@ -154,6 +167,8 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public void close() {
-    rocksDBIterator.close();
+    if (isIteratorClosed.compareAndSet(false, true)) {
+      rocksDBIterator.close();
+    }
   }
 }

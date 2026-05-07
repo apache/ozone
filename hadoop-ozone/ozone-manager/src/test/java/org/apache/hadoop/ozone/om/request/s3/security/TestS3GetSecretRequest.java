@@ -71,7 +71,8 @@ import org.apache.hadoop.ozone.om.response.s3.security.S3RevokeSecretResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
@@ -133,8 +134,8 @@ public class TestS3GetSecretRequest {
     when(call.getRemoteUser()).thenReturn(ugiAlice);
     Server.getCurCall().set(call);
 
-    omMetrics = OMMetrics.create();
     OzoneConfiguration conf = new OzoneConfiguration();
+    omMetrics = OMMetrics.create(conf);
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here
@@ -444,10 +445,8 @@ public class TestS3GetSecretRequest {
     when(omMultiTenantManager.isTenantAdmin(ugiAlice, TENANT_ID, false))
         .thenReturn(true);
 
-    // Init LayoutVersionManager to prevent NPE in checkLayoutFeature
-    final OMLayoutVersionManager lvm =
-        new OMLayoutVersionManager(OMLayoutVersionManager.maxLayoutVersion());
-    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
 
     // 1. CreateTenantRequest: Create tenant "finance".
     long txLogIndex = 1;

@@ -58,6 +58,13 @@ public interface UpgradeFinalizer<T> {
       throws IOException;
 
   /**
+   * Finalize the metadata upgrade. If finalization is not needed or is already underway, this call is a noop.
+   * @param service the service on which we run finalization.
+   * @throws IOException if the finalization fails at any stage.
+   */
+  void finalize(T service) throws IOException;
+
+  /**
    * Finalize the component if needed, and wait until completion.
    * @param upgradeClientID the initiating client's identifier.
    * @param service the service on which we run finalization.

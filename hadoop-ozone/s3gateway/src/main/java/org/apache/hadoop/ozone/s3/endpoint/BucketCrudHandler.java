@@ -17,18 +17,14 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
-
 import java.io.IOException;
 import java.io.InputStream;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
-import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
 
 /**
@@ -43,7 +39,7 @@ import org.apache.http.HttpStatus;
  * This handler extends EndpointBase to inherit all required functionality
  * (configuration, headers, request context, audit logging, metrics, etc.).
  */
-public class BucketCrudHandler extends EndpointBase implements BucketOperationHandler {
+public class BucketCrudHandler extends BucketOperationHandler {
 
   /**
    * Handle only plain PUT bucket (create bucket), not subresources.
@@ -58,32 +54,24 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
    * Handle PUT /{bucket} for bucket creation.
    */
   @Override
-  public Response handlePutRequest(String bucketName, InputStream body)
+  Response handlePutRequest(S3RequestContext context, String bucketName, InputStream body)
       throws IOException, OS3Exception {
 
     if (!shouldHandle()) {
       return null;
     }
 
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.CREATE_BUCKET;
+    context.setAction(S3GAction.CREATE_BUCKET);
 
     try {
-      String location = createS3Bucket(bucketName);
-      auditWriteSuccess(s3GAction);
-      getMetrics().updateCreateBucketSuccessStats(startNanos);
-      return Response.status(HttpStatus.SC_OK).header("Location", location)
+      getClient().getObjectStore().createS3Bucket(bucketName);
+      getMetrics().updateCreateBucketSuccessStats(context.getStartNanos());
+      return Response.status(HttpStatus.SC_OK)
+          .header(HttpHeaders.LOCATION, "/" + bucketName)
           .build();
-    } catch (OMException exception) {
-      auditWriteFailure(s3GAction, exception);
-      getMetrics().updateCreateBucketFailureStats(startNanos);
-      if (exception.getResult() == OMException.ResultCodes.INVALID_BUCKET_NAME) {
-        throw newError(S3ErrorTable.INVALID_BUCKET_NAME, bucketName, exception);
-      }
-      throw exception;
-    } catch (Exception ex) {
-      auditWriteFailure(s3GAction, ex);
-      throw ex;
+    } catch (Exception e) {
+      getMetrics().updateCreateBucketFailureStats(context.getStartNanos());
+      throw e;
     }
   }
 
@@ -91,41 +79,27 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
    * Handle DELETE /{bucket} for bucket deletion.
    */
   @Override
-  public Response handleDeleteRequest(String bucketName)
+  Response handleDeleteRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
 
     if (!shouldHandle()) {
       return null;
     }
 
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.DELETE_BUCKET;
+    context.setAction(S3GAction.DELETE_BUCKET);
 
     try {
       if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
-        OzoneBucket bucket = getBucket(bucketName);
+        OzoneBucket bucket = context.getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
-      deleteS3Bucket(bucketName);
-    } catch (OMException ex) {
-      auditWriteFailure(s3GAction, ex);
-      getMetrics().updateDeleteBucketFailureStats(startNanos);
-      if (ex.getResult() == OMException.ResultCodes.BUCKET_NOT_EMPTY) {
-        throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
-      } else if (ex.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else {
-        throw ex;
-      }
+      context.getVolume().deleteBucket(bucketName);
     } catch (Exception ex) {
-      auditWriteFailure(s3GAction, ex);
+      getMetrics().updateDeleteBucketFailureStats(context.getStartNanos());
       throw ex;
     }
 
-    auditWriteSuccess(s3GAction);
-    getMetrics().updateDeleteBucketSuccessStats(startNanos);
+    getMetrics().updateDeleteBucketSuccessStats(context.getStartNanos());
     return Response
         .status(HttpStatus.SC_NO_CONTENT)
         .build();

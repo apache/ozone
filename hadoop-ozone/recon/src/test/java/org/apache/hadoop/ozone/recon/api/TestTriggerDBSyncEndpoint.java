@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -138,7 +137,6 @@ public class TestTriggerDBSyncEndpoint {
             .withContainerDB()
             .addBinding(NodeEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
-            .addBinding(ContainerHealthSchemaManager.class)
             .addBinding(ReconUtils.class, reconUtilsMock)
             .addBinding(StorageContainerLocationProtocol.class,
                 mock(StorageContainerLocationProtocol.class))

@@ -44,7 +44,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -70,8 +71,8 @@ public class TestOMClientRequestWithUserInfo {
   @BeforeEach
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
-    OMMetrics omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    OMMetrics omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
@@ -85,9 +86,7 @@ public class TestOMClientRequestWithUserInfo {
     when(omConfig.isFileSystemPathEnabled()).thenReturn(false);
     when(ozoneManager.getConfig()).thenReturn(omConfig);
 
-    // Mock version manager to avoid NPE in preExecute
-    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion()).thenReturn(0);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
 
     inetAddress = InetAddress.getByName("127.0.0.1");

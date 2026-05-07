@@ -128,6 +128,8 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
 
   @Test
   public void testPreExecuteBadOwner() {
+    when(getOzoneManager().isAdminAuthorizationEnabled()).thenReturn(true);
+
     // Owner is not set for the request.
     OMRequest omRequest = deleteSnapshotRequest(getVolumeName(),
         getBucketName(), snapshotName);

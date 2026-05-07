@@ -26,6 +26,17 @@ on:
         description: Ozone ref (branch, tag or commit SHA)
         default: ''
         required: false
+    secrets:
+      DEVELOCITY_ACCESS_KEY:
+        description: 'Token for submitting build scan to Develocity'
+        required: false
+      OZONE_WEBSITE_BUILD:
+        description: 'Token for publishing to apache/ozone-site'
+        required: false
+      SONARCLOUD_TOKEN:
+        description: 'Token for submitting coverage data to SonarCloud'
+        required: false
+
 env:
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
@@ -34,9 +45,11 @@ env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 
+permissions: { }
+
 jobs:
   build-info:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
@@ -56,19 +69,19 @@ jobs:
       with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
       - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
         if: github.event_name  == 'push'
       - name: "Checkout ${{ github.sha }} with its parent (pull request)"
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
         if: github.event_name  == 'pull_request'
       - name: "Checkout ${{ inputs.ref }} given in workflow input (manual dispatch)"
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
@@ -121,7 +134,33 @@ jobs:
       sha: ${{ needs.build-info.outputs.sha }}
       timeout-minutes: 60
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+
+  generate-config-doc:
+    needs:
+      - build-info
+      - build
+    if: |
+      needs.build-info.outputs.needs-build == 'true' &&
+      (github.repository != 'apache/ozone' || github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref_name == 'master'))
+    uses: ./.github/workflows/generate-config-doc.yml
+    with:
+      sha: ${{ needs.build-info.outputs.sha }}
+
+  update-ozone-site-config-doc:
+    needs:
+      - generate-config-doc
+    if: |
+      github.event_name == 'push' &&
+      github.repository == 'apache/ozone' &&
+      github.ref_name == 'master'
+    uses: ./.github/workflows/update-ozone-site-config-doc.yml
+    permissions:
+      contents: read
+    secrets:
+      OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
 
   compile:
     needs:
@@ -151,7 +190,8 @@ jobs:
       split: ${{ matrix.java }}
       timeout-minutes: 45
       with-coverage: false
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
 
   basic:
     needs:
@@ -160,13 +200,14 @@ jobs:
     uses: ./.github/workflows/check.yml
     with:
       checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
-      java-version: 8 # HDDS-10150
+      java-version: ${{ matrix.check == 'findbugs' && '8' || needs.build-info.outputs.java-version }} # HDDS-10150
       needs-maven-cache: ${{ !contains('author,bats', matrix.check) }}
       ratis-args: ${{ inputs.ratis_args }}
       script: ${{ matrix.check }}
       sha: ${{ needs.build-info.outputs.sha }}
       timeout-minutes: 30
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
@@ -177,7 +218,8 @@ jobs:
       - build-info
       - build
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-binary-tarball: true
@@ -190,7 +232,8 @@ jobs:
       - build-info
       - build
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-repo: true
@@ -202,9 +245,11 @@ jobs:
     needs:
       - build-info
       - build
+      - basic
     if: needs.build-info.outputs.needs-compile == 'true'
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-repo: true
@@ -220,7 +265,8 @@ jobs:
       - dependency
       - license
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-repo: true
@@ -241,7 +287,8 @@ jobs:
       - license
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: 11 # Hadoop may not work with newer Java
       needs-ozone-binary-tarball: true
@@ -266,7 +313,8 @@ jobs:
       - license
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
@@ -284,7 +332,8 @@ jobs:
       - license
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     uses: ./.github/workflows/check.yml
-    secrets: inherit
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
       pre-script: sudo hostname localhost
@@ -310,12 +359,13 @@ jobs:
       - integration
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
           ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -324,7 +374,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: target/artifacts
       - name: Untar binaries
@@ -332,7 +382,7 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Setup java ${{ env.TEST_JAVA_VERSION }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
@@ -346,7 +396,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage
           path: target/coverage

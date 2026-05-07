@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.FinalizeUpgrade;
 
 import java.io.IOException;
@@ -68,7 +68,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     Exception exception = null;
 
     try {
-      if (ozoneManager.getAclsEnabled()) {
+      if (ozoneManager.isAdminAuthorizationEnabled()) {
         UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "
@@ -79,9 +79,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
 
       FinalizeUpgradeRequest request =
           getOmRequest().getFinalizeUpgradeRequest();
-
       String upgradeClientID = request.getUpgradeClientId();
-
       StatusAndMessages omStatus =
           ozoneManager.finalizeUpgrade(upgradeClientID);
 
@@ -93,10 +91,10 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
               .build();
 
       OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-      int lV = ozoneManager.getVersionManager().getMetadataLayoutVersion();
+      int apparentVersion = ozoneManager.getVersionManager().getApparentVersion().serialize();
       omMetadataManager.getMetaTable().addCacheEntry(
-          new CacheKey<>(LAYOUT_VERSION_KEY),
-          CacheValue.get(context.getIndex(), String.valueOf(lV)));
+          new CacheKey<>(APPARENT_VERSION_KEY),
+          CacheValue.get(context.getIndex(), String.valueOf(apparentVersion)));
 
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()
@@ -104,7 +102,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
               .build();
       responseBuilder.setFinalizeUpgradeResponse(omResponse);
       response = new OMFinalizeUpgradeResponse(responseBuilder.build(),
-          ozoneManager.getVersionManager().getMetadataLayoutVersion());
+          ozoneManager.getVersionManager().getApparentVersion().serialize());
       LOG.trace("Returning response: {}", response);
     } catch (IOException e) {
       exception = e;
