@@ -62,16 +62,29 @@ public final class SaslMechanismFactory {
   }
 
   public static boolean isDefaultMechanism(AuthMethod authMethod) {
-    return HADOOP_SECURITY_SASL_MECHANISM_DEFAULT.equals(SaslRpcClient.getMechanismName(authMethod));
+    return HADOOP_SECURITY_SASL_MECHANISM_DEFAULT.equals(getMechanismName(authMethod));
   }
 
   public static boolean isDigestMechanism(AuthMethod authMethod) {
-    return SaslRpcClient.getMechanismName(authMethod).startsWith("DIGEST-");
+    return getMechanismName(authMethod).startsWith("DIGEST-");
   }
 
   private SaslMechanismFactory() {}
 
   public static void main(String[] args) {
     System.out.println("SASL_MECHANISM = " + getMechanism());
+  }
+
+  /** Helper to get actual mechanism name from config.  Required because {@code AuthMethod} is from Hadoop,
+   * not forked (because it is used in UGI, etc.). */
+  public static String getMechanismName(AuthMethod authMethod) {
+    switch (authMethod) {
+    case DIGEST:
+    case TOKEN:
+      return getMechanism();
+    default:
+      return authMethod.getMechanismName();
+
+    }
   }
 }

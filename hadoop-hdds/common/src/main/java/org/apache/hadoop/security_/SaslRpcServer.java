@@ -21,9 +21,7 @@ package org.apache.hadoop.security_;
 import static org.apache.hadoop.security_.SaslMechanismFactory.HADOOP_SECURITY_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY;
 
 import java.io.ByteArrayInputStream;
-import java.io.DataInput;
 import java.io.DataInputStream;
-import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
@@ -91,7 +89,7 @@ public class SaslRpcServer {
   
   public SaslRpcServer(AuthMethod authMethod) throws IOException {
     this.authMethod = authMethod;
-    mechanism = SaslRpcClient.getMechanismName(authMethod);
+    mechanism = SaslMechanismFactory.getMechanismName(authMethod);
     switch (authMethod) {
       case SIMPLE: {
         return; // no sasl for simple
