@@ -17,75 +17,25 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
-import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
-import org.reflections.Reflections;
-import org.reflections.scanners.SubTypesScanner;
-import org.reflections.scanners.TypeAnnotationsScanner;
-import org.reflections.util.ConfigurationBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeAction;
+import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
+import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
 
 /**
- * Loads {@link HDDSUpgradeAction} implementations annotated with
- * {@link UpgradeActionHdds} for datanode upgrades.
+ * Loads {@link DatanodeUpgradeAction} implementations annotated with {@link UpgradeActionDatanode}.
  */
-public final class DatanodeUpgradeActionProvider
-    implements ComponentUpgradeActionProvider<HDDSUpgradeAction<?>> {
+public final class DatanodeUpgradeActionProvider extends AbstractUpgradeActionProvider<DatanodeUpgradeAction> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeUpgradeActionProvider.class);
+  public static final String DATANODE_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.container";
 
-  /**
-   * Package scanned for {@link UpgradeActionHdds}-annotated classes.
-   */
-  public static final String DATANODE_UPGRADE_CLASS_PACKAGE =
-      "org.apache.hadoop.ozone.container";
+  public DatanodeUpgradeActionProvider() {
+    super(UpgradeActionDatanode.class, DatanodeUpgradeAction.class, DATANODE_UPGRADE_CLASS_PACKAGE);
+  }
 
   @Override
-  public Map<ComponentVersion, HDDSUpgradeAction<?>> load() {
-    Map<ComponentVersion, HDDSUpgradeAction<?>> upgradeActions = new HashMap<>();
-
-    Reflections reflections = new Reflections(new ConfigurationBuilder()
-        .forPackages(DATANODE_UPGRADE_CLASS_PACKAGE)
-        .setScanners(new TypeAnnotationsScanner(), new SubTypesScanner())
-        .setExpandSuperTypes(false)
-        .setParallel(true));
-    Set<Class<?>> typesAnnotatedWith =
-        reflections.getTypesAnnotatedWith(UpgradeActionHdds.class);
-
-    typesAnnotatedWith.forEach(actionClass -> {
-      if (HDDSUpgradeAction.class.isAssignableFrom(actionClass)) {
-        try {
-          UpgradeActionHdds annotation =
-              actionClass.getAnnotation(UpgradeActionHdds.class);
-          if (annotation.component() != DATANODE) {
-            return;
-          }
-          HDDSUpgradeAction<?> action =
-              (HDDSUpgradeAction<?>) actionClass.getDeclaredConstructor().newInstance();
-          HDDSLayoutFeature feature = annotation.feature();
-          LOG.info("Registering Upgrade Action : {}", action.name());
-          upgradeActions.put(feature, action);
-        } catch (Exception e) {
-          LOG.error("Cannot instantiate Upgrade Action class {}",
-              actionClass.getSimpleName(), e);
-        }
-      } else {
-        LOG.warn("Found upgrade action class not of type " +
-            "org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction : {}",
-            actionClass.getName());
-      }
-    });
-
-    return upgradeActions;
+  protected ComponentVersion extractVersion(Class<?> clazz) {
+    UpgradeActionDatanode annotation = clazz.getAnnotation(UpgradeActionDatanode.class);
+    return annotation.feature();
   }
 }

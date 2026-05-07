@@ -17,19 +17,47 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.Map;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeAction;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeActionProvider;
 import org.apache.hadoop.hdds.upgrade.HDDSVersionManager;
 import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
  * Datanode-specific version manager that wires upgrade actions internally.
  */
 public class DatanodeVersionManager extends HDDSVersionManager {
 
-  public DatanodeVersionManager(DatanodeStorage storage,
-      DatanodeStateMachine datanodeStateMachine) throws IOException {
-    super(storage, new DatanodeUpgradeActionProvider());
-    setUpgradeActionArg(datanodeStateMachine);
+  private final Map<ComponentVersion, DatanodeUpgradeAction> upgradeActions;
+  private final DatanodeStateMachine upgradeActionArg;
+
+  public DatanodeVersionManager(DatanodeStorage storage, DatanodeStateMachine upgradeActionArg) throws IOException {
+    super(storage);
+    upgradeActions = new DatanodeUpgradeActionProvider().load();
+    this.upgradeActionArg = upgradeActionArg;
+  }
+
+  @VisibleForTesting
+  public Map<ComponentVersion, DatanodeUpgradeAction> getUpgradeActionsForTesting() {
+    return upgradeActions;
+  }
+
+  @Override
+  protected void runUpgradeAction(ComponentVersion version) throws UpgradeException {
+    DatanodeUpgradeAction action = upgradeActions.get(version);
+    if (action == null) {
+      return;
+    }
+    try {
+      action.execute(upgradeActionArg);
+    } catch (Exception e) {
+      logAndThrow(e, "Datanode upgrade action for version " + version + " failed.",
+          UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED);
+    }
   }
 }

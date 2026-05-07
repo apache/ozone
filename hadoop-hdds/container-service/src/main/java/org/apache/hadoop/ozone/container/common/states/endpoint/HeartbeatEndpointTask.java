@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
-import org.apache.hadoop.hdds.upgrade.HDDSVersionManager;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -77,7 +77,7 @@ public class HeartbeatEndpointTask
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
-  private final HDDSVersionManager versionManager;
+  private final DatanodeVersionManager versionManager;
 
   /**
    * Constructs a SCM heart beat.
@@ -89,7 +89,7 @@ public class HeartbeatEndpointTask
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
                                ConfigurationSource conf, StateContext context,
-                               HDDSVersionManager versionManager) {
+                               DatanodeVersionManager versionManager) {
     this.rpcEndpoint = rpcEndpoint;
     this.context = context;
     this.maxContainerActionsPerHB = conf.getInt(HDDS_CONTAINER_ACTION_MAX_LIMIT,
@@ -438,7 +438,7 @@ public class HeartbeatEndpointTask
     private ConfigurationSource conf;
     private DatanodeDetails datanodeDetails;
     private StateContext context;
-    private HDDSVersionManager versionManager;
+    private DatanodeVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -460,11 +460,11 @@ public class HeartbeatEndpointTask
     /**
      * Sets the LayoutVersionManager.
      *
-     * @param lvm config
+     * @param versionManager config
      * @return Builder
      */
-    public Builder setVersionManager(HDDSVersionManager lvm) {
-      this.versionManager = lvm;
+    public Builder setVersionManager(DatanodeVersionManager versionManager) {
+      this.versionManager = versionManager;
       return this;
     }
 
