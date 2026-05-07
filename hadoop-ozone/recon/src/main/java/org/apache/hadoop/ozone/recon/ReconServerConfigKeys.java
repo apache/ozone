@@ -228,7 +228,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.container.sync.task.interval.delay";
 
   public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT
-      = "1h";
+      = "6h";
 
   /**
    * Initial delay before the first incremental SCM container sync run.
@@ -301,16 +301,31 @@ public final class  ReconServerConfigKeys {
   public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
 
   /**
-   * Maximum number of CLOSED/QUASI_CLOSED containers to check against SCM per
-   * Pass 4 (DELETED retirement) sync cycle. Limiting the batch size prevents
-   * excessive SCM RPC load during a single sync run; containers not checked in
-   * one cycle are deferred to the next.
+   * Page size for Pass 4 (DELETED retirement) in each TARGETED_SYNC cycle.
    *
-   * <p>Default: 500 containers per sync cycle.
+   * <p>Pass 4 paginates SCM's DELETED list using {@code getListOfContainerInfos},
+   * which returns {@code ContainerInfo} objects (~86 bytes each on wire, no
+   * pipeline or DatanodeDetails). The safe IPC upper bound at 128 MB default is
+   * {@code 128 MB / 128 bytes = 1,048,576} containers per page.
+   *
+   * <p>At the default of 1,000,000 per page:
+   * <ul>
+   *   <li>Wire payload: 1M × 86 bytes ≈ 82 MB — within the 128 MB IPC limit.</li>
+   *   <li>JVM heap per page: 1M × ~300 bytes ≈ 286 MB — processed one page at a
+   *       time and GC'd before the next page is fetched.</li>
+   *   <li>Even 1 billion DELETED containers require only ~1,000 page calls per
+   *       sync cycle, each completing quickly.</li>
+   * </ul>
+   *
+   * <p>The value is automatically capped at
+   * {@code ipc.maximum.data.length / 128} (1,048,576 at the 128 MB default)
+   * regardless of what is configured here.
+   *
+   * <p>Default: 1,000,000 containers per page.
    */
   public static final String OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE =
       "ozone.recon.scm.deleted.container.check.batch.size";
-  public static final int OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT = 500;
+  public static final int OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT = 1_000_000;
 
   /**
    * Per-state drift threshold used by the tiered sync decision when the total
@@ -330,16 +345,29 @@ public final class  ReconServerConfigKeys {
    * </ul>
    *
    * <p>If the drift in <em>any</em> of the checked states exceeds this
-   * threshold a targeted sync is triggered.  A full snapshot is deliberately
-   * NOT triggered for per-state drift because the targeted sync's per-state
-   * passes already correct these conditions efficiently without replacing the
-   * entire database.
+   * threshold, a targeted sync is triggered. A full snapshot is deliberately
+   * NOT triggered because the targeted sync's per-state passes correct these
+   * conditions efficiently without replacing the entire database.
    *
-   * <p>Default: 5.
+   * <p>The check uses a strict {@code >} comparison — drift must <em>exceed</em>
+   * (not merely equal) the threshold to trigger. A value of 1 means any single
+   * wrong-state container triggers TARGETED_SYNC at the next scheduled check.
+   * This is the recommended default because:
+   * <ul>
+   *   <li>TARGETED_SYNC runs at most once per scheduled interval (default 6h)
+   *       regardless of how many times drift is detected.</li>
+   *   <li>All four sync passes are idempotent — running unnecessarily has no
+   *       side effects and completes quickly in steady state.</li>
+   *   <li>A per-state threshold of 5 tolerates up to 5 wrong-state containers
+   *       permanently if total counts happen to match by coincidence, which
+   *       compromises Recon's monitoring accuracy.</li>
+   * </ul>
+   *
+   * <p>Default: 1.
    */
   public static final String OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD =
       "ozone.recon.scm.per.state.drift.threshold";
-  public static final int OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT = 5;
+  public static final int OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT = 1;
 
   /**
    * Private constructor for utility class.

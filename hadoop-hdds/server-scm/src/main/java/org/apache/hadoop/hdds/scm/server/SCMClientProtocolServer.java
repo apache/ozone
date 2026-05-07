@@ -1522,7 +1522,7 @@ public class SCMClientProtocolServer implements
   @Override
   public long getContainerCount() throws IOException {
     try {
-      long count = scm.getContainerManager().getContainers().size();
+      long count = scm.getContainerManager().getTotalContainerCount();
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_COUNT, null));
       return count;

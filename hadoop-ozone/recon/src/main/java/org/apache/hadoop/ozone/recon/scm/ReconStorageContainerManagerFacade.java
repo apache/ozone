@@ -443,7 +443,7 @@ public class ReconStorageContainerManagerFacade
     // Each cycle calls decideSyncAction() — two lightweight count RPCs to SCM
     // — and then:
     //
-    //   |total drift| > threshold (default 1,000,000)
+    //   non-OPEN drift > threshold (default 1,000,000)
     //       → warn and expose the drift via metrics; full snapshot is not
     //         downloaded automatically by this periodic task
     //
@@ -477,11 +477,7 @@ public class ReconStorageContainerManagerFacade
         ReconStorageContainerSyncHelper.SyncAction action =
             containerSyncHelper.decideSyncAction();
         switch (action) {
-        case FULL_SNAPSHOT:
-          LOG.warn("Tiered sync decision: FULL_SNAPSHOT. "
-              + "Non-OPEN container drift exceeded the configured threshold, "
-              + "but periodic full SCM DB snapshot download is disabled. "
-              + "Skipping automatic SCM checkpoint replacement.");
+        case LARGE_DRIFT_THRESHOLD_EXCEEDED:
           break;
         case TARGETED_SYNC:
           LOG.info("Tiered sync decision: TARGETED_SYNC. Running 4-pass incremental sync.");
@@ -627,8 +623,8 @@ public class ReconStorageContainerManagerFacade
    *
    * <p>For the periodic scheduler the tiered
    * {@link ReconStorageContainerSyncHelper#decideSyncAction()} path is used
-   * instead, which may escalate to a full snapshot or skip work entirely
-   * depending on observed drift.
+   * instead, which may report large drift, run targeted sync, or skip work
+   * entirely depending on observed drift.
    */
   public boolean syncWithSCMContainerInfo() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
