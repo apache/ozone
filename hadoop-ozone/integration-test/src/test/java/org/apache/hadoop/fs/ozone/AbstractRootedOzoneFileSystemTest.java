@@ -1997,9 +1997,9 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     String ecRelKey = "ec-policy-mixed/" + ecKey;
     TestDataUtil.createKey(bucket, ratisRelKey,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        RandomUtils.secure().randomBytes(1));
+        new byte[]{0});
     TestDataUtil.createKey(bucket, ecRelKey, ecConfig,
-        RandomUtils.secure().randomBytes(1));
+        new byte[]{0});
 
     try {
       assertEquals("",
@@ -2018,6 +2018,23 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     } finally {
       fs.delete(parentDir, true);
     }
+  }
+
+  @Test
+  void testContentSummaryErasureCodingPolicyOnEcBucket() throws Exception {
+    ECReplicationConfig ecConfig = new ECReplicationConfig("RS-3-2-1024k");
+    BucketArgs ecBucketArgs = BucketArgs.newBuilder()
+        .setStorageType(StorageType.DISK)
+        .setBucketLayout(BucketLayout.LEGACY)
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(ecConfig))
+        .build();
+    String ecVol = UUID.randomUUID().toString();
+    String ecBuck = UUID.randomUUID().toString();
+    TestDataUtil.createVolumeAndBucket(client, ecVol, ecBuck, ecBucketArgs);
+
+    Path ecBucketPath = new Path(new Path(OZONE_URI_DELIMITER, ecVol), ecBuck);
+    assertEquals(ecConfig.getReplication(),
+        fs.getContentSummary(ecBucketPath).getErasureCodingPolicy());
   }
 
   @Test

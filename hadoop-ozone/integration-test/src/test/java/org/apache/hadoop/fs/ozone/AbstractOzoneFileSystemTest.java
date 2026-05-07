@@ -68,7 +68,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.BlockLocation;
@@ -442,9 +441,9 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     String ecRelKey = "ec-policy-mixed-o3fs/" + ecKey;
     TestDataUtil.createKey(ozoneBucket, ratisRelKey,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        RandomUtils.secure().randomBytes(1));
+        new byte[]{0});
     TestDataUtil.createKey(ozoneBucket, ecRelKey, ecConfig,
-        RandomUtils.secure().randomBytes(1));
+        new byte[]{0});
 
     try {
       assertEquals("",

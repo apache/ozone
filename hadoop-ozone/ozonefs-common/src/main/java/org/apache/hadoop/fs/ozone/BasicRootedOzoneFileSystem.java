@@ -1600,14 +1600,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       summary[3] += c.getDirectoryCount();
     }
 
-    String ecPolicy = status.getErasureCodingPolicy();
-    if (ecPolicy == null) {
-      ecPolicy = "";
-    }
     ContentSummary.Builder builder = new ContentSummary.Builder().length(summary[0]).
         fileCount(summary[2]).directoryCount(summary[3]).
         spaceConsumed(summary[1]);
-    applyEcPolicy(builder, ecPolicy);
+    applyEcPolicy(builder, status.getErasureCodingPolicy());
     return builder.build();
   }
 
@@ -1618,7 +1614,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * does not exist. The Hadoop 3 subclass overrides this to set the policy.
    */
   protected void applyEcPolicy(ContentSummary.Builder builder, String ecPolicy) {
-    // no-op; Hadoop 3 subclass overrides
   }
 
   @Override
