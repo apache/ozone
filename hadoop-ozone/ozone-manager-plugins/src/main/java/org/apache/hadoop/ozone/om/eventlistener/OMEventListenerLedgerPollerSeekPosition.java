@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
  * This is a helper class to get/set the seek position used by the
  * OMEventListenerLedgerPoller.
  *
- * XXX: the seek position should be persisted (and ideally distrbuted to
+ * XXX: the seek position should be persisted (and ideally distributed to
  * all OMs) but at the moment it only lives in memory
  */
 public class OMEventListenerLedgerPollerSeekPosition {
