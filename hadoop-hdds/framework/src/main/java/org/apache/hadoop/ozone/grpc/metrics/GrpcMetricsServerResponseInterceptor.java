@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.grpc.metrics;
 
-import com.google.protobuf.AbstractMessage;
-import io.grpc.ForwardingServerCall;
-import io.grpc.Metadata;
-import io.grpc.ServerCall;
-import io.grpc.ServerCallHandler;
-import io.grpc.ServerInterceptor;
+import org.apache.ratis.thirdparty.com.google.protobuf.AbstractMessage;
+import org.apache.ratis.thirdparty.io.grpc.ForwardingServerCall;
+import org.apache.ratis.thirdparty.io.grpc.Metadata;
+import org.apache.ratis.thirdparty.io.grpc.ServerCall;
+import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
+import org.apache.ratis.thirdparty.io.grpc.ServerInterceptor;
 
 /**
  * Interceptor to gather metrics based on grpc server response.

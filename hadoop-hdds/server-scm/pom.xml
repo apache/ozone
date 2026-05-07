@@ -41,7 +41,8 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <!-- <scope>test</scope> but transitive via hdds-server-framework -->
+      <!-- no scope = compile; also transitive via hdds-server-framework, but
+           explicit compile scope keeps it on the runtime classpath -->
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -74,7 +75,8 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
-      <!-- <scope>test</scope> but transitive via hdds-server-framework -->
+      <!-- no scope = compile; also transitive via hdds-server-framework, but
+           explicit compile scope keeps it on the runtime classpath -->
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -95,7 +97,8 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
-      <!-- <scope>test</scope> but transitive via hdds-container-service -->
+      <!-- no scope = compile; also transitive via hdds-container-service, but
+           explicit compile scope keeps it on the runtime classpath -->
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -124,6 +127,10 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-managed-rocksdb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-scm-grpc-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

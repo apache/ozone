@@ -22,8 +22,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import io.grpc.Context;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 

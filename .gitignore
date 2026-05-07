@@ -16,6 +16,7 @@
 .project
 .settings
 *.factorypath
+*.class
 target
 build
 dependency-reduced-pom.xml

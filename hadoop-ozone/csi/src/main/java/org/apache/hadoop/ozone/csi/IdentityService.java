@@ -19,15 +19,15 @@ package org.apache.hadoop.ozone.csi;
 
 import static csi.v1.Csi.PluginCapability.Service.Type.CONTROLLER_SERVICE;
 
-import com.google.protobuf.BoolValue;
 import csi.v1.Csi.GetPluginCapabilitiesResponse;
 import csi.v1.Csi.GetPluginInfoResponse;
 import csi.v1.Csi.PluginCapability;
 import csi.v1.Csi.PluginCapability.Service;
 import csi.v1.Csi.ProbeResponse;
 import csi.v1.IdentityGrpc.IdentityImplBase;
-import io.grpc.stub.StreamObserver;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
+import org.apache.ratis.thirdparty.com.google.protobuf.BoolValue;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 
 /**
  * Implementation of the CSI identity service.

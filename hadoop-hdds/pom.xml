@@ -35,6 +35,7 @@
     <module>container-service</module>
     <module>crypto-api</module>
     <module>crypto-default</module>
+    <module>datanode-grpc-client</module>
     <module>docs</module>
     <module>erasurecode</module>
     <module>framework</module>
@@ -45,6 +46,7 @@
     <module>managed-rocksdb</module>
     <module>rocks-native</module>
     <module>rocksdb-checkpoint-differ</module>
+    <module>scm-grpc-client</module>
     <module>server-scm</module>
     <module>test-utils</module>
   </modules>

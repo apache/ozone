@@ -205,6 +205,25 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>analyze</id>
+            <configuration>
+              <ignoredUnusedDeclaredDependencies combine.children="append">
+                <!--
+                  ratis-common is required for Ratis protocol/enum types used indirectly
+                  via ratis-client; classes appear only in transitive usages not visible
+                  directly in the compiled bytecode of this module.
+                -->
+                <ignoredUnusedDeclaredDependency>org.apache.ratis:ratis-common</ignoredUnusedDeclaredDependency>
+              </ignoredUnusedDeclaredDependencies>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>

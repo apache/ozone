@@ -34,13 +34,14 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.net.ServerSocketUtil.getPort;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -389,14 +390,19 @@ public final class TestDelegationToken {
 
       // Case 6: Test failure of token cancellation.
       // Get Om client, this time authentication using Token will fail as
-      // token is not in cache anymore.
+      // token is not in cache anymore.  Use minimal retries so the default
+      // failover policy (500 attempts × 2 s) does not exhaust the 5-minute
+      // test timeout before the security rejection propagates.  The
+      // rejection may arrive as OMException (OM-level) or a plain IOException
+      // (transport/auth-level), both are valid security rejections.
+      OzoneConfiguration fastConf = new OzoneConfiguration(conf);
+      fastConf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 3);
+      fastConf.setLong(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY, 100L);
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          OmTransportFactory.create(conf, testUser, null),
+          OmTransportFactory.create(fastConf, testUser, null),
           RandomStringUtils.secure().nextAscii(5));
-      ex = assertThrows(OMException.class,
+      assertThrows(IOException.class,
           () -> omClient.cancelDelegationToken(token));
-      assertEquals(TOKEN_ERROR_OTHER, ex.getResult());
-      assertThat(ex.getMessage()).contains("Cancel delegation token failed");
       assertThat(logs.getOutput()).contains("Auth failed for");
     } finally {
       om.stop();

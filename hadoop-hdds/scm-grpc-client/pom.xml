@@ -19,14 +19,15 @@
     <artifactId>hdds</artifactId>
     <version>2.2.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hdds-interface-client</artifactId>
+  <artifactId>hdds-scm-grpc-client</artifactId>
   <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-  <name>Apache Ozone HDDS Client Interface</name>
-  <description>Apache Ozone Distributed Data Store Client interface.
-    Also contains the ContainerProtos message classes generated from DatanodeClientProtocol.proto
-    and rewritten to the ratis-thirdparty shaded namespace so that hdds-common and other
-    foundational modules can depend on the shaded types without pulling in the gRPC stubs.</description>
+  <name>Apache Ozone HDDS SCM gRPC Client</name>
+  <description>SCM internal gRPC stubs generated from InterSCMProtocol.proto, SCMUpdateProtocol.proto, and
+    SCMRatisProtocol.proto. Package names in generated sources are rewritten by maven-antrun-plugin (Ant
+    replace task, pure Java) from vanilla com.google.protobuf / io.grpc / com.google.common to their
+    ratis-thirdparty counterparts before compilation. Replaces the antrun source-rewriting approach
+    previously in hdds-interface-server.</description>
 
   <properties>
     <!-- used in temp dir names; must be filesystem/protoc-safe (no ':') -->
@@ -34,32 +35,27 @@
     <!-- no testable code in this module -->
     <maven.test.skip>true</maven.test.skip>
     <mdep.analyze.skip>true</mdep.analyze.skip>
-    <!-- only generated code in this module -->
     <spotbugs.skip>true</spotbugs.skip>
   </properties>
 
   <dependencies>
+    <!--
+      Shaded gRPC / Netty / protobuf runtime. The generated sources are rewritten to reference
+      org.apache.ratis.thirdparty.* directly, so ratis-thirdparty-misc must be on the compile
+      classpath and is exposed transitively to all consumers of this module.
+    -->
     <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-    </dependency>
-    <dependency>
-      <!--
-        Shaded gRPC / Netty / protobuf runtime.  DatanodeClientProtocol.proto is compiled here
-        (messages only, no gRPC stubs) and its generated sources are rewritten to
-        org.apache.ratis.thirdparty.* before javac compiles them, so this dependency must be
-        on the compile classpath and is exposed transitively to consumers (e.g. hdds-common).
-      -->
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
     <dependency>
-      <!-- for generated sources, Java 11+ -->
+      <!-- for @Generated annotation in generated sources (Java 11+) -->
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
       <scope>provided</scope>
     </dependency>
   </dependencies>
+
   <build>
     <pluginManagement>
       <plugins>
@@ -69,11 +65,10 @@
           <configuration>
             <develocity>
               <plugins>
-                <!-- This module has only generated sources (protobuf). -->
                 <plugin>
                   <artifactId>maven-compiler-plugin</artifactId>
                   <outputs>
-                    <notCacheableBecause>compiles generated sources</notCacheableBecause>
+                    <notCacheableBecause>compiles generated + rewritten sources</notCacheableBecause>
                   </outputs>
                 </plugin>
                 <plugin>
@@ -112,43 +107,26 @@
         <artifactId>protobuf-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>compile-proto-${protobuf.version}</id>
+            <id>compile-proto-scm</id>
             <goals>
               <goal>compile</goal>
-              <goal>test-compile</goal>
-            </goals>
-            <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf.version}</outputDirectory>
-              <temporaryProtoFileDirectory>${java.io.tmpdir}/ozone-protoc-dependencies/${project.artifactId}/protobuf-${protobuf.version}-${maven.build.timestamp}</temporaryProtoFileDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
-              <excludes>
-                <!-- DatanodeClientProtocol.proto is compiled separately below with ratis protoc -->
-                <exclude>DatanodeClientProtocol.proto</exclude>
-              </excludes>
-            </configuration>
-          </execution>
-          <execution>
-            <!--
-              Generate ContainerProtos message classes from DatanodeClientProtocol.proto using
-              the same protoc version as ratis-thirdparty, output to proto-java-ratis/ so that
-              the antrun shading below can rewrite them in-place.  The IDE/LSP also uses
-              proto-java-ratis/ as a source root, so it compiles the same shaded sources.
-              No gRPC stubs are generated here; those live in hdds-datanode-grpc-client.
-            -->
-            <id>compile-proto-datanode-ratis</id>
-            <goals>
-              <goal>compile</goal>
+              <goal>compile-custom</goal>
             </goals>
             <phase>generate-sources</phase>
             <configuration>
+              <!--
+                Use the same protoc/grpc-java versions as ratis-thirdparty so that the generated
+                API surface is compatible with the shaded runtime in ratis-thirdparty-misc.
+                Output directly to proto-java-ratis so that both Maven and the IDE/LSP compile the
+                same ratis-shaded source tree, eliminating any race between Maven's javac and the
+                LSP writing vanilla class files to target/classes/.
+              -->
               <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <outputDirectory>${project.build.directory}/generated-sources/proto-java-ratis</outputDirectory>
-              <temporaryProtoFileDirectory>${java.io.tmpdir}/ozone-protoc-dependencies/${project.artifactId}/ratis-${maven.build.timestamp}</temporaryProtoFileDirectory>
+              <temporaryProtoFileDirectory>${java.io.tmpdir}/ozone-protoc-dependencies/${project.artifactId}/${maven.build.timestamp}</temporaryProtoFileDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
-              <includes>
-                <include>DatanodeClientProtocol.proto</include>
-              </includes>
+              <pluginId>grpc-java</pluginId>
+              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${ratis-thirdparty.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
             </configuration>
           </execution>
         </executions>
@@ -159,10 +137,23 @@
         <executions>
           <execution>
             <!--
-              Rewrite vanilla package names produced by protoc for DatanodeClientProtocol.proto
-              in-place inside proto-java-ratis/.  The IDE/LSP also uses proto-java-ratis/ as its
-              Java source root, so it compiles the same shaded sources and writes shaded class
-              files to target/classes/ – no race between Maven javac and the LSP.
+              mdep.analyze.skip=true for this module so pre-verify-refresh-classes-from-jar
+              (inherited from the root POM) is not needed.  Binding it to "none" prevents the
+              inherited execution from wiping target/classes/ at pre-integration-test, which
+              would leave the directory temporarily empty and cause downstream reactor modules
+              to fail with "class file not found" errors during compilation.
+            -->
+            <id>pre-verify-refresh-classes-from-jar</id>
+            <phase>none</phase>
+          </execution>
+          <execution>
+            <!--
+              Rewrite vanilla package names produced by protoc/grpc-java in-place inside
+              proto-java-ratis/ (the protobuf-maven-plugin outputDirectory).  Because the
+              IDE/LSP also uses proto-java-ratis/ as its Java source root, it will compile
+              the same shaded sources and write shaded class files to target/classes/, which
+              means both Maven javac and the LSP produce identical bytecode – no more race
+              where the LSP overwrites Maven's correctly-shaded class files.
             -->
             <id>rewrite-generated-sources-to-ratis-ns</id>
             <goals>
@@ -173,6 +164,7 @@
               <target>
                 <replace dir="${project.build.directory}/generated-sources/proto-java-ratis" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
                 <replace dir="${project.build.directory}/generated-sources/proto-java-ratis" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
+                <replace dir="${project.build.directory}/generated-sources/proto-java-ratis" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
               </target>
             </configuration>
           </execution>
