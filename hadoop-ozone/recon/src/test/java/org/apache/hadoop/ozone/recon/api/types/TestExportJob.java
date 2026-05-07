@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 class TestExportJob {
 
   @Test
-  void downloadAllowed_initiallyTrue() {
+  void downloadAllowedInitiallyTrue() {
     ExportJob job = new ExportJob("job-1", "MISSING", 3);
 
     assertThat(job.isDownloadAllowed()).isTrue();
@@ -40,7 +40,7 @@ class TestExportJob {
   }
 
   @Test
-  void tryReserveDownload_decrementsRemaining() {
+  void tryReserveDownloadDecrementsRemaining() {
     ExportJob job = new ExportJob("job-1", "MISSING", 3);
 
     assertThat(job.tryReserveDownload()).isTrue();
@@ -50,7 +50,7 @@ class TestExportJob {
   }
 
   @Test
-  void downloadAllowed_falseAtLimit() {
+  void downloadAllowedFalseAtLimit() {
     ExportJob job = new ExportJob("job-1", "MISSING", 3);
 
     assertThat(job.tryReserveDownload()).isTrue();
@@ -63,7 +63,7 @@ class TestExportJob {
   }
 
   @Test
-  void downloadsRemaining_neverNegative() {
+  void downloadsRemainingNeverNegative() {
     ExportJob job = new ExportJob("job-1", "MISSING", 1);
 
     assertThat(job.tryReserveDownload()).isTrue();
@@ -76,7 +76,7 @@ class TestExportJob {
   }
 
   @Test
-  void setFilePath_derivesFileName() {
+  void setFilePathDerivesFileName() {
     ExportJob job = new ExportJob("job-1", "MISSING", 3);
 
     job.setFilePath("/var/recon/exports/export_missing_1736000000000.tar");
@@ -87,7 +87,7 @@ class TestExportJob {
   }
 
   @Test
-  void setFilePath_null_clearsFileName() {
+  void setFilePathNullClearsFileName() {
     ExportJob job = new ExportJob("job-1", "MISSING", 3);
     job.setFilePath("/foo/export_missing_1.tar");
     assertThat(job.getFileName()).isEqualTo("export_missing_1.tar");
@@ -99,7 +99,7 @@ class TestExportJob {
   }
 
   @Test
-  void initialStatus_isQueued() {
+  void initialStatusIsQueued() {
     ExportJob job = new ExportJob("job-1", "MISSING", 3);
 
     assertThat(job.getStatus()).isEqualTo(ExportJob.JobStatus.QUEUED);

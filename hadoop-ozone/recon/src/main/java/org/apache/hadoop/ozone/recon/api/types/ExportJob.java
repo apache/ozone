@@ -26,7 +26,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Represents an asynchronous CSV export job.
  */
 public class ExportJob {
-  
+
+  /**
+   * Current execution state of the export job.
+   */
   public enum JobStatus {
     QUEUED,      // Waiting for worker thread
     RUNNING,     // Actively exporting
@@ -40,7 +43,6 @@ public class ExportJob {
   @JsonProperty("state")
   private String state;
 
-  
   @JsonProperty("status")
   private JobStatus status;
   

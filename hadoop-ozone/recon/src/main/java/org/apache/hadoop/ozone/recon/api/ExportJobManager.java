@@ -225,11 +225,17 @@ public class ExportJobManager {
       FileUtils.deleteQuietly(new File(exportDirectory + "/" + jobId));
     }
 
-    // For any status: delete the TAR file and remove job from memory
+    // Delete the TAR file outside the lock — file I/O does not need synchronization
     if (job.getFilePath() != null) {
       FileUtils.deleteQuietly(new File(job.getFilePath()));
     }
-    jobTracker.remove(jobId);
+
+    // Remove from both maps atomically so submitJob's duplicate-state check
+    // (which also runs inside synchronized(jobQueue)) never sees a half-removed job
+    synchronized (jobQueue) {
+      jobQueue.remove(jobId);   // no-op for COMPLETED/FAILED jobs already off the queue
+      jobTracker.remove(jobId);
+    }
 
     LOG.info("Deleted export job {} file={} (was {})", jobId, job.getFileName(), job.getStatus());
   }
@@ -261,15 +267,13 @@ public class ExportJobManager {
       // Open database cursor (-1 = unlimited, 0 = no prevKey offset)
       try (Cursor<UnhealthyContainersRecord> cursor =
                containerHealthSchemaManager.getUnhealthyContainersCursor(internalState, -1, 0)) {
-        
         int fileIndex = 1;
         long totalRecords = 0;
         long recordsInCurrentFile = 0;
-        final int RECORDS_PER_FILE = 500_000;
+        final int recordsPerFile = 500_000;
         
         BufferedWriter writer = null;
         FileOutputStream fos = null;
-        
         try {
           while (cursor.hasNext()) {
             // Check for cancellation
@@ -319,7 +323,7 @@ public class ExportJobManager {
             job.setTotalRecords(totalRecords);
             
             // Move to next file if per-file record limit reached
-            if (recordsInCurrentFile >= RECORDS_PER_FILE) {
+            if (recordsInCurrentFile >= recordsPerFile) {
               writer.flush();
               writer.close();
               writer = null;

@@ -84,7 +84,7 @@ class TestExportJobManager {
   // ── Submit path ──────────────────────────────────────────────────────────
 
   @Test
-  void submit_completes_andProducesTar() throws Exception {
+  void submitCompletesAndProducesTar() throws Exception {
     stubExport(STATE_MISSING, 5);
 
     String jobId = manager.submitJob(STATE_MISSING);
@@ -98,7 +98,7 @@ class TestExportJobManager {
   }
 
   @Test
-  void submit_emptyResult_stillReachesCompleted() throws Exception {
+  void submitEmptyResultStillReachesCompleted() throws Exception {
     stubExport(STATE_MISSING, 0);
 
     String jobId = manager.submitJob(STATE_MISSING);
@@ -110,7 +110,7 @@ class TestExportJobManager {
   }
 
   @Test
-  void submit_duplicateState_whileRunning_isRejected() throws Exception {
+  void submitDuplicateStateWhileRunningIsRejected() throws Exception {
     CountDownLatch release = new CountDownLatch(1);
     when(schema.getUnhealthyContainersCount(any(), anyInt(), anyLong())).thenReturn(1L);
     when(schema.getUnhealthyContainersCursor(any(), anyInt(), anyLong()))
@@ -130,7 +130,7 @@ class TestExportJobManager {
   }
 
   @Test
-  void submit_duplicateState_whileCompleted_isRejected() throws Exception {
+  void submitDuplicateStateWhileCompletedIsRejected() throws Exception {
     stubExport(STATE_MISSING, 2);
 
     String firstJobId = manager.submitJob(STATE_MISSING);
@@ -142,7 +142,7 @@ class TestExportJobManager {
   }
 
   @Test
-  void submit_failedState_doesNotBlockRetry() throws Exception {
+  void submitFailedStateDoesNotBlockRetry() throws Exception {
     when(schema.getUnhealthyContainersCount(any(), anyInt(), anyLong())).thenReturn(1L);
     when(schema.getUnhealthyContainersCursor(any(), anyInt(), anyLong()))
         .thenThrow(new RuntimeException("simulated DB failure"))
@@ -157,7 +157,7 @@ class TestExportJobManager {
   }
 
   @Test
-  void submit_queueFull_throws() throws Exception {
+  void submitQueueFullThrows() throws Exception {
     // Re-instantiate with the smallest possible queue (1) so we hit the
     // limit with the fewest distinct states. Layout once first job is
     // pulled by the worker:
@@ -189,7 +189,7 @@ class TestExportJobManager {
   // ── Cancel path ──────────────────────────────────────────────────────────
 
   @Test
-  void cancel_runningJob_marksFailed_andRemovesFromTracker() throws Exception {
+  void cancelRunningJobMarksFailedAndRemovesFromTracker() throws Exception {
     CountDownLatch release = new CountDownLatch(1);
     when(schema.getUnhealthyContainersCount(any(), anyInt(), anyLong())).thenReturn(1L);
     when(schema.getUnhealthyContainersCursor(any(), anyInt(), anyLong()))
@@ -209,7 +209,7 @@ class TestExportJobManager {
   }
 
   @Test
-  void cancel_completedJob_deletesTarFile() throws Exception {
+  void cancelCompletedJobDeletesTarFile() throws Exception {
     stubExport(STATE_MISSING, 2);
 
     String jobId = manager.submitJob(STATE_MISSING);
@@ -225,7 +225,7 @@ class TestExportJobManager {
   }
 
   @Test
-  void cancel_unknownJobId_throws() {
+  void cancelUnknownJobIdThrows() {
     assertThatThrownBy(() -> manager.cancelJob("does-not-exist"))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Job not found");
@@ -234,7 +234,7 @@ class TestExportJobManager {
   // ── Queue + listing ──────────────────────────────────────────────────────
 
   @Test
-  void getQueuePosition_assignsSequentialPositions() throws Exception {
+  void getQueuePositionAssignsSequentialPositions() throws Exception {
     CountDownLatch release = new CountDownLatch(1);
     when(schema.getUnhealthyContainersCount(any(), anyInt(), anyLong())).thenReturn(1L);
     when(schema.getUnhealthyContainersCursor(any(), anyInt(), anyLong()))
@@ -259,7 +259,7 @@ class TestExportJobManager {
   }
 
   @Test
-  void getAllJobs_returnsEveryTrackedJob() throws Exception {
+  void getAllJobsReturnsEveryTrackedJob() throws Exception {
     stubExport(STATE_MISSING, 1);
 
     String first = manager.submitJob(STATE_MISSING);
@@ -276,7 +276,7 @@ class TestExportJobManager {
   // ── Startup cleanup ──────────────────────────────────────────────────────
 
   @Test
-  void startupCleanup_removesLeftoverTarsAndDirs() throws Exception {
+  void startupCleanupRemovesLeftoverTarsAndDirs() throws Exception {
     manager.shutdown();
 
     File leftoverTar = new File(tempDir.toFile(), "stale_export.tar");
@@ -299,7 +299,7 @@ class TestExportJobManager {
   // ── Filename derivation ─────────────────────────────────────────────────
 
   @Test
-  void submit_fileName_matchesExpectedPattern() throws Exception {
+  void submitFileNameMatchesExpectedPattern() throws Exception {
     stubExport(STATE_MISSING, 1);
 
     String jobId = manager.submitJob(STATE_MISSING);
