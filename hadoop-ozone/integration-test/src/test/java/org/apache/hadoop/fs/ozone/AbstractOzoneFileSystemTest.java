@@ -68,6 +68,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.BlockLocation;
@@ -76,6 +77,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -424,6 +426,49 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
     createKeyWithECReplicationConfig(root, cluster.getConf());
+  }
+
+  @Test
+  void testContentSummaryErasureCodingPolicy() throws Exception {
+    String ratisKey = "ratis-ec-policy-key";
+    String ecKey = "ec-policy-key";
+    ECReplicationConfig ecConfig = new ECReplicationConfig("RS-3-2-1024k");
+    Path parentDir = new Path(OZONE_URI_DELIMITER, "ec-policy-mixed-o3fs");
+    Path ratisFile = new Path(parentDir, ratisKey);
+    Path ecFile = new Path(parentDir, ecKey);
+
+    fs.mkdirs(parentDir);
+    String ratisRelKey = "ec-policy-mixed-o3fs/" + ratisKey;
+    String ecRelKey = "ec-policy-mixed-o3fs/" + ecKey;
+    TestDataUtil.createKey(ozoneBucket, ratisRelKey,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        RandomUtils.secure().randomBytes(1));
+    TestDataUtil.createKey(ozoneBucket, ecRelKey, ecConfig,
+        RandomUtils.secure().randomBytes(1));
+
+    try {
+      assertEquals("",
+          fs.getContentSummary(ROOT).getErasureCodingPolicy());
+      assertEquals("Replicated",
+          fs.getContentSummary(ratisFile).getErasureCodingPolicy());
+      assertEquals(ecConfig.getReplication(),
+          fs.getContentSummary(ecFile).getErasureCodingPolicy());
+      assertEquals("",
+          fs.getContentSummary(parentDir).getErasureCodingPolicy());
+    } finally {
+      fs.delete(parentDir, true);
+    }
+  }
+
+  @Test
+  void testLsDashEDoesNotThrow() throws Exception {
+    FsShell shell = new FsShell(fs.getConf());
+    try {
+      int exitCode = shell.run(new String[]{"-ls", "-R", "-e", fsRoot});
+      assertEquals(0, exitCode);
+    } finally {
+      shell.close();
+    }
   }
 
   @Test
