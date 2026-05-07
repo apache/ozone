@@ -30,10 +30,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQu
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import java.io.IOException;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import java.util.Collections;
 import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class TestOzoneManagerProtocolClientSideTranslatorPB {
 
