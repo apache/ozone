@@ -103,12 +103,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     final int numberOfDisks =
         HddsServerUtil.getDatanodeStorageDirs(conf).size();
     final int poolSize = threadCountPerDisk * numberOfDisks;
-    final int maxConnections = dnConf.getGrpcMaxConnections();
     final int soBacklog = dnConf.getGrpcSoBacklog();
-    GrpcConnectionLimitFilter connectionLimitFilter =
-        new GrpcConnectionLimitFilter(maxConnections);
-    LOG.info("Datanode gRPC server max connections: {}, SO_BACKLOG: {}",
-        maxConnections > 0 ? maxConnections : "unlimited", soBacklog);
+    LOG.info("Datanode gRPC server SO_BACKLOG: {}", soBacklog);
 
     readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
         60, TimeUnit.SECONDS,
@@ -144,8 +140,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
             xceiverService.bindServiceWithZeroCopy(),
-            new GrpcServerInterceptor()))
-        .addTransportFilter(connectionLimitFilter);
+            new GrpcServerInterceptor()));
 
     SecurityConfig secConf = new SecurityConfig(conf);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {

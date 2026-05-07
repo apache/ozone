@@ -139,9 +139,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
-  public static final String GRPC_MAX_CONNECTIONS_KEY = "hdds.datanode.grpc.max.connections";
-  public static final int GRPC_MAX_CONNECTIONS_DEFAULT = 5000;
-
   public static final String GRPC_SO_BACKLOG_KEY = "hdds.datanode.grpc.so.backlog";
   public static final int GRPC_SO_BACKLOG_DEFAULT = 4096;
 
@@ -159,19 +156,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "Number of threads per volume that Datanode will use for reading replicated chunks."
   )
   private int numReadThreadPerVolume = 10;
-
-  /**
-   * Maximum number of concurrent gRPC connections to the Datanode server.
-   */
-  @Config(key = "hdds.datanode.grpc.max.connections",
-      type = ConfigType.INT,
-      defaultValue = "5000",
-      tags = {DATANODE},
-      description = "Maximum number of concurrent gRPC connections to the " +
-          "Datanode server. This helps prevent file descriptor exhaustion. " +
-          "Set to 0 to disable the limit."
-  )
-  private int grpcMaxConnections = GRPC_MAX_CONNECTIONS_DEFAULT;
 
   /**
    * SO_BACKLOG value for the gRPC server socket.
@@ -1244,14 +1228,6 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static long getDefaultFreeSpace() {
     final StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
     return Math.round(measure.getUnit().toBytes(measure.getValue()));
-  }
-
-  public int getGrpcMaxConnections() {
-    return grpcMaxConnections;
-  }
-
-  public void setGrpcMaxConnections(int grpcMaxConnections) {
-    this.grpcMaxConnections = grpcMaxConnections;
   }
 
   public int getGrpcSoBacklog() {
