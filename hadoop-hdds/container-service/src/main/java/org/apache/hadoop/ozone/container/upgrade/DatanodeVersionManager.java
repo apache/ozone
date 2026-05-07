@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeActionProvider;
 import org.apache.hadoop.hdds.upgrade.HDDSVersionManager;
 import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
@@ -37,9 +38,15 @@ public class DatanodeVersionManager extends HDDSVersionManager {
   private final DatanodeStateMachine upgradeActionArg;
 
   public DatanodeVersionManager(DatanodeStorage storage, DatanodeStateMachine upgradeActionArg) throws IOException {
+    this(storage, upgradeActionArg, new DatanodeUpgradeActionProvider());
+  }
+
+  @VisibleForTesting
+  public DatanodeVersionManager(DatanodeStorage storage, DatanodeStateMachine upgradeActionArg,
+      ComponentUpgradeActionProvider<DatanodeUpgradeAction> upgradeActionProvider) throws IOException {
     super(storage);
-    upgradeActions = new DatanodeUpgradeActionProvider().load();
     this.upgradeActionArg = upgradeActionArg;
+    upgradeActions = upgradeActionProvider.load();
   }
 
   @VisibleForTesting
