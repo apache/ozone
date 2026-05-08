@@ -297,4 +297,25 @@ public class TestOmSnapshotLocalDataYaml {
     assertTrue(snapshotData.getSstFiltered());
     assertEquals(3, snapshotData.getVersionSstFileInfos().size());
   }
+
+  @Test
+  public void testLoadYamlWithEmptyLastDefragTimeDefaultsTo0() throws IOException {
+    // Parser compatibility for older/edited YAML: removing this field or
+    // leaving it empty must not make deserialization fail.
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot6", null);
+    File yamlFile = yamlFilePrevIdPair.getLeft();
+    String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
+    String legacyContent = content.replace("lastDefragTime: " + LAST_DEFRAG_TIME,
+        "lastDefragTime:");
+    FileUtils.writeStringToFile(yamlFile, legacyContent, Charset.defaultCharset());
+
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
+
+    assertEquals(44, snapshotData.getVersion());
+    assertEquals(0L, snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefrag());
+    assertTrue(snapshotData.getSstFiltered());
+    assertEquals(3, snapshotData.getVersionSstFileInfos().size());
+  }
 }

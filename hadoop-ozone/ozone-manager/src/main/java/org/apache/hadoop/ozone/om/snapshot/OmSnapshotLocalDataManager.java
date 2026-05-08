@@ -877,7 +877,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       Optional<OmSnapshotLocalData> previousSnapshotLocalData = getPreviousSnapshotLocalData();
       this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles,
           previousSnapshotLocalData.map(OmSnapshotLocalData::getVersion).orElse(0));
-      this.getSnapshotLocalData().setLastDefragTime(Time.now());
       // Adding a new snapshot version means it has been defragged thus the flag needs to be reset.
       this.getSnapshotLocalData().setNeedsDefrag(false);
       // Set Dirty if a version is added.
@@ -897,8 +896,10 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     public synchronized void commit() throws IOException {
+      SnapshotVersionsMeta existingVersionsMeta = getVersionNodeMap().get(super.snapshotId);
       // Validate modification and commit the changes.
       SnapshotVersionsMeta localDataVersionNodes = validateModification(super.snapshotLocalData);
+      boolean persistLastDefragTime = shouldUpdateLastDefragTime(existingVersionsMeta, localDataVersionNodes);
       // Need to update the disk state if and only if the dirty bit is set.
       if (isDirty()) {
         String filePath = getSnapshotLocalPropertyYamlPath(super.snapshotId);
@@ -913,9 +914,19 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           if (tmpFileExists) {
             throw new IOException("Unable to delete tmp file " + tmpFilePath);
           }
-          snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
+          Long committedLastDefragTime = null;
+          OmSnapshotLocalData snapshotLocalDataToPersist = super.snapshotLocalData;
+          if (persistLastDefragTime) {
+            committedLastDefragTime = Time.now();
+            snapshotLocalDataToPersist = super.snapshotLocalData.copyObject();
+            snapshotLocalDataToPersist.setLastDefragTime(committedLastDefragTime);
+          }
+          snapshotLocalDataSerializer.save(new File(tmpFilePath), snapshotLocalDataToPersist);
           Files.move(tmpFile.toPath(), Paths.get(filePath), StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
+          if (committedLastDefragTime != null) {
+            super.snapshotLocalData.setLastDefragTime(committedLastDefragTime);
+          }
         } else if (snapshotLocalDataFile.exists()) {
           LOG.info("Deleting YAML file corresponding to snapshotId: {} in path : {}",
               super.snapshotId, snapshotLocalDataFile.getAbsolutePath());
@@ -929,6 +940,16 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         // Reset dirty bit
         resetDirty();
       }
+    }
+
+    private boolean shouldUpdateLastDefragTime(SnapshotVersionsMeta existingVersionsMeta,
+        SnapshotVersionsMeta currentVersionsMeta) {
+      if (currentVersionsMeta.getSnapshotVersions().isEmpty()) {
+        return false;
+      }
+      int currentVersion = currentVersionsMeta.getVersion();
+      return currentVersion > 0 &&
+          (existingVersionsMeta == null || currentVersion > existingVersionsMeta.getVersion());
     }
 
     private void checkForOphanVersionsAndIncrementCount(UUID snapshotId, SnapshotVersionsMeta previousVersionsMeta,
