@@ -130,7 +130,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         .setCreationTime(Time.now());
     return omRequest.toBuilder().setCreateSnapshotRequest(createSnapshotRequest.build()).build();
   }
-  
+
+  @Override
+  public void handleRequestFailure(OzoneManager ozoneManager) {
+    ozoneManager.getOmSnapshotManager().decrementInFlightSnapshotCount();
+  }
+
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
 
@@ -167,6 +172,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         LOG.debug("Snapshot '{}' already exists under '{}'", key, snapshotPath);
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
       }
+
+      ozoneManager.getOmSnapshotManager().assertSnapshotLimitNotExceeded();
 
       ByteString txnBytes = TransactionInfo.valueOf(context.getTermIndex()).toByteString();
       snapshotInfo.setCreateTransactionInfo(txnBytes);
