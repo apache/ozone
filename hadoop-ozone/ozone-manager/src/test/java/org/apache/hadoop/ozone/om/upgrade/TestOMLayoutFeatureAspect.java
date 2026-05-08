@@ -86,25 +86,4 @@ public class TestOMLayoutFeatureAspect {
     assertThat(omException.getMessage())
         .contains("cannot be invoked before finalization");
   }
-
-  @Test
-  public void testPreExecuteLayoutCheck() {
-
-    OzoneManager om = mock(OzoneManager.class);
-    OMVersionManager ovm = mock(OMVersionManager.class);
-    when(ovm.isAllowed(any(ComponentVersion.class))).thenReturn(false);
-    when(om.getVersionManager()).thenReturn(ovm);
-
-    MockOmRequest mockOmRequest = new MockOmRequest();
-    OMLayoutFeatureAspect aspect = new OMLayoutFeatureAspect();
-
-    JoinPoint joinPoint = mock(JoinPoint.class);
-    when(joinPoint.getArgs()).thenReturn(new Object[]{om});
-    when(joinPoint.getTarget()).thenReturn(mockOmRequest);
-
-    OMException omException = assertThrows(OMException.class,
-        () -> aspect.beforeRequestApplyTxn(joinPoint));
-    assertThat(omException.getMessage())
-        .contains("cannot be invoked before finalization");
-  }
 }

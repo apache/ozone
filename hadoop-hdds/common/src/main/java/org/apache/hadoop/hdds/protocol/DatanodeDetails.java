@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.hdds.protocol;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -46,7 +43,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsP
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetUtils;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
-import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
@@ -1031,13 +1027,9 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
      */
     public enum Name {
       STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
-      @BelongsToHDDSLayoutVersion(RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS)
       RATIS_DATASTREAM,
-      @BelongsToHDDSLayoutVersion(WEBUI_PORTS_IN_DATANODEDETAILS)
       HTTP,
-      @BelongsToHDDSLayoutVersion(WEBUI_PORTS_IN_DATANODEDETAILS)
       HTTPS,
-      @BelongsToHDDSLayoutVersion(HADOOP_PRC_PORTS_IN_DATANODEDETAILS)
       CLIENT_RPC;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
