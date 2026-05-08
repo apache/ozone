@@ -384,6 +384,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private boolean isDiskCheckEnabled = true;
 
+  @Config(key = "hdds.datanode.disk.check.rocksdb.check.io.test.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {DATANODE},
+      description = "The configuration to enable or disable RocksDb disk IO checks."
+  )
+  private boolean isRocksDbDiskCheckEnabled = true;
+
   @Config(key = "hdds.datanode.disk.check.io.failures.tolerated",
       defaultValue = "1",
       type = ConfigType.INT,
@@ -1011,6 +1019,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public boolean isDiskCheckEnabled() {
     return isDiskCheckEnabled;
+  }
+
+  public boolean isRocksDbDiskCheckEnabled() {
+    return isRocksDbDiskCheckEnabled;
   }
 
   public Duration getDiskCheckSlidingWindowTimeout() {

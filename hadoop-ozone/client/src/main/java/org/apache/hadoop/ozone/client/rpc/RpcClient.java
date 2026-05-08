@@ -1439,7 +1439,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
         bucketName, keyName, size, replicationConfig, metadata, tags);
     builder.setExpectedDataGeneration(
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS);
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
     return openOutputStream(builder.build(), size);
   }
 
@@ -1550,7 +1550,7 @@ public class RpcClient implements ClientProtocol {
         volumeName, bucketName, keyName, size, replicationConfig, metadata,
         tags);
     builder.setExpectedDataGeneration(
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS);
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
     return openDataStreamOutput(builder.build());
   }
 

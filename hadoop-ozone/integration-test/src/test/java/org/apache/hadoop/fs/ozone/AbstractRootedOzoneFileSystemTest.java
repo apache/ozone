@@ -1732,25 +1732,21 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testRenameFile() throws Exception {
     final String dir = "/dir" + RandomUtils.secure().randomInt(0, 1000);
-    Path dirPath = new Path(getBucketPath() + dir);
-    Path file1Source = new Path(getBucketPath() + dir
-        + "/file1_Copy");
-    Path file1Destin = new Path(getBucketPath() + dir + "/file1");
+    Path dirPath = pathUnderFsRoot(dir);
     try {
-      getFs().mkdirs(dirPath);
-
-      ContractTestUtils.touch(getFs(), file1Source);
-      assertTrue(getFs().rename(file1Source, file1Destin), "Renamed failed");
-      assertTrue(getFs().exists(file1Destin), "Renamed failed: /dir/file1");
-      FileStatus[] fStatus = getFs().listStatus(dirPath);
-      assertEquals(1, fStatus.length, "Renamed failed");
+      renameFile(dir);
     } finally {
       // clean up
       fs.delete(dirPath, true);
     }
   }
 
-
+  @Override
+  void verifyRenameFile(Path workDir, Path expectedDest) throws IOException {
+    FileStatus[] fStatus = getFs().listStatus(workDir);
+    assertEquals(1, fStatus.length, "Renamed failed");
+    assertEquals(expectedDest.toString(), fStatus[0].getPath().toUri().getPath(), "Wrong path name!");
+  }
 
   /**
    * Rename file to an existed directory.
@@ -1758,17 +1754,13 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testRenameFileToDir() throws Exception {
     final String dir = "/dir" + RandomUtils.secure().randomInt(0, 1000);
-    Path dirPath = new Path(getBucketPath() + dir);
-    getFs().mkdirs(dirPath);
-
-    Path file1Destin = new Path(getBucketPath() + dir  + "/file1");
-    ContractTestUtils.touch(getFs(), file1Destin);
-    Path abcRootPath = new Path(getBucketPath() + "/a/b/c");
-    getFs().mkdirs(abcRootPath);
-    assertTrue(getFs().rename(file1Destin, abcRootPath), "Renamed failed");
-    assertTrue(getFs().exists(new Path(
-        abcRootPath, "file1")), "Renamed filed: /a/b/c/file1");
+    renameFileToDir(dir);
     getFs().delete(getBucketPath(), true);
+  }
+
+  @Override
+  Path pathUnderFsRoot(String relativePath) {
+    return new Path(getBucketPath() + relativePath);
   }
 
   /**
@@ -1781,33 +1773,11 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   @Test
   void testRenameToParentDir() throws Exception {
-    final String root = "/root_dir";
-    final String dir1 = root + "/dir1";
-    final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(getBucketPath() + dir2);
-    final Path destRootPath = new Path(getBucketPath() + root);
-    Path file1Source = new Path(getBucketPath() + dir1 + "/file2");
     try {
-      getFs().mkdirs(dir2SourcePath);
-
-      ContractTestUtils.touch(getFs(), file1Source);
-
-      // rename source directory to its parent directory(destination).
-      assertTrue(getFs().rename(dir2SourcePath, destRootPath), "Rename failed");
-      final Path expectedPathAfterRename =
-          new Path(getBucketPath() + root + "/dir2");
-      assertTrue(getFs().exists(expectedPathAfterRename), "Rename failed");
-
-      // rename source file to its parent directory(destination).
-      assertTrue(getFs().rename(file1Source, destRootPath), "Rename failed");
-      final Path expectedFilePathAfterRename =
-          new Path(getBucketPath() + root + "/file2");
-      assertTrue(getFs().exists(expectedFilePathAfterRename), "Rename failed");
+      renameToParentDir();
     } finally {
       // clean up
-      fs.delete(file1Source, true);
-      fs.delete(dir2SourcePath, true);
-      fs.delete(destRootPath, true);
+      fs.delete(pathUnderFsRoot("/root_dir"), true);
     }
   }
 
@@ -1817,22 +1787,9 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testRenameDirToItsOwnSubDir() throws Exception {
     final String root = "/root";
-    final String dir1 = root + "/dir1";
-    final Path dir1Path = new Path(getBucketPath() + dir1);
-    // Add a sub-dir1 to the directory to be moved.
-    final Path subDir1 = new Path(dir1Path, "sub_dir1");
-    getFs().mkdirs(subDir1);
-    LOG.info("Created dir1 {}", subDir1);
-
-    final Path sourceRoot = new Path(getBucketPath() + root);
-    LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
-    //  rename should fail and return false
+    final Path sourceRoot = pathUnderFsRoot(root);
     try {
-      getFs().rename(sourceRoot, subDir1);
-      fail("Should throw exception : Cannot rename a directory to" +
-          " its own subdirectory");
-    } catch (IllegalArgumentException e) {
-      //expected
+      renameDirToItsOwnSubDir();
     } finally {
       // clean up
       fs.delete(sourceRoot, true);
@@ -1846,33 +1803,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   @Test
   void testRenameDestinationParentDoesNotExist() throws Exception {
-    final String root = "/root_dir";
-    final String dir1 = root + "/dir1";
-    final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(getBucketPath() + dir2);
-    getFs().mkdirs(dir2SourcePath);
-    // (a) parent of dst does not exist.  /root_dir/b/c
-    final Path destinPath = new Path(getBucketPath()
-        + root + "/b/c");
-
-    // rename should throw exception
-    try {
-      getFs().rename(dir2SourcePath, destinPath);
-      fail("Should fail as parent of dst does not exist!");
-    } catch (FileNotFoundException fnfe) {
-      //expected
-    }
-    // (b) parent of dst is a file. /root_dir/file1/c
-    Path filePath = new Path(getBucketPath() + root + "/file1");
-    ContractTestUtils.touch(getFs(), filePath);
-    Path newDestinPath = new Path(filePath, "c");
-    // rename shouldthrow exception
-    try {
-      getFs().rename(dir2SourcePath, newDestinPath);
-      fail("Should fail as parent of dst is a file!");
-    } catch (IOException e) {
-      //expected
-    }
+    renameDestinationParentDoesNotExist();
   }
 
   @Test

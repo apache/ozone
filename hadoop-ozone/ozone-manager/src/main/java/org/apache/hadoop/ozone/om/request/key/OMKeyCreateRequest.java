@@ -97,7 +97,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     if (keyArgs.hasExpectedDataGeneration()) {
       if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         ozoneManager.checkFeatureEnabled(
             OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
       } else {
