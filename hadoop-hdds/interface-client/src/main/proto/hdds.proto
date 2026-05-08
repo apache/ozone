@@ -326,6 +326,18 @@ enum ReplicationFactor {
     ZERO = 0; // Invalid Factor
 }
 
+enum StorageTierProto {
+    DISK_TIER = 1;
+    SSD_TIER = 2;
+    ARCHIVE_TIER = 3;
+}
+
+enum StoragePolicyProto {
+    HOT = 1;
+    WARM = 2;
+    COLD = 3;
+}
+
 message ECReplicationConfig {
     required int32 data = 1;
     required int32 parity = 2;
