@@ -73,7 +73,7 @@ public class TestOMEventListenerKafkaPublisher {
         .setBucketName(BUCKET_NAME)
         .setKeyName(keyName)
         .setCreationTime(Time.now())
-        .setOpArgs(new OperationArgs.NoArgs())
+        .setOpArgs(opArgs)
         .build();
   }
 
