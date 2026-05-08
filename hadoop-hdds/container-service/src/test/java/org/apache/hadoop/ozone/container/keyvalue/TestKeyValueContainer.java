@@ -496,7 +496,7 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testFailedImportCleanupDeletesChunksBeforeMetadata(
+  public void testFailedImportCleanupMovesContainerBeforeDelete(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
 
@@ -507,8 +507,10 @@ public class TestKeyValueContainer {
         keyValueContainerData, CONF) {
       @Override
       void deleteDirectory(File directory) throws IOException {
-        if (directory.equals(new File(getContainerData().getMetadataPath()))) {
-          throw new IOException("Injected metadata cleanup failure");
+        File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
+            getContainerData(), getContainerData().getVolume()).toFile();
+        if (directory.equals(deletedContainerDir)) {
+          throw new IOException("Injected tmp cleanup failure");
         }
         super.deleteDirectory(directory);
       }
@@ -543,8 +545,16 @@ public class TestKeyValueContainer {
     assertThrows(IOException.class, () -> container.importContainerData(
         new ByteArrayInputStream(new byte[0]), failingPacker));
 
-    assertFalse(new File(container.getContainerData().getChunksPath()).exists());
-    assertTrue(new File(container.getContainerData().getMetadataPath()).exists());
+    assertFalse(new File(container.getContainerData().getContainerPath())
+        .exists());
+    File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container.getContainerData(), container.getContainerData().getVolume())
+        .toFile();
+    assertTrue(deletedContainerDir.exists());
+    assertTrue(new File(deletedContainerDir, OzoneConsts.STORAGE_DIR_CHUNKS)
+        .exists());
+    assertTrue(new File(deletedContainerDir, OzoneConsts.CONTAINER_META_PATH)
+        .exists());
   }
 
   private void checkContainerFilesPresent(KeyValueContainerData data,
