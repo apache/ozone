@@ -1090,8 +1090,8 @@ public class TestReconSCMContainerSyncIntegration
      *   <li>50,000 CLOSED  (20k corrected + 30k added)</li>
      *   <li>20,000 OPEN    (newly added)</li>
      *   <li>10,000 QUASI_CLOSED (newly added)</li>
-     *   <li>19,999 DELETED (retired — Pass 4 uses batch of 100k
-     *       covering all CLOSED/QUASI_CLOSED candidates at time of run)</li>
+     *   <li>20,000 DELETED (19,999 retired and one SCM-only DELETED
+     *       container added by Pass 4)</li>
      * </ul>
      */
     @Test
@@ -1099,7 +1099,8 @@ public class TestReconSCMContainerSyncIntegration
       // ---- Pre-seed Recon ----
       // Range 1-20k: stuck OPEN (SCM has them as CLOSED)
       seedRecon(1, 20_000, OPEN);
-      // Range 80001-100000: CLOSED in Recon (will be deleted)
+      // Range 80001-99999: CLOSED in Recon (will be deleted).
+      // ID 100000 is absent in Recon but present in SCM's DELETED list.
       seedRecon(80_001, 19_999, CLOSED);
 
       // ---- Mock SCM ----
@@ -1171,12 +1172,12 @@ public class TestReconSCMContainerSyncIntegration
       // 10k newly added from SCM's QUASI_CLOSED list
       assertEquals(10_000, qcCount,
           "Expected 10,000 QUASI_CLOSED containers");
-      // 19,999 retired from Recon's CLOSED set to DELETED
-      assertEquals(19_999, deletedCount,
-          "Expected 19,999 DELETED containers");
+      // 19,999 retired from Recon's CLOSED set + 1 missing DELETED added.
+      assertEquals(20_000, deletedCount,
+          "Expected 20,000 DELETED containers");
 
-      // Total: 50k+20k+10k+19999 = 99,999
-      assertEquals(99_999, allContainers.size());
+      // Total: 50k+20k+10k+20k = 100,000
+      assertEquals(100_000, allContainers.size());
     }
 
     @Test
