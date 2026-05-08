@@ -133,13 +133,11 @@ class TestReconStorageContainerSyncHelper {
     when(mockContainerManager.containerExist(cid2)).thenReturn(false);
     when(mockContainerManager.containerExist(cid3)).thenReturn(true);
     when(mockContainerManager.getContainer(cid3)).thenReturn(closedInfo3);
-    // Pass 1 fetches each missing CLOSED container individually.
+    // Pass 1 collects all absent IDs on a page and fetches them in ONE batch call.
+    // Page 1 has cid1 and cid2 both absent → single call with [1L, 2L].
     when(mockScmServiceProvider.getExistContainerWithPipelinesInBatch(
-        Collections.singletonList(1L)))
-        .thenReturn(Collections.singletonList(cwp1));
-    when(mockScmServiceProvider.getExistContainerWithPipelinesInBatch(
-        Collections.singletonList(2L)))
-        .thenReturn(Collections.singletonList(cwp2));
+        Arrays.asList(1L, 2L)))
+        .thenReturn(Arrays.asList(cwp1, cwp2));
     // Page 2: cid3 already exists in Recon; no batch call needed for that page.
 
     boolean result = pagedHelper.syncWithSCMContainerInfo();
@@ -201,7 +199,11 @@ class TestReconStorageContainerSyncHelper {
   }
 
   @Test
-  void testEmptyListFromSCMReturnsFalse() throws Exception {
+  void testEmptyListFromSCMReturnsTrue() throws Exception {
+    // SCM reports 1 CLOSED container but getListOfContainerIDs returns empty —
+    // this can happen when the count RPC and list RPC are not atomic (e.g., the
+    // container was deleted between the two calls). Pass 1 treats an empty page
+    // as "end of pagination" and returns true; it does NOT treat this as an error.
     when(mockScmServiceProvider.getContainerCount(CLOSED)).thenReturn(1L);
     when(mockScmServiceProvider.getListOfContainerIDs(
         eq(ContainerID.valueOf(1L)), eq(1), eq(CLOSED)))
@@ -209,10 +211,7 @@ class TestReconStorageContainerSyncHelper {
 
     boolean result = syncHelper.syncWithSCMContainerInfo();
 
-    assertFalse(result);
-    // Empty batch → Pass 1 returns false immediately without adding any containers.
-    // Pass 4 may call getContainers() (returning empty list, which is harmless), so
-    // we assert on addNewContainer specifically rather than verifyNoInteractions.
+    assertTrue(result);
     verify(mockContainerManager, never()).addNewContainer(any());
     verify(mockContainerManager, never()).updateContainerState(any(), any());
   }

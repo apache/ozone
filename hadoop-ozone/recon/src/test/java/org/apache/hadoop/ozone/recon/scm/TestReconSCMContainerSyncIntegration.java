@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
@@ -32,6 +33,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SC
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -122,6 +124,19 @@ public class TestReconSCMContainerSyncIntegration
   }
 
   /**
+   * Builds a {@link ContainerInfo} directly (no pipeline wrapper).
+   * Used to stub {@code getListOfContainerInfos} in Pass 4 tests.
+   */
+  private ContainerInfo containerInfo(long id, LifeCycleState state) {
+    return new ContainerInfo.Builder()
+        .setContainerID(id)
+        .setState(state)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setOwner("test")
+        .build();
+  }
+
+  /**
    * Seeds the real {@link ReconContainerManager} with {@code count} containers
    * in the given {@code state}, using IDs in the range
    * [{@code startId}, {@code startId + count}).
@@ -182,6 +197,8 @@ public class TestReconSCMContainerSyncIntegration
       when(mockScm.getContainerCount()).thenReturn(15L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(5L);
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
+      // CLOSED count must match Recon's 10 so per-state drift = 0
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(10L);
 
       assertEquals(SyncAction.NO_ACTION, syncHelper.decideSyncAction());
     }
@@ -304,14 +321,16 @@ public class TestReconSCMContainerSyncIntegration
 
     @Test
     void perStateDriftBelowThresholdReturnsNoAction() throws Exception {
-      // Both OPEN and QUASI_CLOSED drift <= threshold → NO_ACTION
+      // All per-state drifts ≤ default threshold (1) → NO_ACTION.
+      // Threshold uses strict >, so drift == threshold does NOT trigger.
       // Recon: 20 OPEN + 30 CLOSED = 50 total
       seedRecon(1, 20, OPEN);
       seedRecon(21, 30, CLOSED);
 
       when(mockScm.getContainerCount()).thenReturn(50L);
-      when(mockScm.getContainerCount(OPEN)).thenReturn(18L);  // drift = 2 <= 5
+      when(mockScm.getContainerCount(OPEN)).thenReturn(20L);   // drift = 0 ≤ 1
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L); // drift = 0
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(30L); // drift = 0 ≤ 1
 
       assertEquals(SyncAction.NO_ACTION, syncHelper.decideSyncAction());
     }
@@ -737,7 +756,7 @@ public class TestReconSCMContainerSyncIntegration
   }
 
   // ===========================================================================
-  // Pass 4: DELETED retirement (uses getExistContainerWithPipelinesInBatch)
+  // Pass 4: DELETED retirement (uses getListOfContainerInfos for SCM DELETED list)
   // ===========================================================================
 
   @Nested
@@ -750,31 +769,45 @@ public class TestReconSCMContainerSyncIntegration
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
     }
 
+    /** Stubs SCM's DELETED list to contain exactly the given containers. */
+    private void stubDeletedList(ContainerInfo... infos) throws IOException {
+      List<ContainerInfo> page = Arrays.asList(infos);
+      // First page returns the list; cursor beyond the last ID returns empty.
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(page);
+      long nextCursor = page.isEmpty() ? 1L
+          : page.get(page.size() - 1).getContainerID() + 1;
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(nextCursor)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
+    }
+
     @Test
     void retiresClosedContainerWhenSCMReportsDeleted() throws Exception {
       seedRecon(100, 1, CLOSED);
       ContainerID cid = ContainerID.valueOf(100L);
 
-      // Batch RPC returns the container as DELETED
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
-          .thenReturn(Collections.singletonList(containerCwp(100L, DELETED)));
+      stubDeletedList(containerInfo(100L, DELETED));
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(DELETED, getContainerManager().getContainer(cid).getState());
     }
 
     @Test
-    void retiresClosedContainerToDeletingWhenSCMReportsDeleting() throws Exception {
+    void completesRetirementOfDeletingContainerWhenSCMReportsDeleted() throws Exception {
+      // Container is already DELETING in Recon (applied DELETE in a prior sync cycle
+      // when SCM was DELETING). Now SCM confirms DELETED → Pass 4 applies CLEANUP.
       seedRecon(101, 1, CLOSED);
       ContainerID cid = ContainerID.valueOf(101L);
+      getContainerManager().updateContainerState(cid, DELETE);
+      assertEquals(DELETING, getContainerManager().getContainer(cid).getState());
 
-      // Batch RPC returns the container as DELETING
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
-          .thenReturn(Collections.singletonList(containerCwp(101L, DELETING)));
+      // SCM's DELETED list now contains the container
+      stubDeletedList(containerInfo(101L, DELETED));
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
-      // Only DELETING transition applied (not CLEANUP), so state is DELETING in Recon
-      assertEquals(DELETING, getContainerManager().getContainer(cid).getState());
+      assertEquals(DELETED, getContainerManager().getContainer(cid).getState());
     }
 
     @Test
@@ -782,25 +815,20 @@ public class TestReconSCMContainerSyncIntegration
       seedRecon(102, 1, QUASI_CLOSED);
       ContainerID cid = ContainerID.valueOf(102L);
 
-      // Batch RPC returns the container as DELETED
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
-          .thenReturn(Collections.singletonList(containerCwp(102L, DELETED)));
+      stubDeletedList(containerInfo(102L, DELETED));
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(DELETED, getContainerManager().getContainer(cid).getState());
     }
 
     @Test
-    void emptyBatchResultSkipsRetirementAsAmbiguous() throws Exception {
-      // A completely empty batch result is ambiguous: it could mean the
-      // queried containers were purged, but it could also mean the batch RPC
-      // failed or returned no data. Recon should skip retirement in that
-      // case rather than deleting live containers.
+    void emptyDeletedListSkipsRetirement() throws Exception {
+      // SCM's DELETED list is empty → nothing to retire.
       seedRecon(103, 1, CLOSED);
       ContainerID cid = ContainerID.valueOf(103L);
 
-      // Batch returns empty list → skip retirement for safety
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
@@ -808,30 +836,35 @@ public class TestReconSCMContainerSyncIntegration
     }
 
     @Test
-    void openContainersAreNotCandidatesForRetirement() throws Exception {
-      // Pass 4 only checks CLOSED and QUASI_CLOSED; OPEN containers are skipped.
-      // No batch RPC mock needed: Pass 4 sees no candidates and returns early.
+    void openContainersAreNotRetiredEvenIfInDeletedList() throws Exception {
+      // OPEN containers whose lifecycle completed while Recon was down appear
+      // in the DELETED list. Pass 4 drives them all the way to DELETED.
       seedRecon(200, 5, OPEN);
 
+      List<ContainerInfo> deleted = idRange(200, 205).stream()
+          .map(c -> containerInfo(c.getId(), DELETED))
+          .collect(Collectors.toList());
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(deleted);
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(205L)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
+
       assertTrue(syncHelper.syncWithSCMContainerInfo());
-      // All OPEN containers remain OPEN; no retirements occurred
-      assertEquals(5, getContainerManager().getContainers(OPEN).size());
-      assertEquals(0, getContainerManager().getContainers(DELETED).size());
+      assertEquals(5, getContainerManager().getContainers(DELETED).size());
+      assertEquals(0, getContainerManager().getContainers(OPEN).size());
     }
 
     @Test
-    void liveContainersAreNotRetired() throws Exception {
-      // CLOSED in Recon, also CLOSED in SCM (not deleted) → must stay CLOSED.
+    void liveContainersNotInDeletedListAreNotRetired() throws Exception {
+      // CLOSED in Recon; not in SCM's DELETED list → must stay CLOSED.
       seedRecon(300, 3, CLOSED);
 
-      // Batch RPC returns all three containers as CLOSED (still live in SCM)
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
-          .thenAnswer(inv -> {
-            List<Long> ids = inv.getArgument(0);
-            return ids.stream()
-                .map(id -> containerCwp(id, CLOSED))
-                .collect(Collectors.toList());
-          });
+      // DELETED list is empty for these containers
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(3, getContainerManager().getContainers(CLOSED).size());
@@ -839,53 +872,59 @@ public class TestReconSCMContainerSyncIntegration
     }
 
     @Test
-    void batchSizeLimitsCheckPerCycle() throws Exception {
-      // Seed 10 CLOSED containers; set batch size = 3.
-      // Only a rotating window of 3 should be evaluated per sync cycle.
+    void batchSizeLimitsDeletedListPagePerCycle() throws Exception {
+      // Seed 10 CLOSED containers. With batch size = 3, only the first 3
+      // from SCM's DELETED list are processed per cycle.
       seedRecon(400, 10, CLOSED);
       getConf().setInt(OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE, 3);
       ReconStorageContainerSyncHelper batchHelper = new ReconStorageContainerSyncHelper(
           mockScm, getConf(), getContainerManager());
 
-      // All containers in the batch window are DELETED in SCM
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
-          .thenAnswer(inv -> {
-            List<Long> ids = inv.getArgument(0);
-            return ids.stream()
-                .map(id -> containerCwp(id, DELETED))
-                .collect(Collectors.toList());
-          });
+      // SCM's DELETED list page 1 (IDs 400-402), then empty.
+      List<ContainerInfo> firstPage = idRange(400, 403).stream()
+          .map(c -> containerInfo(c.getId(), DELETED))
+          .collect(Collectors.toList());
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), eq(3), eq(DELETED)))
+          .thenReturn(firstPage);
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(403L)), eq(3), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
 
       assertTrue(batchHelper.syncWithSCMContainerInfo());
-      // Exactly 3 containers should be retired per cycle (rotating batch window)
       long retiredCount = getContainerManager().getContainers().stream()
           .filter(c -> c.getState() == DELETED).count();
-      assertTrue(retiredCount <= 3,
-          "Expected at most 3 retirements per cycle, got " + retiredCount);
+      assertEquals(3, retiredCount,
+          "Expected exactly 3 retirements from first DELETED page");
     }
 
     @Test
-    void batchRPCPartialResultRetiresPresentAndAbsent() throws Exception {
-      // 500: not in batch result (absent from SCM → purged) → should be retired to DELETED
-      // 501: in batch result with CLOSED state (still live in SCM) → should stay CLOSED
-      // 502: in batch result with DELETED state → should be retired to DELETED
-      seedRecon(500, 3, CLOSED);
+    void partialDeletedListRetiresPresentAndAddsMissing() throws Exception {
+      // 500, 502: CLOSED in Recon, appear in SCM's DELETED list → retired.
+      // 501: CLOSED in Recon, NOT in SCM's DELETED list → stays CLOSED.
+      // 503: NOT in Recon, appears in SCM's DELETED list → added as DELETED.
+      seedRecon(500, 3, CLOSED); // seeds 500, 501, 502
 
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
-          .thenReturn(Arrays.asList(
-              containerCwp(501L, CLOSED),
-              containerCwp(502L, DELETED)));
+      List<ContainerInfo> deletedList = Arrays.asList(
+          containerInfo(500L, DELETED),
+          containerInfo(502L, DELETED),
+          containerInfo(503L, DELETED));  // 503 absent from Recon
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(deletedList);
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(504L)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
-      // 500: absent from batch → treated as purged → DELETED
       assertEquals(DELETED, getContainerManager().getContainer(
           ContainerID.valueOf(500L)).getState());
-      // 501: SCM still has it as CLOSED → no retirement
       assertEquals(CLOSED, getContainerManager().getContainer(
           ContainerID.valueOf(501L)).getState());
-      // 502: SCM says DELETED → DELETED
       assertEquals(DELETED, getContainerManager().getContainer(
           ContainerID.valueOf(502L)).getState());
+      assertEquals(DELETED, getContainerManager().getContainer(
+          ContainerID.valueOf(503L)).getState());
     }
   }
 
@@ -899,15 +938,15 @@ public class TestReconSCMContainerSyncIntegration
     private static final int LARGE_COUNT = 100_000;
 
     @BeforeEach
-    void configLargeBatchSize() {
+    void configLargeBatchSize() throws IOException {
       // Allow single-batch fetches for all large-scale tests
       getConf().setLong(
           ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE,
           (long) LARGE_COUNT);
       getConf().setInt(OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE,
           LARGE_COUNT);
-      // Default Pass 4 mock: all queried containers are still CLOSED (not deleted).
-      // Individual tests that need retirement override this mock inline.
+      // Default Pass 1/2/3 add mock: getExistContainerWithPipelinesInBatch returns CLOSED.
+      // Tests that need different states override this inline.
       when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
           .thenAnswer(inv -> {
             List<Long> ids = inv.getArgument(0);
@@ -915,6 +954,11 @@ public class TestReconSCMContainerSyncIntegration
                 .map(id -> containerCwp(id, CLOSED))
                 .collect(Collectors.toList());
           });
+      // Default Pass 4 mock: SCM's DELETED list is empty → no retirements.
+      // Tests that need Pass 4 retirement override this inline.
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
     }
 
     @Test
@@ -985,14 +1029,16 @@ public class TestReconSCMContainerSyncIntegration
       when(mockScm.getContainerCount(CLOSED)).thenReturn(0L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
-      // Override default mock: all queried containers are DELETED in SCM
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
-          .thenAnswer(inv -> {
-            List<Long> ids = inv.getArgument(0);
-            return ids.stream()
-                .map(id -> containerCwp(id, DELETED))
-                .collect(Collectors.toList());
-          });
+      // Override Pass 4: SCM's DELETED list contains all 100k containers.
+      List<ContainerInfo> deletedPage = idRange(1, LARGE_COUNT + 1).stream()
+          .map(c -> containerInfo(c.getId(), DELETED))
+          .collect(Collectors.toList());
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(deletedPage);
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf((long) LARGE_COUNT + 1)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(LARGE_COUNT, getContainerManager().getContainers(DELETED).size());
@@ -1007,14 +1053,16 @@ public class TestReconSCMContainerSyncIntegration
       when(mockScm.getContainerCount(CLOSED)).thenReturn(0L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
-      // Override default mock: all queried containers are DELETED in SCM
-      when(mockScm.getExistContainerWithPipelinesInBatch(anyList()))
-          .thenAnswer(inv -> {
-            List<Long> ids = inv.getArgument(0);
-            return ids.stream()
-                .map(id -> containerCwp(id, DELETED))
-                .collect(Collectors.toList());
-          });
+      // Override Pass 4: SCM's DELETED list contains all 100k containers.
+      List<ContainerInfo> deletedPage = idRange(1, LARGE_COUNT + 1).stream()
+          .map(c -> containerInfo(c.getId(), DELETED))
+          .collect(Collectors.toList());
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(deletedPage);
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf((long) LARGE_COUNT + 1)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(LARGE_COUNT, getContainerManager().getContainers(DELETED).size());
@@ -1077,25 +1125,33 @@ public class TestReconSCMContainerSyncIntegration
           eq(ContainerID.valueOf(1L)), eq(10_000), eq(QUASI_CLOSED)))
           .thenReturn(qcIds);
 
-      // Unified batch mock: handles both Pass 1/2/3 add paths and Pass 4 retirement.
-      // Pass 1 adds [20001-50000] as CLOSED, Pass 2 adds [50001-70000] as OPEN,
-      // Pass 3 adds [70001-80000] as QUASI_CLOSED; Pass 4 retires [80001-100000] as DELETED.
+      // Pass 1/2/3 add mock: getExistContainerWithPipelinesInBatch returns the
+      // appropriate live state for each container.
       when(mockScm.getExistContainerWithPipelinesInBatch(anyList())).thenAnswer(inv -> {
         List<Long> ids = inv.getArgument(0);
         return ids.stream().map(id -> {
           LifeCycleState state;
-          if (id > 80_000) {
-            state = DELETED;       // Pass 4: retire these containers
-          } else if (id > 70_000) {
-            state = QUASI_CLOSED;  // Pass 3 add + Pass 4: alive as QUASI_CLOSED
+          if (id > 70_000) {
+            state = QUASI_CLOSED;  // Pass 3 add: alive as QUASI_CLOSED
           } else if (id > 50_000) {
-            state = OPEN;          // Pass 2 add (Pass 4 doesn't query OPEN containers)
+            state = OPEN;          // Pass 2 add: alive as OPEN
           } else {
-            state = CLOSED;        // Pass 1 correct+add + Pass 4: alive as CLOSED
+            state = CLOSED;        // Pass 1 correct+add: alive as CLOSED
           }
           return containerCwp(id, state);
         }).collect(Collectors.toList());
       });
+
+      // Pass 4 mock: SCM's DELETED list contains containers 80001-100000.
+      List<ContainerInfo> deletedPage = idRange(80_001, 100_001).stream()
+          .map(c -> containerInfo(c.getId(), DELETED))
+          .collect(Collectors.toList());
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(deletedPage);
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(100_001L)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
 
       // ---- Run sync ----
       assertTrue(syncHelper.syncWithSCMContainerInfo());
@@ -1206,102 +1262,97 @@ public class TestReconSCMContainerSyncIntegration
       //   absent       → CLOSED    (Pass 1 add)
       //   absent       → OPEN      (Pass 2 add)
       //   absent       → QUASI_CLOSED  (Pass 3 add)
-      //   CLOSED       → DELETING  (Pass 4: SCM DELETING)
-      //   CLOSED       → DELETED   (Pass 4: SCM DELETED)
-      //   QUASI_CLOSED → DELETED   (Pass 4: SCM DELETED)
-      //   CLOSED       → DELETED   (Pass 4: ContainerNotFoundException)
+      //   CLOSED       → DELETED   (Pass 4: SCM DELETED list, full lifecycle)
+      //   QUASI_CLOSED → DELETED   (Pass 4: SCM DELETED list)
+      //   absent       → DELETED   (Pass 4: in DELETED list but missing from Recon)
 
-      int perGroup = 10_000;  // 10k containers per scenario = 90k total
+      int perGroup = 10_000;
 
       // Pre-seed Recon
       long base = 1L;
-      seedRecon(base,           perGroup, OPEN);          // group A: stuck OPEN
-      seedReconAsClosing(base + perGroup, perGroup);      // group B: stuck CLOSING
-      // group C (base+2*perGroup): absent, SCM has them CLOSED
-      // group D (base+3*perGroup): absent, SCM has them OPEN
-      // group E (base+4*perGroup): absent, SCM has them QUASI_CLOSED
-      seedRecon(base + 5L * perGroup, perGroup, CLOSED);  // group F: to retire → DELETING
-      seedRecon(base + 6L * perGroup, perGroup, CLOSED);  // group G: to retire → DELETED
-      seedRecon(base + 7L * perGroup, perGroup, QUASI_CLOSED); // group H: to retire → DELETED
-      seedRecon(base + 8L * perGroup, perGroup, CLOSED);  // group I: SCM ContainerNotFound
+      seedRecon(base,                perGroup, OPEN);       // group A: stuck OPEN → CLOSED
+      seedReconAsClosing(base + perGroup, perGroup);        // group B: stuck CLOSING → CLOSED
+      // group C (base+2*perGroup): absent, SCM CLOSED → added
+      // group D (base+3*perGroup): absent, SCM OPEN → added
+      // group E (base+4*perGroup): absent, SCM QUASI_CLOSED → added
+      seedRecon(base + 5L * perGroup, perGroup, CLOSED);   // group F: CLOSED → DELETED
+      seedRecon(base + 6L * perGroup, perGroup, QUASI_CLOSED); // group G: QUASI_CLOSED → DELETED
+      // group H (base+7*perGroup): absent, in DELETED list → added as DELETED
 
-      // Ranges
       long bEnd = base + 2L * perGroup;
       long cEnd = base + 3L * perGroup;
       long dEnd = base + 4L * perGroup;
       long eEnd = base + 5L * perGroup;
       long fEnd = base + 6L * perGroup;
+      long gEnd = base + 7L * perGroup;
       long hEnd = base + 8L * perGroup;
 
-      // Build CLOSED list for Pass 1: groups A + B + C
+      // Pass 1 — CLOSED list: groups A + B + C
       List<ContainerID> closedIds = idRange(base, cEnd);
       when(mockScm.getContainerCount(CLOSED)).thenReturn((long) closedIds.size());
       when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), eq(closedIds.size()), eq(CLOSED)))
           .thenReturn(closedIds);
 
-      // Build OPEN list for Pass 2: group D
+      // Pass 2 — OPEN list: group D
       List<ContainerID> openIds = idRange(bEnd, dEnd);
       when(mockScm.getContainerCount(OPEN)).thenReturn((long) openIds.size());
       when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), eq(openIds.size()), eq(OPEN)))
           .thenReturn(openIds);
 
-      // Build QUASI_CLOSED list for Pass 3: group E
+      // Pass 3 — QUASI_CLOSED list: group E
       List<ContainerID> qcIds = idRange(dEnd, eEnd);
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn((long) qcIds.size());
       when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), eq(qcIds.size()), eq(QUASI_CLOSED)))
           .thenReturn(qcIds);
 
-      // Unified batch mock: handles both Pass 1/2/3 add paths and Pass 4 retirement.
-      // Pass 1 adds group C (absent→CLOSED); Pass 2 adds group D (absent→OPEN);
-      // Pass 3 adds group E (absent→QUASI_CLOSED); Pass 4 retires groups F/G/H/I.
+      // Pass 1/2/3 add mock: returns correct live states for absent containers.
       when(mockScm.getExistContainerWithPipelinesInBatch(anyList())).thenAnswer(inv -> {
         List<Long> ids = inv.getArgument(0);
         List<ContainerWithPipeline> result = new ArrayList<>();
         for (Long id : ids) {
           if (id >= base && id < cEnd) {
-            result.add(containerCwp(id, CLOSED));        // Groups A,B,C: CLOSED in SCM
+            result.add(containerCwp(id, CLOSED));
           } else if (id >= cEnd && id < dEnd) {
-            result.add(containerCwp(id, OPEN));          // Group D: OPEN in SCM (Pass 2 add)
+            result.add(containerCwp(id, OPEN));
           } else if (id >= dEnd && id < eEnd) {
-            result.add(containerCwp(id, QUASI_CLOSED));  // Group E: QUASI_CLOSED (Pass 3 + alive)
-          } else if (id >= eEnd && id < fEnd) {
-            result.add(containerCwp(id, DELETING));      // Group F: DELETING in SCM
-          } else if (id >= fEnd && id < hEnd) {
-            result.add(containerCwp(id, DELETED));       // Groups G+H: DELETED in SCM
+            result.add(containerCwp(id, QUASI_CLOSED));
           }
-          // Group I (>= hEnd): excluded from result → scmState=null → retired to DELETED
+          // Groups F, G, H are not requested via this API
         }
         return result;
       });
 
+      // Pass 4 — SCM DELETED list: groups F + G + H (F and G exist in Recon; H is absent).
+      List<ContainerInfo> deletedPage = new ArrayList<>();
+      idRange(eEnd, fEnd).forEach(c -> deletedPage.add(containerInfo(c.getId(), DELETED))); // F
+      idRange(fEnd, gEnd).forEach(c -> deletedPage.add(containerInfo(c.getId(), DELETED))); // G
+      idRange(gEnd, hEnd).forEach(c -> deletedPage.add(containerInfo(c.getId(), DELETED))); // H
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
+          .thenReturn(deletedPage);
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(hEnd)), anyInt(), eq(DELETED)))
+          .thenReturn(Collections.emptyList());
+
       assertTrue(syncHelper.syncWithSCMContainerInfo());
 
       List<ContainerInfo> all = getContainerManager().getContainers();
+      long closedCount  = all.stream().filter(c -> c.getState() == CLOSED).count();
+      long openCount    = all.stream().filter(c -> c.getState() == OPEN).count();
+      long qcCount      = all.stream().filter(c -> c.getState() == QUASI_CLOSED).count();
+      long deletedCount = all.stream().filter(c -> c.getState() == DELETED).count();
 
-      long closedCount    = all.stream().filter(c -> c.getState() == CLOSED).count();
-      long openCount      = all.stream().filter(c -> c.getState() == OPEN).count();
-      long qcCount        = all.stream().filter(c -> c.getState() == QUASI_CLOSED).count();
-      long deletingCount  = all.stream().filter(c -> c.getState() == DELETING).count();
-      long deletedCount   = all.stream().filter(c -> c.getState() == DELETED).count();
-
-      // Groups A+B corrected + Group C added = 3 * perGroup CLOSED
+      // Groups A+B corrected + Group C added = 3*perGroup CLOSED
       assertEquals(3L * perGroup, closedCount,
           "Groups A (OPEN→CLOSED), B (CLOSING→CLOSED), C (added) = 3 * perGroup CLOSED");
-      // Group D added as OPEN
-      assertEquals((long) perGroup, openCount,
-          "Group D: added as OPEN");
-      // Group E added as QUASI_CLOSED
-      assertEquals((long) perGroup, qcCount,
-          "Group E: added as QUASI_CLOSED");
-      // Group F: CLOSED → DELETING
-      assertEquals((long) perGroup, deletingCount,
-          "Group F: CLOSED → DELETING");
-      // Groups G + H + I: CLOSED/QUASI_CLOSED → DELETED
+      assertEquals((long) perGroup, openCount, "Group D: added as OPEN");
+      assertEquals((long) perGroup, qcCount,   "Group E: added as QUASI_CLOSED");
+      // Groups F (CLOSED→DELETED) + G (QUASI_CLOSED→DELETED) + H (absent→DELETED) = 3*perGroup
       assertEquals(3L * perGroup, deletedCount,
-          "Groups G, H, I: → DELETED");
+          "Groups F, G, H: → DELETED");
     }
   }
 }
