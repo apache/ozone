@@ -17,18 +17,22 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import com.google.protobuf.ServiceException;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
-import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -47,14 +51,22 @@ public class TestOMUpgradeFinalizeService {
   private OMVersionManager versionManager;
   private ScmClient scmClient;
   private StorageContainerLocationProtocol containerClient;
+  private OzoneManagerRatisServer omRatisServer;
   private OMUpgradeFinalizeService service;
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getThreadNamePrefix()).thenReturn("");
 
     versionManager = mock(OMVersionManager.class);
+    // preExecute() calls ozoneManager.getVersionManager().getApparentVersion().serialize()
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
+    when(versionManager.getApparentVersion()).thenReturn(OzoneManagerVersion.DEFAULT_VERSION);
+
+    omRatisServer = mock(OzoneManagerRatisServer.class);
+    // OzoneManagerRatisUtils.submitRequest() calls ozoneManager.getOmRatisServer().submitRequest(...)
+    when(ozoneManager.getOmRatisServer()).thenReturn(omRatisServer);
 
     containerClient = mock(StorageContainerLocationProtocol.class);
     scmClient = mock(ScmClient.class);
@@ -65,7 +77,7 @@ public class TestOMUpgradeFinalizeService {
 
   /**
    * When the OM is not the leader, getTasks() should return an empty queue
-   * and no interaction with the version manager or SCM client should occur.
+   * and no interaction with the SCM client or Ratis server should occur.
    */
   @Test
   void testNoTasksSubmittedWhenNotLeader() throws Exception {
@@ -75,12 +87,12 @@ public class TestOMUpgradeFinalizeService {
     service.runPeriodicalTaskNow();
 
     verifyNoInteractions(scmClient);
-    verify(versionManager, never()).finalizeUpgrade();
+    verifyNoInteractions(omRatisServer);
   }
 
   /**
    * When finalization is not needed, getTasks() should return an empty queue
-   * and finalizeUpgrade() should never be called.
+   * and no SCM query or Ratis submission should occur.
    */
   @Test
   void testNoTasksSubmittedWhenFinalizationNotNeeded() throws Exception {
@@ -90,12 +102,12 @@ public class TestOMUpgradeFinalizeService {
     service.runPeriodicalTaskNow();
 
     verifyNoInteractions(scmClient);
-    verify(versionManager, never()).finalizeUpgrade();
+    verifyNoInteractions(omRatisServer);
   }
 
   /**
    * When the OM is the leader, finalization is needed, and SCM reports
-   * shouldFinalize=true, finalizeUpgrade() should be called exactly once.
+   * shouldFinalize=true, a FinalizeUpgrade request should be submitted via Ratis.
    */
   @Test
   void testFinalizationTriggeredWhenScmIsFinalized() throws Exception {
@@ -113,12 +125,13 @@ public class TestOMUpgradeFinalizeService {
     service.runPeriodicalTaskNow();
 
     verify(containerClient).queryUpgradeStatus();
-    // TODO - need to validate the ratis call
+    // Implementation submits a FinalizeUpgrade request through Ratis
+    verify(omRatisServer).submitRequest(any(), any(ClientId.class), anyLong());
   }
 
   /**
    * When SCM reports shouldFinalize=false (SCM is not yet finalized),
-   * the OM should not attempt to finalize.
+   * no Ratis request should be submitted.
    */
   @Test
   void testFinalizationSkippedWhenScmNotYetFinalized() throws Exception {
@@ -136,12 +149,12 @@ public class TestOMUpgradeFinalizeService {
     service.runPeriodicalTaskNow();
 
     verify(containerClient).queryUpgradeStatus();
-    verify(versionManager, never()).finalizeUpgrade();
+    verifyNoInteractions(omRatisServer);
   }
 
   /**
    * When the SCM client throws an IOException, the service should absorb it
-   * and not call finalizeUpgrade().
+   * and not submit any Ratis request.
    */
   @Test
   void testExceptionFromScmClientIsHandledGracefully() throws Exception {
@@ -149,19 +162,19 @@ public class TestOMUpgradeFinalizeService {
     when(versionManager.needsFinalization()).thenReturn(true);
     when(containerClient.queryUpgradeStatus()).thenThrow(new IOException("SCM unavailable"));
 
-    // runPeriodicalTaskNow() calls call() directly; the catch block in the task
-    // swallows the exception, so this should complete without throwing.
+    // The catch block in the task swallows the exception.
     service.runPeriodicalTaskNow();
 
     verify(containerClient).queryUpgradeStatus();
-    verify(versionManager, never()).finalizeUpgrade();
+    verifyNoInteractions(omRatisServer);
   }
 
   /**
-   * When finalizeUpgrade() itself throws, the service should absorb the error.
+   * When the Ratis submission throws, the service should absorb the error
+   * and not propagate the exception.
    */
   @Test
-  void testExceptionFromFinalizeUpgradeIsHandledGracefully() throws Exception {
+  void testExceptionFromRatisSubmitIsHandledGracefully() throws Exception {
     when(ozoneManager.isLeaderReady()).thenReturn(true);
     when(versionManager.needsFinalization()).thenReturn(true);
 
@@ -172,12 +185,13 @@ public class TestOMUpgradeFinalizeService {
         .setNumDatanodesTotal(3)
         .build();
     when(containerClient.queryUpgradeStatus()).thenReturn(scmStatus);
-    UpgradeException upgradeException = new UpgradeException("finalization failed",
-        UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED);
-    org.mockito.Mockito.doThrow(upgradeException).when(versionManager).finalizeUpgrade();
+    when(omRatisServer.submitRequest(any(), any(ClientId.class), anyLong()))
+        .thenThrow(new ServiceException("Ratis unavailable"));
 
     // The catch block in the task swallows the exception.
     service.runPeriodicalTaskNow();
-    // TODO - these tests need a bit of rework since moving to ratis.
+
+    // submitRequest was attempted but threw — service should not propagate the exception.
+    verify(omRatisServer).submitRequest(any(), any(ClientId.class), anyLong());
   }
 }

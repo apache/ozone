@@ -5028,4 +5028,10 @@
     <tag>OZONE, RATIS, OM</tag>
     <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
+  <property>
+    <name> ozone.om.upgrade.finalization.check.interval</name>
+    <value>1m</value>
+    <tag>OM</tag>
+    <description>If OM is unfinalized, how frequently it should poll SCM to trigger finalization</description>
+  </property>
 </configuration>
