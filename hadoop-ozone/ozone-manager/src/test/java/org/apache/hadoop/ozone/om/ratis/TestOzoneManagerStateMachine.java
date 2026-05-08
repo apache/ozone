@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -868,14 +869,21 @@ public class TestOzoneManagerStateMachine {
     verify(snapshotProvider, never()).init();
   }
 
-  // --- notifyLeaderReady tests ---
-
   @Test
   public void testNotifyLeaderReady() {
     OmSnapshotManager snapshotManager = mock(OmSnapshotManager.class);
     when(om.getOmSnapshotManager()).thenReturn(snapshotManager);
 
     sm.notifyLeaderReady();
+    verify(snapshotManager, never()).resetInFlightSnapshotCount();
+  }
+
+  @Test
+  public void testNotifyNotLeader() {
+    OmSnapshotManager snapshotManager = mock(OmSnapshotManager.class);
+    when(om.getOmSnapshotManager()).thenReturn(snapshotManager);
+
+    sm.notifyNotLeader(Collections.emptyList());
 
     verify(snapshotManager).resetInFlightSnapshotCount();
   }

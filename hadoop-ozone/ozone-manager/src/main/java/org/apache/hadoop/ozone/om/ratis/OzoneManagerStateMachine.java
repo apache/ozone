@@ -188,7 +188,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyLeaderReady() {
-    ozoneManager.getOmSnapshotManager().resetInFlightSnapshotCount();
     OMMetrics metrics = ozoneManager.getMetrics();
     if (metrics != null) {
       metrics.addRatisEvent("Ready to serve requests as the leader");
@@ -198,6 +197,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
     LOG.info("current leader OM steps down.");
+    // Reset in-flight snapshot count when stepping down as leader.
+    // Any in-flight snapshot requests tracked by this OM are no longer valid
+    // since this OM is no longer the leader processing client requests.
+    ozoneManager.getOmSnapshotManager().resetInFlightSnapshotCount();
     OMMetrics metrics = ozoneManager.getMetrics();
     if (metrics != null) {
       metrics.addRatisEvent("current leader OM steps down.");
