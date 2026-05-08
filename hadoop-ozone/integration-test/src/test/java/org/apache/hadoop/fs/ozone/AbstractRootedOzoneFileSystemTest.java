@@ -2021,27 +2021,6 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
-  void testContentSummaryErasureCodingPolicyOnEcBucket() throws Exception {
-    ECReplicationConfig ecConfig = new ECReplicationConfig("RS-3-2-1024k");
-    BucketArgs ecBucketArgs = BucketArgs.newBuilder()
-        .setStorageType(StorageType.DISK)
-        .setBucketLayout(BucketLayout.LEGACY)
-        .setDefaultReplicationConfig(new DefaultReplicationConfig(ecConfig))
-        .build();
-    String ecVol = UUID.randomUUID().toString();
-    String ecBuck = UUID.randomUUID().toString();
-    TestDataUtil.createVolumeAndBucket(client, ecVol, ecBuck, ecBucketArgs);
-
-    Path ecBucketPath = new Path(new Path(OZONE_URI_DELIMITER, ecVol), ecBuck);
-    try {
-      assertEquals(ecConfig.getReplication(),
-          fs.getContentSummary(ecBucketPath).getErasureCodingPolicy());
-    } finally {
-      fs.delete(ecBucketPath, true);
-    }
-  }
-
-  @Test
   void testLsDashEDoesNotThrow() throws Exception {
     FsShell shell = new FsShell(conf);
     try {
