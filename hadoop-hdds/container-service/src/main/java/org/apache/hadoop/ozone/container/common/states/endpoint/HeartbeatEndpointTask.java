@@ -519,6 +519,12 @@ public class HeartbeatEndpointTask
             "construct HeartbeatEndpointTask task");
       }
 
+      if (versionManager == null) {
+        LOG.error("No version manager specified.");
+        throw new IllegalArgumentException("A valid version manager is needed to " +
+            "construct HeartbeatEndpointTask task");
+      }
+
       HeartbeatEndpointTask task = new HeartbeatEndpointTask(this
           .endPointStateMachine, this.conf, this.context, this.versionManager);
       task.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());

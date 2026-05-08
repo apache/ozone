@@ -158,6 +158,7 @@ public class RunningDatanodeState implements DatanodeState {
           .setConfig(conf)
           .setEndpointStateMachine(endpoint)
           .setDatanodeDetails(context.getParent().getDatanodeDetails())
+          .setVersionManager(context.getParent().getVersionManager())
           .setContext(context)
           .build();
     default:
