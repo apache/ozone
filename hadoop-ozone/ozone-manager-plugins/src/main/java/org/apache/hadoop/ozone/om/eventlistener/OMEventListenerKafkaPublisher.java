@@ -77,13 +77,14 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
   @Override
   public void start() {
-    ledgerPoller.start();
-
     try {
       kafkaClient.initialize();
     } catch (IOException ex) {
       LOG.error("Failure initializing kafka client", ex);
+      return;
     }
+
+    ledgerPoller.start();
   }
 
   @Override
