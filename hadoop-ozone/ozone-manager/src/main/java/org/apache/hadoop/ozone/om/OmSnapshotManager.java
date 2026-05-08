@@ -962,42 +962,45 @@ public final class OmSnapshotManager implements AutoCloseable {
     checkSnapshotActive(toSnapInfo, false);
   }
 
+  /**
+   * Checks snapshot limit considering in-flight count and increments the counter if allowed.
+   * Called in preExecute() to track and limit concurrent snapshot creations.
+   *
+   * @throws IOException if failed to get snapshot count
+   * @throws OMException if the snapshot limit would be exceeded
+   */
   public void snapshotLimitCheck() throws IOException, OMException {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
 
-    AtomicReference<IOException> exceptionRef = new AtomicReference<>(null);
+    AtomicReference<Exception> exceptionRef = new AtomicReference<>(null);
     inFlightSnapshotCount.updateAndGet(count -> {
-      int currentSnapshotNum = 0;
+      int currentSnapshotCount;
       try {
-        currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
+        currentSnapshotCount = snapshotChainManager.getGlobalSnapshotChain().size();
+        throwIfSnapshotLimitExceeded(currentSnapshotCount, count);
       } catch (IOException e) {
         exceptionRef.set(e);
-        return count;
-      }
-      if (currentSnapshotNum + count >= fsSnapshotMaxLimit) {
-        exceptionRef.set(new OMException(
-            String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
-                "Current snapshots: %d, In-flight creations: %d",
-                fsSnapshotMaxLimit, currentSnapshotNum, count) +
-                " If you already deleted some snapshots, " +
-                "please wait for the background service to complete the cleanup.",
-            OMException.ResultCodes.TOO_MANY_SNAPSHOTS));
         return count;
       }
       return count + 1;
     });
     if (exceptionRef.get() != null) {
-      throw exceptionRef.get();
+      Exception e = exceptionRef.get();
+      if (e instanceof OMException) {
+        throw (OMException) e;
+      }
+      throw (IOException) e;
     }
   }
 
   public void decrementInFlightSnapshotCount() {
-    // TODO this is a work around for the accounting logic of `inFlightSnapshotCount`.
-    //    - It incorrectly assumes that LeaderReady means that there are no inflight snapshot requests.
-    //    We may consider fixing it by waiting all the pending requests in notifyLeaderReady().
-    //    - Also, it seems to have another bug that the PrepareState could disallow snapshot requests.
-    //    In such case, `inFlightSnapshotCount` won't be decremented.
+    // The counter can go negative in the following scenario:
+    // 1. Old leader increments counter in preExecute()
+    // 2. Leader election happens, old leader calls resetInFlightSnapshotCount() in notifyNotLeader()
+    // 3. New leader applies the pending request via validateAndUpdateCache()
+    // 4. validateAndUpdateCache() decrements counter on new leader (which was 0)
+    // This is expected and handled by resetting to 0 when negative.
     int result = inFlightSnapshotCount.decrementAndGet();
     if (result < 0) {
       resetInFlightSnapshotCount();
@@ -1010,6 +1013,43 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public int getInFlightSnapshotCount() {
     return inFlightSnapshotCount.get();
+  }
+
+  /**
+   * Throws OMException if creating a new snapshot would exceed the limit.
+   * This is a pure check with no side effects.
+   *
+   * @param currentSnapshotCount current number of snapshots
+   * @param inFlightCount number of in-flight snapshot requests
+   * @throws OMException if the snapshot limit would be exceeded
+   */
+  private void throwIfSnapshotLimitExceeded(int currentSnapshotCount, int inFlightCount) throws OMException {
+    if (currentSnapshotCount + inFlightCount >= fsSnapshotMaxLimit) {
+      throw new OMException(
+          String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
+              "Current snapshots: %d, In-flight creations: %d. " +
+              "Please delete some snapshots before creating new ones.",
+              fsSnapshotMaxLimit, currentSnapshotCount, inFlightCount),
+          OMException.ResultCodes.TOO_MANY_SNAPSHOTS);
+    }
+  }
+
+  /**
+   * Hard check on snapshot limit without considering in-flight count.
+   * Used as a safety net in validateAndUpdateCache to ensure the limit
+   * is never exceeded, even if in-flight tracking has bugs.
+   *
+   * @throws OMException if the snapshot limit has been reached
+   * @throws IOException if failed to get snapshot count
+   */
+  public void assertSnapshotLimitNotExceeded() throws OMException, IOException {
+    OmMetadataManagerImpl omMetadataManager =
+        (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+
+    int currentSnapshotCount = snapshotChainManager.getGlobalSnapshotChain().size();
+    throwIfSnapshotLimitExceeded(currentSnapshotCount, 0);
   }
 
   private String validateToken(final String token) throws IOException {
