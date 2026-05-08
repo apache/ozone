@@ -1033,6 +1033,19 @@ public class RPC {
      return protocolImplMapArray.get(rpcKind.ordinal());   
    }
    
+    /**
+     * Returns {@code true} only if at least one protocol has been registered
+     * on this server instance for the given {@link RPC.RpcKind}.
+     * Used to reject incoming requests for unsupported RPC kinds before any
+     * deserialization of the request payload takes place.
+     * @param rpcKind the RPC kind from the incoming request header.
+     * @return {@code true} if at least one protocol is registered for this kind.
+     */
+    boolean hasRegisteredProtocols(RPC.RpcKind rpcKind) {
+      Map<ProtoNameVer, ProtoClassProtoImpl> implMap = getProtocolImplMap(rpcKind);
+      return implMap != null && !implMap.isEmpty();
+    }
+
    // Register  protocol and its impl for rpc calls
    void registerProtocolAndImpl(RpcKind rpcKind, Class<?> protocolClass, 
        Object protocolImpl) {
