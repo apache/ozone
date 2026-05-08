@@ -99,7 +99,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
   }
 
   private boolean printReconciliationStatus(ScmClient scmClient, long containerID, SequenceWriter arrayWriter,
-                                             StringBuilder errorBuilder) {
+      StringBuilder errorBuilder) {
     try {
       ContainerInfo containerInfo = scmClient.getContainer(containerID);
       if (containerInfo.isOpen()) {
