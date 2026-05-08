@@ -195,7 +195,7 @@ public class TestStorageDistributionEndpoint {
     String contentDisposition = response.getHeaderString(CONTENT_DISPOSITION);
     assertNotNull(contentDisposition);
     assertTrue(contentDisposition.startsWith("attachment; filename=\"Datanode_Insights_" + CLUSTER_ID + "_"));
-    assertTrue(contentDisposition.endsWith(".csv\""));
+    assertTrue(contentDisposition.endsWith("Z.csv\""));
     String csv = readCsv(response);
     for (String row : csvRows) {
       assertTrue(csv.contains(row));

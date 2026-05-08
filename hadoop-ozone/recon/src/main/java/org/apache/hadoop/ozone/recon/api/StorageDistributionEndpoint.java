@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -85,7 +86,7 @@ public class StorageDistributionEndpoint {
   private final DataNodeMetricsService dataNodeMetricsService;
   private final ReconContext reconContext;
   private static final DateTimeFormatter TIMESTAMP_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyyMMdd_HHmm");
+      DateTimeFormatter.ofPattern("yyyyMMdd_HHmm'Z'");
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
@@ -149,7 +150,12 @@ public class StorageDistributionEndpoint {
    * The CSV includes the following headers: HostName, Datanode UUID, Filesystem Capacity,
    * Filesystem Used Space, Filesystem Remaining Space, Ozone Capacity, Ozone Used Space,
    * Ozone Remaining Space, PreAllocated Container Space, Reserved Space, Minimum Free
-   * Space, and Pending Block Size.
+   * Space, and Pending Block Size. The values for all size-related headers are represented
+   * in bytes.
+   *
+   * The downloaded csv file is dynamically named using the cluster ID and a UTC timestamp,
+   * to ensure clear timezone-independent record keeping.
+   * Example: Datanode_Insights_<clusterId>_yyyyMMdd_HHmmZ.csv
    *
    * @return A Response object. Depending on the state of metrics collection, this can be:
    *         - An HTTP 202 (Accepted) response with a status and metrics data if the
@@ -227,17 +233,12 @@ public class StorageDistributionEndpoint {
             v -> v.getMetric() != null ? v.getMetric().getPendingBlockSize() : -1
         );
 
-    String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMATTER);
-    // Retrieve clusterId from ReconContext
-    String clusterID = "UnknownCluster";
-    try {
-      if (reconContext != null && StringUtils.isNotBlank(reconContext.getClusterId())) {
-        clusterID = reconContext.getClusterId();
-      }
-    } catch (Exception e) {
-      LOG.warn("Could not retrieve cluster ID for export filename", e);
+    String timestamp = LocalDateTime.now(ZoneOffset.UTC).format(TIMESTAMP_FORMATTER);
+    String clusterId = "UnknownCluster";
+    if (StringUtils.isNotBlank(reconContext.getClusterId())) {
+      clusterId = reconContext.getClusterId();
     }
-    String fileName = String.format("Datanode_Insights_%s_%s.csv", clusterID, timestamp);
+    String fileName = String.format("Datanode_Insights_%s_%s.csv", clusterId, timestamp);
 
     return ReconUtils.downloadCsv(fileName, headers, data, columns);
   }
