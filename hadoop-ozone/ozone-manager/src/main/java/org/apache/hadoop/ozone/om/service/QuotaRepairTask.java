@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
@@ -72,6 +73,8 @@ public class QuotaRepairTask {
       QuotaRepairTask.class);
   private static final int BATCH_SIZE = 5000;
   private static final int TASK_THREAD_CNT = 3;
+  /** Parallel full-table scans (OBS keys, FSO files, dirs, deleted keys, deleted dirs). */
+  private static final int QUOTA_REPAIR_SCAN_TASKS = 5;
   private static final AtomicBoolean IN_PROGRESS = new AtomicBoolean(false);
   private static final RepairStatus REPAIR_STATUS = new RepairStatus();
   private static final AtomicLong RUN_CNT = new AtomicLong(0);
@@ -103,15 +106,13 @@ public class QuotaRepairTask {
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
     // thread pool with 3 Table type * (1 task each + 3 thread for each task)
-    executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
+    executor = Executors.newFixedThreadPool(QUOTA_REPAIR_SCAN_TASKS * (1 + TASK_THREAD_CNT));
     try (OMMetadataManager activeMetaManager =
         createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration())) {
       OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder
           = OzoneManagerProtocolProtos.QuotaRepairRequest.newBuilder();
       // repair active db
       repairActiveDb(activeMetaManager, builder, buckets);
-
-      // TODO: repair snapshots for quota
 
       // submit request to update
       ClientId clientId = ClientId.randomId();
@@ -175,6 +176,10 @@ public class QuotaRepairTask {
       bucketCountBuilder.setDiffUsedBytes(updatedBuckedInfo.getUsedBytes() - oriBucketInfo.getUsedBytes());
       bucketCountBuilder.setDiffUsedNamespace(
           updatedBuckedInfo.getUsedNamespace() - oriBucketInfo.getUsedNamespace());
+      bucketCountBuilder.setDiffSnapshotUsedBytes(
+          updatedBuckedInfo.getSnapshotUsedBytes() - oriBucketInfo.getSnapshotUsedBytes());
+      bucketCountBuilder.setDiffSnapshotUsedNamespace(
+          updatedBuckedInfo.getSnapshotUsedNamespace() - oriBucketInfo.getSnapshotUsedNamespace());
       bucketCountBuilder.setSupportOldQuota(oldQuota);
       builder.addBucketCount(bucketCountBuilder.build());
     }
@@ -253,17 +258,28 @@ public class QuotaRepairTask {
     oriBucketInfoMap.put(bucketNameKey, bucketInfo.copyObject());
     bucketInfo.decrUsedBytes(bucketInfo.getUsedBytes(), false);
     bucketInfo.decrUsedNamespace(bucketInfo.getUsedNamespace(), false);
+    resetSnapshotBucketQuota(bucketInfo);
     nameBucketInfoMap.put(bucketNameKey, bucketInfo);
     idBucketInfoMap.put(buildIdPath(metadataManager.getVolumeId(bucketInfo.getVolumeName()),
             bucketInfo.getObjectID()), bucketInfo);
   }
 
   private boolean isChange(OmBucketInfo lBucketInfo, OmBucketInfo rBucketInfo) {
-    if (lBucketInfo.getUsedNamespace() != rBucketInfo.getUsedNamespace()
-        || lBucketInfo.getUsedBytes() != rBucketInfo.getUsedBytes()) {
-      return true;
+    return lBucketInfo.getUsedNamespace() != rBucketInfo.getUsedNamespace()
+        || lBucketInfo.getUsedBytes() != rBucketInfo.getUsedBytes()
+        || lBucketInfo.getSnapshotUsedBytes() != rBucketInfo.getSnapshotUsedBytes()
+        || lBucketInfo.getSnapshotUsedNamespace() != rBucketInfo.getSnapshotUsedNamespace();
+  }
+
+  private static void resetSnapshotBucketQuota(OmBucketInfo bucketInfo) {
+    long snapBytes = bucketInfo.getSnapshotUsedBytes();
+    if (snapBytes != 0) {
+      bucketInfo.purgeSnapshotUsedBytes(snapBytes);
     }
-    return false;
+    long snapNs = bucketInfo.getSnapshotUsedNamespace();
+    if (snapNs != 0) {
+      bucketInfo.purgeSnapshotUsedNamespace(snapNs);
+    }
   }
   
   private static String buildNamePath(String volumeName, String bucketName) {
@@ -293,6 +309,8 @@ public class QuotaRepairTask {
     Map<String, CountPair> keyCountMap = new ConcurrentHashMap<>();
     Map<String, CountPair> fileCountMap = new ConcurrentHashMap<>();
     Map<String, CountPair> directoryCountMap = new ConcurrentHashMap<>();
+    Map<String, CountPair> snapshotDeletedKeyMap = new ConcurrentHashMap<>();
+    Map<String, CountPair> snapshotDeletedDirMap = new ConcurrentHashMap<>();
     try {
       nameBucketInfoMap.keySet().stream().forEach(e -> keyCountMap.put(e,
           new CountPair()));
@@ -300,7 +318,9 @@ public class QuotaRepairTask {
           new CountPair()));
       idBucketInfoMap.keySet().stream().forEach(e -> directoryCountMap.put(e,
           new CountPair()));
-      
+      nameBucketInfoMap.keySet().forEach(k -> snapshotDeletedKeyMap.put(k, new CountPair()));
+      idBucketInfoMap.keySet().forEach(k -> snapshotDeletedDirMap.put(k, new CountPair()));
+
       List<Future<?>> tasks = new ArrayList<>();
       tasks.add(executor.submit(() -> recalculateUsages(
           metadataManager.getKeyTable(BucketLayout.OBJECT_STORE),
@@ -311,6 +331,14 @@ public class QuotaRepairTask {
       tasks.add(executor.submit(() -> recalculateUsages(
           metadataManager.getDirectoryTable(),
           directoryCountMap, "Directory usages", false)));
+
+      Map<Long, OmBucketInfo> bucketById = buildBucketByObjectId(idBucketInfoMap);
+
+      tasks.add(executor.submit(() -> recalculateSnapshotDeletedKeyUsages(
+          metadataManager.getDeletedTable(), bucketById, snapshotDeletedKeyMap)));
+      tasks.add(executor.submit(() -> recalculateSnapshotDeletedDirNamespace(
+          metadataManager.getDeletedDirTable(), snapshotDeletedDirMap)));
+
       for (Future<?> f : tasks) {
         f.get();
       }
@@ -326,7 +354,102 @@ public class QuotaRepairTask {
     updateCountToBucketInfo(nameBucketInfoMap, keyCountMap);
     updateCountToBucketInfo(idBucketInfoMap, fileCountMap);
     updateCountToBucketInfo(idBucketInfoMap, directoryCountMap);
+    mergeSnapshotDeletedTableCounts(nameBucketInfoMap, snapshotDeletedKeyMap);
+    mergeDeletedDirSnapshotNamespace(idBucketInfoMap, snapshotDeletedDirMap);
     LOG.info("Completed quota repair counting for all keys, files and directories");
+  }
+
+  private static Map<Long, OmBucketInfo> buildBucketByObjectId(
+      Map<String, OmBucketInfo> idBucketInfoMap) {
+    Map<Long, OmBucketInfo> bucketById = new HashMap<>();
+    for (OmBucketInfo bucketInfo : idBucketInfoMap.values()) {
+      bucketById.putIfAbsent(bucketInfo.getObjectID(), bucketInfo);
+    }
+    return bucketById;
+  }
+
+  private void recalculateSnapshotDeletedKeyUsages(
+      Table<String, RepeatedOmKeyInfo> deletedTable,
+      Map<Long, OmBucketInfo> bucketById,
+      Map<String, CountPair> snapshotCountByBucketNameKey)
+      throws UncheckedIOException {
+    LOG.info("Starting recalculate snapshot usages from deletedTable");
+
+    int count = 0;
+    long startTime = Time.monotonicNow();
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> keyIter
+        = deletedTable.iterator()) {
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
+        count++;
+        RepeatedOmKeyInfo val = kv.getValue();
+        OmBucketInfo bucket = bucketById.get(val.getBucketId());
+        if (bucket == null) {
+          continue;
+        }
+        String nameKey = buildNamePath(bucket.getVolumeName(), bucket.getBucketName());
+        CountPair usage = snapshotCountByBucketNameKey.get(nameKey);
+        if (usage == null) {
+          continue;
+        }
+        usage.incrSpace(val.getTotalSize().getRight());
+        usage.incrNamespace(val.getOmKeyInfoList().size());
+      }
+      LOG.info("Recalculate snapshot usages from deletedTable completed, count {} time {}ms",
+          count, (Time.monotonicNow() - startTime));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  private void recalculateSnapshotDeletedDirNamespace(
+      Table<String, OmKeyInfo> deletedDirTable,
+      Map<String, CountPair> snapshotDirNsByIdPrefix)
+      throws UncheckedIOException {
+    LOG.info("Starting recalculate snapshot namespace from deletedDirectoryTable");
+
+    int count = 0;
+    long startTime = Time.monotonicNow();
+    try (Table.KeyValueIterator<String, OmKeyInfo> keyIter
+        = deletedDirTable.iterator()) {
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+        count++;
+        String prefix = getVolumeBucketPrefix(kv.getKey());
+        CountPair usage = snapshotDirNsByIdPrefix.get(prefix);
+        if (usage != null) {
+          usage.incrNamespace(1L);
+        }
+      }
+      LOG.info(
+          "Recalculate snapshot namespace from deletedDirectoryTable completed, count {} time {}ms",
+          count, (Time.monotonicNow() - startTime));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  private static synchronized void mergeSnapshotDeletedTableCounts(
+      Map<String, OmBucketInfo> nameBucketInfoMap,
+      Map<String, CountPair> counts) {
+    for (Map.Entry<String, CountPair> entry : counts.entrySet()) {
+      OmBucketInfo bucket = nameBucketInfoMap.get(entry.getKey());
+      if (bucket != null) {
+        bucket.incrSnapshotUsedBytes(entry.getValue().getSpace());
+        bucket.incrSnapshotUsedNamespace(entry.getValue().getNamespace());
+      }
+    }
+  }
+
+  private static synchronized void mergeDeletedDirSnapshotNamespace(
+      Map<String, OmBucketInfo> idBucketInfoMap,
+      Map<String, CountPair> counts) {
+    for (Map.Entry<String, CountPair> entry : counts.entrySet()) {
+      OmBucketInfo bucket = idBucketInfoMap.get(entry.getKey());
+      if (bucket != null) {
+        bucket.incrSnapshotUsedNamespace(entry.getValue().getNamespace());
+      }
+    }
   }
 
   private <VALUE> void recalculateUsages(
@@ -500,6 +623,12 @@ public class QuotaRepairTask {
         ConcurrentHashMap<String, Long> diffCountMap = new ConcurrentHashMap<>();
         diffCountMap.put("DiffUsedBytes", quotaCount.getDiffUsedBytes());
         diffCountMap.put("DiffUsedNamespace", quotaCount.getDiffUsedNamespace());
+        if (quotaCount.hasDiffSnapshotUsedBytes()) {
+          diffCountMap.put("DiffSnapshotUsedBytes", quotaCount.getDiffSnapshotUsedBytes());
+        }
+        if (quotaCount.hasDiffSnapshotUsedNamespace()) {
+          diffCountMap.put("DiffSnapshotUsedNamespace", quotaCount.getDiffSnapshotUsedNamespace());
+        }
         bucketCountDiffMap.put(bucketKey, diffCountMap);
       }
     }

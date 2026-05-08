@@ -8213,6 +8213,18 @@
                     "value": "false"
                   }
                 ]
+              },
+              {
+                "id": 6,
+                "name": "diffSnapshotUsedBytes",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "diffSnapshotUsedNamespace",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
