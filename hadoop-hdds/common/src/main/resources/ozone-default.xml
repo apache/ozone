@@ -3618,12 +3618,12 @@
   </property>
   <property>
     <name>ozone.recon.scm.per.state.drift.threshold</name>
-    <value>5</value>
+    <value>1</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
       Per-state lifecycle drift threshold used when SCM and Recon total container
-      counts are equal. If OPEN, QUASI_CLOSED, or derived CLOSED counts differ by
-      more than this value, Recon triggers a targeted SCM container sync.
+      counts are equal. If OPEN, QUASI_CLOSED, or CLOSED counts differ by at
+      least this value, Recon triggers a targeted SCM container sync.
     </description>
   </property>
   <property>

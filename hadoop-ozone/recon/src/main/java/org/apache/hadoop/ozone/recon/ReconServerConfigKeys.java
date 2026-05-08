@@ -344,21 +344,21 @@ public final class  ReconServerConfigKeys {
    *       invisible to the OPEN check alone.</li>
    * </ul>
    *
-   * <p>If the drift in <em>any</em> of the checked states exceeds this
+   * <p>If the drift in <em>any</em> of the checked states reaches this
    * threshold, a targeted sync is triggered. A full snapshot is deliberately
    * NOT triggered because the targeted sync's per-state passes correct these
    * conditions efficiently without replacing the entire database.
    *
-   * <p>The check uses a strict {@code >} comparison — drift must <em>exceed</em>
-   * (not merely equal) the threshold to trigger. A value of 1 means any single
-   * wrong-state container triggers TARGETED_SYNC at the next scheduled check.
+   * <p>The check uses an inclusive {@code >=} comparison. A value of 1 means
+   * any single wrong-state container triggers TARGETED_SYNC at the next
+   * scheduled check.
    * This is the recommended default because:
    * <ul>
    *   <li>TARGETED_SYNC runs at most once per scheduled interval (default 6h)
    *       regardless of how many times drift is detected.</li>
    *   <li>All four sync passes are idempotent — running unnecessarily has no
    *       side effects and completes quickly in steady state.</li>
-   *   <li>A per-state threshold of 5 tolerates up to 5 wrong-state containers
+   *   <li>A per-state threshold of 5 tolerates up to 4 wrong-state containers
    *       permanently if total counts happen to match by coincidence, which
    *       compromises Recon's monitoring accuracy.</li>
    * </ul>

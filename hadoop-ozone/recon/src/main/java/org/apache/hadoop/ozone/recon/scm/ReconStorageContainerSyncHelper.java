@@ -251,7 +251,7 @@ class ReconStorageContainerSyncHelper {
    *             are equal (e.g., OPEN and QUASI_CLOSED counts are also equal but
    *             some containers are in the wrong bucket).</li>
    *       </ul>
-   *       If drift in <em>any</em> checked state exceeds the threshold:
+   *       If drift in <em>any</em> checked state reaches the threshold:
    *       return {@link SyncAction#TARGETED_SYNC}.</li>
    *   <li>Otherwise: return {@link SyncAction#NO_ACTION}.</li>
    * </ol>
@@ -334,7 +334,7 @@ class ReconStorageContainerSyncHelper {
       long scmCount = (long) entry[1];
       long reconCount = (long) entry[2];
       long drift = Math.abs(scmCount - reconCount);
-      if (drift > perStateDriftThreshold) {
+      if (drift >= perStateDriftThreshold) {
         LOG.info("Per-state {} drift {} detected (SCM_{}={}, Recon_{}={}, threshold={}). "
                 + "Total counts are equal — targeted sync will correct stale states.",
             state, drift, state, scmCount, state, reconCount, perStateDriftThreshold);

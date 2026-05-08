@@ -450,7 +450,8 @@ public class ReconStorageContainerManagerFacade
     //   0 < |total drift| <= threshold
     //       → targeted sync: 4-pass incremental repair
     //
-    //   total drift = 0 but per-state drift (OPEN or QUASI_CLOSED) > threshold (default 5)
+    //   total drift = 0 but per-state drift (OPEN, QUASI_CLOSED, or CLOSED)
+    //       >= threshold (default 1)
     //       → targeted sync: corrects containers stuck in a stale lifecycle state
     //
     //   no drift detected
