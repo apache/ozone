@@ -117,7 +117,7 @@ class TestDatanodeVersionManager extends AbstractComponentVersionManagerTest {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageRoot.toString());
     DatanodeStorage storage = new DatanodeStorage(conf, UUID.randomUUID().toString(), apparentVersion);
     storage.setApparentVersion(apparentVersion);
-    storage.getCurrentDir().mkdirs();
+    assertTrue(storage.getCurrentDir().mkdirs());
     storage.persistCurrentState();
     return storage;
   }
