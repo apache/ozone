@@ -388,8 +388,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       isFile(keyPath, keyDetails);
 
-      Response conditionalResponse = S3ConditionalRequest
-          .evaluateReadPreconditions(getHeaders(), keyPath, keyDetails);
+      Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
+          getHeaders(), keyPath, keyDetails, S3ConditionalRequest.PreconditionContext.READ);
       if (conditionalResponse != null) {
         long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(
             startNanos);
@@ -547,8 +547,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
-      Response conditionalResponse = S3ConditionalRequest
-          .evaluateReadPreconditions(getHeaders(), keyPath, key);
+      Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
+          getHeaders(), keyPath, key, S3ConditionalRequest.PreconditionContext.READ);
       if (conditionalResponse != null) {
         getMetrics().updateHeadKeySuccessStats(startNanos);
         auditReadSuccess(s3GAction);
@@ -1055,8 +1055,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
 
       String sourceKeyPath = sourceBucket + "/" + sourceKey;
-      S3ConditionalRequest.evaluateCopySourcePreconditions(
-          getHeaders(), sourceKeyPath, sourceKeyDetails);
+      S3ConditionalRequest.evaluatePreconditions(getHeaders(), sourceKeyPath,
+          sourceKeyDetails, S3ConditionalRequest.PreconditionContext.COPY_SOURCE);
 
       S3ConditionalRequest.WriteConditions writeConditions =
           S3ConditionalRequest.parseWriteConditions(getHeaders(), destkey);
