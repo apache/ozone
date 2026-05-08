@@ -3425,6 +3425,47 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.export.directory</name>
+    <value></value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Directory where Recon stores exported TAR files containing unhealthy container
+      CSVs. When empty (default), the path is resolved at runtime as
+      {ozone.recon.db.dir}/exports so exports are co-located with Recon metadata.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.export.max.downloads</name>
+    <value>3</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Maximum number of times a completed export TAR file can be downloaded.
+      Once the limit is reached the download endpoint returns HTTP 429.
+      Prevents repeated downloads from misusing network bandwidth.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.export.max.jobs.total</name>
+    <value>4</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Maximum number of export jobs (waiting + executing) that can exist at once.
+      Submissions beyond this limit are rejected with HTTP 429. Kept small because
+      export is single-threaded and the number of distinct unhealthy-container
+      states is bounded.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.unhealthy.container.fetch.size</name>
+    <value>10000</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Number of rows Derby returns per JDBC round-trip when streaming unhealthy
+      container records during a CSV export. Higher values reduce round-trip
+      overhead at the cost of slightly more memory per fetch batch.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.network.topology.schema.file</name>
     <value>network-topology-default.xml</value>
     <tag>OZONE, MANAGEMENT</tag>
