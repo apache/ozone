@@ -2656,6 +2656,11 @@ public abstract class Server {
         InterruptedException {
       Class<? extends Writable> rpcRequestClass = 
           getRpcRequestWrapper(header.getRpcKind());
+      if (header.getRpcKind() == RpcKindProto.RPC_WRITABLE) {
+        final String err = "WritableRpcEngine is not supported.";
+        LOG.warn(err + " Client: {}", getHostAddress());
+        throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_INVALID_RPC_HEADER, err);
+      }
       if (rpcRequestClass == null) {
         LOG.warn("Unknown rpc kind "  + header.getRpcKind() + 
             " from client " + getHostAddress());
