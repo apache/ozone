@@ -29,16 +29,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
-import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -46,26 +41,29 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OMUpgradeTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,9 +91,6 @@ public class TestHSyncUpgrade {
   private static final int SERVICE_INTERVAL = 100;
   private static final int EXPIRE_THRESHOLD_MS = 140;
 
-  private static final int POLL_INTERVAL_MILLIS = 500;
-  private static final int POLL_MAX_WAIT_MILLIS = 120_000;
-
   @BeforeEach
   public void init() throws Exception {
     final BucketLayout layout = BUCKET_LAYOUT;
@@ -117,7 +112,10 @@ public class TestHSyncUpgrade {
     conf.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
-    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OMLayoutFeature.MULTITENANCY_SCHEMA.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OzoneManagerVersion.ATOMIC_REWRITE_KEY.serialize());
+    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY,
+        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
+    conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -217,20 +215,8 @@ public class TestHSyncUpgrade {
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
-    final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
-    UpgradeFinalization.StatusAndMessages finalizationResponse =
-        omClient.finalizeUpgrade(upgradeClientID);
-
-    // The status should transition as soon as the client call above returns
-    assertTrue(isStarting(finalizationResponse.status()));
-    // Wait for the finalization to be marked as done.
-    // 10s timeout should be plenty.
-    await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
-      final UpgradeFinalization.StatusAndMessages progress =
-          omClient.queryUpgradeFinalizationProgress(
-              upgradeClientID, false, false);
-      return isDone(progress.status());
-    });
+    cluster.getStorageContainerLocationClient().finalizeUpgrade();
+    OMUpgradeTestUtils.waitForFinalization(omClient);
   }
 
 }

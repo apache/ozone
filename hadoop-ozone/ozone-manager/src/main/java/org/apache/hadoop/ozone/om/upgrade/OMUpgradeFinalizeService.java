@@ -1,0 +1,120 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om.upgrade;
+
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.hdds.utils.BackgroundTask;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ScmClient;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.ratis.protocol.ClientId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A background service that periodically checks whether SCM has completed finalization of an upgrade and, if so,
+ * finalizes the OM upgrade.
+ */
+public class OMUpgradeFinalizeService extends BackgroundService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OMUpgradeFinalizeService.class);
+
+  private static final int THREAD_POOL_SIZE = 1;
+  private static final TimeUnit INTERVAL_UNIT = TimeUnit.MILLISECONDS;
+  private static final long TIMEOUT = 60000;
+  private static final AtomicLong RUN_COUNT = new AtomicLong(0);
+
+  private final OzoneManager ozoneManager;
+  private final OMVersionManager versionManager;
+  private final ScmClient scmClient;
+
+  /**
+   * Creates an {@code OMUpgradeFinalizeService} with a custom check interval.
+   * Primarily intended for testing.
+   *
+   * @param ozoneManager   the OzoneManager instance
+   * @param versionManager the {@link OMVersionManager} to query the finalization status
+   * @param scmClient      the scmClient instance used to query SCM
+   * @param intervalMs     the duration to wait between checks
+   */
+  public OMUpgradeFinalizeService(OzoneManager ozoneManager, OMVersionManager versionManager, ScmClient scmClient,
+                                  long intervalMs) {
+    super("OMUpgradeFinalizeService", intervalMs, INTERVAL_UNIT, THREAD_POOL_SIZE, TIMEOUT,
+        ozoneManager.getThreadNamePrefix());
+    this.ozoneManager = ozoneManager;
+    this.versionManager = versionManager;
+    this.scmClient = scmClient;
+  }
+
+  @Override
+  public BackgroundTaskQueue getTasks() {
+    BackgroundTaskQueue queue = new BackgroundTaskQueue();
+    if (ozoneManager.isLeaderReady() && versionManager.needsFinalization()) {
+      queue.add(new UpgradeStatusCheckTask());
+    }
+    return queue;
+  }
+
+  /**
+   * Periodic task that checks upgrade finalization status and logs the result.
+   */
+  private class UpgradeStatusCheckTask implements BackgroundTask {
+
+    @Override
+    public BackgroundTaskResult call() {
+      if (!ozoneManager.isLeaderReady()) {
+        LOG.debug("OMUpgradeFinalizeService: skipping check — not the leader.");
+        return BackgroundTaskResult.EmptyTaskResult.newResult();
+      }
+      if (versionManager.needsFinalization()) {
+        try {
+          if (scmClient == null) {
+            LOG.info("SCM client is null");
+          }
+          if (scmClient.getContainerClient() == null) {
+            LOG.info("SCM client's container client is null");
+          }
+          HddsProtos.UpgradeStatus upgradeStatus = scmClient.getContainerClient().queryUpgradeStatus();
+          LOG.info("+++ polled scm and the status is {}", upgradeStatus.getShouldFinalize());
+          if (upgradeStatus.getShouldFinalize()) {
+            LOG.info("The SCM Upgrade has been finalized. OM will now finalize");
+
+            OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+                .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
+                .setClientId("todo")
+                .build();
+            OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+            omRequest = omClientRequest.preExecute(ozoneManager);
+            OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, ClientId.randomId(),
+                RUN_COUNT.getAndIncrement());
+          }
+        } catch (Exception e) {
+          LOG.error("An exception occurred while trying to check the SCM Upgrade status or finalize OM", e);
+        }
+      }
+      return BackgroundTaskResult.EmptyTaskResult.newResult();
+    }
+  }
+}

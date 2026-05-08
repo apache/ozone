@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -40,7 +42,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -69,6 +70,11 @@ class TestOMUpgradeFinalization {
   @Test
   void testOMUpgradeFinalizationWithOneOMDown() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.layoutVersion());
+    // Finalization is triggered when SCM is finalized, so we first start it unfinalized and then finalize it to trigger
+    // the OM finalization.
+    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     try (MiniOzoneHAClusterImpl cluster = newCluster(conf)) {
       cluster.waitForClusterToBeReady();
 
@@ -93,12 +99,10 @@ class TestOMUpgradeFinalization {
         long prepareIndex = omClient.prepareOzoneManager(120L, 5L);
         assertClusterPrepared(prepareIndex, runningOms);
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_PREPARE, AuditEventStatus.SUCCESS);
-
         omClient.cancelOzoneManagerPrepare();
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_CANCEL, AuditEventStatus.SUCCESS);
-        StatusAndMessages response =
-            omClient.finalizeUpgrade("finalize-test");
-        System.out.println("Finalization Messages : " + response.msgs());
+        // Send the finalize command to SCM which triggers the OM finalize when SCM reports it is complete.
+        cluster.getStorageContainerLocationClient().finalizeUpgrade();
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
 
         waitForFinalization(omClient);
