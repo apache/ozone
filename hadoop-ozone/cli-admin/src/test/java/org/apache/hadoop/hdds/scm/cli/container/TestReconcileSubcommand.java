@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -61,6 +62,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.ExitUtils.ExitException;
 import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,6 +89,9 @@ public class TestReconcileSubcommand {
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
+  private static final class TestGenericCliRoot extends GenericCli {
+  }
+
   @BeforeEach
   public void setup() throws IOException {
     scmClient = mock(ScmClient.class);
@@ -94,6 +100,7 @@ public class TestReconcileSubcommand {
 
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
+    ExitUtils.disableSystemExit();
   }
 
   @AfterEach
@@ -101,6 +108,7 @@ public class TestReconcileSubcommand {
     System.setOut(originalOut);
     System.setErr(originalErr);
     System.setIn(originalIn);
+    ExitUtils.clear();
   }
 
   @Test
@@ -331,10 +339,7 @@ public class TestReconcileSubcommand {
         new AccessControlException("Client cannot authenticate via:[KERBEROS]"));
     doThrow(authWrapped).when(scmClient).reconcileContainer(1L);
 
-    RuntimeException thrown =
-        assertThrows(RuntimeException.class, () -> executeReconcileFromArgs(1, 2));
-
-    assertThat(thrown.getMessage()).contains("Failed to trigger reconciliation for 1 container");
+    assertThrows(ExitException.class, () -> executeReconcileFromArgs(1, 2));
 
     verify(scmClient, times(1)).reconcileContainer(1L);
     verify(scmClient, never()).reconcileContainer(2L);
@@ -413,7 +418,13 @@ public class TestReconcileSubcommand {
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
 
     ReconcileSubcommand cmd = new ReconcileSubcommand();
-    new CommandLine(cmd).parseArgs(args);
+    TestGenericCliRoot root = new TestGenericCliRoot();
+    CommandLine commandLine = new CommandLine(root);
+    commandLine.addSubcommand("reconcile", cmd);
+    String[] fullArgs = new String[args.length + 1];
+    fullArgs[0] = "reconcile";
+    System.arraycopy(args, 0, fullArgs, 1, args.length);
+    commandLine.parseArgs(fullArgs);
     cmd.execute(scmClient);
   }
 

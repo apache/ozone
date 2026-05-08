@@ -58,8 +58,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
 
   private enum StatusProcessing {
     OK,
-    FAILED_CONTINUE,
-    FAILED_ABORT_AUTH
+    FAILED_CONTINUE
   }
 
   private static boolean isAuthenticationFailure(Throwable t) {
@@ -89,9 +88,6 @@ public class ReconcileSubcommand extends ScmSubcommand {
             printReconciliationStatus(scmClient, containerID, arrayWriter, errorBuilder);
         if (outcome != StatusProcessing.OK) {
           failureCount++;
-          if (outcome == StatusProcessing.FAILED_ABORT_AUTH) {
-            break;
-          }
         }
       }
       arrayWriter.flush();
@@ -129,11 +125,13 @@ public class ReconcileSubcommand extends ScmSubcommand {
       arrayWriter.write(new ContainerWrapper(containerInfo, replicas));
       arrayWriter.flush();
     } catch (Exception ex) {
+      if (isAuthenticationFailure(ex)) {
+        rootCommand().printError(ex);
+      }
       errorBuilder.append("Failed to get reconciliation status of container ")
-          .append(containerID).append(": ").append(getExceptionMessage(ex)).append(System.lineSeparator());
-      return isAuthenticationFailure(ex)
-          ? StatusProcessing.FAILED_ABORT_AUTH
-          : StatusProcessing.FAILED_CONTINUE;
+          .append(containerID).append(": ").append(getExceptionMessage(ex))
+          .append(System.lineSeparator());
+      return StatusProcessing.FAILED_CONTINUE;
     }
     return StatusProcessing.OK;
   }
@@ -147,11 +145,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
         System.out.println("Reconciliation has been triggered for container " + containerID);
         successCount++;
       } catch (Exception ex) {
-        System.err.println(getExceptionMessage(ex));
+        rootCommand().printError(ex);
         failureCount++;
-        if (isAuthenticationFailure(ex)) {
-          break;
-        }
       }
     }
 

@@ -97,7 +97,7 @@ public abstract class GenericCli implements GenericParentCommand {
     String aclLine = HddsUtils.formatAccessControlExceptionLine(error);
     if (aclLine != null) {
       cmd.getErr().println(aclLine);
-      return;
+      ExitUtils.terminate(EXECUTION_ERROR_EXIT_CODE, aclLine, null);
     }
     if (error instanceof FileSystemException) {
       String errorMessage = handleFileSystemException((FileSystemException) error);
