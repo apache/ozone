@@ -64,10 +64,6 @@ public class InfoSubcommand extends ScmSubcommand {
 
   private boolean multiContainer = false;
 
-  private static boolean isAuthenticationFailure(Throwable t) {
-    return HddsUtils.formatAccessControlExceptionLine(t) != null;
-  }
-
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     // validate all container IDs and fail fast
@@ -81,9 +77,7 @@ public class InfoSubcommand extends ScmSubcommand {
       if (!first) {
         printBreak();
       }
-      if (printDetails(scmClient, containerID)) {
-        break;
-      }
+      printDetails(scmClient, containerID);
       first = false;
     }
     printFooter();
@@ -113,14 +107,14 @@ public class InfoSubcommand extends ScmSubcommand {
     }
   }
 
-  private boolean printDetails(ScmClient scmClient, long containerID) throws IOException {
+  private void printDetails(ScmClient scmClient, long containerID) throws IOException {
     final ContainerWithPipeline container;
     try {
       container = scmClient.getContainerWithPipeline(containerID);
       Objects.requireNonNull(container, "Container cannot be null");
     } catch (IOException e) {
       rootCommand().printError(e);
-      return isAuthenticationFailure(e);
+      return;
     }
 
     List<ContainerReplicaInfo> replicas = null;
@@ -128,9 +122,6 @@ public class InfoSubcommand extends ScmSubcommand {
       replicas = scmClient.getContainerReplicas(containerID);
     } catch (IOException e) {
       rootCommand().printError(e);
-      if (isAuthenticationFailure(e)) {
-        return true;
-      }
     }
 
     if (json) {
@@ -166,9 +157,9 @@ public class InfoSubcommand extends ScmSubcommand {
         if (SCMHAUtils.unwrapException(
             ioe) instanceof PipelineNotFoundException) {
           System.out.println("Write Pipeline State: CLOSED");
-        } else if (isAuthenticationFailure(ioe)) {
+        } else if (HddsUtils.formatAccessControlExceptionLine(ioe) != null) {
           rootCommand().printError(ioe);
-          return true;
+          return;
         } else {
           printError("Failed to retrieve pipeline info");
         }
@@ -191,7 +182,6 @@ public class InfoSubcommand extends ScmSubcommand {
         System.out.printf("Replicas: [%s]%n", replicaStr);
       }
     }
-    return false;
   }
 
   private static String buildDatanodeDetails(DatanodeDetails details) {

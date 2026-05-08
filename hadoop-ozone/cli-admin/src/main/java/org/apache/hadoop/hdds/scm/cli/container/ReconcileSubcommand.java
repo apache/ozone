@@ -56,11 +56,6 @@ public class ReconcileSubcommand extends ScmSubcommand {
       description = "Display the reconciliation status of this container's replicas")
   private boolean status;
 
-  private enum StatusProcessing {
-    OK,
-    FAILED_CONTINUE
-  }
-
   private static boolean isAuthenticationFailure(Throwable t) {
     return HddsUtils.formatAccessControlExceptionLine(t) != null;
   }
@@ -84,9 +79,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
       // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
       // processing the remaining containers.
       for (Long containerID : containerIDs) {
-        StatusProcessing outcome =
-            printReconciliationStatus(scmClient, containerID, arrayWriter, errorBuilder);
-        if (outcome != StatusProcessing.OK) {
+        if (!printReconciliationStatus(scmClient, containerID, arrayWriter, errorBuilder)) {
           failureCount++;
         }
       }
@@ -105,21 +98,21 @@ public class ReconcileSubcommand extends ScmSubcommand {
     }
   }
 
-  private StatusProcessing printReconciliationStatus(ScmClient scmClient, long containerID,
-                                                     SequenceWriter arrayWriter, StringBuilder errorBuilder) {
+  private boolean printReconciliationStatus(ScmClient scmClient, long containerID, SequenceWriter arrayWriter,
+                                             StringBuilder errorBuilder) {
     try {
       ContainerInfo containerInfo = scmClient.getContainer(containerID);
       if (containerInfo.isOpen()) {
         errorBuilder.append("Cannot get status of container ").append(containerID)
             .append(". Reconciliation is not supported for open containers")
             .append(System.lineSeparator());
-        return StatusProcessing.FAILED_CONTINUE;
+        return false;
       }
       if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
         errorBuilder.append("Cannot get status of container ").append(containerID)
             .append(". Reconciliation is only supported for Ratis replicated containers")
             .append(System.lineSeparator());
-        return StatusProcessing.FAILED_CONTINUE;
+        return false;
       }
       List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(containerID);
       arrayWriter.write(new ContainerWrapper(containerInfo, replicas));
@@ -131,9 +124,9 @@ public class ReconcileSubcommand extends ScmSubcommand {
       errorBuilder.append("Failed to get reconciliation status of container ")
           .append(containerID).append(": ").append(getExceptionMessage(ex))
           .append(System.lineSeparator());
-      return StatusProcessing.FAILED_CONTINUE;
+      return false;
     }
-    return StatusProcessing.OK;
+    return true;
   }
 
   private void executeReconcile(ScmClient scmClient) {
@@ -166,12 +159,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
    * display that to the user.
    */
   private String getExceptionMessage(Exception ex) {
-    String aclLine = HddsUtils.formatAccessControlExceptionLine(ex);
-    if (aclLine != null) {
-      return aclLine;
-    }
     return ex.getMessage().split("\n", 2)[0];
-
   }
 
   /**
