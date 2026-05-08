@@ -164,7 +164,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     CreateFileRequest createFileRequest = getOmRequest().getCreateFileRequest();
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
@@ -280,13 +281,13 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          dbOpenKeyName, omKeyInfo, trxnLogIndex);
+          dbOpenKeyName, omKeyInfo, cacheEpoch);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
           bucketName, omBucketInfo.getBucketLayout(),
-          null, missingParentInfos, trxnLogIndex);
+          null, missingParentInfos, cacheEpoch);
 
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()

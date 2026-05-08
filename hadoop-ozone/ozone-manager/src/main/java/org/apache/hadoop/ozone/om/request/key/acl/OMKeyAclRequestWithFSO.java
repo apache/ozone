@@ -58,7 +58,8 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     OmKeyInfo omKeyInfo = null;
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
@@ -135,12 +136,12 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
         Table<String, OmDirectoryInfo> dirTable =
             omMetadataManager.getDirectoryTable();
         dirTable.addCacheEntry(new CacheKey<>(dbKey),
-            CacheValue.get(trxnLogIndex,
+            CacheValue.get(cacheEpoch,
                 OMFileRequest.getDirectoryInfo(omKeyInfo)));
       } else {
         omMetadataManager.getKeyTable(getBucketLayout())
             .addCacheEntry(new CacheKey<>(dbKey),
-                CacheValue.get(trxnLogIndex, omKeyInfo));
+                CacheValue.get(cacheEpoch, omKeyInfo));
       }
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
           isDirectory, volumeId, bucketId);

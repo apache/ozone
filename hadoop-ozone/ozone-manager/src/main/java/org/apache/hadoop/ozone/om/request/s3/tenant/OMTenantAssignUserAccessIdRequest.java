@@ -189,7 +189,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
   @Override
   @SuppressWarnings("checkstyle:methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
 
@@ -278,7 +279,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
-          CacheValue.get(transactionLogIndex, omDBAccessIdInfo));
+          CacheValue.get(cacheEpoch, omDBAccessIdInfo));
 
       // Add to principalToAccessIdsTable
       if (principalInfo == null) {
@@ -290,7 +291,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       }
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal),
-          CacheValue.get(transactionLogIndex, principalInfo));
+          CacheValue.get(cacheEpoch, principalInfo));
 
       // Expect accessId absence from S3SecretTable
       ozoneManager.getS3SecretManager()

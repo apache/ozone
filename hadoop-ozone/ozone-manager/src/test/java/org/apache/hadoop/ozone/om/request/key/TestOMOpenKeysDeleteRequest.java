@@ -345,6 +345,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         .updateOpenKeyTableCache(
             any(OzoneManager.class),
             anyLong(),
+            anyLong(),
             any(OpenKeyBucket.class),
             anyMap());
 

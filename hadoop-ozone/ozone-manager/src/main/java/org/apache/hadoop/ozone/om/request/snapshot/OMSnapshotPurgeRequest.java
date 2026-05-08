@@ -75,7 +75,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OmSnapshotInternalMetrics omSnapshotIntMetrics = ozoneManager.getOmSnapshotIntMetrics();
 
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long cacheEpoch = context.getCacheEpoch();
 
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
@@ -113,13 +113,13 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null : SnapshotUtils.getNextSnapshot(ozoneManager,
             snapshotChainManager, nextSnapshot);
         // Step 1: Update the deep clean flag for the next snapshot
-        updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);
-        updateSnapshotInfoAndCache(nextToNextSnapshot, omMetadataManager, trxnLogIndex);
+        updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, cacheEpoch);
+        updateSnapshotInfoAndCache(nextToNextSnapshot, omMetadataManager, cacheEpoch);
         // Step 2: Update the snapshot chain.
-        updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, trxnLogIndex);
+        updateSnapshotChainAndCache(omMetadataManager, fromSnapshot, cacheEpoch);
         // Step 3: Purge the snapshot from SnapshotInfoTable cache and also remove from the map.
         omMetadataManager.getSnapshotInfoTable()
-            .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
+            .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(cacheEpoch));
         updatedSnapshotInfos.remove(fromSnapshot.getTableKey());
       }
       // Update the snapshotInfo lastTransactionInfo.
@@ -158,7 +158,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
   }
 
   private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo, OmMetadataManagerImpl omMetadataManager,
-                                          long trxnLogIndex) throws IOException {
+                                          long cacheEpoch) throws IOException {
     if (snapInfo != null) {
       // Setting next snapshot deep clean to false, Since the
       // current snapshot is deleted. We can potentially
@@ -168,7 +168,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapInfo.getTableKey()),
-          CacheValue.get(trxnLogIndex, snapInfo));
+          CacheValue.get(cacheEpoch, snapInfo));
       updatedSnapshotInfos.put(snapInfo.getTableKey(), snapInfo);
     }
   }
@@ -182,7 +182,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
   private void updateSnapshotChainAndCache(
       OmMetadataManagerImpl metadataManager,
       SnapshotInfo snapInfo,
-      long trxnLogIndex
+      long cacheEpoch
   ) throws IOException {
     if (snapInfo == null) {
       return;
@@ -227,7 +227,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       nextPathSnapInfo.setPathPreviousSnapshotId(snapInfo.getPathPreviousSnapshotId());
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(nextPathSnapInfo.getTableKey()),
-          CacheValue.get(trxnLogIndex, nextPathSnapInfo));
+          CacheValue.get(cacheEpoch, nextPathSnapInfo));
     }
 
     SnapshotInfo nextGlobalSnapInfo =
@@ -237,7 +237,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       nextGlobalSnapInfo.setGlobalPreviousSnapshotId(snapInfo.getGlobalPreviousSnapshotId());
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(nextGlobalSnapInfo.getTableKey()),
-          CacheValue.get(trxnLogIndex, nextGlobalSnapInfo));
+          CacheValue.get(cacheEpoch, nextGlobalSnapInfo));
     }
 
     snapshotChainManager.deleteSnapshot(snapInfo);

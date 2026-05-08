@@ -90,7 +90,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   @Override @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     DeleteKeysRequest deleteKeyRequest = getOmRequest().getDeleteKeysRequest();
 
     OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
@@ -193,7 +194,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
       Pair<Long, Integer> quotaReleasedEmptyKeys =
-          markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
+          markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, cacheEpoch, omKeyInfoList,
               dirList, omMetadataManager, openKeyInfoMap);
       omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
       // For empty keyInfos the quota should be released and not added to namespace.
@@ -304,7 +305,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   }
 
   protected Pair<Long, Integer> markKeysAsDeletedInCache(OzoneManager ozoneManager,
-      long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
+      long trxnLogIndex, long cacheEpoch, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap)
           throws IOException {
     int emptyKeys = 0;
@@ -315,7 +316,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       String keyName = omKeyInfo.getKeyName();
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
-          CacheValue.get(trxnLogIndex));
+          CacheValue.get(cacheEpoch));
 
       omKeyInfo = omKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
@@ -334,7 +335,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         if (openKeyInfo != null) {
           openKeyInfo = openKeyInfo.withMetadataMutations(
               metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
+          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, cacheEpoch);
           // Add to the map of open keys to be deleted.
           openKeyInfoMap.put(dbOpenKey, openKeyInfo);
         } else {

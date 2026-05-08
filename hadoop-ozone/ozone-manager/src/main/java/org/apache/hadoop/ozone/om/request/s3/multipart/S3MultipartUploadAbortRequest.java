@@ -97,7 +97,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     MultipartUploadAbortRequest multipartUploadAbortRequest = getOmRequest()
         .getAbortMultiPartUploadRequest();
@@ -186,10 +187,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // in delete table are not used by any read/write operations.
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(multipartOpenKey),
-              CacheValue.get(trxnLogIndex));
+              CacheValue.get(cacheEpoch));
       omMetadataManager.getMultipartInfoTable()
           .addCacheEntry(new CacheKey<>(multipartKey),
-              CacheValue.get(trxnLogIndex));
+              CacheValue.get(cacheEpoch));
 
       omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
           multipartKey, multipartOpenKey, omResponse, omBucketInfo);

@@ -69,7 +69,8 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     CreateDirectoryRequest createDirectoryRequest = getOmRequest()
         .getCreateDirectoryRequest();
@@ -154,7 +155,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             omPathInfo.getLastKnownParentId(), trxnLogIndex,
             omBucketInfo, omPathInfo, ozoneManager.getConfig());
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-            volumeId, bucketId, trxnLogIndex,
+            volumeId, bucketId, cacheEpoch,
             missingParentInfos, dirInfo);
 
         result = OMDirectoryCreateRequest.Result.SUCCESS;

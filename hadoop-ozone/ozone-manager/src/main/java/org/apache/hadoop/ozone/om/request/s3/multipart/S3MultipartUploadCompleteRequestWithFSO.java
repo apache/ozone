@@ -115,12 +115,12 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
   @Override
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
-      String ozoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex)
+      String ozoneKey, OmKeyInfo omKeyInfo, long cacheEpoch)
       throws IOException {
 
     // Add key entry to file table.
     OMFileRequest.addFileTableCacheEntry(omMetadataManager, ozoneKey, omKeyInfo,
-        omKeyInfo.getFileName(), transactionLogIndex);
+        omKeyInfo.getFileName(), cacheEpoch);
   }
 
   @Override

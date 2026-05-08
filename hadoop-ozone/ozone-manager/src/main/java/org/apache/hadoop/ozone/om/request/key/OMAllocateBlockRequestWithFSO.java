@@ -72,7 +72,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     AllocateBlockRequest allocateBlockRequest =
             getOmRequest().getAllocateBlockRequest();
@@ -167,7 +168,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
           .build();
 
       // Add to cache.
-      addOpenTableCacheEntry(trxnLogIndex, omMetadataManager, openKeyName, keyName,
+      addOpenTableCacheEntry(cacheEpoch, omMetadataManager, openKeyName, keyName,
               openKeyInfo);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
@@ -221,11 +222,11 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
           .build().getOpenFileName(clientID);
   }
 
-  private void addOpenTableCacheEntry(long trxnLogIndex,
+  private void addOpenTableCacheEntry(long cacheEpoch,
       OMMetadataManager omMetadataManager, String openKeyName, String keyName,
       OmKeyInfo openKeyInfo) {
     OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, openKeyName,
-        openKeyInfo, keyName, trxnLogIndex);
+        openKeyInfo, keyName, cacheEpoch);
   }
 
   @Nonnull

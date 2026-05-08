@@ -77,7 +77,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
@@ -142,7 +143,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-          CacheValue.get(transactionLogIndex, omVolumeArgs));
+          CacheValue.get(cacheEpoch, omVolumeArgs));
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().build());

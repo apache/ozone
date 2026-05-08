@@ -87,7 +87,8 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     PutObjectTaggingRequest putObjectTaggingRequest = getOmRequest().getPutObjectTaggingRequest();
 
@@ -138,7 +139,7 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
       // Update table cache
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOzoneKey),
-          CacheValue.get(trxnLogIndex, omKeyInfo)
+          CacheValue.get(cacheEpoch, omKeyInfo)
       );
 
       omClientResponse = new S3PutObjectTaggingResponse(

@@ -184,7 +184,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketCreates();
 
@@ -277,9 +278,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       // Update table cache.
       metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-          CacheValue.get(transactionLogIndex, omVolumeArgs));
+          CacheValue.get(cacheEpoch, omVolumeArgs));
       metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-          CacheValue.get(transactionLogIndex, omBucketInfo));
+          CacheValue.get(cacheEpoch, omBucketInfo));
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());

@@ -61,7 +61,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     // protobuf guarantees acls are non-null.
     List<OzoneAcl> ozoneAcls = getAcls();
@@ -131,7 +132,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
         // update cache.
         omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(dbBucketKey),
-            CacheValue.get(transactionLogIndex, omBucketInfo));
+            CacheValue.get(cacheEpoch, omBucketInfo));
       }
 
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);

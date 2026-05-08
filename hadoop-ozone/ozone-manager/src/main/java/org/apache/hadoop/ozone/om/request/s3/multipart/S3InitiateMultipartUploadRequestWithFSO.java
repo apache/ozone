@@ -67,7 +67,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
 
@@ -200,16 +201,16 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              volumeId, bucketId, transactionLogIndex,
+              volumeId, bucketId, cacheEpoch,
               missingParentInfos, null);
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
           multipartOpenKey, omKeyInfo, keyName,
-              transactionLogIndex);
+              cacheEpoch);
 
       // Add to cache
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
-          multipartKey, multipartKeyInfo, transactionLogIndex);
+          multipartKey, multipartKeyInfo, cacheEpoch);
 
       omClientResponse =
           new S3InitiateMultipartUploadResponseWithFSO(

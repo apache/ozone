@@ -55,7 +55,8 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     // protobuf guarantees volume and acls are non-null.
     String volume = getVolumeName();
     List<OzoneAcl> ozoneAcls = getAcls();
@@ -106,7 +107,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
         // update cache.
         omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-            CacheValue.get(trxnLogIndex, omVolumeArgs));
+            CacheValue.get(cacheEpoch, omVolumeArgs));
       }
 
       omClientResponse = onSuccess(omResponse, omVolumeArgs, applyAcl);

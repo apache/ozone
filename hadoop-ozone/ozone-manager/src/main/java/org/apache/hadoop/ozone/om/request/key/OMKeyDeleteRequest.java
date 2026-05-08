@@ -105,7 +105,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
@@ -157,7 +158,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(
               omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
-          CacheValue.get(trxnLogIndex));
+          CacheValue.get(cacheEpoch));
 
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -179,7 +180,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         if (openKeyInfo != null) {
           openKeyInfo = openKeyInfo.withMetadataMutations(
               metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
+          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, cacheEpoch);
           deletedOpenKeyInfo = openKeyInfo;
         } else {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);

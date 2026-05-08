@@ -114,7 +114,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     CreateDirectoryRequest createDirectoryRequest = getOmRequest()
         .getCreateDirectoryRequest();
@@ -192,7 +193,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, omBucketInfo.getBucketLayout(),
-            dirKeyInfo, missingParentInfos, trxnLogIndex);
+            dirKeyInfo, missingParentInfos, cacheEpoch);
         
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),

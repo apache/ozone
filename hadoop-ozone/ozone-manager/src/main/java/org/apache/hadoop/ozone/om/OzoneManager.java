@@ -1844,6 +1844,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       for (File ratisGroupDir : ratisDirFiles) {
         if (ratisGroupDir.isDirectory()) {
           if (!ratisGroupDir.getName().equals(groupIDfromServiceID)) {
+            // In multi-raft mode bucket-group dirs (UUIDs derived from
+            // bucket-group indices) coexist with the main service-id dir on
+            // disk, so a non-matching name is expected and not a config drift.
+            if (isMultiRaftEnabled) {
+              continue;
+            }
             throw new IOException("Ratis group Dir on disk "
                 + ratisGroupDir.getName() + " does not match with RaftGroupID"
                 + groupIDfromServiceID + " generated from service id "
@@ -2063,11 +2069,30 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metadataManager.start(configuration);
 
+    // Restore the in-memory bucket→raft-group assignments from the persisted
+    // bucket table before Ratis starts. Otherwise the map starts empty and any
+    // write for an already-assigned bucket would trigger a fresh assignment to
+    // a different group, causing the cross-group updateID divergence under
+    // restart-during-load scenarios.
+    if (omRaftGroupManager != null) {
+      omRaftGroupManager.initBucketMap();
+    }
+
     startSecretManagerIfNecessary();
 //    cleanUpRaftGroupsTransactions();
     // Start Ratis services
     if (omRatisServer != null) {
       omRatisServer.start();
+    }
+
+    // Idempotent safe-mode signal for restart. Without this, the bucketGroupsReady
+    // flag stays false forever after an OM restart — onBucketRaftGroupsReady() is
+    // otherwise only fired from createRaftGroupForBucket on the apply path of a
+    // fresh CreateBucketRaftGroups transaction, which doesn't re-apply on restart.
+    // The bucket raft groups themselves are loaded from disk by Ratis at startup,
+    // so once start() returns and the count matches, it's safe to leave safe mode.
+    if (omSafeModeManager != null && bucketRaftGroupsCreated()) {
+      omSafeModeManager.onBucketRaftGroupsReady();
     }
 
     Integer layoutVersionInDB = getLayoutVersionInDB();

@@ -106,7 +106,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
@@ -210,7 +211,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          CacheValue.get(transactionLogIndex, omBucketInfo));
+          CacheValue.get(cacheEpoch, omBucketInfo));
 
       omResponse.setSetBucketPropertyResponse(
           SetBucketPropertyResponse.newBuilder().build());

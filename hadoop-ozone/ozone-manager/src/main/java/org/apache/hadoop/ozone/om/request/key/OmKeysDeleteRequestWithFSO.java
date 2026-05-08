@@ -89,7 +89,8 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
   @Override
   protected Pair<Long, Integer> markKeysAsDeletedInCache(
-      OzoneManager ozoneManager, long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
+      OzoneManager ozoneManager, long trxnLogIndex, long cacheEpoch, List<OmKeyInfo> omKeyInfoList,
+      List<OmKeyInfo> dirList,
       OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap) throws IOException {
     long quotaReleased = 0L;
     int emptyKeys = 0;
@@ -107,7 +108,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
           volumeId, bucketId, parentId, fileName);
       omMetadataManager.getKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(dbKey),
-              CacheValue.get(trxnLogIndex));
+              CacheValue.get(cacheEpoch));
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
       final OmKeyInfo updatedOmKeyInfo = omKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
@@ -127,7 +128,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
         if (openKeyInfo != null) {
           final OmKeyInfo updatedOpenKeyInfo = openKeyInfo.withMetadataMutations(
               metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-          openKeyTable.addCacheEntry(dbOpenKey, updatedOpenKeyInfo, trxnLogIndex);
+          openKeyTable.addCacheEntry(dbOpenKey, updatedOpenKeyInfo, cacheEpoch);
           // Add to the map of open keys to be deleted.
           openKeyInfoMap.put(dbOpenKey, updatedOpenKeyInfo);
         } else {
@@ -150,7 +151,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
           volumeId, bucketId, parentId, dirName);
       omMetadataManager.getDirectoryTable()
           .addCacheEntry(new CacheKey<>(dbDirKey),
-            CacheValue.get(trxnLogIndex));
+            CacheValue.get(cacheEpoch));
 
       final OmKeyInfo updatedDirInfo = dirInfo.toBuilder()
           .setUpdateID(trxnLogIndex)

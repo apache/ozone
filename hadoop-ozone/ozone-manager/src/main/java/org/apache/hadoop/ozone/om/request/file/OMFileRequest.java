@@ -400,7 +400,6 @@ public final class OMFileRequest {
    * @param bucketName
    * @param keyInfo
    * @param parentInfoList
-   * @param index
    *
    * TODO : move code to a separate utility class.
    */
@@ -408,19 +407,19 @@ public final class OMFileRequest {
       OMMetadataManager omMetadataManager, String volumeName,
       String bucketName, BucketLayout layout,
       OmKeyInfo keyInfo, List<OmKeyInfo> parentInfoList,
-      long index) throws IOException {
+      long cacheEpoch) throws IOException {
     final Table<String, OmKeyInfo> table
         = omMetadataManager.getKeyTable(layout);
     for (OmKeyInfo parentInfo : parentInfoList) {
       table.addCacheEntry(omMetadataManager.getOzoneKey(
           volumeName, bucketName, parentInfo.getKeyName()),
-          parentInfo, index);
+          parentInfo, cacheEpoch);
     }
 
     if (keyInfo != null) {
       table.addCacheEntry(omMetadataManager.getOzoneKey(
           volumeName, bucketName, keyInfo.getKeyName()),
-          keyInfo, index);
+          keyInfo, cacheEpoch);
     }
   }
 
@@ -430,13 +429,12 @@ public final class OMFileRequest {
    * @param omMetadataManager  OM Metadata Manager
    * @param volumeId           ID of the Volume
    * @param bucketId           ID of the Bucket
-   * @param trxnLogIndex       transaction log index
    * @param missingParentInfos list of the parents to be added to DB
    * @param dirInfo            directory info
    */
   public static void addDirectoryTableCacheEntries(
           OMMetadataManager omMetadataManager,
-          long volumeId, long bucketId, long trxnLogIndex,
+          long volumeId, long bucketId, long cacheEpoch,
           List<OmDirectoryInfo> missingParentInfos,
           OmDirectoryInfo dirInfo) {
 
@@ -445,13 +443,13 @@ public final class OMFileRequest {
     for (OmDirectoryInfo subDirInfo : missingParentInfos) {
       table.addCacheEntry(omMetadataManager.getOzonePathKey(
           volumeId, bucketId, subDirInfo),
-          subDirInfo, trxnLogIndex);
+          subDirInfo, cacheEpoch);
     }
 
     if (dirInfo != null) {
       table.addCacheEntry(omMetadataManager.getOzonePathKey(
           volumeId, bucketId, dirInfo),
-          dirInfo, trxnLogIndex);
+          dirInfo, cacheEpoch);
     }
   }
 
@@ -461,11 +459,10 @@ public final class OMFileRequest {
    * @param omMetadataManager OM Metadata Manager
    * @param dbOpenFileName    open file name key
    * @param omFileInfo        key info
-   * @param trxnLogIndex      transaction log index
    */
   public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
-          @Nullable OmKeyInfo omFileInfo, String keyName, long trxnLogIndex) {
+          @Nullable OmKeyInfo omFileInfo, String keyName, long cacheEpoch) {
 
     final Table<String, OmKeyInfo> table = omMetadataManager.getOpenKeyTable(
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -475,9 +472,9 @@ public final class OMFileRequest {
       // This is required as in some cases like hsync, Keys inside openKeyTable is used for auto commit after expiry.
       // (Full key path is required in commit key request)
       omFileInfo.setKeyName(keyName);
-      table.addCacheEntry(dbOpenFileName, omFileInfo, trxnLogIndex);
+      table.addCacheEntry(dbOpenFileName, omFileInfo, cacheEpoch);
     } else {
-      table.addCacheEntry(dbOpenFileName, trxnLogIndex);
+      table.addCacheEntry(dbOpenFileName, cacheEpoch);
     }
   }
 

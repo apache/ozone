@@ -138,7 +138,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -286,7 +287,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             .build();
         openKeyToDelete.setModificationTime(Time.now());
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-            dbOpenKeyToDeleteKey, openKeyToDelete, trxnLogIndex);
+            dbOpenKeyToDeleteKey, openKeyToDelete, cacheEpoch);
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
@@ -392,7 +393,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         // indicating the key is removed from OpenKeyTable.
         // So that this key can't be committed again.
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-            dbOpenKey, trxnLogIndex);
+            dbOpenKey, cacheEpoch);
 
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo = omKeyInfo.withMetadataMutations(metadata -> {
@@ -404,11 +405,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-            dbOpenKey, newOpenKeyInfo, trxnLogIndex);
+            dbOpenKey, newOpenKeyInfo, cacheEpoch);
       }
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-          dbOzoneKey, omKeyInfo, trxnLogIndex);
+          dbOzoneKey, omKeyInfo, cacheEpoch);
 
       omBucketInfo.incrUsedBytes(correctedSpace);
 

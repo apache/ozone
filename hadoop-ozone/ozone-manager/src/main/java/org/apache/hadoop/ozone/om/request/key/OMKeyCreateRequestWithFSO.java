@@ -66,7 +66,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
             getOmRequest().getCreateKeyRequest();
@@ -195,12 +196,12 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-          dbOpenFileName, omFileInfo, keyName, trxnLogIndex);
+          dbOpenFileName, omFileInfo, keyName, cacheEpoch);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              volumeId, bucketId, trxnLogIndex,
+              volumeId, bucketId, cacheEpoch,
               missingParentInfos, null);
 
       // Prepare response. Sets user given full key name in the 'keyName'

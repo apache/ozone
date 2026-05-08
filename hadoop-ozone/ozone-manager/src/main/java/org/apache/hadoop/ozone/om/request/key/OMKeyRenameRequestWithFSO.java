@@ -72,7 +72,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     KeyArgs keyArgs = renameKeyRequest.getKeyArgs();
@@ -176,7 +177,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
           omClientResponse = renameKey(toKeyValue, newToKeyName, fromKeyValue,
               fromKeyName, isRenameDirectory, keyArgs.getModificationTime(),
-              ozoneManager, omResponse, trxnLogIndex);
+              ozoneManager, omResponse, trxnLogIndex, cacheEpoch);
           result = Result.SUCCESS;
         } else {
           // case-6) If destination is a file type and if exists then throws
@@ -194,7 +195,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
         omClientResponse = renameKey(toKeyParent, toKeyName, fromKeyValue,
             fromKeyName, isRenameDirectory, keyArgs.getModificationTime(),
-            ozoneManager, omResponse, trxnLogIndex);
+            ozoneManager, omResponse, trxnLogIndex, cacheEpoch);
 
         result = Result.SUCCESS;
       }
@@ -267,7 +268,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   private OMClientResponse renameKey(OmKeyInfo toKeyParent, String toKeyName,
       OmKeyInfo fromKeyValue, String fromKeyName, boolean isRenameDirectory,
       long modificationTime, OzoneManager ozoneManager,
-      OMResponse.Builder omResponse, long trxnLogIndex) throws IOException {
+      OMResponse.Builder omResponse, long trxnLogIndex, long cacheEpoch) throws IOException {
     final OMMetadataManager ommm = ozoneManager.getMetadataManager();
     final long volumeId = ommm.getVolumeId(fromKeyValue.getVolumeName());
     final long bucketId = ommm.getBucketId(fromKeyValue.getVolumeName(),
@@ -305,7 +306,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
     // Set modification time
     omBucketInfo = setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
-        modificationTime, dirTable, trxnLogIndex);
+        modificationTime, dirTable, cacheEpoch);
     fromKeyParent = OMFileRequest.getKeyParentDir(fromKeyValue.getVolumeName(),
         fromKeyValue.getBucketName(), fromKeyName, ozoneManager, metadataMgr);
     if (fromKeyParent == null && omBucketInfo == null) {
@@ -313,7 +314,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
     }
     omBucketInfo = setModificationTime(ommm, omBucketInfo, fromKeyParent, volumeId,
-        bucketId, modificationTime, dirTable, trxnLogIndex);
+        bucketId, modificationTime, dirTable, cacheEpoch);
 
     // destination dbKeyName
     String dbToKey = ommm.getOzonePathKey(volumeId, bucketId,
@@ -325,20 +326,20 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     // Add from_key and to_key details into cache.
     if (isRenameDirectory) {
       dirTable.addCacheEntry(new CacheKey<>(dbFromKey),
-              CacheValue.get(trxnLogIndex));
+              CacheValue.get(cacheEpoch));
 
       dirTable.addCacheEntry(new CacheKey<>(dbToKey),
-          CacheValue.get(trxnLogIndex,
+          CacheValue.get(cacheEpoch,
               OMFileRequest.getDirectoryInfo(fromKeyValue)));
     } else {
       Table<String, OmKeyInfo> keyTable =
           metadataMgr.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(dbFromKey),
-              CacheValue.get(trxnLogIndex));
+              CacheValue.get(cacheEpoch));
 
       keyTable.addCacheEntry(new CacheKey<>(dbToKey),
-              CacheValue.get(trxnLogIndex, fromKeyValue));
+              CacheValue.get(cacheEpoch, fromKeyValue));
     }
 
     OMClientResponse omClientResponse = new OMKeyRenameResponseWithFSO(
@@ -352,7 +353,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   private OmBucketInfo setModificationTime(OMMetadataManager omMetadataManager,
       OmBucketInfo bucketInfo, OmKeyInfo keyParent,
       long volumeId, long bucketId, long modificationTime,
-      Table<String, OmDirectoryInfo> dirTable, long trxnLogIndex)
+      Table<String, OmDirectoryInfo> dirTable, long cacheEpoch)
       throws OMException {
     // For Filesystem. rename will change renamed file parent directory
     // modification time but not change its modification time.
@@ -361,7 +362,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       String dbToKeyParent = omMetadataManager.getOzonePathKey(volumeId,
           bucketId, keyParent.getParentObjectID(), keyParent.getFileName());
       dirTable.addCacheEntry(new CacheKey<>(dbToKeyParent),
-          CacheValue.get(trxnLogIndex,
+          CacheValue.get(cacheEpoch,
               OMFileRequest.getDirectoryInfo(keyParent)));
       return bucketInfo;
     }
@@ -378,7 +379,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         newBucketInfo.getVolumeName(), newBucketInfo.getBucketName());
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(bucketKey),
-        CacheValue.get(trxnLogIndex, newBucketInfo));
+        CacheValue.get(cacheEpoch, newBucketInfo));
 
     return newBucketInfo;
   }

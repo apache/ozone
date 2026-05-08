@@ -52,7 +52,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     OmPrefixInfo omPrefixInfo = null;
 
@@ -122,12 +123,12 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
           omPrefixInfo.getAcls().isEmpty()) {
         omMetadataManager.getPrefixTable().addCacheEntry(
             new CacheKey<>(prefixPath),
-            CacheValue.get(trxnLogIndex));
+            CacheValue.get(cacheEpoch));
       } else {
         // update cache.
         omMetadataManager.getPrefixTable().addCacheEntry(
             new CacheKey<>(prefixPath),
-            CacheValue.get(trxnLogIndex, omPrefixInfo));
+            CacheValue.get(cacheEpoch, omPrefixInfo));
       }
 
       opResult  = operationResult.isSuccess();

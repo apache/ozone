@@ -76,7 +76,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -208,7 +209,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             .build();
         openKeyToDelete.setModificationTime(Time.now());
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenKeyToDeleteKey, openKeyToDelete, keyName, trxnLogIndex);
+            dbOpenKeyToDeleteKey, openKeyToDelete, keyName, cacheEpoch);
       }
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
@@ -331,7 +332,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         // indicating the key is removed from OpenKeyTable.
         // So that this key can't be committed again.
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, null, keyName, trxnLogIndex);
+            dbOpenFileKey, null, keyName, cacheEpoch);
 
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo = omKeyInfo.withMetadataMutations(
@@ -343,7 +344,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, newOpenKeyInfo, keyName, trxnLogIndex);
+            dbOpenFileKey, newOpenKeyInfo, keyName, cacheEpoch);
       }
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,

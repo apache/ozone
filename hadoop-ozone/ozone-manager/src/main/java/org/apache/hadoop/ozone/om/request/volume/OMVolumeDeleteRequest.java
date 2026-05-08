@@ -59,7 +59,8 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     DeleteVolumeRequest deleteVolumeRequest =
         getOmRequest().getDeleteVolumeRequest();
@@ -125,10 +126,10 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
           transactionLogIndex);
 
       omMetadataManager.getUserTable().addCacheEntry(new CacheKey<>(dbUserKey),
-          CacheValue.get(transactionLogIndex, newVolumeList));
+          CacheValue.get(cacheEpoch, newVolumeList));
 
       omMetadataManager.getVolumeTable().addCacheEntry(
-          new CacheKey<>(dbVolumeKey), CacheValue.get(transactionLogIndex));
+          new CacheKey<>(dbVolumeKey), CacheValue.get(cacheEpoch));
 
       omResponse.setDeleteVolumeResponse(
           DeleteVolumeResponse.newBuilder().build());

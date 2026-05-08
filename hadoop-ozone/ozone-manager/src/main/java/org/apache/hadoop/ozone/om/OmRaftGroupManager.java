@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,8 +39,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -121,6 +125,49 @@ public class OmRaftGroupManager {
     } finally {
       bucketRaftGroupWriteLock.unlock();
     }
+  }
+
+  /**
+   * Restores the in-memory bucket→raft-group map from the persisted bucket
+   * table, treating {@code OmBucketInfo.getRaftGroup()} as the source of
+   * truth.
+   *
+   * <p>Why this exists: the in-memory map is otherwise populated only by
+   * replaying {@code OMBucketRaftGroupAssignRequest} transactions from the
+   * main raft group's log. After log compaction or a snapshot install,
+   * those replay events are no longer available, so an OM that restarts
+   * (or is rebuilt from a snapshot) would otherwise come up with an empty
+   * map and see writes for already-assigned buckets as "unassigned" — which
+   * triggers a fresh assignment to a different group, producing the
+   * cross-group {@code updateID} divergence we observed.
+   *
+   * <p>Idempotent — safe to call multiple times. {@code putIfAbsent} inside
+   * {@link #defineAndGetRaftGroupForBucket} guarantees we don't double-count
+   * usage on retries.
+   */
+  public void initBucketMap() {
+    if (!multiRaftEnabled) {
+      return;
+    }
+    int restored = 0;
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> it =
+        metadataManager.getBucketIterator();
+    while (it.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry = it.next();
+      OmBucketInfo bucketInfo = entry.getValue().getCacheValue();
+      if (bucketInfo == null) {
+        continue;
+      }
+      UUID raftGroup = bucketInfo.getRaftGroup();
+      if (raftGroup == null) {
+        continue;
+      }
+      String bucketKey = metadataManager.getBucketKey(
+          bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+      defineAndGetRaftGroupForBucket(bucketKey, raftGroup);
+      restored++;
+    }
+    LOG.info("Restored {} bucket→raft-group assignments from bucket table.", restored);
   }
 
   public void incrRaftGroupUsageCounter(RaftGroupId raftGroupId) {
@@ -375,8 +422,15 @@ public class OmRaftGroupManager {
       try {
         LOG.info("Waiting for group initiating {}-{}. {}", bucketsPerRaftGroupCounter.size(), omRaftGroupCount,
             bucketsPerRaftGroupCounter);
-        wait(1000);
+        // Plain sleep rather than Object.wait() — there is no synchronized
+        // block around this call, and no other code calls notify() on this
+        // monitor anyway. Object.wait() without holding the monitor throws
+        // IllegalMonitorStateException, which previously surfaced on RPC
+        // handler threads when the bucket-group registry hadn't fully
+        // initialized at the time of an early write request.
+        Thread.sleep(1000);
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new RuntimeException(e);
       }
     }
@@ -443,11 +497,32 @@ public class OmRaftGroupManager {
     return RaftGroupId.valueOf(groupUuid);
   }
 
+  /**
+   * Called from {@code BucketStateMachine.notifyGroupRemove} when Ratis is
+   * tearing down this bucket raft group on the local OM.
+   *
+   * <p>Crucially, this does <strong>not</strong> clear the {@code bucketRaftGroups}
+   * map. {@code OmBucketInfo.getRaftGroup()} is the persisted source of truth
+   * for which raft group owns each bucket; silently wiping the in-memory map
+   * here causes the next write to that bucket to be re-routed to a freshly
+   * picked group, which then writes to the shared keyTable with a low
+   * per-group log index. Meanwhile the old group's still-pending log entries
+   * (replayed after a leader change or follower catch-up) try to write to the
+   * same keys with even lower indices, blowing up
+   * {@code WithObjectID.validate}'s monotonic-{@code updateID} assertion and
+   * terminating the BucketStateMachine.
+   *
+   * <p>By keeping the assignment, a write to a bucket whose group is genuinely
+   * gone fails loudly at the raft routing layer (no leader / group not found)
+   * rather than silently corrupting state. Reassignment must be deliberate —
+   * via a fresh {@code OMBucketRaftGroupAssignRequest} which overwrites the
+   * entry — and ideally drained first.
+   *
+   * <p>The per-group usage counter <em>is</em> cleared, since it's only used
+   * to load-balance future <em>new</em> bucket assignments and a removed
+   * group must not be considered.
+   */
   public void removeGroup(RaftGroupId raftGroupId) {
-    bucketRaftGroups.entrySet().stream()
-            .filter(e -> e.getValue().equals(raftGroupId.getUuid()))
-            .map(Map.Entry::getKey)
-            .forEach(bucketRaftGroups::remove);
     bucketsPerRaftGroupCounter.remove(raftGroupId.getUuid());
   }
 

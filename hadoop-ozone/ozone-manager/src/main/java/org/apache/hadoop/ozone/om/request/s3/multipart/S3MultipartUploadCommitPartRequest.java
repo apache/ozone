@@ -101,7 +101,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =
         getOmRequest().getCommitMultiPartUploadRequest();
 
@@ -226,11 +227,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // read/write requests that info for validation.
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
-          CacheValue.get(trxnLogIndex, multipartKeyInfo));
+          CacheValue.get(cacheEpoch, multipartKeyInfo));
 
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKey),
-          CacheValue.get(trxnLogIndex));
+          CacheValue.get(cacheEpoch));
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 

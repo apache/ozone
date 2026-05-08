@@ -223,7 +223,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -320,7 +321,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
         omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(dbVolumeKey),
-            CacheValue.get(transactionLogIndex, omVolumeArgs));
+            CacheValue.get(cacheEpoch, omVolumeArgs));
       }
 
       // Audit
@@ -345,7 +346,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           bucketNamespacePolicyName, bucketPolicyName);
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          CacheValue.get(transactionLogIndex, omDBTenantState));
+          CacheValue.get(cacheEpoch, omDBTenantState));
 
       // Update tenant cache
       multiTenantManager.getCacheOp().createTenant(

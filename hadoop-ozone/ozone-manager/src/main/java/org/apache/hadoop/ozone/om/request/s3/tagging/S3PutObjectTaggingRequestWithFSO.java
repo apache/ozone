@@ -61,7 +61,8 @@ public class S3PutObjectTaggingRequestWithFSO extends S3PutObjectTaggingRequest 
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     PutObjectTaggingRequest putObjectTaggingRequest = getOmRequest().getPutObjectTaggingRequest();
 
@@ -128,7 +129,7 @@ public class S3PutObjectTaggingRequestWithFSO extends S3PutObjectTaggingRequest 
       // PutObjectTagging rejects operations on FSO directory
       omMetadataManager.getKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(dbKey),
-              CacheValue.get(trxnLogIndex, omKeyInfo));
+              CacheValue.get(cacheEpoch, omKeyInfo));
 
       omClientResponse = new S3PutObjectTaggingResponseWithFSO(
           omResponse.setPutObjectTaggingResponse(PutObjectTaggingResponse.newBuilder()).build(),

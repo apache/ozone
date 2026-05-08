@@ -138,7 +138,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     MultipartUploadCompleteRequest multipartUploadCompleteRequest =
         getOmRequest().getCompleteMultiPartUploadRequest();
 
@@ -340,7 +341,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         }
 
         updateCache(omMetadataManager, dbBucketKey, omBucketInfo, dbOzoneKey,
-            dbMultipartOpenKey, multipartKey, omKeyInfo, trxnLogIndex);
+            dbMultipartOpenKey, multipartKey, omKeyInfo, cacheEpoch);
 
         omResponse.setCompleteMultiPartUploadResponse(
             MultipartUploadCompleteResponse.newBuilder()
@@ -560,13 +561,13 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   protected void addKeyTableCacheEntry(OMMetadataManager omMetadataManager,
-      String dbOzoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex)
+      String dbOzoneKey, OmKeyInfo omKeyInfo, long cacheEpoch)
       throws IOException {
 
     // Add key entry to file table.
     omMetadataManager.getKeyTable(getBucketLayout())
         .addCacheEntry(new CacheKey<>(dbOzoneKey),
-            CacheValue.get(transactionLogIndex, omKeyInfo));
+            CacheValue.get(cacheEpoch, omKeyInfo));
   }
 
   private int getPartsListSize(String requestedVolume,
@@ -660,22 +661,22 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   private void updateCache(OMMetadataManager omMetadataManager,
       String dbBucketKey, @Nullable OmBucketInfo omBucketInfo,
       String dbOzoneKey, String dbMultipartOpenKey, String dbMultipartKey,
-      OmKeyInfo omKeyInfo, long transactionLogIndex) throws IOException {
+      OmKeyInfo omKeyInfo, long cacheEpoch) throws IOException {
     // Update cache.
     // 1. Add key entry to key table.
     // 2. Delete multipartKey entry from openKeyTable and multipartInfo table.
     // 3. If the bucket size has changed (omBucketInfo is not null),
     //    update bucket cache
     addKeyTableCacheEntry(omMetadataManager, dbOzoneKey, omKeyInfo,
-        transactionLogIndex);
+        cacheEpoch);
 
     omMetadataManager.getOpenKeyTable(getBucketLayout())
         .addCacheEntry(
             new CacheKey<>(dbMultipartOpenKey),
-            CacheValue.get(transactionLogIndex));
+            CacheValue.get(cacheEpoch));
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(dbMultipartKey),
-        CacheValue.get(transactionLogIndex));
+        CacheValue.get(cacheEpoch));
 
     // Here, omBucketInfo can be null if its size has not changed. No need to
     // update the bucket info unless its size has changed. We never want to
@@ -683,7 +684,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     if (omBucketInfo != null) {
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(dbBucketKey),
-          CacheValue.get(transactionLogIndex, omBucketInfo));
+          CacheValue.get(cacheEpoch, omBucketInfo));
     }
   }
 

@@ -71,7 +71,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumOpenKeyDeleteRequests();
@@ -103,7 +104,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
-        updateOpenKeyTableCache(ozoneManager, trxnLogIndex,
+        updateOpenKeyTableCache(ozoneManager, trxnLogIndex, cacheEpoch,
             openKeyBucket, deletedOpenKeys);
       }
 
@@ -165,7 +166,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
   }
 
   protected void updateOpenKeyTableCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OpenKeyBucket keysPerBucket,
+      long trxnLogIndex, long cacheEpoch, OpenKeyBucket keysPerBucket,
       Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys) throws IOException {
 
     boolean acquiredLock = false;
@@ -206,7 +207,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           // Update openKeyTable cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
               new CacheKey<>(fullKeyName),
-              CacheValue.get(trxnLogIndex));
+              CacheValue.get(cacheEpoch));
 
           ozoneManager.getMetrics().incNumOpenKeysDeleted();
           LOG.debug("Open key {} deleted.", fullKeyName);

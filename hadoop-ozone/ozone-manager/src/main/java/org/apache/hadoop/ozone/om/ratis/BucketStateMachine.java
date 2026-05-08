@@ -110,9 +110,9 @@ public class BucketStateMachine extends BaseStateMachine {
 
   public BucketStateMachine(RaftGroupId raftGroupId, OzoneManager om) throws IOException {
     this.ozoneManager = om;
-    this.ozoneManagerDoubleBuffer =  buildDoubleBufferForRatis();
-    this.threadNamePrefix = om.getThreadNamePrefix() + "-" + raftGroupId;
     this.currentRaftGroupId = raftGroupId;
+    this.threadNamePrefix = om.getThreadNamePrefix() + "-" + raftGroupId;
+    this.ozoneManagerDoubleBuffer =  buildDoubleBufferForRatis();
 
     loadSnapshotInfoFromDB();
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
@@ -385,6 +385,7 @@ public class BucketStateMachine extends BaseStateMachine {
         .setThreadPrefix(threadNamePrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
         .setThreadPrefix(threadNamePrefix)
+        .setTransactionInfoKey(TRANSACTION_INFO_KEY + currentRaftGroupId.toString())
         .enableTracing(TracingUtil.isTracingEnabled(ozoneManager.getConfiguration()))
         .build()
         .start();
@@ -474,7 +475,7 @@ public class BucketStateMachine extends BaseStateMachine {
     LOG.info("Current Snapshot Index {}", getLastAppliedTermIndex());
     TermIndex lastTermIndex = getLastAppliedTermIndex();
     long lastAppliedIndex = lastTermIndex.getIndex();
-    TransactionInfo transactionInfo = TransactionInfo.valueOf(lastTermIndex.getIndex(), lastAppliedIndex);
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(lastTermIndex.getTerm(), lastAppliedIndex);
     ozoneManager.setTransactionInfo(currentRaftGroupId, transactionInfo);
     Table<String, TransactionInfo> txnInfoTable =
             ozoneManager.getMetadataManager().getTransactionInfoTable();
@@ -637,7 +638,9 @@ public class BucketStateMachine extends BaseStateMachine {
     LOG.trace("Start removing group {}", currentRaftGroupId);
     ozoneManager.getStateMachines().remove(currentRaftGroupId);
     ozoneManager.getOmRaftGroups().remove(currentRaftGroupId);
-    ozoneManager.getOmhaMetrics().deleteRaftGroup(currentRaftGroupId);
+    if (ozoneManager.getOmhaMetrics() != null) {
+      ozoneManager.getOmhaMetrics().deleteRaftGroup(currentRaftGroupId);
+    }
     ozoneManager.getOmRaftGroupManager().removeGroup(currentRaftGroupId);
     try {
       LOG.trace("Deleting transaction for group {}", currentRaftGroupId);

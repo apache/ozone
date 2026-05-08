@@ -95,6 +95,15 @@ public final class OzoneManagerDoubleBuffer {
 
   private final boolean isTracingEnabled;
 
+  /**
+   * Key under which {@link TransactionInfo} is persisted on every batch flush.
+   * Main OM state machine uses {@code TRANSACTION_INFO_KEY}; bucket-group
+   * state machines use {@code TRANSACTION_INFO_KEY + raftGroupId} so each
+   * group's lastApplied stays atomically in sync with the keyTable updates
+   * produced by that group.
+   */
+  private final String transactionInfoKey;
+
   private final OzoneManagerDoubleBufferMetrics metrics = OzoneManagerDoubleBufferMetrics.create();
 
   /** Accumulative count (for testing and debug only). */
@@ -138,8 +147,14 @@ public final class OzoneManagerDoubleBuffer {
     private FlushNotifier flushNotifier;
     private S3SecretManager s3SecretManager;
     private String threadPrefix = "";
+    private String transactionInfoKey = TRANSACTION_INFO_KEY;
 
     private Builder() { }
+
+    public Builder setTransactionInfoKey(String key) {
+      this.transactionInfoKey = key;
+      return this;
+    }
 
     public Builder setOmMetadataManager(OMMetadataManager omMetadataManager) {
       this.omMetadataManager = omMetadataManager;
@@ -204,6 +219,7 @@ public final class OzoneManagerDoubleBuffer {
     this.updateLastAppliedIndex = b.updateLastAppliedIndex;
     this.flushNotifier = b.flushNotifier;
     this.unFlushedTransactions = newSemaphore(b.maxUnFlushedTransactionCount);
+    this.transactionInfoKey = b.transactionInfoKey;
 
     this.isTracingEnabled = b.isTracingEnabled;
 
@@ -379,7 +395,7 @@ public final class OzoneManagerDoubleBuffer {
       addToBatchTransactionInfoWithTrace(lastTraceId,
           lastTransaction.getIndex(),
           () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
-              batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
+              batchOperation, transactionInfoKey, TransactionInfo.valueOf(lastTransaction)));
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),

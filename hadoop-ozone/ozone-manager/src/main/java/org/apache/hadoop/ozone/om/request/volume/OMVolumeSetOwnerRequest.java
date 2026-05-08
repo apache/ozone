@@ -75,7 +75,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
     Objects.requireNonNull(setVolumePropertyRequest, "setVolumePropertyRequest == null");
@@ -162,13 +163,13 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(newOwner)),
-          CacheValue.get(transactionLogIndex, newOwnerVolumeList));
+          CacheValue.get(cacheEpoch, newOwnerVolumeList));
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(oldOwner)),
-          CacheValue.get(transactionLogIndex, oldOwnerVolumeList));
+          CacheValue.get(cacheEpoch, oldOwnerVolumeList));
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
-          CacheValue.get(transactionLogIndex, omVolumeArgs));
+          CacheValue.get(cacheEpoch, omVolumeArgs));
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().setResponse(true).build());

@@ -70,7 +70,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumExpiredMPUAbortRequests();
@@ -107,7 +108,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           submittedExpiredMPUsPerBucket) {
         // For each bucket where the MPU will be aborted from,
         // get its bucket lock and update the cache accordingly.
-        updateTableCache(ozoneManager, trxnLogIndex, mpuByBucket,
+        updateTableCache(ozoneManager, trxnLogIndex, cacheEpoch, mpuByBucket,
             abortedMultipartUploads);
       }
 
@@ -190,7 +191,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
   }
 
   private void updateTableCache(OzoneManager ozoneManager,
-        long trxnLogIndex, ExpiredMultipartUploadsBucket mpusPerBucket,
+        long trxnLogIndex, long cacheEpoch, ExpiredMultipartUploadsBucket mpusPerBucket,
         Map<OmBucketInfo, List<OmMultipartAbortInfo>> abortedMultipartUploads)
       throws IOException {
 
@@ -314,11 +315,11 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
               .isExist(multipartOpenKey)) {
             omMetadataManager.getOpenKeyTable(bucketLayout)
                 .addCacheEntry(new CacheKey<>(multipartOpenKey),
-                    CacheValue.get(trxnLogIndex));
+                    CacheValue.get(cacheEpoch));
           }
           omMetadataManager.getMultipartInfoTable()
               .addCacheEntry(new CacheKey<>(expiredMPUKeyName),
-                  CacheValue.get(trxnLogIndex));
+                  CacheValue.get(cacheEpoch));
 
           long numParts = omMultipartKeyInfo.getPartKeyInfoMap().size();
           ozoneManager.getMetrics().incNumExpiredMPUAborted();

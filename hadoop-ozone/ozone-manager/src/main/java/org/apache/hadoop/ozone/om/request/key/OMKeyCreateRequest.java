@@ -211,7 +211,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
@@ -350,7 +351,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          dbOpenKeyName, omKeyInfo, trxnLogIndex);
+          dbOpenKeyName, omKeyInfo, cacheEpoch);
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()

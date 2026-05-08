@@ -72,7 +72,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long cacheEpoch = context.getCacheEpoch();
     OzoneManagerProtocolProtos.QuotaRepairRequest quotaRepairRequest =
         getOmRequest().getQuotaRepairRequest();
     Objects.requireNonNull(quotaRepairRequest, "quotaRepairRequest == null");
@@ -84,11 +84,11 @@ public class OMQuotaRepairRequest extends OMClientRequest {
     try {
       for (int i = 0; i < quotaRepairRequest.getBucketCountCount(); ++i) {
         OzoneManagerProtocolProtos.BucketQuotaCount bucketCountInfo = quotaRepairRequest.getBucketCount(i);
-        updateBucketInfo(omMetadataManager, bucketCountInfo, transactionLogIndex, bucketMap);
+        updateBucketInfo(omMetadataManager, bucketCountInfo, cacheEpoch, bucketMap);
       }
       Map<String, OmVolumeArgs> volUpdateMap;
       if (quotaRepairRequest.getSupportVolumeOldQuota()) {
-        volUpdateMap = updateOldVolumeQuotaSupport(omMetadataManager, transactionLogIndex);
+        volUpdateMap = updateOldVolumeQuotaSupport(omMetadataManager, cacheEpoch);
       } else {
         volUpdateMap = Collections.emptyMap();
       }
@@ -109,7 +109,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
   
   private void updateBucketInfo(
       OMMetadataManager omMetadataManager, OzoneManagerProtocolProtos.BucketQuotaCount bucketCountInfo,
-      long transactionLogIndex, Map<Pair<String, String>, OmBucketInfo> bucketMap) throws IOException {
+      long cacheEpoch, Map<Pair<String, String>, OmBucketInfo> bucketMap) throws IOException {
     // acquire lock.
     mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
         BUCKET_LOCK, bucketCountInfo.getVolName(), bucketCountInfo.getBucketName()));
@@ -136,7 +136,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
       }
 
       omMetadataManager.getBucketTable().addCacheEntry(
-          new CacheKey<>(bucketKey), CacheValue.get(transactionLogIndex, bucketInfo));
+          new CacheKey<>(bucketKey), CacheValue.get(cacheEpoch, bucketInfo));
       bucketMap.put(Pair.of(bucketCountInfo.getVolName(), bucketCountInfo.getBucketName()), bucketInfo);
     } finally {
       if (acquiredBucketLock) {
@@ -147,7 +147,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
   }
 
   private Map<String, OmVolumeArgs> updateOldVolumeQuotaSupport(
-      OMMetadataManager metadataManager, long transactionLogIndex) throws IOException {
+      OMMetadataManager metadataManager, long cacheEpoch) throws IOException {
     LOG.info("Starting volume quota support update");
     Map<String, OmVolumeArgs> volUpdateMap = new HashMap<>();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
@@ -176,7 +176,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
           if (isQuotaReset) {
             OmVolumeArgs updated = builder.build();
             metadataManager.getVolumeTable().addCacheEntry(
-                new CacheKey<>(entry.getKey()), CacheValue.get(transactionLogIndex, updated));
+                new CacheKey<>(entry.getKey()), CacheValue.get(cacheEpoch, updated));
             volUpdateMap.put(entry.getKey(), updated);
           }
         } finally {

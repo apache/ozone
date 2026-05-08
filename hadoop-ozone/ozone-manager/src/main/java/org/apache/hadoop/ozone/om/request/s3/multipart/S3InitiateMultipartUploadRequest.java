@@ -110,7 +110,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long transactionLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
 
@@ -220,10 +221,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // Add to cache
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(multipartKey),
-          CacheValue.get(transactionLogIndex, omKeyInfo));
+          CacheValue.get(cacheEpoch, omKeyInfo));
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
-          CacheValue.get(transactionLogIndex, multipartKeyInfo));
+          CacheValue.get(cacheEpoch, multipartKeyInfo));
 
       omClientResponse =
           new S3InitiateMultipartUploadResponse(

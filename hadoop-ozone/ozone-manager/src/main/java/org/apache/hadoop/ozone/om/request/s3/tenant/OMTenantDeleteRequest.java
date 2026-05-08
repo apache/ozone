@@ -146,7 +146,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long cacheEpoch = context.getCacheEpoch();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -196,7 +196,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       // Invalidate cache entry
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          CacheValue.get(transactionLogIndex));
+          CacheValue.get(cacheEpoch));
 
       // Decrement volume refCount
       if (decVolumeRefCount) {
@@ -209,7 +209,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
         omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(dbVolumeKey),
-            CacheValue.get(transactionLogIndex, omVolumeArgs));
+            CacheValue.get(cacheEpoch, omVolumeArgs));
 
         // TODO: Set response dbVolumeKey?
       }

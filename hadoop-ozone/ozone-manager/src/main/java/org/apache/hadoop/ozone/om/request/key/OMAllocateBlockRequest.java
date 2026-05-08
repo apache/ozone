@@ -148,7 +148,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest =
         getOmRequest().getAllocateBlockRequest();
@@ -245,7 +246,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKeyName),
-          CacheValue.get(trxnLogIndex, openKeyInfo));
+          CacheValue.get(cacheEpoch, openKeyInfo));
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());

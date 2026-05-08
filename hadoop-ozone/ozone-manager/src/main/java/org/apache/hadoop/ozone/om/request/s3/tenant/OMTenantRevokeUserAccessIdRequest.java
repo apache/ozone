@@ -147,7 +147,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long cacheEpoch = context.getCacheEpoch();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -194,16 +194,16 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       principalInfo.removeAccessId(accessId);
       CacheValue<OmDBUserPrincipalInfo> cacheValue =
           !principalInfo.getAccessIds().isEmpty()
-              ? CacheValue.get(transactionLogIndex, principalInfo)
+              ? CacheValue.get(cacheEpoch, principalInfo)
               // Invalidate (remove) the entry if accessIds set is empty
-              : CacheValue.get(transactionLogIndex);
+              : CacheValue.get(cacheEpoch);
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal), cacheValue);
 
       // Remove from TenantAccessIdTable
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
-          CacheValue.get(transactionLogIndex));
+          CacheValue.get(cacheEpoch));
 
       S3SecretManager s3SecretManager = ozoneManager.getS3SecretManager();
       s3SecretManager.invalidateCacheEntry(accessId);

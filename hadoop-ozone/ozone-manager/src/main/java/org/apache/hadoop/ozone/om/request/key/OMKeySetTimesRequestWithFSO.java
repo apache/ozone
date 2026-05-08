@@ -63,7 +63,8 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OmKeyInfo omKeyInfo = null;
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
@@ -115,12 +116,12 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
         Table<String, OmDirectoryInfo> dirTable =
             omMetadataManager.getDirectoryTable();
         dirTable.addCacheEntry(new CacheKey<>(dbKey),
-            CacheValue.get(trxnLogIndex,
+            CacheValue.get(cacheEpoch,
                 OMFileRequest.getDirectoryInfo(omKeyInfo)));
       } else {
         omMetadataManager.getKeyTable(getBucketLayout())
             .addCacheEntry(new CacheKey<>(dbKey),
-                CacheValue.get(trxnLogIndex, omKeyInfo));
+                CacheValue.get(cacheEpoch, omKeyInfo));
       }
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
           isDirectory, volumeId, bucketId);

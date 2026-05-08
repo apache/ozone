@@ -75,7 +75,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getCacheEpoch();
+    final long cacheEpoch = context.getCacheEpoch();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketDeletes();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -166,7 +166,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          CacheValue.get(transactionLogIndex));
+          CacheValue.get(cacheEpoch));
 
       omResponse.setDeleteBucketResponse(
           DeleteBucketResponse.newBuilder().build());
@@ -185,7 +185,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(volumeKey),
-          CacheValue.get(transactionLogIndex, omVolumeArgs));
+          CacheValue.get(cacheEpoch, omVolumeArgs));
 
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),

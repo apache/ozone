@@ -117,7 +117,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getCacheEpoch();
+    final long trxnLogIndex = context.getIndex();
+    final long cacheEpoch = context.getCacheEpoch();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
@@ -194,10 +195,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           omMetadataManager.getKeyTable(getBucketLayout());
 
       keyTable.addCacheEntry(new CacheKey<>(fromKey),
-          CacheValue.get(trxnLogIndex));
+          CacheValue.get(cacheEpoch));
 
       keyTable.addCacheEntry(new CacheKey<>(toKey),
-          CacheValue.get(trxnLogIndex, fromKeyValue));
+          CacheValue.get(cacheEpoch, fromKeyValue));
 
       omClientResponse = new OMKeyRenameResponse(omResponse
           .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
