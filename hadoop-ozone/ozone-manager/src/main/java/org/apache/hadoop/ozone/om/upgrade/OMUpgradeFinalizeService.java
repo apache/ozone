@@ -90,14 +90,7 @@ public class OMUpgradeFinalizeService extends BackgroundService {
       }
       if (versionManager.needsFinalization()) {
         try {
-          if (scmClient == null) {
-            LOG.info("SCM client is null");
-          }
-          if (scmClient.getContainerClient() == null) {
-            LOG.info("SCM client's container client is null");
-          }
           HddsProtos.UpgradeStatus upgradeStatus = scmClient.getContainerClient().queryUpgradeStatus();
-          LOG.info("+++ polled scm and the status is {}", upgradeStatus.getShouldFinalize());
           if (upgradeStatus.getShouldFinalize()) {
             LOG.info("The SCM Upgrade has been finalized. OM will now finalize");
 
