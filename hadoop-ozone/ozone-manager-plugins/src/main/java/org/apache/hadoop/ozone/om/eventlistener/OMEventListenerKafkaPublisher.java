@@ -167,6 +167,7 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
         }
       } else {
         LOG.warn("Producing event {} [KAFKA DOWN]", message);
+        throw new IOException("Kafka producer is not initialized");
       }
     }
 
