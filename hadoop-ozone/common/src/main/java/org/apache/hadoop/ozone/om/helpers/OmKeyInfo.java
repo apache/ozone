@@ -110,6 +110,7 @@ public final class OmKeyInfo extends WithParentObjectId
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
+  private long byteRangeStartOffset;
 
   private OmKeyInfo(Builder b) {
     super(b);
@@ -129,6 +130,7 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.byteRangeStartOffset = b.byteRangeStartOffset;
   }
 
   private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
@@ -187,6 +189,14 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
+  }
+
+  public long getByteRangeStartOffset() {
+    return byteRangeStartOffset;
+  }
+
+  public void setByteRangeStartOffset(long offset) {
+    this.byteRangeStartOffset = offset;
   }
 
   public String getOwnerName() {
@@ -492,6 +502,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private long byteRangeStartOffset;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -514,6 +525,7 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.byteRangeStartOffset = obj.byteRangeStartOffset;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
@@ -685,6 +697,11 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setByteRangeStartOffset(long offset) {
+      this.byteRangeStartOffset = offset;
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -804,6 +821,9 @@ public final class OmKeyInfo extends WithParentObjectId
     if (expectedDataGeneration != null) {
       kb.setExpectedDataGeneration(expectedDataGeneration);
     }
+    if (byteRangeStartOffset > 0) {
+      kb.setByteRangeStartOffset(byteRangeStartOffset);
+    }
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
@@ -856,6 +876,9 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     if (keyInfo.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
+    }
+    if (keyInfo.hasByteRangeStartOffset()) {
+      builder.setByteRangeStartOffset(keyInfo.getByteRangeStartOffset());
     }
 
     if (keyInfo.hasOwnerName()) {

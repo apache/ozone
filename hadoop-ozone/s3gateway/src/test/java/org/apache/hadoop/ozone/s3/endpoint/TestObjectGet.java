@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -46,6 +48,7 @@ import java.time.format.DateTimeFormatter;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -277,6 +280,13 @@ public class TestObjectGet {
     assertEquals(
         String.format("bytes 0-%s/%s", CONTENT.length() - 1, CONTENT.length()),
         response.getHeaderString("Content-Range"));
+
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=1-3");
+    response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals("3", response.getHeaderString("Content-Length"));
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ((StreamingOutput) response.getEntity()).write(output);
+    assertEquals("123", output.toString(UTF_8.name()));
 
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
   }

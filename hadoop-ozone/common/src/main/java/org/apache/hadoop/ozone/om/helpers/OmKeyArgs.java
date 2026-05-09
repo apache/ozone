@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ByteRange;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 
@@ -62,6 +63,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // been modified.
   private Long expectedDataGeneration = null;
   private final String expectedETag;
+  private final Long byteRangeStart;
+  private final Long byteRangeEnd;
 
   private OmKeyArgs(Builder b) {
     super(b);
@@ -84,6 +87,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
     this.expectedETag = b.expectedETag;
+    this.byteRangeStart = b.byteRangeStart;
+    this.byteRangeEnd = b.byteRangeEnd;
   }
 
   public boolean getIsMultipartKey() {
@@ -170,6 +175,18 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return expectedETag;
   }
 
+  public boolean hasByteRange() {
+    return byteRangeStart != null && byteRangeEnd != null;
+  }
+
+  public long getByteRangeStart() {
+    return byteRangeStart;
+  }
+
+  public long getByteRangeEnd() {
+    return byteRangeEnd;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -218,6 +235,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     if (expectedETag != null) {
       builder.setExpectedETag(expectedETag);
     }
+    if (hasByteRange()) {
+      builder.setByteRange(ByteRange.newBuilder()
+          .setStart(byteRangeStart)
+          .setEnd(byteRangeEnd));
+    }
     return builder.build();
   }
 
@@ -244,6 +266,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
     private String expectedETag;
+    private Long byteRangeStart;
+    private Long byteRangeEnd;
 
     public Builder() {
       this(AclListBuilder.empty());
@@ -290,6 +314,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
+      this.byteRangeStart = obj.byteRangeStart;
+      this.byteRangeEnd = obj.byteRangeEnd;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
     }
@@ -362,6 +388,12 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setMultipartUploadPartNumber(int multipartUploadPartNumber) {
       this.multipartUploadPartNumber = multipartUploadPartNumber;
+      return this;
+    }
+
+    public Builder setByteRange(long start, long end) {
+      this.byteRangeStart = start;
+      this.byteRangeEnd = end;
       return this;
     }
 

@@ -382,14 +382,26 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       context.setAction(S3GAction.GET_KEY);
 
-      OzoneKeyDetails keyDetails = (partNumber != 0) ?
-          getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
-          getClientProtocol().getS3KeyDetails(bucketName, keyPath);
+      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
+      OzoneKey keyMetadata;
+      OzoneKeyDetails keyDetails = null;
+      if (rangeHeaderVal == null) {
+        keyDetails = (partNumber != 0) ?
+            getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber) :
+            getClientProtocol().getS3KeyDetails(bucketName, keyPath);
+        keyMetadata = keyDetails;
+      } else if (partNumber != 0) {
+        keyDetails =
+            getClientProtocol().getS3KeyDetails(bucketName, keyPath, partNumber);
+        keyMetadata = keyDetails;
+      } else {
+        keyMetadata = getClientProtocol().headS3Object(bucketName, keyPath);
+      }
 
-      isFile(keyPath, keyDetails);
+      isFile(keyPath, keyMetadata);
 
       Response conditionalResponse = S3ConditionalRequest
-          .evaluateReadPreconditions(getHeaders(), keyPath, keyDetails);
+          .evaluateReadPreconditions(getHeaders(), keyPath, keyMetadata);
       if (conditionalResponse != null) {
         long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(
             startNanos);
@@ -399,11 +411,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         return conditionalResponse;
       }
 
-      long length = keyDetails.getDataSize();
+      long length = keyMetadata.getDataSize();
 
       LOG.debug("Data length of the key {} is {}", keyPath, length);
 
-      String rangeHeaderVal = getHeaders().getHeaderString(RANGE_HEADER);
       RangeHeader rangeHeader = null;
 
       LOG.debug("range Header provided value: {}", rangeHeaderVal);
@@ -419,9 +430,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       ResponseBuilder responseBuilder;
 
       if (rangeHeaderVal == null || rangeHeader.isReadFull()) {
+        if (keyDetails == null) {
+          keyDetails = getClientProtocol().getS3KeyDetails(bucketName, keyPath);
+        }
+        final OzoneKeyDetails responseKeyDetails = keyDetails;
         StreamingOutput output = dest -> {
-          try (OzoneInputStream key = keyDetails.getContent()) {
-            long readLength = IOUtils.copy(key, dest, getIOBufferSize(keyDetails.getDataSize()));
+          try (OzoneInputStream key = responseKeyDetails.getContent()) {
+            long readLength = IOUtils.copy(key, dest,
+                getIOBufferSize(responseKeyDetails.getDataSize()));
             getMetrics().incGetKeySuccessLength(readLength);
             perf.appendSizeBytes(readLength);
           }
@@ -430,16 +446,19 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         };
 
         responseBuilder = Response.ok(output)
-            .header(HttpHeaders.CONTENT_LENGTH, keyDetails.getDataSize());
+            .header(HttpHeaders.CONTENT_LENGTH, responseKeyDetails.getDataSize());
 
       } else {
         long startOffset = rangeHeader.getStartOffset();
         long endOffset = rangeHeader.getEndOffset();
         long copyLength = endOffset - startOffset + 1;
+        OzoneKeyDetails rangedKeyDetails = getClientProtocol()
+            .getS3KeyDetails(bucketName, keyPath, partNumber, startOffset,
+                endOffset);
 
         StreamingOutput output = dest -> {
-          try (OzoneInputStream ozoneInputStream = keyDetails.getContent()) {
-            ozoneInputStream.seek(startOffset);
+          try (OzoneInputStream ozoneInputStream =
+                   rangedKeyDetails.getContent()) {
             long readLength = IOUtils.copyLarge(ozoneInputStream, dest, 0,
                 copyLength, new byte[getIOBufferSize(copyLength)]);
             getMetrics().incGetKeySuccessLength(readLength);
@@ -459,7 +478,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
 
       responseBuilder.header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
-      addEntityTagHeader(responseBuilder, keyDetails);
+      addEntityTagHeader(responseBuilder, keyMetadata);
 
       MultivaluedMap<String, String> queryParams =
           getContext().getUriInfo().getQueryParameters();
@@ -475,8 +494,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         }
       }
 
-      addLastModifiedDate(responseBuilder, keyDetails);
-      addTagCountIfAny(responseBuilder, keyDetails);
+      addLastModifiedDate(responseBuilder, keyMetadata);
+      addTagCountIfAny(responseBuilder, keyMetadata);
 
       long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);

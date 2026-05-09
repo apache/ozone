@@ -1532,6 +1532,53 @@ public class TestKeyManagerImpl {
     assertEquals(0, locationList.size());
   }
 
+  @Test
+  void testGetByteRangeFiltersLocations() throws IOException {
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
+
+    initKeyTableForMultipartTest(keyName, VOLUME_NAME);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName(keyName)
+        .setByteRange(150, 260)
+        .build();
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test");
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo
+        .getLatestVersionLocations().getLocationList();
+    assertEquals(2, locationList.size());
+    assertEquals(1, locationList.get(0).getPartNumber());
+    assertEquals(2, locationList.get(1).getPartNumber());
+    assertEquals(50, omKeyInfo.getByteRangeStartOffset());
+    assertEquals(111, omKeyInfo.getDataSize());
+  }
+
+  @Test
+  void testGetParticularPartWithByteRangeFiltersLocations()
+      throws IOException {
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
+
+    initKeyTableForMultipartTest(keyName, VOLUME_NAME);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName(keyName)
+        .setMultipartUploadPartNumber(3)
+        .setByteRange(20, 40)
+        .build();
+    OmKeyInfo omKeyInfo = keyManager.getKeyInfo(keyArgs, RESOLVED_BUCKET, "test");
+
+    List<OmKeyLocationInfo> locationList = omKeyInfo
+        .getLatestVersionLocations().getLocationList();
+    assertEquals(1, locationList.size());
+    assertEquals(3, locationList.get(0).getPartNumber());
+    assertEquals(20, omKeyInfo.getByteRangeStartOffset());
+    assertEquals(21, omKeyInfo.getDataSize());
+  }
+
   private OmKeyInfo getMockedOmKeyInfo(OmBucketInfo bucketInfo, long parentId, String key, long objectId) {
     OmKeyInfo omKeyInfo = mock(OmKeyInfo.class);
     if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
@@ -1668,6 +1715,7 @@ public class TestKeyManagerImpl {
     for (int i = 0; i < 5; i++) {
       OmKeyLocationInfo locationInfo1 = new OmKeyLocationInfo.Builder()
               .setBlockID(new BlockID(i, i))
+              .setLength(100L)
               .setPartNumber(i)
               .build();
       locationInfoList.add(locationInfo1);
@@ -1681,6 +1729,7 @@ public class TestKeyManagerImpl {
             .setKeyName(keyName)
             .setBucketName(BUCKET_NAME)
             .setVolumeName(volume)
+            .setDataSize(500L)
             .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
             .setOmKeyLocationInfos(locationInfoGroups)
             .build();

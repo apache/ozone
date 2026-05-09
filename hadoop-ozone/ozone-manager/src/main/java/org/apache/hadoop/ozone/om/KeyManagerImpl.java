@@ -647,7 +647,47 @@ public class KeyManagerImpl implements KeyManager {
             .sum());
       }
     }
+    if (args.hasByteRange()) {
+      filterKeyLocationsByByteRange(value, args.getByteRangeStart(),
+          args.getByteRangeEnd());
+    }
     return value;
+  }
+
+  private void filterKeyLocationsByByteRange(OmKeyInfo keyInfo,
+      long byteRangeStart, long byteRangeEnd) {
+    OmKeyLocationInfoGroup latestLocationVersion =
+        keyInfo.getLatestVersionLocations();
+    if (latestLocationVersion == null) {
+      return;
+    }
+
+    List<OmKeyLocationInfo> currentLocations =
+        latestLocationVersion.getBlocksLatestVersionOnly();
+    List<OmKeyLocationInfo> filteredLocations = new ArrayList<>();
+    long blockStart = 0;
+    long firstBlockStart = 0;
+    for (OmKeyLocationInfo locationInfo : currentLocations) {
+      long blockEnd = blockStart + locationInfo.getLength() - 1;
+      if (blockStart > byteRangeEnd) {
+        break;
+      }
+      if (blockEnd >= byteRangeStart) {
+        if (filteredLocations.isEmpty()) {
+          firstBlockStart = blockStart;
+        }
+        filteredLocations.add(locationInfo);
+      }
+      blockStart += locationInfo.getLength();
+    }
+
+    keyInfo.updateLocationInfoList(filteredLocations,
+        latestLocationVersion.isMultipartKey(), true);
+    if (!filteredLocations.isEmpty()) {
+      keyInfo.setByteRangeStartOffset(byteRangeStart - firstBlockStart);
+    }
+    keyInfo.setDataSize(filteredLocations.isEmpty() ? 0 :
+        byteRangeEnd - byteRangeStart + 1);
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,

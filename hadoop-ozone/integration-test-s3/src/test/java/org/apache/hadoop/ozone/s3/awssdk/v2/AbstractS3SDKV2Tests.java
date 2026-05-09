@@ -1027,6 +1027,37 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testGetParticularPartWithRange(@TempDir Path tempDir) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final int partSize = (int) (5 * MB);
+    final int rangeStart = 2;
+    final int rangeEnd = 4;
+
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+    createFile(multipartUploadFile, (int) (15 * MB));
+    multipartUpload(bucketName, keyName, multipartUploadFile, partSize,
+        Collections.emptyMap(), Collections.emptyList());
+
+    ResponseBytes<GetObjectResponse> rangedPart = s3Client.getObjectAsBytes(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .partNumber(2)
+        .range("bytes=" + rangeStart + "-" + rangeEnd));
+
+    GetObjectResponse getObjectResponse = rangedPart.response();
+    assertEquals(rangeEnd - rangeStart + 1, getObjectResponse.contentLength());
+    assertEquals("bytes " + rangeStart + "-" + rangeEnd + "/" + partSize, getObjectResponse.contentRange());
+
+    byte[] uploadedBytes = Files.readAllBytes(multipartUploadFile.toPath());
+    byte[] expectedBytes = Arrays.copyOfRange(uploadedBytes, partSize + rangeStart,
+        partSize + rangeEnd + 1);
+    assertThat(rangedPart.asByteArray()).containsExactly(expectedBytes);
+  }
+
+  @Test
   public void testResumableDownloadWithEtagMismatch() throws Exception {
     // Arrange
     final String bucketName = getBucketName("resumable");

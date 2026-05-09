@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ByteRange;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -637,6 +638,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
         .setHeadOp(keyArgs.getHeadOp())
         .build();
+    if (keyArgs.hasByteRange()) {
+      ByteRange byteRange = keyArgs.getByteRange();
+      if (byteRange.hasStart() && byteRange.hasEnd()) {
+        omKeyArgs = omKeyArgs.toBuilder()
+            .setByteRange(byteRange.getStart(), byteRange.getEnd())
+            .build();
+      }
+    }
     OmKeyInfo keyInfo = impl.lookupKey(omKeyArgs);
 
     resp.setKeyInfo(keyInfo.getProtobuf(keyArgs.getHeadOp(), clientVersion));
@@ -658,6 +667,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             keyArgs.getForceUpdateContainerCacheFromSCM())
         .setMultipartUploadPartNumber(keyArgs.getMultipartNumber())
         .build();
+    if (keyArgs.hasByteRange()) {
+      ByteRange byteRange = keyArgs.getByteRange();
+      if (byteRange.hasStart() && byteRange.hasEnd()) {
+        omKeyArgs = omKeyArgs.toBuilder()
+            .setByteRange(byteRange.getStart(), byteRange.getEnd())
+            .build();
+      }
+    }
     KeyInfoWithVolumeContext keyInfo = impl.getKeyInfo(omKeyArgs,
         request.getAssumeS3Context());
 

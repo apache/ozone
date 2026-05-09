@@ -57,6 +57,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
 
   ATOMIC_CREATE_IF_NOT_EXISTS(12,
       "OzoneManager version that supports explicit create-if-not-exists key semantics"),
+
+  S3_BYTE_RANGE_GET(13,
+      "OzoneManager version that supports S3 byte range GET key location filtering"),
     
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");

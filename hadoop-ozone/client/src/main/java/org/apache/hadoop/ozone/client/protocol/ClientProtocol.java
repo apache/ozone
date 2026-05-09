@@ -178,6 +178,21 @@ public interface ClientProtocol {
                                   int partNumber)
       throws IOException;
 
+  /**
+   * Get OzoneKey in S3 context with content positioned at the requested
+   * byte range start.
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @param partNumber Multipart-upload part number, or zero for the whole key
+   * @param startOffset inclusive byte range start offset
+   * @param endOffset inclusive byte range end offset
+   * @return {@link OzoneKey}
+   * @throws IOException
+   */
+  OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
+      int partNumber, long startOffset, long endOffset)
+      throws IOException;
+
   OzoneVolume buildOzoneVolume(OmVolumeArgs volume);
 
   /**
