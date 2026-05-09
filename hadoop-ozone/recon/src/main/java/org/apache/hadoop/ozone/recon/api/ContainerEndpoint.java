@@ -26,8 +26,12 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MAX_CONTA
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MIN_CONTAINER_ID;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -39,8 +43,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -48,6 +54,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -67,6 +74,7 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.DeletedContainerInfo;
+import org.apache.hadoop.ozone.recon.api.types.ExportJob;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
@@ -104,6 +112,7 @@ public class ContainerEndpoint {
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
+  private final ExportJobManager exportJobManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
   private BucketLayout layout = BucketLayout.DEFAULT;
@@ -145,7 +154,8 @@ public class ContainerEndpoint {
                            ContainerHealthSchemaManager containerHealthSchemaManager,
                            ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                            ReconContainerMetadataManager reconContainerMetadataManager,
-                           ReconOMMetadataManager omMetadataManager) {
+                           ReconOMMetadataManager omMetadataManager,
+                           ExportJobManager exportJobManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
@@ -154,6 +164,7 @@ public class ContainerEndpoint {
     this.reconSCM = reconSCM;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.omMetadataManager = omMetadataManager;
+    this.exportJobManager = exportJobManager;
   }
 
   /**
@@ -500,6 +511,159 @@ public class ContainerEndpoint {
       @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
     return getUnhealthyContainersFromSchema(null, limit, maxContainerId,
         minContainerId);
+  }
+
+  /**
+   * List all export jobs tracked by the server (any status).
+   *
+   * @return Response containing a list of ExportJob objects
+   */
+  @GET
+  @Path("/unhealthy/export")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response listExportJobs() {
+    List<ExportJob> jobs = exportJobManager.getAllJobs();
+    for (ExportJob job : jobs) {
+      if (job.getStatus() == ExportJob.JobStatus.QUEUED) {
+        job.setQueuePosition(exportJobManager.getQueuePosition(job.getJobId()));
+      }
+    }
+    return Response.ok(jobs).build();
+  }
+
+  /**
+   * Start an async CSV export job for unhealthy containers.
+   * Returns immediately with a job ID that the client can poll.
+   *
+   * @param state The container state (required: MISSING, UNDER_REPLICATED, etc.)
+   * @return Response containing ExportJob with jobId
+   */
+  @POST
+  @Path("/unhealthy/export")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response startExport(@QueryParam("state") String state) {
+
+    if (StringUtils.isEmpty(state)) {
+      throw new WebApplicationException("state query parameter is required",
+          Response.Status.BAD_REQUEST);
+    }
+
+    // Validate state parameter
+    try {
+      ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException("Invalid state: " + state, Response.Status.BAD_REQUEST);
+    }
+
+    try {
+      String jobId = exportJobManager.submitJob(state);
+      ExportJob job = exportJobManager.getJob(jobId);
+      return Response.ok(job).build();
+    } catch (IllegalStateException e) {
+      // Return JSON error response instead of HTML
+      Map<String, String> errorResponse = new HashMap<>();
+      errorResponse.put("error", "Too Many Requests");
+      errorResponse.put("message", e.getMessage());
+      return Response.status(Response.Status.TOO_MANY_REQUESTS)
+          .entity(errorResponse)
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
+  }
+
+  /**
+   * Get the status of an export job.
+   *
+   * @param jobId The job ID returned by startExport
+   * @return Response containing the ExportJob with current status/progress
+   */
+  @GET
+  @Path("/unhealthy/export/{jobId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response getExportStatus(@PathParam("jobId") String jobId) {
+    ExportJob job = exportJobManager.getJob(jobId);
+    if (job == null) {
+      throw new WebApplicationException("Job not found", Response.Status.NOT_FOUND);
+    }
+    
+    // Calculate and set queue position if QUEUED
+    if (job.getStatus() == ExportJob.JobStatus.QUEUED) {
+      int position = exportJobManager.getQueuePosition(jobId);
+      job.setQueuePosition(position);
+    }
+    
+    return Response.ok(job).build();
+  }
+
+  /**
+   * Download a completed export TAR file.
+   *
+   * @param jobId The job ID
+   * @return Response with TAR file stream
+   */
+  @GET
+  @Path("/unhealthy/export/{jobId}/download")
+  @Produces("application/x-tar")
+  public Response downloadExport(@PathParam("jobId") String jobId) {
+    ExportJob job = exportJobManager.getJob(jobId);
+    if (job == null) {
+      throw new WebApplicationException("Job not found", Response.Status.NOT_FOUND);
+    }
+    if (job.getStatus() != ExportJob.JobStatus.COMPLETED) {
+      throw new WebApplicationException("Job not completed yet", Response.Status.CONFLICT);
+    }
+
+    File file = new File(job.getFilePath());
+    if (!file.exists()) {
+      throw new WebApplicationException("Export file not found", Response.Status.NOT_FOUND);
+    }
+
+    if (!job.tryReserveDownload()) {
+      Map<String, String> errorResponse = new java.util.HashMap<>();
+      errorResponse.put("error", "Download limit reached");
+      errorResponse.put("message", "This export has reached its maximum download limit of "
+          + job.getMaxDownloads() + ".");
+      return Response.status(Response.Status.TOO_MANY_REQUESTS)
+          .entity(errorResponse)
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
+
+    LOG.info("Download {} of {} for job {}", job.getDownloadCount(), job.getMaxDownloads(), jobId);
+
+    StreamingOutput stream = outputStream -> {
+      try (InputStream fis = Files.newInputStream(file.toPath());
+           BufferedOutputStream bos = new BufferedOutputStream(outputStream, 256 * 1024)) {
+        byte[] buffer = new byte[8192];
+        int bytesRead;
+        while ((bytesRead = fis.read(buffer)) != -1) {
+          bos.write(buffer, 0, bytesRead);
+        }
+        bos.flush();
+      }
+    };
+
+    return Response.ok(stream)
+        .header("Content-Disposition", "attachment; filename=\"" + job.getFileName() + "\"")
+        .header("Content-Type", "application/x-tar")
+        .build();
+  }
+
+  /**
+   * Cancel a running export job.
+   *
+   * @param jobId The job ID
+   * @return Response with 200 if successful
+   */
+  @DELETE
+  @Path("/unhealthy/export/{jobId}")
+  public Response cancelExport(@PathParam("jobId") String jobId) {
+    try {
+      exportJobManager.cancelJob(jobId);
+      return Response.ok().build();
+    } catch (IllegalStateException e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.NOT_FOUND);
+    }
   }
 
   /**

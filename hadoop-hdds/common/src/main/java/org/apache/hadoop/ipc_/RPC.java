@@ -83,7 +83,7 @@ public class RPC {
   final static int RPC_SERVICE_CLASS_DEFAULT = 0;
   public enum RpcKind {
     RPC_BUILTIN ((short) 1),         // Used for built in calls by tests
-    RPC_WRITABLE ((short) 2),        // Use WritableRpcEngine 
+    RPC_WRITABLE ((short) 2),        // ignored
     RPC_PROTOCOL_BUFFER ((short) 3); // Use ProtobufRpcEngine
     final static short MAX_SIZE = RPC_PROTOCOL_BUFFER.value; // used for array size
     private final short value;
@@ -216,8 +216,7 @@ public class RPC {
       Configuration conf) {
     RpcEngine engine = PROTOCOL_ENGINES.get(protocol);
     if (engine == null) {
-      Class<?> impl = conf.getClass(ENGINE_PROP+"."+protocol.getName(),
-                                    WritableRpcEngine.class);
+      Class<?> impl = conf.getClass(ENGINE_PROP+"."+protocol.getName(), ProtobufRpcEngine.class);
       engine = (RpcEngine)ReflectionUtils.newInstance(impl, conf);
       PROTOCOL_ENGINES.put(protocol, engine);
     }
@@ -1034,6 +1033,19 @@ public class RPC {
      return protocolImplMapArray.get(rpcKind.ordinal());   
    }
    
+    /**
+     * Returns {@code true} only if at least one protocol has been registered
+     * on this server instance for the given {@link RPC.RpcKind}.
+     * Used to reject incoming requests for unsupported RPC kinds before any
+     * deserialization of the request payload takes place.
+     * @param rpcKind the RPC kind from the incoming request header.
+     * @return {@code true} if at least one protocol is registered for this kind.
+     */
+    boolean hasRegisteredProtocols(RPC.RpcKind rpcKind) {
+      Map<ProtoNameVer, ProtoClassProtoImpl> implMap = getProtocolImplMap(rpcKind);
+      return implMap != null && !implMap.isEmpty();
+    }
+
    // Register  protocol and its impl for rpc calls
    void registerProtocolAndImpl(RpcKind rpcKind, Class<?> protocolClass, 
        Object protocolImpl) {

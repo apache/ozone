@@ -47,6 +47,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.util.Preconditions;
@@ -156,9 +157,7 @@ public final class ScmInvokerCodeGenerator {
 
   UncheckedAutoCloseable printScope(boolean codeBlock, int intendLevel) {
     println(false, codeBlock ? " {" : "");
-    for (int i = 0; i < intendLevel; i++) {
-      indentation += "  ";
-    }
+    indentation = indentation.concat(StringUtils.repeat("  ", intendLevel));
     return () -> {
       if (intendLevel > 0) {
         indentation = indentation.substring(2 * intendLevel);
