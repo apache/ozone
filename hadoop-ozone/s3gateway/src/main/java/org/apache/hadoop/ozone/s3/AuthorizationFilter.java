@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 import org.apache.hadoop.ozone.s3.signature.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.signature.StringToSignProducer;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +64,11 @@ public class AuthorizationFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext context) throws
       IOException {
+    if (isCorsPreflightRequest(context)) {
+      signatureInfo.initialize(new SignatureInfo.Builder(Version.NONE).build());
+      return;
+    }
+
     try {
       signatureInfo.initialize(signatureProcessor.parseSignature());
       if (signatureInfo.getVersion() == Version.V4) {
@@ -104,6 +110,14 @@ public class AuthorizationFilter implements ContainerRequestFilter {
   @VisibleForTesting
   public SignatureInfo getSignatureInfo() {
     return signatureInfo;
+  }
+
+  private static boolean isCorsPreflightRequest(
+      ContainerRequestContext context) {
+    return "OPTIONS".equalsIgnoreCase(context.getMethod())
+        && context.getHeaderString(S3Consts.ORIGIN_HEADER) != null
+        && context.getHeaderString(
+            S3Consts.ACCESS_CONTROL_REQUEST_METHOD) != null;
   }
 
 }

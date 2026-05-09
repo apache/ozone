@@ -140,6 +140,10 @@ public enum S3ErrorTable {
   NO_SUCH_TAG_SET(
       "NoSuchTagSet", "The specified tag does not exist.", HTTP_NOT_FOUND),
 
+  NO_SUCH_CORS_CONFIGURATION(
+      "NoSuchCORSConfiguration", "The CORS configuration does not exist.",
+      HTTP_NOT_FOUND),
+
   MALFORMED_XML(
       "MalformedXML", "The XML you provided was not well-formed or did not " +
       "validate against our published schema", HTTP_BAD_REQUEST),

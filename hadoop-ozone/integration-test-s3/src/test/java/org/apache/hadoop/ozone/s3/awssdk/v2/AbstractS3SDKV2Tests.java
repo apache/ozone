@@ -103,6 +103,8 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CORSConfiguration;
+import software.amazon.awssdk.services.s3.model.CORSRule;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -218,6 +220,61 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(bucketName, syncResponse.buckets().get(0).name());
     assertEquals(expectedOwner, syncResponse.owner().displayName());
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, syncResponse.owner().id());
+  }
+
+  @Test
+  public void testBucketCORSOperations() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    CORSRule rule = CORSRule.builder()
+        .id("sdk-v2-cors")
+        .allowedOrigins("https://example.com")
+        .allowedMethods("GET", "HEAD")
+        .allowedHeaders("Authorization")
+        .exposeHeaders("ETag")
+        .maxAgeSeconds(3600)
+        .build();
+    CORSConfiguration configuration = CORSConfiguration.builder()
+        .corsRules(rule)
+        .build();
+
+    s3Client.putBucketCors(b -> b.bucket(bucketName)
+        .corsConfiguration(configuration));
+
+    List<CORSRule> resultRules =
+        s3Client.getBucketCors(b -> b.bucket(bucketName)).corsRules();
+    assertThat(resultRules).hasSize(1);
+    CORSRule resultRule = resultRules.get(0);
+    assertEquals("sdk-v2-cors", resultRule.id());
+    assertThat(resultRule.allowedOrigins()).containsExactly("https://example.com");
+    assertThat(resultRule.allowedMethods()).containsExactly("GET", "HEAD");
+    assertThat(resultRule.allowedHeaders()).containsExactly("Authorization");
+    assertThat(resultRule.exposeHeaders()).containsExactly("ETag");
+    assertEquals(3600, resultRule.maxAgeSeconds());
+
+    s3Client.deleteBucketCors(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketCors(b -> b.bucket(bucketName)));
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchCORSConfiguration",
+        exception.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  public void testDeleteBucketCORSWithoutConfiguration() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.deleteBucketCors(b -> b.bucket(bucketName));
+    s3Client.deleteBucketCors(b -> b.bucket(bucketName));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getBucketCors(b -> b.bucket(bucketName)));
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchCORSConfiguration",
+        exception.awsErrorDetails().errorCode());
   }
 
   @Test
@@ -1900,6 +1957,27 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             .expectedBucketOwner(WRONG_OWNER)
             .build();
         verifyBucketOwnershipVerificationAccessDenied(() -> s3Client.putBucketAcl(wrongRequest));
+      }
+
+      @Test
+      public void testPutBucketCors() {
+        CORSRule rule = CORSRule.builder()
+            .allowedOrigins("https://example.com")
+            .allowedMethods("GET")
+            .build();
+        CORSConfiguration configuration = CORSConfiguration.builder()
+            .corsRules(rule)
+            .build();
+
+        verifyPassBucketOwnershipVerification(() -> s3Client.putBucketCors(
+            b -> b.bucket(DEFAULT_BUCKET_NAME)
+                .expectedBucketOwner(correctOwner)
+                .corsConfiguration(configuration)));
+
+        verifyBucketOwnershipVerificationAccessDenied(() -> s3Client.putBucketCors(
+            b -> b.bucket(DEFAULT_BUCKET_NAME)
+                .expectedBucketOwner(WRONG_OWNER)
+                .corsConfiguration(configuration)));
       }
 
       @Test

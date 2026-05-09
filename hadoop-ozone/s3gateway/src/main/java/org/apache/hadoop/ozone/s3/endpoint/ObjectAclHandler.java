@@ -47,7 +47,7 @@ class ObjectAclHandler extends ObjectOperationHandler {
 
   @SuppressWarnings("SwitchStatementWithTooFewBranches")
   S3GAction getAction() {
-    if (queryParams().get(S3Consts.QueryParams.ACL) == null) {
+    if (!queryParams().contains(S3Consts.QueryParams.ACL)) {
       return null;
     }
 

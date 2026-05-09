@@ -37,6 +37,7 @@ import java.util.Objects;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.OPTIONS;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -102,6 +103,12 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
   }
 
+  @OPTIONS
+  public Response options(@PathParam(BUCKET) String bucketName)
+      throws IOException, OS3Exception {
+    return corsPreflightResponse(bucketName);
+  }
+
   @Override
   Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
     final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
@@ -134,7 +141,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       boolean shallow = listKeysShallowEnabled
           && OZONE_URI_DELIMITER.equals(delimiter);
 
-      bucket = context.getVolume().getBucket(bucketName);
+      bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
@@ -289,8 +296,9 @@ public class BucketEndpoint extends BucketOperationHandler {
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
+    S3RequestContext context = new S3RequestContext(this, s3GAction);
     try {
-      OzoneBucket bucket = getVolume().getBucket(bucketName);
+      OzoneBucket bucket = context.getS3Bucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       auditReadSuccess(s3GAction);
       getMetrics().updateHeadBucketSuccessStats(startNanos);
@@ -341,41 +349,47 @@ public class BucketEndpoint extends BucketOperationHandler {
   ) throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
 
-    OzoneBucket bucket = getVolume().getBucket(bucketName);
+    S3RequestContext context = new S3RequestContext(this, s3GAction);
     MultiDeleteResponse result = new MultiDeleteResponse();
     List<String> deleteKeys = new ArrayList<>();
 
-    if (request.getObjects() != null) {
-      Map<String, ErrorInfo> undeletedKeyResultMap;
-      for (DeleteObject keyToDelete : request.getObjects()) {
-        deleteKeys.add(keyToDelete.getKey());
-      }
-      long startNanos = Time.monotonicNowNanos();
-      try {
-        S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-        undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
-        for (DeleteObject d : request.getObjects()) {
-          ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
-          boolean deleted = error == null ||
-              // if the key is not found, it is assumed to be successfully deleted
-              ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
-          if (deleted) {
-            deleteKeys.remove(d.getKey());
-            if (!request.isQuiet()) {
-              result.addDeleted(new DeletedObject(d.getKey()));
-            }
-          } else {
-            result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
-          }
+    try {
+      OzoneBucket bucket = context.getS3Bucket(bucketName);
+      if (request.getObjects() != null) {
+        Map<String, ErrorInfo> undeletedKeyResultMap;
+        for (DeleteObject keyToDelete : request.getObjects()) {
+          deleteKeys.add(keyToDelete.getKey());
         }
-        getMetrics().updateDeleteKeySuccessStats(startNanos);
-      } catch (IOException ex) {
-        LOG.error("Delete key failed: {}", ex.getMessage());
-        getMetrics().updateDeleteKeyFailureStats(startNanos);
-        result.addError(
-            new Error("ALL", "InternalError",
-                ex.getMessage()));
+        long startNanos = Time.monotonicNowNanos();
+        S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+        try {
+          undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
+          for (DeleteObject d : request.getObjects()) {
+            ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
+            boolean deleted = error == null ||
+                // if the key is not found, it is assumed to be successfully deleted
+                ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
+            if (deleted) {
+              deleteKeys.remove(d.getKey());
+              if (!request.isQuiet()) {
+                result.addDeleted(new DeletedObject(d.getKey()));
+              }
+            } else {
+              result.addError(new Error(d.getKey(), error.getCode(),
+                  error.getMessage()));
+            }
+          }
+          getMetrics().updateDeleteKeySuccessStats(startNanos);
+        } catch (IOException ex) {
+          LOG.error("Delete key failed: {}", ex.getMessage());
+          getMetrics().updateDeleteKeyFailureStats(startNanos);
+          result.addError(
+              new Error("ALL", "InternalError",
+                  ex.getMessage()));
+        }
       }
+    } catch (OMException ex) {
+      throw newError(bucketName, ex);
     }
 
     AuditMessage.Builder message = auditMessageFor(s3GAction);
@@ -421,6 +435,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     BucketOperationHandler chain = BucketOperationHandlerChain.newBuilder(this)
         .add(new BucketAclHandler())
         .add(new ListMultipartUploadsHandler())
+        .add(new BucketCorsHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();

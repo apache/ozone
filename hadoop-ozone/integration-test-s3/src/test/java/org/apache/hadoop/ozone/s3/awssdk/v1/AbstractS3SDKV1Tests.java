@@ -38,6 +38,8 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.BucketCrossOriginConfiguration;
+import com.amazonaws.services.s3.model.CORSRule;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
@@ -254,6 +256,68 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     s3Client.setBucketAcl(bucketName, aclList);
 
     //assertEquals(aclList, s3Client.getBucketAcl(bucketName));
+  }
+
+  @Test
+  public void testBucketCORSOperations() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    CORSRule rule = new CORSRule()
+        .withId("sdk-v1-cors")
+        .withAllowedOrigins(Collections.singletonList("https://example.com"))
+        .withAllowedMethods(Arrays.asList(
+            CORSRule.AllowedMethods.GET, CORSRule.AllowedMethods.HEAD))
+        .withAllowedHeaders(Collections.singletonList("Authorization"))
+        .withExposedHeaders(Collections.singletonList("ETag"))
+        .withMaxAgeSeconds(3600);
+    BucketCrossOriginConfiguration configuration =
+        new BucketCrossOriginConfiguration().withRules(rule);
+
+    s3Client.setBucketCrossOriginConfiguration(bucketName, configuration);
+
+    BucketCrossOriginConfiguration result =
+        s3Client.getBucketCrossOriginConfiguration(bucketName);
+    assertThat(result.getRules()).hasSize(1);
+    CORSRule resultRule = result.getRules().get(0);
+    assertEquals("sdk-v1-cors", resultRule.getId());
+    assertThat(resultRule.getAllowedOrigins())
+        .containsExactly("https://example.com");
+    assertThat(resultRule.getAllowedMethods()).containsExactly(
+        CORSRule.AllowedMethods.GET, CORSRule.AllowedMethods.HEAD);
+    assertThat(resultRule.getAllowedHeaders())
+        .containsExactly("Authorization");
+    assertThat(resultRule.getExposedHeaders()).containsExactly("ETag");
+    assertEquals(3600, resultRule.getMaxAgeSeconds());
+
+    s3Client.deleteBucketCrossOriginConfiguration(bucketName);
+
+    try {
+      assertThat(s3Client.getBucketCrossOriginConfiguration(bucketName))
+          .isNull();
+    } catch (AmazonServiceException ase) {
+      assertEquals(ErrorType.Client, ase.getErrorType());
+      assertEquals(404, ase.getStatusCode());
+      assertEquals("NoSuchCORSConfiguration", ase.getErrorCode());
+    }
+  }
+
+  @Test
+  public void testDeleteBucketCORSWithoutConfiguration() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    s3Client.deleteBucketCrossOriginConfiguration(bucketName);
+    s3Client.deleteBucketCrossOriginConfiguration(bucketName);
+
+    try {
+      assertThat(s3Client.getBucketCrossOriginConfiguration(bucketName))
+          .isNull();
+    } catch (AmazonServiceException ase) {
+      assertEquals(ErrorType.Client, ase.getErrorType());
+      assertEquals(404, ase.getStatusCode());
+      assertEquals("NoSuchCORSConfiguration", ase.getErrorCode());
+    }
   }
 
   @Test

@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.CorsConfiguration;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -275,6 +276,26 @@ public interface ClientProtocol {
    */
   void setBucketStorageType(String volumeName, String bucketName,
                             StorageType storageType)
+      throws IOException;
+
+  /**
+   * Sets the CORS configuration of a Bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param corsConfiguration CORS configuration to set
+   * @throws IOException
+   */
+  void setBucketCors(String volumeName, String bucketName,
+                     CorsConfiguration corsConfiguration)
+      throws IOException;
+
+  /**
+   * Clears the CORS configuration of a Bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @throws IOException
+   */
+  void deleteBucketCors(String volumeName, String bucketName)
       throws IOException;
 
   /**

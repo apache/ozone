@@ -119,6 +119,7 @@ public class TestObjectTaggingPut {
 
     when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
+    when(mockObjectStore.getS3Bucket("fsoBucket")).thenReturn(mockBucket);
     when(mockObjectStore.getClientProxy()).thenReturn(mock(ClientProtocol.class));
     when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
 
@@ -196,4 +197,3 @@ public class TestObjectTaggingPut {
             "</Tagging>";
   }
 }
-

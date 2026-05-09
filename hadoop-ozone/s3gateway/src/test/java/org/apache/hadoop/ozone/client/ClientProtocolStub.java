@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.helpers.CorsConfiguration;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -184,6 +185,18 @@ public class ClientProtocolStub implements ClientProtocol {
   public void setBucketStorageType(String volumeName, String bucketName,
                                    StorageType storageType) throws IOException {
 
+  }
+
+  @Override
+  public void setBucketCors(String volumeName, String bucketName,
+      CorsConfiguration corsConfiguration) throws IOException {
+    getBucket(volumeName, bucketName).setCorsConfiguration(corsConfiguration);
+  }
+
+  @Override
+  public void deleteBucketCors(String volumeName, String bucketName)
+      throws IOException {
+    getBucket(volumeName, bucketName).deleteCorsConfiguration();
   }
 
   @Override

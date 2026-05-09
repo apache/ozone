@@ -205,6 +205,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setBucketEncryptionKey(bek);
       }
 
+      if (omBucketArgs.hasCorsConfiguration()) {
+        bucketInfoBuilder.setCorsConfiguration(
+            omBucketArgs.getCorsConfiguration());
+      } else if (omBucketArgs.shouldClearCorsConfiguration()) {
+        bucketInfoBuilder.setCorsConfiguration(null);
+      }
+
       omBucketInfo = bucketInfoBuilder.build();
 
       // Update table cache.

@@ -68,7 +68,7 @@ public class BucketAclHandler extends BucketOperationHandler {
    * @return true if the request has the "acl" query parameter
    */
   private boolean shouldHandle() {
-    return queryParams().get(QueryParams.ACL) != null;
+    return queryParams().contains(QueryParams.ACL);
   }
 
   /**
@@ -87,7 +87,7 @@ public class BucketAclHandler extends BucketOperationHandler {
     context.setAction(S3GAction.GET_ACL);
 
     try {
-      OzoneBucket bucket = context.getVolume().getBucket(bucketName);
+      OzoneBucket bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       S3Owner owner = S3Owner.of(bucket.getOwner());
 
@@ -139,7 +139,7 @@ public class BucketAclHandler extends BucketOperationHandler {
 
     try {
       OzoneVolume volume = context.getVolume();
-      OzoneBucket bucket = volume.getBucket(bucketName);
+      OzoneBucket bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();

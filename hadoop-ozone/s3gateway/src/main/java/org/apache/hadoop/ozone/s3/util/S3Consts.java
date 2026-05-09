@@ -98,6 +98,24 @@ public final class S3Consts {
 
   public static final String CHECKSUM_HEADER = "Content-MD5";
 
+  public static final String ORIGIN_HEADER = "Origin";
+  public static final String ACCESS_CONTROL_REQUEST_METHOD =
+      "Access-Control-Request-Method";
+  public static final String ACCESS_CONTROL_REQUEST_HEADERS =
+      "Access-Control-Request-Headers";
+  public static final String ACCESS_CONTROL_ALLOW_ORIGIN =
+      "Access-Control-Allow-Origin";
+  public static final String ACCESS_CONTROL_ALLOW_METHODS =
+      "Access-Control-Allow-Methods";
+  public static final String ACCESS_CONTROL_ALLOW_HEADERS =
+      "Access-Control-Allow-Headers";
+  public static final String ACCESS_CONTROL_EXPOSE_HEADERS =
+      "Access-Control-Expose-Headers";
+  public static final String ACCESS_CONTROL_MAX_AGE =
+      "Access-Control-Max-Age";
+  public static final String CACHED_BUCKETS_CONTEXT_PROPERTY =
+      "org.apache.hadoop.ozone.s3.cachedBuckets";
+
   // Conditional request headers
   public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
   public static final String IF_MATCH_HEADER = "If-Match";
@@ -121,6 +139,7 @@ public final class S3Consts {
   /** Constants for query parameters. */
   public static final class QueryParams {
     public static final String ACL = "acl";
+    public static final String CORS = "cors";
     public static final String CONTINUATION_TOKEN = "continuation-token";
     public static final String DELETE = "delete";
     public static final String DELIMITER = "delimiter";

@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -33,6 +35,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.CorsConfiguration;
+import org.apache.hadoop.ozone.om.helpers.CorsRule;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -157,15 +161,128 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
   private OMRequest createSetBucketPropertyRequest(String volumeName,
       String bucketName, boolean isVersionEnabled, long quotaInBytes) {
+    BucketArgs bucketArgs = BucketArgs.newBuilder().setBucketName(bucketName)
+        .setVolumeName(volumeName)
+        .setQuotaInBytes(quotaInBytes)
+        .setQuotaInNamespace(1000L)
+        .setIsVersionEnabled(isVersionEnabled).build();
+    return createSetBucketPropertyRequest(bucketArgs);
+  }
+
+  private OMRequest createSetBucketPropertyRequest(BucketArgs bucketArgs) {
     return OMRequest.newBuilder().setSetBucketPropertyRequest(
-        SetBucketPropertyRequest.newBuilder().setBucketArgs(
-            BucketArgs.newBuilder().setBucketName(bucketName)
-                .setVolumeName(volumeName)
-                .setQuotaInBytes(quotaInBytes)
-                .setQuotaInNamespace(1000L)
-                .setIsVersionEnabled(isVersionEnabled).build()))
+        SetBucketPropertyRequest.newBuilder().setBucketArgs(bucketArgs))
         .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
         .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  @Test
+  public void testSetCorsConfiguration() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    CorsConfiguration corsConfiguration = createCorsConfiguration();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    BucketArgs bucketArgs = OmBucketArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setCorsConfiguration(corsConfiguration)
+        .build()
+        .getProtobuf();
+
+    OMBucketSetPropertyRequest request =
+        new OMBucketSetPropertyRequest(
+            createSetBucketPropertyRequest(bucketArgs));
+
+    OMClientResponse response =
+        request.validateAndUpdateCache(ozoneManager, 1);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertEquals(corsConfiguration, bucketInfo.getCorsConfiguration());
+  }
+
+  @Test
+  public void testDeleteCorsConfiguration() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OmBucketInfo.Builder bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setCorsConfiguration(createCorsConfiguration());
+
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, bucketInfo);
+    BucketArgs bucketArgs = OmBucketArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setClearCorsConfiguration(true)
+        .build()
+        .getProtobuf();
+
+    OMBucketSetPropertyRequest request =
+        new OMBucketSetPropertyRequest(
+            createSetBucketPropertyRequest(bucketArgs));
+
+    OMClientResponse response =
+        request.validateAndUpdateCache(ozoneManager, 1);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    OmBucketInfo updatedBucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertNull(updatedBucketInfo.getCorsConfiguration());
+  }
+
+  @Test
+  public void rejectsDeletingCorsConfigurationOnLink() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String linkName = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    OmBucketInfo.Builder link = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(linkName)
+        .setSourceVolume(volumeName)
+        .setSourceBucket(bucketName);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, link);
+    BucketArgs bucketArgs = OmBucketArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(linkName)
+        .setClearCorsConfiguration(true)
+        .build()
+        .getProtobuf();
+
+    OMBucketSetPropertyRequest request =
+        new OMBucketSetPropertyRequest(
+            createSetBucketPropertyRequest(bucketArgs));
+
+    OMClientResponse response =
+        request.validateAndUpdateCache(ozoneManager, 1);
+
+    assertFalse(response.getOMResponse().getSuccess());
+    assertEquals(
+        OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+        response.getOMResponse().getStatus());
+  }
+
+  private static CorsConfiguration createCorsConfiguration() {
+    return CorsConfiguration.newBuilder()
+        .addRule(CorsRule.newBuilder()
+            .setId("read-rule")
+            .setAllowedOrigins(Collections.singletonList(
+                "https://example.com"))
+            .setAllowedMethods(Arrays.asList("GET", "HEAD"))
+            .setAllowedHeaders(Collections.singletonList("Authorization"))
+            .setExposeHeaders(Collections.singletonList("ETag"))
+            .setMaxAgeSeconds(3000)
+            .build())
+        .build();
   }
 
   @Test

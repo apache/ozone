@@ -85,6 +85,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final DefaultReplicationConfig defaultReplicationConfig;
 
+  private final CorsConfiguration corsConfiguration;
+
   private final String sourceVolume;
 
   private final String sourceBucket;
@@ -128,6 +130,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.bucketLayout = b.bucketLayout;
     this.owner = b.owner;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
+    this.corsConfiguration = b.corsConfiguration;
   }
 
   public static Codec<OmBucketInfo> getCodec() {
@@ -215,6 +218,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   public DefaultReplicationConfig getDefaultReplicationConfig() {
     return defaultReplicationConfig;
+  }
+
+  public CorsConfiguration getCorsConfiguration() {
+    return corsConfiguration;
   }
 
   public String getSourceVolume() {
@@ -378,7 +385,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setSnapshotUsedNamespace(snapshotUsedNamespace)
         .setBucketLayout(bucketLayout)
         .setOwner(owner)
-        .setDefaultReplicationConfig(defaultReplicationConfig);
+        .setDefaultReplicationConfig(defaultReplicationConfig)
+        .setCorsConfiguration(corsConfiguration);
   }
 
   /**
@@ -404,6 +412,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private DefaultReplicationConfig defaultReplicationConfig;
     private long snapshotUsedBytes;
     private long snapshotUsedNamespace;
+    private CorsConfiguration corsConfiguration;
 
     public Builder() {
       acls = AclListBuilder.empty();
@@ -550,6 +559,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
+    public Builder setCorsConfiguration(
+        CorsConfiguration corsConfig) {
+      this.corsConfiguration = corsConfig;
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -594,6 +609,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
     if (defaultReplicationConfig != null) {
       bib.setDefaultReplicationConfig(defaultReplicationConfig.toProto());
+    }
+    if (corsConfiguration != null) {
+      bib.setCorsConfiguration(corsConfiguration.getProtobuf());
     }
     if (sourceVolume != null) {
       bib.setSourceVolume(sourceVolume);
@@ -650,6 +668,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       obib.setDefaultReplicationConfig(
           DefaultReplicationConfig.fromProto(
               bucketInfo.getDefaultReplicationConfig()));
+    }
+    if (bucketInfo.hasCorsConfiguration()) {
+      obib.setCorsConfiguration(CorsConfiguration.getFromProtobuf(
+          bucketInfo.getCorsConfiguration()));
     }
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());
@@ -745,7 +767,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         Objects.equals(getMetadata(), that.getMetadata()) &&
         Objects.equals(bekInfo, that.bekInfo) &&
         Objects.equals(owner, that.owner) &&
-        Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig);
+        Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig) &&
+        Objects.equals(corsConfiguration, that.corsConfiguration);
   }
 
   @Override
@@ -777,6 +800,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ", bucketLayout=" + bucketLayout +
         ", owner=" + owner +
         ", defaultReplicationConfig=" + defaultReplicationConfig +
+        ", corsConfiguration=" + corsConfiguration +
         '}';
   }
 }

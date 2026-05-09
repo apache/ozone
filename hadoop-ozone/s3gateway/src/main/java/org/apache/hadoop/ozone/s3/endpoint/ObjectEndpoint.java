@@ -63,6 +63,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.OPTIONS;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -152,6 +153,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .add(this)
         .build();
     handler = new AuditingObjectOperationHandler(chain);
+  }
+
+  @OPTIONS
+  public Response options(@PathParam(BUCKET) String bucketName)
+      throws IOException, OS3Exception {
+    return corsPreflightResponse(bucketName);
   }
 
   /**
@@ -541,7 +548,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     OzoneKey key;
     try {
       if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
-        OzoneBucket bucket = getVolume().getBucket(bucketName);
+        OzoneBucket bucket = loadBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
       key = getClientProtocol().headS3Object(bucketName, keyPath);
@@ -672,7 +679,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     S3GAction s3GAction = S3GAction.INIT_MULTIPART_UPLOAD;
 
     try {
-      OzoneBucket ozoneBucket = getVolume().getBucket(bucket);
+      OzoneBucket ozoneBucket = loadBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
 
       Map<String, String> customMetadata =
@@ -720,7 +727,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     final String uploadID = queryParams().get(QueryParams.UPLOAD_ID, "");
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
-    OzoneVolume volume = getVolume();
     // Using LinkedHashMap to preserve ordering of parts list.
     Map<Integer, String> partsMap = new LinkedHashMap<>();
     List<CompleteMultipartUploadRequest.Part> partList =
@@ -731,7 +737,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
-      OzoneBucket ozoneBucket = volume.getBucket(bucket);
+      OzoneBucket ozoneBucket = loadBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
 
       for (CompleteMultipartUploadRequest.Part part : partList) {
@@ -841,7 +847,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         String sourceBucket = result.getLeft();
         String sourceKey = result.getRight();
         if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
-          String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
+          String sourceBucketOwner = loadBucket(sourceBucket).getOwner();
           S3Owner.verifyBucketOwnerConditionOnCopyOperation(getHeaders(), sourceBucket, sourceBucketOwner, bucketName,
               ozoneBucket.getOwner());
         }
@@ -984,7 +990,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         srcKeyLen > getDatastreamMinLength()) {
       perf.appendStreamMode();
       copyLength = ObjectEndpointStreaming
-          .copyKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
+          .copyKeyWithStream(loadBucket(destBucket), destKey, srcKeyLen,
               getChunkSize(), replication, metadata, src, perf, startNanos, tags);
     } else {
       try (OzoneOutputStream dest = getClientProtocol()
@@ -1018,7 +1024,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     DigestInputStream sourceDigestInputStream = null;
 
     if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
-      String sourceBucketOwner = volume.getBucket(sourceBucket).getOwner();
+      String sourceBucketOwner = loadBucket(sourceBucket).getOwner();
       // The destBucket owner has already been checked in the caller method
       S3Owner.verifyBucketOwnerConditionOnCopyOperation(getHeaders(), sourceBucket, sourceBucketOwner, null, null);
     }
@@ -1147,7 +1153,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   /** Request context shared among {@code ObjectOperationHandler}s. */
   final class ObjectRequestContext extends S3RequestContext {
     private final String bucketName;
-    private OzoneBucket bucket;
 
     /** @param action best guess on action based on request method, may be refined later by handlers */
     ObjectRequestContext(S3GAction action, String bucketName) {
@@ -1160,10 +1165,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
 
     OzoneBucket getBucket() throws IOException {
-      if (bucket == null) {
-        bucket = getVolume().getBucket(bucketName);
-      }
-      return bucket;
+      return super.getS3Bucket(bucketName);
     }
 
   }

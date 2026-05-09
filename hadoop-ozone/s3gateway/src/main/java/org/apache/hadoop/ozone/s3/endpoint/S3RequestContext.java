@@ -19,8 +19,12 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import jakarta.annotation.Nullable;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.S3GAction;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.util.Time;
 
@@ -30,6 +34,7 @@ class S3RequestContext {
   private final EndpointBase endpoint;
   private S3GAction action;
   private OzoneVolume volume;
+  private final Map<String, OzoneBucket> buckets = new HashMap<>();
 
   S3RequestContext(EndpointBase endpoint, S3GAction action) {
     this.endpoint = endpoint;
@@ -51,6 +56,27 @@ class S3RequestContext {
       volume = endpoint.getVolume();
     }
     return volume;
+  }
+
+  OzoneBucket getBucket(String bucketName) throws IOException {
+    OzoneBucket bucket = buckets.get(bucketName);
+    if (bucket == null) {
+      bucket = getVolume().getBucket(bucketName);
+      endpoint.cacheBucket(bucketName, bucket);
+      buckets.put(bucketName, bucket);
+    }
+    return bucket;
+  }
+
+  OzoneBucket getS3Bucket(String bucketName) throws IOException {
+    OzoneBucket bucket = buckets.get(bucketName);
+    if (bucket == null) {
+      ObjectStore objectStore = endpoint.getClient().getObjectStore();
+      bucket = objectStore.getS3Bucket(bucketName);
+      endpoint.cacheBucket(bucketName, bucket);
+      buckets.put(bucketName, bucket);
+    }
+    return bucket;
   }
 
   S3GAction getAction() {

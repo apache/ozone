@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.CorsConfiguration;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -82,6 +83,7 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
   private ReplicationConfig replicationConfig;
+  private CorsConfiguration corsConfiguration;
 
   public static Builder newBuilder() {
     return new Builder();
@@ -108,6 +110,22 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   boolean isEmpty() {
     return keyDetails.isEmpty();
+  }
+
+  @Override
+  public CorsConfiguration getCorsConfiguration() {
+    return corsConfiguration;
+  }
+
+  @Override
+  public void setCorsConfiguration(
+      CorsConfiguration newCorsConfiguration) {
+    this.corsConfiguration = newCorsConfiguration;
+  }
+
+  @Override
+  public void deleteCorsConfiguration() {
+    this.corsConfiguration = null;
   }
 
   @Override

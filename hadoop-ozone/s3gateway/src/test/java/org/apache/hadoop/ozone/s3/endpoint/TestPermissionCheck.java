@@ -118,8 +118,7 @@ public class TestPermissionCheck {
    */
   @Test
   public void testGetBucket() throws IOException {
-    doThrow(exception).when(volume).getBucket(anyString());
-    when(objectStore.getS3Volume()).thenReturn(volume);
+    doThrow(exception).when(objectStore).getS3Bucket(anyString());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -145,7 +144,7 @@ public class TestPermissionCheck {
   public void testDeleteBucket() throws IOException {
     doThrow(exception).when(volume).deleteBucket(anyString());
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -185,7 +184,7 @@ public class TestPermissionCheck {
   public void testDeleteKeys() throws IOException, OS3Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     Map<String, ErrorInfo> deleteErrors = new HashMap<>();
     deleteErrors.put("deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
     when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
@@ -261,6 +260,7 @@ public class TestPermissionCheck {
   @Test
   public void testPutKey() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
+    when(objectStore.getS3Bucket("bucketName")).thenReturn(bucket);
     when(volume.getBucket("bucketName")).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).createKey(
             anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap());
@@ -308,6 +308,7 @@ public class TestPermissionCheck {
   public void testObjectTagging() throws Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     when(objectStore.getS3Volume()).thenReturn(volume);
+    when(objectStore.getS3Bucket("bucketName")).thenReturn(bucket);
     when(volume.getBucket("bucketName")).thenReturn(bucket);
     when(bucket.getObjectTagging(anyString())).thenThrow(exception);
     doThrow(exception).when(bucket).putObjectTagging(anyString(), anyMap());

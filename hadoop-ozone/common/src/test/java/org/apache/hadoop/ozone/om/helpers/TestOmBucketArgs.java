@@ -23,12 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collections;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for the OmBucketArgs class.
+ * Test bucket property arguments.
  */
 public class TestOmBucketArgs {
 
@@ -89,5 +90,39 @@ public class TestOmBucketArgs {
 
     assertEquals(EC,
         argsFromProto.getDefaultReplicationConfig().getType());
+  }
+
+  @Test
+  public void corsConfigurationCanBeSetOrCleared() {
+    CorsConfiguration corsConfiguration =
+        CorsConfiguration.newBuilder()
+            .addRule(CorsRule.newBuilder()
+                .setAllowedOrigins(Collections.singletonList("*"))
+                .setAllowedMethods(Collections.singletonList("GET"))
+                .build())
+            .build();
+
+    OmBucketArgs setArgs = OmBucketArgs.newBuilder()
+        .setVolumeName("vol1")
+        .setBucketName("bucket")
+        .setCorsConfiguration(corsConfiguration)
+        .build();
+
+    OmBucketArgs recoveredSetArgs =
+        OmBucketArgs.getFromProtobuf(setArgs.getProtobuf());
+    assertTrue(recoveredSetArgs.hasCorsConfiguration());
+    assertFalse(recoveredSetArgs.shouldClearCorsConfiguration());
+    assertEquals(corsConfiguration, recoveredSetArgs.getCorsConfiguration());
+
+    OmBucketArgs clearArgs = OmBucketArgs.newBuilder()
+        .setVolumeName("vol1")
+        .setBucketName("bucket")
+        .setClearCorsConfiguration(true)
+        .build();
+
+    OmBucketArgs recoveredClearArgs =
+        OmBucketArgs.getFromProtobuf(clearArgs.getProtobuf());
+    assertFalse(recoveredClearArgs.hasCorsConfiguration());
+    assertTrue(recoveredClearArgs.shouldClearCorsConfiguration());
   }
 }

@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.CorsConfiguration;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -151,6 +152,7 @@ public class OzoneBucket extends WithMetadata {
    * Bucket Owner.
    */
   private String owner;
+  private CorsConfiguration corsConfiguration;
   /**
    * Pending deletion bytes (Includes bytes retained by snapshots).
    */
@@ -201,6 +203,7 @@ public class OzoneBucket extends WithMetadata {
       this.bucketLayout = builder.bucketLayout;
     }
     this.owner = builder.owner;
+    this.corsConfiguration = builder.corsConfiguration;
   }
 
   /**
@@ -1169,6 +1172,21 @@ public class OzoneBucket extends WithMetadata {
     return result;
   }
 
+  public CorsConfiguration getCorsConfiguration() {
+    return corsConfiguration;
+  }
+
+  public void setCorsConfiguration(
+      CorsConfiguration newCorsConfiguration) throws IOException {
+    proxy.setBucketCors(volumeName, name, newCorsConfiguration);
+    this.corsConfiguration = newCorsConfiguration;
+  }
+
+  public void deleteCorsConfiguration() throws IOException {
+    proxy.deleteBucketCors(volumeName, name);
+    this.corsConfiguration = null;
+  }
+
   /**
    * Builder for OmBucketInfo.
    /**
@@ -1252,6 +1270,7 @@ public class OzoneBucket extends WithMetadata {
     private String owner;
     private long pendingDeleteBytes;
     private long pendingDeleteNamespace;
+    private CorsConfiguration corsConfiguration;
 
     protected Builder() {
     }
@@ -1345,6 +1364,12 @@ public class OzoneBucket extends WithMetadata {
 
     public Builder setOwner(String owner) {
       this.owner = owner;
+      return this;
+    }
+
+    public Builder setCorsConfiguration(
+        CorsConfiguration corsConfig) {
+      this.corsConfiguration = corsConfig;
       return this;
     }
 

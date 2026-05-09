@@ -787,6 +787,7 @@ message BucketInfo {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
+    optional CORSConfiguration corsConfiguration = 23;
 }
 
 enum BucketLayoutProto {
@@ -860,6 +861,21 @@ message BucketArgs {
     optional string ownerName = 10;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
+    optional CORSConfiguration corsConfiguration = 13;
+    optional bool clearCorsConfiguration = 14 [default = false];
+}
+
+message CORSConfiguration {
+    repeated CORSRule corsRule = 1;
+}
+
+message CORSRule {
+    optional string id = 1;
+    repeated string allowedOrigins = 2;
+    repeated string allowedMethods = 3;
+    repeated string allowedHeaders = 4;
+    repeated string exposeHeaders = 5;
+    optional uint32 maxAgeSeconds = 6;
 }
 
 message PrefixInfo {

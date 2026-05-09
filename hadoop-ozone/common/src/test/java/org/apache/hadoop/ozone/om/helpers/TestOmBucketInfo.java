@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.Collections;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -65,6 +66,35 @@ public class TestOmBucketInfo {
 
     assertEquals(bucket,
         OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+  }
+
+  @Test
+  public void protobufConversionWithCorsConfiguration() {
+    CorsRule corsRule = CorsRule.newBuilder()
+        .setId("read-rule")
+        .setAllowedOrigins(Arrays.asList("https://example.com"))
+        .setAllowedMethods(Arrays.asList("GET", "HEAD"))
+        .setAllowedHeaders(Arrays.asList("Authorization", "x-amz-*"))
+        .setExposeHeaders(Arrays.asList("ETag"))
+        .setMaxAgeSeconds(3000)
+        .build();
+    CorsConfiguration corsConfiguration =
+        CorsConfiguration.newBuilder()
+            .addRule(corsRule)
+            .build();
+
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setCreationTime(1L)
+        .setIsVersionEnabled(false)
+        .setStorageType(StorageType.ARCHIVE)
+        .setCorsConfiguration(corsConfiguration)
+        .build();
+
+    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(corsConfiguration, recovered.getCorsConfiguration());
+    assertEquals(bucket, recovered);
   }
 
   @Test

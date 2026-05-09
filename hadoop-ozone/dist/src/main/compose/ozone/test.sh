@@ -53,6 +53,7 @@ execute_robot_test scm -v USERNAME:httpfs httpfs
 execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-bucket ozonefs/ozonefs.robot
 execute_robot_test scm -v SCHEME:ofs -N ozonefs-obs ozonefs/ozonefs-obs.robot
 
+execute_robot_test s3g -N s3-bucketcors s3/bucketcors.robot
 execute_robot_test s3g grpc/grpc-om-s3-metrics.robot
 
 execute_robot_test scm --exclude pre-finalized-snapshot-tests snapshot

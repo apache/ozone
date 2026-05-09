@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.CorsConfiguration;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -119,15 +120,18 @@ public final class OzoneVolumeStub extends OzoneVolume {
       throw new OMException("", OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
     }
 
+    CorsConfiguration corsConfiguration = bucketArgs.getCorsConfiguration();
     buckets.put(bucketName, OzoneBucketStub.newBuilder()
         .setVolumeName(getName())
         .setName(bucketName)
+        .setOwner(getOwner())
         .setDefaultReplicationConfig(new DefaultReplicationConfig(
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE)))
         .setBucketLayout(bucketArgs.getBucketLayout())
         .setStorageType(bucketArgs.getStorageType())
         .setVersioning(bucketArgs.getVersioning())
+        .setCorsConfiguration(corsConfiguration)
         .setCreationTime(Time.now())
         .build());
   }

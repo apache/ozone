@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.CorsConfiguration;
 
 /**
  * This class encapsulates the arguments that are
@@ -68,6 +69,7 @@ public final class BucketArgs {
   private final long quotaInNamespace;
 
   private final String owner;
+  private final CorsConfiguration corsConfiguration;
 
   /**
    * Bucket Layout.
@@ -87,6 +89,7 @@ public final class BucketArgs {
     bucketLayout = b.bucketLayout;
     owner = b.owner;
     defaultReplicationConfig = b.defaultReplicationConfig;
+    corsConfiguration = b.corsConfiguration;
   }
 
   /**
@@ -185,6 +188,10 @@ public final class BucketArgs {
     return owner;
   }
 
+  public CorsConfiguration getCorsConfiguration() {
+    return corsConfiguration;
+  }
+
   /**
    * Builder for OmBucketInfo.
    */
@@ -201,6 +208,7 @@ public final class BucketArgs {
     private BucketLayout bucketLayout;
     private String owner;
     private DefaultReplicationConfig defaultReplicationConfig;
+    private CorsConfiguration corsConfiguration;
 
     public Builder() {
       quotaInBytes = OzoneConsts.QUOTA_RESET;
@@ -271,6 +279,12 @@ public final class BucketArgs {
     public BucketArgs.Builder setDefaultReplicationConfig(
         DefaultReplicationConfig defaultReplConfig) {
       defaultReplicationConfig = defaultReplConfig;
+      return this;
+    }
+
+    public BucketArgs.Builder setCorsConfiguration(
+        CorsConfiguration corsConfig) {
+      corsConfiguration = corsConfig;
       return this;
     }
 

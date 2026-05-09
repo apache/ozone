@@ -26,6 +26,10 @@ public interface RequestParameters {
 
   String get(String key);
 
+  default boolean contains(String key) {
+    return get(key) != null;
+  }
+
   static MultivaluedMapImpl of(MultivaluedMap<String, String> params) {
     return new MultivaluedMapImpl(params);
   }
@@ -75,6 +79,11 @@ public interface RequestParameters {
     @Override
     public String get(String key) {
       return params.getFirst(key);
+    }
+
+    @Override
+    public boolean contains(String key) {
+      return params.containsKey(key);
     }
 
     @Override

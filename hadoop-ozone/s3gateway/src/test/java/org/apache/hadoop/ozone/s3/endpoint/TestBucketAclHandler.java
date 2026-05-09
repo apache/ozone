@@ -35,6 +35,7 @@ import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -263,9 +264,10 @@ public class TestBucketAclHandler {
   private S3RequestContext mockContext() throws IOException {
     BucketEndpoint endpoint = mock(BucketEndpoint.class);
     OzoneVolume volume = mock(OzoneVolume.class);
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(BUCKET_NAME);
     when(endpoint.getVolume()).thenReturn(volume);
     when(volume.getBucket(BUCKET_NAME))
-        .thenAnswer(any -> client.getObjectStore().getS3Bucket(BUCKET_NAME));
+        .thenReturn(bucket);
     when(volume.getBucket("nonexistent-bucket"))
         .thenThrow(new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND));
     return new S3RequestContext(endpoint, null);

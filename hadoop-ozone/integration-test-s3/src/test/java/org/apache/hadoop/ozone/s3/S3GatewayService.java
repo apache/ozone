@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.HOST_ADDRESS;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
+import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ratis.util.Preconditions;
@@ -54,6 +56,13 @@ public class S3GatewayService implements MiniOzoneCluster.Service {
 
   public OzoneConfiguration getConf() {
     return OzoneConfigurationHolder.configuration();
+  }
+
+  public String getHttpAddressForClient() {
+    final Gateway instance = s3g;
+    Preconditions.assertNotNull(instance, "S3 Gateway not running");
+    InetSocketAddress address = instance.getHttpAddress();
+    return HOST_ADDRESS + ":" + address.getPort();
   }
 
   private void configureS3G(OzoneConfiguration conf) {

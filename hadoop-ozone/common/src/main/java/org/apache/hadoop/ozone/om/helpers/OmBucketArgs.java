@@ -58,6 +58,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   private final boolean quotaInBytesSet;
   private final boolean quotaInNamespaceSet;
   private final DefaultReplicationConfig defaultReplicationConfig;
+  private final CorsConfiguration corsConfiguration;
+  private final boolean clearCorsConfiguration;
   /**
    * Bucket Owner Name.
    */
@@ -76,6 +78,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.quotaInNamespaceSet = b.quotaInNamespaceSet;
     this.quotaInNamespace = quotaInNamespaceSet ? b.quotaInNamespace : OzoneConsts.QUOTA_RESET;
     this.bekInfo = b.bekInfo;
+    this.corsConfiguration = b.corsConfiguration;
+    this.clearCorsConfiguration = b.clearCorsConfiguration;
   }
 
   /**
@@ -151,6 +155,18 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     return bekInfo;
   }
 
+  public CorsConfiguration getCorsConfiguration() {
+    return corsConfiguration;
+  }
+
+  public boolean hasCorsConfiguration() {
+    return corsConfiguration != null;
+  }
+
+  public boolean shouldClearCorsConfiguration() {
+    return clearCorsConfiguration;
+  }
+
   /**
    * Returns Bucket Owner Name.
    *
@@ -204,6 +220,12 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
           this.defaultReplicationConfig.getReplicationConfig()
               .getReplication());
     }
+    if (this.corsConfiguration != null) {
+      auditMap.put("corsConfiguration", this.corsConfiguration.toString());
+    }
+    if (this.clearCorsConfiguration) {
+      auditMap.put("clearCorsConfiguration", "true");
+    }
     return auditMap;
   }
 
@@ -221,6 +243,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private long quotaInNamespace;
     private BucketEncryptionKeyInfo bekInfo;
     private DefaultReplicationConfig defaultReplicationConfig;
+    private CorsConfiguration corsConfiguration;
+    private boolean clearCorsConfiguration;
     private String ownerName;
 
     /**
@@ -288,6 +312,21 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    public Builder setCorsConfiguration(
+        CorsConfiguration corsConfig) {
+      this.corsConfiguration = corsConfig;
+      this.clearCorsConfiguration = false;
+      return this;
+    }
+
+    public Builder setClearCorsConfiguration(boolean shouldClear) {
+      this.clearCorsConfiguration = shouldClear;
+      if (shouldClear) {
+        this.corsConfiguration = null;
+      }
+      return this;
+    }
+
     /**
      * Constructs the OmBucketArgs.
      * @return instance of OmBucketArgs.
@@ -330,6 +369,12 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (bekInfo != null) {
       builder.setBekInfo(OMPBHelper.convert(bekInfo));
     }
+    if (corsConfiguration != null) {
+      builder.setCorsConfiguration(corsConfiguration.getProtobuf());
+    }
+    if (clearCorsConfiguration) {
+      builder.setClearCorsConfiguration(true);
+    }
 
     return builder.build();
   }
@@ -370,6 +415,13 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (bucketArgs.hasBekInfo()) {
       builder.setBucketEncryptionKey(
           OMPBHelper.convert(bucketArgs.getBekInfo()));
+    }
+    if (bucketArgs.hasCorsConfiguration()) {
+      builder.setCorsConfiguration(CorsConfiguration.getFromProtobuf(
+          bucketArgs.getCorsConfiguration()));
+    }
+    if (bucketArgs.hasClearCorsConfiguration()) {
+      builder.setClearCorsConfiguration(bucketArgs.getClearCorsConfiguration());
     }
 
     return builder;
