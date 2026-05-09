@@ -81,11 +81,6 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public VALUE getSkipCache(KEY key) {
-    return map.get(key);
-  }
-
-  @Override
   public void delete(KEY key) {
     map.remove(key);
   }

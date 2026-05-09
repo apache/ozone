@@ -119,7 +119,7 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
    * @throws RocksDatabaseException if the underlying db throws an exception
    *                                or the file is not deleted within a time limit.
    */
-  public void deleteFile(
+  public void deleteSstFileRange(
       ColumnFamilyHandle columnFamilyHandle,
       LiveFileMetaData fileToBeDeleted) throws RocksDatabaseException {
     File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());

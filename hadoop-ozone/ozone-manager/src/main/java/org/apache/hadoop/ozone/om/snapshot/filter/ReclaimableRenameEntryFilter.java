@@ -83,11 +83,6 @@ public class ReclaimableRenameEntryFilter extends ReclaimableFilter<String> {
       if (previousTable != null) {
         String prevDbKey = renameEntry.getValue();
         WithObjectID withObjectID = previousTable.getIfExist(prevDbKey);
-        if (withObjectID == null) {
-          // Snapshot reclaim logic must be correctness-first. If table cache
-          // says "not found", verify directly from RocksDB before reclaiming.
-          withObjectID = previousTable.getSkipCache(prevDbKey);
-        }
         if (withObjectID != null) {
           return false;
         }

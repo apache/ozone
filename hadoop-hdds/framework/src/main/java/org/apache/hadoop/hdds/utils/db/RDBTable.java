@@ -100,15 +100,15 @@ class RDBTable implements Table<byte[], byte[]> {
   public boolean isExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyMayExistChecks();
     final Supplier<byte[]> valueSupplier = db.keyMayExist(family, key);
-    if (valueSupplier != null) {
-      final byte[] value = valueSupplier.get();
-      if (value != null) {
-        return true; // definitely exists
-      }
+    if (valueSupplier == null) {
+      return false;  // definitely not exists
+    }
+    final byte[] value = valueSupplier.get();
+    if (value != null) {
+      return true; // definitely exists
     }
 
-    // keyMayExist can be a false-negative in some RocksDB setups (for example,
-    // snapshot/checkpoint DBs). Verify via point-get to preserve correctness.
+    // keyMayExist could not return the value; confirm via point-get.
     final boolean exists = get(key) != null;
     if (!exists) {
       rdbMetrics.incNumDBKeyMayExistMisses();
@@ -142,14 +142,15 @@ class RDBTable implements Table<byte[], byte[]> {
   public byte[] getIfExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
     final Supplier<byte[]> valueSupplier = db.keyMayExist(family, key);
-    if (valueSupplier != null) {
-      final byte[] value = valueSupplier.get();
-      if (value != null) {
-        return value; // definitely exists
-      }
+    if (valueSupplier == null) {
+      return null; // definitely not exists
+    }
+    final byte[] value = valueSupplier.get();
+    if (value != null) {
+      return value; // definitely exists
     }
 
-    // keyMayExist is treated as a hint only; confirm via point-get.
+    // keyMayExist could not return the value; confirm via point-get.
     rdbMetrics.incNumDBKeyGetIfExistGets();
     final byte[] val = get(key);
     if (val == null) {
@@ -164,15 +165,16 @@ class RDBTable implements Table<byte[], byte[]> {
     // ByteBuffer instance for fallback point-get.
     final Supplier<Integer> value = db.keyMayExist(
         family, key.duplicate(), outValue.duplicate());
-    if (value != null) {
-      final Integer length = value.get();
-      if (length != null) {
-        // definitely exists, return value size.
-        return length;
-      }
+    if (value == null) {
+      return null; // definitely not exists
+    }
+    final Integer length = value.get();
+    if (length != null) {
+      // definitely exists, return value size.
+      return length;
     }
 
-    // keyMayExist is treated as a hint only; confirm via point-get.
+    // keyMayExist could not return the value; confirm via point-get.
     rdbMetrics.incNumDBKeyGetIfExistGets();
     final Integer val = get(key.duplicate(), outValue);
     if (val == null) {

@@ -368,8 +368,8 @@ public class TestRDBTableStore {
 
     RDBMetrics rdbMetrics = rdbStore.getMetrics();
     assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
-    assertEquals(2, rdbMetrics.getNumDBKeyMayExistMisses());
-    assertEquals(4, rdbMetrics.getNumDBKeyGets());
+    assertEquals(0, rdbMetrics.getNumDBKeyMayExistMisses());
+    assertEquals(2, rdbMetrics.getNumDBKeyGets());
 
     // Reinsert key for further testing.
     testTable.put(key, value);
@@ -437,8 +437,9 @@ public class TestRDBTableStore {
     RDBMetrics rdbMetrics = rdbStore.getMetrics();
     assertEquals(3, rdbMetrics.getNumDBKeyGetIfExistChecks());
 
-    assertEquals(2, rdbMetrics.getNumDBKeyGetIfExistMisses());
-    assertEquals(2, rdbMetrics.getNumDBKeyGetIfExistGets());
+    assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
+
+    assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistGets());
 
     // Reinsert key for further testing.
     testTable.put(key, value);

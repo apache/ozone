@@ -905,7 +905,7 @@ public final class RocksDatabase implements Closeable {
               StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
               db.get().getName(),
               prefixForColumnFamily);
-          db.deleteFile(handle, liveFileMetaData);
+          db.deleteSstFileRange(handle, liveFileMetaData);
         }
       }
     }
