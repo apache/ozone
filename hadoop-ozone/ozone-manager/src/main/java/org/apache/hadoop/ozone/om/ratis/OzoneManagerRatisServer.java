@@ -595,7 +595,7 @@ public final class OzoneManagerRatisServer {
       if (notLeaderException != null) {
         throw new ServiceException(
             OMNotLeaderException.convertToOMNotLeaderException(
-                  notLeaderException, getRaftPeerId()));
+                notLeaderException, getRaftPeerId(), this::resolvePeerDetails));
       }
 
       LeaderNotReadyException leaderNotReadyException =
@@ -913,8 +913,22 @@ public final class OzoneManagerRatisServer {
     if (leader == null) {
       return new OMNotLeaderException(raftPeerId);
     }
-    final String leaderAddress = getRaftLeaderAddress(leader);
-    return new OMNotLeaderException(raftPeerId, leader.getId(), leaderAddress);
+    OMNodeDetails leaderDetails = resolvePeerDetails(leader.getId());
+    if (leaderDetails == null) {
+      return new OMNotLeaderException(raftPeerId);
+    }
+    String rpcHostPort = leaderDetails.getRpcAddressString();
+    InetAddress inetAddress = leaderDetails.getInetAddress();
+    String ip = inetAddress == null ? null : inetAddress.getHostAddress();
+    return new OMNotLeaderException(raftPeerId, leader.getId(), rpcHostPort, ip);
+  }
+
+  private OMNodeDetails resolvePeerDetails(RaftPeerId peerId) {
+    String nodeId = peerId.toString();
+    if (nodeId.equals(ozoneManager.getOMNodeId())) {
+      return ozoneManager.getNodeDetails();
+    }
+    return ozoneManager.getPeerNode(nodeId);
   }
 
   /**

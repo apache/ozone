@@ -387,6 +387,31 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
   }
 
   @Test
+  public void testWriteFailoverHitsLeaderHint() throws Exception {
+    ObjectStore store = getObjectStore();
+    HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> provider =
+        OmTestUtil.getFailoverProxyProvider(store);
+
+    // Pick a real follower from cluster state.
+    String followerId = getCluster().getOzoneManagersList().stream()
+        .filter(om -> !om.isLeaderReady())
+        .map(OzoneManager::getOMNodeId)
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("No follower OM found"));
+
+    // setNextOmProxy only updates nextProxyIndex; performFailover commits it
+    // into currentProxyIndex so leaderProxy.getProxy() will return the follower.
+    provider.setNextOmProxy(followerId);
+    provider.performFailover(null);
+
+    // Write goes through FollowerReadInvocationHandler.invoke() ->
+    // leaderProxy.getProxy() (now the follower) -> server returns
+    // ServiceException(RemoteException(OMNotLeaderException)) -> RetryProxy ->
+    // OMFailoverProxyProviderBase retry policy -> line 221.
+    store.createVolume("vol-" + RandomStringUtils.secure().nextNumeric(5));
+  }
+
+  @Test
   public void testJMXMetrics() throws Exception {
     // Verify any one ratis metric is exposed by JMX MBeanServer
     OzoneManagerRatisServer ratisServer =
