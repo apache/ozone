@@ -19,15 +19,19 @@ Documentation       Basic checks that snapshots still look correct while the OM 
 ...                 Cluster setup: filesystem snapshots on; defrag interval in compose/ozone
 ...                 docker-config. Default compose has one datanode: use replication 1 (OZONE_REPLICATION_FACTOR)
 ...                 or scale datanodes to match replication.
+Force Tags          om_filesystem
 Library             OperatingSystem
 Resource            ../ozone-lib/shell.robot
 Resource            snapshot-setup.robot
-Suite Setup         Prepare Suite With Bucket And First Snapshot
+Suite Setup         Run Keywords    Assert Snapshot Defrag Interval Is Positive
+...                 AND    Detect Rocks Tools Available
+...                 AND    Prepare Suite With Bucket And First Snapshot
 Test Timeout        20 minutes
 
 *** Variables ***
-# Wait long enough for at least two defrag runs (OM uses a 30s interval in compose).
-${DEFRAG_WAIT_SECONDS}     65
+${DEFRAG_POLL_TIMEOUT}       10 minutes
+${DEFRAG_POLL_INTERVAL}      5 seconds
+${DEFRAG_FALLBACK_SECONDS}    65
 
 *** Test Cases ***
 Read Snapshot Data Right After Create
@@ -40,7 +44,7 @@ After Waiting Keys Still Match Through Snapshot And On Live Bucket
     ${key_two} =            snapshot-setup.Create key           ${VOLUME}       ${BUCKET}       /etc/passwd
     Set Suite Variable      ${KEY_TWO}          ${key_two}
     Set Suite Variable      ${LIVE_KEY_TWO_PATH}                   /${VOLUME}/${BUCKET}/${key_two}
-    Sleep                   ${DEFRAG_WAIT_SECONDS}
+    Wait Until Snapshot Local YAML Shows Defragged    ${SNAPSHOT_ONE}
     Key Should Match Local File         ${SNAP_KEY_PATH_ONE}       /etc/hosts
     Key Should Match Local File         ${LIVE_KEY_TWO_PATH}       /etc/passwd
 
@@ -80,11 +84,12 @@ Snapshot Diff Json Report Lists Added Keys
                     Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_THREE}
 
 After More Defrag Time Snapshot Info And Reads Stay Consistent
-    [Documentation]     Wait again so defrag can run. Re-check ozone sh snapshot info (OM metadata includes
-    ...                 checkpointDir / status) and re-read keys through snapshot paths. We do not rerun snapshot
+    [Documentation]     Poll OmSnapshot local YAML until defrag is recorded (version > 0, needsDefrag false),
+    ...                 then re-check ozone sh snapshot info and snapshot reads. We do not rerun snapshot
     ...                 diff --get-report here: a completed diff report is served from cache for
     ...                 ozone.om.snapshot.diff.job.report.persistent.time, so that call would not retrigger work.
-    Sleep                   ${DEFRAG_WAIT_SECONDS}
+    Wait Until Snapshot Local YAML Shows Defragged      ${SNAPSHOT_ONE}
+    Wait Until Snapshot Local YAML Shows Defragged      ${SNAPSHOT_TWO}
     ${info_one} =       Execute             ozone sh snapshot info /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE}
                         Should contain      echo '${info_one}' | jq '.volumeName'       ${VOLUME}
                         Should contain      echo '${info_one}' | jq '.bucketName'       ${BUCKET}
@@ -108,13 +113,54 @@ Delete Older Snapshot Younger One Still Readable
     [Documentation]     Delete the first snapshot; it shows SNAPSHOT_DELETED; read all keys through the second snapshot path.
     ${output} =         Execute           ozone sh snapshot delete /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE}
                         Should not contain                    ${output}       Failed
-    ${output} =         Execute            ozone sh snapshot ls /${VOLUME}/${BUCKET} | jq '[.[] | select(.name == "${SNAPSHOT_ONE}") | .snapshotStatus] | if length > 0 then .[] else "SNAPSHOT_DELETED" end'
+    ${output} =         Execute            ozone sh snapshot ls /${VOLUME}/${BUCKET} | jq --arg n '${SNAPSHOT_ONE}' '[.[] | select(.name == $n) | .snapshotStatus] | if length > 0 then .[] else "SNAPSHOT_DELETED" end'
                         Should contain                        ${output}       SNAPSHOT_DELETED
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_ONE}       /etc/hosts
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_TWO}       /etc/passwd
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_THREE}     /etc/group
 
 *** Keywords ***
+Assert Snapshot Defrag Interval Is Positive
+    [Documentation]     Default ozone.snapshot.defrag.service.interval is -1 (service off). This suite needs a
+    ...                 positive interval (compose/ozone docker-config).
+    ${ival} =    Execute    ozone getconf confKey ozone.snapshot.defrag.service.interval
+    ${ival} =    Strip String    ${ival}
+    Should Not Contain    ${ival}    -1
+    Should Not Be Equal As Strings    ${ival}    ${EMPTY}
+
+Detect Rocks Tools Available
+    [Documentation]     SnapshotDefragService needs rocks-tools JNI. CI Linux dist embeds .so; a Mac-built jar may only
+    ...                 contain .dylib, so defrag never runs and YAML version stays 0.
+    ${out} =    Execute    ozone debug checknative
+    ${ok} =     Run Keyword And Return Status    Should Match Regexp    ${out}    (?m)^\\s*rocks-tools:\\s+true\\b
+    Set Suite Variable    ${ROCKS_TOOLS_AVAILABLE}    ${ok}
+
+Get Snapshot Local YAML Path
+    [Arguments]    ${snapshot_name}
+    ${info} =          Execute    ozone sh snapshot info /${VOLUME}/${BUCKET} ${snapshot_name}
+    ${snapshot_id} =   Execute    echo '${info}' | jq -r '.snapshotId'
+    [Return]           /data/metadata/db.snapshots/checkpointState/om.db-${snapshot_id}.yaml
+
+Snapshot Local YAML Should Show Defragged
+    [Arguments]    ${snapshot_name}
+    ${yaml} =          Get Snapshot Local YAML Path    ${snapshot_name}
+    Execute            test -f '${yaml}'
+    ${version} =       Execute    awk '/^[[:space:]]*version:/ {print $2; exit}' '${yaml}'
+    ${version} =       Strip String    ${version}
+    ${v} =             Convert To Integer    ${version}
+    Should Be True     ${v} > 0
+    ${needs_defrag} =  Execute    awk '/^[[:space:]]*needsDefrag:/ {print $2; exit}' '${yaml}'
+    ${needs_defrag} =  Strip String    ${needs_defrag}
+    Should Be Equal    ${needs_defrag}    false
+
+Wait Until Snapshot Local YAML Shows Defragged
+    [Arguments]    ${snapshot_name}
+    Run Keyword Unless    ${ROCKS_TOOLS_AVAILABLE}    Log
+    ...    rocks-tools JNI not loaded in OM; using ${DEFRAG_FALLBACK_SECONDS}s wait instead of YAML defrag poll (build Linux dist with -Drocks_tools_native to exercise reviewer YAML path).
+    Run Keyword Unless    ${ROCKS_TOOLS_AVAILABLE}    Sleep    ${DEFRAG_FALLBACK_SECONDS}
+    Run Keyword If    ${ROCKS_TOOLS_AVAILABLE}    Wait Until Keyword Succeeds    ${DEFRAG_POLL_TIMEOUT}    ${DEFRAG_POLL_INTERVAL}
+    ...    Snapshot Local YAML Should Show Defragged    ${snapshot_name}
+
 Prepare Suite With Bucket And First Snapshot
     Setup volume and bucket
     ${key_one} =            snapshot-setup.Create key           ${VOLUME}       ${BUCKET}       /etc/hosts

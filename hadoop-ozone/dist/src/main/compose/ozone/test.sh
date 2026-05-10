@@ -55,4 +55,6 @@ execute_robot_test scm -v SCHEME:ofs -N ozonefs-obs ozonefs/ozonefs-obs.robot
 
 execute_robot_test s3g grpc/grpc-om-s3-metrics.robot
 
-execute_robot_test scm --exclude pre-finalized-snapshot-tests snapshot
+execute_robot_test scm --exclude om_filesystem --exclude pre-finalized-snapshot-tests snapshot
+
+execute_robot_test om snapshot/snapshot-defrag.robot
