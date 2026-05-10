@@ -35,6 +35,7 @@ import {
   ContainersPaginationResponse,
   ContainerState,
   ExpandedRow,
+  QuasiClosedContainersResponse,
   TabPaginationState,
 } from "@/v2/types/container.types";
 import { ClusterStateResponse } from "@/v2/types/overview.types";
@@ -124,6 +125,23 @@ const Containers: React.FC<{}> = () => {
     }
   }, [clusterState.data]);
 
+  // Fetches the total quasi-closed count independently to populate Highlights on page load.
+  const fetchQuasiClosedCount = async () => {
+    try {
+      const response = await fetchData<QuasiClosedContainersResponse>(
+        '/api/v1/containers/quasiClosed',
+        'GET',
+        { limit: 1, minContainerId: 0 }
+      );
+      setState(prev => ({
+        ...prev,
+        quasiClosedCount: response.quasiClosedCount ?? prev.quasiClosedCount,
+      }));
+    } catch (_) {
+      // Non-critical: Highlights card will just show 0 until the tab is opened.
+    }
+  };
+
   // Fetch a single page for a tab using cursor-based pagination.
   // minContainerId=0 means "start from the beginning".
   // currentPageSize is passed explicitly so callers (e.g. size-change handler) can
@@ -142,13 +160,53 @@ const Containers: React.FC<{}> = () => {
       [tabKey]: { ...prev[tabKey], loading: true },
     }));
 
+    if (tabKey === '6') {
+      // Quasi-closed tab uses its own dedicated endpoint and response type.
+      try {
+        const response = await fetchData<QuasiClosedContainersResponse>(
+          '/api/v1/containers/quasiClosed',
+          'GET',
+          { limit: fetchSize, minContainerId }
+        );
+        const allContainers = response.containers ?? [];
+        const hasNextPage = allContainers.length > currentPageSize;
+        const containers = allContainers.slice(0, currentPageSize);
+        const lastKey = containers.length > 0
+          ? Math.max(...containers.map(c => c.containerID))
+          : 0;
+        const firstKey = containers.length > 0
+          ? Math.min(...containers.map(c => c.containerID))
+          : 0;
+        setTabStates(prev => ({
+          ...prev,
+          [tabKey]: {
+            ...prev[tabKey],
+            data: containers as any,
+            loading: false,
+            firstKey,
+            lastKey,
+            currentMinContainerId: minContainerId,
+            hasNextPage,
+          },
+        }));
+        setState(prev => ({
+          ...prev,
+          quasiClosedCount: response.quasiClosedCount ?? prev.quasiClosedCount,
+          lastUpdated: Number(moment()),
+        }));
+      } catch (error) {
+        setTabStates(prev => ({
+          ...prev,
+          [tabKey]: { ...prev[tabKey], loading: false },
+        }));
+        showDataFetchError(error);
+      }
+      return;
+    }
+
     try {
-      const endpoint = tabKey === '6' 
-        ? `/api/v1/containers/quasiClosed` 
-        : `/api/v1/containers/unhealthy/${containerStateName}`;
-        
       const response = await fetchData<ContainersPaginationResponse>(
-        endpoint,
+        `/api/v1/containers/unhealthy/${containerStateName}`,
         'GET',
         { limit: fetchSize, minContainerId }
       );
@@ -180,7 +238,7 @@ const Containers: React.FC<{}> = () => {
         },
       }));
 
-      // Summary counts are returned by every tab endpoint.
+      // Summary counts are returned by every unhealthy tab endpoint.
       setState(prev => ({
         ...prev,
         missingCount: response.missingCount ?? prev.missingCount,
@@ -188,7 +246,6 @@ const Containers: React.FC<{}> = () => {
         overReplicatedCount: response.overReplicatedCount ?? prev.overReplicatedCount,
         misReplicatedCount: response.misReplicatedCount ?? prev.misReplicatedCount,
         replicaMismatchCount: response.replicaMismatchCount ?? prev.replicaMismatchCount,
-        quasiClosedCount: response.quasiClosedCount ?? prev.quasiClosedCount,
         lastUpdated: Number(moment()),
       }));
     } catch (error) {
@@ -200,9 +257,10 @@ const Containers: React.FC<{}> = () => {
     }
   };
 
-  // Initial fetch on mount.
+  // Initial fetch on mount: load tab 1 and fetch the quasi-closed count independently.
   useEffect(() => {
     fetchTabData('1', 0, DEFAULT_PAGE_SIZE);
+    fetchQuasiClosedCount();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleColumnChange(selected: ValueType<Option, true>) {
@@ -272,6 +330,7 @@ const Containers: React.FC<{}> = () => {
       '6': { ...DEFAULT_TAB_STATE },
     });
     fetchTabData(selectedTab, 0, pageSize);
+    fetchQuasiClosedCount();
     clusterState.refetch();
   };
 

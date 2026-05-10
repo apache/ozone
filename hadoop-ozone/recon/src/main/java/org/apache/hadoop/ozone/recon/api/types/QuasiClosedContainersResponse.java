@@ -21,10 +21,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * Class that represents the API Response structure for Quasi-Closed Containers.
+ * API response wrapper for the quasi-closed containers endpoint.
  */
 public class QuasiClosedContainersResponse {
-  
+
   @JsonProperty("quasiClosedCount")
   private long quasiClosedCount = 0;
 
@@ -35,13 +35,13 @@ public class QuasiClosedContainersResponse {
   private long lastKey = 0;
 
   @JsonProperty("containers")
-  private List<UnhealthyContainerMetadata> containers;
+  private List<QuasiClosedContainerMetadata> containers;
 
   public QuasiClosedContainersResponse() {
   }
 
   public QuasiClosedContainersResponse(long quasiClosedCount, long firstKey, long lastKey,
-      List<UnhealthyContainerMetadata> containers) {
+      List<QuasiClosedContainerMetadata> containers) {
     this.quasiClosedCount = quasiClosedCount;
     this.firstKey = firstKey;
     this.lastKey = lastKey;
@@ -72,11 +72,11 @@ public class QuasiClosedContainersResponse {
     this.lastKey = lastKey;
   }
 
-  public List<UnhealthyContainerMetadata> getContainers() {
+  public List<QuasiClosedContainerMetadata> getContainers() {
     return containers;
   }
 
-  public void setContainers(List<UnhealthyContainerMetadata> containers) {
+  public void setContainers(List<QuasiClosedContainerMetadata> containers) {
     this.containers = containers;
   }
 }

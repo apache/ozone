@@ -95,6 +95,7 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
@@ -1997,11 +1998,10 @@ public class TestContainerEndpoint {
     assertEquals(200L, result.getFirstKey());
     assertEquals(202L, result.getLastKey());
 
-    List<UnhealthyContainerMetadata> containers =
+    List<QuasiClosedContainerMetadata> containers =
         new ArrayList<>(result.getContainers());
     assertEquals(3, containers.size());
     containers.forEach(c -> {
-      assertEquals("QUASI_CLOSED", c.getContainerState());
       // StandaloneReplicationConfig.ONE → requiredNodes = 1
       assertEquals(1L, c.getExpectedReplicaCount());
     });
@@ -2044,7 +2044,7 @@ public class TestContainerEndpoint {
     assertNotNull(result);
     assertEquals(1, result.getContainers().size());
 
-    UnhealthyContainerMetadata meta = result.getContainers().get(0);
+    QuasiClosedContainerMetadata meta = result.getContainers().get(0);
     assertEquals(210L, meta.getContainerID());
     assertEquals(2L, meta.getActualReplicaCount());
     assertEquals(2, meta.getReplicas().size());
@@ -2091,16 +2091,16 @@ public class TestContainerEndpoint {
 
     // IDs must not overlap between pages.
     Set<Long> page1Ids = page1.getContainers().stream()
-        .map(UnhealthyContainerMetadata::getContainerID)
+        .map(QuasiClosedContainerMetadata::getContainerID)
         .collect(Collectors.toSet());
     Set<Long> page2Ids = page2.getContainers().stream()
-        .map(UnhealthyContainerMetadata::getContainerID)
+        .map(QuasiClosedContainerMetadata::getContainerID)
         .collect(Collectors.toSet());
     assertTrue(Collections.disjoint(page1Ids, page2Ids));
   }
 
   @Test
-  public void testGetQuasiClosedCountInUnhealthySummary() throws Exception {
+  public void testGetQuasiClosedCountViaDedicatedEndpoint() throws Exception {
     // Add 2 containers and move them to QUASI_CLOSED.
     reconContainerManager.addNewContainer(
         getTestContainer(HddsProtos.LifeCycleState.OPEN, 400L));
@@ -2115,12 +2115,12 @@ public class TestContainerEndpoint {
     }
     assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 2);
 
-    // The unhealthy summary endpoint must include the quasi-closed count
-    // so the Highlights card is populated on first page load (tab 1 fetch).
-    Response response = containerEndpoint.getUnhealthyContainers(1000, 0, 0);
-    UnhealthyContainersResponse summary =
-        (UnhealthyContainersResponse) response.getEntity();
+    // The quasi-closed count is fetched independently via the dedicated endpoint.
+    // The unhealthy endpoint no longer carries this count.
+    Response response = containerEndpoint.getQuasiClosedContainers(1, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
 
-    assertEquals(2L, summary.getQuasiClosedCount());
+    assertEquals(2L, result.getQuasiClosedCount());
   }
 }

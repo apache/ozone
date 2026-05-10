@@ -72,12 +72,37 @@ export type ContainersPaginationResponse = {
   overReplicatedCount: number;
   misReplicatedCount: number;
   replicaMismatchCount: number;
-  quasiClosedCount?: number;
-  totalCount?: number;
+}
+
+export type QuasiClosedContainer = {
+  containerID: number;
+  pipelineID: string;
+  keys: number;
+  stateEnterTime: number;
+  expectedReplicaCount: number;
+  actualReplicaCount: number;
+  replicas: ContainerReplica[];
+}
+
+export type QuasiClosedContainersResponse = {
+  quasiClosedCount: number;
+  firstKey: number;
+  lastKey: number;
+  containers: QuasiClosedContainer[];
 }
 
 export type TabPaginationState = {
   data: Container[];
+  loading: boolean;
+  firstKey: number;
+  lastKey: number;
+  currentMinContainerId: number;
+  pageHistory: number[];
+  hasNextPage: boolean;
+}
+
+export type QuasiClosedTabState = {
+  data: QuasiClosedContainer[];
   loading: boolean;
   firstKey: number;
   lastKey: number;

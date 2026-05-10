@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadat
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
@@ -448,11 +449,6 @@ public class ContainerEndpoint {
     for (UnhealthyContainersSummary s : summary) {
       response.setSummaryCount(s.getContainerState(), s.getCount());
     }
-    
-    // Also include the quasi-closed count in the summary for the frontend Highlights tab
-    long quasiClosedCount = containerManager.getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
-    response.setQuasiClosedCount(quasiClosedCount);
-    
     return Response.ok(response).build();
   }
 
@@ -822,50 +818,51 @@ public class ContainerEndpoint {
   /**
    * Return all containers in QUASI_CLOSED state.
    *
-   * @param limit   max no. of containers to get.
-   * @param prevKey the containerID after which results are returned.
+   * @param limit          max no. of containers to get.
+   * @param minContainerId cursor — return containers with ID &gt; minContainerId.
    * @return {@link Response}
    */
   @GET
   @Path("/quasiClosed")
   public Response getQuasiClosedContainers(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit,
-      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE) @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
 
     List<ContainerInfo> containers = containerManager.getContainers(
-        ContainerID.valueOf(prevKey + 1), limit, HddsProtos.LifeCycleState.QUASI_CLOSED);
+        ContainerID.valueOf(minContainerId + 1), limit, HddsProtos.LifeCycleState.QUASI_CLOSED);
 
-    List<UnhealthyContainerMetadata> metaList = containers.stream()
-        .map(ci -> {
-          long containerID = ci.getContainerID();
-          int requiredNodes = 0;
-          try {
-            requiredNodes = ci.getReplicationConfig().getRequiredNodes();
-          } catch (Exception e) {
-            LOG.warn("Could not get required nodes for container {}", containerID, e);
-          }
-          List<ContainerHistory> replicas = containerManager.getLatestContainerHistory(containerID, requiredNodes);
-          
-          UnhealthyContainerMetadata metadata = new UnhealthyContainerMetadata(
-              containerID,
-              "QUASI_CLOSED",
-              ci.getStateEnterTime() != null ? ci.getStateEnterTime().toEpochMilli() : 0L,
-              requiredNodes,
-              replicas.size(),
-              replicas.size() - requiredNodes,
-              "",
-              ci.getNumberOfKeys(),
-              ci.getPipelineID() != null ? ci.getPipelineID().getId() : null,
-              replicas
-          );
-          return metadata;
-        })
+    List<QuasiClosedContainerMetadata> metaList = containers.stream()
+        .map(this::toQuasiClosedMetadata)
         .collect(Collectors.toList());
 
-    long firstKey = metaList.isEmpty() ? prevKey : metaList.get(0).getContainerID();
-    long lastKey  = metaList.isEmpty() ? prevKey : metaList.get(metaList.size() - 1).getContainerID();
+    long firstKey = metaList.isEmpty() ? minContainerId : metaList.get(0).getContainerID();
+    long lastKey  = metaList.isEmpty() ? minContainerId : metaList.get(metaList.size() - 1).getContainerID();
     long total    = containerManager.getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
 
     return Response.ok(new QuasiClosedContainersResponse(total, firstKey, lastKey, metaList)).build();
+  }
+
+  private QuasiClosedContainerMetadata toQuasiClosedMetadata(ContainerInfo ci) {
+    try {
+      long containerID = ci.getContainerID();
+      int requiredNodes = ci.getReplicationConfig().getRequiredNodes();
+      List<ContainerHistory> replicas =
+          containerManager.getLatestContainerHistory(containerID, requiredNodes);
+      long stateEnterTime = ci.getStateEnterTime() != null
+          ? ci.getStateEnterTime().toEpochMilli() : 0L;
+      String pipelineID = ci.getPipelineID() != null
+          ? ci.getPipelineID().getId().toString() : null;
+      return new QuasiClosedContainerMetadata(
+          containerID,
+          pipelineID,
+          ci.getNumberOfKeys(),
+          stateEnterTime,
+          requiredNodes,
+          replicas.size(),
+          replicas);
+    } catch (Exception e) {
+      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 }
