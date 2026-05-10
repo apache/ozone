@@ -199,7 +199,7 @@ public class SequenceIdGenerator {
      * Compare And Swap lastId saved in db from expectedLastId to newLastId.
      * If based on Ratis, it will submit a raft client request.
      *
-     * @param sequenceIdName : name of the sequence id.
+     * @param idType : the type of sequence ID.
      * @param expectedLastId : the expected lastId saved in db
      * @param newLastId      : the new lastId to save in db
      * @return               : result of the C.A.S.
@@ -210,7 +210,7 @@ public class SequenceIdGenerator {
         throws SCMException;
 
     /**
-     * @param sequenceIdName : name of the sequence id.
+     * @param idType : the type of sequence ID.
      * @return lastId saved in db
      */
     Long getLastId(SequenceIdType idType);
