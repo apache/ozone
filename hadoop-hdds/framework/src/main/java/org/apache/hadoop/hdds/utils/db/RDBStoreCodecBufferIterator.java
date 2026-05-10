@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.Preconditions;
 
@@ -33,7 +34,12 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
       CodecBuffer prefix, IteratorType type) {
-    super(iterator, table, prefix, type);
+    this(iterator, table, prefix, type, null);
+  }
+
+  RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
+      CodecBuffer prefix, IteratorType type, ManagedReadOptions readOptions) {
+    super(iterator, table, prefix, type, readOptions);
 
     final String name = table != null ? table.getName() : null;
     this.keyBuffer = new Buffer(
@@ -91,10 +97,13 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   @Override
   public void close() {
     if (closed.compareAndSet(false, true)) {
-      super.close();
-      Optional.ofNullable(getPrefix()).ifPresent(CodecBuffer::release);
-      keyBuffer.release();
-      valueBuffer.release();
+      try {
+        super.close();
+      } finally {
+        Optional.ofNullable(getPrefix()).ifPresent(CodecBuffer::release);
+        keyBuffer.release();
+        valueBuffer.release();
+      }
     }
   }
 }

@@ -17,20 +17,22 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.util.Arrays;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 
 /**
  * RocksDB store iterator using the byte[] API.
  */
 class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
-  private static byte[] copyPrefix(byte[] prefix) {
-    return prefix == null || prefix.length == 0 ? null : Arrays.copyOf(prefix, prefix.length);
+  RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
+      RDBTable table, byte[] prefix, IteratorType type) {
+    this(iterator, table, prefix, type, null);
   }
 
   RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
-      RDBTable table, byte[] prefix, IteratorType type) {
-    super(iterator, table, copyPrefix(prefix), type);
+      RDBTable table, byte[] prefix, IteratorType type,
+      ManagedReadOptions readOptions) {
+    super(iterator, table, copyNonEmpty(prefix), type, readOptions);
     seekToFirst();
   }
 

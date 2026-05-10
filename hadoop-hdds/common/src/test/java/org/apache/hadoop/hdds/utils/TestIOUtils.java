@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -29,6 +32,20 @@ class TestIOUtils {
   void closeQuietlyNull() {
     ByteArrayOutputStream out = null;
     IOUtils.closeQuietly(out);
+  }
+
+  @Test
+  void closeAndSuppress() {
+    IOException failure = new IOException("original");
+    RuntimeException closeFailure = new RuntimeException("close");
+
+    IOUtils.closeAndSuppress(failure,
+        () -> {
+          throw closeFailure;
+        },
+        null);
+
+    assertSame(closeFailure, failure.getSuppressed()[0]);
   }
 
 }

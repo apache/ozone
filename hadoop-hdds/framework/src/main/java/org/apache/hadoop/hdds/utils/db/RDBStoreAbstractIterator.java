@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +44,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   // prefix for each key.
   private final RAW prefix;
   private final IteratorType type;
+  private final ManagedReadOptions readOptions;
   private final AtomicBoolean isIteratorClosed = new AtomicBoolean(false);
 
   /**
@@ -50,10 +53,53 @@ abstract class RDBStoreAbstractIterator<RAW>
    * or always closed in a finally block to ensure accurate refcounting.
    */
   RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type) {
+    this(iterator, table, prefix, type, null);
+  }
+
+  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table,
+      RAW prefix, IteratorType type, ManagedReadOptions readOptions) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
     this.type = type;
+    this.readOptions = readOptions;
+  }
+
+  static byte[] copyNonEmpty(byte[] prefix) {
+    return prefix == null || prefix.length == 0 ? null
+        : Arrays.copyOf(prefix, prefix.length);
+  }
+
+  static byte[] getNextHigherPrefix(byte[] prefix) {
+    if (prefix == null || prefix.length == 0) {
+      return null;
+    }
+    for (int i = prefix.length - 1; i >= 0; i--) {
+      if ((prefix[i] & 0xFF) != 0xFF) {
+        byte[] upperBound = Arrays.copyOf(prefix, i + 1);
+        upperBound[i]++;
+        return upperBound;
+      }
+    }
+    return null;
+  }
+
+  static ManagedReadOptions newReadOptions(byte[] prefix, boolean fillCache) {
+    final byte[] lowerBound =
+        prefix == null || prefix.length == 0 ? null : prefix;
+    final ManagedReadOptions readOptions = new ManagedReadOptions(
+        lowerBound, getNextHigherPrefix(lowerBound));
+    try {
+      readOptions.setFillCache(fillCache);
+      return readOptions;
+    } catch (RuntimeException | Error e) {
+      try {
+        readOptions.close();
+      } catch (RuntimeException | Error closeException) {
+        e.addSuppressed(closeException);
+      }
+      throw e;
+    }
   }
 
   IteratorType getType() {
@@ -148,6 +194,8 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final Table.KeyValue<RAW, RAW> seek(RAW key) {
+    // Prefix-bounded RocksDB iterators must not seek below their native
+    // lower bound. RocksDB documents that case as undefined.
     seek0(key);
     setCurrentEntry();
     return currentEntry;
@@ -168,7 +216,13 @@ abstract class RDBStoreAbstractIterator<RAW>
   @Override
   public void close() {
     if (isIteratorClosed.compareAndSet(false, true)) {
-      rocksDBIterator.close();
+      try {
+        rocksDBIterator.close();
+      } finally {
+        if (readOptions != null) {
+          readOptions.close();
+        }
+      }
     }
   }
 }

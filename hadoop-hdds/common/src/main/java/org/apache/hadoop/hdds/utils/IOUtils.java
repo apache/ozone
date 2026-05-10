@@ -107,6 +107,28 @@ public final class IOUtils {
     close(null, closeables);
   }
 
+  /**
+   * Close each argument and add any thrown {@link Throwable} to the original
+   * failure as suppressed.
+   */
+  public static void closeAndSuppress(Throwable failure,
+      AutoCloseable... closeables) {
+    if (closeables == null) {
+      return;
+    }
+    for (AutoCloseable c : closeables) {
+      if (c != null) {
+        try {
+          c.close();
+        } catch (Throwable t) {
+          if (failure != t) {
+            failure.addSuppressed(t);
+          }
+        }
+      }
+    }
+  }
+
   /** Write {@code properties} to the file at {@code path}, truncating any existing content. */
   public static void writePropertiesToFile(File file, Properties properties) throws IOException {
     try (OutputStream out = new AtomicFileOutputStream(file)) {

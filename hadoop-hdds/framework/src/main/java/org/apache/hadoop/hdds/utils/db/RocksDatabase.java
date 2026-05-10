@@ -793,6 +793,17 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  public ManagedRocksIterator newIterator(ColumnFamily family,
+      ManagedReadOptions readOptions) throws RocksDatabaseException {
+    final UncheckedAutoCloseable ref = acquire();
+    try {
+      return managed(db.get().newIterator(family.getHandle(), readOptions), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
+    }
+  }
+
   public void batchWrite(ManagedWriteBatch writeBatch,
                          ManagedWriteOptions options)
       throws RocksDatabaseException {

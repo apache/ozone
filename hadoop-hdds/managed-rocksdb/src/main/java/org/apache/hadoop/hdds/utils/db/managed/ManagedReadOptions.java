@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
+import java.util.Arrays;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.ReadOptions;
 
@@ -27,13 +29,70 @@ import org.rocksdb.ReadOptions;
  */
 public class ManagedReadOptions extends ReadOptions {
   private final UncheckedAutoCloseable leakTracker = track(this);
+  private final byte[] lowerBound;
+  private final byte[] upperBound;
+  private final ManagedSlice lowerBoundSlice;
+  private final ManagedSlice upperBoundSlice;
+
+  public ManagedReadOptions() {
+    this(null, null);
+  }
+
+  public ManagedReadOptions(byte[] lowerBound, byte[] upperBound) {
+    this.lowerBound = copy(lowerBound);
+    this.upperBound = copy(upperBound);
+
+    ManagedSlice lowerSlice = null;
+    ManagedSlice upperSlice = null;
+    try {
+      lowerSlice = this.lowerBound != null
+          ? new ManagedSlice(this.lowerBound) : null;
+      upperSlice = this.upperBound != null
+          ? new ManagedSlice(this.upperBound) : null;
+
+      if (lowerSlice != null) {
+        setIterateLowerBound(lowerSlice);
+      }
+      if (upperSlice != null) {
+        setIterateUpperBound(upperSlice);
+      }
+    } catch (RuntimeException | Error e) {
+      closeOnConstructorFailure(lowerSlice, upperSlice, e);
+      throw e;
+    }
+
+    this.lowerBoundSlice = lowerSlice;
+    this.upperBoundSlice = upperSlice;
+  }
+
+  private static byte[] copy(byte[] bytes) {
+    return bytes != null ? Arrays.copyOf(bytes, bytes.length) : null;
+  }
+
+  public byte[] getLowerBound() {
+    return copy(lowerBound);
+  }
+
+  public byte[] getUpperBound() {
+    return copy(upperBound);
+  }
+
+  private void closeOnConstructorFailure(ManagedSlice lowerSlice,
+      ManagedSlice upperSlice, Throwable failure) {
+    IOUtils.closeAndSuppress(failure, this::closeReadOptions, lowerSlice,
+        upperSlice, leakTracker);
+  }
+
+  private void closeReadOptions() {
+    super.close();
+  }
 
   @Override
   public void close() {
     try {
       super.close();
     } finally {
-      leakTracker.close();
+      IOUtils.closeQuietly(lowerBoundSlice, upperBoundSlice, leakTracker);
     }
   }
 }
