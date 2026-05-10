@@ -607,7 +607,7 @@ public final class OzoneManagerRatisServer {
 
       LeaderSteppingDownException leaderSteppingDownException = reply.getLeaderSteppingDownException();
       if (leaderSteppingDownException != null) {
-        throw new ServiceException(new OMNotLeaderException(leaderSteppingDownException.getMessage()));
+        throw new ServiceException(newOMNotLeaderException());
       }
 
       ReadIndexException readIndexException = reply.getReadIndexException();

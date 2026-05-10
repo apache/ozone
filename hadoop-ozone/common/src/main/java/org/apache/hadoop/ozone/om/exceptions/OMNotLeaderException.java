@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.exceptions;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.function.Function;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.ratis.protocol.RaftPeer;
@@ -51,16 +52,15 @@ public class OMNotLeaderException extends IOException {
   private static final String UNRESOLVED_IP = "unresolved";
 
   /**
-   *
-   * Patterns for parsing the suggested leader information from the exception message of the form
+   * Pattern for parsing the suggested-leader fields from the exception message of the form
+   * <pre>
    * OM:om2 is not the leader. Suggested leader is OM:om1 at om1.cluster.local:9862 (ip=10.0.0.5).
    * OM:om2 is not the leader. Suggested leader is OM:om1 at [fe80::1]:9862 (ip=fe80::1).
    * OM:om2 is not the leader. Suggested leader is OM:om1 at om1.cluster.local:9862 (ip=unresolved).
+   * </pre>
    */
-  private static final Pattern CURRENT_PEER_ID_PATTERN =
-      Pattern.compile("^OM:(\\S+) is not the leader\\..*", Pattern.DOTALL);
   private static final Pattern SUGGESTED_LEADER_PATTERN =
-      Pattern.compile(".*Suggested leader is OM:(\\S+) at (\\S+) \\(ip=(\\S+?)\\)\\.\\s*$", Pattern.DOTALL);
+      Pattern.compile(".*Suggested leader is OM:(\\S+) at (\\S+) \\(ip=(\\S+?)\\)\\..*", Pattern.DOTALL);
 
   public OMNotLeaderException(RaftPeerId currentPeerId) {
     super(String.format(NO_LEADER_FORMAT, currentPeerId));
@@ -69,13 +69,8 @@ public class OMNotLeaderException extends IOException {
     this.leaderIpAddress = null;
   }
 
-  public OMNotLeaderException(RaftPeerId currentPeerId,
-      RaftPeerId suggestedLeaderPeerId) {
-    this(currentPeerId, suggestedLeaderPeerId, null);
-  }
-
   /**
-   *
+   * Note that the port here is the RPC port of the suggested leader and not the Ratis port
    * @param suggestedLeaderHostPort host:rpcPort
    */
   public OMNotLeaderException(RaftPeerId currentPeerId,
@@ -92,9 +87,19 @@ public class OMNotLeaderException extends IOException {
 
   public OMNotLeaderException(String msg) {
     super(msg);
-    this.leaderPeerId = null;
-    this.leaderAddress = null;
-    this.leaderIpAddress = null;
+    Matcher matcher = SUGGESTED_LEADER_PATTERN.matcher(msg);
+    String parsedLeaderPeerId = null;
+    String parsedLeaderAddress = null;
+    String parsedLeaderIpAddress = null;
+    if (matcher.matches()) {
+      parsedLeaderPeerId = matcher.group(1);
+      parsedLeaderAddress = matcher.group(2);
+      parsedLeaderIpAddress = matcher.group(3);
+      parsedLeaderIpAddress = parsedLeaderIpAddress.equals(UNRESOLVED_IP) ? null : parsedLeaderIpAddress;
+    }
+    this.leaderPeerId = parsedLeaderPeerId;
+    this.leaderAddress = parsedLeaderAddress;
+    this.leaderIpAddress = parsedLeaderIpAddress;
   }
 
   public String getSuggestedLeaderNodeId() {
@@ -103,6 +108,10 @@ public class OMNotLeaderException extends IOException {
 
   public String getSuggestedLeaderAddress() {
     return leaderAddress;
+  }
+
+  public String getSuggestedLeaderIpAddress() {
+    return leaderIpAddress;
   }
 
   /**
