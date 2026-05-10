@@ -17,7 +17,13 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -29,6 +35,56 @@ class TestIOUtils {
   void closeQuietlyNull() {
     ByteArrayOutputStream out = null;
     IOUtils.closeQuietly(out);
+  }
+
+  @Test
+  void closeAndSuppress() {
+    IOException failure = new IOException("original");
+    RuntimeException closeFailure = new RuntimeException("close");
+
+    IOUtils.closeAndSuppress(failure,
+        () -> {
+          throw closeFailure;
+        },
+        null);
+
+    assertSame(closeFailure, failure.getSuppressed()[0]);
+  }
+
+  @Test
+  void closeAndSuppressSingleClosesResource() {
+    IOException failure = new IOException("original");
+    AtomicInteger closed = new AtomicInteger();
+
+    IOUtils.closeAndSuppress(closed::incrementAndGet, failure);
+
+    assertEquals(1, closed.get());
+    assertEquals(0, failure.getSuppressed().length);
+  }
+
+  @Test
+  void closeAndSuppressSingleAddsCloseFailureAsSuppressed() {
+    IOException failure = new IOException("original");
+    RuntimeException closeFailure = new RuntimeException("close");
+
+    IOUtils.closeAndSuppress(() -> {
+      throw closeFailure;
+    }, failure);
+
+    assertEquals(1, failure.getSuppressed().length);
+    assertSame(closeFailure, failure.getSuppressed()[0]);
+  }
+
+  @Test
+  void closeAndSuppressSingleIgnoresNullAndSelf() {
+    IOException failure = new IOException("original");
+    IOUtils.closeAndSuppress((AutoCloseable) null, failure);
+    IOUtils.closeAndSuppress(() -> {
+      throw failure;
+    }, failure);
+    assertEquals(0, failure.getSuppressed().length);
+    assertThrows(NullPointerException.class,
+        () -> IOUtils.closeAndSuppress(() -> { }, null));
   }
 
 }

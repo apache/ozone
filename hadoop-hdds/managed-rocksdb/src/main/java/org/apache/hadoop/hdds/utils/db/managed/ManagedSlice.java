@@ -37,6 +37,12 @@ public class ManagedSlice extends Slice {
     return super.getNativeHandle();
   }
 
+  /** Widen visibility so owners can verify the native handle is released. */
+  @Override
+  public synchronized boolean isOwningHandle() {
+    return super.isOwningHandle();
+  }
+
   @Override
   protected void disposeInternal() {
     // RocksMutableObject.close is final thus can't be decorated.

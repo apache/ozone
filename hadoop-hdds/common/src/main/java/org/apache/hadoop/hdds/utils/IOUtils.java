@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Properties;
 import org.apache.ratis.util.AtomicFileOutputStream;
 import org.apache.ratis.util.Preconditions;
@@ -105,6 +106,44 @@ public final class IOUtils {
    */
   public static void closeQuietly(Collection<? extends AutoCloseable> closeables) {
     close(null, closeables);
+  }
+
+  /**
+   * Close each argument and add any thrown {@link Throwable} to the original
+   * failure as suppressed.
+   */
+  public static void closeAndSuppress(Throwable failure,
+      AutoCloseable... closeables) {
+    if (closeables == null) {
+      return;
+    }
+    for (AutoCloseable c : closeables) {
+      closeAndSuppress(c, failure);
+    }
+  }
+
+  /**
+   * Close the given resource. If closing throws, the exception is added to
+   * {@code failure} as suppressed instead of being propagated.
+   * This is intended for cleanup on an exception path, where the original
+   * failure must not be masked.
+   *
+   * @param closeable the resource to close, may be null.
+   * @param failure the original failure, must not be null.
+   */
+  public static void closeAndSuppress(AutoCloseable closeable,
+      Throwable failure) {
+    Objects.requireNonNull(failure, "failure == null");
+    if (closeable == null) {
+      return;
+    }
+    try {
+      closeable.close();
+    } catch (Throwable t) {
+      if (failure != t) {
+        failure.addSuppressed(t);
+      }
+    }
   }
 
   /** Write {@code properties} to the file at {@code path}, truncating any existing content. */

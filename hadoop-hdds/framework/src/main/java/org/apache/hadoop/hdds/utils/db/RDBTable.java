@@ -25,8 +25,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.util.Time;
 import org.rocksdb.ByteBufferGetStatus;
 import org.slf4j.Logger;
@@ -245,14 +248,42 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, IteratorType type)
       throws RocksDatabaseException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
-        prefix, type);
+    final ManagedReadOptions readOptions =
+        RDBStoreAbstractIterator.newReadOptions(prefix, false);
+    ManagedRocksIterator rocksIterator = null;
+    try {
+      rocksIterator = db.newIterator(family, readOptions);
+      return new RDBStoreByteArrayIterator(rocksIterator, this, prefix, type,
+          readOptions);
+    } catch (RocksDatabaseException | RuntimeException e) {
+      IOUtils.closeAndSuppress(e, rocksIterator, readOptions);
+      throw e;
+    }
   }
 
   KeyValueIterator<CodecBuffer, CodecBuffer> iterator(
       CodecBuffer prefix, IteratorType type) throws RocksDatabaseException {
-    return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
-        this, prefix, type);
+    final ManagedReadOptions readOptions =
+        RDBStoreAbstractIterator.newReadOptions(toByteArray(prefix), false);
+    ManagedRocksIterator rocksIterator = null;
+    try {
+      rocksIterator = db.newIterator(family, readOptions);
+      return new RDBStoreCodecBufferIterator(rocksIterator, this, prefix, type,
+          readOptions);
+    } catch (RocksDatabaseException | RuntimeException e) {
+      IOUtils.closeAndSuppress(e, rocksIterator, readOptions);
+      throw e;
+    }
+  }
+
+  private static byte[] toByteArray(CodecBuffer buffer) {
+    if (buffer == null || buffer.readableBytes() == 0) {
+      return null;
+    }
+    final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer();
+    final byte[] bytes = new byte[byteBuffer.remaining()];
+    byteBuffer.get(bytes);
+    return bytes;
   }
 
   boolean isClosed() {
