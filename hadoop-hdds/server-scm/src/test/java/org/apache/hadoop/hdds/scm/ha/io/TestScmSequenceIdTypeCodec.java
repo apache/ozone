@@ -52,7 +52,6 @@ public class TestScmSequenceIdTypeCodec {
   @SuppressWarnings("deprecation")
   public void testPersistingExplicitBytes() throws Exception {
 
-    // EnumMap provides type safety and high performance without extra dependencies
     Map<SequenceIdType, byte[]> testCases = new EnumMap<>(SequenceIdType.class);
 
     testCases.put(SequenceIdType.LOCAL_ID,
@@ -70,7 +69,6 @@ public class TestScmSequenceIdTypeCodec {
     testCases.put(SequenceIdType.ROOT_CERTIFICATE_ID,
         new byte[] {'R', 'O', 'O', 'T', '_', 'C', 'E', 'R', 'T', 'I', 'F', 'I', 'C', 'A', 'T', 'E', '_', 'I', 'D'});
 
-    // Clean, type-safe loop
     for (Map.Entry<SequenceIdType, byte[]> entry : testCases.entrySet()) {
       checkPersisting(entry.getKey(), entry.getValue());
     }

@@ -59,7 +59,7 @@ public class TestSequenceIdType {
 
     Set<String> removed = new HashSet<>(expectedNames);
     removed.removeAll(actualNames);
-
+    // Fails the test if any sequenceId types are added or removed.
     assertTrue(added.isEmpty() && removed.isEmpty(),
         () -> "SequenceIdType constants changed!\n" +
             "Unexpectedly Added: " + added + "\n" +
