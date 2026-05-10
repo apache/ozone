@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -70,6 +71,7 @@ public final class ScmCodecFactory {
     codecs.put(com.google.protobuf.ByteString.class, new ScmNonShadedByteStringCodec());
     codecs.put(ByteString.class, new ScmByteStringCodec());
     codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
+    codecs.put(SequenceIdType.class, new ScmSequenceIdTypeCodec());
 
     putEnum(LifeCycleEvent.class, LifeCycleEvent::forNumber);
     putEnum(PipelineState.class, PipelineState::forNumber);

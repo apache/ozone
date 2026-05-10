@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
@@ -64,15 +65,15 @@ public class SequenceIdGenerator {
   /**
    * Ids supported.
    */
-  public static final String LOCAL_ID = SequenceIdType.LOCAL_ID.getDbKey();
-  public static final String DEL_TXN_ID = SequenceIdType.DEL_TXN_ID.getDbKey();
-  public static final String CONTAINER_ID = SequenceIdType.CONTAINER_ID.getDbKey();
+  private static final String LOCAL_ID = SequenceIdType.LOCAL_ID.getDbKey();
+  private static final String DEL_TXN_ID = SequenceIdType.DEL_TXN_ID.getDbKey();
+  private static final String CONTAINER_ID = SequenceIdType.CONTAINER_ID.getDbKey();
 
   // Certificate ID for all services, including root certificates, whose ID
   // were using "rootCertificateId" before.
-  public static final String CERTIFICATE_ID = SequenceIdType.CERTIFICATE_ID.getDbKey();
+  private static final String CERTIFICATE_ID = SequenceIdType.CERTIFICATE_ID.getDbKey();
   @Deprecated
-  public static final String ROOT_CERTIFICATE_ID = SequenceIdType.ROOT_CERTIFICATE_ID.getDbKey();
+  private static final String ROOT_CERTIFICATE_ID = SequenceIdType.ROOT_CERTIFICATE_ID.getDbKey();
 
   private static final long INVALID_SEQUENCE_ID = 0;
 
@@ -89,13 +90,21 @@ public class SequenceIdGenerator {
    */
   public SequenceIdGenerator(ConfigurationSource conf,
       SCMHAManager scmhaManager, Table<String, Long> sequenceIdTable) {
-    this.sequenceIdToBatchMap = new EnumMap<>(SequenceIdType.class);
+    this.sequenceIdToBatchMap = newSequenceIdToBatchMap();
     this.lock = new ReentrantLock();
     this.batchSize = conf.getInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE,
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
 
     Objects.requireNonNull(scmhaManager, "scmhaManager == null");
     this.stateManager = createStateManager(scmhaManager, sequenceIdTable);
+  }
+
+  static Map<SequenceIdType, Batch> newSequenceIdToBatchMap() {
+    final EnumMap<SequenceIdType, Batch> map = new EnumMap<>(SequenceIdType.class);
+    for (SequenceIdType type : SequenceIdType.values()) {
+      map.put(type, new Batch());
+    }
+    return Collections.unmodifiableMap(map);
   }
 
   public StateManager createStateManager(SCMHAManager scmhaManager,
@@ -114,8 +123,7 @@ public class SequenceIdGenerator {
   public long getNextId(SequenceIdType idType) throws SCMException {
     lock.lock();
     try {
-      Batch batch = sequenceIdToBatchMap.computeIfAbsent(
-          idType, key -> new Batch());
+      final Batch batch = sequenceIdToBatchMap.get(idType);
 
       if (batch.nextId <= batch.lastId) {
         return batch.nextId++;
@@ -130,8 +138,7 @@ public class SequenceIdGenerator {
         long nextLastId = batch.lastId +
             (idType == SequenceIdType.CERTIFICATE_ID ? 1 : batchSize);
 
-        if (stateManager.allocateBatch(idType.getDbKey(),
-            prevLastId, nextLastId)) {
+        if (stateManager.allocateBatch(idType, prevLastId, nextLastId)) {
           batch.lastId = nextLastId;
           LOG.info("Allocate a batch for {}, change lastId from {} to {}.",
               idType, prevLastId, batch.lastId);
@@ -139,7 +146,7 @@ public class SequenceIdGenerator {
         }
 
         // reload lastId from RocksDB.
-        batch.lastId = stateManager.getLastId(idType.getDbKey());
+        batch.lastId = stateManager.getLastId(idType);
       }
 
       Preconditions.checkArgument(batch.nextId <= batch.lastId);
@@ -198,7 +205,7 @@ public class SequenceIdGenerator {
      * @return               : result of the C.A.S.
      */
     @Replicate
-    Boolean allocateBatch(String sequenceIdName,
+    Boolean allocateBatch(SequenceIdType idType,
                           Long expectedLastId, Long newLastId)
         throws SCMException;
 
@@ -206,7 +213,7 @@ public class SequenceIdGenerator {
      * @param sequenceIdName : name of the sequence id.
      * @return lastId saved in db
      */
-    Long getLastId(String sequenceIdName);
+    Long getLastId(SequenceIdType idType);
 
     /**
      * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
@@ -227,7 +234,7 @@ public class SequenceIdGenerator {
   static final class StateManagerImpl implements StateManager {
     private Table<String, Long> sequenceIdTable;
     private final DBTransactionBuffer transactionBuffer;
-    private final Map<String, Long> sequenceIdToLastIdMap;
+    private final Map<SequenceIdType, Long> sequenceIdToLastIdMap;
 
     private StateManagerImpl(Table<String, Long> sequenceIdTable,
                                DBTransactionBuffer trxBuffer) {
@@ -238,12 +245,12 @@ public class SequenceIdGenerator {
     }
 
     @Override
-    public Boolean allocateBatch(String sequenceIdName,
+    public Boolean allocateBatch(SequenceIdType idType,
                                  Long expectedLastId, Long newLastId) {
-      Long lastId = sequenceIdToLastIdMap.computeIfAbsent(sequenceIdName,
+      Long lastId = sequenceIdToLastIdMap.computeIfAbsent(idType,
           key -> {
             try {
-              Long idInDb = this.sequenceIdTable.get(key);
+              Long idInDb = this.sequenceIdTable.get(key.getDbKey());
               return idInDb != null ? idInDb : INVALID_SEQUENCE_ID;
             } catch (IOException ioe) {
               throw new RuntimeException("Failed to get lastId from db", ioe);
@@ -252,24 +259,24 @@ public class SequenceIdGenerator {
 
       if (!lastId.equals(expectedLastId)) {
         LOG.warn("Failed to allocate a batch for {}, expected lastId is {}," +
-            " actual lastId is {}.", sequenceIdName, expectedLastId, lastId);
+            " actual lastId is {}.", idType, expectedLastId, lastId);
         return false;
       }
 
       try {
         transactionBuffer
-            .addToBuffer(sequenceIdTable, sequenceIdName, newLastId);
+            .addToBuffer(sequenceIdTable, idType.getDbKey(), newLastId);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to put lastId to Batch", ioe);
       }
 
-      sequenceIdToLastIdMap.put(sequenceIdName, newLastId);
+      sequenceIdToLastIdMap.put(idType, newLastId);
       return true;
     }
 
     @Override
-    public Long getLastId(String sequenceIdName) {
-      return sequenceIdToLastIdMap.get(sequenceIdName);
+    public Long getLastId(SequenceIdType idType) {
+      return sequenceIdToLastIdMap.get(idType);
     }
 
     @Override
@@ -280,18 +287,15 @@ public class SequenceIdGenerator {
       initialize();
     }
 
+    /**
+     * Avoid complete scanning of sequenceIdTable, instead fetch
+     * only the sequence IDs defined in the SequenceIdType enum.
+     */
     private void initialize() throws IOException {
-      try (Table.KeyValueIterator<String, Long> iterator = sequenceIdTable.iterator()) {
-
-        while (iterator.hasNext()) {
-          Table.KeyValue<String, Long> kv = iterator.next();
-          final String sequenceIdName = kv.getKey();
-          final Long lastId = kv.getValue();
-          Objects.requireNonNull(sequenceIdName,
-              "sequenceIdName should not be null");
-          Objects.requireNonNull(lastId,
-              "lastId should not be null");
-          sequenceIdToLastIdMap.put(sequenceIdName, lastId);
+      for (SequenceIdType type : SequenceIdType.values()) {
+        Long lastId = sequenceIdTable.get(type.getDbKey());
+        if (lastId != null) {
+          sequenceIdToLastIdMap.put(type, lastId);
         }
       }
     }

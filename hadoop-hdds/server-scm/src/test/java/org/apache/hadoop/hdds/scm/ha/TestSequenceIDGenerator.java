@@ -20,10 +20,10 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.util.Objects;
@@ -165,8 +165,9 @@ public class TestSequenceIDGenerator {
     // So this SCM can only allocate IDs within the current batch
     // ([1, batchSize]), does not allow the allocation of IDs for the next batch
     // ([batchSize + 1, batchSize * 2])
-    when(stateManager.allocateBatch(anyString(), anyLong(), anyLong()))
-        .thenThrow(new SCMException(SCMException.ResultCodes.SCM_NOT_LEADER));
+    //Pre-supplies the exception without calling the real method
+    doThrow(new SCMException(SCMException.ResultCodes.SCM_NOT_LEADER))
+        .when(stateManager).allocateBatch(any(SequenceIdType.class), anyLong(), anyLong());
 
     for (int i = 0; i < batchSize * 3; i++) {
       try {
