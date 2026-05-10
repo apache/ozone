@@ -151,3 +151,23 @@ export type ContainerState = {
   replicaMismatchCount: number;
   quasiClosedCount: number;
 }
+
+
+export type ExportJobStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export type ExportJob = {
+  jobId: string;
+  state: string;
+  status: ExportJobStatus;
+  queuePosition: number;
+  totalRecords: number;
+  estimatedTotal: number;
+  progressPercent: number;
+  fileName: string | null;
+  errorMessage: string | null;
+  submittedAt: number;
+  startedAt: number;
+  completedAt: number;
+  downloadCount: number;
+  downloadsRemaining: number;
+}

@@ -23,7 +23,6 @@ package org.apache.hadoop.ozone.common;
 
 import java.nio.ByteBuffer;
 import java.util.zip.Checksum;
-import org.apache.ratis.util.Preconditions;
 
 /**
  * A sub-interface of {@link Checksum}
@@ -46,82 +45,5 @@ public interface ChecksumByteBuffer extends Checksum {
   @Override
   default void update(byte[] b, int off, int len) {
     update(ByteBuffer.wrap(b, off, len).asReadOnlyBuffer());
-  }
-
-  /**
-   * An abstract class implementing {@link ChecksumByteBuffer}
-   * with a 32-bit checksum and a lookup table.
-   */
-  @SuppressWarnings("innerassignment")
-  abstract class CrcIntTable implements ChecksumByteBuffer {
-    /** Current CRC value with bit-flipped. */
-    private int crc;
-
-    CrcIntTable() {
-      reset();
-      Preconditions.assertTrue(getTable().length == 8 * (1 << 8));
-    }
-
-    abstract int[] getTable();
-
-    @Override
-    public final long getValue() {
-      return (~crc) & 0xffffffffL;
-    }
-
-    @Override
-    public final void reset() {
-      crc = 0xffffffff;
-    }
-
-    @Override
-    public final void update(int b) {
-      crc = (crc >>> 8) ^ getTable()[(((crc ^ b) << 24) >>> 24)];
-    }
-
-    @Override
-    public final void update(ByteBuffer b) {
-      crc = update(crc, b, getTable());
-    }
-
-    private static int update(int crc, ByteBuffer b, int[] table) {
-      for (; b.remaining() > 7;) {
-        final int c0 = (b.get() ^ crc) & 0xff;
-        final int c1 = (b.get() ^ (crc >>>= 8)) & 0xff;
-        final int c2 = (b.get() ^ (crc >>>= 8)) & 0xff;
-        final int c3 = (b.get() ^ (crc >>> 8)) & 0xff;
-        crc = (table[0x700 + c0] ^ table[0x600 + c1])
-            ^ (table[0x500 + c2] ^ table[0x400 + c3]);
-
-        final int c4 = b.get() & 0xff;
-        final int c5 = b.get() & 0xff;
-        final int c6 = b.get() & 0xff;
-        final int c7 = b.get() & 0xff;
-
-        crc ^= (table[0x300 + c4] ^ table[0x200 + c5])
-            ^ (table[0x100 + c6] ^ table[c7]);
-      }
-
-      // loop unroll - duff's device style
-      switch (b.remaining()) {
-      case 7:
-        crc = (crc >>> 8) ^ table[((crc ^ b.get()) & 0xff)];
-      case 6:
-        crc = (crc >>> 8) ^ table[((crc ^ b.get()) & 0xff)];
-      case 5:
-        crc = (crc >>> 8) ^ table[((crc ^ b.get()) & 0xff)];
-      case 4:
-        crc = (crc >>> 8) ^ table[((crc ^ b.get()) & 0xff)];
-      case 3:
-        crc = (crc >>> 8) ^ table[((crc ^ b.get()) & 0xff)];
-      case 2:
-        crc = (crc >>> 8) ^ table[((crc ^ b.get()) & 0xff)];
-      case 1:
-        crc = (crc >>> 8) ^ table[((crc ^ b.get()) & 0xff)];
-      default: // noop
-      }
-
-      return crc;
-    }
   }
 }

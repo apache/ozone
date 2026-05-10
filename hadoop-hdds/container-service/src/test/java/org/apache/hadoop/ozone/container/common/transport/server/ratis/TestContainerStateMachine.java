@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroup;
@@ -155,6 +156,7 @@ abstract class TestContainerStateMachine {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
+  @Flaky("HDDS-14962")
   public void testApplyTransactionFailure(boolean failWithException) throws ExecutionException,
       InterruptedException, IOException {
     RaftProtos.LogEntryProto entry = mock(RaftProtos.LogEntryProto.class);

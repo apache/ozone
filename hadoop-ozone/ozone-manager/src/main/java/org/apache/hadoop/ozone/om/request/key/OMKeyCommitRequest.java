@@ -95,7 +95,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     if (keyArgs.hasExpectedDataGeneration()) {
       if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         ozoneManager.checkFeatureEnabled(
             OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
       } else {
@@ -625,7 +625,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       Long expectedGen = toCommit.getExpectedDataGeneration();
       auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
 
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         if (existing != null) {
           throw new OMException("Atomic create-if-not-exists conflicted with an existing key",
               OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);

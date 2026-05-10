@@ -58,6 +58,9 @@ public class TestBucketList {
     endpoint.queryParamsForTest().set(QueryParams.PREFIX, "");
     ListObjectResponse getBucketResponse = (ListObjectResponse) endpoint.get("b1").getEntity();
 
+    assertNotNull(getBucketResponse.getPrefix());
+    assertEquals("", getBucketResponse.getPrefix().getName());
+
     assertEquals(1, getBucketResponse.getCommonPrefixes().size());
     assertEquals("dir1/",
         getBucketResponse.getCommonPrefixes().get(0).getPrefix().getName());
