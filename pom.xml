@@ -94,7 +94,7 @@
     <httpcore.version>4.4.16</httpcore.version>
     <iceberg.version>1.10.1</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
-    <jackson2-bom.version>2.21.2</jackson2-bom.version>
+    <jackson2-bom.version>2.21.3</jackson2-bom.version>
     <jackson2.version>2.21.3</jackson2.version>
     <jacoco.version>0.8.14</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
