@@ -70,7 +70,7 @@ public class OMNotLeaderException extends IOException {
   }
 
   /**
-   * Note that the port here is the RPC port of the suggested leader and not the Ratis port
+   * Note that the port here is the RPC port of the suggested leader and not the Ratis port.
    * @param suggestedLeaderHostPort host:rpcPort
    */
   public OMNotLeaderException(RaftPeerId currentPeerId,
