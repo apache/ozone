@@ -4411,8 +4411,9 @@
     <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
-      Ozone namespace should follow S3 naming rule by default.
-      However this parameter allows the namespace to support non-S3 compatible characters.
+      When `true` (the default), volume and bucket names follow strict S3 naming rules.
+      When `false`, S3 rules still apply except that underscore (`_`) is additionally
+      allowed in volume and bucket names; no other non-S3 characters are permitted.
     </description>
   </property>
 
