@@ -115,6 +115,7 @@ import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotVersion;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -967,6 +968,7 @@ public class TestRocksDBCheckpointDiffer {
    * Does actual DB write, flush, compaction.
    */
   @Test
+  @Flaky("HDDS-15209")
   void testDifferWithDB() throws Exception {
     writeKeysAndCheckpointing();
     readRocksDBInstance(ACTIVE_DB_DIR_NAME, activeRocksDB, null,
