@@ -48,7 +48,7 @@ Method level annotation used to "disallow" an API if current layout version does
 ## @BelongsToLayoutVersion Annotation
 Annotation to mark an OM request class that it belongs to a specific Layout Version. Until that version is available post finalize, this request will not be supported. A newer version of an existing OM request can be created (by inheritance or a fully new class) and marked with a newer layout version. Until finalizing this layout version, the older request class is used. Post finalizing, the newer version of the request class is used.
 
-## Upgrade Action (UpgradeActionOm & UpgradeActionHdds)
+## Upgrade Action (UpgradeActionOm, UpgradeActionScm & UpgradeActionDatanode)
 Annotation to specify upgrade action run during finalization. Each layout feature can optionally define a single upgrade action that will be executed when the feature is finalized. This action should be idempotent and execute quickly. The action must complete for the feature to finish
 finalizing, so if there is an error executing the action it will be retried. This partial failure should not leave the component inoperable.
 

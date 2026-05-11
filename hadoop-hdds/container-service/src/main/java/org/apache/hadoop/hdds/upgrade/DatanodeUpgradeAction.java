@@ -15,24 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
+package org.apache.hadoop.hdds.upgrade;
 
-import java.util.Map;
-import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
- * Supplies upgrade actions keyed by {@link ComponentVersion}. Implementations typically perform classpath scanning or
- * return a fixed map for tests. The component version manager decides when each action is invoked.
- *
- * @param <A> concrete upgrade action type (for example OM-specific or HDDS-specific)
+ * Datanode Upgrade Action interface. An upgrade action is an operation that
+ * needs to be executed during finalization.
  */
-@FunctionalInterface
-public interface ComponentUpgradeActionProvider<A extends UpgradeAction<?>> {
-
-  /**
-   * Returns all upgrade actions from this provider, keyed by component version.
-   * <p>
-   * Implementations must return a newly allocated map on each call; the caller may retain and use it directly.
-   */
-  Map<ComponentVersion, A> load();
+public interface DatanodeUpgradeAction extends UpgradeAction<DatanodeStateMachine> {
 }

@@ -15,24 +15,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
+package org.apache.hadoop.hdds.upgrade;
 
-import java.util.Map;
 import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
+import org.apache.hadoop.ozone.upgrade.UpgradeActionScm;
 
 /**
- * Supplies upgrade actions keyed by {@link ComponentVersion}. Implementations typically perform classpath scanning or
- * return a fixed map for tests. The component version manager decides when each action is invoked.
- *
- * @param <A> concrete upgrade action type (for example OM-specific or HDDS-specific)
+ * Loads {@link ScmUpgradeAction} implementations annotated with {@link UpgradeActionScm}.
  */
-@FunctionalInterface
-public interface ComponentUpgradeActionProvider<A extends UpgradeAction<?>> {
+public final class ScmUpgradeActionProvider extends AbstractUpgradeActionProvider<ScmUpgradeAction> {
 
-  /**
-   * Returns all upgrade actions from this provider, keyed by component version.
-   * <p>
-   * Implementations must return a newly allocated map on each call; the caller may retain and use it directly.
-   */
-  Map<ComponentVersion, A> load();
+  public static final String SCM_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.hdds.scm.server";
+
+  public ScmUpgradeActionProvider() {
+    super(UpgradeActionScm.class, ScmUpgradeAction.class, SCM_UPGRADE_CLASS_PACKAGE);
+  }
+
+  @Override
+  protected ComponentVersion extractVersion(Class<?> clazz) {
+    UpgradeActionScm annotation = clazz.getAnnotation(UpgradeActionScm.class);
+    return annotation.feature();
+  }
 }

@@ -15,12 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.upgrade;
-
-import org.apache.hadoop.ozone.upgrade.UpgradeAction;
-
 /**
- * Upgrade Action for SCM and DataNodes.
+ * Provides Datanode upgrade actions and providers.
  */
-public interface HDDSUpgradeAction<T> extends UpgradeAction<T> {
-}
+package org.apache.hadoop.hdds.upgrade;

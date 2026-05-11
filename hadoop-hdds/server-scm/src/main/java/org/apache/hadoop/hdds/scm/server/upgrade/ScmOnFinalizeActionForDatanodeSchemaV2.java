@@ -18,19 +18,18 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
-import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
-import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
+import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
+import org.apache.hadoop.ozone.upgrade.UpgradeActionScm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * SCM Upgrade Action for the very first Upgrade Version.
  */
-@UpgradeActionHdds(feature = DATANODE_SCHEMA_V2, component = SCM)
+@UpgradeActionScm(feature = DATANODE_SCHEMA_V2)
 public class ScmOnFinalizeActionForDatanodeSchemaV2 implements
-    HDDSUpgradeAction<SCMUpgradeFinalizationContext> {
+    ScmUpgradeAction {
   private static final Logger LOG =
       LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
 

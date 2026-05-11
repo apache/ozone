@@ -15,32 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
+package org.apache.hadoop.hdds.upgrade;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
- * Annotation to specify upgrade action run during HDDS (SCM or Datanode) finalization.
+ * Storage Container Manager Upgrade Action interface. An upgrade action is an operation that
+ * needs to be executed during finalization.
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface UpgradeActionHdds {
-  HDDSLayoutFeature feature();
-
-  Component component();
-
-  /**
-   * Simple enum to denote if an action is for the SCM or the DN.
-   */
-  enum Component {
-    SCM,
-    DATANODE;
-  }
+public interface ScmUpgradeAction extends UpgradeAction<SCMUpgradeFinalizationContext> {
 }
-
-
-
