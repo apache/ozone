@@ -1099,6 +1099,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetricsQuery'
+  /heatmap/readaccess:
+    get:
+      tags:
+        - Heat Map
+      summary: Returns the top-N prefixes by read access as a tree of `EntityReadAccessHeatMap` nodes
+      operationId: getReadAccessHeatMap
+      description: |
+        Heatmap responses are feature-gated. If the HeatMap feature is disabled (see
+        `/features/disabledFeatures`), this route returns **404 Not Found**.
+      parameters:
+        - name: startDate
+          in: query
+          required: false
+          description: Look-back window for access aggregation. Default `24H`.
+          schema:
+            type: string
+            default: "24H"
+        - name: entityType
+          in: query
+          required: false
+          description: Entity granularity. Default `key`.
+          schema:
+            type: string
+            default: key
+        - name: path
+          in: query
+          required: false
+          description: Restrict heatmap to this path prefix.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityReadAccessHeatMap'
+        '404':
+          description: HeatMap feature is disabled.
+        '500':
+          description: HeatMap provider failure.
+  /heatmap/healthCheck:
+    get:
+      tags:
+        - Heat Map
+      summary: Health check for the configured HeatMap provider
+      operationId: getHeatMapHealthCheck
+      responses:
+        '200':
+          description: Health check result. Body depends on the provider implementation.
+          content:
+            application/json:
+              schema:
+                type: object
+  /features/disabledFeatures:
+    get:
+      tags:
+        - Features
+      summary: Lists Recon features that are currently disabled
+      operationId: getDisabledFeatures
+      description: |
+        Returned strings match the enum constant names from `FeatureProvider.Feature`
+        (currently the only candidate is `HEATMAP`).
+      responses:
+        '200':
+          description: Array of disabled feature names (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example:
+                  - HEATMAP
+  /triggerdbsync/om:
+    get:
+      tags:
+        - Admin Utilities
+      summary: Triggers an immediate OM DB sync from Recon
+      operationId: triggerOMDBSync
+      responses:
+        '200':
+          description: Boolean indicating whether the sync request was accepted.
+          content:
+            application/json:
+              schema:
+                type: boolean
+                example: true
   /storageDistribution:
     get:
       tags:
@@ -2946,3 +3034,37 @@ components:
       example:
         pendingDirectorySize: 204800
         pendingKeySize: 1048576
+    EntityReadAccessHeatMap:
+      type: object
+      description: |
+        Nested tree node used by `/heatmap/readaccess`. The root has `label: "root"` and `path: "/"`;
+        children represent volumes, then buckets, then directories, then keys.
+      properties:
+        label:
+          type: string
+          example: vol1
+        path:
+          type: string
+          example: /vol1
+        size:
+          type: integer
+          format: int64
+          description: Aggregate size in bytes of this entity.
+        accessCount:
+          type: integer
+          format: int64
+          description: Access count for this entity within the queried time window.
+        minAccessCount:
+          type: integer
+          format: int64
+        maxAccessCount:
+          type: integer
+          format: int64
+        color:
+          type: number
+          format: double
+          description: Normalized color value (heatmap intensity).
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityReadAccessHeatMap'

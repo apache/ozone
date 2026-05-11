@@ -1556,3 +1556,84 @@ The response body depends on `component`:
 }
 ```
 
+## Heat Map (admin only)
+
+Read-access heatmap data is feature-gated. If the HeatMap feature is listed by
+`/api/v1/features/disabledFeatures`, `/api/v1/heatmap/readaccess` returns `404 Not Found`.
+
+### GET /api/v1/heatmap/readaccess
+
+**Parameters**
+
+* startDate (optional)
+
+  Look-back window for access aggregation. Default `24H`.
+
+* entityType (optional)
+
+  Entity granularity. Default `key`.
+
+* path (optional)
+
+  Restrict the heatmap to this path prefix.
+
+**Returns**
+
+A nested `EntityReadAccessHeatMap` tree. The root represents `/`; children represent volumes, then
+buckets, then directories, then keys. Each node carries `size`, `accessCount`,
+`minAccessCount`/`maxAccessCount`, and a normalized `color` value.
+
+```json
+{
+  "label": "root",
+  "path": "/",
+  "size": 12345678,
+  "accessCount": 1000,
+  "minAccessCount": 0,
+  "maxAccessCount": 250,
+  "color": 0.5,
+  "children": [
+    {
+      "label": "vol1",
+      "path": "/vol1",
+      "size": 8345678,
+      "accessCount": 750,
+      "color": 0.75,
+      "children": []
+    }
+  ]
+}
+```
+
+### GET /api/v1/heatmap/healthCheck
+
+**Returns**
+
+Health-check response from the configured HeatMap provider. The body shape depends on the provider
+implementation.
+
+## Features (admin only)
+
+### GET /api/v1/features/disabledFeatures
+
+**Returns**
+
+JSON array of feature enum names that are currently disabled. The only feature name in use today
+is `HEATMAP`. Useful for the UI to decide whether to show or grey out feature-gated controls.
+
+```json
+["HEATMAP"]
+```
+
+## Admin Utilities (admin only)
+
+### GET /api/v1/triggerdbsync/om
+
+**Returns**
+
+Requests Recon to start an immediate sync from the Ozone Manager DB. Returns a boolean indicating
+whether the sync request was accepted by the OM service provider.
+
+```json
+true
+```
