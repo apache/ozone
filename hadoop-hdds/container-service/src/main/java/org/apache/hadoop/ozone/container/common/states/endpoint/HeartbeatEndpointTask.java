@@ -85,18 +85,16 @@ public class HeartbeatEndpointTask
    * @param rpcEndpoint rpc Endpoint
    * @param conf Config.
    * @param context State context
-   * @param versionManager Layout version Manager
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
-                               ConfigurationSource conf, StateContext context,
-                               DatanodeVersionManager versionManager) {
+                               ConfigurationSource conf, StateContext context) {
     this.rpcEndpoint = rpcEndpoint;
     this.context = context;
     this.maxContainerActionsPerHB = conf.getInt(HDDS_CONTAINER_ACTION_MAX_LIMIT,
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
-    this.versionManager = versionManager;
+    this.versionManager = context.getParent().getVersionManager();
   }
 
   /**
@@ -438,7 +436,6 @@ public class HeartbeatEndpointTask
     private ConfigurationSource conf;
     private DatanodeDetails datanodeDetails;
     private StateContext context;
-    private DatanodeVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -454,17 +451,6 @@ public class HeartbeatEndpointTask
      */
     public Builder setEndpointStateMachine(EndpointStateMachine rpcEndPoint) {
       this.endPointStateMachine = rpcEndPoint;
-      return this;
-    }
-
-    /**
-     * Sets the LayoutVersionManager.
-     *
-     * @param versionManager config
-     * @return Builder
-     */
-    public Builder setVersionManager(DatanodeVersionManager versionManager) {
-      this.versionManager = versionManager;
       return this;
     }
 
@@ -519,14 +505,8 @@ public class HeartbeatEndpointTask
             "construct HeartbeatEndpointTask task");
       }
 
-      if (versionManager == null) {
-        LOG.error("No version manager specified.");
-        throw new IllegalArgumentException("A valid version manager is needed to " +
-            "construct HeartbeatEndpointTask task");
-      }
-
       HeartbeatEndpointTask task = new HeartbeatEndpointTask(this
-          .endPointStateMachine, this.conf, this.context, this.versionManager);
+          .endPointStateMachine, this.conf, this.context);
       task.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
       return task;
     }

@@ -97,7 +97,7 @@ public class TestHeartbeatEndpointTask {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine =
-        mock(DatanodeStateMachine.class);
+        mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -136,7 +136,7 @@ public class TestHeartbeatEndpointTask {
                 .build());
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -170,7 +170,7 @@ public class TestHeartbeatEndpointTask {
                 .build());
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -194,7 +194,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithNodeReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -229,7 +229,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithContainerReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -265,7 +265,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithCommandStatusReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -302,7 +302,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithContainerActions() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -339,7 +339,7 @@ public class TestHeartbeatEndpointTask {
   public void testheartbeatWithAllReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine =
-        mock(DatanodeStateMachine.class);
+        mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -419,19 +419,21 @@ public class TestHeartbeatEndpointTask {
     when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
     when(endpointStateMachine.getAddress())
         .thenReturn(TEST_SCM_ENDPOINT);
-    DatanodeVersionManager versionManager =
-        mock(DatanodeVersionManager.class);
-    when(versionManager.getSoftwareVersion())
-        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getApparentVersion())
-        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
         .setDatanodeDetails(datanodeDetails)
         .setContext(context)
-        .setVersionManager(versionManager)
         .setEndpointStateMachine(endpointStateMachine)
         .build();
+  }
+  
+  private DatanodeStateMachine mockDatanodeStateMachine() {
+    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    DatanodeStateMachine mockDSM = mock(DatanodeStateMachine.class);
+    when(mockDSM.getVersionManager()).thenReturn(versionManager);
+    return mockDSM;
   }
 
   private ContainerAction getContainerAction() {

@@ -654,8 +654,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       fail(String.format("Datanode %s not registered",
           hostname));
     }
-    // TODO switch this to HDDSVersion.SOFTWARE_VERSION when SCM starts using the new versioning framework.
-    assertEquals(HDDSVersion.ZDU.serialize(), datanodeMetadata.getLayoutVersion());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), datanodeMetadata.getLayoutVersion());
   }
 
   @Test
