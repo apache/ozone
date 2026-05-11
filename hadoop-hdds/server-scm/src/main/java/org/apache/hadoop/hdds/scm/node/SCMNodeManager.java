@@ -158,14 +158,13 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * TODO HDDS-15129 Remove when SCM uses the new versioning framework
-   * Datanodes on {@link HDDSVersion} report {@link HDDSVersion#ZDU} as software layout version ({@code 100}), while
+   * Datanodes on {@link HDDSVersion} report {@link HDDSVersion#ZDU} as software version ({@code 100}), while
    * SCM still on {@link org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature} reports the legacy maximum ({@code 10}
    * today).
    * Without this bridge, registration fails and heartbeats log {@code dnSlv > scmSlv} as an invalid node.
    */
-  @VisibleForTesting
-  static boolean shouldAllowZduDatanode(int dnSoftwareVersion, int scmSoftwareLayoutVersion) {
-    return scmSoftwareLayoutVersion < dnSoftwareVersion && dnSoftwareVersion == HDDSVersion.ZDU.serialize();
+  private static boolean shouldFenceDatanode(int dnSoftwareVersion, int scmSoftwareVersion) {
+    return dnSoftwareVersion > scmSoftwareVersion && dnSoftwareVersion != HDDSVersion.ZDU.serialize();
   }
 
   /**
@@ -411,8 +410,7 @@ public class SCMNodeManager implements NodeManager {
       LayoutVersionProto layoutInfo) {
     int dnSlvRegister = layoutInfo.getSoftwareLayoutVersion();
     int scmSlvRegister = scmLayoutVersionManager.getSoftwareLayoutVersion();
-    if (dnSlvRegister != scmSlvRegister
-        && !shouldAllowZduDatanode(dnSlvRegister, scmSlvRegister)) {
+    if (shouldFenceDatanode(dnSlvRegister, scmSlvRegister)) {
       return RegisteredCommand.newBuilder()
           .setErrorCode(ErrorCode.errorNodeNotPermitted)
           .setDatanode(datanodeDetails)
@@ -773,12 +771,9 @@ public class SCMNodeManager implements NodeManager {
 
     // A datanode with a larger software layout version is from a future
     // version of ozone. It should not have been added to the cluster.
-    if (dnSlv > scmSlv) {
-      // TODO HDDS-15129 REMOVE WHEN SCM USES new versioning framework.
-      //  For now, do not treat datanodes with future software versions as invalid.
-      if (shouldAllowZduDatanode(dnSlv, scmSlv)) {
-        return;
-      }
+    // TODO HDDS-15129 REMOVE WHEN SCM USES new versioning framework.
+    //  For now, do not treat datanodes with ZDU future software version as invalid.
+    if (shouldFenceDatanode(dnSlv, scmSlv)) {
       LOG.error("Invalid data node in the cluster : {}. " +
               "DataNode SoftwareLayoutVersion = {}, SCM " +
               "SoftwareLayoutVersion = {}",
