@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.server;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.AccessControlException;
@@ -63,17 +65,22 @@ public class TestSCMClientProtocolServer {
   private SCMClientProtocolServer server;
   private StorageContainerManager scm;
   private StorageContainerLocationProtocolServerSideTranslatorPB service;
+  private SCMSafeModeManager mockSafeModeManager;
 
   @BeforeEach
   void setUp(@TempDir File testDir) throws Exception {
     OzoneConfiguration config = SCMTestUtils.getConf(testDir);
+
+    mockSafeModeManager = mock(SCMSafeModeManager.class);
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(false);
+
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
+    configurator.setScmSafeModeManager(mockSafeModeManager);
     config.set(OZONE_READONLY_ADMINISTRATORS, "testUser");
     scm = HddsTestUtils.getScm(config, configurator);
     scm.start();
-    scm.exitSafeMode();
 
     server = scm.getClientProtocolServer();
     service = new StorageContainerLocationProtocolServerSideTranslatorPB(server,
@@ -184,6 +191,23 @@ public class TestSCMClientProtocolServer {
     assertEquals(0, status.getNumDatanodesFinalized());
     assertEquals(0, status.getNumDatanodesTotal());
     assertTrue(status.getShouldFinalize());
+  }
+
+  @Test
+  public void testQueryUpgradeStatusInSafemode() throws Exception {
+    // mockSafeModeManager defaults to returning true for getInSafeMode()
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
+    assertTrue(scm.isInSafeMode());
+
+    HddsProtos.UpgradeStatus status = server.queryUpgradeStatus();
+
+    // SCM starts already finalized in tests
+    assertTrue(status.getScmFinalized());
+    // No datanodes registered
+    assertEquals(0, status.getNumDatanodesFinalized());
+    assertEquals(0, status.getNumDatanodesTotal());
+    // shouldFinalize is false because SCM is in safe mode
+    assertFalse(status.getShouldFinalize());
   }
 
   private ContainerInfo newContainerInfoForTest() {
