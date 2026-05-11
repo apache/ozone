@@ -262,6 +262,7 @@ CDDL 1.1 + GPLv2 with classpath exception
 Apache License 2.0
 =====================
 
+   at.yawk.lz4:lz4-java
    ch.qos.reload4j:reload4j
    com.amazonaws:aws-java-sdk-core
    com.amazonaws:aws-java-sdk-kms
@@ -384,6 +385,7 @@ Apache License 2.0
    org.apache.hadoop:hadoop-shaded-guava
    org.apache.hadoop:hadoop-shaded-protobuf_3_25
    org.apache.httpcomponents:httpcore
+   org.apache.kafka:kafka-clients
    org.apache.kerby:kerb-admin
    org.apache.kerby:kerb-client
    org.apache.kerby:kerb-common

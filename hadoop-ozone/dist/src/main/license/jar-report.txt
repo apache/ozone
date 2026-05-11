@@ -159,6 +159,7 @@ share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jspecify.jar
 share/ozone/lib/jsr311-api.jar
+share/ozone/lib/kafka-clients.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerb-crypto.jar
 share/ozone/lib/kerb-util.jar
@@ -170,6 +171,7 @@ share/ozone/lib/kotlin-stdlib.jar
 share/ozone/lib/listenablefuture-empty-to-avoid-conflict-with-guava.jar
 share/ozone/lib/log4j-api.jar
 share/ozone/lib/log4j-core.jar
+share/ozone/lib/lz4-java.jar
 share/ozone/lib/metrics-core.jar
 share/ozone/lib/netty-buffer.Final.jar
 share/ozone/lib/netty-codec.Final.jar
@@ -227,6 +229,7 @@ share/ozone/lib/ozone-insight.jar
 share/ozone/lib/ozone-interface-client.jar
 share/ozone/lib/ozone-interface-storage.jar
 share/ozone/lib/ozone-manager.jar
+share/ozone/lib/ozone-manager-plugins.jar
 share/ozone/lib/ozone-multitenancy-ranger.jar
 share/ozone/lib/ozone-reconcodegen.jar
 share/ozone/lib/ozone-recon.jar
