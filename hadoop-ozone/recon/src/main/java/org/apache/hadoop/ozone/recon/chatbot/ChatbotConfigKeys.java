@@ -88,6 +88,62 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_MAX_TOOL_CALLS = OZONE_RECON_CHATBOT_PREFIX + "max.tool.calls";
   public static final int OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT = 5;
 
+  // ── ToolExecutor HTTP timeouts (loopback calls to Recon REST APIs) ───────
+  /**
+   * Connect timeout in milliseconds for loopback HTTP calls from ToolExecutor
+   * to Recon's own REST APIs. Increase this on slow or heavily loaded clusters.
+   */
+  public static final String OZONE_RECON_CHATBOT_EXEC_CONNECT_TIMEOUT_MS =
+      OZONE_RECON_CHATBOT_PREFIX + "exec.connect.timeout.ms";
+  public static final int OZONE_RECON_CHATBOT_EXEC_CONNECT_TIMEOUT_MS_DEFAULT = 30_000;
+
+  /**
+   * Read timeout in milliseconds for loopback HTTP calls from ToolExecutor
+   * to Recon's own REST APIs. Increase this when Recon APIs are slow due to
+   * large dataset sizes (e.g. millions of unhealthy containers).
+   */
+  public static final String OZONE_RECON_CHATBOT_EXEC_READ_TIMEOUT_MS =
+      OZONE_RECON_CHATBOT_PREFIX + "exec.read.timeout.ms";
+  public static final int OZONE_RECON_CHATBOT_EXEC_READ_TIMEOUT_MS_DEFAULT = 30_000;
+
+  // ── Async execution thread pool ──────────────────────────────
+  /**
+   * Number of threads in the dedicated thread pool used to execute chatbot
+   * requests asynchronously, keeping Jetty's main thread pool free.
+   * Each concurrent chatbot query occupies one thread for its full duration
+   * (up to 2 LLM calls + up to 5 Recon API calls). Size this pool to the
+   * maximum number of concurrent chatbot users you expect.
+   */
+  public static final String OZONE_RECON_CHATBOT_THREAD_POOL_SIZE =
+      OZONE_RECON_CHATBOT_PREFIX + "thread.pool.size";
+  public static final int OZONE_RECON_CHATBOT_THREAD_POOL_SIZE_DEFAULT = 5;
+
+  /**
+   * Maximum number of chatbot requests that can wait in the queue while all
+   * threads are busy. Once this limit is reached, new requests are rejected
+   * immediately with HTTP 503 (Service Unavailable) rather than queuing
+   * indefinitely and consuming memory. Total in-flight chatbot load is bounded
+   * by {@code thread.pool.size + max.queue.size}.
+   */
+  public static final String OZONE_RECON_CHATBOT_MAX_QUEUE_SIZE =
+      OZONE_RECON_CHATBOT_PREFIX + "max.queue.size";
+  public static final int OZONE_RECON_CHATBOT_MAX_QUEUE_SIZE_DEFAULT = 10;
+
+  /**
+   * Overall wall-clock timeout in milliseconds for a single chatbot request,
+   * measured from the moment the HTTP request is received until a response must
+   * be returned to the client. If the LLM or Recon API calls have not completed
+   * within this window, the client receives an HTTP 504 Gateway Timeout response.
+   *
+   * <p>Default is 3 minutes — comfortably above the typical worst-case observed
+   * latency (~90 s for slow preview models) while still protecting clients from
+   * waiting indefinitely on a hung request.</p>
+   */
+  public static final String OZONE_RECON_CHATBOT_REQUEST_TIMEOUT_MS =
+      OZONE_RECON_CHATBOT_PREFIX + "request.timeout.ms";
+  public static final long OZONE_RECON_CHATBOT_REQUEST_TIMEOUT_MS_DEFAULT =
+      3L * 60L * 1000L; // 3 minutes
+
   // ── Per-provider model lists (comma-separated, configurable) ──
   /**
    * Comma-separated list of OpenAI model names exposed via GET /chatbot/models.

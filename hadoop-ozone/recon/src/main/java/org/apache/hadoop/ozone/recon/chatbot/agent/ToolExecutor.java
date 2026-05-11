@@ -52,12 +52,9 @@ public class ToolExecutor {
   // We define the specific String suffixes for APIs we want to explicitly watch out for
   private static final String LIST_KEYS_ENDPOINT_SUFFIX = "/keys/listKeys";
 
-  // Hardcoded security timeouts. If Recon takes longer than 30 seconds to connect
-  // or return data, kill the request so we don't freeze the chatbot.
-  private static final int CONNECT_TIMEOUT_MS = 30_000;
-  private static final int READ_TIMEOUT_MS = 30_000;
-
   private final String reconBaseUrl;
+  private final int connectTimeoutMs;
+  private final int readTimeoutMs;
   private final int defaultMaxRecords;  // Max records to fetch in total
   private final int defaultMaxPages;   // Max pages to loop through
   private final int defaultPageSize;  // Default size of one page
@@ -72,6 +69,12 @@ public class ToolExecutor {
         ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_DEFAULT);
     this.reconBaseUrl = "http://" + rawAddress.replace("0.0.0.0", "127.0.0.1");
 
+    this.connectTimeoutMs = configuration.getInt(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_CONNECT_TIMEOUT_MS,
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_CONNECT_TIMEOUT_MS_DEFAULT);
+    this.readTimeoutMs = configuration.getInt(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_READ_TIMEOUT_MS,
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_READ_TIMEOUT_MS_DEFAULT);
     this.defaultMaxRecords = configuration.getInt(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS_DEFAULT);
@@ -82,8 +85,10 @@ public class ToolExecutor {
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE_DEFAULT);
 
-    LOG.info("ToolExecutor initialized with Recon URL: {}, maxRecords={}, maxPages={}, pageSize={}",
-        reconBaseUrl, defaultMaxRecords, defaultMaxPages, defaultPageSize);
+    LOG.info("ToolExecutor initialized with Recon URL: {}, connectTimeoutMs={}, " +
+            "readTimeoutMs={}, maxRecords={}, maxPages={}, pageSize={}",
+        reconBaseUrl, connectTimeoutMs, readTimeoutMs,
+        defaultMaxRecords, defaultMaxPages, defaultPageSize);
   }
 
   /**
@@ -244,8 +249,8 @@ public class ToolExecutor {
       conn = (HttpURLConnection) new URL(url).openConnection();
       conn.setRequestMethod(
           "GET".equalsIgnoreCase(method) ? "GET" : "POST");
-      conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-      conn.setReadTimeout(READ_TIMEOUT_MS);
+      conn.setConnectTimeout(connectTimeoutMs);
+      conn.setReadTimeout(readTimeoutMs);
 
       // Tell Recon we expect to receive JSON data format
       conn.setRequestProperty("Accept", "application/json");
