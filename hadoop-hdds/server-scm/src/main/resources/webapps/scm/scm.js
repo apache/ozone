@@ -165,9 +165,6 @@
                      nodeStatusCopy = [...$scope.nodeStatus];
                      $scope.filteredNodes = [...nodeStatusCopy];
                      $scope.totalItems = $scope.filteredNodes.length;
-                     //let initialLimit = parseInt($scope.RecordsToDisplay);
-                     //$scope.lastIndex = Math.ceil($scope.filteredNodes.length / initialLimit);
-                     //$scope.nodeStatus = $scope.filteredNodes.slice(0, initialLimit);
                      $scope.UpdateRecordsToShow();
 
                     $scope.formatValue = function(value) {
