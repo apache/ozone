@@ -2100,6 +2100,40 @@ public class TestContainerEndpoint {
   }
 
   @Test
+  public void testGetQuasiClosedContainersLimitZeroReturnsCountOnly() throws Exception {
+    // Add 3 containers in QUASI_CLOSED state.
+    for (long id = 500L; id <= 502L; id++) {
+      reconContainerManager.addNewContainer(
+          getTestContainer(HddsProtos.LifeCycleState.OPEN, id));
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 3);
+
+    // limit=0 must return an empty container list but still populate quasiClosedCount.
+    Response response = containerEndpoint.getQuasiClosedContainers(0, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertTrue(result.getContainers() == null || result.getContainers().isEmpty());
+    assertEquals(3, result.getQuasiClosedCount());
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersInvalidInputsReturnBadRequest() {
+    // Negative minContainerId must return 400.
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
+        containerEndpoint.getQuasiClosedContainers(10, -1L).getStatus());
+
+    // Negative limit must return 400.
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
+        containerEndpoint.getQuasiClosedContainers(-1, 0L).getStatus());
+  }
+
+  @Test
   public void testGetQuasiClosedCountViaDedicatedEndpoint() throws Exception {
     // Add 2 containers and move them to QUASI_CLOSED.
     reconContainerManager.addNewContainer(
