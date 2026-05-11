@@ -1433,4 +1433,126 @@ Example: /api/v1/metrics/query?query=ratis_leader_election_electionCount
        }
      }
 ```
-  
+
+## Storage Distribution (admin only)
+
+### GET /api/v1/storageDistribution
+
+**Parameters**
+
+No parameters.
+
+**Returns**
+
+Aggregated storage capacity distribution across the cluster, including the global storage hierarchy
+(filesystem capacity, Ozone capacity, used/free/reserved/committed space), namespace totals, a
+breakdown of used space (open vs finalized), and per-datanode storage reports.
+
+`500 Internal Server Error` (text/plain body) is returned if the report cannot be produced.
+
+```json
+{
+  "globalStorage": {
+    "totalFileSystemCapacity": 270461374464,
+    "totalReservedSpace": 31457280,
+    "totalOzoneCapacity": 270429917184,
+    "totalOzoneUsedSpace": 358805504,
+    "totalOzoneFreeSpace": 270071111680,
+    "totalOzoneCommittedSpace": 27007111,
+    "totalMinimumFreeSpace": 20480
+  },
+  "globalNamespace": {
+    "totalUsedSpace": 500000000,
+    "totalKeys": 10000
+  },
+  "usedSpaceBreakdown": {
+    "openKeyBytes": {
+      "openKeyAndFileBytes": 13824,
+      "multipartOpenKeyBytes": 4096,
+      "totalOpenKeyBytes": 17920
+    },
+    "finalizedKeyBytes": 450000000
+  },
+  "dataNodeUsage": [
+    {
+      "datanodeUuid": "841be80f-0454-47df-b676",
+      "hostName": "ozone-datanode-1",
+      "capacity": 270429917184,
+      "used": 358805504,
+      "remaining": 270071111680,
+      "committed": 27007111,
+      "minimumFreeSpace": 20480,
+      "reserved": 31457280,
+      "filesystemCapacity": 270461374464,
+      "filesystemUsed": 390262784,
+      "filesystemAvailable": 270071111680
+    }
+  ]
+}
+```
+
+### GET /api/v1/storageDistribution/download
+
+**Parameters**
+
+No parameters.
+
+**Returns**
+
+Triggers or polls a background per-datanode metrics collection. The response varies by collection
+state:
+
+* `200 OK` (`text/csv`) when collection is FINISHED. The CSV columns are HostName, Datanode UUID,
+  Filesystem Capacity, Filesystem Used Space, Filesystem Remaining Space, Ozone Capacity, Ozone Used
+  Space, Ozone Remaining Space, PreAllocated Container Space, Reserved Space, Minimum Free Space,
+  Pending Block Size. A `Content-Disposition: attachment` header carries the file name.
+* `202 Accepted` (`application/json`, body matches `DataNodeMetricsServiceResponse`) when collection
+  is NOT_STARTED or IN_PROGRESS. Poll the endpoint again until status is FINISHED.
+* `500 Internal Server Error` (`text/plain`) if collection is marked FINISHED but the metrics data
+  is missing.
+
+## Pending Deletion (admin only)
+
+### GET /api/v1/pendingDeletion
+
+Returns pending-deletion statistics for one of the three Ozone components.
+
+**Parameters**
+
+* component (required)
+
+  One of `scm`, `om`, `dn`. Selects the source whose pending-deletion data should be returned.
+
+* limit (optional)
+
+  Maximum number of per-datanode entries to return. Only applies when `component=dn`. Must be at
+  least 1.
+
+**Returns**
+
+The response body depends on `component`:
+
+* `component=scm`
+  * `200 OK` with a `ScmPendingDeletion` object (`totalBlocksize`, `totalReplicatedBlockSize`,
+    `totalBlocksCount`).
+  * `204 No Content` if SCM has no pending-deletion summary yet.
+* `component=om`
+  * `200 OK` with a map keyed by category (typical keys: `pendingDirectorySize`,
+    `pendingKeySize`). Values are byte counts.
+* `component=dn`
+  * `200 OK` with a `DataNodeMetricsServiceResponse` body when the background metrics collection
+    has FINISHED.
+  * `202 Accepted` with the same shape while collection is NOT_STARTED or IN_PROGRESS; poll until
+    `status` becomes `FINISHED`.
+
+`400 Bad Request` (text/plain) is returned when `component` is missing/invalid, or when
+`component=dn` and `limit < 1`.
+
+```json
+{
+  "totalBlocksize": 10485760,
+  "totalReplicatedBlockSize": 31457280,
+  "totalBlocksCount": 500
+}
+```
+
