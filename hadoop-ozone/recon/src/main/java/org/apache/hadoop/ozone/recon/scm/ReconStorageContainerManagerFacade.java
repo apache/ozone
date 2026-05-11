@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpc
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT;
@@ -877,27 +876,41 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
-  private void deleteOldSCMDB() throws IOException {
-    if (dbStore != null) {
-      File oldDBLocation = dbStore.getDbLocation();
-      if (oldDBLocation.exists()) {
-        LOG.info("Cleaning up old SCM snapshot db at {}.",
-            oldDBLocation.getAbsolutePath());
-        FileUtils.deleteDirectory(oldDBLocation);
-      }
+  private void cleanupOldSCMDB(File oldDbLocation, File newDbLocation) {
+    if (oldDbLocation == null || !oldDbLocation.exists() ||
+        oldDbLocation.equals(newDbLocation)) {
+      return;
+    }
+    try {
+      LOG.info("Cleaning up old SCM snapshot db at {}.",
+          oldDbLocation.getAbsolutePath());
+      FileUtils.deleteDirectory(oldDbLocation);
+    } catch (IOException e) {
+      LOG.warn("Unable to clean up old SCM snapshot db at {}.",
+          oldDbLocation.getAbsolutePath(), e);
     }
   }
 
   private void initializeNewRdbStore(File dbFile) throws IOException {
+    final DBStore oldStore = dbStore;
+    final File oldDbLocation = oldStore != null ? oldStore.getDbLocation() :
+        null;
+    DBStore newStore = null;
     try {
-      final DBStore newStore = DBStoreBuilder.newBuilder(ozoneConfiguration, ReconSCMDBDefinition.get(), dbFile)
-          .build();
-      final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(dbStore);
-      final Table<DatanodeID, DatanodeDetails> newNodeTable = ReconSCMDBDefinition.NODES.getTable(newStore);
-      try (TableIterator<DatanodeID, ? extends KeyValue<DatanodeID, DatanodeDetails>> iterator = nodeTable.iterator()) {
-        while (iterator.hasNext()) {
-          final KeyValue<DatanodeID, DatanodeDetails> keyValue = iterator.next();
-          newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+      newStore = DBStoreBuilder.newBuilder(ozoneConfiguration,
+          ReconSCMDBDefinition.get(), dbFile).build();
+      if (oldStore != null) {
+        final Table<DatanodeID, DatanodeDetails> nodeTable =
+            ReconSCMDBDefinition.NODES.getTable(oldStore);
+        final Table<DatanodeID, DatanodeDetails> newNodeTable =
+            ReconSCMDBDefinition.NODES.getTable(newStore);
+        try (TableIterator<DatanodeID, ? extends KeyValue<DatanodeID,
+            DatanodeDetails>> iterator = nodeTable.iterator()) {
+          while (iterator.hasNext()) {
+            final KeyValue<DatanodeID, DatanodeDetails> keyValue =
+                iterator.next();
+            newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+          }
         }
       }
       sequenceIdGen.reinitialize(
@@ -908,20 +921,15 @@ public class ReconStorageContainerManagerFacade
           ReconSCMDBDefinition.CONTAINERS.getTable(newStore));
       nodeManager.reinitialize(
           ReconSCMDBDefinition.NODES.getTable(newStore));
-      IOUtils.close(LOG, dbStore);
-      deleteOldSCMDB();
       dbStore = newStore;
-      File newDb = new File(dbFile.getParent() +
-          OZONE_URI_DELIMITER + ReconSCMDBDefinition.RECON_SCM_DB_NAME);
-      boolean success = dbFile.renameTo(newDb);
-      if (success) {
-        LOG.info("SCM snapshot linked to Recon DB.");
-      }
+      IOUtils.close(LOG, oldStore);
+      cleanupOldSCMDB(oldDbLocation, dbFile);
       LOG.info("Created SCM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
-    } catch (IOException ioEx) {
-      LOG.error("Unable to initialize Recon SCM DB snapshot store.", ioEx);
-      throw ioEx;
+    } catch (IOException | RuntimeException ex) {
+      IOUtils.close(LOG, newStore);
+      LOG.error("Unable to initialize Recon SCM DB snapshot store.", ex);
+      throw ex;
     }
   }
 
