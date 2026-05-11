@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Represents the sequence ID types managed by {@link SequenceIdGenerator} and their persisted RocksDB keys.
  */
@@ -42,6 +46,19 @@ public enum SequenceIdType {
    */
   private final String dbKey;
 
+  /**
+   * Reverse lookup map from db key string to enum constant.
+   */
+  private static final Map<String, SequenceIdType> DB_KEY_MAP;
+
+  static {
+    Map<String, SequenceIdType> map = new HashMap<>();
+    for (SequenceIdType type : values()) {
+      map.put(type.dbKey, type);
+    }
+    DB_KEY_MAP = Collections.unmodifiableMap(map);
+  }
+
   SequenceIdType(String dbKey) {
     this.dbKey = dbKey;
   }
@@ -55,4 +72,13 @@ public enum SequenceIdType {
     return dbKey;
   }
 
+  /**
+   * Returns the {@link SequenceIdType} corresponding to the provided RocksDB key string, or null if unmapped.
+   */
+  public static SequenceIdType fromDbKey(String dbKey) {
+    if (dbKey == null) {
+      return null;
+    }
+    return DB_KEY_MAP.get(dbKey);
+  }
 }

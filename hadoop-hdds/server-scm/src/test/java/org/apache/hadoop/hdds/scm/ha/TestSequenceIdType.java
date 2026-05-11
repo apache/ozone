@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -40,6 +41,21 @@ public class TestSequenceIdType {
     assertEquals("containerId", SequenceIdType.CONTAINER_ID.getDbKey());
     assertEquals("CertificateId", SequenceIdType.CERTIFICATE_ID.getDbKey());
     assertEquals("rootCertificateId", SequenceIdType.ROOT_CERTIFICATE_ID.getDbKey());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedStringSyncWithEnumConstants() {
+    assertEquals(SequenceIdType.ROOT_CERTIFICATE_ID.getDbKey(),
+        SequenceIdGenerator.ROOT_CERTIFICATE_ID);
+  }
+
+  @Test
+  public void testNumberOfEnumConstants() {
+    // If a new SequenceIdType is added, this test will fail.
+    // This serves as a reminder to the developer to verify RocksDB backward
+    // compatibility and update this test class accordingly.
+    assertEquals(5, SequenceIdType.values().length);
   }
 
   @Test
@@ -67,4 +83,11 @@ public class TestSequenceIdType {
             "ACTION REQUIRED: If this change is intentional, you MUST verify " +
             "RocksDB backward compatibility and update this test's expectedNames.");
   }
+
+  @Test
+  public void testReturnsNullIfEnumConstantNotAvailable() {
+    assertNull(SequenceIdType.fromDbKey("unmapped-key-string"));
+    assertNull(SequenceIdType.fromDbKey(null));
+  }
+
 }
