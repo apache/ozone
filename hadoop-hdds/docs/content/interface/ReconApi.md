@@ -877,20 +877,33 @@ No parameters.
 Returns a summary of the current state of the Ozone cluster.
 
 ```json
-     {
-     	"pipelines": 5,
-     	"totalDatanodes": 4,
-     	"healthyDatanodes": 4,
-     	"storageReport": {
-     		"capacity": 1081719668736,
-     		"used": 1309212672,
-     		"remaining": 597361258496
-     	},
-     	"containers": 26,
-     	"volumes": 6,
-     	"buckets": 26,
-     	"keys": 25
-     }
+{
+  "pipelines": 5,
+  "totalDatanodes": 4,
+  "healthyDatanodes": 4,
+  "storageReport": {
+    "capacity": 1081719668736,
+    "used": 1309212672,
+    "remaining": 597361258496,
+    "committed": 27007111,
+    "reserved": 31457280,
+    "minimumFreeSpace": 20480,
+    "filesystemCapacity": 1081730000000,
+    "filesystemUsed": 1310000000,
+    "filesystemAvailable": 597361258496
+  },
+  "containers": 26,
+  "missingContainers": 0,
+  "openContainers": 5,
+  "deletedContainers": 1,
+  "volumes": 6,
+  "buckets": 26,
+  "keys": 25,
+  "keysPendingDeletion": 0,
+  "deletedDirs": 0,
+  "scmServiceId": "scmservice",
+  "omServiceId": "omservice"
+}
 ```
 
 ## Volumes (admin only)
