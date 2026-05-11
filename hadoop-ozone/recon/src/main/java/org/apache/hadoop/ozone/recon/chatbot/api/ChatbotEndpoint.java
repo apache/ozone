@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.chatbot.api;
 import javax.inject.Inject;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.slf4j.Logger;
@@ -125,12 +126,13 @@ public class ChatbotEndpoint {
   }
 
   /**
-   * Checks if the chatbot is enabled in configuration.
+   * Returns whether the chatbot is enabled. Delegates to
+   * {@link ChatbotConfigKeys#isChatbotEnabled(OzoneConfiguration)} so the
+   * check is consistent with the Guice module installation guard in
+   * {@code ReconControllerModule}.
    */
   private boolean isChatbotEnabled() {
-    return configuration.getBoolean(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_ENABLED,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_ENABLED_DEFAULT);
+    return ChatbotConfigKeys.isChatbotEnabled(configuration);
   }
 
   /**
@@ -201,16 +203,15 @@ public class ChatbotEndpoint {
           String response = chatbotAgent.processQuery(
               request.getQuery(),
               request.getModel(),
-              request.getProvider(),
-              null);
+              request.getProvider());
 
           ChatResponse chatResponse = new ChatResponse();
           chatResponse.setResponse(response);
           chatResponse.setSuccess(true);
           asyncResponse.resume(Response.ok(chatResponse).build());
 
-        } catch (Exception e) {
-          LOG.error("Error processing chat request", e);
+        } catch (ChatbotException e) {
+          LOG.error("Chatbot query processing failed", e);
           asyncResponse.resume(
               Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                   .entity(Collections.singletonMap("error",

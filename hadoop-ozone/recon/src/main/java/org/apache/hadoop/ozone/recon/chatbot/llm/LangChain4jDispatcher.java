@@ -177,8 +177,7 @@ public class LangChain4jDispatcher implements LLMClient {
    * </ol>
    */
   @Override
-  public LLMResponse chatCompletion(List<ChatMessage> messages, String modelStr,
-                                    String apiKey, Map<String, Object> parameters)
+  public LLMResponse chatCompletion(List<ChatMessage> messages, String modelStr, Map<String, Object> parameters)
       throws LLMException {
 
     if (messages == null || messages.isEmpty()) {
@@ -201,7 +200,7 @@ public class LangChain4jDispatcher implements LLMClient {
     LOG.debug("Routing chatCompletion: model={}, resolvedProvider={}", actualModel, provider);
 
     // Build the LangChain4j model for this specific request.
-    ChatLanguageModel chatModel = buildModel(provider, actualModel, apiKey);
+    ChatLanguageModel chatModel = buildModel(provider, actualModel);
 
     // Translate our internal ChatMessage list into LangChain4j's message types.
     List<dev.langchain4j.data.message.ChatMessage> lc4jMessages =
@@ -288,17 +287,12 @@ public class LangChain4jDispatcher implements LLMClient {
 
   /**
    * Builds a LangChain4j {@link ChatLanguageModel} for the given provider and model name.
-   *
-   * <p>The per-request API key (if provided) takes priority over the server-configured key.
-   * If neither is available, an exception is thrown immediately rather than letting the
-   * library discover it at network call time.</p>
+   * The API key is always resolved from the server configuration via {@link CredentialHelper}.
    */
-  private ChatLanguageModel buildModel(String provider, String model,
-                                       String perRequestApiKey) throws LLMException {
+  private ChatLanguageModel buildModel(String provider, String model) throws LLMException {
     switch (provider) {
       case "openai": {
-        String key = resolveKey(perRequestApiKey,
-            ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "openai");
+        String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "openai");
         String baseUrl = configuration.get(
             ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL,
             ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT);
@@ -310,8 +304,7 @@ public class LangChain4jDispatcher implements LLMClient {
             .build();
       }
       case "gemini": {
-        String key = resolveKey(perRequestApiKey,
-            ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "gemini");
+        String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "gemini");
         return GoogleAiGeminiChatModel.builder()
             .apiKey(key)
             .modelName(model)
@@ -319,8 +312,7 @@ public class LangChain4jDispatcher implements LLMClient {
             .build();
       }
       case "anthropic": {
-        String key = resolveKey(perRequestApiKey,
-            ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY, "anthropic");
+        String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY, "anthropic");
         String betaHeader = configuration.get(
             ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER,
             ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER_DEFAULT);
@@ -340,14 +332,11 @@ public class LangChain4jDispatcher implements LLMClient {
   }
 
   /**
-   * Resolves the API key to use: per-request key takes priority, then the configured key.
-   * Throws {@link LLMException} if neither is available, giving a clear error message.
+   * Resolves the API key for the given provider from the Hadoop credential store or
+   * ozone-site.xml via {@link CredentialHelper}.
+   * Throws {@link LLMException} immediately if no key is configured.
    */
-  private String resolveKey(String perRequestKey, String configKey,
-                             String providerName) throws LLMException {
-    if (perRequestKey != null && !perRequestKey.isEmpty()) {
-      return perRequestKey;
-    }
+  private String resolveKey(String configKey, String providerName) throws LLMException {
     String configured = credentialHelper.getSecret(configKey);
     if (configured == null || configured.isEmpty()) {
       throw new LLMException(

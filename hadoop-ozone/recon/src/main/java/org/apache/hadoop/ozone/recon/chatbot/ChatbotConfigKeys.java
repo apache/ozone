@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.chatbot;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
  * Configuration keys for Recon Chatbot service.
@@ -36,6 +37,18 @@ public final class ChatbotConfigKeys {
   // ── Feature toggle ──────────────────────────────────────────
   public static final String OZONE_RECON_CHATBOT_ENABLED = OZONE_RECON_CHATBOT_PREFIX + "enabled";
   public static final boolean OZONE_RECON_CHATBOT_ENABLED_DEFAULT = false;
+
+  /**
+   * Returns whether the chatbot feature is enabled in the given configuration.
+   * Centralised here so that both {@code ReconControllerModule} (Guice wiring)
+   * and {@code ChatbotEndpoint} (request handling) use the same check without
+   * duplicating the key name or default value.
+   */
+  public static boolean isChatbotEnabled(OzoneConfiguration configuration) {
+    return configuration.getBoolean(
+        OZONE_RECON_CHATBOT_ENABLED,
+        OZONE_RECON_CHATBOT_ENABLED_DEFAULT);
+  }
 
   // ── Provider selection ──────────────────────────────────────
   /**

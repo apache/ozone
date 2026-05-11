@@ -41,6 +41,8 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotModule;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
@@ -129,7 +131,14 @@ public class ReconControllerModule extends AbstractModule {
     install(new ReconOmTaskBindingModule());
     install(new ReconDaoBindingModule());
     bind(ReconTaskStatusUpdaterManager.class).in(Singleton.class);
-    install(new org.apache.hadoop.ozone.recon.chatbot.ChatbotModule());
+    // Only install chatbot bindings when the feature is explicitly enabled.
+    // This prevents startup-time failures (e.g. bad credential provider paths)
+    // from breaking Recon when the chatbot is intentionally disabled.
+    OzoneConfiguration ozoneConfig =
+        getProvider(OzoneConfiguration.class).get();
+    if (ChatbotConfigKeys.isChatbotEnabled(ozoneConfig)) {
+      install(new ChatbotModule());
+    }
 
     bind(ReconTaskController.class)
         .to(ReconTaskControllerImpl.class).in(Singleton.class);

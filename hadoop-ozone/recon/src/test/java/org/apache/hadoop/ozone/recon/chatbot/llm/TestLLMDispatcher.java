@@ -59,13 +59,13 @@ public class TestLLMDispatcher {
     public void testEmptyMessagesThrows() {
         List<LLMClient.ChatMessage> messages = new ArrayList<>();
         assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "gpt-4.1", null, new HashMap<>()));
+            dispatcher.chatCompletion(messages, "gpt-4.1", new HashMap<>()));
     }
 
     @Test
     public void testNullMessagesThrows() {
         assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(null, "gpt-4.1", null, new HashMap<>()));
+            dispatcher.chatCompletion(null, "gpt-4.1", new HashMap<>()));
     }
 
     @Test
@@ -119,7 +119,7 @@ public class TestLLMDispatcher {
         messages.add(new LLMClient.ChatMessage("user", "hello"));
 
         LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "gemini-2.5-flash", null, new HashMap<>()));
+            dispatcher.chatCompletion(messages, "gemini-2.5-flash", new HashMap<>()));
         assertTrue(ex.getMessage().toLowerCase().contains("gemini"),
             "Error should mention gemini provider");
     }
@@ -131,7 +131,7 @@ public class TestLLMDispatcher {
         messages.add(new LLMClient.ChatMessage("user", "hello"));
 
         LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "gpt-4.1", null, new HashMap<>()));
+            dispatcher.chatCompletion(messages, "gpt-4.1", new HashMap<>()));
         assertTrue(ex.getMessage().toLowerCase().contains("openai"),
             "Error should mention openai provider");
     }
@@ -143,7 +143,7 @@ public class TestLLMDispatcher {
         messages.add(new LLMClient.ChatMessage("user", "hello"));
 
         LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "claude-sonnet-4-6", null, new HashMap<>()));
+            dispatcher.chatCompletion(messages, "claude-sonnet-4-6", new HashMap<>()));
         assertTrue(ex.getMessage().toLowerCase().contains("anthropic"),
             "Error should mention anthropic provider");
     }
@@ -155,7 +155,7 @@ public class TestLLMDispatcher {
         messages.add(new LLMClient.ChatMessage("user", "hello"));
 
         LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "some-unknown-model", null, new HashMap<>()));
+            dispatcher.chatCompletion(messages, "some-unknown-model", new HashMap<>()));
         assertTrue(ex.getMessage().toLowerCase().contains("gemini"),
             "Unknown model should route to the default gemini provider");
     }
@@ -171,7 +171,7 @@ public class TestLLMDispatcher {
         messages.add(new LLMClient.ChatMessage("user", "hello"));
 
         LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "some-unknown-model", null, new HashMap<>()));
+            dispatcher.chatCompletion(messages, "some-unknown-model", new HashMap<>()));
         assertTrue(ex.getMessage().toLowerCase().contains("openai"),
             "Should route to openai when it is the configured default");
     }
@@ -184,7 +184,7 @@ public class TestLLMDispatcher {
 
         LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
             dispatcher.chatCompletion(
-                messages, "anthropic:claude-sonnet-4-6", null, new HashMap<>()));
+                messages, "anthropic:claude-sonnet-4-6", new HashMap<>()));
         assertTrue(ex.getMessage().toLowerCase().contains("anthropic"),
             "Explicit provider prefix should route to anthropic");
     }

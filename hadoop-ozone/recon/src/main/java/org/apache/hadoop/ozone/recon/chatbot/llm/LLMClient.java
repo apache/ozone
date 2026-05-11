@@ -36,18 +36,21 @@ public interface LLMClient {
   /**
    * The core action: Send a conversation to an AI and wait for its answer.
    *
+   * <p>API keys are always resolved server-side via
+   * {@link org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper} from
+   * the Hadoop credential store or {@code ozone-site.xml}. There is no per-request
+   * key parameter — all callers should be cluster admins using the shared server key.</p>
+   *
    * @param messages   The back-and-forth chat history so far (System Prompts, User Questions, etc.)
-   * @param model      The specific model name (e.g. "gpt-4" or "gemini-pro")
-   * @param apiKey     The user's password/token (if they didn't provide one, the backend will use the system's token)
+   * @param model      The specific model name (e.g. "gpt-4.1" or "gemini-2.5-flash")
    * @param parameters Extra rules like "temperature" (how creative the AI should be) or
    *                   "max_tokens" (how long the answer can be)
    * @return A standardized LLMResponse object containing the AI's final text.
-   * @throws LLMException if the internet drops, the API key is wrong, or the AI crashes.
+   * @throws LLMException if the network fails, the API key is missing, or the provider returns an error.
    */
   LLMResponse chatCompletion(
       List<ChatMessage> messages,
       String model,
-      String apiKey,
       Map<String, Object> parameters) throws LLMException;
 
   /**

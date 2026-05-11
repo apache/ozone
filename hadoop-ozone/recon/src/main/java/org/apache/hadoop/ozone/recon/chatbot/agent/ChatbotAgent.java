@@ -23,6 +23,7 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ChatMessage;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.LLMResponse;
@@ -172,19 +173,24 @@ public class ChatbotAgent {
   /**
    * THE MAIN ENTRY POINT. Processes a user query and returns a response.
    *
+   * <p>API keys are always resolved server-side via
+   * {@link org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper} — there
+   * is no per-request key parameter. All internal errors (LLM failures, IO errors, etc.)
+   * are wrapped in {@link ChatbotException} so callers have a single typed exception
+   * to handle.</p>
+   *
    * @param userQuery the user's question
-   * @param model     the LLM model to use
+   * @param model     the LLM model to use (null uses the configured default)
    * @param provider  explicit provider name (optional, e.g. "gemini", "openai")
-   * @param apiKey    the user's API key (optional)
    * @return the chatbot response
+   * @throws ChatbotException if query processing fails for any reason
    */
-  public String processQuery(String userQuery, String model,
-                             String provider, String apiKey)
-      throws Exception {
+  public String processQuery(String userQuery, String model, String provider)
+      throws ChatbotException {
 
     // Safety check
     if (userQuery == null || userQuery.trim().isEmpty()) {
-      throw new IllegalArgumentException("Query cannot be empty");
+      throw new ChatbotException("Query cannot be empty");
     }
 
     // Use default model if the user didn't specify one.
@@ -192,98 +198,103 @@ public class ChatbotAgent {
 
     LOG.info("Processing query with model: {}, provider: {}", effectiveModel, provider == null ? "auto" : provider);
 
-    // STEP 1: Ask the LLM what API tools it wants to use to answer the question.
-    ToolCall toolCall = getToolCall(userQuery, effectiveModel, provider, apiKey);
+    try {
+      // STEP 1: Ask the LLM what API tools it wants to use to answer the question.
+      ToolCall toolCall = getToolCall(userQuery, effectiveModel, provider);
 
-    // If the LLM doesn't know what API to call...
-    if (toolCall == null) {
-      // No suitable endpoint found
-      LOG.info("Tool selection result: NO_SUITABLE_ENDPOINT; using fallback");
-      return handleFallback(userQuery, effectiveModel, provider, apiKey);
+      // If the LLM doesn't know what API to call...
+      if (toolCall == null) {
+        // No suitable endpoint found
+        LOG.info("Tool selection result: NO_SUITABLE_ENDPOINT; using fallback");
+        return handleFallback(userQuery, effectiveModel, provider);
+      }
+
+      // If the user asked a general question (e.g. "What is Ozone?"), the LLM answers it directly without an API call.
+      if (toolCall.isDocumentationQuery()) {
+        LOG.info("Tool selection result: DOCUMENTATION_QUERY (no Recon API call)");
+        return toolCall.getAnswer();
+      }
+
+      // STEP 2: Execute the internal Recon API calls
+      Map<String, Object> apiResponses;
+      Map<String, Object> executionMetadata = new HashMap<>();
+
+      // Scenario A: LLM says we need to call MULTIPLE APIs to get the answer
+      if (toolCall.isMultipleEndpoints()) {
+
+        if (toolCall.getToolCalls() == null || toolCall.getToolCalls().isEmpty()) {
+          LOG.warn("LLM returned MULTI_ENDPOINT but no tool calls");
+          return handleFallback(userQuery, effectiveModel, provider);
+        }
+        LOG.info("Tool selection result: MULTI_ENDPOINT count={}",
+            toolCall.getToolCalls().size());
+
+        // Check if the LLM asked for something dangerous (like scanning the whole cluster without a limit)
+        String clarification = buildClarificationForToolCalls(toolCall.getToolCalls());
+        if (clarification != null) {
+          LOG.info("Execution policy returned clarification for multi-endpoint " +
+              "request: {}", clarification);
+          return clarification;
+        }
+        for (ToolCall selected : toolCall.getToolCalls()) {
+          LOG.info("Selected Recon API: method={}, endpoint={}, paramKeys={}, reasoning={}",
+              selected.getMethod(),
+              selected.getEndpoint(),
+              selected.getParameters() == null ? "[]" : selected.getParameters().keySet(),
+              selected.getReasoning());
+        }
+
+        // Execute all the API calls securely
+        apiResponses = executeMultipleToolCalls(toolCall.getToolCalls(), executionMetadata);
+
+        // Scenario B: LLM says we only need ONE API call
+      } else {
+        if (toolCall.getEndpoint() == null || toolCall.getEndpoint().isEmpty()) {
+          LOG.warn("LLM returned SINGLE_ENDPOINT with empty endpoint");
+          return handleFallback(userQuery, effectiveModel, provider);
+        }
+        LOG.info("Tool selection result: SINGLE_ENDPOINT method={}, endpoint={}, paramKeys={}, reasoning={}",
+            toolCall.getMethod(),
+            toolCall.getEndpoint(),
+            toolCall.getParameters() == null ? "[]" : toolCall.getParameters().keySet(),
+            toolCall.getReasoning());
+        String clarification = validateToolCallForExecution(toolCall);
+        if (clarification != null) {
+          LOG.info("Execution policy returned clarification for endpoint {}: {}",
+              toolCall.getEndpoint(), clarification);
+          return clarification;
+        }
+        // Go fetch the data using our ToolExecutor!
+        ToolExecutor.ToolExecutionOutcome outcome = toolExecutor.executeToolCallWithPolicy(
+            toolCall.getEndpoint(),
+            toolCall.getMethod(),
+            toolCall.getParameters(),
+            maxRecordsPerAnswer,
+            maxPagesPerAnswer,
+            pageSizePerCall);
+
+        // Save the raw JSON data the API returned
+        apiResponses = new HashMap<>();
+        apiResponses.put(toolCall.getEndpoint(), outcome.getResponseBody());
+        executionMetadata.put(toolCall.getEndpoint(),
+            createExecutionMetadataMap(outcome));
+      }
+
+      // STEP 3: Send the raw JSON data BACK to the LLM to format a nice answer
+      LOG.info("Summarization input prepared: endpointCount={}, endpoints={}",
+          apiResponses.size(), apiResponses.keySet());
+      return summarizeResponse(userQuery, apiResponses, executionMetadata, effectiveModel, provider);
+
+    } catch (Exception e) {
+      throw new ChatbotException("Failed to process chatbot query: " + e.getMessage(), e);
     }
-
-    // If the user asked a general question (e.g. "What is Ozone?"), the LLM answers it directly without an API call.
-    if (toolCall.isDocumentationQuery()) {
-      LOG.info("Tool selection result: DOCUMENTATION_QUERY (no Recon API call)");
-      return toolCall.getAnswer();
-    }
-
-    // STEP 2: Execute the internal Recon API calls
-    Map<String, Object> apiResponses;
-    Map<String, Object> executionMetadata = new HashMap<>();
-
-    // Scenario A: LLM says we need to call MULTIPLE APIs to get the answer
-    if (toolCall.isMultipleEndpoints()) {
-
-      if (toolCall.getToolCalls() == null || toolCall.getToolCalls().isEmpty()) {
-        LOG.warn("LLM returned MULTI_ENDPOINT but no tool calls");
-        return handleFallback(userQuery, effectiveModel, provider, apiKey);
-      }
-      LOG.info("Tool selection result: MULTI_ENDPOINT count={}",
-          toolCall.getToolCalls().size());
-
-      // Check if the LLM asked for something dangerous (like scanning the whole cluster without a limit)
-      String clarification = buildClarificationForToolCalls(toolCall.getToolCalls());
-      if (clarification != null) {
-        LOG.info("Execution policy returned clarification for multi-endpoint " +
-            "request: {}", clarification);
-        return clarification;
-      }
-      for (ToolCall selected : toolCall.getToolCalls()) {
-        LOG.info("Selected Recon API: method={}, endpoint={}, paramKeys={}, reasoning={}",
-            selected.getMethod(),
-            selected.getEndpoint(),
-            selected.getParameters() == null ? "[]" : selected.getParameters().keySet(),
-            selected.getReasoning());
-      }
-
-      // Execute all the API calls securely
-      apiResponses = executeMultipleToolCalls(toolCall.getToolCalls(), executionMetadata);
-
-      // Scenario B: LLM says we only need ONE API call
-    } else {
-      if (toolCall.getEndpoint() == null || toolCall.getEndpoint().isEmpty()) {
-        LOG.warn("LLM returned SINGLE_ENDPOINT with empty endpoint");
-        return handleFallback(userQuery, effectiveModel, provider, apiKey);
-      }
-      LOG.info("Tool selection result: SINGLE_ENDPOINT method={}, endpoint={}, paramKeys={}, reasoning={}",
-          toolCall.getMethod(),
-          toolCall.getEndpoint(),
-          toolCall.getParameters() == null ? "[]" : toolCall.getParameters().keySet(),
-          toolCall.getReasoning());
-      String clarification = validateToolCallForExecution(toolCall);
-      if (clarification != null) {
-        LOG.info("Execution policy returned clarification for endpoint {}: {}",
-            toolCall.getEndpoint(), clarification);
-        return clarification;
-      }
-      // Go fetch the data using our ToolExecutor!
-      ToolExecutor.ToolExecutionOutcome outcome = toolExecutor.executeToolCallWithPolicy(
-          toolCall.getEndpoint(),
-          toolCall.getMethod(),
-          toolCall.getParameters(),
-          maxRecordsPerAnswer,
-          maxPagesPerAnswer,
-          pageSizePerCall);
-
-      // Save the raw JSON data the API returned
-      apiResponses = new HashMap<>();
-      apiResponses.put(toolCall.getEndpoint(), outcome.getResponseBody());
-      executionMetadata.put(toolCall.getEndpoint(),
-          createExecutionMetadataMap(outcome));
-    }
-
-    // STEP 3: Send the raw JSON data BACK to the LLM to format a nice answer
-    LOG.info("Summarization input prepared: endpointCount={}, endpoints={}",
-        apiResponses.size(), apiResponses.keySet());
-    return summarizeResponse(userQuery, apiResponses, executionMetadata, effectiveModel, provider, apiKey);
   }
 
   /**
    * "Step 1" Helper: Talks to the LLM and asks for a JSON object telling us which API to call.
    */
-  private ToolCall getToolCall(String userQuery, String model, String provider,
-                               String apiKey) throws Exception {
+  private ToolCall getToolCall(String userQuery, String model,
+                               String provider) throws LLMClient.LLMException, IOException {
 
     // Build the "cheat sheet" prompt (includes the recon-api-guide.md)
     String systemPrompt = buildToolSelectionPrompt();
@@ -301,8 +312,7 @@ public class ChatbotAgent {
       parameters.put("_provider", provider);
     }
 
-    // Send the request to the LLM
-    LLMResponse response = llmClient.chatCompletion(messages, model, apiKey, parameters);
+    LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
 
     LOG.info("Tool selection LLM response: model={}, promptTokens={}, completionTokens={}, totalTokens={}",
         response.getModel(),
@@ -376,8 +386,8 @@ public class ChatbotAgent {
   private String summarizeResponse(String userQuery,
                                    Map<String, Object> apiResponses,
                                    Map<String, Object> executionMetadata,
-                                   String model, String provider, String apiKey)
-      throws Exception {
+                                   String model, String provider)
+      throws LLMClient.LLMException {
 
     // Give the LLM a new set of rules
     String systemPrompt = buildSummarizationPrompt();
@@ -396,8 +406,7 @@ public class ChatbotAgent {
       parameters.put("_provider", provider);
     }
 
-    // Send the request to the LLM
-    LLMResponse response = llmClient.chatCompletion(messages, model, apiKey, parameters);
+    LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
 
     LOG.info("Summarization LLM response: model={}, promptTokens={}, " +
             "completionTokens={}, totalTokens={}",
@@ -415,8 +424,8 @@ public class ChatbotAgent {
    * The prompt template is loaded from {@code chatbot/recon-fallback-prompt-template.txt}.
    * The single {@code %s} placeholder is substituted with the user's original query.
    */
-  private String handleFallback(String userQuery, String model, String provider,
-                                String apiKey) throws Exception {
+  private String handleFallback(String userQuery, String model,
+                                String provider) throws LLMClient.LLMException {
     String prompt = String.format(fallbackPromptTemplate, userQuery);
 
     List<ChatMessage> messages = new ArrayList<>();
@@ -429,8 +438,7 @@ public class ChatbotAgent {
       parameters.put("_provider", provider);
     }
 
-    LLMResponse response = llmClient.chatCompletion(
-        messages, model, apiKey, parameters);
+    LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
 
     return response.getContent();
   }
