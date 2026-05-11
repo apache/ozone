@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Iterables;
 import java.io.IOException;
@@ -112,7 +113,7 @@ public class FakeDatanodePipeline {
 
     // Mock XceiverClientRatis
     this.xceiverClient = mock(XceiverClientRatis.class);
-    doReturn(pipeline).when(xceiverClient).getPipeline();
+    when(xceiverClient.getPipeline()).thenReturn(pipeline);
     doReturn(0L).when(xceiverClient).getReplicatedMinCommitIndex();
 
     // Mock DataStreamApi to return our concrete DataStreamOutput
