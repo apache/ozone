@@ -58,7 +58,7 @@
             $scope.filteredNodes = [];
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
-            $scope.lastIndex = 0;
+            $scope.lastIndex = 1;
             $scope.statistics = {
                 nodes : {
                     usages : {
@@ -165,9 +165,10 @@
                      nodeStatusCopy = [...$scope.nodeStatus];
                      $scope.filteredNodes = [...nodeStatusCopy];
                      $scope.totalItems = $scope.filteredNodes.length;
-                     let initialLimit = parseInt($scope.RecordsToDisplay);
-                     $scope.lastIndex = Math.ceil($scope.filteredNodes.length / initialLimit);
-                     $scope.nodeStatus = $scope.filteredNodes.slice(0, initialLimit);
+                     //let initialLimit = parseInt($scope.RecordsToDisplay);
+                     //$scope.lastIndex = Math.ceil($scope.filteredNodes.length / initialLimit);
+                     //$scope.nodeStatus = $scope.filteredNodes.slice(0, initialLimit);
+                     $scope.UpdateRecordsToShow();
 
                     $scope.formatValue = function(value) {
                         if (value && value.includes(';')) {
@@ -265,14 +266,16 @@
                 $scope.totalItems = $scope.filteredNodes.length;
                 $scope.UpdateRecordsToShow(); // Re-calculate pagination
             };
-             /* If option is 'All' display all records, else display specified records on page */
+            /* If option is 'All' display all records, else display specified records on page */
              $scope.UpdateRecordsToShow = () => {
                  if ($scope.RecordsToDisplay === 'All') {
                      $scope.lastIndex = 1;
                      $scope.nodeStatus = $scope.filteredNodes;
                  } else {
                      let limit = parseInt($scope.RecordsToDisplay);
-                     $scope.lastIndex = Math.ceil($scope.filteredNodes.length / limit);
+                     // Use Math.max(1, ...) to ensure lastIndex never drops to 0.
+                     // This prevents the "Next" button from remaining active on empty search results.
+                     $scope.lastIndex = Math.max(1, Math.ceil($scope.filteredNodes.length / limit));
                      $scope.nodeStatus = $scope.filteredNodes.slice(0, limit);
                  }
                  $scope.currentPage = 1;
