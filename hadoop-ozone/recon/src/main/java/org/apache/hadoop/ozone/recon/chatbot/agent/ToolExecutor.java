@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,9 +64,13 @@ public class ToolExecutor {
 
   @Inject
   public ToolExecutor(OzoneConfiguration configuration) {
-    // Get Recon base URL from configuration
-    // Default to localhost for local development
-    this.reconBaseUrl = "http://localhost:9888";
+    // Resolve the Recon HTTP address from ozone-site.xml (ozone.recon.http-address).
+    // The configured value is typically "0.0.0.0:9888" (bind address), so we always
+    // substitute 0.0.0.0 with 127.0.0.1 so the loopback call actually reaches this process.
+    String rawAddress = configuration.get(
+        ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY,
+        ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_DEFAULT);
+    this.reconBaseUrl = "http://" + rawAddress.replace("0.0.0.0", "127.0.0.1");
 
     this.defaultMaxRecords = configuration.getInt(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS,
@@ -217,6 +222,15 @@ public class ToolExecutor {
 
   /**
    * The Actual HTTP Execution.
+   *
+   * <p>NOTE — Kerberos / SPNEGO: When {@code ozone.recon.http.auth.type=kerberos} is active,
+   * every request to /api/v1/* is intercepted by ReconAuthFilter and requires a valid
+   * SPNEGO Negotiate token. Plain {@link HttpURLConnection} carries no ticket and will
+   * receive a 401 Unauthorized response. The long-term fix is to replace these loopback
+   * HTTP calls with direct in-process invocations of the Recon service beans (injected via
+   * Guice), which avoids the network hop and the auth requirement entirely. Until then, this
+   * code works correctly for non-Kerberos deployments (the common Docker Compose use case).
+   * TODO: Replace loopback HTTP with direct in-process service calls (HDDS-XXXX).</p>
    */
   private JsonNode executeSingleCall(String endpoint, String method,
                                      Map<String, String> parameters)

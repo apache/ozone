@@ -87,4 +87,15 @@ public final class ChatbotConfigKeys {
   // ── Agent configuration ─────────────────────────────────────
   public static final String OZONE_RECON_CHATBOT_MAX_TOOL_CALLS = OZONE_RECON_CHATBOT_PREFIX + "max.tool.calls";
   public static final int OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT = 5;
+
+  // ── Anthropic-specific headers ───────────────────────────────
+  /**
+   * Controls the Anthropic beta feature header sent with every request.
+   * The default enables the extended 1M-token context window feature.
+   * Set to empty string to disable sending the beta header entirely.
+   */
+  public static final String OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER =
+      OZONE_RECON_CHATBOT_PREFIX + "anthropic.beta.header";
+  public static final String OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER_DEFAULT =
+      "context-1m-2025-08-07";
 }

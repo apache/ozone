@@ -75,11 +75,6 @@ public class ChatbotAgent {
   private final int pageSizePerCall;
   private final boolean requireSafeScope;
 
-  /**
-   * Set per-request by processQuery; used to inject provider hint.
-   */
-  private volatile String currentProvider;
-
   @Inject
   public ChatbotAgent(LLMClient llmClient,
                       ToolExecutor toolExecutor,
@@ -137,20 +132,16 @@ public class ChatbotAgent {
     // Use default model if the user didn't specify one.
     String effectiveModel = (model != null && !model.isEmpty()) ? model : defaultModel;
 
-    // Store provider so private helper methods can inject it
-    // into LLM call parameters.
-    this.currentProvider = provider;
-
     LOG.info("Processing query with model: {}, provider: {}", effectiveModel, provider == null ? "auto" : provider);
 
     // STEP 1: Ask the LLM what API tools it wants to use to answer the question.
-    ToolCall toolCall = getToolCall(userQuery, effectiveModel, apiKey);
+    ToolCall toolCall = getToolCall(userQuery, effectiveModel, provider, apiKey);
 
     // If the LLM doesn't know what API to call...
     if (toolCall == null) {
       // No suitable endpoint found
       LOG.info("Tool selection result: NO_SUITABLE_ENDPOINT; using fallback");
-      return handleFallback(userQuery, effectiveModel, apiKey);
+      return handleFallback(userQuery, effectiveModel, provider, apiKey);
     }
 
     // If the user asked a general question (e.g. "What is Ozone?"), the LLM answers it directly without an API call.
@@ -168,7 +159,7 @@ public class ChatbotAgent {
 
       if (toolCall.getToolCalls() == null || toolCall.getToolCalls().isEmpty()) {
         LOG.warn("LLM returned MULTI_ENDPOINT but no tool calls");
-        return handleFallback(userQuery, effectiveModel, apiKey);
+        return handleFallback(userQuery, effectiveModel, provider, apiKey);
       }
       LOG.info("Tool selection result: MULTI_ENDPOINT count={}",
           toolCall.getToolCalls().size());
@@ -195,7 +186,7 @@ public class ChatbotAgent {
     } else {
       if (toolCall.getEndpoint() == null || toolCall.getEndpoint().isEmpty()) {
         LOG.warn("LLM returned SINGLE_ENDPOINT with empty endpoint");
-        return handleFallback(userQuery, effectiveModel, apiKey);
+        return handleFallback(userQuery, effectiveModel, provider, apiKey);
       }
       LOG.info("Tool selection result: SINGLE_ENDPOINT method={}, endpoint={}, paramKeys={}, reasoning={}",
           toolCall.getMethod(),
@@ -227,14 +218,14 @@ public class ChatbotAgent {
     // STEP 3: Send the raw JSON data BACK to the LLM to format a nice answer
     LOG.info("Summarization input prepared: endpointCount={}, endpoints={}",
         apiResponses.size(), apiResponses.keySet());
-    return summarizeResponse(userQuery, apiResponses, executionMetadata, effectiveModel, apiKey);
+    return summarizeResponse(userQuery, apiResponses, executionMetadata, effectiveModel, provider, apiKey);
   }
 
   /**
    * "Step 1" Helper: Talks to the LLM and asks for a JSON object telling us which API to call.
    */
-  private ToolCall getToolCall(String userQuery, String model, String apiKey)
-      throws Exception {
+  private ToolCall getToolCall(String userQuery, String model, String provider,
+                               String apiKey) throws Exception {
 
     // Build the "cheat sheet" prompt (includes the recon-api-guide.md)
     String systemPrompt = buildToolSelectionPrompt();
@@ -248,8 +239,8 @@ public class ChatbotAgent {
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.1);
     parameters.put("max_tokens", 8192);
-    if (currentProvider != null && !currentProvider.isEmpty()) {
-      parameters.put("_provider", currentProvider);
+    if (provider != null && !provider.isEmpty()) {
+      parameters.put("_provider", provider);
     }
 
     // Send the request to the LLM
@@ -327,7 +318,7 @@ public class ChatbotAgent {
   private String summarizeResponse(String userQuery,
                                    Map<String, Object> apiResponses,
                                    Map<String, Object> executionMetadata,
-                                   String model, String apiKey)
+                                   String model, String provider, String apiKey)
       throws Exception {
 
     // Give the LLM a new set of rules
@@ -343,8 +334,8 @@ public class ChatbotAgent {
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.3);
     parameters.put("max_tokens", 2000);
-    if (currentProvider != null && !currentProvider.isEmpty()) {
-      parameters.put("_provider", currentProvider);
+    if (provider != null && !provider.isEmpty()) {
+      parameters.put("_provider", provider);
     }
 
     // Send the request to the LLM
@@ -364,8 +355,8 @@ public class ChatbotAgent {
    * Helper: If the user asks "What is the meaning of life?", we use this to say
    * "Sorry, I only know about Hadoop."
    */
-  private String handleFallback(String userQuery, String model, String apiKey)
-      throws Exception {
+  private String handleFallback(String userQuery, String model, String provider,
+                                String apiKey) throws Exception {
     String prompt = String.format(
         "The user asked: \"%s\"\n\n" +
             "This question cannot be answered using the available " +
@@ -385,8 +376,8 @@ public class ChatbotAgent {
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.5);
     parameters.put("max_tokens", 500);
-    if (currentProvider != null && !currentProvider.isEmpty()) {
-      parameters.put("_provider", currentProvider);
+    if (provider != null && !provider.isEmpty()) {
+      parameters.put("_provider", provider);
     }
 
     LLMResponse response = llmClient.chatCompletion(
