@@ -127,7 +127,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     assertNull(dataVolume.getDbVolume());
     assertFalse(dataVolume.isDbLoaded());
 
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
     // RocksDB is created during upgrade
     File dbFile = new File(dataVolume.getStorageDir().getAbsolutePath() + "/" +
         dataVolume.getClusterID() + "/" + dataVolume.getStorageID());
@@ -164,7 +164,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         .getVolumesList().get(0);
     assertNull(dataVolume.getDbParentDir());
 
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
     // RocksDB is created during upgrade
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
@@ -220,7 +220,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Restart DN and finalize upgrade
     dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
 
     // RocksDB is created by upgrade action
     dataVolume = ((HddsVolume) dsm.getContainer().getVolumeSet()
@@ -250,13 +250,13 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
 
     DbVolume dbVolume = ((HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0)).getDbVolume();
     assertNotNull(dbVolume);
 
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
     // DB Dir should be the same.
     assertEquals(dbVolume, ((HddsVolume) dsm.getContainer()
         .getVolumeSet().getVolumesList().get(0)).getDbVolume());
@@ -277,7 +277,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
 
     // Add a new HddsVolume. It should have DB created after DN restart.
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
@@ -314,7 +314,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
     assertNull(hddsVolume.getDbParentDir());
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
     // DB is created during upgrade
     File dbDir = hddsVolume.getDbParentDir();
     assertTrue(dbDir.getAbsolutePath().startsWith(
@@ -354,7 +354,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
 
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
     File newDataVolume = UpgradeTestHelper.addHddsVolume(conf, tempFolder);
@@ -424,7 +424,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
 
     final Pipeline pipeline = MockPipeline.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
@@ -495,7 +495,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
       return null;
     });
 
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
     // If there was a failure reading during the upgrade, the exception will
     // be thrown here.
     readFuture.get();
@@ -557,7 +557,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Finalize will fail because of DB creation failure
     try {
-      dsm.finalizeUpgrade();
+      dsm.getVersionManager().finalizeUpgrade();
     } catch (Exception e) {
       // Currently there will be retry if finalization failed.
       // Let's assume retry is terminated by user.

@@ -97,7 +97,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     // close container to allow upgrade.
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
     assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.HBASE_SUPPORT));
     // open a new container after finalization
     final long containerID2 = UpgradeTestHelper.addContainer(dispatcher, pipeline);
@@ -134,7 +134,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     // close container to allow upgrade.
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
-    dsm.finalizeUpgrade();
+    dsm.getVersionManager().finalizeUpgrade();
     assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.HBASE_SUPPORT));
     final long containerID2 = UpgradeTestHelper.addContainer(dispatcher, pipeline);
     ContainerProtos.WriteChunkRequestProto writeChunk2 =

@@ -83,8 +83,6 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -750,21 +748,6 @@ public class DatanodeStateMachine implements Closeable {
   @VisibleForTesting
   public DatanodeStorage getStorage() {
     return storage;
-  }
-
-  public StatusAndMessages finalizeUpgrade() throws IOException {
-    if (!versionManager.needsFinalization()) {
-      return UpgradeFinalization.FINALIZED_MSG;
-    }
-    versionManager.finalizeUpgrade();
-    return UpgradeFinalization.FINALIZATION_DONE_MSG;
-  }
-
-  public StatusAndMessages queryUpgradeStatus() {
-    if (versionManager.needsFinalization()) {
-      return UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
-    }
-    return UpgradeFinalization.FINALIZATION_DONE_MSG;
   }
 
   public ConfigurationSource getConf() {

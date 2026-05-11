@@ -100,9 +100,8 @@ public final class TestHddsUpgradeUtils {
     try {
       GenericTestUtils.waitFor(() -> {
         for (HddsDatanodeService dataNode : datanodes) {
-          DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-          if ((dsm.queryUpgradeStatus().status() != FINALIZATION_DONE) &&
-              (dsm.queryUpgradeStatus().status() != ALREADY_FINALIZED)) {
+          DatanodeVersionManager versionManager = dataNode.getDatanodeStateMachine().getVersionManager();
+          if (versionManager.needsFinalization()) {
             return false;
           }
         }
