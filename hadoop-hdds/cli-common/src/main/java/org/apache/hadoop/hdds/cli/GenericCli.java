@@ -25,6 +25,7 @@ import java.nio.file.FileSystemException;
 import java.nio.file.NoSuchFileException;
 import java.util.Map;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
@@ -93,14 +94,19 @@ public abstract class GenericCli implements GenericParentCommand {
     final String rawMessage = error.getMessage();
     if (verbose || rawMessage == null || rawMessage.isEmpty()) {
       error.printStackTrace(cmd.getErr());
-    } else {
-      if (error instanceof FileSystemException) {
-        String errorMessage = handleFileSystemException((FileSystemException) error);
-        cmd.getErr().println(errorMessage);
-      } else {
-        cmd.getErr().println(rawMessage.split("\n")[0]);
-      }
+      return;
     }
+    String aclLine = HddsUtils.formatAccessControlExceptionLine(error);
+    if (aclLine != null) {
+      cmd.getErr().println(aclLine);
+      ExitUtils.terminate(EXECUTION_ERROR_EXIT_CODE, aclLine, null);
+    }
+    if (error instanceof FileSystemException) {
+      String errorMessage = handleFileSystemException((FileSystemException) error);
+      cmd.getErr().println(errorMessage);
+      return;
+    }
+    cmd.getErr().println(rawMessage.split("\n")[0]);
   }
 
   @Override
@@ -134,22 +140,23 @@ public abstract class GenericCli implements GenericParentCommand {
   }
 
   private static String handleFileSystemException(FileSystemException e) {
-    String errorMessage = e.getMessage();
+    StringBuilder sb = new StringBuilder();
+    sb.append("Error: ");
 
     // If reason is set, return the exception's message as it is.
     // Otherwise, construct a custom message based on the type of exception
     if (e.getReason() == null) {
       if (e instanceof NoSuchFileException) {
-        errorMessage = "File not found: " + errorMessage;
+        sb.append("File not found: ");
       } else if (e instanceof AccessDeniedException) {
-        errorMessage = "Access denied: " + errorMessage;
+        sb.append("Access denied: ");
       } else if (e instanceof FileAlreadyExistsException) {
-        errorMessage = "File already exists: " + errorMessage;
+        sb.append("File already exists: ");
       } else {
-        errorMessage = e.getClass().getSimpleName() + ": " + errorMessage;
+        sb.append(e.getClass().getSimpleName()).append(": ");
       }
     }
 
-    return "Error: " + errorMessage;
+    return sb.append(e.getMessage()).toString();
   }
 }

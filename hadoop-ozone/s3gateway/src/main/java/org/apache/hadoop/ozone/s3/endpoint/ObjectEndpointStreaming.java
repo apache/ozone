@@ -186,11 +186,13 @@ final class ObjectEndpointStreaming {
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
       DigestInputStream body, PerformanceStringBuilder perf, long startNanos,
-      Map<String, String> tags)
+      Map<String, String> tags,
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
     long writeLen;
-    try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
-        length, replicationConfig, keyMetadata, tags)) {
+    try (OzoneDataStreamOutput streamOutput = openStreamKeyForPut(bucket,
+        keyPath, length, replicationConfig, keyMetadata, tags,
+        writeConditions)) {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);

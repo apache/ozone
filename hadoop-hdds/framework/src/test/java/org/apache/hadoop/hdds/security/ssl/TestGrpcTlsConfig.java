@@ -51,6 +51,7 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -146,6 +147,26 @@ public class TestGrpcTlsConfig {
     }
   }
 
+  @Test
+  public void testServerIgnoresUnsupportedConfiguredCiphers() throws Exception {
+    Server server = null;
+    ManagedChannel channel = null;
+    try {
+      String[] configuredCiphers = {
+          "TLS_FAKE_CIPHER_SUITE",
+          "TLS_AES_256_GCM_SHA384"
+      };
+      server = setupServer(new String[]{"TLSv1.3"}, configuredCiphers);
+      server.start();
+      channel = setupClient(server.getPort(), new String[]{"TLSv1.3"}, new String[]{"TLS_AES_256_GCM_SHA384"});
+      XceiverClientProtocolServiceStub asyncStub = XceiverClientProtocolServiceGrpc.newStub(channel);
+      ContainerCommandResponseProto response = sendRequest(asyncStub);
+      assertEquals(SUCCESS, response.getResult());
+    } finally {
+      shutdown(channel, server);
+    }
+  }
+
   private Server setupServer(String[] protocols, String[] ciphers)
       throws Exception {
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(0).addService(new GrpcService());
@@ -157,7 +178,9 @@ public class TestGrpcTlsConfig {
       sslContextBuilder.protocols(protocols);
     }
     if (ciphers != null) {
-      sslContextBuilder.ciphers(Arrays.asList(ciphers));
+      sslContextBuilder.ciphers(
+          Arrays.asList(ciphers),
+          SupportedCipherSuiteFilter.INSTANCE);
     }
     nettyServerBuilder.sslContext(sslContextBuilder.build());
     return nettyServerBuilder.build();

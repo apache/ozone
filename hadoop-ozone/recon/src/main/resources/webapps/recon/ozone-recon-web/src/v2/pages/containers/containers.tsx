@@ -16,10 +16,23 @@
  * limitations under the License.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import moment from "moment";
-import { Card, Row, Tabs } from "antd";
+import {
+  Button,
+  Card,
+  message,
+  Progress,
+  Row,
+  Select,
+  Table,
+  Tag,
+  Tabs,
+  Tooltip,
+} from "antd";
+import { DeleteOutlined, DownloadOutlined, ExportOutlined } from "@ant-design/icons";
 import { ValueType } from "react-select/src/types";
+import { ColumnsType } from "antd/es/table";
 
 import Search from "@/v2/components/search/search";
 import MultiSelect, { Option } from "@/v2/components/select/multiSelect";
@@ -35,6 +48,7 @@ import {
   ContainersPaginationResponse,
   ContainerState,
   ExpandedRow,
+  ExportJob,
   TabPaginationState,
 } from "@/v2/types/container.types";
 import { ClusterStateResponse } from "@/v2/types/overview.types";
@@ -51,6 +65,14 @@ const TAB_STATE_MAP: Record<string, string> = {
   '4': 'MIS_REPLICATED',
   '5': 'REPLICA_MISMATCH',
 };
+
+const EXPORT_STATE_OPTIONS = [
+  { label: 'Missing', value: 'MISSING' },
+  { label: 'Under-Replicated', value: 'UNDER_REPLICATED' },
+  { label: 'Over-Replicated', value: 'OVER_REPLICATED' },
+  { label: 'Mis-Replicated', value: 'MIS_REPLICATED' },
+  { label: 'Replica Mismatch', value: 'REPLICA_MISMATCH' },
+];
 
 const SearchableColumnOpts = [{
   label: 'Container ID',
@@ -74,6 +96,8 @@ const DEFAULT_TAB_STATE: TabPaginationState = {
   pageHistory: [],
   hasNextPage: false,
 };
+
+const POLL_INTERVAL_MS = 3000;
 
 const Containers: React.FC<{}> = () => {
   const [state, setState] = useState<ContainerState>({
@@ -100,6 +124,12 @@ const Containers: React.FC<{}> = () => {
   const [selectedTab, setSelectedTab] = useState<string>('1');
   const [searchColumn, setSearchColumn] = useState<'containerID' | 'pipelineID'>('containerID');
 
+  // Export tab state
+  const [exportJobs, setExportJobs] = useState<ExportJob[]>([]);
+  const [selectedExportState, setSelectedExportState] = useState<string>('MISSING');
+  const [exportSubmitting, setExportSubmitting] = useState<boolean>(false);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const debouncedSearch = useDebounce(searchTerm, 300);
 
   const clusterState = useApiData<ClusterStateResponse>(
@@ -121,17 +151,134 @@ const Containers: React.FC<{}> = () => {
     }
   }, [clusterState.data]);
 
-  // Fetch a single page for a tab using cursor-based pagination.
-  // minContainerId=0 means "start from the beginning".
-  // currentPageSize is passed explicitly so callers (e.g. size-change handler) can
-  // provide the new value before React state has updated.
+  // ── Polling ──────────────────────────────────────────────────────────────
+  const fetchExportJobs = async () => {
+    try {
+      const jobs = await fetchData<ExportJob[]>(
+        '/api/v1/containers/unhealthy/export'
+      );
+      setExportJobs(jobs ?? []);
+      // Stop polling when no active jobs remain
+      const hasActive = (jobs ?? []).some(
+        j => j.status === 'QUEUED' || j.status === 'RUNNING'
+      );
+      if (!hasActive && pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    } catch (err) {
+      // Silent — polling errors shouldn't break the UI
+    }
+  };
+
+  const startPolling = () => {
+    if (pollTimerRef.current) return; // already polling
+    fetchExportJobs(); // immediate fetch
+    pollTimerRef.current = setInterval(fetchExportJobs, POLL_INTERVAL_MS);
+  };
+
+  // Start polling when Export tab is active; stop when leaving if no active jobs.
+  useEffect(() => {
+    if (selectedTab === '6') {
+      startPolling();
+    } else {
+      const hasActive = exportJobs.some(
+        j => j.status === 'QUEUED' || j.status === 'RUNNING'
+      );
+      if (!hasActive && pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    }
+    return () => {
+      // Do NOT clear on unmount if active jobs exist; React StrictMode
+      // can remount, so we guard with hasActive inside the interval callback.
+    };
+  }, [selectedTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear on component unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+      }
+    };
+  }, []);
+
+  // ── Export submit ─────────────────────────────────────────────────────────
+  const handleSubmitExport = async () => {
+    // Guard against race condition where exportJobs state may be stale
+    if (exportJobs.some(
+      j => j.state === selectedExportState
+        && (j.status === 'QUEUED' || j.status === 'RUNNING' || j.status === 'COMPLETED')
+    )) {
+      message.warning(
+        `A ${selectedExportState} export already exists. Delete it from the Completed Exports table to start a new one.`,
+      );
+      return;
+    }
+    setExportSubmitting(true);
+    try {
+      const response = await fetch(
+        `/api/v1/containers/unhealthy/export?state=${selectedExportState}`,
+        { method: 'POST' }
+      );
+      if (!response.ok) {
+        let errorMsg = `Failed to start export (HTTP ${response.status})`;
+        try {
+          const body = await response.json();
+          errorMsg = body.message || body.error || errorMsg;
+        } catch {
+          const text = await response.text();
+          if (text && !text.includes('<html>')) errorMsg = text;
+        }
+        // Use a longer duration for queue-full errors so the user has time to read it
+        const duration = response.status === 429 ? 6 : 4;
+        message.error({ content: errorMsg, duration });
+        return;
+      }
+      await fetchExportJobs();
+      startPolling();
+      message.success({ content: 'Export job submitted. Track progress in the table below.', duration: 3 });
+    } catch (err: any) {
+      message.error({ content: `Export failed: ${err.message || err}`, duration: 4 });
+    } finally {
+      setExportSubmitting(false);
+    }
+  };
+
+  // ── Download helper ───────────────────────────────────────────────────────
+  // Uses a hidden <a> so the browser streams the TAR directly to disk
+  // (no in-memory buffering — important for multi-GB exports).
+  const downloadFile = (jobId: string) => {
+    const link = document.createElement('a');
+    link.href = `/api/v1/containers/unhealthy/export/${jobId}/download`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // Backend has already incremented downloadCount; refresh so the UI reflects
+    // the new downloadsRemaining value without waiting for the next poll tick.
+    setTimeout(() => fetchExportJobs(), 500);
+  };
+
+  // ── Delete job helper ─────────────────────────────────────────────────────
+  const deleteJob = async (jobId: string) => {
+    try {
+      await fetch(`/api/v1/containers/unhealthy/export/${jobId}`, { method: 'DELETE' });
+      fetchExportJobs();
+    } catch (err: any) {
+      message.error({ content: `Delete failed: ${err.message || err}`, duration: 4 });
+    }
+  };
+
+  // ── Container data fetching ───────────────────────────────────────────────
   const fetchTabData = async (
     tabKey: string,
     minContainerId: number,
     currentPageSize: number
   ) => {
     const containerStateName = TAB_STATE_MAP[tabKey];
-    // Fetch one extra item so we can detect a next page without a separate count request.
+    if (!containerStateName) return; // skip Export tab (key='6') or unknown keys
     const fetchSize = currentPageSize + 1;
 
     setTabStates(prev => ({
@@ -147,12 +294,8 @@ const Containers: React.FC<{}> = () => {
       );
 
       const allContainers = response.containers ?? [];
-      // If we received more than currentPageSize items, a next page exists.
       const hasNextPage = allContainers.length > currentPageSize;
-      // Always display at most currentPageSize rows.
       const containers = allContainers.slice(0, currentPageSize);
-      // Derive cursor keys from the visible slice, not the full response,
-      // so the next-page request starts exactly after the last displayed row.
       const lastKey = containers.length > 0
         ? Math.max(...containers.map(c => c.containerID))
         : 0;
@@ -173,7 +316,6 @@ const Containers: React.FC<{}> = () => {
         },
       }));
 
-      // Summary counts are returned by every tab endpoint.
       setState(prev => ({
         ...prev,
         missingCount: response.missingCount ?? 0,
@@ -192,7 +334,6 @@ const Containers: React.FC<{}> = () => {
     }
   };
 
-  // Initial fetch on mount.
   useEffect(() => {
     fetchTabData('1', 0, DEFAULT_PAGE_SIZE);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -203,8 +344,7 @@ const Containers: React.FC<{}> = () => {
 
   function handleTabChange(key: string) {
     setSelectedTab(key);
-    // Lazy-load: fetch first page only if the tab has never been loaded.
-    if (tabStates[key].data.length === 0 && !tabStates[key].loading) {
+    if (key !== '6' && tabStates[key]?.data.length === 0 && !tabStates[key]?.loading) {
       fetchTabData(key, 0, pageSize);
     }
   }
@@ -212,8 +352,6 @@ const Containers: React.FC<{}> = () => {
   function handleNextPage(tabKey: string) {
     const tab = tabStates[tabKey];
     if (tab.loading || !tab.hasNextPage) return;
-
-    // Push the current minContainerId so we can navigate back.
     setTabStates(prev => ({
       ...prev,
       [tabKey]: {
@@ -227,10 +365,8 @@ const Containers: React.FC<{}> = () => {
   function handlePrevPage(tabKey: string) {
     const tab = tabStates[tabKey];
     if (tab.loading || tab.pageHistory.length === 0) return;
-
     const history = [...tab.pageHistory];
     const prevMinContainerId = history.pop() ?? 0;
-
     setTabStates(prev => ({
       ...prev,
       [tabKey]: { ...prev[tabKey], pageHistory: history },
@@ -238,7 +374,6 @@ const Containers: React.FC<{}> = () => {
     fetchTabData(tabKey, prevMinContainerId, pageSize);
   }
 
-  // Changing page size resets all tabs and re-fetches the active tab from page 1.
   function handlePageSizeChange(newSize: number) {
     setPageSize(newSize);
     const reset = {
@@ -252,7 +387,6 @@ const Containers: React.FC<{}> = () => {
     fetchTabData(selectedTab, 0, newSize);
   }
 
-  // Full refresh: reset all tab states and re-fetch the active tab from page 1.
   const loadContainersData = () => {
     setTabStates({
       '1': { ...DEFAULT_TAB_STATE },
@@ -278,14 +412,176 @@ const Containers: React.FC<{}> = () => {
     replicaMismatchCount,
   } = state;
 
-  const currentTabState = tabStates[selectedTab];
+  const currentTabState = tabStates[selectedTab] ?? DEFAULT_TAB_STATE;
 
+  // ── Export jobs table helpers ─────────────────────────────────────────────
+  const activeJobs = exportJobs.filter(j => j.status === 'RUNNING' || j.status === 'QUEUED');
+  const completedJobs = exportJobs.filter(j => j.status === 'COMPLETED' || j.status === 'FAILED');
+  const isStateAlreadyActive = exportJobs.some(
+    j => j.state === selectedExportState
+      && (j.status === 'QUEUED' || j.status === 'RUNNING' || j.status === 'COMPLETED')
+  );
+
+  const statusColor: Record<string, string> = {
+    QUEUED: 'blue',
+    RUNNING: 'processing',
+    COMPLETED: 'green',
+    FAILED: 'red',
+  };
+
+  const jobIdColumn: ColumnsType<ExportJob>[0] = {
+    title: 'Job ID',
+    dataIndex: 'jobId',
+    key: 'jobId',
+    width: 110,
+    render: (id: string) => (
+      <Tooltip title={id}>
+        <code>{id.substring(0, 8)}</code>
+      </Tooltip>
+    ),
+  };
+
+  const stateColumn: ColumnsType<ExportJob>[0] = {
+    title: 'State',
+    dataIndex: 'state',
+    key: 'state',
+    render: (s: string) => s.replace(/_/g, ' '),
+  };
+
+  const statusColumn: ColumnsType<ExportJob>[0] = {
+    title: 'Status',
+    dataIndex: 'status',
+    key: 'status',
+    width: 120,
+    render: (status: string) => (
+      <Tag color={statusColor[status] ?? 'default'}>{status}</Tag>
+    ),
+  };
+
+  const submittedColumn: ColumnsType<ExportJob>[0] = {
+    title: 'Submitted',
+    dataIndex: 'submittedAt',
+    key: 'submittedAt',
+    render: (ts: number) => ts ? moment(ts).format('MMM D, HH:mm:ss') : '—',
+  };
+
+  const startedColumn: ColumnsType<ExportJob>[0] = {
+    title: 'Started',
+    dataIndex: 'startedAt',
+    key: 'startedAt',
+    render: (ts: number) => ts ? moment(ts).format('MMM D, HH:mm:ss') : '—',
+  };
+
+  // ── Active exports columns (RUNNING / QUEUED) ─────────────────────────────
+  const activeExportColumns: ColumnsType<ExportJob> = [
+    jobIdColumn,
+    stateColumn,
+    statusColumn,
+    {
+      title: 'Queue Position',
+      dataIndex: 'queuePosition',
+      key: 'queuePosition',
+      width: 130,
+      render: (_: number, record: ExportJob) =>
+        record.status === 'QUEUED' && record.queuePosition > 0
+          ? `#${record.queuePosition}`
+          : '—',
+    },
+    submittedColumn,
+    startedColumn,
+    {
+      title: 'Progress',
+      key: 'progress',
+      render: (_: unknown, record: ExportJob) => {
+        if (record.status === 'RUNNING') {
+          const pct = record.progressPercent || 0;
+          const processed = record.totalRecords?.toLocaleString() ?? '0';
+          const total = record.estimatedTotal > 0
+            ? record.estimatedTotal.toLocaleString()
+            : '?';
+          return (
+            <div style={{ minWidth: 160 }}>
+              <Progress percent={pct} size='small' />
+              <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                {processed} / {total} records
+              </div>
+            </div>
+          );
+        }
+        return '—';
+      },
+    },
+  ];
+
+  // ── Completed exports columns (COMPLETED / FAILED) ────────────────────────
+  const completedExportColumns: ColumnsType<ExportJob> = [
+    jobIdColumn,
+    stateColumn,
+    statusColumn,
+    {
+      title: 'Records',
+      dataIndex: 'totalRecords',
+      key: 'totalRecords',
+      render: (n: number, record: ExportJob) =>
+        record.status === 'COMPLETED' ? (n?.toLocaleString() ?? '—') : '—',
+    },
+    submittedColumn,
+    startedColumn,
+    {
+      title: 'Completed',
+      dataIndex: 'completedAt',
+      key: 'completedAt',
+      render: (ts: number) => ts ? moment(ts).format('MMM D, HH:mm:ss') : '—',
+    },
+    {
+      title: 'Action',
+      key: 'action',
+      render: (_: unknown, record: ExportJob) => {
+        const deleteBtn = (
+          <Button
+            danger
+            size='small'
+            icon={<DeleteOutlined />}
+            onClick={() => deleteJob(record.jobId)}>
+            Delete
+          </Button>
+        );
+        if (record.status === 'COMPLETED') {
+          const limitReached = record.downloadsRemaining === 0;
+          return (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button
+                type='primary'
+                size='small'
+                icon={<DownloadOutlined />}
+                disabled={limitReached}
+                onClick={() => downloadFile(record.jobId)}>
+                {limitReached ? 'Limit reached' : `Download (${record.downloadsRemaining} left)`}
+              </Button>
+              {deleteBtn}
+            </div>
+          );
+        }
+        if (record.status === 'FAILED') {
+          return (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Tooltip title={record.errorMessage ?? 'Unknown error'}>
+                <span style={{ color: '#ff4d4f', fontSize: 12, alignSelf: 'center' }}>
+                  {record.errorMessage ?? 'Failed'}
+                </span>
+              </Tooltip>
+              {deleteBtn}
+            </div>
+          );
+        }
+        return null;
+      },
+    },
+  ];
+
+  // ── Highlights ────────────────────────────────────────────────────────────
   const highlightData = (
-    <div style={{
-        display: 'flex',
-        width: '90%',
-        justifyContent: 'space-between'
-      }}>
+    <div style={{ display: 'flex', width: '90%', justifyContent: 'space-between' }}>
       <div className='highlight-content'>
         Total Containers <br/>
         <span className='highlight-content-value'>{totalContainers ?? 'N/A'}</span>
@@ -329,44 +625,44 @@ const Containers: React.FC<{}> = () => {
           <Card
             title='Highlights'
             loading={currentTabState.loading && missingCount === 0}>
-              <Row
-                align='middle'>
-                  {highlightData}
-                </Row>
+            <Row align='middle'>{highlightData}</Row>
           </Card>
         </div>
         <div className='content-div'>
-          <div className='table-header-section'>
-            <div className='table-filter-section'>
-              <MultiSelect
-                options={columnOptions}
-                defaultValue={selectedColumns}
-                selected={selectedColumns}
-                placeholder='Columns'
-                onChange={handleColumnChange}
-                fixedColumn='containerID'
-                onTagClose={() => { }}
-                columnLength={columnOptions.length} />
-            </div>
-            <Search
-              disabled={currentTabState.data.length === 0}
-              searchOptions={SearchableColumnOpts}
-              searchInput={searchTerm}
-              searchColumn={searchColumn}
-              onSearchChange={
-                (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
-              }
-              onChange={(value) => {
-                setSearchTerm('');
-                setSearchColumn(value as 'containerID' | 'pipelineID');
-              }} />
-          </div>
-          <Tabs defaultActiveKey='1'
+          <Tabs
+            defaultActiveKey='1'
             onChange={(activeKey: string) => handleTabChange(activeKey)}>
+
+            {/* ── Container data tabs ───────────────────────────────────── */}
             {(['1','2','3','4','5'] as const).map((key) => (
               <Tabs.TabPane
                 key={key}
                 tab={['Missing','Under-Replicated','Over-Replicated','Mis-Replicated','Mismatched Replicas'][Number(key)-1]}>
+                <div className='table-header-section'>
+                  <div className='table-filter-section'>
+                    <MultiSelect
+                      options={columnOptions}
+                      defaultValue={selectedColumns}
+                      selected={selectedColumns}
+                      placeholder='Columns'
+                      onChange={handleColumnChange}
+                      fixedColumn='containerID'
+                      onTagClose={() => {}}
+                      columnLength={columnOptions.length} />
+                  </div>
+                  <Search
+                    disabled={tabStates[key].data.length === 0}
+                    searchOptions={SearchableColumnOpts}
+                    searchInput={searchTerm}
+                    searchColumn={searchColumn}
+                    onSearchChange={
+                      (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)
+                    }
+                    onChange={(value) => {
+                      setSearchTerm('');
+                      setSearchColumn(value as 'containerID' | 'pipelineID');
+                    }} />
+                </div>
                 <ContainerTable
                   data={tabStates[key].data}
                   loading={tabStates[key].loading}
@@ -384,11 +680,79 @@ const Containers: React.FC<{}> = () => {
                 />
               </Tabs.TabPane>
             ))}
+
+            {/* ── Export tab ────────────────────────────────────────────── */}
+            <Tabs.TabPane
+              key='6'
+              tab={
+                <span>
+                  <ExportOutlined />
+                  Export
+                </span>
+              }>
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontWeight: 500 }}>Container State:</span>
+                <Select
+                  value={selectedExportState}
+                  onChange={(v: string) => setSelectedExportState(v)}
+                  options={EXPORT_STATE_OPTIONS}
+                  style={{ width: 200 }} />
+                <Tooltip title={isStateAlreadyActive
+                  ? `A ${selectedExportState} export already exists. Delete it to start a new one.`
+                  : ''}>
+                  <Button
+                    type='primary'
+                    icon={<ExportOutlined />}
+                    loading={exportSubmitting}
+                    disabled={isStateAlreadyActive}
+                    onClick={handleSubmitExport}>
+                    Export CSV
+                  </Button>
+                </Tooltip>
+              </div>
+
+              {/* Active Exports */}
+              {activeJobs.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+                    Active Exports
+                  </div>
+                  <Table<ExportJob>
+                    rowKey='jobId'
+                    dataSource={activeJobs}
+                    columns={activeExportColumns}
+                    pagination={false}
+                    size='middle'
+                    locale={{ filterTitle: '' }}
+                  />
+                </div>
+              )}
+
+              {/* Completed Exports */}
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+                  Completed Exports
+                </div>
+                <Table<ExportJob>
+                  rowKey='jobId'
+                  dataSource={completedJobs}
+                  columns={completedExportColumns}
+                  pagination={{ pageSize: 10, showSizeChanger: false }}
+                  size='middle'
+                  locale={{
+                    emptyText: activeJobs.length === 0
+                      ? 'No export jobs yet. Select a state and click Export CSV.'
+                      : 'No completed exports yet.',
+                    filterTitle: '',
+                  }}
+                />
+              </div>
+            </Tabs.TabPane>
           </Tabs>
         </div>
       </div>
     </>
   );
-}
+};
 
 export default Containers;
