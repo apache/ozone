@@ -1011,7 +1011,7 @@ public class ContainerEndpoint {
 
     long firstKey = metaList.isEmpty() ? minContainerId : metaList.get(0).getContainerID();
     long lastKey  = metaList.isEmpty() ? minContainerId : metaList.get(metaList.size() - 1).getContainerID();
-    long total    = containerManager.getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
+    int total     = containerManager.getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
 
     return Response.ok(new QuasiClosedContainersResponse(total, firstKey, lastKey, metaList)).build();
   }
