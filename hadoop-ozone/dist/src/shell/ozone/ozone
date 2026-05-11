@@ -59,6 +59,7 @@ function ozone_usage
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
+  ozone_add_subcommand "interactive" client "interactive shell for ozone commands"
   ozone_add_subcommand "admin" client "Ozone admin tool"
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
@@ -220,6 +221,17 @@ function ozonecmd_case
     dtutil)
       OZONE_CLASSNAME=org.apache.hadoop.security.token.DtUtilShell
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
+    interactive)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneInteractiveShell
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-shell"
+      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      # Add all CLI classpaths to support all subcommands dynamically
+      for cp_file in "ozone-cli-admin" "ozone-cli-debug" "ozone-cli-repair" "ozone-tools"; do
+        if [[ -f "${OZONE_HOME}/share/ozone/classpath/${cp_file}.classpath" ]]; then
+          ozone_add_classpath_from_file "${OZONE_HOME}/share/ozone/classpath/${cp_file}.classpath"
+        fi
+      done
     ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin

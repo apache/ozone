@@ -143,6 +143,20 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   @Override
   public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    boolean isOmLeader = om.isLeaderReady();
+    if (!isOmLeader) {
+      String msg = "Unable to process metadata snapshot request as "
+          + "this OM is not the leader or not ready to serve requests";
+      LOG.warn(msg);
+      try {
+        response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, msg);
+      } catch (IOException e) {
+        LOG.warn("Failed to send error response, falling back to status only", e);
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      }
+      return;
+    }
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);

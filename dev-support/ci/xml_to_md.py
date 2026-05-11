@@ -64,12 +64,19 @@ def parse_xml_file(xml_content, properties):
       raise ValueError(f"Property '{name}' is missing a description.")
     tag = prop.findtext('tag', '')
 
-    properties[name] = Property(
+    p = Property(
       name=name.strip(),
       value=prop.findtext('value', '').strip(),
       tag=tag,
       description=' '.join(description.split()).strip()
     )
+    if name in properties and p != properties[name]:
+      msg = f"Duplicate property '{name}'"
+      print(msg)
+      print(properties[name])
+      print(p)
+      raise ValueError(msg)
+    properties[name] = p
   return properties
 
 def format_properties(properties):

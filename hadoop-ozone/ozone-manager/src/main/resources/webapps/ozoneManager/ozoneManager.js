@@ -30,6 +30,9 @@
             })
             .when("/snapshots", {
                 template: "<om-snapshots></om-snapshots>"
+            })
+            .when("/ratis_events", {
+                template: "<ratis-events></ratis-events>"
             });
     });
     angular.module('ozoneManager').component('omSnapshots', {
@@ -38,11 +41,38 @@
             var ctrl = this;
             ctrl.snapshotMetrics = [];
             ctrl.snapshotDiffJobs = [];
+            ctrl.snapshots = [];
             ctrl.snapshotUsageMetrics = {
                 'NumSnapshotActive': 0,
                 'NumSnapshotDeleted': 0,
                 'NumSnapshotCacheSize': 0
             };
+
+            ctrl.listSnapshots = function(volume, bucket) {
+                if (volume && bucket) {
+                    $http.get("snapshotList?volume=" + volume + "&bucket=" + bucket)
+                        .then(function (result) {
+                            ctrl.snapshots = result.data;
+                        })
+                        .catch(function (error) {
+                            console.error("Error fetching snapshots:", error);
+                            ctrl.snapshots = [];
+                        });
+                } else {
+                    ctrl.snapshots = [];
+                }
+            };
+
+            ctrl.formatBytes = function(bytes, decimals) {
+                if (bytes == 0) return '0 Bytes';
+                if (!bytes) return 'N/A';
+                var k = 1024,
+                    dm = decimals + 1 || 3,
+                    sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
+                    i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+            }
+
             $scope.reverse = false;
             $scope.columnName = "jobId";
             let snapDiffJobsCopy = [];
@@ -57,6 +87,11 @@
                         ctrl.snapshotUsageMetrics.NumSnapshotActive = metrics.NumSnapshotActive || 0;
                         ctrl.snapshotUsageMetrics.NumSnapshotDeleted = metrics.NumSnapshotDeleted || 0;
                         ctrl.snapshotUsageMetrics.NumSnapshotCacheSize = metrics.NumSnapshotCacheSize || 0;
+                        for (var key in metrics) {
+                            if (key.match(/NumSnapshot|NumCancelSnapshotDiff|NumListSnapshotDiffJob/)) {
+                                ctrl.snapshotMetrics.push({key: key, value: metrics[key]});
+                            }
+                        }
                     }
                 });
 
@@ -129,6 +164,24 @@
                 }
                 return ($scope.currentPage - 1) * $scope.RecordsToDisplay + 1;
             }
+        }
+    });
+    angular.module('ozoneManager').component('ratisEvents', {
+        templateUrl: 'ratis-events.html',
+        controller: function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    var metrics = result.data.beans[0];
+                    var rawEvents = metrics['tag.RatisEvents'] ? metrics['tag.RatisEvents'].split('\n') : [];
+                    ctrl.events = rawEvents.map(function(e) {
+                        var parts = e.split('|');
+                        return {
+                            timestamp: parts[0],
+                            description: parts[1]
+                        };
+                    });
+                });
         }
     });
     angular.module('ozoneManager').component('omMetrics', {

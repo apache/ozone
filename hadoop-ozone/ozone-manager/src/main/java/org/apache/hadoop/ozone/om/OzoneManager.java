@@ -333,6 +333,7 @@ import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
@@ -492,6 +493,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static boolean testReloadConfigFlag = false;
   private static boolean testSecureOmFlag = false;
   private static UserGroupInformation testUgi;
+  private static boolean testInstallSnapshot = false;
 
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
@@ -699,7 +701,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isS3MultiTenancyEnabled =
         OMMultiTenantManager.checkAndEnableMultiTenancy(this, conf);
 
-    metrics = OMMetrics.create();
+    metrics = OMMetrics.create(conf);
     omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
     perfMetrics = OMPerformanceMetrics.register();
     omDeletionMetrics = DeletingServiceMetrics.create();
@@ -3314,7 +3316,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (null == omRatisServer) {
       return getRatisRolesException("Server is shutting down");
     }
-    String leaderReadiness = omRatisServer.getLeaderStatus().name();
+
+    String localLeaderStatus = omRatisServer.getLeaderStatus().name();
+    String localNodeId = omNodeDetails.getNodeId();
     final RaftPeerId leaderId = omRatisServer.getLeaderId();
     if (leaderId == null) {
       LOG.error(NO_LEADER_ERROR_MESSAGE);
@@ -3328,7 +3332,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to getServiceList", e);
       return getRatisRolesException("IO-Exception Occurred, " + e.getMessage());
     }
-    return OmUtils.format(serviceList, port, leaderId.toString(), leaderReadiness);
+    return OmUtils.format(serviceList, port, leaderId.toString(),
+        localNodeId, localLeaderStatus);
   }
 
   /**
@@ -4003,24 +4008,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final String realVolumeName = bucket.realVolume();
+    final String realBucketName = bucket.realBucket();
 
-    Map<String, String> auditMap = bucket.audit();
-    auditMap.put(OzoneConsts.KEY, keyName);
-    auditMap.put(OzoneConsts.UPLOAD_ID, uploadID);
-    auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
-        Integer.toString(partNumberMarker));
-    auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
-
-    metrics.incNumListMultipartUploadParts();
+    final Map<String, String> auditMap = bucket.audit();
     try {
-      OmMultipartUploadListParts omMultipartUploadListParts =
-          keyManager.listParts(bucket.realVolume(), bucket.realBucket(),
-              keyName, uploadID, partNumberMarker, maxParts);
+      auditMap.put(OzoneConsts.KEY, keyName);
+      auditMap.put(OzoneConsts.UPLOAD_ID, uploadID);
+      auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
+          Integer.toString(partNumberMarker));
+      auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
+
+      if (getAclsEnabled()) {
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, null);
+        omMetadataReader.checkAcls(
+            ResourceType.KEY, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, keyName);
+      }
+
+      metrics.incNumListMultipartUploadParts();
+      final OmMultipartUploadListParts omMultipartUploadListParts = keyManager.listParts(
+          realVolumeName, realBucketName, keyName, uploadID, partNumberMarker, maxParts);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap));
       return omMultipartUploadListParts;
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       metrics.incNumListMultipartUploadPartFails();
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction
           .LIST_MULTIPART_UPLOAD_PARTS, auditMap, ex));
@@ -4034,15 +4047,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws IOException {
 
-    ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    final String realVolumeName = bucket.realVolume();
+    final String realBucketName = bucket.realBucket();
 
-    Map<String, String> auditMap = bucket.audit();
+    final Map<String, String> auditMap = bucket.audit();
     auditMap.put(OzoneConsts.PREFIX, prefix);
 
-    metrics.incNumListMultipartUploads();
     try {
-      OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(bucket.realVolume(),
-          bucket.realBucket(), prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
+      if (getAclsEnabled()) {
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, realVolumeName, realBucketName, null);
+        omMetadataReader.checkAcls(
+            ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, realVolumeName, realBucketName, null);
+      }
+
+      metrics.incNumListMultipartUploads();
+      final OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(
+          realVolumeName, realBucketName, prefix, keyMarker, uploadIdMarker, maxUploads, withPagination);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_MULTIPART_UPLOADS, auditMap));
       return omMultipartUploadList;
 
@@ -4129,6 +4151,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException if download or cleanup fails
    */
   public synchronized TermIndex installSnapshotFromLeader(String leaderId) throws IOException {
+    if (!isRunning() || testInstallSnapshot) {
+      LOG.warn("OzoneManager is not in running state, state {}. Abort install snapshot from Leader.",
+          omState);
+      return null;
+    }
+
     if (omRatisSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
@@ -4575,6 +4603,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public static void setTestReloadConfigFlag(boolean testReloadConfigFlag) {
     OzoneManager.testReloadConfigFlag = testReloadConfigFlag;
+  }
+
+  public static void setTestInstallSnapshot(boolean testInstallSnapshot) {
+    OzoneManager.testInstallSnapshot = testInstallSnapshot;
   }
 
   public static void setTestSecureOmFlag(boolean testSecureOmFlag) {
@@ -5344,6 +5376,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
+  @Deprecated
   @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volume,
                                            String bucket,
@@ -5385,6 +5418,90 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } finally {
       if (auditSuccess) {
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.GET_SNAPSHOT_DIFF_REPORT,
+            auditMap));
+      }
+    }
+  }
+
+  @Override
+  public SnapshotDiffResponse snapshotDiff(String volume,
+                                           String bucket,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize)
+      throws IOException {
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, volume);
+    auditMap.put(OzoneConsts.BUCKET, bucket);
+    auditMap.put(OzoneConsts.FROM_SNAPSHOT, fromSnapshot);
+    auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
+    auditMap.put(OzoneConsts.TOKEN, token);
+    auditMap.put(OzoneConsts.PAGE_SIZE, String.valueOf(pageSize));
+
+    try {
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
+      if (getAclsEnabled()) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      }
+      // do not increment snapshot diff job metrics here, since it is not
+      // a job, but a request.
+      return omSnapshotManager.getSnapshotDiffResponse(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+              fromSnapshot, toSnapshot, token, pageSize);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.GET_SNAPSHOT_DIFF_REPORT,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.GET_SNAPSHOT_DIFF_REPORT,
+            auditMap));
+      }
+    }
+  }
+
+  @Override
+  public SubmitSnapshotDiffResponse submitSnapshotDiff(String volume,
+                                                       String bucket,
+                                                       String fromSnapshot,
+                                                       String toSnapshot,
+                                                       boolean forceFullDiff,
+                                                       boolean disableNativeDiff)
+      throws IOException {
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(OzoneConsts.VOLUME, volume);
+    auditMap.put(OzoneConsts.BUCKET, bucket);
+    auditMap.put(OzoneConsts.FROM_SNAPSHOT, fromSnapshot);
+    auditMap.put(OzoneConsts.TO_SNAPSHOT, toSnapshot);
+    auditMap.put(OzoneConsts.FORCE_FULL_DIFF, String.valueOf(forceFullDiff));
+    auditMap.put(OzoneConsts.DISABLE_NATIVE_DIFF, String.valueOf(disableNativeDiff));
+
+    try {
+      // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+      // permission check, since linked bucket permissions and source bucket permissions could be different.
+      ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
+      if (getAclsEnabled()) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+      }
+      // do not increment snapshot diff job metrics here, since it is not
+      // a job, but a request.
+      return omSnapshotManager.submitSnapshotDiff(resolvedBucket.realVolume(), resolvedBucket.realBucket(),
+          fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.SUBMIT_SNAPSHOT_DIFF_JOB,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.SUBMIT_SNAPSHOT_DIFF_JOB,
             auditMap));
       }
     }

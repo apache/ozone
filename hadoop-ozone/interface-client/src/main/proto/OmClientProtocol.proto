@@ -156,11 +156,12 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
-  SetLifecycleConfiguration = 150;
-  GetLifecycleConfiguration   = 151;
-  DeleteLifecycleConfiguration = 152;
-  GetLifecycleServiceStatus    = 153;
-  SetLifecycleServiceStatus     = 154;
+  SubmitSnapshotDiff = 143;
+  SetLifecycleConfiguration = 144;
+  GetLifecycleConfiguration   = 145;
+  DeleteLifecycleConfiguration = 146;
+  GetLifecycleServiceStatus    = 147;
+  SetLifecycleServiceStatus     = 148;
 }
 
 enum SafeMode {
@@ -311,12 +312,13 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
+  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest      = 144;
 
-  optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 144;
-  optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 145;
-  optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 146;
-  optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 147;
-  optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 148;
+  optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 145;
+  optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 146;
+  optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 147;
+  optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 148;
+  optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 149;
 }
 
 message OMResponse {
@@ -450,13 +452,13 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
+  optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
 
-  optional SetLifecycleConfigurationResponse setLifecycleConfigurationResponse = 150;
-  optional GetLifecycleConfigurationResponse   getLifecycleConfigurationResponse   = 151;
-  optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 152;
-
-  optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 153;
-  optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 154;
+  optional SetLifecycleConfigurationResponse setLifecycleConfigurationResponse = 144;
+  optional GetLifecycleConfigurationResponse   getLifecycleConfigurationResponse   = 145;
+  optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 146;
+  optional GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse = 147;
+  optional SetLifecycleServiceStatusResponse setLifecycleServiceStatusResponse = 148;
 }
 
 enum Status {
@@ -1208,11 +1210,6 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
-
-    // expectedETag, when set, indicates that the existing key must have
-    // the given ETag for the operation to succeed. This is used for
-    // S3 conditional writes with the If-Match header.
-    optional string expectedETag = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -2073,6 +2070,15 @@ message SnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional string token = 5;
   optional uint32 pageSize = 6;
+  optional bool forceFullDiff = 7 [deprecated = true];
+  optional bool disableNativeDiff = 8 [deprecated = true];
+}
+
+message SubmitSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
   optional bool forceFullDiff = 7;
   optional bool disableNativeDiff = 8;
 }
@@ -2212,6 +2218,7 @@ message SnapshotDiffResponse {
     REJECTED = 4;
     FAILED = 5;
     CANCELLED = 6;
+    NOT_FOUND = 7;
   }
 
   enum SubStatus {
@@ -2227,6 +2234,10 @@ message SnapshotDiffResponse {
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
   optional SubStatus subStatus = 5;
+}
+
+message SubmitSnapshotDiffResponse {
+  optional string response = 1;
 }
 
 message CancelSnapshotDiffResponse {

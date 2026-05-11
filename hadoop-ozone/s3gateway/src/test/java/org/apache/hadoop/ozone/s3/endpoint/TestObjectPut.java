@@ -84,6 +84,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -458,6 +459,123 @@ class TestObjectPut {
     OS3Exception e = assertErrorResponse(INVALID_ARGUMENT,
         () -> put(objectEndpoint, DEST_BUCKET_NAME, "somekey", CONTENT));
     assertThat(e.getErrorMessage()).contains("The tagging copy directive specified is invalid");
+  }
+
+  @Test
+  void testCopyObjectWithSourceIfMatchSuccess() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+    OzoneKeyDetails sourceKey = bucket.getKey(KEY_NAME);
+    String sourceETag = sourceKey.getMetadata().get(OzoneConsts.ETAG);
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.COPY_SOURCE_IF_MATCH)).thenReturn("\"" + sourceETag + "\"");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+  }
+
+  @Test
+  void testCopyObjectWithSourceIfMatchFails() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.COPY_SOURCE_IF_MATCH)).thenReturn("\"wrong-etag\"");
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+  }
+
+  @Test
+  void testCopyObjectWithSourceIfNoneMatchSuccess() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.COPY_SOURCE_IF_NONE_MATCH)).thenReturn("\"different-etag\"");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+  }
+
+  @Test
+  void testCopyObjectWithSourceIfNoneMatchFails() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+    OzoneKeyDetails sourceKey = bucket.getKey(KEY_NAME);
+    String sourceETag = sourceKey.getMetadata().get(OzoneConsts.ETAG);
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.COPY_SOURCE_IF_NONE_MATCH)).thenReturn("\"" + sourceETag + "\"");
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+  }
+
+  @Test
+  void testCopyObjectWithDestinationIfNoneMatchSuccess() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn("*");
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+  }
+
+  @Test
+  void testCopyObjectWithDestinationIfNoneMatchFails() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn("*");
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+  }
+
+  @Test
+  void testCopyObjectWithDestinationIfMatchSuccess() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    OzoneKeyDetails destKey = destBucket.getKey(DEST_KEY);
+    String destETag = destKey.getMetadata().get(OzoneConsts.ETAG);
+
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn("\"" + destETag + "\"");
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+  }
+
+  @Test
+  void testCopyObjectWithDestinationIfMatchFails() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn("\"wrong-etag\"");
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+  }
+
+  @Test
+  void testCopyObjectWithDestinationIfMatchKeyNotFound() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
+        BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn("\"some-etag\"");
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
   }
 
   @Test

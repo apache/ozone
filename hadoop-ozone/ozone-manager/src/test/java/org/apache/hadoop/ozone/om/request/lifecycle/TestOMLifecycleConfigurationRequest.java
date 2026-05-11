@@ -70,8 +70,8 @@ public class TestOMLifecycleConfigurationRequest {
   @BeforeEach
   public void setup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
-    omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS, tempDir.getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
