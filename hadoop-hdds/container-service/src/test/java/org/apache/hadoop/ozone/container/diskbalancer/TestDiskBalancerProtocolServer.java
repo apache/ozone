@@ -93,6 +93,7 @@ class TestDiskBalancerProtocolServer {
         TEST_THREADS,
         TEST_STOP_AFTER_DISK_EVEN,
         DiskBalancerVersion.DEFAULT_VERSION,
+        DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES,
         0L, // successCount
         0L, // failureCount
         0L, // bytesToMove
@@ -189,6 +190,7 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_BANDWIDTH, conf.getDiskBandwidthInMB());
     assertEquals(TEST_THREADS, conf.getParallelThread());
     assertEquals(TEST_STOP_AFTER_DISK_EVEN, conf.getStopAfterDiskEven());
+    assertEquals(DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, conf.getContainerStates());
     assertEquals(10, status.getSuccessMoveCount());
     assertEquals(2, status.getFailureMoveCount());
     assertEquals(1000000, status.getBytesToMove());
@@ -258,6 +260,7 @@ class TestDiskBalancerProtocolServer {
         .setDiskBandwidthInMB(100L)
         .setParallelThread(20)
         .setStopAfterDiskEven(false)
+        .setContainerStates("CLOSED")
         .build();
     
     // Update configuration
@@ -268,6 +271,7 @@ class TestDiskBalancerProtocolServer {
     assertEquals(100L, diskBalancerInfo.getBandwidthInMB());
     assertEquals(20, diskBalancerInfo.getParallelThread());
     assertFalse(diskBalancerInfo.isStopAfterDiskEven());
+    assertEquals("CLOSED", diskBalancerInfo.getContainerStates());
     
     // Verify service was refreshed
     verify(diskBalancerService, times(1)).refresh(diskBalancerInfo);

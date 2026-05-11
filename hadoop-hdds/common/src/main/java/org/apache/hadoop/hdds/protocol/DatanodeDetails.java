@@ -758,7 +758,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       this.id = details.id;
       this.ipAddress = details.getIpAddressAsByteString();
       this.hostName = details.getHostNameAsByteString();
-      this.networkName = details.getHostNameAsByteString();
+      this.networkName = details.getNetworkNameAsByteString();
       this.networkLocation = details.getNetworkLocationAsByteString();
       this.level = details.getLevel();
       this.ports = details.getPorts();

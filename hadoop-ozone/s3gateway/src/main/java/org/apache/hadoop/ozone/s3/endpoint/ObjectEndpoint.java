@@ -388,8 +388,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       isFile(keyPath, keyDetails);
 
-      Response conditionalResponse = S3ConditionalRequest
-          .evaluateReadPreconditions(getHeaders(), keyPath, keyDetails);
+      Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
+          getHeaders(), keyPath, keyDetails, S3ConditionalRequest.PreconditionContext.READ);
       if (conditionalResponse != null) {
         long metadataLatencyNs = getMetrics().updateGetKeyMetadataStats(
             startNanos);
@@ -547,8 +547,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       key = getClientProtocol().headS3Object(bucketName, keyPath);
 
       isFile(keyPath, key);
-      Response conditionalResponse = S3ConditionalRequest
-          .evaluateReadPreconditions(getHeaders(), keyPath, key);
+      Response conditionalResponse = S3ConditionalRequest.evaluatePreconditions(
+          getHeaders(), keyPath, key, S3ConditionalRequest.PreconditionContext.READ);
       if (conditionalResponse != null) {
         getMetrics().updateHeadKeySuccessStats(startNanos);
         auditReadSuccess(s3GAction);
@@ -726,6 +726,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     List<CompleteMultipartUploadRequest.Part> partList =
         multipartUploadRequest.getPartList();
 
+    S3ConditionalRequest.WriteConditions writeConditions =
+        S3ConditionalRequest.parseWriteConditions(getHeaders(), key);
+
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
       OzoneBucket ozoneBucket = volume.getBucket(bucket);
@@ -738,7 +741,16 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         LOG.debug("Parts map {}", partsMap);
       }
 
-      omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(key, uploadID, partsMap);
+      Long expectedDataGeneration = null;
+      String expectedETag = null;
+      if (writeConditions.hasIfNoneMatch()) {
+        expectedDataGeneration = OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
+      } else if (writeConditions.hasIfMatch()) {
+        expectedETag = writeConditions.getExpectedETag();
+      }
+
+      omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(
+          key, uploadID, partsMap, expectedDataGeneration, expectedETag);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
@@ -770,6 +782,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             "considered as Unix Paths. A directory already exists with a " +
             "given KeyName caused failure for MPU");
         throw os3Exception;
+      } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
+          || ex.getResult() == ResultCodes.ETAG_MISMATCH
+          || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
+        throw newError(PRECOND_FAILED, key, ex);
+      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
+          && writeConditions.hasIfMatch()) {
+        throw newError(PRECOND_FAILED, key, ex);
       }
       throw newError(bucket, key, ex);
     } catch (Exception ex) {
@@ -957,20 +976,23 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       ReplicationConfig replication,
       Map<String, String> metadata,
       PerformanceStringBuilder perf, long startNanos,
-      Map<String, String> tags)
+      Map<String, String> tags,
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
     long copyLength;
+
     if (isDatastreamEnabled() && !(replication != null &&
         replication.getReplicationType() == EC) &&
         srcKeyLen > getDatastreamMinLength()) {
       perf.appendStreamMode();
       copyLength = ObjectEndpointStreaming
           .copyKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
-              getChunkSize(), replication, metadata, src, perf, startNanos, tags);
+              getChunkSize(), replication, metadata, src, perf, startNanos, tags,
+              writeConditions);
     } else {
-      try (OzoneOutputStream dest = getClientProtocol()
-          .createKey(volume.getName(), destBucket, destKey, srcKeyLen,
-              replication, metadata, tags)) {
+      try (OzoneOutputStream dest = openKeyForPut(
+          volume.getName(), destBucket, destKey, srcKeyLen,
+          replication, metadata, tags, writeConditions)) {
         long metadataLatencyNs =
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -1031,6 +1053,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           return copyObjectResponse;
         }
       }
+
+      String sourceKeyPath = sourceBucket + "/" + sourceKey;
+      S3ConditionalRequest.evaluatePreconditions(getHeaders(), sourceKeyPath,
+          sourceKeyDetails, S3ConditionalRequest.PreconditionContext.COPY_SOURCE);
+
+      S3ConditionalRequest.WriteConditions writeConditions =
+          S3ConditionalRequest.parseWriteConditions(getHeaders(), destkey);
+
       long sourceKeyLen = sourceKeyDetails.getDataSize();
 
       // Object tagging in copyObject with tagging directive
@@ -1072,7 +1102,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
         sourceDigestInputStream = new DigestInputStream(src, getMD5DigestInstance());
         copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket, replicationConfig,
-                customMetadata, perf, startNanos, tags);
+                customMetadata, perf, startNanos, tags, writeConditions);
       }
 
       final OzoneKeyDetails destKeyDetails = getClientProtocol().getKeyDetails(
@@ -1085,9 +1115,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       return copyObjectResponse;
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        if (getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
+          throw newError(PRECOND_FAILED, destkey, ex);
+        }
         throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket, ex);
+      } else if (ex.getResult() == ResultCodes.ATOMIC_WRITE_CONFLICT
+          || ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
+          || ex.getResult() == ResultCodes.ETAG_MISMATCH
+          || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
+        throw newError(PRECOND_FAILED, destkey, ex);
       }
       throw newError(destBucket + "/" + destkey, ex);
     } finally {
