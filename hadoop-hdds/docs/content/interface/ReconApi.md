@@ -1164,7 +1164,8 @@ Returns all the datanodes in the cluster.
       "revision": "abcdef1",
       "layoutVersion": 6,
       "networkLocation": "/default-rack"
-    }
+    },
+    ...
   ]
 }
 ```
