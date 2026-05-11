@@ -2081,8 +2081,6 @@ components:
           items:
             type: object
             properties:
-              buildDate:
-                type: string
               layoutVersion:
                 type: integer
               networkLocation:
@@ -2134,34 +2132,51 @@ components:
               containers:
                 type: integer
                 example: 17
+              openContainers:
+                type: integer
+                example: 4
               leaderCount:
                 type: integer
                 example: 1
     RemovedDatanodesResponse:
       type: object
+      description: |
+        Wraps the result of a remove-datanodes request. `datanodesResponseMap` is keyed by outcome
+        category: `removedDatanodes`, `failedDatanodes`, `notFoundDatanodes`. Categories with no
+        entries for this request are omitted (not empty arrays).
       properties:
         datanodesResponseMap:
           type: object
           properties:
             removedDatanodes:
-              type: object
-              properties:
-                totalCount:
-                  type: integer
-                datanodes:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      uuid:
-                        type: string
-                      hostname:
-                        type: string
-                      state:
-                        type: string
-                      pipelines:
-                        type: string
-                        nullable: true
+              $ref: '#/components/schemas/DatanodesResponseEntry'
+            failedDatanodes:
+              description: Pre-check failures. `datanodes` is empty; use `totalCount` and `errors`.
+              allOf:
+                - $ref: '#/components/schemas/DatanodesResponseEntry'
+            notFoundDatanodes:
+              $ref: '#/components/schemas/DatanodesResponseEntry'
+    DatanodesResponseEntry:
+      type: object
+      properties:
+        totalCount:
+          type: integer
+        datanodes:
+          type: array
+          items:
+            type: object
+            properties:
+              uuid:
+                type: string
+              hostname:
+                type: string
+              state:
+                type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: Only present on `failedDatanodes`. Maps uuid to a human-readable failure reason.
     DatanodesDecommissionInfo:
       type: object
       properties:

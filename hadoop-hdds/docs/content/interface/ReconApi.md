@@ -1014,35 +1014,41 @@ No parameters.
 Returns all the datanodes in the cluster.
 
 ```json
-     {
-     	"totalCount": 4,
-     	"datanodes": [{
-     		"uuid": "f8f8cb45-3ab2-4123",
-     		"hostname": "localhost-1",
-     		"state": "HEALTHY",
-     		"lastHeartbeat": 1605738400544,
-     		"storageReport": {
-     			"capacity": 270429917184,
-     			"used": 358805504,
-     			"remaining": 119648149504
-     		},
-     		"pipelines": [{
-     			"pipelineID": "b9415b20-b9bd-4225",
-     			"replicationType": "RATIS",
-     			"replicationFactor": 3,
-     			"leaderNode": "localhost-2"
-     		}, {
-     			"pipelineID": "3bf4a9e9-69cc-4d20",
-     			"replicationType": "RATIS",
-     			"replicationFactor": 1,
-     			"leaderNode": "localhost-1"
-     		}],
-     		"containers": 17,
-     		"leaderCount": 1
-     	},
-        ...
-        ]
-     }
+{
+  "totalCount": 4,
+  "datanodes": [
+    {
+      "uuid": "f8f8cb45-3ab2-4123",
+      "hostname": "localhost-1",
+      "state": "HEALTHY",
+      "opState": "IN_SERVICE",
+      "lastHeartbeat": 1605738400544,
+      "storageReport": {
+        "capacity": 270429917184,
+        "used": 358805504,
+        "remaining": 270071111680,
+        "committed": 27007111,
+        "reserved": 31457280,
+        "minimumFreeSpace": 20480,
+        "filesystemCapacity": 270461374464,
+        "filesystemUsed": 390262784,
+        "filesystemAvailable": 270071111680
+      },
+      "pipelines": [
+        { "pipelineID": "b9415b20-b9bd-4225", "replicationType": "RATIS", "replicationFactor": 3, "leaderNode": "localhost-2" },
+        { "pipelineID": "3bf4a9e9-69cc-4d20", "replicationType": "RATIS", "replicationFactor": 1, "leaderNode": "localhost-1" }
+      ],
+      "containers": 17,
+      "openContainers": 4,
+      "leaderCount": 1,
+      "version": "2.0.0",
+      "setupTime": 1605700000000,
+      "revision": "abcdef1",
+      "layoutVersion": 6,
+      "networkLocation": "/default-rack"
+    }
+  ]
+}
 ```
 
 ### PUT /api/v1/datanodes/remove
@@ -1054,30 +1060,43 @@ Returns all the datanodes in the cluster.
 ```json
 [
   "50ca4c95-2ef3-4430-b944-97d2442c3daf"
-]  
+]
 ```
 
 **Returns**
 
-Returns the list of datanodes which are removed successfully and list of datanodes which were not found.
+Returns a `datanodesResponseMap` keyed by the outcome category. Each value is a `DatanodesResponse`
+(same shape as `GET /api/v1/datanodes`). Categories that have no entries for a given request are
+omitted (not present as empty arrays).
+
+* `removedDatanodes`: successfully removed.
+* `failedDatanodes`: pre-checks failed (e.g. node is not DEAD, or still has open containers/pipelines). Includes `totalCount` and a per-uuid `errors` map describing the failure reason; `datanodes` is empty.
+* `notFoundDatanodes`: uuid did not match any known datanode.
 
 ```json
 {
-  "removedNodes": {
-    "totalCount": 1,
-    "datanodes": [
-      {
-        "uuid": "50ca4c95-2ef3-4430-b944-97d2442c3daf",
-        "hostname": "ozone-datanode-4.ozone_default",
-        "state": "DEAD",
-        "pipelines": null
+  "datanodesResponseMap": {
+    "removedDatanodes": {
+      "totalCount": 1,
+      "datanodes": [
+        {
+          "uuid": "50ca4c95-2ef3-4430-b944-97d2442c3daf",
+          "hostname": "ozone-datanode-4.ozone_default",
+          "state": "DEAD"
+        }
+      ]
+    },
+    "failedDatanodes": {
+      "totalCount": 1,
+      "datanodes": [],
+      "errors": {
+        "60ca4c95-...": "Open Containers/Pipelines"
       }
-    ],
-    "message": "Success"
+    }
   }
-}     
+}
 ```
-  
+
 ## Pipelines
 
 ### GET /api/v1/pipelines
