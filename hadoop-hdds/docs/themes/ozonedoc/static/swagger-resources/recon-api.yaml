@@ -554,6 +554,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OpenKeysSummary'
+  /keys/open/mpu/summary:
+    get:
+      tags:
+        - Keys
+      summary: Returns the summary of all open multipart-upload keys
+      operationId: getOpenMPUKeySummary
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenMPUKeysSummary'
 
   /keys/deletePending:
     get:
@@ -643,6 +656,70 @@ paths:
                 properties:
                   totalDeletedDirectories:
                     type: integer
+  /keys/listKeys:
+    get:
+      tags:
+        - Keys
+      summary: List committed keys under a prefix with optional filters.
+      operationId: listKeys
+      parameters:
+        - name: startPrefix
+          in: query
+          required: true
+          description: |
+            Bucket-level or deeper prefix (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`).
+            Shallower prefixes return `400 Bad Request`.
+          schema:
+            type: string
+        - name: replicationType
+          in: query
+          required: false
+          description: Filter by replication type (e.g. `RATIS`, `EC`).
+          schema:
+            type: string
+        - name: creationDate
+          in: query
+          required: false
+          description: Filter by creation date (only keys created on or after this date are returned).
+          schema:
+            type: string
+        - name: keySize
+          in: query
+          required: false
+          description: Filter to keys with data size at least this many bytes.
+          schema:
+            type: integer
+            default: 0
+        - name: prevKey
+          in: query
+          required: false
+          description: Pagination cursor. Pass back the `lastKey` from the previous response.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of keys to return.
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListKeysResponse'
+        '204':
+          description: No keys matched the given filters.
+        '400':
+          description: Missing or shallower-than-bucket `startPrefix`.
+        '503':
+          description: Recon is still bootstrapping OM DB; retry later. Response status is `INITIALIZING`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListKeysResponse'
   /containers/{id}/keys:
     get:
       tags:
@@ -1512,6 +1589,18 @@ components:
           type: integer
         totalOpenKeys:
           type: integer
+    OpenMPUKeysSummary:
+      type: object
+      description: |
+        Note that the unreplicated total is reported as `totalDataSize` (not
+        `totalUnreplicatedDataSize`). This naming differs from `OpenKeysSummary`.
+      properties:
+        totalOpenMPUKeys:
+          type: integer
+        totalReplicatedDataSize:
+          type: integer
+        totalDataSize:
+          type: integer
     OpenKeys:
       type: object
       required: ['lastKey', 'replicatedDataSize', 'unreplicatedDataSize', 'status']
@@ -1730,6 +1819,66 @@ components:
             type: integer
           localID:
             type: integer
+    ListKeysResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: OK
+          description: One of `OK`, `INITIALIZING`. `INITIALIZING` accompanies a 503 response while Recon is still bootstrapping OM DB.
+        path:
+          type: string
+          description: The startPrefix that was queried.
+          example: /vol1/bucket1
+        replicatedDataSize:
+          type: integer
+          example: 600000
+        unReplicatedDataSize:
+          type: integer
+          example: 200000
+        lastKey:
+          type: string
+          description: Pagination cursor. Pass back as `prevKey` for the next page.
+          example: /vol1/bucket1/dir1/file42
+        keys:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                description: Internal table key (`/volumeId/bucketId/parentId/keyName` for FSO buckets).
+              path:
+                type: string
+                description: Human-readable full path.
+                example: /vol1/bucket1/dir1/file42
+              size:
+                type: integer
+                example: 1048576
+              replicatedSize:
+                type: integer
+                example: 3145728
+              replicationInfo:
+                type: object
+                properties:
+                  replicationFactor:
+                    type: string
+                    example: THREE
+                  requiredNodes:
+                    type: integer
+                    example: 3
+                  replicationType:
+                    type: string
+                    example: RATIS
+              creationTime:
+                type: integer
+                example: 1717000000000
+              modificationTime:
+                type: integer
+                example: 1717100000000
+              isKey:
+                type: boolean
+                example: true
     DeletePendingKeys:
       type: object
       properties:

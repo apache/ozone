@@ -498,6 +498,36 @@ Returns set of keys/files which are open. FSO and non-FSO keys are reported in s
 }
 ```
 
+### GET /api/v1/keys/open/summary
+
+**Returns**
+
+Returns a flat summary of all currently-open keys across the cluster.
+
+```json
+{
+  "totalOpenKeys": 8,
+  "totalReplicatedDataSize": 90000,
+  "totalUnreplicatedDataSize": 30000
+}
+```
+
+### GET /api/v1/keys/open/mpu/summary
+
+**Returns**
+
+Returns a flat summary of all currently-open multipart-upload keys across the cluster. Note that
+the unreplicated total is reported as `totalDataSize` (not `totalUnreplicatedDataSize`): the
+naming differs from `/keys/open/summary`.
+
+```json
+{
+  "totalOpenMPUKeys": 2,
+  "totalReplicatedDataSize": 90000,
+  "totalDataSize": 30000
+}
+```
+
 ### GET /api/v1/keys/deletePending
 
 
@@ -594,6 +624,96 @@ Returns the set of directories pending for deletion. Each entry in `deletedDirIn
     }
   ],
   "status": "OK"
+}
+```
+
+### GET /api/v1/keys/deletePending/summary
+
+**Returns**
+
+Returns a flat summary of all keys pending deletion across the cluster.
+
+```json
+{
+  "totalDeletedKeys": 8,
+  "totalReplicatedDataSize": 90000,
+  "totalUnreplicatedDataSize": 30000
+}
+```
+
+### GET /api/v1/keys/deletePending/dirs/summary
+
+**Returns**
+
+Returns the total count of directories pending deletion.
+
+```json
+{
+  "totalDeletedDirectories": 5
+}
+```
+
+### GET /api/v1/keys/listKeys
+
+**Parameters**
+
+* startPrefix (required)
+
+  Bucket-level or deeper prefix (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`). Shallower prefixes
+  return `400 Bad Request`.
+
+* replicationType (optional)
+
+  Filter by replication type (e.g. `RATIS`, `EC`).
+
+* creationDate (optional)
+
+  Filter by creation date; only keys created on or after this date are returned.
+
+* keySize (optional)
+
+  Filter to keys with data size at least this many bytes. Default 0.
+
+* prevKey (optional)
+
+  Pagination cursor. Pass back the `lastKey` from the previous response to continue iteration.
+
+* limit (optional)
+
+  Maximum number of keys to return. Default 1000.
+
+**Returns**
+
+Returns committed keys (and files in FSO buckets) under the given prefix.
+
+* `200 OK` with a `ListKeysResponse` body.
+* `204 No Content` when no keys matched the given filters.
+* `400 Bad Request` when `startPrefix` is missing or shallower than bucket level.
+* `503 Service Unavailable` while Recon is still bootstrapping OM DB; response body status is `INITIALIZING`.
+
+```json
+{
+  "status": "OK",
+  "path": "/vol1/bucket1",
+  "replicatedDataSize": 600000,
+  "unReplicatedDataSize": 200000,
+  "lastKey": "/vol1/bucket1/dir1/file42",
+  "keys": [
+    {
+      "key": "/vol1/bucket1/dir1/file42",
+      "path": "/vol1/bucket1/dir1/file42",
+      "size": 1048576,
+      "replicatedSize": 3145728,
+      "replicationInfo": {
+        "replicationFactor": "THREE",
+        "requiredNodes": 3,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1717000000000,
+      "modificationTime": 1717100000000,
+      "isKey": true
+    }
+  ]
 }
 ```
 
