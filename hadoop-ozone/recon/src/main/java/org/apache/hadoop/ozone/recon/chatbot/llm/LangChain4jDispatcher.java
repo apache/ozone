@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -140,22 +139,26 @@ public class LangChain4jDispatcher implements LLMClient {
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER_DEFAULT);
 
     // Register available providers. A provider is considered "available" only if
-    // a non-empty API key has been configured for it.
+    // a non-empty API key has been configured for it. Model lists are read from
+    // ozone-site.xml so admins can update them without a code change when vendors
+    // rename, add, or retire models.
     if (!credentialHelper.getSecret(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY).isEmpty()) {
-      supportedModels.put("openai",
-          Arrays.asList("gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"));
+      supportedModels.put("openai", parseModelList(configuration,
+          ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_MODELS,
+          ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_MODELS_DEFAULT));
     }
     if (!credentialHelper.getSecret(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY).isEmpty()) {
-      supportedModels.put("gemini",
-          Arrays.asList("gemini-2.5-pro", "gemini-2.5-flash",
-              "gemini-3-flash-preview", "gemini-3.1-pro-preview"));
+      supportedModels.put("gemini", parseModelList(configuration,
+          ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_MODELS,
+          ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_MODELS_DEFAULT));
     }
     if (!credentialHelper.getSecret(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY).isEmpty()) {
-      supportedModels.put("anthropic",
-          Arrays.asList("claude-opus-4-6", "claude-sonnet-4-6"));
+      supportedModels.put("anthropic", parseModelList(configuration,
+          ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_MODELS,
+          ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_MODELS_DEFAULT));
     }
 
     LOG.info("LangChain4jDispatcher initialized. Available providers: {}, default: {}",
@@ -380,6 +383,30 @@ public class LangChain4jDispatcher implements LLMClient {
       }
     }
     return result;
+  }
+
+  /**
+   * Reads a comma-separated model list from config, trims whitespace from each entry,
+   * and filters out any blank tokens. Falls back to the provided default string if
+   * the config value is empty or missing.
+   *
+   * <p>Example config value: {@code "gemini-2.5-pro, gemini-2.5-flash, gemini-3-flash-preview"}
+   */
+  private List<String> parseModelList(OzoneConfiguration conf,
+                                      String configKey,
+                                      String defaultValue) {
+    String raw = conf.get(configKey, defaultValue);
+    if (raw == null || raw.trim().isEmpty()) {
+      raw = defaultValue;
+    }
+    List<String> models = new ArrayList<>();
+    for (String token : raw.split(",")) {
+      String trimmed = token.trim();
+      if (!trimmed.isEmpty()) {
+        models.add(trimmed);
+      }
+    }
+    return models;
   }
 
   /** Safely unboxes a nullable Integer, returning 0 for null. */

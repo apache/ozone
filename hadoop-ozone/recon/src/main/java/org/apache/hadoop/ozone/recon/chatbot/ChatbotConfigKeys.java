@@ -88,6 +88,37 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_MAX_TOOL_CALLS = OZONE_RECON_CHATBOT_PREFIX + "max.tool.calls";
   public static final int OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT = 5;
 
+  // ── Per-provider model lists (comma-separated, configurable) ──
+  /**
+   * Comma-separated list of OpenAI model names exposed via GET /chatbot/models.
+   * Override this when OpenAI renames, adds, or retires models without requiring
+   * a code change. Example: {@code gpt-4.1,gpt-4.1-mini,gpt-4.1-nano,o3}
+   */
+  public static final String OZONE_RECON_CHATBOT_OPENAI_MODELS =
+      OZONE_RECON_CHATBOT_PREFIX + "openai.models";
+  public static final String OZONE_RECON_CHATBOT_OPENAI_MODELS_DEFAULT =
+      "gpt-4.1,gpt-4.1-mini,gpt-4.1-nano";
+
+  /**
+   * Comma-separated list of Google Gemini model names exposed via GET /chatbot/models.
+   * Override this when Google renames, adds, or retires models without requiring
+   * a code change. Example: {@code gemini-2.5-pro,gemini-2.5-flash}
+   */
+  public static final String OZONE_RECON_CHATBOT_GEMINI_MODELS =
+      OZONE_RECON_CHATBOT_PREFIX + "gemini.models";
+  public static final String OZONE_RECON_CHATBOT_GEMINI_MODELS_DEFAULT =
+      "gemini-2.5-pro,gemini-2.5-flash,gemini-3-flash-preview,gemini-3.1-pro-preview";
+
+  /**
+   * Comma-separated list of Anthropic Claude model names exposed via GET /chatbot/models.
+   * Override this when Anthropic renames, adds, or retires models without requiring
+   * a code change. Example: {@code claude-opus-4-6,claude-sonnet-4-6,claude-haiku-4-6}
+   */
+  public static final String OZONE_RECON_CHATBOT_ANTHROPIC_MODELS =
+      OZONE_RECON_CHATBOT_PREFIX + "anthropic.models";
+  public static final String OZONE_RECON_CHATBOT_ANTHROPIC_MODELS_DEFAULT =
+      "claude-opus-4-6,claude-sonnet-4-6";
+
   // ── Anthropic-specific headers ───────────────────────────────
   /**
    * Controls the Anthropic beta feature header sent with every request.
