@@ -100,10 +100,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
     if (keyArgs.hasExpectedDataGeneration()) {
-      if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
-        ozoneManager.checkFeatureEnabled(
-            OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
+      if (keyArgs.getExpectedDataGeneration() == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+        ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
       } else {
         ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
       }

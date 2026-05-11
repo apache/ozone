@@ -130,7 +130,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     KeyArgs resolvedKeyArgs =
         resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
             IAccessAuthorizer.ACLType.WRITE, commitKeyRequest.getClientID());
-    validateConditionalCommitAtAdmission(ozoneManager.getMetadataManager(),
+    validateAtomicRewriteAtAdmission(ozoneManager.getMetadataManager(),
         resolvedKeyArgs, commitKeyRequest.getClientID());
 
     return request.toBuilder()
@@ -138,7 +138,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             .setKeyArgs(resolvedKeyArgs)).build();
   }
 
-  protected void validateConditionalCommitAtAdmission(
+  protected void validateAtomicRewriteAtAdmission(
       OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
       throws IOException {
     OmKeyInfo openKeyInfo = getOpenKeyInfoForCommitAdmission(
@@ -147,7 +147,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       return;
     }
 
-    validateAtomicRewriteAtCommit(
+    validateAtomicRewriteAtAdmission(
         getCommittedKeyInfoForCommitAdmission(omMetadataManager, keyArgs),
         openKeyInfo.getExpectedDataGeneration(), null);
   }

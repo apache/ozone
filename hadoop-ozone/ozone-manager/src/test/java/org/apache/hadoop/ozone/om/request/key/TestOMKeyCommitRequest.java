@@ -409,7 +409,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     OMException ex = assertThrows(OMException.class,
         () -> doPreExecute(createCommitKeyRequest()));
-    assertEquals(OMException.ResultCodes.ATOMIC_WRITE_CONFLICT, ex.getResult());
+    assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
   }
 
   @Test
@@ -438,7 +438,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     OMException ex = assertThrows(OMException.class,
         () -> doPreExecute(createCommitKeyRequest()));
-    assertEquals(OMException.ResultCodes.ATOMIC_WRITE_CONFLICT, ex.getResult());
+    assertEquals(OMException.ResultCodes.KEY_ALREADY_EXISTS, ex.getResult());
   }
 
   @Test
