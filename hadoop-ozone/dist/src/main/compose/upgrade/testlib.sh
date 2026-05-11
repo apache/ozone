@@ -49,8 +49,10 @@ prepare_for_image() {
 ##   the upgrade being tested if one exists. If neither exists, print a
 ##   warning that nothing was tested.
 ## @param The name of the function to run.
+## @param All remaining parameters are passed as parameters to the called function
 callback() {
   local func="$1"
+  shift
 
   set -u
   : "${OZONE_UPGRADE_CALLBACK}"
@@ -61,7 +63,7 @@ callback() {
     # Common callback always exists.
     source "$OZONE_COMMON_CALLBACK"
     if [[ "$(type -t "$func")" = function ]]; then
-      "$func"
+      "$func" "$@"
     fi
   )
 
@@ -70,7 +72,7 @@ callback() {
     if [[ -f "$OZONE_UPGRADE_CALLBACK" ]]; then
       source "$OZONE_UPGRADE_CALLBACK"
       if [[ "$(type -t "$func")" = function ]]; then
-        "$func"
+        "$func" "$@"
       fi
     fi
   )

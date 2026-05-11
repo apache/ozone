@@ -19,18 +19,24 @@ source "$TEST_DIR"/testlib.sh
 
 ### CALLBACKS ###
 
-before_service_restart() {
-  generate "generate-${SERVICE}-${STAGE_PREFIX}" "$CLIENT"
+## @description Run while a service is stopped, it'll generate data on the cluster (upgrade/generate.robot)
+## @param The prefix to use for data generated.
+with_service_stopped() {
+  generate "${1}" "$CLIENT"
 }
 
-after_service_restart() {
-  validate "generate-${SERVICE}-${STAGE_PREFIX}" "$CLIENT"
+## @description Run while a service is started again (with new image), it'll validate data on the cluster (upgrade/validate.robot)
+## @param The prefix to use for data generated.
+with_service_restarted() {
+  validate "${1}" "$CLIENT"
 }
 
 with_old_version() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
   generate old1 "$CLIENT"
   validate old1 "$CLIENT"
+
+  generate overwrite "$CLIENT"
 }
 
 with_this_version_pre_finalized() {
@@ -40,23 +46,31 @@ with_this_version_pre_finalized() {
 
   generate new1 "$CLIENT"
   validate new1 "$CLIENT"
+
+  validate overwrite "$CLIENT"
+  generate overwrite "$CLIENT" --exclude create-volume-and-bucket
 }
 
 with_old_version_downgraded() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
   validate old1 "$CLIENT"
   validate new1 "$CLIENT"
 
   generate old2 "$CLIENT"
   validate old2 "$CLIENT"
+
+  validate overwrite "$CLIENT"
+  generate overwrite "$CLIENT" --exclude create-volume-and-bucket
 }
 
 with_this_version_finalized() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/check-finalization.robot
   validate old1 "$CLIENT"
   validate new1 "$CLIENT"
   validate old2 "$CLIENT"
 
   generate new2 "$CLIENT"
   validate new2 "$CLIENT"
+
+  validate overwrite "$CLIENT"
 }

@@ -325,6 +325,8 @@ services:
   client:
     command: ["sleep","1000000"]
     <<: *common-config
+    environment:
+      <<: *environment
     hostname: client
     networks:
       net:
