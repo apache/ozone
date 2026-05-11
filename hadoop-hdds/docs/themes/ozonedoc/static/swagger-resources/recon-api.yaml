@@ -53,6 +53,18 @@ tags:
     externalDocs:
       description: Prometheus API docs
       url: https://prometheus.io/docs/prometheus/latest/querying/api/
+  - name: Container Export
+    description: Async export job lifecycle for unhealthy container metadata. **Admin Only**
+  - name: Storage Distribution
+    description: APIs to fetch data about storage distribution across datanodes. **Admin Only**
+  - name: Pending Deletion
+    description: APIs to fetch data about pending deletions by component (SCM, OM, or Datanodes). **Admin Only**
+  - name: Heat Map
+    description: APIs to fetch read-access heatmap data. **Admin Only**, feature-gated by HeatMapProvider service.
+  - name: Features
+    description: APIs to introspect Recon feature state. **Admin Only**
+  - name: Admin Utilities
+    description: Administrative actions such as triggering OM DB sync. **Admin Only**
 paths:
   /containers:
     get:
