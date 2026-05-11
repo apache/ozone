@@ -101,16 +101,6 @@ export type TabPaginationState = {
   hasNextPage: boolean;
 }
 
-export type QuasiClosedTabState = {
-  data: QuasiClosedContainer[];
-  loading: boolean;
-  firstKey: number;
-  lastKey: number;
-  currentMinContainerId: number;
-  pageHistory: number[];
-  hasNextPage: boolean;
-}
-
 export type ContainerTableProps = {
   loading: boolean;
   data: Container[];

@@ -45,10 +45,12 @@ import { useAutoReload } from "@/v2/hooks/useAutoReload.hook";
 import * as CONSTANTS from '@/v2/constants/overview.constants';
 
 import {
+  Container,
   ContainersPaginationResponse,
   ContainerState,
   ExpandedRow,
   ExportJob,
+  QuasiClosedContainer,
   QuasiClosedContainersResponse,
   TabPaginationState,
 } from "@/v2/types/container.types";
@@ -65,7 +67,8 @@ const TAB_STATE_MAP: Record<string, string> = {
   '3': 'OVER_REPLICATED',
   '4': 'MIS_REPLICATED',
   '5': 'REPLICA_MISMATCH',
-  '6': 'QUASI_CLOSED',
+  // '6' (Quasi Closed) intentionally absent — it uses /quasiClosed, not /unhealthy/:state
+  // '7' (Export) intentionally absent — it has no container data to fetch
 };
 
 const EXPORT_STATE_OPTIONS = [
@@ -100,6 +103,26 @@ const DEFAULT_TAB_STATE: TabPaginationState = {
 };
 
 const POLL_INTERVAL_MS = 3000;
+
+/**
+ * Maps a QuasiClosedContainer (from the /quasiClosed API) to the shared
+ * Container type so it can be displayed in the existing ContainerTable.
+ * Explicit field mapping ensures TypeScript catches any upstream renames.
+ */
+function toContainer(qc: QuasiClosedContainer): Container {
+  return {
+    containerID: qc.containerID,
+    pipelineID: qc.pipelineID,
+    keys: qc.keys,
+    containerState: 'QUASI_CLOSED',
+    unhealthySince: qc.stateEnterTime,
+    expectedReplicaCount: qc.expectedReplicaCount,
+    actualReplicaCount: qc.actualReplicaCount,
+    replicaDeltaCount: qc.actualReplicaCount - qc.expectedReplicaCount,
+    reason: '',
+    replicas: qc.replicas,
+  };
+}
 
 const Containers: React.FC<{}> = () => {
   const [state, setState] = useState<ContainerState>({
@@ -283,7 +306,7 @@ const Containers: React.FC<{}> = () => {
       const response = await fetchData<QuasiClosedContainersResponse>(
         '/api/v1/containers/quasiClosed',
         'GET',
-        { limit: 1, minContainerId: 0 }
+        { limit: 0, minContainerId: 0 }
       );
       setState(prev => ({
         ...prev,
@@ -299,17 +322,14 @@ const Containers: React.FC<{}> = () => {
     minContainerId: number,
     currentPageSize: number
   ) => {
-    const containerStateName = TAB_STATE_MAP[tabKey];
-    if (!containerStateName) return; // skip Export tab (key='7') or unknown keys
     const fetchSize = currentPageSize + 1;
 
-    setTabStates(prev => ({
-      ...prev,
-      [tabKey]: { ...prev[tabKey], loading: true },
-    }));
-
     if (tabKey === '6') {
-      // Quasi-closed tab uses its own dedicated in-memory endpoint.
+      // Quasi-closed uses its own dedicated in-memory endpoint, not /unhealthy/:state.
+      setTabStates(prev => ({
+        ...prev,
+        [tabKey]: { ...prev[tabKey], loading: true },
+      }));
       try {
         const response = await fetchData<QuasiClosedContainersResponse>(
           '/api/v1/containers/quasiClosed',
@@ -319,16 +339,9 @@ const Containers: React.FC<{}> = () => {
         const allContainers = response.containers ?? [];
         const hasNextPage = allContainers.length > currentPageSize;
         const pageContainers = allContainers.slice(0, currentPageSize);
-        // Map stateEnterTime → unhealthySince so the shared ContainerTable renders correctly.
-        const mapped = pageContainers.map(c => ({
-          ...c,
-          containerState: 'QUASI_CLOSED',
-          unhealthySince: c.stateEnterTime,
-          replicaDeltaCount: c.actualReplicaCount - c.expectedReplicaCount,
-          reason: '',
-        })) as any;
-        const lastKey = mapped.length > 0 ? Math.max(...mapped.map((c: any) => c.containerID)) : 0;
-        const firstKey = mapped.length > 0 ? Math.min(...mapped.map((c: any) => c.containerID)) : 0;
+        const mapped: Container[] = pageContainers.map(toContainer);
+        const lastKey = mapped.length > 0 ? Math.max(...mapped.map(c => c.containerID)) : 0;
+        const firstKey = mapped.length > 0 ? Math.min(...mapped.map(c => c.containerID)) : 0;
         setTabStates(prev => ({
           ...prev,
           [tabKey]: {
@@ -355,6 +368,14 @@ const Containers: React.FC<{}> = () => {
       }
       return;
     }
+
+    const containerStateName = TAB_STATE_MAP[tabKey];
+    if (!containerStateName) return; // skips tab '7' (Export) and any unknown keys
+
+    setTabStates(prev => ({
+      ...prev,
+      [tabKey]: { ...prev[tabKey], loading: true },
+    }));
 
     try {
       const response = await fetchData<ContainersPaginationResponse>(

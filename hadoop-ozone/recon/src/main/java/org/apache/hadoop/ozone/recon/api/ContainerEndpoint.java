@@ -993,6 +993,15 @@ public class ContainerEndpoint {
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
 
+    if (minContainerId < 0) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("minContainerId must be >= 0").build();
+    }
+    if (limit < 0) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("limit must be >= 0").build();
+    }
+
     List<ContainerInfo> containers = containerManager.getContainers(
         ContainerID.valueOf(minContainerId + 1), limit, HddsProtos.LifeCycleState.QUASI_CLOSED);
 
