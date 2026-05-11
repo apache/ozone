@@ -22,10 +22,10 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY;
@@ -86,6 +86,14 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmRatisSnapshotProvider.class);
+
+  private final Map<String, OMNodeDetails> peerNodesMap;
+  private final HttpConfig.Policy httpPolicy;
+  private final boolean spnegoEnabled;
+  private final URLConnectionFactory connectionFactory;
+  private final boolean useV2CheckpointApi;
+  /** Minimum usable bytes on snapshot volume before download; 0 = disabled. */
+  private final long bootstrapMinSpaceBytes;
 
   /**
    * Whether this {@link IOException} (or its causes) typically means the
@@ -153,14 +161,6 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
         ioe.getMessage(),
         ioe);
   }
-
-  private final Map<String, OMNodeDetails> peerNodesMap;
-  private final HttpConfig.Policy httpPolicy;
-  private final boolean spnegoEnabled;
-  private final URLConnectionFactory connectionFactory;
-  private final boolean useV2CheckpointApi;
-  /** Minimum usable bytes on snapshot volume before download; 0 = disabled. */
-  private final long bootstrapMinSpaceBytes;
 
   public OmRatisSnapshotProvider(File snapshotDir,
       Map<String, OMNodeDetails> peerNodesMap, HttpConfig.Policy httpPolicy,
