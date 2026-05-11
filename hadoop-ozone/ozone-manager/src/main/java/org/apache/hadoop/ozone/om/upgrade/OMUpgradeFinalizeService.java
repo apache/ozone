@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -49,6 +50,7 @@ public class OMUpgradeFinalizeService extends BackgroundService {
   private final OzoneManager ozoneManager;
   private final OMVersionManager versionManager;
   private final ScmClient scmClient;
+  private final AtomicBoolean stopInitiated = new AtomicBoolean(false);
 
   /**
    * Creates an {@code OMUpgradeFinalizeService} with a custom check interval.
@@ -71,7 +73,19 @@ public class OMUpgradeFinalizeService extends BackgroundService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    if (ozoneManager.isLeaderReady() && versionManager.needsFinalization()) {
+    if (!versionManager.needsFinalization()) {
+      // Finalization is done (or was never needed), so this service can now shutdown. To avoid deadlocking on the
+      // executor.awaitTermination by calling shutdown directly, spawn a thread to perform the shutdown which will
+      // block until this task / thread completes in the executor.
+      if (stopInitiated.compareAndSet(false, true)) {
+        LOG.info("OMUpgradeFinalizeService: finalization is no longer needed, shutting down.");
+        Thread stopper = new Thread(this::shutdown, "OMUpgradeFinalizeService-stopper");
+        stopper.setDaemon(true);
+        stopper.start();
+      }
+      return queue; // empty — PeriodicalTask.run() will return without scheduling work
+    }
+    if (ozoneManager.isLeaderReady()) {
       queue.add(new UpgradeStatusCheckTask());
     }
     return queue;

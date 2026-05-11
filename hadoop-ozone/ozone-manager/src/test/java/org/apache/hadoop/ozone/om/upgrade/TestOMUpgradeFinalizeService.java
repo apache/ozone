@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -26,6 +28,9 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -166,6 +171,48 @@ public class TestOMUpgradeFinalizeService {
     service.runPeriodicalTaskNow();
 
     verify(containerClient).queryUpgradeStatus();
+    verifyNoInteractions(omRatisServer);
+  }
+
+  /**
+   * When {@code needsFinalization()} returns {@code false}, {@link OMUpgradeFinalizeService#getTasks()}
+   * should spawn a stopper thread that calls {@link OMUpgradeFinalizeService#shutdown()} exactly once,
+   * even when {@code getTasks()} is driven multiple times (guarded by the internal
+   * {@code stopInitiated} AtomicBoolean). No SCM or Ratis interactions should occur.
+   * <p>
+   * The service is subclassed to intercept {@code shutdown()} via a {@link CountDownLatch},
+   * avoiding both actual executor teardown and any need for {@code Thread.sleep}.
+   */
+  @Test
+  void testShutdownTriggeredExactlyOnceWhenFinalizationNoLongerNeeded() throws Exception {
+    AtomicInteger shutdownCount = new AtomicInteger(0);
+    CountDownLatch firstShutdown = new CountDownLatch(1);
+
+    OMUpgradeFinalizeService testService = new OMUpgradeFinalizeService(
+        ozoneManager, versionManager, scmClient, INTERVAL_MS) {
+      @Override
+      public synchronized void shutdown() {
+        shutdownCount.incrementAndGet();
+        firstShutdown.countDown();
+        // Don't propagate to super — avoids racing on the test executor.
+      }
+    };
+
+    when(ozoneManager.isLeaderReady()).thenReturn(true);
+    when(versionManager.needsFinalization()).thenReturn(false);
+
+    // Drive getTasks() three times; the stopper thread should only fire once.
+    testService.runPeriodicalTaskNow();
+    testService.runPeriodicalTaskNow();
+    testService.runPeriodicalTaskNow();
+
+    // Wait for the single stopper thread to call shutdown().
+    assertTrue(firstShutdown.await(5, TimeUnit.SECONDS),
+        "shutdown() should have been called by the stopper thread within 5 s");
+    // incrementAndGet() happens before countDown(), so the count is already final — no sleep needed.
+    assertEquals(1, shutdownCount.get(),
+        "shutdown() must be called exactly once despite multiple getTasks() invocations");
+    verifyNoInteractions(scmClient);
     verifyNoInteractions(omRatisServer);
   }
 
