@@ -1089,9 +1089,10 @@ paths:
           required: true
           description: |
             The Prometheus HTTP API endpoint to invoke (for example `query` or `query_range`).
+            On the Java side the segment falls back to `query` when absent, but in OpenAPI a path
+            parameter is always required, so callers must pass a value.
           schema:
             type: string
-            default: query
         - name: query
           in: query
           description: The query in a Prometheus query format for which to fetch results
