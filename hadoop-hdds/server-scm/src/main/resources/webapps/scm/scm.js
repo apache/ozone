@@ -255,12 +255,12 @@
                     $scope.filteredNodes = [...nodeStatusCopy];
                 } else {
                     let query = $scope.search.toLowerCase();
-                    // Filter the master list
+                    // Dynamically search across all properties in the node object
                     $scope.filteredNodes = nodeStatusCopy.filter(function(node) {
-                        return (node.hostname && node.hostname.toLowerCase().includes(query)) ||
-                               (node.opstate && node.opstate.toLowerCase().includes(query)) ||
-                               (node.comstate && node.comstate.toLowerCase().includes(query)) ||
-                               (node.uuid && node.uuid.toLowerCase().includes(query));
+                        return Object.values(node).some(function(val) {
+                             return val !== null && val !== undefined
+                             && val.toString().toLowerCase().includes(query);
+                        });
                     });
                 }
                 $scope.totalItems = $scope.filteredNodes.length;
