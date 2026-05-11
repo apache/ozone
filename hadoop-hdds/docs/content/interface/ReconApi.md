@@ -436,55 +436,63 @@ Returns all DELETED containers in SCM along with their pipeline and replication 
 
     Only returns the limited number of results. The default limit is 1000.
 
+* startPrefix (optional)
+
+    Restricts the listing to keys matching this prefix. Must be at bucket level or deeper
+    (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`); shallower prefixes return `400 Bad Request`.
+
+* includeFso (optional)
+
+    Boolean, default `false`. Include keys/files from FSO buckets in the result.
+
+* includeNonFso (optional)
+
+    Boolean, default `false`. Include keys/files from non-FSO (OBS / LEGACY) buckets.
+
+If neither `includeFso` nor `includeNonFso` is `true`, the response will be empty.
+
 **Returns**
 
-Returns set of keys/files which are open.
+Returns set of keys/files which are open. FSO and non-FSO keys are reported in separate arrays.
 
 ```json
 {
   "lastKey": "/vol1/fso-bucket/dir1/dir2/file2",
-  "replicatedTotal": 13824,
-  "unreplicatedTotal": 4608,
-  "entities": [
+  "replicatedDataSize": 13824,
+  "unreplicatedDataSize": 4608,
+  "status": "OK",
+  "fso": [
     {
-      "path": "/vol1/bucket1/key1",
-      "keyState": "Open",
-      "inStateSince": 1667564193026,
-      "size": 1024,
-      "replicatedSize": 3072,
-      "unreplicatedSize": 1024,
-      "replicationType": "RATIS",
-      "replicationFactor": "THREE"
-    },
-    {
-      "path": "/vol1/bucket1/key2",
-      "keyState": "Open",
-      "inStateSince": 1667564193026,
-      "size": 512,
-      "replicatedSize": 1536,
-      "unreplicatedSize": 512,
-      "replicationType": "RATIS",
-      "replicationFactor": "THREE"
-    },
-    {
+      "key": "/-9223372036854775552/-9223372036854774016/file1",
       "path": "/vol1/fso-bucket/dir1/file1",
-      "keyState": "Open",
       "inStateSince": 1667564193026,
       "size": 1024,
       "replicatedSize": 3072,
-      "unreplicatedSize": 1024,
-      "replicationType": "RATIS",
-      "replicationFactor": "THREE"
-    },
+      "replicationInfo": {
+        "replicationFactor": "THREE",
+        "requiredNodes": 3,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1667564000000,
+      "modificationTime": 1667564193026,
+      "isKey": true
+    }
+  ],
+  "nonFSO": [
     {
-      "path": "/vol1/fso-bucket/dir1/dir2/file2",
-      "keyState": "Open",
+      "key": "/vol1/bucket1/key1",
+      "path": "/vol1/bucket1/key1",
       "inStateSince": 1667564193026,
-      "size": 2048,
-      "replicatedSize": 6144,
-      "unreplicatedSize": 2048,
-      "replicationType": "RATIS",
-      "replicationFactor": "THREE"
+      "size": 1024,
+      "replicatedSize": 3072,
+      "replicationInfo": {
+        "replicationFactor": "THREE",
+        "requiredNodes": 3,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1667564000000,
+      "modificationTime": 1667564193026,
+      "isKey": true
     }
   ]
 }
@@ -504,45 +512,37 @@ Returns set of keys/files which are open.
 
   Only returns the limited number of results. The default limit is 1000.
 
+* startPrefix (optional)
+
+  Restricts the listing to keys matching this prefix. Must be at bucket level or deeper
+  (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`); shallower prefixes return `400 Bad Request`.
+
 **Returns**
 
-Returns set of keys/files pending for deletion.
+Returns the set of keys/files pending deletion, paired with aggregated size totals. Each item in
+`deletedKeyInfo` is a `RepeatedOmKeyInfo` (a wrapper around one or more `OmKeyInfo` entries).
 
 ```json
 {
   "lastKey": "sampleVol/bucketOne/key_one",
-  "replicatedTotal": -1530804718628866300,
-  "unreplicatedTotal": -1530804718628866300,
-  "deletedkeyinfo": [
+  "replicatedDataSize": 600000,
+  "unreplicatedDataSize": 200000,
+  "deletedKeyInfo": [
     {
       "omKeyInfoList": [
         {
-          "metadata": {},
-          "objectID": 0,
-          "updateID": 0,
-          "parentObjectID": 0,
           "volumeName": "sampleVol",
           "bucketName": "bucketOne",
           "keyName": "key_one",
-          "dataSize": -1530804718628866300,
-          "keyLocationVersions": [],
-          "creationTime": 0,
-          "modificationTime": 0,
+          "dataSize": 200000,
+          "replicatedSize": 600000,
           "replicationConfig": {
-            "replicationFactor": "ONE",
-            "requiredNodes": 1,
-            "replicationType": "STANDALONE"
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
           },
-          "fileChecksum": null,
-          "fileName": "key_one",
-          "acls": [],
-          "path": "0/key_one",
-          "file": false,
-          "latestVersionLocations": null,
-          "replicatedSize": -1530804718628866300,
-          "fileEncryptionInfo": null,
-          "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='-1530804718628866186', creationTime='0', objectID='0', parentID='0', replication='STANDALONE/ONE', fileChecksum='null}",
-          "updateIDset": false
+          "creationTime": 1717000000000,
+          "modificationTime": 1717100000000
         }
       ]
     }
@@ -567,45 +567,30 @@ Returns set of keys/files pending for deletion.
 
 **Returns**
 
-   Returns set of directories pending for deletion.
+Returns the set of directories pending for deletion. Each entry in `deletedDirInfo` is a
+`KeyEntityInfo` describing one pending-delete directory (not a `RepeatedOmKeyInfo` like
+`/keys/deletePending`).
 
 ```json
 {
-  "lastKey": "vol1/bucket1/bucket1/dir1",
-  "replicatedTotal": -1530804718628866300,
-  "unreplicatedTotal": -1530804718628866300,
-  "deletedkeyinfo": [
+  "lastKey": "/vol1/bucket1/dir1",
+  "replicatedDataSize": 13824,
+  "unreplicatedDataSize": 4608,
+  "deletedDirInfo": [
     {
-      "omKeyInfoList": [
-        {
-          "metadata": {},
-          "objectID": 0,
-          "updateID": 0,
-          "parentObjectID": 0,
-          "volumeName": "sampleVol",
-          "bucketName": "bucketOne",
-          "keyName": "key_one",
-          "dataSize": -1530804718628866300,
-          "keyLocationVersions": [],
-          "creationTime": 0,
-          "modificationTime": 0,
-          "replicationConfig": {
-            "replicationFactor": "ONE",
-            "requiredNodes": 1,
-            "replicationType": "STANDALONE"
-          },
-          "fileChecksum": null,
-          "fileName": "key_one",
-          "acls": [],
-          "path": "0/key_one",
-          "file": false,
-          "latestVersionLocations": null,
-          "replicatedSize": -1530804718628866300,
-          "fileEncryptionInfo": null,
-          "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='-1530804718628866186', creationTime='0', objectID='0', parentID='0', replication='STANDALONE/ONE', fileChecksum='null}",
-          "updateIDset": false
-        }
-      ]
+      "key": "/-9223372036854775552/-9223372036854774016/dir1",
+      "path": "/vol1/bucket1/dir1",
+      "inStateSince": 1717000000000,
+      "size": 4608,
+      "replicatedSize": 13824,
+      "replicationInfo": {
+        "replicationFactor": "THREE",
+        "requiredNodes": 3,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1716900000000,
+      "modificationTime": 1716999999999,
+      "isKey": false
     }
   ],
   "status": "OK"
