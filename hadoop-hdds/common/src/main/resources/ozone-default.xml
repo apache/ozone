@@ -3516,24 +3516,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.scm.connection.request.timeout</name>
-    <value>5s</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Connection request timeout in milliseconds for HTTP call made by Recon to
-      request SCM DB snapshot.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.scm.connection.timeout</name>
-    <value>5s</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Connection timeout for HTTP call in milliseconds made by Recon to request
-      SCM snapshot.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.scmclient.rpc.timeout</name>
     <value>1m</value>
     <tag>OZONE, RECON, SCM</tag>
@@ -4621,14 +4603,6 @@
   </property>
 
   <property>
-    <name>ozone.recon.scm.snapshot.task.interval.delay</name>
-    <value>24h</value>
-    <tag>OZONE, MANAGEMENT, RECON</tag>
-    <description>
-      Interval in MINUTES by Recon to request SCM DB Snapshot.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.scm.container.sync.task.initial.delay</name>
     <value>2m</value>
     <tag>OZONE, MANAGEMENT, RECON, SCM</tag>
@@ -4640,7 +4614,7 @@
   </property>
   <property>
     <name>ozone.recon.scm.container.sync.task.interval.delay</name>
-    <value>1h</value>
+    <value>6h</value>
     <tag>OZONE, MANAGEMENT, RECON, SCM</tag>
     <description>
       Interval between incremental SCM container sync runs in Recon. Each cycle
