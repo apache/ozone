@@ -50,6 +50,7 @@ import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
+import org.apache.ratis.thirdparty.io.netty.channel.ChannelOption;
 import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.ServerChannel;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.Epoll;
@@ -58,6 +59,7 @@ import org.apache.ratis.thirdparty.io.netty.channel.epoll.EpollServerSocketChann
 import org.apache.ratis.thirdparty.io.netty.channel.nio.NioEventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,11 +99,13 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       this.port = 0;
     }
 
-    final int threadCountPerDisk =
-        conf.getObject(DatanodeConfiguration.class).getNumReadThreadPerVolume();
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    final int threadCountPerDisk = dnConf.getNumReadThreadPerVolume();
     final int numberOfDisks =
         HddsServerUtil.getDatanodeStorageDirs(conf).size();
     final int poolSize = threadCountPerDisk * numberOfDisks;
+    final int soBacklog = dnConf.getGrpcSoBacklog();
+    LOG.info("Datanode gRPC server SO_BACKLOG: {}", soBacklog);
 
     readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
         60, TimeUnit.SECONDS,
@@ -133,6 +137,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .bossEventLoopGroup(eventLoopGroup)
         .workerEventLoopGroup(eventLoopGroup)
         .channelType(channelType)
+        .withOption(ChannelOption.SO_BACKLOG, soBacklog)
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
             xceiverService.bindServiceWithZeroCopy(),
@@ -145,6 +150,10 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
             caClient.getKeyManager());
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslClientContextBuilder, secConf.getGrpcSslProvider());
+        sslContextBuilder.protocols(secConf.getGrpcTlsProtocols());
+        sslContextBuilder.ciphers(
+            secConf.getGrpcTlsCiphers(),
+            SupportedCipherSuiteFilter.INSTANCE);
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure datanode GRPC endpoint.", ex);

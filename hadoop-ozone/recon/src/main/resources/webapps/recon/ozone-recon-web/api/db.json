@@ -1328,33 +1328,144 @@
     ]
   },
   "fileSizeCounts": [
-    { "volume": "voltpb", "bucket": "buck1pb", "fileSize": 137438953472, "count": 2857 },
-    { "volume": "voltpb", "bucket": "buck2pb", "fileSize": 137438953472, "count": 143  },
-
-    { "volume": "vol-reverse", "bucket": "bucket-r7", "fileSize": 549755813888, "count": 2    },
-    { "volume": "vol-reverse", "bucket": "bucket-r6", "fileSize": 274877906944, "count": 5    },
-    { "volume": "vol-reverse", "bucket": "bucket-r5", "fileSize": 8589934592,   "count": 30   },
-    { "volume": "vol-reverse", "bucket": "bucket-r4", "fileSize": 1048576,      "count": 180  },
-    { "volume": "vol-reverse", "bucket": "bucket-r3", "fileSize": 65536,        "count": 450  },
-    { "volume": "vol-reverse", "bucket": "bucket-r2", "fileSize": 4096,         "count": 1200 },
-    { "volume": "vol-reverse", "bucket": "bucket-r1", "fileSize": 1024,         "count": 3800 },
-
-    { "volume": "vol-single", "bucket": "bucket-s1", "fileSize": 67108864, "count": 620 },
-    { "volume": "vol-single", "bucket": "bucket-s2", "fileSize": 67108864, "count": 180 },
-
-    { "volume": "vol-edge", "bucket": "bucket-e1", "fileSize": 1099511627776, "count": 1     },
-    { "volume": "vol-edge", "bucket": "bucket-e2", "fileSize": 1024,          "count": 50000 },
-
-    { "volume": "vol1", "bucket": "bucket1",  "fileSize": 1024,      "count": 56  },
-    { "volume": "vol1", "bucket": "bucket2",  "fileSize": 4096,      "count": 25  },
-    { "volume": "vol1", "bucket": "bucket3",  "fileSize": 32768,     "count": 312 },
-    { "volume": "vol1", "bucket": "bucket4",  "fileSize": 131072,    "count": 78  },
-    { "volume": "vol1", "bucket": "bucket5",  "fileSize": 1024,      "count": 123 },
-    { "volume": "vol1", "bucket": "bucket6",  "fileSize": 131072,    "count": 187 },
-    { "volume": "vol2", "bucket": "bucket7",  "fileSize": 1048576,   "count": 410 },
-    { "volume": "vol2", "bucket": "bucket8",  "fileSize": 16777216,  "count": 94  },
-    { "volume": "vol3", "bucket": "bucket9",  "fileSize": 134217728, "count": 38  },
-    { "volume": "vol3", "bucket": "bucket10", "fileSize": 1024,      "count": 217 }
+    {
+      "volume": "voltpb",
+      "bucket": "buck1pb",
+      "fileSize": 137438953472,
+      "count": 2857
+    },
+    {
+      "volume": "voltpb",
+      "bucket": "buck2pb",
+      "fileSize": 137438953472,
+      "count": 143
+    },
+    {
+      "volume": "vol-reverse",
+      "bucket": "bucket-r7",
+      "fileSize": 549755813888,
+      "count": 2
+    },
+    {
+      "volume": "vol-reverse",
+      "bucket": "bucket-r6",
+      "fileSize": 274877906944,
+      "count": 5
+    },
+    {
+      "volume": "vol-reverse",
+      "bucket": "bucket-r5",
+      "fileSize": 8589934592,
+      "count": 30
+    },
+    {
+      "volume": "vol-reverse",
+      "bucket": "bucket-r4",
+      "fileSize": 1048576,
+      "count": 180
+    },
+    {
+      "volume": "vol-reverse",
+      "bucket": "bucket-r3",
+      "fileSize": 65536,
+      "count": 450
+    },
+    {
+      "volume": "vol-reverse",
+      "bucket": "bucket-r2",
+      "fileSize": 4096,
+      "count": 1200
+    },
+    {
+      "volume": "vol-reverse",
+      "bucket": "bucket-r1",
+      "fileSize": 1024,
+      "count": 3800
+    },
+    {
+      "volume": "vol-single",
+      "bucket": "bucket-s1",
+      "fileSize": 67108864,
+      "count": 620
+    },
+    {
+      "volume": "vol-single",
+      "bucket": "bucket-s2",
+      "fileSize": 67108864,
+      "count": 180
+    },
+    {
+      "volume": "vol-edge",
+      "bucket": "bucket-e1",
+      "fileSize": 1099511627776,
+      "count": 1
+    },
+    {
+      "volume": "vol-edge",
+      "bucket": "bucket-e2",
+      "fileSize": 1024,
+      "count": 50000
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 1024,
+      "count": 56
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket2",
+      "fileSize": 4096,
+      "count": 25
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket3",
+      "fileSize": 32768,
+      "count": 312
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket4",
+      "fileSize": 131072,
+      "count": 78
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket5",
+      "fileSize": 1024,
+      "count": 123
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket6",
+      "fileSize": 131072,
+      "count": 187
+    },
+    {
+      "volume": "vol2",
+      "bucket": "bucket7",
+      "fileSize": 1048576,
+      "count": 410
+    },
+    {
+      "volume": "vol2",
+      "bucket": "bucket8",
+      "fileSize": 16777216,
+      "count": 94
+    },
+    {
+      "volume": "vol3",
+      "bucket": "bucket9",
+      "fileSize": 134217728,
+      "count": 38
+    },
+    {
+      "volume": "vol3",
+      "bucket": "bucket10",
+      "fileSize": 1024,
+      "count": 217
+    }
   ],
   "containerCount": [
     {
@@ -2264,6 +2375,2129 @@
             "lastSeenTime": 1665590272289,
             "lastBcsId": 0,
             "dataChecksum": 12345678
+          }
+        ]
+      }
+    ]
+  },
+  "unhealthyMissing": {
+    "missingCount": 25,
+    "underReplicatedCount": 15,
+    "overReplicatedCount": 12,
+    "misReplicatedCount": 13,
+    "replicaMismatchCount": 11,
+    "firstKey": 31,
+    "lastKey": 967,
+    "containers": [
+      {
+        "containerID": 543,
+        "containerState": "MISSING",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 4,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 127,
+        "containerState": "MISSING",
+        "unhealthySince": 1665591000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 12,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": []
+      },
+      {
+        "containerID": 892,
+        "containerState": "MISSING",
+        "unhealthySince": 1665592000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 7,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 31,
+        "containerState": "MISSING",
+        "unhealthySince": 1665593000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 2,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": []
+      },
+      {
+        "containerID": 756,
+        "containerState": "MISSING",
+        "unhealthySince": 1665594000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 19,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": []
+      },
+      {
+        "containerID": 244,
+        "containerState": "MISSING",
+        "unhealthySince": 1665595000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 5,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 618,
+        "containerState": "MISSING",
+        "unhealthySince": 1665596000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 31,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": []
+      },
+      {
+        "containerID": 89,
+        "containerState": "MISSING",
+        "unhealthySince": 1665597000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 8,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": []
+      },
+      {
+        "containerID": 371,
+        "containerState": "MISSING",
+        "unhealthySince": 1665598000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 967,
+        "containerState": "MISSING",
+        "unhealthySince": 1665599000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 14,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": []
+      },
+      {
+        "containerID": 142,
+        "containerState": "MISSING",
+        "unhealthySince": 1665600000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 9,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": []
+      },
+      {
+        "containerID": 503,
+        "containerState": "MISSING",
+        "unhealthySince": 1665601000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 3,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 278,
+        "containerState": "MISSING",
+        "unhealthySince": 1665602000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 22,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": []
+      },
+      {
+        "containerID": 819,
+        "containerState": "MISSING",
+        "unhealthySince": 1665603000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 6,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": []
+      },
+      {
+        "containerID": 65,
+        "containerState": "MISSING",
+        "unhealthySince": 1665604000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 17,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 446,
+        "containerState": "MISSING",
+        "unhealthySince": 1665605000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 11,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": []
+      },
+      {
+        "containerID": 731,
+        "containerState": "MISSING",
+        "unhealthySince": 1665606000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 2,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": []
+      },
+      {
+        "containerID": 193,
+        "containerState": "MISSING",
+        "unhealthySince": 1665607000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 28,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 584,
+        "containerState": "MISSING",
+        "unhealthySince": 1665608000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 10,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": []
+      },
+      {
+        "containerID": 322,
+        "containerState": "MISSING",
+        "unhealthySince": 1665609000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 5,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": []
+      },
+      {
+        "containerID": 711,
+        "containerState": "MISSING",
+        "unhealthySince": 1665610000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 16,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 48,
+        "containerState": "MISSING",
+        "unhealthySince": 1665611000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 7,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": []
+      },
+      {
+        "containerID": 875,
+        "containerState": "MISSING",
+        "unhealthySince": 1665612000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 3,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": []
+      },
+      {
+        "containerID": 260,
+        "containerState": "MISSING",
+        "unhealthySince": 1665613000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 20,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": []
+      },
+      {
+        "containerID": 634,
+        "containerState": "MISSING",
+        "unhealthySince": 1665614000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 0,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 13,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": []
+      }
+    ]
+  },
+  "unhealthyUnderReplicated": {
+    "missingCount": 25,
+    "underReplicatedCount": 15,
+    "overReplicatedCount": 12,
+    "misReplicatedCount": 13,
+    "replicaMismatchCount": 11,
+    "firstKey": 1045,
+    "lastKey": 4987,
+    "containers": [
+      {
+        "containerID": 3502,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 8,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 3502,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 5
+          }
+        ]
+      },
+      {
+        "containerID": 1847,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665591000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 3,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 1847,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 3
+          }
+        ]
+      },
+      {
+        "containerID": 4721,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665592000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 15,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 4721,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 7
+          },
+          {
+            "containerId": 4721,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 6
+          }
+        ]
+      },
+      {
+        "containerID": 2219,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665593000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 2,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 2219,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 2
+          }
+        ]
+      },
+      {
+        "containerID": 4938,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665594000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 24,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 4938,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 4938,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 4
+          }
+        ]
+      },
+      {
+        "containerID": 2663,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665595000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 6,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 2663,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 1
+          }
+        ]
+      },
+      {
+        "containerID": 1045,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665596000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 11,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 1045,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 8
+          }
+        ]
+      },
+      {
+        "containerID": 4987,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665597000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 18,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 4987,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 4987,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 5
+          }
+        ]
+      },
+      {
+        "containerID": 2155,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665598000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 4,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 2155,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 3
+          }
+        ]
+      },
+      {
+        "containerID": 3311,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665599000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 9,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 3311,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 2
+          }
+        ]
+      },
+      {
+        "containerID": 1872,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665600000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 33,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 1872,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 9
+          },
+          {
+            "containerId": 1872,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 9
+          }
+        ]
+      },
+      {
+        "containerID": 3134,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665601000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 7,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 3134,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 4
+          }
+        ]
+      },
+      {
+        "containerID": 4598,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665602000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 4598,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 6
+          }
+        ]
+      },
+      {
+        "containerID": 1467,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665603000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 26,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 1467,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 7
+          },
+          {
+            "containerId": 1467,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 7
+          }
+        ]
+      },
+      {
+        "containerID": 3789,
+        "containerState": "UNDER_REPLICATED",
+        "unhealthySince": 1665604000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 1,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 5,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 3789,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          }
+        ]
+      }
+    ]
+  },
+  "unhealthyOverReplicated": {
+    "missingCount": 25,
+    "underReplicatedCount": 15,
+    "overReplicatedCount": 12,
+    "misReplicatedCount": 13,
+    "replicaMismatchCount": 11,
+    "firstKey": 5234,
+    "lastKey": 8876,
+    "containers": [
+      {
+        "containerID": 7234,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 5,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 6,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 7234,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 7234,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 7234,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 7234,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 7234,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 3
+          }
+        ]
+      },
+      {
+        "containerID": 5567,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665591000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 4,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 14,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 5567,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 5567,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 5567,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 5567,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 6
+          }
+        ]
+      },
+      {
+        "containerID": 8876,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665592000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 5,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 2,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 8876,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 8876,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 8876,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 8876,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 8876,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 2
+          }
+        ]
+      },
+      {
+        "containerID": 6412,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665593000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 4,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 9,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 6412,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 6412,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 6412,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 6412,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 4
+          }
+        ]
+      },
+      {
+        "containerID": 7689,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665594000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 6,
+        "replicaDeltaCount": 3,
+        "reason": null,
+        "keys": 21,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 7689,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 8
+          },
+          {
+            "containerId": 7689,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 8
+          },
+          {
+            "containerId": 7689,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 8
+          },
+          {
+            "containerId": 7689,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 8
+          },
+          {
+            "containerId": 7689,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 8
+          },
+          {
+            "containerId": 7689,
+            "datanodeUuid": "cc334455-3333-4444-5555-666677778888",
+            "datanodeHost": "dn6.rack-c.ozone",
+            "firstSeenTime": 1665588260000,
+            "lastSeenTime": 1665590440000,
+            "lastBcsId": 8
+          }
+        ]
+      },
+      {
+        "containerID": 5345,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665595000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 4,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 3,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 5345,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 1
+          },
+          {
+            "containerId": 5345,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 1
+          },
+          {
+            "containerId": 5345,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 1
+          },
+          {
+            "containerId": 5345,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 1
+          }
+        ]
+      },
+      {
+        "containerID": 8654,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665596000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 5,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 16,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 8654,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 5
+          },
+          {
+            "containerId": 8654,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 5
+          },
+          {
+            "containerId": 8654,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 5
+          },
+          {
+            "containerId": 8654,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 5
+          },
+          {
+            "containerId": 8654,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 5
+          }
+        ]
+      },
+      {
+        "containerID": 6123,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665597000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 4,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 7,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 6123,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 6123,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 6123,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 6123,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 3
+          }
+        ]
+      },
+      {
+        "containerID": 7901,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665598000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 5,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 11,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 7901,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 7
+          },
+          {
+            "containerId": 7901,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 7
+          },
+          {
+            "containerId": 7901,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 7
+          },
+          {
+            "containerId": 7901,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 7
+          },
+          {
+            "containerId": 7901,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 7
+          }
+        ]
+      },
+      {
+        "containerID": 5234,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665599000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 4,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 4,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 5234,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 5234,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 5234,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 5234,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 2
+          }
+        ]
+      },
+      {
+        "containerID": 6678,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665600000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 5,
+        "replicaDeltaCount": 2,
+        "reason": null,
+        "keys": 18,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 6678,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 6678,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 6678,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 6678,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 6678,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 6
+          }
+        ]
+      },
+      {
+        "containerID": 8456,
+        "containerState": "OVER_REPLICATED",
+        "unhealthySince": 1665601000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 4,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 8,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 8456,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 8456,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 8456,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 8456,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 4
+          }
+        ]
+      }
+    ]
+  },
+  "unhealthyMisReplicated": {
+    "missingCount": 25,
+    "underReplicatedCount": 15,
+    "overReplicatedCount": 12,
+    "misReplicatedCount": 13,
+    "replicaMismatchCount": 11,
+    "firstKey": 9089,
+    "lastKey": 13876,
+    "containers": [
+      {
+        "containerID": 12543,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 11,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 12543,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 12543,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 4
+          }
+        ]
+      },
+      {
+        "containerID": 9721,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665591000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 5,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 9721,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 9721,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 2
+          }
+        ]
+      },
+      {
+        "containerID": 13876,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665592000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 19,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 13876,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 13876,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 6
+          }
+        ]
+      },
+      {
+        "containerID": 10965,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665593000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 3,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 10965,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 10965,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 3
+          }
+        ]
+      },
+      {
+        "containerID": 11234,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665594000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 27,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 11234,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 5
+          },
+          {
+            "containerId": 11234,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 5
+          }
+        ]
+      },
+      {
+        "containerID": 9089,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665595000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 8,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 9089,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 1
+          },
+          {
+            "containerId": 9089,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 1
+          }
+        ]
+      },
+      {
+        "containerID": 13321,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665596000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 14,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 13321,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 7
+          },
+          {
+            "containerId": 13321,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 7
+          }
+        ]
+      },
+      {
+        "containerID": 10087,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665597000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 2,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 10087,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 8
+          },
+          {
+            "containerId": 10087,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 8
+          }
+        ]
+      },
+      {
+        "containerID": 12456,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665598000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 22,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 12456,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 3
+          },
+          {
+            "containerId": 12456,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 3
+          }
+        ]
+      },
+      {
+        "containerID": 11765,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665599000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 6,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 11765,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 4
+          },
+          {
+            "containerId": 11765,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 4
+          }
+        ]
+      },
+      {
+        "containerID": 9654,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665600000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 17,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 9654,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 6
+          },
+          {
+            "containerId": 9654,
+            "datanodeUuid": "aa112233-1111-2222-3333-444455556666",
+            "datanodeHost": "dn4.rack-b.ozone",
+            "firstSeenTime": 1665588220000,
+            "lastSeenTime": 1665590420000,
+            "lastBcsId": 6
+          }
+        ]
+      },
+      {
+        "containerID": 12987,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665601000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 9,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 12987,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 2
+          },
+          {
+            "containerId": 12987,
+            "datanodeUuid": "bb223344-2222-3333-4444-555566667777",
+            "datanodeHost": "dn5.rack-c.ozone",
+            "firstSeenTime": 1665588240000,
+            "lastSeenTime": 1665590430000,
+            "lastBcsId": 2
+          }
+        ]
+      },
+      {
+        "containerID": 10321,
+        "containerState": "MIS_REPLICATED",
+        "unhealthySince": 1665602000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 2,
+        "replicaDeltaCount": 1,
+        "reason": null,
+        "keys": 4,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 10321,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 5
+          },
+          {
+            "containerId": 10321,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 5
+          }
+        ]
+      }
+    ]
+  },
+  "unhealthyReplicaMismatch": {
+    "missingCount": 25,
+    "underReplicatedCount": 15,
+    "overReplicatedCount": 12,
+    "misReplicatedCount": 13,
+    "replicaMismatchCount": 11,
+    "firstKey": 14234,
+    "lastKey": 17987,
+    "containers": [
+      {
+        "containerID": 16456,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 2",
+        "keys": 7,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 16456,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 4,
+            "dataChecksum": "a1b2c3d4"
+          },
+          {
+            "containerId": 16456,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 4,
+            "dataChecksum": "x9y8z7w6"
+          },
+          {
+            "containerId": 16456,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 4,
+            "dataChecksum": "a1b2c3d4"
+          }
+        ]
+      },
+      {
+        "containerID": 14234,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665591000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 1",
+        "keys": 3,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 14234,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2,
+            "dataChecksum": "dead1234"
+          },
+          {
+            "containerId": 14234,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 2,
+            "dataChecksum": "dead1234"
+          },
+          {
+            "containerId": 14234,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 2,
+            "dataChecksum": "cafe5678"
+          }
+        ]
+      },
+      {
+        "containerID": 17987,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665592000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 3",
+        "keys": 15,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 17987,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 6,
+            "dataChecksum": "f00dface"
+          },
+          {
+            "containerId": 17987,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 6,
+            "dataChecksum": "f00dface"
+          },
+          {
+            "containerId": 17987,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 6,
+            "dataChecksum": "0b1ec0de"
+          }
+        ]
+      },
+      {
+        "containerID": 15654,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665593000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 2",
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 15654,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 3,
+            "dataChecksum": "12345abc"
+          },
+          {
+            "containerId": 15654,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 3,
+            "dataChecksum": "99999xyz"
+          },
+          {
+            "containerId": 15654,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 3,
+            "dataChecksum": "12345abc"
+          }
+        ]
+      },
+      {
+        "containerID": 16901,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665594000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 1",
+        "keys": 9,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 16901,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 8,
+            "dataChecksum": "aabbccdd"
+          },
+          {
+            "containerId": 16901,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 8,
+            "dataChecksum": "11223344"
+          },
+          {
+            "containerId": 16901,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 8,
+            "dataChecksum": "aabbccdd"
+          }
+        ]
+      },
+      {
+        "containerID": 14876,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665595000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 3",
+        "keys": 22,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 14876,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 5,
+            "dataChecksum": "c0ffee01"
+          },
+          {
+            "containerId": 14876,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 5,
+            "dataChecksum": "c0ffee01"
+          },
+          {
+            "containerId": 14876,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 5,
+            "dataChecksum": "baadf00d"
+          }
+        ]
+      },
+      {
+        "containerID": 15678,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665596000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 2",
+        "keys": 4,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 15678,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 7,
+            "dataChecksum": "abcd1234"
+          },
+          {
+            "containerId": 15678,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 7,
+            "dataChecksum": "eeee9999"
+          },
+          {
+            "containerId": 15678,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 7,
+            "dataChecksum": "abcd1234"
+          }
+        ]
+      },
+      {
+        "containerID": 17321,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665597000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 1",
+        "keys": 13,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 17321,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 1,
+            "dataChecksum": "feedbeef"
+          },
+          {
+            "containerId": 17321,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 1,
+            "dataChecksum": "deadc0de"
+          },
+          {
+            "containerId": 17321,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 1,
+            "dataChecksum": "feedbeef"
+          }
+        ]
+      },
+      {
+        "containerID": 14987,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665598000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 3",
+        "keys": 6,
+        "pipelineID": "c30hhcd8-0gf7-636c-cch7-91012hh5gc23",
+        "replicas": [
+          {
+            "containerId": 14987,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 9,
+            "dataChecksum": "01020304"
+          },
+          {
+            "containerId": 14987,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 9,
+            "dataChecksum": "01020304"
+          },
+          {
+            "containerId": 14987,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 9,
+            "dataChecksum": "09080706"
+          }
+        ]
+      },
+      {
+        "containerID": 16543,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665599000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 2",
+        "keys": 18,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 16543,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 6,
+            "dataChecksum": "aa11bb22"
+          },
+          {
+            "containerId": 16543,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 6,
+            "dataChecksum": "cc33dd44"
+          },
+          {
+            "containerId": 16543,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 6,
+            "dataChecksum": "aa11bb22"
+          }
+        ]
+      },
+      {
+        "containerID": 15120,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665600000000,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": "Checksum mismatch on replica 1",
+        "keys": 2,
+        "pipelineID": "b20ggbc7-9fe6-525b-bbg6-80901gg4fb12",
+        "replicas": [
+          {
+            "containerId": 15120,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "dn1.rack-a.ozone",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 3,
+            "dataChecksum": "ff00ff00"
+          },
+          {
+            "containerId": 15120,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "dn2.rack-a.ozone",
+            "firstSeenTime": 1665588180000,
+            "lastSeenTime": 1665590400000,
+            "lastBcsId": 3,
+            "dataChecksum": "00ff00ff"
+          },
+          {
+            "containerId": 15120,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "dn3.rack-b.ozone",
+            "firstSeenTime": 1665588200000,
+            "lastSeenTime": 1665590410000,
+            "lastBcsId": 3,
+            "dataChecksum": "ff00ff00"
           }
         ]
       }
@@ -5349,156 +7583,158 @@
     "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/9/113328113600626690",
     "replicatedDataSize": 31457280,
     "unreplicatedDataSize": 10485760,
-    "fso": [{
+    "fso": [
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/0/113328113600561153",
         "path": "dir1/dir2/dir3/pnrnqh5gux/0",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820562,
         "modificationTime": 1729249820562,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/1/113328113600626694",
         "path": "dir1/dir2/dir3/pnrnqh5gux/1",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820562,
         "modificationTime": 1729249820562,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/2/113328113600626691",
         "path": "dir1/dir2/dir3/pnrnqh5gux/2",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820563,
         "modificationTime": 1729249820563,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/3/113328113600692233",
         "path": "dir1/dir2/dir3/pnrnqh5gux/3",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820563,
         "modificationTime": 1729249820563,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/4/113328113600626695",
         "path": "dir1/dir2/dir3/pnrnqh5gux/4",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820563,
         "modificationTime": 1729249820563,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/5/113328113600561152",
         "path": "dir1/dir2/dir3/pnrnqh5gux/5",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820564,
         "modificationTime": 1729249820564,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/6/113328113600626692",
         "path": "dir1/dir2/dir3/pnrnqh5gux/6",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820564,
         "modificationTime": 1729249820564,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/7/113328113600626696",
         "path": "dir1/dir2/dir3/pnrnqh5gux/7",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820564,
         "modificationTime": 1729249820564,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/8/113328113600626693",
         "path": "dir1/dir2/dir3/pnrnqh5gux/8",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820564,
         "modificationTime": 1729249820564,
         "isKey": true
-    },
-    {
+      },
+      {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/9/113328113600626690",
         "path": "dir1/dir2/dir3/pnrnqh5gux/9",
         "inStateSince": 1729249780277,
         "size": 1048576,
         "replicatedSize": 3145728,
         "replicationInfo": {
-            "replicationFactor": "THREE",
-            "requiredNodes": 3,
-            "replicationType": "RATIS"
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
         },
         "creationTime": 1729249820565,
         "modificationTime": 1729249820565,
         "isKey": true
-    }],
+      }
+    ],
     "status": "OK"
   },
   "keydeletePending": {
@@ -6647,88 +8883,87 @@
     "status": "OK"
   },
   "decommissioninfo": {
-    "DatanodesDecommissionInfo":[
+    "DatanodesDecommissionInfo": [
       {
         "datanodeDetails": {
-            "level": 3,
-            "parent": null,
-            "cost": 0,
-            "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013055",
-            "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013055",
-            "ipAddress": "172.18.0.13",
-            "hostName": "ozone-ha-datanode-6.ozone-ha_default",
-            
-            "certSerialId": null,
-            "version": null,
-            "setupTime": 0,
-            "revision": null,
-            "buildDate": null,
-            "persistedOpState": "IN_SERVICE",
-            "persistedOpStateExpiryEpochSec": 0,
-            "initialVersion": 0,
-            "currentVersion": 1,
-            "decommissioned": false,
-            "maintenance": false,
-            "ipAddressAsByteString": {
-                "string": "172.18.0.13",
-                "bytes": {
-                    "validUtf8": true,
-                    "empty": false
-                }
-            },
-            "hostNameAsByteString": {
-                "string": "ozone-ha-datanode-6.ozone-ha_default",
-                "bytes": {
-                    "validUtf8": true,
-                    "empty": false
-                }
-            },
-            "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
-            "networkLocation": "/default-rack",
-            "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
-            "numOfLeaves": 1,
-            "networkNameAsByteString": {
-                "string": "4712ba3d-4bb2-477a-9211-d9b50c013055",
-                "bytes": {
-                    "validUtf8": true,
-                    "empty": false
-                }
-            },
-            "networkLocationAsByteString": {
-                "string": "/default-rack",
-                "bytes": {
-                    "validUtf8": true,
-                    "empty": false
-                }
+          "level": 3,
+          "parent": null,
+          "cost": 0,
+          "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+          "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+          "ipAddress": "172.18.0.13",
+          "hostName": "ozone-ha-datanode-6.ozone-ha_default",
+          "certSerialId": null,
+          "version": null,
+          "setupTime": 0,
+          "revision": null,
+          "buildDate": null,
+          "persistedOpState": "IN_SERVICE",
+          "persistedOpStateExpiryEpochSec": 0,
+          "initialVersion": 0,
+          "currentVersion": 1,
+          "decommissioned": false,
+          "maintenance": false,
+          "ipAddressAsByteString": {
+            "string": "172.18.0.13",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
             }
+          },
+          "hostNameAsByteString": {
+            "string": "ozone-ha-datanode-6.ozone-ha_default",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+          "networkLocation": "/default-rack",
+          "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
+          "numOfLeaves": 1,
+          "networkNameAsByteString": {
+            "string": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "networkLocationAsByteString": {
+            "string": "/default-rack",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          }
         },
         "metrics": null,
         "containers": {}
       },
       {
         "datanodeDetails": {
-            "level": 3,
-            "parent": null,
-            "cost": 0,
-            "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013056",
-            "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013056",
-            "ipAddress": "172.18.0.13",
-            "hostName": "ozone-ha-datanode-6.ozone-ha_default",
-            "certSerialId": null,
-            "version": null,
-            "setupTime": 0,
-            "revision": null,
-            "buildDate": null,
-            "persistedOpState": "IN_SERVICE",
-            "persistedOpStateExpiryEpochSec": 0,
-            "initialVersion": 0,
-            "currentVersion": 1,
-            "decommissioned": false,
-            "maintenance": false,
-            "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
-            "networkLocation": "/default-rack",
-            "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
-            "numOfLeaves": 1
+          "level": 3,
+          "parent": null,
+          "cost": 0,
+          "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013056",
+          "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013056",
+          "ipAddress": "172.18.0.13",
+          "hostName": "ozone-ha-datanode-6.ozone-ha_default",
+          "certSerialId": null,
+          "version": null,
+          "setupTime": 0,
+          "revision": null,
+          "buildDate": null,
+          "persistedOpState": "IN_SERVICE",
+          "persistedOpStateExpiryEpochSec": 0,
+          "initialVersion": 0,
+          "currentVersion": 1,
+          "decommissioned": false,
+          "maintenance": false,
+          "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+          "networkLocation": "/default-rack",
+          "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
+          "numOfLeaves": 1
         },
         "metrics": null,
         "containers": {}
@@ -6827,8 +9062,8 @@
         "metrics": {
           "decommissionStartTime": "23/05/2024 07:28:35 UTC",
           "numOfUnclosedPipelines": 2,
-          "numOfUnderReplicatedContainers": 0.0,
-          "numOfUnclosedContainers": 0.0
+          "numOfUnderReplicatedContainers": 0,
+          "numOfUnclosedContainers": 0
         },
         "containers": {
           "UnderReplicated": [],
@@ -6856,8 +9091,8 @@
       "totalOzoneCommittedSpace":1022024
     },
     "globalNamespace": {
-        "totalUsedSpace": 12349932,
-        "totalKeys": 1576
+      "totalUsedSpace": 12349932,
+      "totalKeys": 1576
     },
     "usedSpaceBreakdown": {
         "openKeyBytes": {
@@ -6868,76 +9103,76 @@
         "finalizedKeyBytes": 1249923
     },
     "dataNodeUsage": [
-        {
-            "datanodeUuid": "1bf314dc-3eba-4774-9dbc-6d957cc7670b",
-            "hostName": "ozone-datanode-7.ozone_default",
-            "capacity": 125645656770,
-            "used": 4382720,
-            "remaining": 77110996992,
-            "committed": 0,
-            "minimumFreeSpace": 104857600,
-            "reserved": 12565822
-        },
-        {
-            "datanodeUuid": "8adead67-85a6-4ba9-942f-cd313f1472f9",
-            "hostName": "ozone-datanode-6.ozone_default",
-            "capacity": 125645656770,
-            "used": 4382720,
-            "remaining": 77110996992,
-            "committed": 0,
-            "minimumFreeSpace": 104857600,
-            "reserved": 12565822
-        },
-        {
-            "datanodeUuid": "953b91f4-c03a-45d8-9fbe-142887531cb1",
-            "hostName": "ozone-datanode-5.ozone_default",
-            "capacity": 125645656770,
-            "used": 4382720,
-            "remaining": 77110996992,
-            "committed": 0,
-            "minimumFreeSpace": 104857600,
-            "reserved": 12565822
-        },
-        {
-            "datanodeUuid": "44617070-a300-48af-a0e3-117167b008b6",
-            "hostName": "ozone-datanode-2.ozone_default",
-            "capacity": 125645656770,
-            "used": 4382720,
-            "remaining": 77110996992,
-            "committed": 0,
-            "minimumFreeSpace": 104857600,
-            "reserved": 12565822
-        },
-        {
-            "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
-            "hostName": "ozone-datanode-1.ozone_default",
-            "capacity": 125645656770,
-            "used": 4382720,
-            "remaining": 77110996992,
-            "committed": 0,
-            "minimumFreeSpace": 104857600,
-            "reserved": 12565822
-        },
-        {
-            "datanodeUuid": "149a1640-e600-4e98-b62d-397804059f0e",
-            "hostName": "ozone-datanode-3.ozone_default",
-            "capacity": 125645656770,
-            "used": 4382720,
-            "remaining": 77110996992,
-            "committed": 0,
-            "minimumFreeSpace": 104857600,
-            "reserved": 12565822
-        },
-        {
-            "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
-            "hostName": "ozone-datanode-4.ozone_default",
-            "capacity": 125645656770,
-            "used": 4382720,
-            "remaining": 77110996992,
-            "committed": 0,
-            "minimumFreeSpace": 104857600,
-            "reserved": 12565822
-        }
+      {
+        "datanodeUuid": "1bf314dc-3eba-4774-9dbc-6d957cc7670b",
+        "hostName": "ozone-datanode-7.ozone_default",
+        "capacity": 125645656770,
+        "used": 4382720,
+        "remaining": 77110996992,
+        "committed": 0,
+        "minimumFreeSpace": 104857600,
+        "reserved": 12565822
+      },
+      {
+        "datanodeUuid": "8adead67-85a6-4ba9-942f-cd313f1472f9",
+        "hostName": "ozone-datanode-6.ozone_default",
+        "capacity": 125645656770,
+        "used": 4382720,
+        "remaining": 77110996992,
+        "committed": 0,
+        "minimumFreeSpace": 104857600,
+        "reserved": 12565822
+      },
+      {
+        "datanodeUuid": "953b91f4-c03a-45d8-9fbe-142887531cb1",
+        "hostName": "ozone-datanode-5.ozone_default",
+        "capacity": 125645656770,
+        "used": 4382720,
+        "remaining": 77110996992,
+        "committed": 0,
+        "minimumFreeSpace": 104857600,
+        "reserved": 12565822
+      },
+      {
+        "datanodeUuid": "44617070-a300-48af-a0e3-117167b008b6",
+        "hostName": "ozone-datanode-2.ozone_default",
+        "capacity": 125645656770,
+        "used": 4382720,
+        "remaining": 77110996992,
+        "committed": 0,
+        "minimumFreeSpace": 104857600,
+        "reserved": 12565822
+      },
+      {
+        "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
+        "hostName": "ozone-datanode-1.ozone_default",
+        "capacity": 125645656770,
+        "used": 4382720,
+        "remaining": 77110996992,
+        "committed": 0,
+        "minimumFreeSpace": 104857600,
+        "reserved": 12565822
+      },
+      {
+        "datanodeUuid": "149a1640-e600-4e98-b62d-397804059f0e",
+        "hostName": "ozone-datanode-3.ozone_default",
+        "capacity": 125645656770,
+        "used": 4382720,
+        "remaining": 77110996992,
+        "committed": 0,
+        "minimumFreeSpace": 104857600,
+        "reserved": 12565822
+      },
+      {
+        "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
+        "hostName": "ozone-datanode-4.ozone_default",
+        "capacity": 125645656770,
+        "used": 4382720,
+        "remaining": 77110996992,
+        "committed": 0,
+        "minimumFreeSpace": 104857600,
+        "reserved": 12565822
+      }
     ]
   },
   "pendingDeletionDN": {

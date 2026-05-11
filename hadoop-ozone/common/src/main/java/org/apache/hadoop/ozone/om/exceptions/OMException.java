@@ -279,5 +279,7 @@ public class OMException extends IOException {
     ETAG_MISMATCH,
 
     ETAG_NOT_AVAILABLE,
+
+    ATOMIC_WRITE_CONFLICT,
   }
 }

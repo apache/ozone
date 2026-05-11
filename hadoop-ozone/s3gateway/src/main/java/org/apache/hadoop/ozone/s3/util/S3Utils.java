@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BAD_DIGEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_DIGEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_STORAGE_CLASS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_CHUNKED;
@@ -216,6 +217,20 @@ public final class S3Utils {
   }
 
   /**
+   * Normalizes an ETag header value by trimming whitespace and removing
+   * surrounding double quotes.
+   *
+   * @param value the raw header value
+   * @return the normalized ETag, or {@code null} if the input is null
+   */
+  public static String parseETag(String value) {
+    if (value == null) {
+      return null;
+    }
+    return stripQuotes(value.trim());
+  }
+
+  /**
    * Wraps the given string in double quotes.
    *
    * @param value the input string
@@ -228,23 +243,34 @@ public final class S3Utils {
   /**
    * Validates the Content-MD5 header against the actual MD5 hash.
    *
+   * <p>Throws {@link org.apache.hadoop.ozone.s3.exception.S3ErrorTable#INVALID_DIGEST}
+   * when the Content-MD5 header is absent, contains an invalid Base64 string,
+   * or decodes to a byte array that is not exactly 16 bytes (i.e. not a valid
+   * MD5 digest).  Throws
+   * {@link org.apache.hadoop.ozone.s3.exception.S3ErrorTable#BAD_DIGEST}
+   * when the header is well-formed but does not match the computed hash.
+   *
    * @param clientMD5 the base64-encoded MD5 from Content-MD5 header
    * @param serverMD5 the hex-encoded MD5 hash of the data
    * @param resource  the resource path for error messages
-   * @throws OS3Exception if the MD5 values do not match
+   * @throws OS3Exception if the Content-MD5 is invalid or does not match
    */
   public static void validateContentMD5(String clientMD5, String serverMD5, String resource)
       throws OS3Exception {
     if (clientMD5 == null) {
-      throw newError(BAD_DIGEST, resource);
+      throw newError(INVALID_DIGEST, resource);
     }
 
     try {
-      if (!Hex.encodeHexString(Base64.getDecoder().decode(clientMD5)).equals(serverMD5)) {
+      byte[] decoded = Base64.getDecoder().decode(clientMD5);
+      if (decoded.length != 16) {
+        throw newError(INVALID_DIGEST, resource);
+      }
+      if (!Hex.encodeHexString(decoded).equals(serverMD5)) {
         throw newError(BAD_DIGEST, resource);
       }
     } catch (IllegalArgumentException ex) {
-      throw newError(BAD_DIGEST, resource);
+      throw newError(INVALID_DIGEST, resource);
     }
   }
 

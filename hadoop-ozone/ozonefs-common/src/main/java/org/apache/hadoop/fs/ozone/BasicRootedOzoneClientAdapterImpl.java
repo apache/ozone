@@ -130,7 +130,8 @@ public class BasicRootedOzoneClientAdapterImpl
   private boolean securityEnabled;
   private int configuredDnPort;
   private BucketLayout defaultOFSBucketLayout;
-  private OzoneConfiguration config;
+  private final OzoneConfiguration config;
+  private final OzoneClientConfig clientConfig;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -218,6 +219,7 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
 
+      clientConfig = conf.getObject(OzoneClientConfig.class);
       // Fetches the bucket layout to be used by OFS.
       try {
         initDefaultFsBucketLayout(conf);
@@ -245,11 +247,10 @@ public class BasicRootedOzoneClientAdapterImpl
       throws OMException {
     try {
       this.defaultOFSBucketLayout = BucketLayout.fromString(
-          conf.get(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
-              OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT));
+          clientConfig.getFsDefaultBucketLayout());
     } catch (IllegalArgumentException iae) {
       throw new OMException("Unsupported value provided for " +
-          OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+          OzoneClientConfig.Keys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
           ". Supported values are " + BucketLayout.FILE_SYSTEM_OPTIMIZED +
           " and " + BucketLayout.LEGACY + ".",
           OMException.ResultCodes.INVALID_REQUEST);
@@ -260,7 +261,7 @@ public class BasicRootedOzoneClientAdapterImpl
       throw new OMException(
           "Buckets created with OBJECT_STORE layout do not support file " +
               "system semantics. Supported values for config " +
-              OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+              OzoneClientConfig.Keys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
               " include " + BucketLayout.FILE_SYSTEM_OPTIMIZED + " and " +
               BucketLayout.LEGACY, OMException.ResultCodes.INVALID_REQUEST);
     }
@@ -1298,7 +1299,7 @@ public class BasicRootedOzoneClientAdapterImpl
   public FileChecksum getFileChecksum(String keyName, long length)
       throws IOException {
     OzoneClientConfig.ChecksumCombineMode combineMode =
-        config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
+        clientConfig.getChecksumCombineMode();
     if (combineMode == null) {
       return null;
     }

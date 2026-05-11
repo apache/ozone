@@ -801,16 +801,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
-    <value>8</value>
-    <tag>OZONE, SCM</tag>
-    <description>
-      Factor with which number of delete blocks sent to each datanode in every interval.
-      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
-      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
-    </description>
-  </property>
-  <property>
     <name>ozone.scm.block.size</name>
     <value>256MB</value>
     <tag>OZONE, SCM</tag>
@@ -1823,37 +1813,6 @@
   </property>
 
   <property>
-    <name>hdds.scm.kerberos.keytab.file</name>
-    <value>/etc/security/keytabs/SCM.keytab</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description> The keytab file used by SCM daemon to login as its service principal.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.kerberos.principal</name>
-    <value>SCM/_HOST@REALM</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>The SCM service principal. e.g. scm/_HOST@REALM.COM</description>
-  </property>
-  <property>
-    <name>hdds.scm.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@REALM</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>
-      SCM http server service principal if SPNEGO is enabled for SCM http server.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.http.auth.kerberos.keytab</name>
-    <value>/etc/security/keytabs/HTTP.keytab</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>
-      The keytab file used by SCM http server to login as its service
-      principal if SPNEGO is enabled for SCM http server.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.s3.administrators</name>
     <value/>
     <tag>OZONE, SECURITY</tag>
@@ -1900,6 +1859,46 @@
     <description>
       Ozone read only admin groups delimited by the comma.
       If set, This is the list of groups are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone blacklisted users delimited by the comma.
+      If set, This is the list of users that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone blacklisted groups delimited by the comma.
+      If set, This is the list of groups that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone read blacklist users delimited by the comma.
+      If set, This is the list of users are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone read blacklist groups delimited by the comma.
+      If set, This is the list of groups are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
     </description>
   </property>
 
@@ -2546,6 +2545,24 @@
     <value>false</value>
     <tag>OZONE, HDDS, SECURITY, TLS</tag>
     <description>If HDDS GRPC server TLS is enabled.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.protocols</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS protocol versions for gRPC
+      server endpoints (e.g. "TLSv1.3" or "TLSv1.2,TLSv1.3"). When empty,
+      the TLS provider's defaults are used. Applies to server endpoints
+      only; clients are not restricted.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.ciphers</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS cipher suites for gRPC server
+      endpoints (e.g. "TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256").
+      When empty, the TLS provider's defaults are used. Applies to server
+      endpoints only; clients are not restricted.</description>
   </property>
   <property>
     <name>hdds.x509.default.duration</name>
@@ -3408,6 +3425,47 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.export.directory</name>
+    <value></value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Directory where Recon stores exported TAR files containing unhealthy container
+      CSVs. When empty (default), the path is resolved at runtime as
+      {ozone.recon.db.dir}/exports so exports are co-located with Recon metadata.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.export.max.downloads</name>
+    <value>3</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Maximum number of times a completed export TAR file can be downloaded.
+      Once the limit is reached the download endpoint returns HTTP 429.
+      Prevents repeated downloads from misusing network bandwidth.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.export.max.jobs.total</name>
+    <value>4</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Maximum number of export jobs (waiting + executing) that can exist at once.
+      Submissions beyond this limit are rejected with HTTP 429. Kept small because
+      export is single-threaded and the number of distinct unhealthy-container
+      states is bounded.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.unhealthy.container.fetch.size</name>
+    <value>10000</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Number of rows Derby returns per JDBC round-trip when streaming unhealthy
+      container records during a CSV export. Higher values reduce round-trip
+      overhead at the cost of slightly more memory per fetch batch.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.network.topology.schema.file</name>
     <value>network-topology-default.xml</value>
     <tag>OZONE, MANAGEMENT</tag>
@@ -3708,6 +3766,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.ssl.enabled.protocols</name>
+    <tag>OZONE,SECURITY,CRYPTO_COMPLIANCE</tag>
+    <value/>
+    <description>
+      The supported SSL protocols used to restrict connections towards the WebUI of different components,
+      and the S3 GateWay.
+    </description>
+  </property>
+  <property>
     <name>ssl.server.keystore.location</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value/>
@@ -3925,6 +3992,16 @@
     <description>
       Enables Ozone filesystem snapshot feature if set to true on the OM side.
       Disables it otherwise.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.rename.allowed</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Allows the Ozone snapshot rename operation if set to true on the OM side.
+      Blocks it otherwise.
     </description>
   </property>
 
@@ -4186,7 +4263,7 @@
     <value>60000</value>
     <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
     <description>
-      OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
+      Ozone HTTP server connection timeout in milliseconds.
     </description>
   </property>
 
@@ -4247,18 +4324,6 @@
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.client.max.ec.stripe.write.retries</name>
-    <value>10</value>
-    <tag>CLIENT</tag>
-    <description>
-      When EC stripe write failed, client will request to allocate new block group and write the failed stripe into new
-      block group. If the same stripe failure continued in newly acquired block group also, then it will retry by
-      requesting to allocate new block group again. This configuration is used to limit these number of retries. By
-      default the number of retries are 10.
     </description>
   </property>
 
@@ -4342,24 +4407,13 @@
   </property>
 
   <property>
-    <name>ozone.client.fs.default.bucket.layout</name>
-    <value>FILE_SYSTEM_OPTIMIZED</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      Default bucket layout value used when buckets are created using OFS.
-      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
-      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
-      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
-      will create intermediate directories.
-    </description>
-  </property>
-    <property>
     <name>ozone.om.namespace.s3.strict</name>
     <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
-      Ozone namespace should follow S3 naming rule by default.
-      However this parameter allows the namespace to support non-S3 compatible characters.
+      When `true` (the default), volume and bucket names follow strict S3 naming rules.
+      When `false`, S3 rules still apply except that underscore (`_`) is additionally
+      allowed in volume and bucket names; no other non-S3 characters are permitted.
     </description>
   </property>
 
@@ -4370,6 +4424,16 @@
     <description>
       The size of the container locations cache in Ozone Manager. This cache allows Ozone Manager to populate
       block locations in key-read responses without calling SCM, thus increases Ozone Manager read performance.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.container.location.datanode.cache.size</name>
+    <value>10000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The size of the datanode details cache used to reduce duplicate datanode objects
+      retained by the container location cache in Ozone Manager.
     </description>
   </property>
 
@@ -5003,5 +5067,17 @@
     <name>ozone.om.snapshot.local.data.manager.service.interval</name>
     <value>5m</value>
     <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.events.max.limit</name>
+    <value>100</value>
+    <tag>OZONE, RATIS, SCM</tag>
+    <description>The maximum number of events that can be pending in SCM Ratis.</description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.events.max.limit</name>
+    <value>100</value>
+    <tag>OZONE, RATIS, OM</tag>
+    <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
 </configuration>

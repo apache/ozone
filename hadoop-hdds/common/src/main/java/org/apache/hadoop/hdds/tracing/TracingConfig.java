@@ -43,6 +43,7 @@ public class TracingConfig extends ReconfigurableConfig {
       key = "ozone.tracing.enabled",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
+      reconfigurable = true,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
       description = "If true, tracing is initialized and spans may be exported (subject to sampling)."
   )
@@ -52,6 +53,7 @@ public class TracingConfig extends ReconfigurableConfig {
       key = "ozone.tracing.endpoint",
       defaultValue = "",
       type = ConfigType.STRING,
+      reconfigurable = true,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
       description = "OTLP gRPC receiver endpoint URL."
   )
@@ -61,6 +63,7 @@ public class TracingConfig extends ReconfigurableConfig {
       key = "ozone.tracing.sampler",
       defaultValue = "-1",
       type = ConfigType.DOUBLE,
+      reconfigurable = true,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
       description = "Root trace sampling ratio (0.0 to 1.0)."
   )
@@ -70,6 +73,7 @@ public class TracingConfig extends ReconfigurableConfig {
       key = "ozone.tracing.span.sampling",
       defaultValue = "",
       type = ConfigType.STRING,
+      reconfigurable = true,
       tags = { ConfigTag.OZONE, ConfigTag.HDDS },
       description = "Optional per-span sampling: comma-separated spanName:rate entries."
   )
