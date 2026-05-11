@@ -24,40 +24,40 @@ ${OM_SERVICE_ID}    om
 
 *** Test Cases ***
 Test Lifecycle Status
-    ${output} =         Execute             ozone admin om lifecycle status
+    ${output} =         Execute             ozone admin om lifecycle status --service-id '${OM_SERVICE_ID}'
                         Should Contain      ${output}    IsEnabled
                         Should Contain      ${output}    IsSuspended
 
 Test Lifecycle Suspend And Resume
-    ${output} =         Execute             ozone admin om lifecycle suspend
+    ${output} =         Execute             ozone admin om lifecycle suspend --service-id '${OM_SERVICE_ID}'
                         Should Contain      ${output}    Lifecycle Service has been suspended
 
-    ${output} =         Execute             ozone admin om lifecycle status
+    ${output} =         Execute             ozone admin om lifecycle status --service-id '${OM_SERVICE_ID}'
                         Should Contain      ${output}    IsSuspended: true
 
-    ${output} =         Execute             ozone admin om lifecycle resume
+    ${output} =         Execute             ozone admin om lifecycle resume --service-id '${OM_SERVICE_ID}'
                         Should Contain      ${output}    Lifecycle Service has been resumed
 
-    ${output} =         Execute             ozone admin om lifecycle status
+    ${output} =         Execute             ozone admin om lifecycle status --service-id '${OM_SERVICE_ID}'
                         Should Contain      ${output}    IsSuspended: false
 
 Test Lifecycle Status After Leader Transfer
-    ${output} =         Execute             ozone admin om roles
+    ${output} =         Execute             ozone admin om roles --service-id '${OM_SERVICE_ID}'
     ${is_ha} =          Run Keyword And Return Status    Should Contain    ${output}    FOLLOWER
     IF    ${is_ha}
-        ${output} =         Execute             ozone admin om lifecycle suspend
+        ${output} =         Execute             ozone admin om lifecycle suspend --service-id '${OM_SERVICE_ID}'
                             Should Contain      ${output}    Lifecycle Service has been suspended
 
-        ${output} =         Execute             ozone admin om transfer -r
+        ${output} =         Execute             ozone admin om transfer --service-id '${OM_SERVICE_ID}' -r
                             Should Contain      ${output}    Transfer leadership successfully
 
-        ${output} =         Execute             ozone admin om lifecycle status
+        ${output} =         Execute             ozone admin om lifecycle status --service-id '${OM_SERVICE_ID}'
                             Should Contain      ${output}    IsSuspended: true
 
-        ${output} =         Execute             ozone admin om lifecycle resume
+        ${output} =         Execute             ozone admin om lifecycle resume --service-id '${OM_SERVICE_ID}'
                             Should Contain      ${output}    Lifecycle Service has been resumed
 
-        ${output} =         Execute             ozone admin om lifecycle status
+        ${output} =         Execute             ozone admin om lifecycle status --service-id '${OM_SERVICE_ID}'
                             Should Contain      ${output}    IsSuspended: false
     ELSE
         Pass Execution      Cluster is not HA, skipping leader transfer test
@@ -75,45 +75,45 @@ Test Lifecycle Suspend And Resume Requires Admin
         Kinit test user     testuser2     testuser2.keytab
         
         # Status should work for non-admin
-        ${output} =         Execute and checkrc    ozone admin om lifecycle status    0
+        ${output} =         Execute and checkrc    ozone admin om lifecycle status --service-id '${OM_SERVICE_ID}'     0
                             Should Contain      ${output}    IsEnabled
                             
         # Suspend should fail for non-admin
-        Access should be denied    ozone admin om lifecycle suspend
+        Access should be denied    ozone admin om lifecycle suspend --service-id '${OM_SERVICE_ID}'
         
         # Resume should fail for non-admin
-        Access should be denied    ozone admin om lifecycle resume
+        Access should be denied    ozone admin om lifecycle resume --service-id '${OM_SERVICE_ID}'
         
         # Switch back to admin user for subsequent tests
         Kinit test user     testuser     testuser.keytab
         
         # Verify admin can suspend and resume
-        ${output} =         Execute and checkrc    ozone admin om lifecycle suspend    0
+        ${output} =         Execute and checkrc    ozone admin om lifecycle suspend --service-id '${OM_SERVICE_ID}'    0
                             Should Contain      ${output}    Lifecycle Service has been suspended
                             
-        ${output} =         Execute and checkrc    ozone admin om lifecycle resume    0
+        ${output} =         Execute and checkrc    ozone admin om lifecycle resume --service-id '${OM_SERVICE_ID}'     0
                             Should Contain      ${output}    Lifecycle Service has been resumed
     ELSE
         # In non-secure environments, we can test by passing a different user via HADOOP_USER_NAME
         
         # Status should work for non-admin
-        ${output} =         Execute and checkrc    env HADOOP_USER_NAME=testuser2 ozone admin om lifecycle status    0
+        ${output} =         Execute and checkrc    env HADOOP_USER_NAME=testuser2 ozone admin om lifecycle status --service-id '${OM_SERVICE_ID}'    0
                             Should Contain      ${output}    IsEnabled
                             
         # Suspend should fail for non-admin
-        ${output} =         Execute and checkrc    env HADOOP_USER_NAME=testuser2 ozone admin om lifecycle suspend   255
+        ${output} =         Execute and checkrc    env HADOOP_USER_NAME=testuser2 ozone admin om lifecycle suspend --service-id '${OM_SERVICE_ID}'   255
                             Should Contain      ${output}    Access denied
                             Should Contain      ${output}    Superuser privilege is required
                             
         # Resume should fail for non-admin
-        ${output} =         Execute and checkrc    env HADOOP_USER_NAME=testuser2 ozone admin om lifecycle resume    255
+        ${output} =         Execute and checkrc    env HADOOP_USER_NAME=testuser2 ozone admin om lifecycle resume --service-id '${OM_SERVICE_ID}'    255
                             Should Contain      ${output}    Access denied
                             Should Contain      ${output}    Superuser privilege is required
                             
         # Verify admin (default user) can suspend and resume
-        ${output} =         Execute and checkrc    ozone admin om lifecycle suspend    0
+        ${output} =         Execute and checkrc    ozone admin om lifecycle suspend --service-id '${OM_SERVICE_ID}'    0
                             Should Contain      ${output}    Lifecycle Service has been suspended
                             
-        ${output} =         Execute and checkrc    ozone admin om lifecycle resume    0
+        ${output} =         Execute and checkrc    ozone admin om lifecycle resume --service-id '${OM_SERVICE_ID}'     0
                             Should Contain      ${output}    Lifecycle Service has been resumed
     END
