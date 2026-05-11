@@ -1077,13 +1077,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContainerUtilization'
-  /metrics/query:
+  /metrics/{api}:
     get:
       tags:
         - Metrics
       summary: This is a proxy endpoint for Prometheus, and helps to fetch different metrics for Ozone
       operationId: getMetricsResponse
       parameters:
+        - name: api
+          in: path
+          required: true
+          description: |
+            The Prometheus HTTP API endpoint to invoke (for example `query` or `query_range`).
+          schema:
+            type: string
+            default: query
         - name: query
           in: query
           description: The query in a Prometheus query format for which to fetch results
