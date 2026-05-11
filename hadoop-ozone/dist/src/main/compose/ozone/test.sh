@@ -57,4 +57,5 @@ execute_robot_test s3g grpc/grpc-om-s3-metrics.robot
 
 execute_robot_test scm --exclude om_filesystem --exclude pre-finalized-snapshot-tests snapshot
 
+# snapshot-defrag.robot reads OmSnapshot local YAML under the OM data directory; Robot must run in the om container.
 execute_robot_test om snapshot/snapshot-defrag.robot

@@ -17,8 +17,10 @@
 Documentation       Basic checks that snapshots still look correct while the OM runs periodic
 ...                 snapshot defrag in the background (Jira HDDS-15181 / parent HDDS-13003).
 ...                 Cluster setup: filesystem snapshots on; defrag interval in compose/ozone
-...                 docker-config. Default compose has one datanode: use replication 1 (OZONE_REPLICATION_FACTOR)
-...                 or scale datanodes to match replication.
+...                 docker-config. The unsecure compose test.sh uses start_docker_env, which starts
+...                 three datanodes by default; test.sh sets OZONE_REPLICATION_FACTOR=3. This suite
+...                 should be run with execute_robot_test om: Robot runs inside the OM container and
+...                 Snapshot Local YAML checks read paths under /data/metadata on that OM host.
 Force Tags          om_filesystem
 Library             OperatingSystem
 Resource            ../ozone-lib/shell.robot
