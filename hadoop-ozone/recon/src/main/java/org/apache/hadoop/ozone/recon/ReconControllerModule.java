@@ -134,9 +134,7 @@ public class ReconControllerModule extends AbstractModule {
     // Only install chatbot bindings when the feature is explicitly enabled.
     // This prevents startup-time failures (e.g. bad credential provider paths)
     // from breaking Recon when the chatbot is intentionally disabled.
-    OzoneConfiguration ozoneConfig =
-        getProvider(OzoneConfiguration.class).get();
-    if (ChatbotConfigKeys.isChatbotEnabled(ozoneConfig)) {
+    if (ChatbotConfigKeys.isChatbotEnabled(new ConfigurationProvider().get())) {
       install(new ChatbotModule());
     }
 

@@ -26,13 +26,12 @@ import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.PreDestroy;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.container.AsyncResponse;
-import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.Collections;
@@ -40,12 +39,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.PreDestroy;
+import java.util.concurrent.TimeoutException;
 
 /**
  * REST API endpoint for the Recon Chatbot.
@@ -66,14 +66,17 @@ public class ChatbotEndpoint {
   private final OzoneConfiguration configuration;
 
   /**
-   * Dedicated thread pool for chatbot requests. Each query blocks a thread for the full
-   * round-trip duration (up to 2 LLM calls + up to 5 Recon API calls). Using a separate
-   * pool keeps Jetty's main thread pool free so other Recon UI pages remain responsive
-   * even when chatbot calls are slow.
+   * Dedicated thread pool for chatbot requests.
    *
-   * <p>The pool uses a bounded {@link ArrayBlockingQueue}. When all threads are busy and
-   * the queue is full, new requests are rejected immediately with HTTP 503 rather than
-   * queuing indefinitely. This prevents unbounded memory growth under sustained load.</p>
+   * <p>Each chatbot query is offloaded to this pool and the Jetty thread blocks on
+   * {@link Future#get} with the configured request timeout. This limits concurrent
+   * chatbot occupancy of Jetty threads to {@code poolSize} (default 5) rather than
+   * allowing unlimited blocking. Requests beyond {@code poolSize + maxQueueSize}
+   * are rejected immediately with HTTP 503.</p>
+   *
+   * <p>Note: JAX-RS {@code @Suspended AsyncResponse} requires Servlet 3.x async
+   * support which is not enabled in this container; the synchronous Future approach
+   * is used instead.</p>
    *
    * <p>Pool size: {@link ChatbotConfigKeys#OZONE_RECON_CHATBOT_THREAD_POOL_SIZE}<br>
    * Max queue depth: {@link ChatbotConfigKeys#OZONE_RECON_CHATBOT_MAX_QUEUE_SIZE}</p>
@@ -150,97 +153,87 @@ public class ChatbotEndpoint {
   }
 
   /**
-   * Chat endpoint - processes a user query asynchronously.
+   * Chat endpoint - processes a user query.
    *
-   * <p>The request is handed off immediately to a dedicated thread pool so that Jetty's
-   * main thread is released right away. This prevents slow chatbot calls (which can take
-   * several minutes in the worst case — 2 LLM calls + up to 5 Recon API calls) from
-   * exhausting Jetty's thread pool and blocking other Recon UI pages.</p>
-   *
-   * <p>JAX-RS delivers the response to the client via {@link AsyncResponse#resume} once
-   * the chatbot thread finishes.</p>
+   * <p>The work is submitted to a dedicated bounded thread pool and the Jetty thread
+   * blocks on {@link Future#get} with the configured request timeout. This caps
+   * concurrent chatbot occupancy of Jetty threads to the pool size (default 5).
+   * Requests beyond pool + queue capacity receive HTTP 503 immediately.</p>
    */
   @POST
   @Path("/chat")
   @Consumes(MediaType.APPLICATION_JSON)
-  public void chat(ChatRequest request, @Suspended AsyncResponse asyncResponse) {
+  public Response chat(ChatRequest request) {
 
-    // Safety check 1: If chatbot is disabled, return immediately — no need to queue.
     if (!isChatbotEnabled()) {
-      asyncResponse.resume(Response.status(Response.Status.SERVICE_UNAVAILABLE)
+      return Response.status(Response.Status.SERVICE_UNAVAILABLE)
           .entity(Collections.singletonMap("error", "Chatbot service is not enabled"))
-          .build());
-      return;
+          .build();
     }
 
-    // Safety check 2: Validate the query before queuing.
     if (request.getQuery() == null || request.getQuery().trim().isEmpty()) {
-      asyncResponse.resume(Response.status(Response.Status.BAD_REQUEST)
+      return Response.status(Response.Status.BAD_REQUEST)
           .entity(Collections.singletonMap("error", "Query cannot be empty"))
-          .build());
-      return;
+          .build();
     }
 
-    LOG.info("Chat request queued: userId={}, model={}, provider={}",
+    long requestTimeoutMs = configuration.getLong(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_REQUEST_TIMEOUT_MS,
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_REQUEST_TIMEOUT_MS_DEFAULT);
+
+    LOG.info("Chat request received: userId={}, model={}, provider={}",
         sanitizeUserId(request.getUserId()),
         request.getModel() == null ? "default" : request.getModel(),
         request.getProvider() == null ? "auto" : request.getProvider());
 
-    // Set a wall-clock timeout on the client connection. If the chatbot thread
-    // has not called resume() within this window, JAX-RS fires the timeout handler
-    // which returns 504 to the client and interrupts the worker thread.
-    long requestTimeoutMs = configuration.getLong(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_REQUEST_TIMEOUT_MS,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_REQUEST_TIMEOUT_MS_DEFAULT);
-    asyncResponse.setTimeout(requestTimeoutMs, TimeUnit.MILLISECONDS);
-
-    // Submit to the dedicated chatbot thread pool — Jetty thread is now free.
-    // RejectedExecutionException is thrown when all threads are busy AND the
-    // bounded queue is full, which we convert to a 503.
+    // Submit chatbot work to the dedicated pool and block the Jetty thread with
+    // a hard timeout. At most poolSize Jetty threads are ever blocked on chatbot
+    // work; requests beyond pool+queue capacity are rejected immediately.
+    Future<String> future;
     try {
-      Future<?> future = chatbotExecutor.submit(() -> {
-        try {
-          String response = chatbotAgent.processQuery(
+      future = chatbotExecutor.submit(() ->
+          chatbotAgent.processQuery(
               request.getQuery(),
               request.getModel(),
-              request.getProvider());
-
-          ChatResponse chatResponse = new ChatResponse();
-          chatResponse.setResponse(response);
-          chatResponse.setSuccess(true);
-          asyncResponse.resume(Response.ok(chatResponse).build());
-
-        } catch (ChatbotException e) {
-          LOG.error("Chatbot query processing failed", e);
-          asyncResponse.resume(
-              Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                  .entity(Collections.singletonMap("error",
-                      "An error occurred processing your request."))
-                  .build());
-        }
-      });
-
-      // If the request times out, send 504 to the client and interrupt the
-      // worker thread so it stops waiting on any blocked LLM or HTTP call.
-      asyncResponse.setTimeoutHandler(ar -> {
-        LOG.warn("Chatbot request timed out after {}ms — cancelling worker thread",
-            requestTimeoutMs);
-        future.cancel(true);
-        ar.resume(Response.status(Response.Status.GATEWAY_TIMEOUT)
-            .entity(Collections.singletonMap("error",
-                "The chatbot request timed out. The LLM or Recon API took too long " +
-                "to respond. Please try again or use a faster model."))
-            .build());
-      });
-
+              request.getProvider()));
     } catch (RejectedExecutionException e) {
       LOG.warn("Chatbot request rejected — thread pool and queue are full");
-      asyncResponse.resume(
-          Response.status(Response.Status.SERVICE_UNAVAILABLE)
-              .entity(Collections.singletonMap("error",
-                  "The chatbot is currently handling too many requests. " +
-                  "Please try again in a moment."))
-              .build());
+      return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+          .entity(Collections.singletonMap("error",
+              "The chatbot is currently handling too many requests. " +
+              "Please try again in a moment."))
+          .build();
+    }
+
+    try {
+      String result = future.get(requestTimeoutMs, TimeUnit.MILLISECONDS);
+      ChatResponse chatResponse = new ChatResponse();
+      chatResponse.setResponse(result);
+      chatResponse.setSuccess(true);
+      return Response.ok(chatResponse).build();
+
+    } catch (TimeoutException e) {
+      future.cancel(true);
+      LOG.warn("Chatbot request timed out after {}ms", requestTimeoutMs);
+      return Response.status(Response.Status.GATEWAY_TIMEOUT)
+          .entity(Collections.singletonMap("error",
+              "The chatbot request timed out. The LLM or Recon API took too long " +
+              "to respond. Please try again or use a faster model."))
+          .build();
+
+    } catch (ExecutionException e) {
+      LOG.error("Chatbot query processing failed", e.getCause());
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity(Collections.singletonMap("error",
+              "An error occurred processing your request."))
+          .build();
+
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+          .entity(Collections.singletonMap("error",
+              "Request was interrupted. Please try again."))
+          .build();
     }
   }
 
