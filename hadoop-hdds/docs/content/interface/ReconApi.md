@@ -555,8 +555,8 @@ Returns the set of keys/files pending deletion, paired with aggregated size tota
 ```json
 {
   "lastKey": "sampleVol/bucketOne/key_one",
-  "replicatedDataSize": 600000,
-  "unreplicatedDataSize": 200000,
+  "replicatedDataSize": 1800000,
+  "unreplicatedDataSize": 600000,
   "deletedKeyInfo": [
     {
       "omKeyInfoList": [
@@ -575,7 +575,8 @@ Returns the set of keys/files pending deletion, paired with aggregated size tota
           "modificationTime": 1717100000000
         }
       ]
-    }
+    },
+    ...
   ],
   "status": "OK"
 }
