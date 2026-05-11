@@ -302,7 +302,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // creation after the knob turned on.
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
 
-      validateAtomicRewriteAtCommit(keyToDelete, omKeyInfo, auditMap);
+      validateAtomicRewriteAtCommit(keyToDelete, omKeyInfo.getExpectedDataGeneration(), auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
       omKeyInfo = omKeyInfo.toBuilder()

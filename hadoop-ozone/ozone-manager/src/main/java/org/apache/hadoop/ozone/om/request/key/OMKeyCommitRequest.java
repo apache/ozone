@@ -130,7 +130,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     KeyArgs resolvedKeyArgs =
         resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
             IAccessAuthorizer.ACLType.WRITE, commitKeyRequest.getClientID());
-    validateAtomicRewriteAtAdmission(ozoneManager.getMetadataManager(),
+    validateAtomicRewriteForCommitAdmission(ozoneManager.getMetadataManager(),
         resolvedKeyArgs, commitKeyRequest.getClientID());
 
     return request.toBuilder()
@@ -138,7 +138,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             .setKeyArgs(resolvedKeyArgs)).build();
   }
 
-  protected void validateAtomicRewriteAtAdmission(
+  private void validateAtomicRewriteForCommitAdmission(
       OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
       throws IOException {
     OmKeyInfo openKeyInfo = getOpenKeyInfoForCommitAdmission(
@@ -338,7 +338,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      validateAtomicRewriteAtCommit(keyToDelete, omKeyInfo, auditMap);
+      validateAtomicRewriteAtCommit(keyToDelete, omKeyInfo.getExpectedDataGeneration(), auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
       // Combination

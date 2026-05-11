@@ -148,16 +148,10 @@ public class OMKeyRequestTests {
         .setKeyName(keyName)
         .setUpdateID(expectedGeneration)
         .build();
-    KeyArgs keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setExpectedDataGeneration(expectedGeneration)
-        .build();
     Map<String, String> auditMap = new HashMap<>();
 
     new TestableOMKeyRequest().validateAtomicRewriteAtAdmission(
-        existingKeyInfo, keyArgs, auditMap);
+        existingKeyInfo, expectedGeneration, auditMap);
 
     assertEquals(String.valueOf(expectedGeneration),
         auditMap.get(OzoneConsts.REWRITE_GENERATION));
