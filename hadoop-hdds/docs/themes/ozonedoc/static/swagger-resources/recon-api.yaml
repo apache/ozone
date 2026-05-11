@@ -72,6 +72,24 @@ paths:
         - Containers
       summary: Get all Container Metadata information
       operationId: getContainerInfo
+      parameters:
+        - name: prevKey
+          in: query
+          description: |
+            Returns containers with ID greater than the given prevKey (the prevKey container itself is
+            skipped). Use 0 to start at the beginning.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+        - name: limit
+          in: query
+          description: Maximum number of containers to return.
+          required: false
+          schema:
+            type: integer
+            default: 1000
       responses:
         '200':
           description: Successful operation
@@ -79,6 +97,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContainerMetadata'
+        '406':
+          description: Invalid parameters (negative prevKey or limit).
   /containers/deleted:
     get:
       tags:
@@ -142,19 +162,33 @@ paths:
       summary: Get UnhealthyContainerMetadata for all the unhealthy containers
       operationId: getUnhealthyContainers
       parameters:
-        - name: batchNum
-          in: query
-          description: Size of the batch for the result. It will give us results from **(limit + 1) to (2 * limit)**
-          required: false
-          schema:
-            type: integer
         - name: limit
           in: query
-          description: Limit of the number of results returned
+          description: Maximum number of unhealthy containers to return.
           required: false
           schema:
             type: integer
             default: 1000
+        - name: maxContainerId
+          in: query
+          description: |
+            Upper bound for container IDs to include (exclusive). When specified, returns containers
+            with IDs less than this value in descending order. Use for backward pagination.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+        - name: minContainerId
+          in: query
+          description: |
+            Lower bound for container IDs to include (exclusive). When `maxContainerId` is not specified,
+            returns containers with IDs greater than this value in ascending order. Use for forward pagination.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
       responses:
         '200':
           description: Successful operation
@@ -176,19 +210,33 @@ paths:
           schema:
             type: string
             example: MISSING
-        - name: batchNum
-          in: query
-          description: Size of the batch for the result. It will give us results from **(limit + 1) to (2 * limit)**
-          required: false
-          schema:
-            type: integer
         - name: limit
           in: query
-          description: Limit of the number of results returned
+          description: Maximum number of unhealthy containers to return.
           required: false
           schema:
             type: integer
             default: 1000
+        - name: maxContainerId
+          in: query
+          description: |
+            Upper bound for container IDs to include (exclusive). When specified, returns containers
+            with IDs less than this value in descending order. Use for backward pagination.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+        - name: minContainerId
+          in: query
+          description: |
+            Lower bound for container IDs to include (exclusive). When `maxContainerId` is not specified,
+            returns containers with IDs greater than this value in ascending order. Use for forward pagination.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
       responses:
         '200':
           description: Successful operation
@@ -1131,6 +1179,17 @@ components:
         misReplicatedCount:
           type: integer
           example: 0
+        replicaMismatchCount:
+          type: integer
+          example: 0
+        firstKey:
+          type: integer
+          description: Smallest container ID present in this page. Use with `maxContainerId` for backward pagination.
+          example: 1
+        lastKey:
+          type: integer
+          description: Largest container ID present in this page. Use as `minContainerId` for the next forward page.
+          example: 42
         containers:
           type: array
           items:

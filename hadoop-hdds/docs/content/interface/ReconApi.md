@@ -96,30 +96,32 @@ Returns all the ContainerMetadata objects.
 
 **Returns**
 
-Returns all the KeyMetadata objects for the given ContainerID.
-    
+Returns all the KeyMetadata objects for the given ContainerID. `lastKey` is the final key seen in
+this page: pass it back as `prevKey` to continue paginating.
+
 ```json
     {
-      "totalCount":7,
+      "totalCount": 7,
+      "lastKey": "/vol-1-73141/bucket-3-35816/key-0-43637",
       "keys": [
         {
-          "Volume":"vol-1-73141",
-          "Bucket":"bucket-3-35816",
-          "Key":"key-0-43637",
-          "DataSize":1000,
-          "Versions":[0],
+          "Volume": "vol-1-73141",
+          "Bucket": "bucket-3-35816",
+          "Key": "key-0-43637",
+          "CompletePath": "/vol-1-73141/bucket-3-35816/dir1/dir2/key-0-43637",
+          "DataSize": 1000,
+          "Versions": [0],
           "Blocks": {
             "0": [
               {
-                "containerID":1,
-                "localID":105232659753992201
+                "containerID": 1,
+                "localID": 105232659753992201
               }
             ]
           },
-          "CreationTime":"2020-11-18T18:09:17.722Z",
-          "ModificationTime":"2020-11-18T18:09:30.405Z"
-        },
-        ...
+          "CreationTime": "2020-11-18T18:09:17.722Z",
+          "ModificationTime": "2020-11-18T18:09:30.405Z"
+        }
       ]
     }
 ```
@@ -183,22 +185,26 @@ Returns all the ContainerHistory objects for the given ContainerID.
  
 ### GET /api/v1/containers/unhealthy
 
- 
+
 **Parameters**
 
-* batchNum (optional)
-
-    The batch number (like "page number") of results to return.
-    Passing 1, will return records 1 to limit. 2 will return
-    limit + 1 to 2 * limit, etc.
-    
 * limit (optional)
 
-    Only returns the limited number of results. The default limit is 1000.  
+    Only returns the limited number of results. The default limit is 1000.
+
+* maxContainerId (optional)
+
+    Upper bound for container IDs (exclusive). When specified, returns containers with IDs less
+    than this value in descending order. Use it for backward pagination.
+
+* minContainerId (optional)
+
+    Lower bound for container IDs (exclusive). When `maxContainerId` is not specified, returns
+    containers with IDs greater than this value in ascending order. Use it for forward pagination.
 
 **Returns**
 
-Returns the UnhealthyContainerMetadata objects for all the unhealthycontainers.
+Returns the UnhealthyContainerMetadata objects for all the unhealthy containers.
      
 ```json
      {
@@ -231,23 +237,27 @@ Returns the UnhealthyContainerMetadata objects for all the unhealthycontainers.
 ```
 
 ### GET /api/v1/containers/unhealthy/:state
- 
+
 **Parameters**
 
-* batchNum (optional)
-     
-   The batch number (like "page number") of results to return.
-   Passing 1, will return records 1 to limit. 2 will return
-   limit + 1 to 2 * limit, etc.
- 
 * limit (optional)
 
-   Only returns the limited number of results. The default limit is 1000.  
+   Only returns the limited number of results. The default limit is 1000.
+
+* maxContainerId (optional)
+
+   Upper bound for container IDs (exclusive). When specified, returns containers with IDs less
+   than this value in descending order. Use it for backward pagination.
+
+* minContainerId (optional)
+
+   Lower bound for container IDs (exclusive). When `maxContainerId` is not specified, returns
+   containers with IDs greater than this value in ascending order. Use it for forward pagination.
 
 **Returns**
 
 Returns the UnhealthyContainerMetadata objects for the containers in the given state.
-Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`,`UNDER_REPLICATED`, `OVER_REPLICATED`.
+Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`, `OVER_REPLICATED`.
 The response structure is same as `/containers/unhealthy`.
 
 
