@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.iceberg;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -31,12 +33,16 @@ import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.iceberg.ContentFile;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.GenericManifestFile;
 import org.apache.iceberg.GenericPartitionFieldSummary;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.InternalData;
 import org.apache.iceberg.ManifestFile;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.PartitionStatisticsFile;
 import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.RewriteTablePathUtil.RewriteResult;
@@ -48,7 +54,10 @@ import org.apache.iceberg.TableMetadata.MetadataLogEntry;
 import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.actions.ImmutableRewriteTablePath;
 import org.apache.iceberg.actions.RewriteTablePath;
+import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.util.Pair;
 
 /**
@@ -211,7 +220,8 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   }
 
   private String rebuildMetadata() {
-    //TODO need to implement rewrite of manifest files and position delete files.
+    // TODO: position delete file entries in rewriteManifestResult.copyPlan() reference staging paths
+    //       that are never written, exclude them until position delete rewriting is implemented.
     TableMetadata startMetadata = startVersionName != null
         ? new StaticTableOperations(startVersionName, table.io()).current()
         : null;
@@ -227,14 +237,20 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     Set<Long> deltaSnapshotIds =  deltaSnapshots.stream().map(Snapshot::snapshotId).collect(Collectors.toSet());
     Set<Snapshot> validSnapshots = new HashSet<>(RewriteTablePathOzoneUtils.snapshotSet(endMetadata));
     validSnapshots.removeAll(RewriteTablePathOzoneUtils.snapshotSet(startMetadata));
+    
     Set<String> manifestsToRewrite = manifestsToRewrite(validSnapshots, 
         startMetadata != null ? deltaSnapshotIds : null);
+    
     RewriteResult<ManifestFile> rewriteManifestListResult = 
         rewriteManifestLists(validSnapshots, endMetadata, manifestsToRewrite);
+
+    RewriteContentFileResult rewriteManifestResult =
+        rewriteManifests(deltaSnapshots, endMetadata, rewriteManifestListResult.toRewrite());
 
     Set<Pair<String, String>> copyPlan = new HashSet<>();
     copyPlan.addAll(rewriteVersionResult.copyPlan());
     copyPlan.addAll(rewriteManifestListResult.copyPlan());
+    copyPlan.addAll(rewriteManifestResult.copyPlan());
 
     return RewriteTablePathOzoneUtils.saveFileList(copyPlan, stagingDir, table.io());
   }
@@ -458,6 +474,196 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
       return allSnapshots.stream()
           .filter(s -> !startSnapshotIds.contains(s.snapshotId()))
           .collect(Collectors.toSet());
+    }
+  }
+
+  /** Aggregated result of rewriting content files (data and delete manifests). */
+  public static class RewriteContentFileResult extends RewriteResult<ContentFile<?>> {
+    @Override
+    public RewriteContentFileResult append(RewriteResult<ContentFile<?>> r1) {
+      this.copyPlan().addAll(r1.copyPlan());
+      this.toRewrite().addAll(r1.toRewrite());
+      return this;
+    }
+
+    public RewriteContentFileResult appendDataFile(RewriteResult<DataFile> r1) {
+      this.copyPlan().addAll(r1.copyPlan());
+      this.toRewrite().addAll(r1.toRewrite());
+      return this;
+    }
+
+    public RewriteContentFileResult appendDeleteFile(RewriteResult<DeleteFile> r1) {
+      this.copyPlan().addAll(r1.copyPlan());
+      this.toRewrite().addAll(r1.toRewrite());
+      return this;
+    }
+  }
+
+  private RewriteContentFileResult rewriteManifests(
+      Set<Snapshot> deltaSnapshots, TableMetadata tableMetadata, Set<ManifestFile> toRewrite) {
+    if (toRewrite.isEmpty()) {
+      return new RewriteContentFileResult();
+    }
+
+    Set<Long> deltaSnapshotIds =
+        deltaSnapshots.stream().map(Snapshot::snapshotId).collect(Collectors.toSet());
+
+    int maxInFlight = parallelism * MAX_INFLIGHT_MULTIPLIER;
+    Semaphore semaphore = new Semaphore(maxInFlight);
+    ExecutorCompletionService<RewriteContentFileResult> completionService =
+        new ExecutorCompletionService<>(executorService);
+
+    RewriteContentFileResult aggregatedResult = new RewriteContentFileResult();
+    int submittedTasks = 0;
+    int completedTasks = 0;
+
+    try {
+      for (ManifestFile manifestFile : toRewrite) {
+        semaphore.acquire();
+
+        boolean taskSubmitted = false;
+        try {
+          completionService.submit(() -> {
+            try {
+              System.out.println("Processing manifest " + manifestFile.path());
+              return processManifest(
+                  manifestFile,
+                  table,
+                  deltaSnapshotIds,
+                  stagingDir,
+                  tableMetadata.formatVersion(),
+                  sourcePrefix,
+                  targetPrefix);
+            } finally {
+              semaphore.release();
+            }
+          });
+          taskSubmitted = true;
+          submittedTasks++;
+        } finally {
+          if (!taskSubmitted) {
+            semaphore.release();
+          }
+        }
+
+        Future<RewriteContentFileResult> done;
+        while ((done = completionService.poll()) != null) {
+          aggregatedResult.append(done.get());
+          completedTasks++;
+        }
+      }
+
+      // drain remaining
+      while (completedTasks < submittedTasks) {
+        aggregatedResult.append(completionService.take().get());
+        completedTasks++;
+      }
+
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      executorService.shutdownNow();
+      throw new RuntimeException("Interrupted while rewriting manifests", e);
+    } catch (ExecutionException e) {
+      executorService.shutdownNow();
+      throw new RuntimeException("Failed to rewrite manifest", e.getCause());
+    }
+
+    return aggregatedResult;
+  }
+
+  private static RewriteContentFileResult processManifest(
+      ManifestFile manifestFile,
+      Table table,
+      Set<Long> deltaSnapshotIds,
+      String stagingLocation,
+      int format,
+      String sourcePrefix,
+      String targetPrefix) {
+    RewriteContentFileResult result = new RewriteContentFileResult();
+    switch (manifestFile.content()) {
+    case DATA:
+      result.appendDataFile(
+          writeDataManifest(
+              manifestFile,
+              table,
+              deltaSnapshotIds,
+              stagingLocation,
+              format,
+              sourcePrefix,
+              targetPrefix));
+      break;
+    case DELETES:
+      result.appendDeleteFile(
+          writeDeleteManifest(
+              manifestFile,
+              table,
+              deltaSnapshotIds,
+              stagingLocation,
+              format,
+              sourcePrefix,
+              targetPrefix));
+      break;
+    default:
+      throw new UnsupportedOperationException(
+          "Unsupported manifest type: " + manifestFile.content());
+    }
+    return result;
+  }
+
+  private static RewriteResult<DataFile> writeDataManifest(
+      ManifestFile manifestFile,
+      Table table,
+      Set<Long> snapshotIds,
+      String stagingLocation,
+      int format,
+      String sourcePrefix,
+      String targetPrefix) {
+    try {
+      String stagingPath =
+          RewriteTablePathUtil.stagingPath(manifestFile.path(), sourcePrefix, stagingLocation);
+      FileIO io = table.io();
+      OutputFile outputFile = io.newOutputFile(stagingPath);
+      Map<Integer, PartitionSpec> specsById = table.specs();
+      return RewriteTablePathUtil.rewriteDataManifest(
+          manifestFile,
+          snapshotIds,
+          outputFile,
+          io,
+          format,
+          specsById,
+          sourcePrefix,
+          targetPrefix);
+    } catch (IOException e) {
+      throw new RuntimeIOException(e);
+    }
+  }
+
+  private static RewriteResult<DeleteFile> writeDeleteManifest(
+      ManifestFile manifestFile,
+      Table table,
+      Set<Long> snapshotIds,
+      String stagingLocation,
+      int format,
+      String sourcePrefix,
+      String targetPrefix) {
+    try {
+      String stagingPath =
+          RewriteTablePathUtil.stagingPath(manifestFile.path(), sourcePrefix, stagingLocation);
+      FileIO io = table.io();
+      OutputFile outputFile = io.newOutputFile(stagingPath);
+      Map<Integer, PartitionSpec> specsById = table.specs();
+      return RewriteTablePathUtil.rewriteDeleteManifest(
+          manifestFile,
+          snapshotIds,
+          outputFile,
+          io,
+          format,
+          specsById,
+          sourcePrefix,
+          targetPrefix,
+          stagingLocation);
+    } catch (IOException e) {
+      throw new RuntimeIOException(e);
     }
   }
 }
