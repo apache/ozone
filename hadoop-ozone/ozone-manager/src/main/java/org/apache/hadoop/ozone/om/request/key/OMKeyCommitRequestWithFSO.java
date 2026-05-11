@@ -78,8 +78,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
   }
 
   @Override
-  protected OmKeyInfo getOpenKeyInfoForCommitAdmission(
-      OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
+  protected OmKeyInfo getOpenKeyInfo(OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
       throws IOException {
     try {
       OmFSOFile fsoFile = getOmFSOFileForCommitAdmission(
@@ -96,8 +95,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
   }
 
   @Override
-  protected OmKeyInfo getCommittedKeyInfoForCommitAdmission(
-      OMMetadataManager omMetadataManager, KeyArgs keyArgs)
+  protected OmKeyInfo getKeyInfo(OMMetadataManager omMetadataManager, KeyArgs keyArgs)
       throws IOException {
     try {
       OmFSOFile fsoFile = getOmFSOFileForCommitAdmission(

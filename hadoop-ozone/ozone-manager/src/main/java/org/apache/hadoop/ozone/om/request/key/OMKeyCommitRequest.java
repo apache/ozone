@@ -130,29 +130,20 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     KeyArgs resolvedKeyArgs =
         resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
             IAccessAuthorizer.ACLType.WRITE, commitKeyRequest.getClientID());
-    validateAtomicRewriteForCommitAdmission(ozoneManager.getMetadataManager(),
-        resolvedKeyArgs, commitKeyRequest.getClientID());
+
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmKeyInfo openKeyInfo = getOpenKeyInfo(omMetadataManager, resolvedKeyArgs, commitKeyRequest.getClientID());
+    if (openKeyInfo != null) {
+      OmKeyInfo keyInfo = getKeyInfo(omMetadataManager, resolvedKeyArgs);
+      validateAtomicRewriteAtAdmission(keyInfo, openKeyInfo.getExpectedDataGeneration(), null);
+    }
 
     return request.toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
             .setKeyArgs(resolvedKeyArgs)).build();
   }
 
-  private void validateAtomicRewriteForCommitAdmission(
-      OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
-      throws IOException {
-    OmKeyInfo openKeyInfo = getOpenKeyInfoForCommitAdmission(
-        omMetadataManager, keyArgs, clientId);
-    if (openKeyInfo == null) {
-      return;
-    }
-
-    validateAtomicRewriteAtAdmission(
-        getCommittedKeyInfoForCommitAdmission(omMetadataManager, keyArgs),
-        openKeyInfo.getExpectedDataGeneration(), null);
-  }
-
-  protected OmKeyInfo getOpenKeyInfoForCommitAdmission(
+  protected OmKeyInfo getOpenKeyInfo(
       OMMetadataManager omMetadataManager, KeyArgs keyArgs, long clientId)
       throws IOException {
     String dbOpenKey = omMetadataManager.getOpenKey(
@@ -162,7 +153,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         .get(dbOpenKey);
   }
 
-  protected OmKeyInfo getCommittedKeyInfoForCommitAdmission(
+  protected OmKeyInfo getKeyInfo(
       OMMetadataManager omMetadataManager, KeyArgs keyArgs)
       throws IOException {
     String dbOzoneKey = omMetadataManager.getOzoneKey(
