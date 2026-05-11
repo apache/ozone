@@ -1097,6 +1097,62 @@ omitted (not present as empty arrays).
 }
 ```
 
+### GET /api/v1/datanodes/decommission/info
+
+**Parameters**
+
+No parameters.
+
+**Returns**
+
+Returns info for every datanode currently in the `DECOMMISSIONING` state. Each entry wraps the
+datanode details, the per-state container list, and decommission metrics from the SCM JMX bean
+`Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics`.
+
+```json
+{
+  "DatanodesDecommissionInfo": [
+    {
+      "datanodeDetails": {
+        "uuid": "f8f8cb45-3ab2-4123",
+        "hostName": "ozone-datanode-3",
+        "ipAddress": "10.0.0.13",
+        "persistedOpState": "DECOMMISSIONING"
+      },
+      "metrics": {
+        "decommissionStartTime": "2024-05-01T10:00:00Z",
+        "numOfUnclosedContainers": 2,
+        "numOfUnclosedPipelines": 0,
+        "numOfUnderReplicatedContainers": 1
+      },
+      "containers": {
+        "OPEN": ["#1234"],
+        "CLOSED": ["#1235", "#1236"]
+      }
+    }
+  ]
+}
+```
+
+### GET /api/v1/datanodes/decommission/info/datanode
+
+Returns info for a single decommissioning datanode. Provide either `uuid` or `ipAddress`. If both
+are passed, `uuid` wins. Omitting both returns an error.
+
+**Parameters**
+
+* uuid (optional)
+
+   UUID of the decommissioning datanode.
+
+* ipAddress (optional)
+
+   IP address of the decommissioning datanode. Used when `uuid` is not provided.
+
+**Returns**
+
+Same shape as `/api/v1/datanodes/decommission/info`, but the array contains at most one entry.
+
 ## Pipelines
 
 ### GET /api/v1/pipelines
