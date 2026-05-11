@@ -63,7 +63,7 @@ import org.junit.jupiter.api.Timeout;
 
 /**
  * Integration tests for {@link ReconStorageContainerSyncHelper} and
- * {@link ReconStorageContainerManagerFacade#syncWithSCMContainerInfo()}.
+ * {@link ReconStorageContainerManagerFacade#triggerTargetedSCMContainerSync()}.
  *
  * <p>Uses a <em>real</em> {@link ReconContainerManager} backed by RocksDB
  * (from {@link AbstractReconContainerManagerTest}) and a mocked
@@ -205,10 +205,11 @@ public class TestReconSCMContainerSyncIntegration
 
     @Test
     void smallTotalDriftReturnsTargetedSync() throws Exception {
-      // Recon has 5, SCM has 8 → drift = 3
+      // Recon has 5 CLOSED, SCM has 8 CLOSED → repairable CLOSED drift = 3.
       seedRecon(1, 5, CLOSED);
 
       when(mockScm.getContainerCount()).thenReturn(8L);
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(8L);
 
       assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
@@ -221,7 +222,8 @@ public class TestReconSCMContainerSyncIntegration
           OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT);
 
       when(mockScm.getContainerCount()).thenReturn((long) threshold);
-      // Recon is empty → drift == threshold
+      when(mockScm.getContainerCount(CLOSED)).thenReturn((long) threshold);
+      // Recon is empty → non-OPEN drift == threshold
 
       assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
@@ -265,7 +267,23 @@ public class TestReconSCMContainerSyncIntegration
 
       // Drift = 50 → TARGETED_SYNC (50 is at threshold, not above)
       seedRecon(1, 1, CLOSED); // Recon now has 1, SCM 51 → drift = 50
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(51L);
       assertEquals(SyncAction.TARGETED_SYNC, customHelper.decideSyncAction());
+    }
+
+    @Test
+    void deletedOnlyTotalDriftReturnsNoAction() throws Exception {
+      // Recon has extra terminal DELETED containers that SCM no longer lists.
+      // Targeted sync cannot remove this opposite-direction DELETED drift, so
+      // it should not run forever on total-count drift alone.
+      seedRecon(1, 5, DELETED);
+
+      when(mockScm.getContainerCount()).thenReturn(0L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
+      when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(0L);
+
+      assertEquals(SyncAction.NO_ACTION, syncHelper.decideSyncAction());
     }
 
     @Test
@@ -336,17 +354,17 @@ public class TestReconSCMContainerSyncIntegration
 
     @Test
     void customPerStateDriftThresholdIsRespected() throws Exception {
-      // Override per-state threshold to 2; OPEN drift of 2 should now trigger
+      // Override per-state threshold to 2; QUASI_CLOSED drift of 2 should trigger.
       getConf().setInt(OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD, 2);
       ReconStorageContainerSyncHelper customHelper = new ReconStorageContainerSyncHelper(
           mockScm, getConf(), getContainerManager());
 
-      seedRecon(1, 10, OPEN);
+      seedRecon(1, 10, QUASI_CLOSED);
       seedRecon(11, 10, CLOSED);
 
       when(mockScm.getContainerCount()).thenReturn(20L); // no total drift
-      when(mockScm.getContainerCount(OPEN)).thenReturn(8L);   // drift = 2
-      when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
+      when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
+      when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(8L); // drift = 2
 
       assertEquals(SyncAction.TARGETED_SYNC, customHelper.decideSyncAction());
     }
@@ -1209,11 +1227,12 @@ public class TestReconSCMContainerSyncIntegration
     }
 
     @Test
-    void decideSyncAction100kDriftAtThresholdTriggersTargetedSync() throws Exception {
-      // SCM has 100k containers, Recon is empty → drift 100k == threshold.
-      // Threshold is exclusive, so this stays on targeted sync.
+    void decideSyncAction100kClosedDriftTriggersTargetedSync() throws Exception {
+      // SCM has 100k CLOSED containers, Recon is empty. This is repairable
+      // CLOSED drift, so it stays on targeted sync.
       when(mockScm.getContainerCount()).thenReturn(100_000L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(100_000L);
 
       assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
@@ -1225,6 +1244,7 @@ public class TestReconSCMContainerSyncIntegration
 
       when(mockScm.getContainerCount()).thenReturn(100_000L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(100_000L);
 
       assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
@@ -1236,6 +1256,7 @@ public class TestReconSCMContainerSyncIntegration
 
       when(mockScm.getContainerCount()).thenReturn(100_000L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(100_000L);
 
       assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
@@ -1250,6 +1271,7 @@ public class TestReconSCMContainerSyncIntegration
       when(mockScm.getContainerCount()).thenReturn(100_000L); // total matches
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);          // SCM has 0 OPEN
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
+      when(mockScm.getContainerCount(CLOSED)).thenReturn(100_000L);
 
       assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }

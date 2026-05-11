@@ -438,7 +438,7 @@ public class ReconStorageContainerManagerFacade
       initializePipelinesFromScm();
     }
     // -----------------------------------------------------------------------
-    // Scheduler (incremental/targeted sync): runs every 1h (default).
+    // Scheduler (incremental/targeted sync): runs on the configured interval.
     //
     // Each cycle calls decideSyncAction() — two lightweight count RPCs to SCM
     // — and then:
@@ -447,18 +447,20 @@ public class ReconStorageContainerManagerFacade
     //       → warn and expose the drift via metrics; full snapshot is not
     //         downloaded automatically by this periodic task
     //
-    //   0 < |total drift| <= threshold
+    //   OPEN drift > 0
     //       → targeted sync: 4-pass incremental repair
     //
-    //   total drift = 0 but per-state drift (OPEN, QUASI_CLOSED, or CLOSED)
-    //       >= threshold (default 1)
+    //   QUASI_CLOSED or CLOSED drift >= threshold (default 1)
     //       → targeted sync: corrects containers stuck in a stale lifecycle state
+    //
+    //   only non-repairable drift detected (for example, extra DELETED in Recon)
+    //       → no action this cycle
     //
     //   no drift detected
     //       → no action this cycle
     //
-    // Running this on a 1h cadence means container state discrepancies are
-    // detected and corrected without an unconditional periodic full snapshot.
+    // Running this periodically detects and corrects container state
+    // discrepancies without an unconditional periodic full snapshot.
     // -----------------------------------------------------------------------
     long syncInterval = ozoneConfiguration.getTimeDuration(
         OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY,
@@ -627,7 +629,7 @@ public class ReconStorageContainerManagerFacade
    * instead, which may report large drift, run targeted sync, or skip work
    * entirely depending on observed drift.
    */
-  public boolean syncWithSCMContainerInfo() {
+  public boolean triggerTargetedSCMContainerSync() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
       try {
         return runTargetedSyncWithMetrics();

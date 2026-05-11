@@ -133,17 +133,16 @@ public final class  ReconServerConfigKeys {
       OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "60s";
 
   /**
-   * Total container count drift threshold above which the periodic incremental
-   * sync escalates to a full SCM DB snapshot.
+   * Non-OPEN container count drift threshold above which the periodic
+   * incremental sync records a large-drift event.
    *
    * <p>When {@code |(SCM_total_containers - SCM_open_containers) -
    * (Recon_total_containers - Recon_open_containers)|} exceeds this value the
-   * targeted 4-pass sync becomes expensive (many batched RPC rounds) and a
-   * full checkpoint replacement is cheaper and more reliable. The comparison
+   * targeted 4-pass sync becomes expensive (many batched RPC rounds). The
+   * periodic scheduler records the condition through logs and metrics rather
+   * than automatically replacing the SCM DB snapshot. The comparison
    * intentionally excludes OPEN containers because missing OPEN containers are
-   * short-lived and can be repaired incrementally without replacing the full
-   * SCM DB. For drift at or below this value the incremental sync corrects the
-   * gap without replacing the entire database.
+   * short-lived and can be repaired incrementally.
    *
    * <p>Default: 1,000,000. In large clusters (millions of containers) operators
    * may raise this further since the targeted sync handles per-state
@@ -156,15 +155,6 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_SCM_SNAPSHOT_ENABLED =
       "ozone.recon.scm.snapshot.enabled";
   public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = true;
-
-  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT =
-      "ozone.recon.scm.connection.timeout";
-  public static final String OZONE_RECON_SCM_CONNECTION_TIMEOUT_DEFAULT = "5s";
-
-  public static final String OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT =
-      "ozone.recon.scm.connection.request.timeout";
-  public static final String
-      OZONE_RECON_SCM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
 
   public static final String OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD =
       "ozone.recon.nssummary.flush.db.max.threshold";
@@ -201,28 +191,18 @@ public final class  ReconServerConfigKeys {
 
   public static final int OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT = 2000;
 
-  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY =
-      "ozone.recon.scm.snapshot.task.initial.delay";
-
-  public static final String
-      OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
-
-  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
-      "ozone.recon.scm.snapshot.task.interval.delay";
-
-  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT
-      = "24h";
-
   /**
    * How often the incremental (targeted) SCM container sync runs.
    *
    * <p>Each cycle calls {@code decideSyncAction()} — two lightweight count
    * RPCs to SCM — and then either runs the 4-pass incremental sync or takes
-   * no action. A full snapshot is still gated by
-   * {@code ozone.recon.scm.snapshot.task.interval.delay} (default 24h).
+   * no action. This periodic task does not download a full SCM DB snapshot
+   * automatically.
    *
-   * <p>Default: 1h. Set to a shorter value in environments where container
-   * state discrepancies need to be detected and corrected faster.
+   * <p>Default:
+   * {@link #OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT}. Set to a
+   * shorter value in environments where container state discrepancies need to
+   * be detected and corrected faster.
    */
   public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY =
       "ozone.recon.scm.container.sync.task.interval.delay";
@@ -233,9 +213,8 @@ public final class  ReconServerConfigKeys {
   /**
    * Initial delay before the first incremental SCM container sync run.
    *
-   * <p>Default: 2m (slightly later than the snapshot initial delay of 1m,
-   * so the snapshot has time to initialize the SCM DB before the first
-   * incremental sync attempts to read it).
+   * <p>Default: 2m, giving Recon startup enough time to initialize the SCM DB
+   * before the first incremental sync attempts to read it.
    */
   public static final String OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY =
       "ozone.recon.scm.container.sync.task.initial.delay";
@@ -328,20 +307,22 @@ public final class  ReconServerConfigKeys {
   public static final int OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT = 1_000_000;
 
   /**
-   * Per-state drift threshold used by the tiered sync decision when the total
-   * container count in SCM and Recon is equal.
+   * Per-state drift threshold used by the tiered sync decision for stable
+   * lifecycle states.
    *
    * <p>Equal totals can still hide lifecycle state drift: a container that
    * advanced from OPEN → QUASI_CLOSED → CLOSED in SCM is counted in both SCM
-   * and Recon's total, but Recon may still record it in the old state.
-   * The following per-state comparisons are evaluated:
+   * and Recon's total, but Recon may still record it in the old state. OPEN
+   * drift always triggers targeted sync when it is non-zero; this threshold is
+   * applied to the following stable-state comparisons:
    *
    * <ul>
-   *   <li><b>OPEN</b>: catches containers stuck OPEN in Recon after SCM has
-   *       already moved them to CLOSING, QUASI_CLOSED, or CLOSED.</li>
    *   <li><b>QUASI_CLOSED</b>: catches containers stuck QUASI_CLOSED in Recon
    *       after SCM has already moved them to CLOSED or beyond.  This case is
    *       invisible to the OPEN check alone.</li>
+   *   <li><b>CLOSED</b>: catches repairable CLOSED count mismatch without using
+   *       all-state total drift, which may include non-repairable DELETED-only
+   *       differences.</li>
    * </ul>
    *
    * <p>If the drift in <em>any</em> of the checked states reaches this
@@ -368,6 +349,45 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD =
       "ozone.recon.scm.per.state.drift.threshold";
   public static final int OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT = 1;
+
+  /**
+   * JDBC fetch size for CSV exports.
+   * Default: 10,000 rows per fetch
+   */
+  public static final String OZONE_RECON_UNHEALTHY_CONTAINER_FETCH_SIZE =
+      "ozone.recon.unhealthy.container.fetch.size";
+  public static final int OZONE_RECON_UNHEALTHY_CONTAINER_FETCH_SIZE_DEFAULT = 10_000;
+
+  /**
+   * Max export jobs that can sit in the queue (waiting + executing) at once.
+   * Submissions beyond this limit are rejected with HTTP 429.
+   * Kept small because export is single-threaded and the unhealthy-container
+   * states it can be invoked for are bounded (~5).
+   * Default: 4
+   */
+  public static final String OZONE_RECON_EXPORT_MAX_JOBS_TOTAL =
+      "ozone.recon.export.max.jobs.total";
+  public static final int OZONE_RECON_EXPORT_MAX_JOBS_TOTAL_DEFAULT = 4;
+
+  /**
+   * Directory to store export CSV files.
+   * Default: /tmp/recon/exports
+   */
+  public static final String OZONE_RECON_EXPORT_DIRECTORY =
+      "ozone.recon.export.directory";
+
+  // Default is resolved at runtime as {ozone.recon.db.dir}/exports.
+  // Empty string signals ExportJobManager to compute the path dynamically.
+  public static final String OZONE_RECON_EXPORT_DIRECTORY_DEFAULT = "";
+
+  /**
+   * Maximum number of times a completed export TAR file can be downloaded.
+   * Prevents repeated downloads from filling up network bandwidth or being misused.
+   * Default: 3
+   */
+  public static final String OZONE_RECON_EXPORT_MAX_DOWNLOADS =
+      "ozone.recon.export.max.downloads";
+  public static final int OZONE_RECON_EXPORT_MAX_DOWNLOADS_DEFAULT = 3;
 
   /**
    * Private constructor for utility class.

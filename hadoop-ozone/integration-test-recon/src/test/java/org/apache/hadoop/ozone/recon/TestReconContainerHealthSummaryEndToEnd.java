@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType.KeyValueContainer;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -169,14 +168,8 @@ public class TestReconContainerHealthSummaryEndToEnd {
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "10m");
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "1s");
 
-    // Delay Recon's background SCM-sync schedulers well beyond any test duration
-    // so they cannot interfere with the test's manual syncWithSCMContainerInfo()
-    // calls.  Without this, the snapshot scheduler fires at ~1 minute (its default
-    // initial delay), acquires the isSyncDataFromSCMRunning flag, and — before the
-    // flag-leak fix — never releases it, causing all subsequent
-    // syncWithSCMContainerInfo() calls to silently return false, leaving
-    // containers absent from Recon and causing ContainerNotFoundException.
-    conf.set(OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY, "1h");
+    // Delay Recon's background SCM sync beyond any test duration so it cannot
+    // interfere with the test's manual targeted sync calls.
     conf.set(OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY, "1h");
 
     ReconTaskConfig taskConfig = conf.getObject(ReconTaskConfig.class);
@@ -223,8 +216,8 @@ public class TestReconContainerHealthSummaryEndToEnd {
    * SCM and Recon for all four induciable lifecycle states.
    *
    * <p>After allocating containers in SCM and transitioning them to OPEN,
-   * CLOSING, QUASI_CLOSED and CLOSED states, a full
-   * {@code syncWithSCMContainerInfo()} is executed. The test then asserts:
+   * CLOSING, QUASI_CLOSED and CLOSED states, a full targeted SCM container sync
+   * is executed. The test then asserts:
    * <pre>
    *   scmCm.getContainers(state).size() == reconCm.getContainers(state).size()
    * </pre>
@@ -244,8 +237,8 @@ public class TestReconContainerHealthSummaryEndToEnd {
     ReconContainerManager reconCm =
         (ReconContainerManager) reconScm.getContainerManager();
 
-    // Allocate all containers as OPEN in SCM first. syncWithSCMContainerInfo()
-    // (Pass 2) adds OPEN containers from SCM to Recon. We then transition each
+    // Allocate all containers as OPEN in SCM first. Targeted sync (Pass 2) adds
+    // OPEN containers from SCM to Recon. We then transition each
     // group to its target state in BOTH SCM and Recon so the counts always match.
     //
     // CLOSING containers must follow this allocate-then-sync-then-FINALIZE pattern
@@ -805,8 +798,8 @@ public class TestReconContainerHealthSummaryEndToEnd {
    * </ol>
    *
    * <p>After calling this method, the caller must invoke
-   * {@code reconScm.syncWithSCMContainerInfo()} to make these containers visible to
-   * Recon's container manager (Pass 1 of the sync discovers CLOSED containers in SCM
+   * {@code reconScm.triggerTargetedSCMContainerSync()} to make these containers
+   * visible to Recon's container manager (Pass 1 discovers CLOSED containers in SCM
    * that are absent from Recon and adds them with their current replica set, which is
    * empty for these containers).
    */
@@ -1189,7 +1182,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
       ReconStorageContainerManagerFacade reconScm,
       ReconContainerManager reconCm,
       List<ContainerID> containerIDs) throws Exception {
-    reconScm.syncWithSCMContainerInfo();
+    reconScm.triggerTargetedSCMContainerSync();
     drainScmAndReconEventQueues();
     backfillMissingContainersFromScm(reconCm, containerIDs);
     LambdaTestUtils.await(REPLICA_SYNC_TIMEOUT_MS, POLL_INTERVAL_MS,

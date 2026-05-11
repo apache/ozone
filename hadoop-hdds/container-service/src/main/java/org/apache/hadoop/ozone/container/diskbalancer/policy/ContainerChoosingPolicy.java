@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -42,11 +43,13 @@ public interface ContainerChoosingPolicy {
    * @param deltaMap the deltaMap for in-progress balancing jobs (negative = space to be freed)
    * @param inProgressContainerIDs containerIDs to avoid (already under move)
    * @param thresholdPercentage the threshold percentage in range (0, 100)
+   * @param movableContainerStates container lifecycle states that may be selected for balancing
    * @return a DiskBalancerVolumeContainerCandidate with container and volumes, or null if none found
    */
   ContainerCandidate chooseVolumesAndContainer(OzoneContainer ozoneContainer,
       MutableVolumeSet volumeSet,
       Map<HddsVolume, Long> deltaMap,
       Set<ContainerID> inProgressContainerIDs,
-      double thresholdPercentage);
+      double thresholdPercentage,
+      Set<State> movableContainerStates);
 }

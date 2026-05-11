@@ -45,7 +45,6 @@ OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
 OZONE-SITE.XML_ozone.recon.scm.container.sync.task.initial.delay=30s
 OZONE-SITE.XML_ozone.recon.scm.container.sync.task.interval.delay=2m
-OZONE-SITE.XML_ozone.recon.scm.snapshot.task.initial.delay=20s
 OZONE-SITE.XML_ozone.recon.scm.snapshot.task.interval.delay=30m
 OZONE-SITE.XML_ozone.recon.scm.container.threshold=20
 OZONE-SITE.XML_ozone.recon.scm.per.state.drift.threshold=1

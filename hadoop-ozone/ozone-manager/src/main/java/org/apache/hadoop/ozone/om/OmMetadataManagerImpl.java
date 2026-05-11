@@ -1856,11 +1856,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           info.getKeyLocationVersions()) {
         List<DeletedBlock> item = keyLocations.getLocationList().stream()
             .map(b -> new DeletedBlock(
-                new BlockID(b.getContainerID(),
-                      b.getLocalID()),
-                      b.getLength(),
-                      QuotaUtil.getReplicatedSize(b.getLength(),
-                      info.getReplicationConfig())))
+                new BlockID(b.getContainerID(), b.getLocalID()),
+                b.getLength(),
+                QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()),
+                QuotaUtil.getSizePerReplica(b.getLength(), info.getReplicationConfig())))
             .collect(Collectors.toList());
         BlockGroup keyBlocks = BlockGroup.newBuilder()
             .setKeyName(deletedKey)

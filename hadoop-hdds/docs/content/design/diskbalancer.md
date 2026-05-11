@@ -104,6 +104,8 @@ D1     ----> C1-CLOSED  --- (5) ---> C1-DELETED
 D2      ----> Temp C1-CLOSED  --- (2) ---> Temp C1-RECOVERING --- (3) ---> C1-RECOVERING --- (4) ---> C1-CLOSED
 ```
 
+**Note:** By default, `hdds.datanode.disk.balancer.container.states` includes **CLOSED** and **QUASI_CLOSED**. The same move process applies for any state listed there.
+
 ### Lazy Deletion of Source Container Replica
 
 The source container on D1 is **not** deleted immediately after the move completes. Instead, it is scheduled for deletion after a configurable delay using config `hdds.datanode.disk.balancer.replica.deletion.delay`, **default: 5 minutes**.
@@ -123,7 +125,7 @@ are configurable, but the default implementations provide robust and safe behavi
 *   **`DefaultContainerChoosingPolicy`**: This is the default policy that consolidates both volume selection and container
 selection into a single operation. It identifies the most over-utilized volume as the source and the most under-utilized
 volume with sufficient space as the destination, then iterates through containers on the source to pick the first one
-that is in a **CLOSED** state and is not already being moved. It caches the list of containers for each volume which auto expires after one hour.
+that is movable (per `hdds.datanode.disk.balancer.container.states`, default **CLOSED** and **QUASI_CLOSED**) and is not already being moved. It caches the list of containers for each volume which auto expires after one hour.
 
 ## Security Design
 DiskBalancer follows the same security model as other services:

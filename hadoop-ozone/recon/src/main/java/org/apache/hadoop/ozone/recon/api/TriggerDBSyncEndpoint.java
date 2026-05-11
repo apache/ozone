@@ -98,7 +98,7 @@ public class TriggerDBSyncEndpoint {
   @POST
   @Path("scm")
   public Response triggerSCMContainerSync() {
-    boolean isSuccess = reconScm.syncWithSCMContainerInfo();
+    boolean isSuccess = reconScm.triggerTargetedSCMContainerSync();
     return Response.ok(isSuccess).build();
   }
 }

@@ -378,8 +378,7 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
           CertificateServer newRootCAServer = null;
           BigInteger newId = BigInteger.ONE;
           try {
-            newId = new BigInteger(String.valueOf(
-                sequenceIdGen.getNextId(CERTIFICATE_ID)));
+            newId = BigInteger.valueOf(sequenceIdGen.getNextId(CERTIFICATE_ID));
             newRootCAServer =
                 HASecurityUtils.initializeRootCertificateServer(secConf,
                     scm.getCertificateStore(), scmStorageConfig, newId,

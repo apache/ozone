@@ -30,6 +30,9 @@ public final class OMConfigKeys {
   public static final String OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY =
       "ozone.filesystem.snapshot.enabled";
   public static final boolean OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT = true;
+  public static final String OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY =
+      "ozone.om.snapshot.rename.allowed";
+  public static final boolean OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT = false;
 
   // Location where the OM stores its DB files. In the future we may support
   // multiple entries for performance (sharding)..
@@ -547,6 +550,11 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT
       = 100_000;
 
+  public static final String OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE
+      = "ozone.om.container.location.datanode.cache.size";
+  public static final int
+      OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT = 10_000;
+
   public static final String OZONE_OM_CONTAINER_LOCATION_CACHE_TTL
       = "ozone.om.container.location.cache.ttl";
 
@@ -690,6 +698,10 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL =
       "ozone.om.snapshot.local.data.manager.service.interval";
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
+
+  public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
+      "ozone.om.ratis.events.max.limit";
+  public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
 
   /**
    * Never constructed.

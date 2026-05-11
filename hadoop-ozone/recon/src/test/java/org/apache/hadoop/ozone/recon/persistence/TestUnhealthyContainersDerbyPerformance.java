@@ -35,6 +35,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule;
 import org.apache.hadoop.ozone.recon.ReconSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider;
@@ -273,7 +274,7 @@ public class TestUnhealthyContainersDerbyPerformance {
 
     dao = injector.getInstance(UnhealthyContainersDao.class);
     schemaDefinition = injector.getInstance(ContainerSchemaDefinition.class);
-    schemaManager = new ContainerHealthSchemaManager(schemaDefinition);
+    schemaManager = new ContainerHealthSchemaManager(schemaDefinition, new OzoneConfiguration());
   }
 
   // -----------------------------------------------------------------------

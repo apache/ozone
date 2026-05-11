@@ -202,6 +202,7 @@ message Node {
     repeated NodeOperationalState nodeOperationalStates = 3;
     optional int32 totalVolumeCount = 4;
     optional int32 healthyVolumeCount = 5;
+    repeated string failedVolumes = 6;
 }
 
 message NodePool {
@@ -573,6 +574,7 @@ message DiskBalancerConfigurationProto {
     optional uint64 diskBandwidthInMB = 2;
     optional int32 parallelThread = 3;
     optional bool stopAfterDiskEven = 4;
+    optional string containerStates = 5;
 }
 
 enum DiskBalancerRunningStatus {

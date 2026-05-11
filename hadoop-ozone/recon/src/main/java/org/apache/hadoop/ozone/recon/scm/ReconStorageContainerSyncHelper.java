@@ -72,10 +72,10 @@ import org.slf4j.LoggerFactory;
  *       batch RPC; fallback via {@code addContainerInfoFallback} for containers
  *       with zero viable replicas whose pipeline cannot be resolved) and corrects
  *       containers stuck OPEN or CLOSING in Recon.</li>
-   *   <li><b>Pass 4 — DELETED retirement (SCM-driven, transition only):</b>
-   *       paginates SCM's DELETED list using {@code getListOfContainerIDs} (IDs
-   *       only, 12 bytes each, no pipeline resolution). For each ID SCM reports
-   *       as DELETED, Recon drives the container atomically from
+ *   <li><b>Pass 4 — DELETED retirement (SCM-driven, transition only):</b>
+ *       paginates SCM's DELETED list using {@code getListOfContainerInfos}
+ *       (metadata only, no pipeline resolution). For each container SCM reports
+ *       as DELETED, Recon drives the container atomically from
    *       CLOSED/QUASI_CLOSED → DELETING → DELETED in a single call. The
    *       DELETING list is intentionally skipped to avoid leaving Recon in an
    *       intermediate DELETING state across cycles.</li>
@@ -86,15 +86,14 @@ import org.slf4j.LoggerFactory;
  *   <li>{@link #decideSyncAction()} uses {@link
  *       org.apache.hadoop.hdds.scm.container.ContainerManager#getTotalContainerCount()}
  *       (O(number of states), all O(1) per-state lookups) — never calls
- *       {@code getContainers()} which would allocate a 20-40 GB
- *       {@code List<ContainerInfo>} on every 6h decision tick.</li>
+ *       {@code getContainers()} which would allocate a large
+ *       {@code List<ContainerInfo>} on every decision tick.</li>
  *   <li>Pass 1 and Pass 3 issue <b>one</b> {@code getExistContainerWithPipelinesInBatch}
  *       RPC per sub-batch of absent containers — not one per absent container.
  *       Sub-batch size is bounded by {@link #safeContainerWithPipelineBatchSize}
  *       to keep the CWP response within the 128 MB IPC limit.</li>
-   *   <li>Pass 4 uses {@code getListOfContainerIDs} (IDs only, 12 bytes/container)
-   *       against SCM's DELETED list only. Even 1 billion deleted containers
-   *       require only ~100 page calls per cycle at the 128 MB IPC limit.</li>
+ *   <li>Pass 4 uses {@code getListOfContainerInfos} against SCM's DELETED list
+ *       only, bounded by {@link #safeContainerInfoBatchSize(int)}.</li>
  * </ul>
  */
 class ReconStorageContainerSyncHelper {
@@ -235,30 +234,30 @@ class ReconStorageContainerSyncHelper {
    *       {@link SyncAction#LARGE_DRIFT_THRESHOLD_EXCEEDED}. Large drift in
    *       non-OPEN containers is surfaced through logs and metrics instead of
    *       triggering an automatic SCM DB snapshot replacement.</li>
-   *   <li>If total drift is positive but the non-OPEN drift is at or below the
-   *       threshold: return {@link SyncAction#TARGETED_SYNC}. This keeps large
-   *       OPEN-only gaps on the incremental path because missing OPEN
-   *       containers can be repaired cheaply without replacing the full SCM DB.</li>
-   *   <li>If total drift is zero, check per-state drift for OPEN, QUASI_CLOSED,
-   *       and CLOSED against {@code ozone.recon.scm.per.state.drift.threshold}
-   *       (default 5):
+   *   <li>If OPEN drift is positive: return
+   *       {@link SyncAction#TARGETED_SYNC}. This keeps OPEN-only gaps on the
+   *       incremental path because missing OPEN containers can be repaired
+   *       cheaply without replacing the full SCM DB.</li>
+   *   <li>Check per-state drift for QUASI_CLOSED and CLOSED against
+   *       {@code ozone.recon.scm.per.state.drift.threshold} (default 1):
    *       <ul>
-   *         <li><b>OPEN</b>: detects containers stuck OPEN in Recon after SCM
-   *             has advanced them to QUASI_CLOSED or CLOSED.</li>
    *         <li><b>QUASI_CLOSED</b>: detects containers stuck QUASI_CLOSED in
    *             Recon after SCM has advanced them to CLOSED.</li>
    *         <li><b>CLOSED</b>: detects CLOSED count mismatch when total counts
    *             are equal (e.g., OPEN and QUASI_CLOSED counts are also equal but
    *             some containers are in the wrong bucket).</li>
    *       </ul>
-   *       If drift in <em>any</em> checked state reaches the threshold:
+   *       If drift in either stable state reaches the threshold:
    *       return {@link SyncAction#TARGETED_SYNC}.</li>
+   *   <li>DELETED-only total-count drift does not trigger targeted sync. Pass 4
+   *       can converge SCM-reported DELETED containers into Recon, but it cannot
+   *       remove extra DELETED containers that SCM no longer lists.</li>
    *   <li>Otherwise: return {@link SyncAction#NO_ACTION}.</li>
    * </ol>
    *
-   * <p>Per-state drift deliberately routes to targeted sync, not a full
-   * snapshot — the targeted sync's per-state passes correct each condition
-   * efficiently without replacing the entire database.
+   * <p>Repairable per-state drift deliberately routes to targeted sync, not a
+   * full snapshot — the targeted sync's per-state passes correct these
+   * conditions efficiently without replacing the entire database.
    *
    * @return the recommended {@link SyncAction}
    * @throws IOException if SCM RPC calls to retrieve counts fail
@@ -267,19 +266,19 @@ class ReconStorageContainerSyncHelper {
     int largeThreshold = ozoneConfiguration.getInt(
         OZONE_RECON_SCM_CONTAINER_THRESHOLD,
         OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT);
-    int perStateDriftThreshold = ozoneConfiguration.getInt(
+    int perStateDriftThreshold = Math.max(1, ozoneConfiguration.getInt(
         OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD,
-        OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT);
+        OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT));
 
     // All per-state counts use O(1) getContainerStateCount() — no heap allocation,
-    // no container list loading. OPEN and QUASI_CLOSED are read here because they
-    // are needed for both the Check 1 non-OPEN drift and Check 2 per-state checks.
-    // reconClosed is read later in Check 2 where it is first needed.
+    // no container list loading. OPEN is read here because it is needed for both
+    // the Check 1 non-OPEN drift and Check 2 repairable per-state drift checks.
+    // QUASI_CLOSED and CLOSED are read later in Check 3 where they are first
+    // needed.
     // getTotalContainerCount() sums all LifeCycleState values via the same O(1)
     // per-state lookups.
-    long reconOpen = containerManager.getContainerStateCount(HddsProtos.LifeCycleState.OPEN);
-    long reconQuasiClosed =
-        containerManager.getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
+    long reconOpen =
+        containerManager.getContainerStateCount(HddsProtos.LifeCycleState.OPEN);
     long reconTotal = containerManager.getTotalContainerCount();
 
     // --- Check 1: large non-OPEN drift exceeds threshold ---
@@ -306,28 +305,33 @@ class ReconStorageContainerSyncHelper {
       }
       return SyncAction.LARGE_DRIFT_THRESHOLD_EXCEEDED;
     }
-    if (totalDrift > 0) {
-      LOG.info("Total container drift {} detected (SCM={}, Recon={}). "
-              + "Non-OPEN drift is {} (SCM_non_OPEN={}, Recon_non_OPEN={}), so "
-              + "using targeted sync.",
-          totalDrift, scmTotal, reconTotal, nonOpenDrift, scmNonOpen, reconNonOpen);
+    // --- Check 2: OPEN drift is always repairable through targeted sync. ---
+    long openDrift = Math.abs(scmOpen - reconOpen);
+    if (openDrift > 0) {
+      LOG.info("OPEN container drift {} detected (SCM_OPEN={}, Recon_OPEN={}). "
+              + "Using targeted sync.",
+          openDrift, scmOpen, reconOpen);
+      if (metrics != null) {
+        recordPerStateDriftMetric(HddsProtos.LifeCycleState.OPEN, openDrift);
+      }
       return SyncAction.TARGETED_SYNC;
     }
 
-    // --- Check 2: per-state drift (total drift = 0, lifecycle state may lag) ---
+    // --- Check 3: stable-state drift that targeted sync can repair. ---
     //
-    // All three counts are read directly via O(1) per-state lookups — no
+    // Counts are read directly via O(1) per-state lookups — no
     // derivation or subtraction. Each is an exact count from the per-state
     // NavigableMap on Recon and from SCM's getContainerStateCount on SCM.
     long scmQuasiClosed =
         scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
     long scmClosed =
         scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.CLOSED);
+    long reconQuasiClosed =
+        containerManager.getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
     long reconClosed =
         containerManager.getContainerStateCount(HddsProtos.LifeCycleState.CLOSED);
 
     for (Object[] entry : new Object[][]{
-        {HddsProtos.LifeCycleState.OPEN, scmOpen, reconOpen},
         {HddsProtos.LifeCycleState.QUASI_CLOSED, scmQuasiClosed, reconQuasiClosed},
         {HddsProtos.LifeCycleState.CLOSED, scmClosed, reconClosed}}) {
       HddsProtos.LifeCycleState state = (HddsProtos.LifeCycleState) entry[0];
@@ -336,7 +340,7 @@ class ReconStorageContainerSyncHelper {
       long drift = Math.abs(scmCount - reconCount);
       if (drift >= perStateDriftThreshold) {
         LOG.info("Per-state {} drift {} detected (SCM_{}={}, Recon_{}={}, threshold={}). "
-                + "Total counts are equal — targeted sync will correct stale states.",
+                + "Targeted sync will correct repairable state drift.",
             state, drift, state, scmCount, state, reconCount, perStateDriftThreshold);
         if (metrics != null) {
           recordPerStateDriftMetric(state, drift);
@@ -345,7 +349,9 @@ class ReconStorageContainerSyncHelper {
       }
     }
 
-    LOG.info("No significant drift detected (total drift={}). No sync needed.", totalDrift);
+    LOG.info("No repairable drift detected (total drift={}, non-OPEN drift={}). "
+            + "No sync needed.",
+        totalDrift, nonOpenDrift);
     return SyncAction.NO_ACTION;
   }
 
@@ -729,11 +735,9 @@ class ReconStorageContainerSyncHelper {
    * CLOSED/QUASI_CLOSED → DELETING → DELETED in a single call with no
    * cross-cycle intermediate state.
    *
-   * <p>Uses {@code getListOfContainerIDs} (IDs only, 12 bytes/container) rather
-   * than {@code getExistContainerWithPipelinesInBatch} (~490 bytes/container with
-   * DatanodeDetails). Pass 4 only needs to know which containers are DELETED.
-   * At 128 MB IPC limit: up to ~10.9M IDs per page, so even 1 billion deleted
-   * containers need only ~100 calls per cycle.
+   * <p>Uses {@code getListOfContainerInfos} rather than
+   * {@code getExistContainerWithPipelinesInBatch} because Pass 4 needs the
+   * DELETED container metadata but does not need pipeline resolution.
    *
    * @return {@code true} if all RPC calls completed without error
    */
@@ -1057,8 +1061,7 @@ class ReconStorageContainerSyncHelper {
    * carry {@code ContainerID} entries at {@link #CONTAINER_ID_PROTO_SIZE_BYTES}
    * bytes each, so a single size constant bounds both directions correctly.
    *
-   * <p>Applies to: Pass 1, Pass 2, Pass 3 pagination, Pass 4
-   * ({@code getListOfContainerIDs} for the DELETED state list).
+   * <p>Applies to Pass 1, Pass 2, and Pass 3 pagination.
    *
    * @param upperBound cap on the returned batch size; pass the total container
    *                   count in a state when paginating that state, or a
