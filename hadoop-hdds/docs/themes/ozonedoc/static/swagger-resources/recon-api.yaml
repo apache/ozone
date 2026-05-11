@@ -17,6 +17,7 @@
 openapi: 3.0.0
 info:
   title: Ozone Recon REST API
+  version: v1
   license:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
     name: Apache 2.0 License
@@ -328,9 +329,10 @@ paths:
             default: 1000
         - name: startPrefix
           in: query
-          description: Will return keys matching this prefix
+          description: Will return keys matching this prefix. Must be at bucket level or deeper (e.g. /vol1/bucket1[/...]).
+          required: false
           schema:
-            type: integer
+            type: string
         - name: includeFso
           in: query
           description: Boolean value to determine whether to include FSO keys or not
@@ -1718,17 +1720,17 @@ components:
                 path: /vol1/bucket1/dir1-2
                 size: 30000
                 sizeWithReplica: 90000
-                isKey": false
+                isKey: false
               - key: false
                 path: /vol1/bucket1/dir1-3
                 size: 30000
                 sizeWithReplica: 90000
-                isKey": false
+                isKey: false
               - key: true
                 path: /vol1/bucket1/key1-1
                 size: 30000
                 sizeWithReplica: 90000
-                isKey": true
+                isKey: true
         sizeDirectKey:
           type: number
           example: 10000
@@ -1800,36 +1802,36 @@ components:
         filesystemAvailable:
           type: number
           example: 270071111680
-      ClusterStorageReport:
-        type: object
-        properties:
-          capacity:
-            type: number
-            example: 270429917184
-          used:
-            type: number
-            example: 358805504
-          remaining:
-            type: number
-            example: 270071111680
-          committed:
-            type: number
-            example: 27007111
-          minimumFreeSpace:
-            type: number
-            example: 20480
-          reserved:
-            type: number
-            example: 31457280
-          filesystemCapacity:
-            type: number
-            example: 270461374464
-          filesystemUsed:
-            type: number
-            example: 390262784
-          filesystemAvailable:
-            type: number
-            example: 270071111680
+    ClusterStorageReport:
+      type: object
+      properties:
+        capacity:
+          type: number
+          example: 270429917184
+        used:
+          type: number
+          example: 358805504
+        remaining:
+          type: number
+          example: 270071111680
+        committed:
+          type: number
+          example: 27007111
+        minimumFreeSpace:
+          type: number
+          example: 20480
+        reserved:
+          type: number
+          example: 31457280
+        filesystemCapacity:
+          type: number
+          example: 270461374464
+        filesystemUsed:
+          type: number
+          example: 390262784
+        filesystemAvailable:
+          type: number
+          example: 270071111680
     ClusterState:
       type: object
       properties:
