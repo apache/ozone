@@ -128,6 +128,8 @@ this page: pass it back as `prevKey` to continue paginating.
 
 ### GET /api/v1/containers/missing
 
+> **Deprecated.** Use `/api/v1/containers/unhealthy/MISSING` instead.
+
 **Parameters**
 
 * limit (optional)
@@ -261,6 +263,75 @@ Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`, `UNDER_REPL
 The response structure is same as `/containers/unhealthy`.
 
 
+### GET /api/v1/containers/unhealthy/export
+
+**Returns**
+
+Lists every unhealthy-container export job currently tracked by Recon, in any status.
+Items are `ExportJob` objects (see schema below).
+
+```json
+[
+  {
+    "jobId": "4f7a8b9c-1234-5678-9abc-def012345678",
+    "state": "MISSING",
+    "status": "RUNNING",
+    "submittedAt": 1718640123456,
+    "startedAt": 1718640124000,
+    "completedAt": 0,
+    "totalRecords": 250,
+    "estimatedTotal": 1000,
+    "fileName": "",
+    "errorMessage": null,
+    "progressPercent": 25,
+    "queuePosition": 0,
+    "downloadCount": 0,
+    "downloadsRemaining": 3
+  }
+]
+```
+
+### POST /api/v1/containers/unhealthy/export
+
+**Parameters**
+
+* state (required)
+
+    One of `MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`, `OVER_REPLICATED`.
+
+**Returns**
+
+Submits a new CSV export job and returns the `ExportJob` with the assigned `jobId`.
+The job initially has `status: QUEUED`.
+
+* `400 Bad Request`: `state` is missing or not a valid unhealthy state.
+* `429 Too Many Requests`: the export queue is full; retry later. Body: `{ "error": "Too Many Requests", "message": "<reason>" }`.
+
+### GET /api/v1/containers/unhealthy/export/:jobId
+
+**Returns**
+
+Returns the current `ExportJob` for the given `jobId`. `404 Not Found` if no job has that id.
+
+### GET /api/v1/containers/unhealthy/export/:jobId/download
+
+**Returns**
+
+Streams the TAR archive produced by the export job. Response `Content-Type` is `application/x-tar` with
+a `Content-Disposition: attachment` header carrying the export filename.
+
+* `404 Not Found`: `jobId` is unknown or the on-disk file was removed.
+* `409 Conflict`: the job has not reached `COMPLETED` status yet.
+* `429 Too Many Requests`: the per-job download limit has been reached. Body matches `RateLimitedError`.
+
+### DELETE /api/v1/containers/unhealthy/export/:jobId
+
+**Returns**
+
+Cancels the export job. `200 OK` with empty body on success. `404 Not Found` if the job cannot be
+cancelled (for example, it has already reached a terminal state).
+
+
 ### GET /api/v1/containers/mismatch
 
 **Returns**
@@ -313,6 +384,41 @@ list of keys mapped to such DELETED state containers.
     "pipelines": []
   }
   ...
+]
+```
+
+### GET /api/v1/containers/deleted
+
+**Parameters**
+
+* limit (optional)
+
+  Maximum number of DELETED containers to return. Default 1000.
+
+* prevKey (optional)
+
+  Previous container ID to skip. Use the last returned `containerId` to fetch the next page.
+  Default 0.
+
+**Returns**
+
+Returns all DELETED containers in SCM along with their pipeline and replication info.
+
+```json
+[
+  {
+    "containerId": 12,
+    "pipelineID": { "id": "1202e6bb-b7c1-4a85-8067-61374b069adb" },
+    "containerState": "DELETED",
+    "stateEnterTime": 1716123456789,
+    "lastUsed": 1716123456789,
+    "replicationConfig": {
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE",
+      "replicationNodes": 3
+    },
+    "replicationFactor": "THREE"
+  }
 ]
 ```
 

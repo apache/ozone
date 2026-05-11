@@ -105,6 +105,22 @@ paths:
         - Containers
       summary: Return all DELETED containers in SCM
       operationId: getSCMDeletedContainers
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of DELETED containers to return.
+          required: false
+          schema:
+            type: integer
+            default: 1000
+        - name: prevKey
+          in: query
+          description: Previous container ID to skip. Use 0 to start at the beginning.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
       responses:
         200:
           description: Successful operation
@@ -117,6 +133,8 @@ paths:
       tags:
         - Containers
       summary: Get the MissingContainerMetadata for all missing containers
+      description: Deprecated. Use `/containers/unhealthy/MISSING` instead.
+      deprecated: true
       operationId: getMissingContainers
       parameters:
         - name: limit
@@ -244,6 +262,115 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnhealthyContainerMetadata'
+  /containers/unhealthy/export:
+    get:
+      tags:
+        - Container Export
+      summary: List all unhealthy-container export jobs (any status).
+      operationId: listUnhealthyExportJobs
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExportJob'
+    post:
+      tags:
+        - Container Export
+      summary: Start an async CSV export job for unhealthy containers in the given state.
+      operationId: startUnhealthyExport
+      parameters:
+        - name: state
+          in: query
+          required: true
+          description: One of **MISSING**, **MIS_REPLICATED**, **UNDER_REPLICATED**, **OVER_REPLICATED**.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job submitted; returns the ExportJob with assigned jobId.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '400':
+          description: Missing or invalid state parameter.
+        '429':
+          description: Too many concurrent export jobs; try again later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitedError'
+  /containers/unhealthy/export/{jobId}:
+    get:
+      tags:
+        - Container Export
+      summary: Get the current status of an export job.
+      operationId: getUnhealthyExportStatus
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job found; returns the ExportJob with current status and progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '404':
+          description: Job not found.
+    delete:
+      tags:
+        - Container Export
+      summary: Cancel a queued or running export job.
+      operationId: cancelUnhealthyExport
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cancel request accepted (empty body).
+        '404':
+          description: Job not found or already in a terminal state.
+  /containers/unhealthy/export/{jobId}/download:
+    get:
+      tags:
+        - Container Export
+      summary: Download the TAR archive for a completed export job.
+      operationId: downloadUnhealthyExport
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TAR archive stream. Content-Disposition includes the export filename.
+          content:
+            application/x-tar:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Job or export file not found.
+        '409':
+          description: Job has not reached COMPLETED status yet.
+        '429':
+          description: Maximum download limit for this job has been reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitedError'
   /containers/mismatch:
     get:
       tags:
@@ -1034,7 +1161,7 @@ components:
         properties:
           containerId:
             type: integer
-          pipelineId:
+          pipelineID:
             type: object
             properties:
               id:
@@ -2285,3 +2412,76 @@ components:
                     example:
                       - 1599159384.455
                       - "5"
+    ExportJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+          example: 4f7a8b9c-1234-5678-9abc-def012345678
+        state:
+          type: string
+          description: The unhealthy-container state being exported (MISSING, MIS_REPLICATED, UNDER_REPLICATED, OVER_REPLICATED).
+          example: MISSING
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, COMPLETED, FAILED]
+          example: RUNNING
+        submittedAt:
+          type: integer
+          description: Epoch millis when the job was submitted.
+          example: 1718640123456
+        startedAt:
+          type: integer
+          description: Epoch millis when the worker started the job. 0 while still queued.
+          example: 1718640124000
+        completedAt:
+          type: integer
+          description: Epoch millis when the job reached COMPLETED or FAILED. 0 while not yet terminal.
+          example: 0
+        totalRecords:
+          type: integer
+          description: Records written so far.
+          example: 250
+        estimatedTotal:
+          type: integer
+          description: Estimated total records for progress reporting. `-1` when unknown.
+          example: 1000
+        fileName:
+          type: string
+          description: Name of the export TAR file (no path). Empty until COMPLETED.
+          example: unhealthy_MISSING_4f7a8b9c.tar
+        errorMessage:
+          type: string
+          nullable: true
+          description: Populated only when status is FAILED.
+        progressPercent:
+          type: integer
+          description: Derived from totalRecords / estimatedTotal. 0 when estimatedTotal is unknown.
+          example: 25
+        queuePosition:
+          type: integer
+          description: 0 for jobs that are not QUEUED. Otherwise 1-based position in the queue.
+          example: 0
+        downloadCount:
+          type: integer
+          example: 0
+        downloadsRemaining:
+          type: integer
+          example: 3
+        maxDownloads:
+          type: integer
+          description: Maximum number of times this export can be downloaded.
+          example: 3
+        downloadAllowed:
+          type: boolean
+          description: Whether the export currently has at least one download remaining.
+          example: true
+    RateLimitedError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Too Many Requests
+        message:
+          type: string
+          example: This export has reached its maximum download limit of 3.
