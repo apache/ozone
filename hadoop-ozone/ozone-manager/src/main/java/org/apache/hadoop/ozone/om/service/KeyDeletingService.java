@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
@@ -165,9 +166,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       blockDeletionResults = new ArrayList<>();
       LOG.info("Skipping SCM call as all {} keys are empty", keyBlocksList.size());
     } else {
-      blockDeletionResults =
-          scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
-              .map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
+      blockDeletionResults = TracingUtil.executeInNewSpan(
+          "deleteKeyBlocks",
+          () -> scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
+              .map(PurgedKey::getBlockGroup).collect(Collectors.toList())));
     }
 
     if (keyBlocksList.size() != nonEmptyKeyBlocksList.size()) {

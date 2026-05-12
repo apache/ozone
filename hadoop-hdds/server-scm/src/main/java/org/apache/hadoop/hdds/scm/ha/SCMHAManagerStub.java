@@ -28,6 +28,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -169,6 +170,9 @@ public final class SCMHAManagerStub implements SCMHAManager {
     private Map<RequestType, Object> handlers =
         new EnumMap<>(RequestType.class);
 
+    private Map<RequestType, ScmInvoker<?>> invokers =
+        new EnumMap<>(RequestType.class);
+
     private RaftPeerId leaderId = RaftPeerId.valueOf(UUID.randomUUID().toString());
 
     @Override
@@ -178,7 +182,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
     @Override
     public void registerStateMachineHandler(final RequestType handlerType,
         final Object handler) {
-      handlers.put(handlerType, handler);
+      if (handler instanceof ScmInvoker) {
+        invokers.put(handlerType, (ScmInvoker<?>) handler);
+      } else {
+        handlers.put(handlerType, handler);
+      }
     }
 
     @Override
@@ -216,6 +224,10 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     private Message process(final SCMRatisRequest request) throws Exception {
+      final ScmInvoker<?> invoker = invokers.get(request.getType());
+      if (invoker != null) {
+        return invoker.invokeLocal(request.getOperation(), request.getArguments());
+      }
       return SCMStateMachine.process(request, handlers.get(request.getType()));
     }
 

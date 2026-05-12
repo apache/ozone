@@ -92,7 +92,7 @@ public class TestRootCARotationManager {
   private File testDir;
   private String cID = UUID.randomUUID().toString();
   private String scmID = UUID.randomUUID().toString();
-  private BigInteger certID = new BigInteger("1");
+  private BigInteger certID = BigInteger.ONE;
 
   @BeforeEach
   public void init() throws IOException, TimeoutException,

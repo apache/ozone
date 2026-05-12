@@ -33,9 +33,21 @@ public abstract class ItemsFromStdin implements Iterable<String> {
       ": one or more, separated by spaces. To read from stdin, specify '-' and supply one item per line.";
 
   private List<String> items = new ArrayList<>();
+  private boolean readFromStdin = false;
 
   protected void setItems(List<String> arguments) {
-    items = readItemsFromStdinIfNeeded(arguments);
+    readFromStdin = arguments != null && !arguments.isEmpty() &&
+        "-".equals(arguments.iterator().next());
+    
+    if (readFromStdin) {
+      items = readItemsFromStdin();
+    } else {
+      items = arguments == null ? new ArrayList<>() : arguments;
+    }
+  }
+
+  public boolean isReadFromStdin() {
+    return readFromStdin;
   }
 
   public List<String> getItems() {
@@ -52,11 +64,7 @@ public abstract class ItemsFromStdin implements Iterable<String> {
     return items.size();
   }
 
-  private static List<String> readItemsFromStdinIfNeeded(List<String> parameters) {
-    if (parameters.isEmpty() || !"-".equals(parameters.iterator().next())) {
-      return parameters;
-    }
-
+  private static List<String> readItemsFromStdin() {
     List<String> items = new ArrayList<>();
     Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8.name());
     while (scanner.hasNextLine()) {

@@ -47,7 +47,7 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "finalizeupgrade",
     description = "Finalizes Ozone Manager's metadata changes and enables new "
-        + "features after a software upgrade.\n"
+        + "features after a software upgrade.%n"
         + "It is possible to specify the service ID for an HA environment, "
         + "or the Ozone manager host in a non-HA environment, if none provided "
         + "the default from configuration is being used if not ambiguous.",

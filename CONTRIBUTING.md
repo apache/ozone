@@ -75,7 +75,7 @@ cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
 OZONE_REPLICATION_FACTOR=3 ./run.sh -d
 ```
 
-See more details in the [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) and in the [docs](https://ozone.apache.org/docs/current/start.html).
+See more details in the [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) and in the [docs](https://ozone.apache.org/docs/developer-guide/run/docker-compose/).
 
 ## Jira guideline
 

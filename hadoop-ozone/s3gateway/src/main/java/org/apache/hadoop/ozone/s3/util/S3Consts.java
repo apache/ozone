@@ -50,6 +50,10 @@ public final class S3Consts {
 
   // Constants related to Range Header
   public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";
+  public static final String COPY_SOURCE_IF_MATCH =
+      COPY_SOURCE_IF_PREFIX + "match";
+  public static final String COPY_SOURCE_IF_NONE_MATCH =
+      COPY_SOURCE_IF_PREFIX + "none-match";
   public static final String COPY_SOURCE_IF_MODIFIED_SINCE =
       COPY_SOURCE_IF_PREFIX + "modified-since";
   public static final String COPY_SOURCE_IF_UNMODIFIED_SINCE =
@@ -101,6 +105,9 @@ public final class S3Consts {
   // Conditional request headers
   public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
   public static final String IF_MATCH_HEADER = "If-Match";
+  public static final String IF_MODIFIED_SINCE_HEADER = "If-Modified-Since";
+  public static final String IF_UNMODIFIED_SINCE_HEADER =
+      "If-Unmodified-Since";
 
   //Never Constructed
   private S3Consts() {
