@@ -32,6 +32,7 @@ import org.apache.commons.io.FileUtils;
  */
 public final class AuditLogTestUtils {
   private static final String AUDITLOG_FILENAME = "audit.log";
+  private static final String SYSTEM_AUDITLOG_FILENAME = "system_audit.log";
 
   private AuditLogTestUtils() {
   }
