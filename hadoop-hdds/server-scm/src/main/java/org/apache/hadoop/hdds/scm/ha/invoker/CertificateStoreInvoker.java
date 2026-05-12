@@ -66,26 +66,8 @@ public class CertificateStoreInvoker extends ScmInvoker<CertificateStore> {
     return new CertificateStore() {
 
       @Override
-      public void storeValidCertificate(BigInteger arg0, X509Certificate arg1, NodeType arg2) throws IOException {
-        final Object[] args = {arg0, arg1, arg2};
-        invoker.invokeReplicateClient(ReplicateMethod.storeValidCertificate, args);
-      }
-
-      @Override
-      public void storeValidScmCertificate(BigInteger arg0, X509Certificate arg1) throws IOException {
-        invoker.getImpl().storeValidScmCertificate(arg0, arg1);
-      }
-
-      @Override
       public void checkValidCertID(BigInteger arg0) throws IOException {
         invoker.getImpl().checkValidCertID(arg0);
-      }
-
-      @Override
-      public List<X509Certificate> removeAllExpiredCertificates() throws IOException {
-        final Object[] args = {};
-        return (List<X509Certificate>) invoker.invokeReplicateDirect(ReplicateMethod.removeAllExpiredCertificates,
-            args);
       }
 
       @Override
@@ -101,6 +83,24 @@ public class CertificateStoreInvoker extends ScmInvoker<CertificateStore> {
       @Override
       public void reinitialize(SCMMetadataStore arg0) {
         invoker.getImpl().reinitialize(arg0);
+      }
+
+      @Override
+      public List<X509Certificate> removeAllExpiredCertificates() throws IOException {
+        final Object[] args = {};
+        return (List<X509Certificate>) invoker.invokeReplicateDirect(ReplicateMethod.removeAllExpiredCertificates,
+            args);
+      }
+
+      @Override
+      public void storeValidCertificate(BigInteger arg0, X509Certificate arg1, NodeType arg2) throws IOException {
+        final Object[] args = {arg0, arg1, arg2};
+        invoker.invokeReplicateClient(ReplicateMethod.storeValidCertificate, args);
+      }
+
+      @Override
+      public void storeValidScmCertificate(BigInteger arg0, X509Certificate arg1) throws IOException {
+        invoker.getImpl().storeValidScmCertificate(arg0, arg1);
       }
     };
   }

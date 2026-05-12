@@ -70,15 +70,8 @@ public class RootCARotationHandlerInvoker extends ScmInvoker<RootCARotationHandl
     return new RootCARotationHandler() {
 
       @Override
-      public void rotationPrepare(String arg0) throws IOException {
-        final Object[] args = {arg0};
-        invoker.invokeReplicateDirect(ReplicateMethod.rotationPrepare, args);
-      }
-
-      @Override
-      public void rotationPrepareAck(String arg0, String arg1, String arg2) throws IOException {
-        final Object[] args = {arg0, arg1, arg2};
-        invoker.invokeReplicateClient(ReplicateMethod.rotationPrepareAck, args);
+      public void resetRotationPrepareAcks() {
+        invoker.getImpl().resetRotationPrepareAcks();
       }
 
       @Override
@@ -94,13 +87,20 @@ public class RootCARotationHandlerInvoker extends ScmInvoker<RootCARotationHandl
       }
 
       @Override
-      public int rotationPrepareAcks() {
-        return invoker.getImpl().rotationPrepareAcks();
+      public void rotationPrepare(String arg0) throws IOException {
+        final Object[] args = {arg0};
+        invoker.invokeReplicateDirect(ReplicateMethod.rotationPrepare, args);
       }
 
       @Override
-      public void resetRotationPrepareAcks() {
-        invoker.getImpl().resetRotationPrepareAcks();
+      public void rotationPrepareAck(String arg0, String arg1, String arg2) throws IOException {
+        final Object[] args = {arg0, arg1, arg2};
+        invoker.invokeReplicateClient(ReplicateMethod.rotationPrepareAck, args);
+      }
+
+      @Override
+      public int rotationPrepareAcks() {
+        return invoker.getImpl().rotationPrepareAcks();
       }
 
       @Override
