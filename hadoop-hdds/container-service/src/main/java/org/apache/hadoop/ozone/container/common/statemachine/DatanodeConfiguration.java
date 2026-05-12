@@ -139,6 +139,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
+  public static final String GRPC_SO_BACKLOG_KEY = "hdds.datanode.grpc.so.backlog";
+  public static final int GRPC_SO_BACKLOG_DEFAULT = 4096;
+
   public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
       "hdds.datanode.block.delete.command.worker.interval";
   public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT = Duration.ofSeconds(2);
@@ -153,6 +156,20 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "Number of threads per volume that Datanode will use for reading replicated chunks."
   )
   private int numReadThreadPerVolume = 10;
+
+  /**
+   * SO_BACKLOG value for the gRPC server socket.
+   */
+  @Config(key = "hdds.datanode.grpc.so.backlog",
+      type = ConfigType.INT,
+      defaultValue = "4096",
+      tags = {DATANODE},
+      description = "The SO_BACKLOG value for the Datanode gRPC server socket. " +
+          "This limits the number of pending connections in the kernel's " +
+          "accept queue. When this limit is reached, the kernel will reject " +
+          "new connection attempts with SYN drops."
+  )
+  private int grpcSoBacklog = GRPC_SO_BACKLOG_DEFAULT;
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -1223,5 +1240,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static long getDefaultFreeSpace() {
     final StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
     return Math.round(measure.getUnit().toBytes(measure.getValue()));
+  }
+
+  public int getGrpcSoBacklog() {
+    return grpcSoBacklog;
+  }
+
+  public void setGrpcSoBacklog(int grpcSoBacklog) {
+    this.grpcSoBacklog = grpcSoBacklog;
   }
 }
