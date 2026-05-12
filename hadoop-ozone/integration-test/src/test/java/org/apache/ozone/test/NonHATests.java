@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.TestObjectStoreWithLegacyFS;
 import org.apache.hadoop.ozone.om.TestOmBlockVersioning;
 import org.apache.hadoop.ozone.om.TestOzoneManagerListVolumes;
 import org.apache.hadoop.ozone.om.TestOzoneManagerRestInterface;
+import org.apache.hadoop.ozone.om.snapshot.TestOmSnapshotCheckpointDbContent;
 import org.apache.hadoop.ozone.reconfig.TestDatanodeReconfiguration;
 import org.apache.hadoop.ozone.reconfig.TestOmReconfiguration;
 import org.apache.hadoop.ozone.reconfig.TestScmReconfiguration;
@@ -327,6 +328,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class OmBlockVersioning extends TestOmBlockVersioning {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OmSnapshotCheckpointDbContent extends TestOmSnapshotCheckpointDbContent {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
