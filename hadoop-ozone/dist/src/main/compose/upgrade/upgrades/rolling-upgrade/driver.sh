@@ -86,6 +86,7 @@ rolling_restart_all_services() {
   # SCMs first
   for s in scm2 scm1 scm3; do
     OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
+    echo "--- RESTARTING ${s} WITH IMAGE ${target_image} ---"
     rolling_restart_service "$s" "$stage_prefix"
   done
 
