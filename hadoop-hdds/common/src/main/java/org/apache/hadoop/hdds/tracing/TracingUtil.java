@@ -26,6 +26,7 @@ import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
+import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
@@ -389,33 +390,42 @@ public final class TracingUtil {
     }
   }
 
+  /**
+   * A TextMapGetter implementation to extract tracing info from getHeader.
+   */
+  public static class HttpHeaderGetter implements TextMapGetter<Function<String, String>> {
+
+    @Override
+    public Iterable<String> keys(Function<String, String> carrier) {
+      // Not used during the extract call, so returning an empty list.
+      return Collections.emptyList();
+    }
+
+    @Override
+    public String get(Function<String, String> carrier, String key) {
+      return carrier == null ? null : carrier.apply(key);
+    }
+  }
+
   public static TraceCloseable createActivatedSpanFromW3cHttpHeaders(
       String spanName, Function<String, String> getHeader, ConfigurationSource conf) {
     if (conf == null || !isTracingEnabled(conf)) {
       return () -> { };
     }
 
-    String traceparent = getHeader.apply("traceparent");
-    if (traceparent == null || traceparent.isEmpty()) {
+    Context remote = W3CTraceContextPropagator.getInstance()
+        .extract(Context.current(), getHeader, new HttpHeaderGetter());
+
+    if (!Span.fromContext(remote).getSpanContext().isValid()) {
       return createActivatedSpan(spanName);
     }
 
-    StringBuilder encoded = new StringBuilder().append("traceparent=").append(traceparent);
-    String tracestate = getHeader.apply("tracestate");
-    if (tracestate != null && !tracestate.isEmpty()) {
-      encoded.append(";tracestate=").append(tracestate);
-    }
+    Span span = tracer.spanBuilder(spanName)
+        .setParent(remote)
+        .startSpan();
 
-    Context remote =
-        W3CTraceContextPropagator.getInstance().extract(
-            Context.current(), encoded.toString(), new TextExtractor());
-
-    if (!Span.fromContext(remote).getSpanContext().isValid()) {
-      return () -> { };
-    }
-
-    Span span = tracer.spanBuilder(spanName).setParent(remote).startSpan();
     Scope scope = span.makeCurrent();
+
     return () -> {
       scope.close();
       span.end();
