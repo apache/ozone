@@ -335,10 +335,10 @@ public class TestSCMSafeModeManager {
     assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
     if (healthyPipelinePercent > 0) {
       validateRuleStatus("HealthyPipelineSafeModeRule",
-          "healthy Ratis/THREE pipelines");
+          "healthy RATIS/THREE pipelines");
     }
     validateRuleStatus("OneReplicaPipelineSafeModeRule",
-        "reported Ratis/THREE pipelines with at least one datanode");
+        "reported RATIS/THREE pipelines with at least one datanode");
 
     testContainerThreshold(containers, 1.0);
 
