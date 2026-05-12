@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
@@ -64,15 +65,15 @@ public class SequenceIdGenerator {
   /**
    * Ids supported.
    */
-  public static final String LOCAL_ID = SequenceIdType.LOCAL_ID.getDbKey();
-  public static final String DEL_TXN_ID = SequenceIdType.DEL_TXN_ID.getDbKey();
-  public static final String CONTAINER_ID = SequenceIdType.CONTAINER_ID.getDbKey();
+  private static final String LOCAL_ID = SequenceIdType.LOCAL_ID.getDbKey();
+  private static final String DEL_TXN_ID = SequenceIdType.DEL_TXN_ID.getDbKey();
+  private static final String CONTAINER_ID = SequenceIdType.CONTAINER_ID.getDbKey();
 
   // Certificate ID for all services, including root certificates, whose ID
   // were using "rootCertificateId" before.
-  public static final String CERTIFICATE_ID = SequenceIdType.CERTIFICATE_ID.getDbKey();
+  private static final String CERTIFICATE_ID = SequenceIdType.CERTIFICATE_ID.getDbKey();
   @Deprecated
-  public static final String ROOT_CERTIFICATE_ID = SequenceIdType.ROOT_CERTIFICATE_ID.getDbKey();
+  private static final String ROOT_CERTIFICATE_ID = SequenceIdType.ROOT_CERTIFICATE_ID.getDbKey();
 
   private static final long INVALID_SEQUENCE_ID = 0;
 
@@ -89,13 +90,21 @@ public class SequenceIdGenerator {
    */
   public SequenceIdGenerator(ConfigurationSource conf,
       SCMHAManager scmhaManager, Table<String, Long> sequenceIdTable) {
-    this.sequenceIdToBatchMap = new EnumMap<>(SequenceIdType.class);
+    this.sequenceIdToBatchMap = newSequenceIdToBatchMap();
     this.lock = new ReentrantLock();
     this.batchSize = conf.getInt(OZONE_SCM_SEQUENCE_ID_BATCH_SIZE,
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
 
     Objects.requireNonNull(scmhaManager, "scmhaManager == null");
     this.stateManager = createStateManager(scmhaManager, sequenceIdTable);
+  }
+
+  static Map<SequenceIdType, Batch> newSequenceIdToBatchMap() {
+    final EnumMap<SequenceIdType, Batch> map = new EnumMap<>(SequenceIdType.class);
+    for (SequenceIdType type : SequenceIdType.values()) {
+      map.put(type, new Batch());
+    }
+    return Collections.unmodifiableMap(map);
   }
 
   public StateManager createStateManager(SCMHAManager scmhaManager,
@@ -114,8 +123,7 @@ public class SequenceIdGenerator {
   public long getNextId(SequenceIdType idType) throws SCMException {
     lock.lock();
     try {
-      Batch batch = sequenceIdToBatchMap.computeIfAbsent(
-          idType, key -> new Batch());
+      Batch batch = sequenceIdToBatchMap.get(idType);
 
       if (batch.nextId <= batch.lastId) {
         return batch.nextId++;
