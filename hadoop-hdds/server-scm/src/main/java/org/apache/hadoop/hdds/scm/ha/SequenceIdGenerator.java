@@ -38,6 +38,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
+import org.apache.hadoop.hdds.scm.ha.invoker.SequenceIdStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -187,7 +189,7 @@ public class SequenceIdGenerator {
   /**
    * Maintain SequenceIdTable in RocksDB.
    */
-  interface StateManager extends SCMHandler {
+  public interface StateManager extends SCMHandler {
     /**
      * Compare And Swap lastId saved in db from expectedLastId to newLastId.
      * If based on Ratis, it will submit a raft client request.
@@ -217,6 +219,10 @@ public class SequenceIdGenerator {
     @Override
     default RequestType getType() {
       return RequestType.SEQUENCE_ID;
+    }
+
+    static void main(String[] args) {
+      ScmInvokerCodeGenerator.generate(StateManager.class, true);
     }
   }
 
@@ -326,7 +332,7 @@ public class SequenceIdGenerator {
 
         final StateManager impl = new StateManagerImpl(table, buffer);
 
-        return ratisServer.getProxyHandler(StateManager.class, impl);
+        return ratisServer.getProxyHandler(new SequenceIdStateManagerInvoker(impl, ratisServer));
       }
     }
   }
