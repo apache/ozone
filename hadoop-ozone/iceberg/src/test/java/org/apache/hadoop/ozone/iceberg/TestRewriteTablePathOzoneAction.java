@@ -217,6 +217,15 @@ class TestRewriteTablePathOzoneAction {
   }
 
   @Test
+  void executeRejectsMissingTargetPrefix() {
+    NullPointerException exception = assertThrows(NullPointerException.class,
+        () -> new RewriteTablePathOzoneAction(table)
+            .rewriteLocationPrefix(sourcePrefix, null));
+
+    assertEquals("Target prefix is null", exception.getMessage());
+  }
+
+  @Test
   void rewriteLocationPrefixRejectsSameSourceAndTarget() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> new RewriteTablePathOzoneAction(table)
@@ -237,6 +246,21 @@ class TestRewriteTablePathOzoneAction {
 
     assertEquals("Cannot find provided version file missing.metadata.json " +
         "in metadata log.", exception.getMessage());
+  }
+
+  @Test
+  void startVersionRejectsDeletedVersionFile() {
+    List<String> metadataPaths = metadataLogEntryPaths(table);
+    String existingName = RewriteTablePathUtil.fileName(metadataPaths.get(0));
+    table.io().deleteFile(metadataPaths.get(0));
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> new RewriteTablePathOzoneAction(table)
+            .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+            .startVersion(existingName)
+            .execute());
+
+    assertThat(exception).hasMessageContaining("does not exist");
   }
 
   @Test
