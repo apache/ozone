@@ -22,6 +22,9 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
@@ -47,6 +50,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -94,6 +98,18 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final boolean useV2CheckpointApi;
   /** Minimum usable bytes on snapshot volume before download; 0 = disabled. */
   private final long bootstrapMinSpaceBytes;
+  /** Applied to leader-reported SST byte estimate to reserve tar/unpack headroom. */
+  private final double bootstrapCheckpointHeadroomRatio;
+
+  private static final class BootstrapSpaceRequirement {
+    private final long requiredBytes;
+    private final boolean usedLeaderEstimateHeader;
+
+    private BootstrapSpaceRequirement(long requiredBytes, boolean usedLeaderEstimateHeader) {
+      this.requiredBytes = requiredBytes;
+      this.usedLeaderEstimateHeader = usedLeaderEstimateHeader;
+    }
+  }
 
   /**
    * Whether this {@link IOException} (or its causes) typically means the
@@ -152,12 +168,13 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     LOG.error(
         "OM ratis snapshot download from leader {} failed: disk full or filesystem quota while "
             + "writing checkpoint file {} (checkpoint URL {}). Usable space on this volume: {}. "
-            + "Free disk on this OM node or raise {}. Underlying message: {}",
+            + "Free disk on this OM node or raise {} or adjust {}. Underlying message: {}",
         leaderNodeId,
         targetFile.getAbsolutePath(),
         checkpointUrl,
         formatSnapshotVolumeUsableSpace(targetFile),
         OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
+        OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY,
         ioe.getMessage(),
         ioe);
   }
@@ -172,10 +189,24 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     this.connectionFactory = connectionFactory;
     this.useV2CheckpointApi = OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
     this.bootstrapMinSpaceBytes = 0L;
+    this.bootstrapCheckpointHeadroomRatio = OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_DEFAULT;
   }
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
+    this(conf, omRatisSnapshotDir, peerNodeDetails, null);
+  }
+
+  /**
+   * Same as {@link #OmRatisSnapshotProvider(MutableConfigurationSource, File, Map)} but allows
+   * tests to inject a {@link URLConnectionFactory} (for example a factory that returns a mock
+   * {@link HttpURLConnection}).
+   */
+  @VisibleForTesting
+  public OmRatisSnapshotProvider(MutableConfigurationSource conf,
+      File omRatisSnapshotDir,
+      Map<String, OMNodeDetails> peerNodeDetails,
+      URLConnectionFactory connectionFactoryOverride) {
     super(omRatisSnapshotDir, OM_DB_NAME);
     LOG.info("Initializing OM Snapshot Provider");
     this.peerNodesMap = new ConcurrentHashMap<>();
@@ -186,28 +217,35 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
         OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
         OZONE_OM_BOOTSTRAP_MIN_SPACE_DEFAULT,
         StorageUnit.BYTES);
+    this.bootstrapCheckpointHeadroomRatio = conf.getDouble(
+        OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY,
+        OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_DEFAULT);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
     this.spnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
 
-    TimeUnit connectionTimeoutUnit =
-        OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT.getUnit();
-    int connectionTimeoutMS = (int) conf.getTimeDuration(
-        OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY,
-        OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT.getDuration(),
-        connectionTimeoutUnit);
+    if (connectionFactoryOverride != null) {
+      this.connectionFactory = connectionFactoryOverride;
+    } else {
+      TimeUnit connectionTimeoutUnit =
+          OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT.getUnit();
+      int connectionTimeoutMS = (int) conf.getTimeDuration(
+          OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY,
+          OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT.getDuration(),
+          connectionTimeoutUnit);
 
-    TimeUnit requestTimeoutUnit =
-        OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT.getUnit();
-    int requestTimeoutMS = (int) conf.getTimeDuration(
-        OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_KEY,
-        OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT.getDuration(),
-        requestTimeoutUnit);
+      TimeUnit requestTimeoutUnit =
+          OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT.getUnit();
+      int requestTimeoutMS = (int) conf.getTimeDuration(
+          OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_KEY,
+          OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT.getDuration(),
+          requestTimeoutUnit);
 
-    connectionFactory = URLConnectionFactory
-      .newDefaultURLConnectionFactory(connectionTimeoutMS, requestTimeoutMS,
-            LegacyHadoopConfigurationSource.asHadoopConfiguration(conf));
+      this.connectionFactory = URLConnectionFactory
+          .newDefaultURLConnectionFactory(connectionTimeoutMS, requestTimeoutMS,
+              LegacyHadoopConfigurationSource.asHadoopConfiguration(conf));
+    }
   }
 
   /**
@@ -232,49 +270,83 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
    *                     usable space is below the configured minimum
    */
   void ensureBootstrapDiskSpace() throws IOException {
-    if (bootstrapMinSpaceBytes <= 0) {
-      LOG.debug("{} is 0 or negative; skipping bootstrap disk space check.",
-          OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
+    ensureBootstrapDiskSpaceForRequiredBytes(
+        new BootstrapSpaceRequirement(bootstrapMinSpaceBytes, false));
+  }
+
+  private BootstrapSpaceRequirement resolveBootstrapSpaceRequirement(
+      HttpURLConnection connection) {
+    String headerValue =
+        connection.getHeaderField(OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER);
+    if (headerValue != null) {
+      String trimmed = headerValue.trim();
+      if (!trimmed.isEmpty()) {
+        try {
+          long estimatedSstBytes = Long.parseLong(trimmed);
+          if (estimatedSstBytes > 0) {
+            long required = (long) Math.ceil(estimatedSstBytes * bootstrapCheckpointHeadroomRatio);
+            return new BootstrapSpaceRequirement(required, true);
+          }
+        } catch (NumberFormatException e) {
+          LOG.warn("Ignoring invalid {} response header: {}",
+              OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER, headerValue);
+        }
+      }
+    }
+    return new BootstrapSpaceRequirement(bootstrapMinSpaceBytes, false);
+  }
+
+  private void ensureBootstrapDiskSpaceForRequiredBytes(BootstrapSpaceRequirement requirement)
+      throws IOException {
+    if (requirement.requiredBytes <= 0) {
+      if (requirement.usedLeaderEstimateHeader) {
+        LOG.debug("Leader returned a non-positive SST size estimate; skipping disk space check.");
+      } else {
+        LOG.debug("{} is 0 or negative; skipping bootstrap disk space check.",
+            OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
+      }
       return;
     }
     File snapshotRoot = getSnapshotDir();
     if (!snapshotRoot.exists()) {
       throw new IOException(String.format(
-          "OM ratis snapshot directory %s does not exist; cannot verify "
-              + "%s (required %s)",
+          "OM ratis snapshot directory %s does not exist; cannot verify required free space (%s)",
           snapshotRoot.getAbsolutePath(),
-          OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
-          StringUtils.byteDesc(bootstrapMinSpaceBytes)));
+          StringUtils.byteDesc(requirement.requiredBytes)));
     }
     final long usable = Files.getFileStore(snapshotRoot.toPath()).getUsableSpace();
-    if (usable < bootstrapMinSpaceBytes) {
+    if (usable < requirement.requiredBytes) {
+      String source = requirement.usedLeaderEstimateHeader
+          ? OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER + " with "
+              + OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY
+          : OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
       String message = String.format(
           "OM bootstrap / install snapshot aborted: volume containing ratis snapshot dir "
-              + "%s has usable space %s (%d bytes) but %s requires at least %s (%d bytes). "
-              + "Free disk on this OM host and increase %s if your checkpoints are larger.",
+              + "%s has usable space %s (%d bytes) but at least %s (%d bytes) is required "
+              + "(from %s). Free disk on this OM host or adjust configuration.",
           snapshotRoot.getAbsolutePath(),
           StringUtils.byteDesc(usable),
           usable,
-          OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY,
-          StringUtils.byteDesc(bootstrapMinSpaceBytes),
-          bootstrapMinSpaceBytes,
-          OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
+          StringUtils.byteDesc(requirement.requiredBytes),
+          requirement.requiredBytes,
+          source);
       LOG.error(message);
       throw new IOException(message);
     }
     LOG.info(
         "Bootstrap disk space check passed for OM ratis snapshot dir {}: usable {} >= "
-            + "minimum {} ({})",
+            + "required {} (from {})",
         snapshotRoot.getAbsolutePath(),
         StringUtils.byteDesc(usable),
-        StringUtils.byteDesc(bootstrapMinSpaceBytes),
-        OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
+        StringUtils.byteDesc(requirement.requiredBytes),
+        requirement.usedLeaderEstimateHeader
+            ? OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER
+            : OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY);
   }
 
   @Override
   public void downloadSnapshot(String leaderNodeID, File targetFile)
       throws IOException {
-    ensureBootstrapDiskSpace();
     OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
     URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
         useV2CheckpointApi, httpPolicy.isHttpEnabled(), true);
@@ -302,6 +374,9 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
               "OM to download latest checkpoint. Checkpoint URL: " +
               omCheckpointUrl + ". ErrorCode: " + errorCode);
         }
+
+        ensureBootstrapDiskSpaceForRequiredBytes(
+            resolveBootstrapSpaceRequirement(connection));
 
         try (InputStream inputStream = connection.getInputStream()) {
           downloadFileWithProgress(inputStream, targetFile);

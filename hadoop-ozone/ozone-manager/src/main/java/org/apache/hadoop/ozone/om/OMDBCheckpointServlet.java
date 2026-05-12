@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
@@ -37,7 +38,6 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -157,7 +157,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest request,
-                                  OutputStream destination,
+                                  HttpServletResponse response,
                                   Set<String> toExcludeList,
                                   Path tmpdir)
       throws IOException, InterruptedException {
@@ -175,18 +175,35 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination)) {
-      RocksDBCheckpointDiffer differ =
-          getDbStore().getRocksDBCheckpointDiffer();
-      DirectoryData sstBackupDir = new DirectoryData(tmpdir,
-          differ.getSSTBackupDir());
-      DirectoryData compactionLogDir = new DirectoryData(tmpdir,
-          differ.getCompactionLogDir());
+    RocksDBCheckpointDiffer differ =
+        getDbStore().getRocksDBCheckpointDiffer();
+    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
+        differ.getSSTBackupDir());
+    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
+        differ.getCompactionLogDir());
 
-      // Files to be excluded from tarball
-      Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
-          checkpoint.getCheckpointLocation(), sstBackupDir);
+    // Files to be excluded from tarball
+    Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
+        checkpoint.getCheckpointLocation(), sstBackupDir);
 
+    if (sstFilesToExclude.isEmpty()) {
+      try {
+        Set<Path> snapshotPaths =
+            snapshotPathsForCheckpointEstimate(checkpoint, includeSnapshotData(request));
+        OMDBCheckpointUtils.SstSizeEstimate estimate =
+            OMDBCheckpointUtils.estimateCheckpointTarballSstDetails(
+                checkpoint.getCheckpointLocation(), snapshotPaths);
+        response.setHeader(OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER,
+            Long.toString(estimate.getTotalBytes()));
+        OMDBCheckpointUtils.logEstimatedTarballSize(estimate, snapshotPaths.size());
+      } catch (IOException e) {
+        LOG.warn("Could not estimate checkpoint tarball SST size for response header: {}",
+            e.getMessage());
+      }
+    }
+
+    try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream =
+             tar(response.getOutputStream())) {
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
           sstBackupDir, compactionLogDir);
@@ -198,6 +215,15 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       LOG.error("got exception writing to archive " + e);
       throw e;
     }
+  }
+
+  private Set<Path> snapshotPathsForCheckpointEstimate(DBCheckpoint checkpoint,
+      boolean includeSnapshotData) throws IOException {
+    Set<Path> snapshotPaths = new HashSet<>();
+    if (includeSnapshotData) {
+      snapshotPaths = getSnapshotDirs(checkpoint, false);
+    }
+    return snapshotPaths;
   }
 
   /**
@@ -310,11 +336,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     AtomicLong copySize = new AtomicLong(0L);
 
-    // Log estimated total data transferred on first request.
-    if (sstFilesToExclude.isEmpty()) {
-      logEstimatedTarballSize(checkpoint, includeSnapshotData);
-    }
-
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
     if (!processDir(dir, copyFiles, hardLinkFiles, sstFilesToExclude,
@@ -345,16 +366,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         hardLinkFiles, sstFilesToExclude,
         new HashSet<>(), copySize,
         compactionLogDir.getOriginalDir().toPath());
-  }
-
-  private void logEstimatedTarballSize(DBCheckpoint checkpoint, boolean includeSnapshotData)
-      throws IOException {
-    Set<Path> snapshotPaths = new HashSet<>();
-    if (includeSnapshotData) {
-      // since this is an estimate we can avoid waiting for dir to exist.
-      snapshotPaths = getSnapshotDirs(checkpoint, false);
-    }
-    OMDBCheckpointUtils.logEstimatedTarballSize(checkpoint.getCheckpointLocation(), snapshotPaths);
   }
 
   /**
