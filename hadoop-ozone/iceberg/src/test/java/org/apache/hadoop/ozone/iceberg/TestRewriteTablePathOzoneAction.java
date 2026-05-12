@@ -232,7 +232,6 @@ class TestRewriteTablePathOzoneAction {
         "Auto-generated staging dir should end with FILE_SEPARATOR: " + actualStagingDir);
   }
   
-
   /**
    * For every staged file in the CSV copy plan, asserts that internal paths are rewritten
    * to the target prefix:
