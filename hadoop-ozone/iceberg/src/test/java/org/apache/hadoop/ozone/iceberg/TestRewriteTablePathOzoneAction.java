@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.iceberg;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,9 +36,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileFormat;
-import org.apache.iceberg.GenericStatisticsFile;
 import org.apache.iceberg.GenericManifestFile;
 import org.apache.iceberg.GenericPartitionFieldSummary;
+import org.apache.iceberg.GenericStatisticsFile;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.InternalData;
 import org.apache.iceberg.ManifestFile;
@@ -220,8 +221,8 @@ class TestRewriteTablePathOzoneAction {
             List.of(statisticsFile("before-1.stats", 100)),
             List.of()));
 
-    assertEquals("Before and after path rewrite, statistic files count should be same",
-        exception.getMessage());
+    assertThat(exception)
+        .hasMessageContaining("Before and after path rewrite, statistic files count should be same");
   }
 
   @Test
@@ -231,8 +232,8 @@ class TestRewriteTablePathOzoneAction {
             List.of(statisticsFile("before-1.stats", 100)),
             List.of(statisticsFile("after-1.stats", 200))));
 
-    assertEquals("Before and after path rewrite, statistic files size should be same",
-        exception.getMessage());
+    assertThat(exception)
+        .hasMessageContaining("Before and after path rewrite, statistic files size should be same");
   }
 
   @Test
