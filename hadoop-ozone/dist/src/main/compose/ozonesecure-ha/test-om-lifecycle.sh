@@ -33,6 +33,6 @@ start_docker_env
 
 execute_robot_test s3g kinit.robot
 
-execute_robot_test s3g admincli/om-lifecycle.robot
+execute_robot_test s3g lifecycle/om-lifecycle.robot
 
 execute_robot_test s3g s3/bucketlifecycle.robot
