@@ -63,6 +63,7 @@ public class TestOMUpgradeFinalizeService {
   void setUp() {
     ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getThreadNamePrefix()).thenReturn("");
+    when(ozoneManager.getOMNodeId()).thenReturn("clientId");
 
     versionManager = mock(OMVersionManager.class);
     // preExecute() calls ozoneManager.getVersionManager().getApparentVersion().serialize()
