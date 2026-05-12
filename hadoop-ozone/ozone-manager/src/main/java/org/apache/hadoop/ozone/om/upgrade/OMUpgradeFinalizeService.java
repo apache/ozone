@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
@@ -54,7 +53,6 @@ public class OMUpgradeFinalizeService extends BackgroundService {
 
   /**
    * Creates an {@code OMUpgradeFinalizeService} with a custom check interval.
-   * Primarily intended for testing.
    *
    * @param ozoneManager   the OzoneManager instance
    * @param versionManager the {@link OMVersionManager} to query the finalization status
@@ -62,7 +60,7 @@ public class OMUpgradeFinalizeService extends BackgroundService {
    * @param intervalMs     the duration to wait between checks
    */
   public OMUpgradeFinalizeService(OzoneManager ozoneManager, OMVersionManager versionManager, ScmClient scmClient,
-                                  long intervalMs) {
+      long intervalMs) {
     super("OMUpgradeFinalizeService", intervalMs, INTERVAL_UNIT, THREAD_POOL_SIZE, TIMEOUT,
         ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
@@ -110,12 +108,13 @@ public class OMUpgradeFinalizeService extends BackgroundService {
 
             OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
-                .setClientId("todo")
+                .setClientId(ozoneManager.getOMNodeId())
                 .build();
-            OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
-            omRequest = omClientRequest.preExecute(ozoneManager);
-            OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, ClientId.randomId(),
-                RUN_COUNT.getAndIncrement());
+            OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
+                ozoneManager, omRequest, ClientId.randomId(), RUN_COUNT.getAndIncrement());
+            if (!response.getSuccess()) {
+              LOG.error("Failed to send FinalizeUpgradeRequest to over Ratis. {}", response.getMessage());
+            }
           }
         } catch (Exception e) {
           LOG.error("An exception occurred while trying to check the SCM Upgrade status or finalize OM", e);

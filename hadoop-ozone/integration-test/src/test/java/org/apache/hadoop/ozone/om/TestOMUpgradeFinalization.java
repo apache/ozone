@@ -103,9 +103,9 @@ class TestOMUpgradeFinalization {
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_CANCEL, AuditEventStatus.SUCCESS);
         // Send the finalize command to SCM which triggers the OM finalize when SCM reports it is complete.
         cluster.getStorageContainerLocationClient().finalizeUpgrade();
-        AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
 
         waitForFinalization(omClient);
+        AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
         cluster.restartOzoneManager(downedOM, true);
 
         OzoneManagerStateMachine omStateMachine = downedOM.getOmRatisServer()

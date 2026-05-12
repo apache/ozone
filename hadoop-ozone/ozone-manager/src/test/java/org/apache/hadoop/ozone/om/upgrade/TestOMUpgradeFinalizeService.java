@@ -60,7 +60,7 @@ public class TestOMUpgradeFinalizeService {
   private OMUpgradeFinalizeService service;
 
   @BeforeEach
-  void setUp() throws Exception {
+  void setUp() {
     ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getThreadNamePrefix()).thenReturn("");
 
