@@ -28,10 +28,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 @InterfaceStability.Unstable
 public final class ChatbotConfigKeys {
 
-  private ChatbotConfigKeys() {
-    // No instances
-  }
-
   public static final String OZONE_RECON_CHATBOT_PREFIX = "ozone.recon.chatbot.";
 
   // ── Feature toggle ──────────────────────────────────────────
@@ -75,12 +71,6 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_OPENAI_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "openai.base.url";
   public static final String OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT = "https://api.openai.com";
 
-  public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "gemini.base.url";
-  public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT = "https://generativelanguage.googleapis.com";
-
-  public static final String OZONE_RECON_CHATBOT_ANTHROPIC_BASE_URL = OZONE_RECON_CHATBOT_PREFIX
-      + "anthropic.base.url";
-  public static final String OZONE_RECON_CHATBOT_ANTHROPIC_BASE_URL_DEFAULT = "https://api.anthropic.com";
 
   // ── Execution policy ────────────────────────────────────────
   public static final String OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS = OZONE_RECON_CHATBOT_PREFIX
@@ -89,7 +79,6 @@ public final class ChatbotConfigKeys {
 
   public static final String OZONE_RECON_CHATBOT_EXEC_MAX_PAGES = OZONE_RECON_CHATBOT_PREFIX + "exec.max.pages";
   public static final int OZONE_RECON_CHATBOT_EXEC_MAX_PAGES_DEFAULT = 5;
-
   public static final String OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE = OZONE_RECON_CHATBOT_PREFIX + "exec.page.size";
   public static final int OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE_DEFAULT = 200;
 

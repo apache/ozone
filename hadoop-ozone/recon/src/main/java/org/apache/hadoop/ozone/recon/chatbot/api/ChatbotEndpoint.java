@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.recon.chatbot.api;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
-import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.slf4j.Logger;
@@ -55,6 +55,7 @@ import java.util.concurrent.TimeoutException;
  * so there are no per-user key storage endpoints.
  * </p>
  */
+@Singleton
 @Path("/chatbot")
 @Produces(MediaType.APPLICATION_JSON)
 public class ChatbotEndpoint {
