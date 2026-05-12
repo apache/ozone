@@ -59,7 +59,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     LOG.trace("Request: {}", getOmRequest());
-    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    AuditLogger auditLogger = ozoneManager.getSystemAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());

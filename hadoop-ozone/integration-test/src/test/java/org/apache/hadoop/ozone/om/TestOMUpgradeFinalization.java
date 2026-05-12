@@ -105,7 +105,7 @@ class TestOMUpgradeFinalization {
         cluster.getStorageContainerLocationClient().finalizeUpgrade();
 
         waitForFinalization(omClient);
-        AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
+        AuditLogTestUtils.verifySystemAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
         cluster.restartOzoneManager(downedOM, true);
 
         OzoneManagerStateMachine omStateMachine = downedOM.getOmRatisServer()

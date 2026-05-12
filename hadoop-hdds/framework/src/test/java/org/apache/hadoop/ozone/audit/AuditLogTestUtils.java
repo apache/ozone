@@ -42,6 +42,7 @@ public final class AuditLogTestUtils {
    */
   public static void enableAuditLog() {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
+    System.setProperty("log4j.configurationFile", "auditlog.properties");
   }
 
   /**
@@ -55,8 +56,22 @@ public final class AuditLogTestUtils {
         1000, 10000);
   }
 
+  /**
+   * Searches for the given action in the system audit log file.
+   */
+  public static void verifySystemAuditLog(AuditAction action,
+      AuditEventStatus eventStatus) throws InterruptedException, TimeoutException {
+    waitFor(
+        () -> fileContains(SYSTEM_AUDITLOG_FILENAME, action.getAction(), eventStatus.getStatus()),
+        1000, 10000);
+  }
+
   public static boolean auditLogContains(String... strings) {
-    File file = new File(AUDITLOG_FILENAME);
+    return fileContains(AUDITLOG_FILENAME, strings);
+  }
+
+  private static boolean fileContains(String filename, String... strings) {
+    File file = new File(filename);
     try {
       String contents = FileUtils.readFileToString(file, UTF_8);
       for (String s : strings) {
@@ -72,6 +87,7 @@ public final class AuditLogTestUtils {
 
   public static void truncateAuditLogFile() throws IOException {
     Files.write(Paths.get(AUDITLOG_FILENAME), new byte[0]);
+    Files.write(Paths.get(SYSTEM_AUDITLOG_FILENAME), new byte[0]);
   }
 
   public static void deleteAuditLogFile() {
