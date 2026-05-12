@@ -525,7 +525,6 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
         try {
           completionService.submit(() -> {
             try {
-              System.out.println("Processing manifest " + manifestFile.path());
               return processManifest(
                   manifestFile,
                   table,
@@ -553,7 +552,6 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
         }
       }
 
-      // drain remaining
       while (completedTasks < submittedTasks) {
         aggregatedResult.append(completionService.take().get());
         completedTasks++;

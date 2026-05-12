@@ -214,6 +214,25 @@ class TestRewriteTablePathOzoneAction {
     assertAllInternalPathsRewritten(csvPairs, targetPrefix);
   }
 
+  @Test
+  void defaultStagingDirIsUnderTableMetadataLocation() {
+    String metadataLocation = RewriteTablePathOzoneUtils.getMetadataLocation(table);
+
+    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table)
+        .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+        .execute();
+
+    String actualStagingDir = result.stagingLocation();
+    assertTrue(actualStagingDir.startsWith(metadataLocation),
+        "Auto-generated staging dir should be under the table's metadata location."
+            + " Expected prefix: " + metadataLocation + ", actual: " + actualStagingDir);
+    assertTrue(actualStagingDir.contains("copy-table-staging-"),
+        "Auto-generated staging dir should contain 'copy-table-staging-': " + actualStagingDir);
+    assertTrue(actualStagingDir.endsWith(RewriteTablePathUtil.FILE_SEPARATOR),
+        "Auto-generated staging dir should end with FILE_SEPARATOR: " + actualStagingDir);
+  }
+  
+
   /**
    * For every staged file in the CSV copy plan, asserts that internal paths are rewritten
    * to the target prefix:
