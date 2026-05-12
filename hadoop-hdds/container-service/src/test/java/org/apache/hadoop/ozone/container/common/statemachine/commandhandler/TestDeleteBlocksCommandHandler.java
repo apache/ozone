@@ -99,6 +99,7 @@ public class TestDeleteBlocksCommandHandler {
   private String schemaVersion;
   private HddsVolume volume1;
   private BlockDeletingServiceMetrics blockDeleteMetrics;
+  private static final long STALE_CONTAINER_ID = 5L;
 
   private void prepareTest(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -514,8 +515,8 @@ public class TestDeleteBlocksCommandHandler {
       realSet.addContainer(container);
     }
 
-    final long swapContainerId = 5L;
-    KeyValueContainer oldContainer = (KeyValueContainer) realSet.getContainer(swapContainerId);
+    KeyValueContainer oldContainer =
+        (KeyValueContainer) realSet.getContainer(STALE_CONTAINER_ID);
     KeyValueContainerData newReplicaData =
         new KeyValueContainerData((KeyValueContainerData) oldContainer.getContainerData());
     newReplicaData.setVolume(volume1);
@@ -526,7 +527,7 @@ public class TestDeleteBlocksCommandHandler {
     ContainerSet containerSetSpy = spy(realSet);
     doAnswer(invocation -> {
       long id = invocation.getArgument(0);
-      if (id != swapContainerId) {
+      if (id != STALE_CONTAINER_ID) {
         return invocation.callRealMethod();
       }
       int seq = getContainerSequence.getAndIncrement();
@@ -553,7 +554,7 @@ public class TestDeleteBlocksCommandHandler {
     handler.getSchemaHandlers().put(SCHEMA_V3, testSchemaHandler3);
 
     DeletedBlocksTransaction transaction =
-        createDeletedBlocksTransaction(77L, swapContainerId);
+        createDeletedBlocksTransaction(77L, STALE_CONTAINER_ID);
     List<DeleteBlockTransactionResult> results =
         handler.executeCmdWithRetry(Collections.singletonList(transaction));
 
