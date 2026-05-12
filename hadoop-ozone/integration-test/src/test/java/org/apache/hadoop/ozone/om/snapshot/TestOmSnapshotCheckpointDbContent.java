@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
@@ -49,7 +48,6 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -57,9 +55,11 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * HDDS-13217: when an OM snapshot is created, the on-disk RocksDB checkpoint for that snapshot
@@ -83,36 +83,30 @@ import org.junit.jupiter.api.Test;
  * <p>Later tests worth adding: a second snapshot on the same bucket; writes after the snapshot to
  * prove the checkpoint slice does not change; multipart uploads with real state; linked buckets
  * resolving to a source bucket.
+ *
+ * <p>Executed as a nested class under {@link org.apache.ozone.test.TestOzoneIntegrationNonHA} so
+ * one {@link MiniOzoneCluster} is shared with other safe tests (HDDS-12183). Tests only add
+ * volumes, buckets, keys, and snapshots; they do not stop or restart the cluster.
  */
-public class TestOmSnapshotCheckpointDbContent {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestOmSnapshotCheckpointDbContent implements NonHATests.TestCase {
 
   private static final byte[] TEST_KEY_CONTENT = new byte[] {0x61, 0x62, 0x63};
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static OzoneClient client;
-  private static ObjectStore store;
+  private OzoneConfiguration conf;
+  private OzoneClient client;
+  private ObjectStore store;
 
-  /** Mini cluster shared by all tests: three datanodes, snapshots enabled; defrag disabled. */
   @BeforeAll
-  public static void init()
-      throws IOException, InterruptedException, TimeoutException {
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
-    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, -1);
-
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+  void init() throws IOException {
+    conf = cluster().getConf();
+    client = cluster().newClient();
     store = client.getObjectStore();
   }
 
   @AfterAll
-  public static void shutdown() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   /**
@@ -163,7 +157,7 @@ public class TestOmSnapshotCheckpointDbContent {
     String snapshotName = "snap-a";
     store.createSnapshot(volumeName, bucketName, snapshotName);
 
-    OzoneManager om = cluster.getOzoneManager();
+    OzoneManager om = cluster().getOzoneManager();
     OMMetadataManager liveMm = om.getMetadataManager();
     SnapshotInfo snapshotInfo = liveMm.getSnapshotInfoTable().get(
         SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
