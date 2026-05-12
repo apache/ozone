@@ -1079,9 +1079,10 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-  
+
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
+      List<ServiceInfo> nodes, int port, String leaderId,
+      String localNodeId, String localLeaderStatus) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -1089,18 +1090,25 @@ public final class OmUtils {
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
     for (ServiceInfo info : omNodes) {
-      // Printing only the OM's running
-      if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
-                      ? "LEADER" : "FOLLOWER";
-        List<String> omInfo = new ArrayList<>();
-        omInfo.add(info.getHostname());
-        omInfo.add(info.getOmRoleInfo().getNodeId());
-        omInfo.add(String.valueOf(port));
-        omInfo.add(role);
-        omInfo.add(leaderReadiness);
-        omInfoList.add(omInfo);
+      String nodeId = info.getOmRoleInfo().getNodeId();
+      boolean isLeaderNode = nodeId.equals(leaderId);
+      boolean isLocalNode = nodeId.equals(localNodeId);
+      String role = info.getOmRoleInfo().getServerRole();
+
+      String displayValue;
+      if (isLeaderNode && isLocalNode) {
+        displayValue = localLeaderStatus;
+      } else {
+        displayValue = role;
       }
+
+      List<String> omInfo = new ArrayList<>();
+      omInfo.add(info.getHostname());
+      omInfo.add(nodeId);
+      omInfo.add(String.valueOf(port));
+      omInfo.add(role);
+      omInfo.add(displayValue);
+      omInfoList.add(omInfo);
     }
     return omInfoList;
   }

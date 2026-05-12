@@ -270,10 +270,7 @@ public class TestInfoSubCommand {
         .collect(Collectors.toList());
     assertEquals(0, replica.size());
 
-    Pattern p = Pattern.compile(
-        "^Unable to retrieve the replica details.*", Pattern.MULTILINE);
-    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+    assertThat(errContent.toString(DEFAULT_ENCODING)).contains("Error getting Replicas");
   }
 
   @Test

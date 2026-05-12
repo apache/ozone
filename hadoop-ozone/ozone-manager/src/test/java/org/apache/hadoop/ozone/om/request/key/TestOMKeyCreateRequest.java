@@ -156,7 +156,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
         false, 0, 100L, replicationConfig,
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT));
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
 
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
@@ -170,7 +170,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(getOpenKey(id));
     assertNotNull(openKeyInfo);
-    assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
+    assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT,
         openKeyInfo.getExpectedDataGeneration());
   }
 
@@ -183,7 +183,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
         false, 0, 100L, replicationConfig,
-        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT));
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
 
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());

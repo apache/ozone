@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -29,6 +32,7 @@ import java.net.Socket;
 import java.net.URI;
 import java.net.URL;
 import java.security.KeyStore;
+import java.util.Arrays;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
@@ -41,6 +45,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -169,9 +176,58 @@ public class TestHttpServer2SSL {
     }
   }
 
+  @Test
+  public void testEnabledProtocolAppliedWhenConfigUnset() throws Exception {
+    OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    serverConf.unset(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY);
+    assertServerAppliesEnabledProtocol(serverConf, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT);
+  }
+
+  @Test
+  public void testEnabledProtocolAppliedWhenConfigSetToDefault() throws Exception {
+    OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    serverConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT);
+    assertServerAppliesEnabledProtocol(serverConf, SSLFactory.SSL_ENABLED_PROTOCOLS_DEFAULT);
+  }
+
+  @Test
+  public void testEnabledProtocolAppliedWhenConfigSetToNonDefault() throws Exception {
+    OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    serverConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.3");
+    assertServerAppliesEnabledProtocol(serverConf, "TLSv1.3");
+  }
+
+  private void assertServerAppliesEnabledProtocol(
+      OzoneConfiguration serverConf, String protocol) throws Exception {
+    HttpServer2 server = buildServer(serverConf, null, null, null);
+    server.start();
+    try {
+      ServerConnector listener = server.getListeners().get(0);
+      SslConnectionFactory connectionFactory =
+          listener.getConnectionFactory(SslConnectionFactory.class);
+      assertNotNull(connectionFactory,
+          "Expected HTTPS listener with an SSL connection factory");
+
+      SslContextFactory.Server sslContextFactory =
+          (SslContextFactory.Server) connectionFactory.getSslContextFactory();
+      assertArrayEquals(new String[] {protocol},
+          sslContextFactory.getIncludeProtocols());
+      assertFalse(Arrays.asList(sslContextFactory.getExcludeProtocols())
+          .contains(protocol),
+          "Configured enabled protocol should be removed from excluded protocols");
+    } finally {
+      server.stop();
+    }
+  }
+
   private HttpServer2 buildServer(String excludeCiphers, String includeCiphers, String enabledProtocols)
       throws Exception {
     OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    return buildServer(serverConf, excludeCiphers, includeCiphers, enabledProtocols);
+  }
+
+  private HttpServer2 buildServer(OzoneConfiguration serverConf, String excludeCiphers,
+      String includeCiphers, String enabledProtocols) throws Exception {
     if (enabledProtocols != null) {
       serverConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, enabledProtocols);
     }
