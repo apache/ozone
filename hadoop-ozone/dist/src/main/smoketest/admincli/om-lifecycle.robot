@@ -19,6 +19,9 @@ Library             OperatingSystem
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
+*** Variables ***
+${OM_SERVICE_ID}    %{OM_SERVICE_ID}
+
 *** Test Cases ***
 Test Lifecycle Status
     ${output} =         Execute             ozone admin om lifecycle status --service-id '${OM_SERVICE_ID}'
