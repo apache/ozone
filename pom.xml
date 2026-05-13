@@ -157,7 +157,7 @@
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <netty.version>4.1.130.Final</netty.version>
+    <netty.version>4.1.133.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>20.18.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
