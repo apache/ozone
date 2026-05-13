@@ -25,6 +25,9 @@ x-common-config:
     - ./krb5.conf:/etc/krb5.conf
   env_file:
     - docker-config
+  depends_on:
+    kdc:
+      condition: service_healthy
 
 services:
   kdc:
