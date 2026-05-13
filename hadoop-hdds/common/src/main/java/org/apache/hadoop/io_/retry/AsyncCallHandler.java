@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.io_.retry;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ipc_.Client;
 import org.apache.hadoop.util.Daemon;
@@ -347,7 +346,6 @@ public class AsyncCallHandler {
     ASYNC_RETURN.set(asyncGet);
   }
 
-  @VisibleForTesting
   public static long getGracePeriod() {
     return AsyncCallQueue.Processor.GRACE_PERIOD;
   }

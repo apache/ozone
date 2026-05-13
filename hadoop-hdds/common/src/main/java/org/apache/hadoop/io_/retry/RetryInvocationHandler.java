@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.io_.retry;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.io.retry.AtMostOnce;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
@@ -49,7 +48,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
   public static final Logger LOG = LoggerFactory.getLogger(
       RetryInvocationHandler.class);
 
-  @VisibleForTesting
   public static final ThreadLocal<Boolean> SET_CALL_ID_FOR_TEST =
       ThreadLocal.withInitial(() -> true);
 
@@ -445,7 +443,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     }
   }
 
-  @VisibleForTesting
   static boolean isRpcInvocation(Object proxy) {
     if (proxy instanceof ProtocolTranslator) {
       proxy = ((ProtocolTranslator) proxy).getUnderlyingProxyObject();
@@ -467,7 +464,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     return RPC.getConnectionIdForProxy(proxyDescriptor.getProxy());
   }
 
-  @VisibleForTesting
   public FailoverProxyProvider<T> getProxyProvider() {
     return proxyDescriptor.fpp;
   }
