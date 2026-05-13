@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ipc_.retry;
+package org.apache.hadoop.io_.retry;
 
 import java.lang.reflect.Proxy;
 import java.util.Map;
