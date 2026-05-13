@@ -2143,6 +2143,96 @@
     </description>
   </property>
   <property>
+    <name>ozone.sts.web.identity.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>
+      Enables experimental Ozone STS AssumeRoleWithWebIdentity support.
+      When enabled, OM validates OIDC web identity JWTs and issues temporary
+      S3 credentials through the existing STS token infrastructure.
+    </description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.issuer.uri</name>
+    <value/>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>Expected OIDC issuer URI for STS web identity tokens.</description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.jwks.uri</name>
+    <value/>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>
+      JWKS URI used to validate STS web identity JWT signatures. If empty,
+      a later STS integration may derive it from issuer metadata.
+    </description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.audience</name>
+    <value/>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>Required audience claim for STS web identity tokens.</description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.username.claim</name>
+    <value>preferred_username</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>OIDC claim used as the effective Ozone username.</description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.subject.claim</name>
+    <value>sub</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>OIDC claim used as the immutable external subject.</description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.groups.claim</name>
+    <value>groups</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>
+      OIDC claim path containing user groups. Nested claim paths such as
+      resource_access.ozone.groups are supported.
+    </description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.roles.claim</name>
+    <value>realm_access.roles</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>
+      OIDC claim path containing role attributes. Roles are identity
+      attributes only; Ranger remains the authorization policy engine.
+    </description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.clock.skew</name>
+    <value>60s</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>Allowed clock skew for OIDC exp, nbf, and iat validation.</description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.jwks.refresh.interval</name>
+    <value>10m</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>Interval for refreshing cached JWKS signing keys.</description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.require.https</name>
+    <value>true</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>
+      Require HTTPS issuer and JWKS URIs for STS web identity validation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.sts.web.identity.allow.insecure.http.for.tests</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, S3, STS, OIDC</tag>
+    <description>
+      Allows HTTP issuer and JWKS URIs only for tests. Do not enable in
+      production.
+    </description>
+  </property>
+  <property>
     <name>ozone.security.http.kerberos.enabled</name>
     <value>false</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>

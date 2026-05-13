@@ -70,6 +70,26 @@ public interface IAccessAuthorizer {
   }
 
   /**
+   * Attempts to authorize an STS AssumeRoleWithWebIdentity request after OM has
+   * validated the web identity token and mapped it to an Ozone identity.
+   *
+   * <p>Implementations must treat Keycloak/OIDC groups and roles as identity
+   * attributes only. The final role-assumption authorization decision and the
+   * returned session policy must come from this authorizer.</p>
+   *
+   * @param request   the web identity role assumption request shape
+   * @return          a String representing the permissions granted according to
+   *                  the authorizer.
+   * @throws OMException if the caller is not authorized or the operation is not
+   *                     supported.
+   */
+  default String generateAssumeRoleWithWebIdentitySessionPolicy(
+      AssumeRoleWithWebIdentityRequest request) throws OMException {
+    throw new OMException("The generateAssumeRoleWithWebIdentitySessionPolicy"
+        + " call is not supported", NOT_SUPPORTED_OPERATION);
+  }
+
+  /**
    * @return true for Ozone-native authorizer
    */
   default boolean isNative() {

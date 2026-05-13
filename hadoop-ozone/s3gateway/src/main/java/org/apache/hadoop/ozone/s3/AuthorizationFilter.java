@@ -50,6 +50,8 @@ import org.slf4j.LoggerFactory;
 @Priority(AuthorizationFilter.PRIORITY)
 public class AuthorizationFilter implements ContainerRequestFilter {
   public static final int PRIORITY = 50;
+  public static final String SKIP_AWS_AUTH_PROPERTY =
+      AuthorizationFilter.class.getName() + ".skipAwsAuth";
 
   private static final Logger LOG = LoggerFactory.getLogger(
       AuthorizationFilter.class);
@@ -63,6 +65,11 @@ public class AuthorizationFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext context) throws
       IOException {
+    if (Boolean.TRUE.equals(context.getProperty(SKIP_AWS_AUTH_PROPERTY))) {
+      LOG.debug("Skipping AWS SigV4 processing for this request");
+      return;
+    }
+
     try {
       signatureInfo.initialize(signatureProcessor.parseSignature());
       if (signatureInfo.getVersion() == Version.V4) {
