@@ -1514,8 +1514,7 @@ public class KeyValueHandler extends Handler {
     long containerID = container.getContainerData().getContainerID();
     Container<?> lockedContainer = containerSet.acquireContainerLock(containerID);
     if (lockedContainer == null) {
-      LOG.warn("Exceeded {} attempts locking live container {}; skipping markContainerUnhealthy.",
-          ContainerSet.maxContainerMapSwapRetries(), containerID);
+      LOG.warn("Container {} no longer present in ContainerSet; skipping markContainerUnhealthy.", containerID);
       return;
     }
     try {
@@ -1582,8 +1581,7 @@ public class KeyValueHandler extends Handler {
     long containerID = container.getContainerData().getContainerID();
     Container<?> lockedContainer = containerSet.acquireContainerLock(containerID);
     if (lockedContainer == null) {
-      LOG.warn("Exceeded {} attempts locking live container {}; skipping closeContainer.",
-          ContainerSet.maxContainerMapSwapRetries(), containerID);
+      LOG.warn("Container {} no longer present in ContainerSet; skipping closeContainer.", containerID);
       return;
     }
     try {
@@ -2306,9 +2304,7 @@ public class KeyValueHandler extends Handler {
     long startTime = clock.millis();
     Container<?> containerLocked = containerSet.acquireContainerLock(containerId);
     if (containerLocked == null) {
-      LOG.info("Exceeded {} retries to lock container {}; Now DN will resend for delete with " +
-              "the current container replica", ContainerSet.maxContainerMapSwapRetries(),
-          containerId);
+      LOG.info("Container {} no longer present in ContainerSet; skipping deleteInternal.", containerId);
       return;
     }
     try {
