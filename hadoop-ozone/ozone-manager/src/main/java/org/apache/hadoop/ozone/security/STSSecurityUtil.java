@@ -154,6 +154,10 @@ public final class STSSecurityUtil {
     final Token<STSTokenIdentifier> token = new Token<>();
     try {
       token.decodeFromUrlString(encodedToken);
+      if (!encodedToken.equals(token.encodeToUrlString())) {
+        throw new SecretManager.InvalidToken(
+            "Failed to decode STS token string: non-canonical token encoding");
+      }
       return token;
     } catch (IOException e) {
       throw new SecretManager.InvalidToken("Failed to decode STS token string: " + e);

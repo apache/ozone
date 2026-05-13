@@ -40,7 +40,7 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
   private static final long TOKEN_MAX_LIFETIME = 43200 * 1000L; // 12 hours in milliseconds
 
   // Store reference to secret key client for encryption key access
-  private final SecretKeySignerClient secretKeyClient;
+  private SecretKeySignerClient secretKeyClient;
 
   /**
    * Create a new STS token secret manager.
@@ -50,6 +50,12 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
   public STSTokenSecretManager(SecretKeySignerClient secretKeyClient) {
     super(TOKEN_MAX_LIFETIME, secretKeyClient);
     this.secretKeyClient = secretKeyClient;
+  }
+
+  @Override
+  public void setSecretKeyClient(SecretKeySignerClient client) {
+    super.setSecretKeyClient(client);
+    this.secretKeyClient = client;
   }
 
   /**
