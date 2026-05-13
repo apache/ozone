@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.chatbot.api;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent;
@@ -299,7 +300,7 @@ public class ChatbotEndpoint {
    * The JsonIgnoreProperties annotation tells the JSON parser not to crash
    * if the user sends an extra field we aren't expecting.
    */
-  @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class ChatRequest {
     private String query;
     private String model;
@@ -342,7 +343,7 @@ public class ChatbotEndpoint {
   /**
    * Chat response DTO. (This maps to the JSON we send BACK to the user)
    */
-  @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class ChatResponse {
     private String response;
     private boolean success;
