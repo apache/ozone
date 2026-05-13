@@ -650,12 +650,12 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         String user = normalizedRequestContext.getClientUgi().getShortUserName();
         final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
         if (stsTokenIdentifier != null) {
-          final StringBuilder builder = new StringBuilder(user);
-          builder.append(" (STS assumed role arn = ");
-          builder.append(stsTokenIdentifier.getRoleArn());
-          builder.append(", tempAccessKeyId = ");
-          builder.append(stsTokenIdentifier.getTempAccessKeyId());
-          builder.append(')');
+          final StringBuilder builder = new StringBuilder(user)
+              .append(" (STS assumed role arn = ")
+              .append(stsTokenIdentifier.getRoleArn())
+              .append(", tempAccessKeyId = ")
+              .append(stsTokenIdentifier.getTempAccessKeyId())
+              .append(')');
           user = builder.toString();
         }
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",

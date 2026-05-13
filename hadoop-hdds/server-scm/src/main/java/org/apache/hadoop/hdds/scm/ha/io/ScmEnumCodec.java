@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Ints;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.util.function.IntFunction;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
@@ -46,14 +46,14 @@ class ScmEnumCodec<T extends Enum<T> & ProtocolMessageEnum> implements ScmCodec<
 
   @Override
   public ByteString serialize(T object) {
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(object.getNumber()));
+    return UnsafeByteOperations.unsafeWrap(IntegerCodec.get().toByteArray(object.getNumber()));
   }
 
   @Override
-  public T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException {
+  public T deserialize(ByteString value) throws InvalidProtocolBufferException {
     final int n;
     try {
-      n = Ints.fromByteArray(value.toByteArray());
+      n = IntegerCodec.get().fromByteArray(value.toByteArray());
     } catch (Exception e) {
       throw new InvalidProtocolBufferException(
           "Failed to deserialize enum " + enumClass + ": "

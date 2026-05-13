@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutV
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -160,7 +159,7 @@ public class TestContainerPlacement {
   ContainerManager createContainerManager()
       throws IOException {
     pipelineManager = spy(pipelineManager);
-    doReturn(true).when(pipelineManager).hasEnoughSpace(any(), anyLong());
+    doReturn(true).when(pipelineManager).hasEnoughSpace(any());
 
     return new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,

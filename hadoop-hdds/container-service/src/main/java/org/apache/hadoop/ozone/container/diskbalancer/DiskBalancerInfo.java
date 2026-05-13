@@ -17,11 +17,15 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 
 /**
- * DiskBalancer's information to persist.
+ * DiskBalancer's information to persist and for report.
+ * Report-only fields (idealUsage, volumeInfo) are NOT persisted to YAML.
  */
 public class DiskBalancerInfo {
   private DiskBalancerRunningStatus operationalState;
@@ -35,33 +39,42 @@ public class DiskBalancerInfo {
   private long bytesToMove;
   private long balancedBytes;
   private double volumeDataDensity;
+  private String containerStates;
+  // Report-only: ideal usage from volume snapshot. NOT persisted.
+  private double idealUsage;
+  // Report-only: per-volume info. NOT persisted.
+  private List<VolumeReportProto> volumeInfo;
 
   public DiskBalancerInfo(DiskBalancerRunningStatus operationalState, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
     this(operationalState, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
-        DiskBalancerVersion.DEFAULT_VERSION);
+        DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, DiskBalancerVersion.DEFAULT_VERSION);
   }
 
   public DiskBalancerInfo(DiskBalancerRunningStatus operationalState, double threshold,
-      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven,
+      String containerStates, DiskBalancerVersion version) {
     this.operationalState = operationalState;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
     this.stopAfterDiskEven = stopAfterDiskEven;
+    this.containerStates = containerStates;
     this.version = version;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public DiskBalancerInfo(DiskBalancerRunningStatus operationalState, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version,
-      long successCount, long failureCount, long bytesToMove, long balancedBytes, double volumeDataDensity) {
+      String containerStates, long successCount, long failureCount, long bytesToMove,
+      long balancedBytes, double volumeDataDensity) {
     this.operationalState = operationalState;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
     this.stopAfterDiskEven = stopAfterDiskEven;
     this.version = version;
+    this.containerStates = containerStates;
     this.successCount = successCount;
     this.failureCount = failureCount;
     this.bytesToMove = bytesToMove;
@@ -80,6 +93,7 @@ public class DiskBalancerInfo {
     this.bandwidthInMB = diskBalancerConf.getDiskBandwidthInMB();
     this.parallelThread = diskBalancerConf.getParallelThread();
     this.stopAfterDiskEven = diskBalancerConf.isStopAfterDiskEven();
+    this.containerStates = diskBalancerConf.getContainerStates();
     this.version = DiskBalancerVersion.DEFAULT_VERSION;
   }
 
@@ -96,6 +110,9 @@ public class DiskBalancerInfo {
     if (stopAfterDiskEven != diskBalancerConf.isStopAfterDiskEven()) {
       setStopAfterDiskEven(diskBalancerConf.isStopAfterDiskEven());
     }
+    if (!Objects.equals(containerStates, diskBalancerConf.getContainerStates())) {
+      setContainerStates(diskBalancerConf.getContainerStates());
+    }
   }
 
   /**
@@ -109,7 +126,16 @@ public class DiskBalancerInfo {
     config.setDiskBandwidthInMB(this.bandwidthInMB);
     config.setParallelThread(this.parallelThread);
     config.setStopAfterDiskEven(this.stopAfterDiskEven);
+    config.setContainerStates(this.containerStates);
     return config;
+  }
+
+  public String getContainerStates() {
+    return containerStates;
+  }
+
+  public void setContainerStates(String containerStates) {
+    this.containerStates = containerStates;
   }
 
   public DiskBalancerRunningStatus getOperationalState() {
@@ -208,6 +234,22 @@ public class DiskBalancerInfo {
     this.volumeDataDensity = volumeDataDensity;
   }
 
+  public double getIdealUsage() {
+    return idealUsage;
+  }
+
+  public void setIdealUsage(double idealUsage) {
+    this.idealUsage = idealUsage;
+  }
+
+  public List<VolumeReportProto> getVolumeInfo() {
+    return volumeInfo != null ? volumeInfo : Collections.emptyList();
+  }
+
+  public void setVolumeInfo(List<VolumeReportProto> volumeInfo) {
+    this.volumeInfo = volumeInfo;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -222,12 +264,13 @@ public class DiskBalancerInfo {
         bandwidthInMB == that.bandwidthInMB &&
         parallelThread == that.parallelThread &&
         stopAfterDiskEven == that.stopAfterDiskEven &&
-        version == that.version;
+        version == that.version &&
+        Objects.equals(containerStates, that.containerStates);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(operationalState, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
-        version);
+        version, containerStates);
   }
 }

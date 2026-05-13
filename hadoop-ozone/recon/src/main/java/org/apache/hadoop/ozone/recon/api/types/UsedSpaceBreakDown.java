@@ -47,22 +47,22 @@ public class UsedSpaceBreakDown {
   @JsonProperty("openKeyBytes")
   private OpenKeyBytesInfo openKeyBytes;
 
-  @JsonProperty("committedKeyBytes")
-  private long committedKeyBytes;
+  @JsonProperty("finalizedKeyBytes")
+  private long finalizedKeyBytes;
 
   public UsedSpaceBreakDown() {
   }
 
-  public UsedSpaceBreakDown(OpenKeyBytesInfo openKeyBytes, long committedKeyBytes) {
+  public UsedSpaceBreakDown(OpenKeyBytesInfo openKeyBytes, long finalizedKeyBytes) {
     this.openKeyBytes = openKeyBytes;
-    this.committedKeyBytes = committedKeyBytes;
+    this.finalizedKeyBytes = finalizedKeyBytes;
   }
 
   public OpenKeyBytesInfo getOpenKeyBytes() {
     return openKeyBytes;
   }
 
-  public long getCommittedKeyBytes() {
-    return committedKeyBytes;
+  public long getFinalizedKeyBytes() {
+    return finalizedKeyBytes;
   }
 }

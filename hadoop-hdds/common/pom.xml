@@ -258,6 +258,9 @@
           <annotationProcessors>
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
           </annotationProcessors>
+          <compilerArgs>
+            <arg>-AartifactId=${project.artifactId}</arg>
+          </compilerArgs>
         </configuration>
       </plugin>
       <plugin>

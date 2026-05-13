@@ -87,7 +87,7 @@ public class TestSCMDbCheckpointServlet {
         .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    scmMetrics = StorageContainerManager.getMetrics();
+    scmMetrics = scm.getMetrics();
 
     requestMock = mock(HttpServletRequest.class);
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))
@@ -252,9 +252,9 @@ public class TestSCMDbCheckpointServlet {
     String endBoundary = boundary + "--" + crNl;
     StringBuilder sb = new StringBuilder();
     toExcludeList.forEach(sfn -> {
-      sb.append(boundary).append(crNl);
-      sb.append(contentDisposition);
-      sb.append(sfn).append(crNl);
+      sb.append(boundary).append(crNl)
+          .append(contentDisposition)
+          .append(sfn).append(crNl);
     });
     sb.append(endBoundary);
 

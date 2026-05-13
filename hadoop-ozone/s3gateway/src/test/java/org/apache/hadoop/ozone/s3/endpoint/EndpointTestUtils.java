@@ -31,6 +31,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -246,16 +247,16 @@ public final class EndpointTestUtils {
     }
   }
 
-  /** Verify error response for {@code request} matches {@code expected} {@link OS3Exception}. */
-  public static OS3Exception assertErrorResponse(OS3Exception expected, CheckedRunnable<?> request) {
+  /** Verify error response for {@code request} matches {@code expected} {@link S3ErrorTable}. */
+  public static OS3Exception assertErrorResponse(S3ErrorTable expected, CheckedRunnable<?> request) {
     OS3Exception actual = assertThrows(OS3Exception.class, request::run);
     assertEquals(expected.getCode(), actual.getCode());
     assertEquals(expected.getHttpCode(), actual.getHttpCode());
     return actual;
   }
 
-  /** Verify error response for {@code request} matches {@code expected} {@link OS3Exception}. */
-  public static OS3Exception assertErrorResponse(OS3Exception expected, CheckedSupplier<Response, ?> request) {
+  /** Verify error response for {@code request} matches {@code expected} {@link S3ErrorTable}. */
+  public static OS3Exception assertErrorResponse(S3ErrorTable expected, CheckedSupplier<Response, ?> request) {
     OS3Exception actual = assertThrows(OS3Exception.class, () -> request.get().close());
     assertEquals(expected.getCode(), actual.getCode());
     assertEquals(expected.getHttpCode(), actual.getHttpCode());

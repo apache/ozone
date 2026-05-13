@@ -38,7 +38,8 @@ public class TestOSTSExceptions {
 
   @Test
   public void testOSTSException() throws Exception {
-    final OSTSException ex = new OSTSException("ValidationError", "1 validation error detected", 400);
+    final OSTSException ex = new OSTSException(S3ErrorTable.STS_VALIDATION_ERROR)
+        .withMessage("1 validation error detected");
     final String requestId = OzoneUtils.getRequestID();
     ex.setRequestId(requestId);
     final String val = ex.toXml();
@@ -58,7 +59,8 @@ public class TestOSTSExceptions {
 
   @Test
   public void testOSTSExceptionInvalidAction() throws Exception {
-    final OSTSException ex = new OSTSException("InvalidAction", "Could not find operation", 400);
+    final OSTSException ex = new OSTSException(S3ErrorTable.STS_INVALID_ACTION)
+        .withMessage("Could not find operation");
     final String requestId = OzoneUtils.getRequestID();
     ex.setRequestId(requestId);
     final String val = ex.toXml();
@@ -76,7 +78,7 @@ public class TestOSTSExceptions {
 
   @Test
   public void testOSTSExceptionWithCustomType() throws Exception {
-    final OSTSException ex = new OSTSException("InternalFailure", "An internal error has occurred.", 500, "Receiver");
+    final OSTSException ex = new OSTSException(S3ErrorTable.STS_INTERNAL_FAILURE).withType("Receiver");
     final String requestId = OzoneUtils.getRequestID();
     ex.setRequestId(requestId);
     final String val = ex.toXml();

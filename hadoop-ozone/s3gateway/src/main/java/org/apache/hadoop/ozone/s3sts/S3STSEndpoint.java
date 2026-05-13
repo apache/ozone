@@ -18,9 +18,14 @@
 package org.apache.hadoop.ozone.s3sts;
 
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
-import static javax.ws.rs.core.Response.Status.FORBIDDEN;
-import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
-import static javax.ws.rs.core.Response.Status.NOT_IMPLEMENTED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.STS_INTERNAL_FAILURE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.STS_INVALID_ACTION;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.STS_INVALID_ACTION_NOT_IMPLEMENTED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.STS_INVALID_CLIENT_TOKEN_ID;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.STS_MALFORMED_POLICY_DOCUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.STS_UNSUPPORTED_OPERATION;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.STS_VALIDATION_ERROR;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -82,13 +87,6 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final String GET_ACCESS_KEY_INFO_ACTION = "GetAccessKeyInfo";
 
   private static final String EXPECTED_VERSION = "2011-06-15";
-  private static final String VALIDATION_ERROR = "ValidationError";
-  private static final String INVALID_ACTION = "InvalidAction";
-  private static final String INTERNAL_FAILURE = "InternalFailure";
-  private static final String ACCESS_DENIED = "AccessDenied";
-  private static final String INVALID_CLIENT_TOKEN_ID = "InvalidClientTokenId";
-  private static final String UNSUPPORTED_OPERATION = "UnsupportedOperation";
-  private static final String MALFORMED_POLICY_DOCUMENT = "MalformedPolicyDocument";
 
   // JAXBContext is relatively expensive to create and is threadsafe, so cache and reuse
   private static final JAXBContext JAXB_CONTEXT;
@@ -180,20 +178,18 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       case GET_CALLER_IDENTITY_ACTION:
       case DECODE_AUTHORIZATION_MESSAGE_ACTION:
       case GET_ACCESS_KEY_INFO_ACTION:
-        throw new OSTSException(
-            INVALID_ACTION, "Operation " + action + " is not supported yet.", NOT_IMPLEMENTED.getStatusCode());
+        throw new OSTSException(STS_INVALID_ACTION_NOT_IMPLEMENTED)
+            .withMessage("Operation " + action + " is not supported yet.");
       default:
-        throw new OSTSException(
-            INVALID_ACTION, "Could not find operation " + action + " for version " +
-            (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version),
-            BAD_REQUEST.getStatusCode());
+        throw new OSTSException(STS_INVALID_ACTION)
+            .withMessage("Could not find operation " + action + " for version " +
+                (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version));
       }
     } catch (OSTSException e) {
       throw e;
     } catch (Exception ex) {
       LOG.error("Unexpected error during STS request", ex);
-      throw new OSTSException(
-          INTERNAL_FAILURE, "An internal error has occurred.", INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
+      throw new OSTSException(STS_INTERNAL_FAILURE, ex).withType("Receiver");
     }
   }
 
@@ -208,10 +204,9 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
     // Validate parameters
     if (version == null || !version.equals(EXPECTED_VERSION)) {
-      final OSTSException exception = new OSTSException(
-          INVALID_ACTION, "Could not find operation " + action + " for version " +
-          (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version),
-          BAD_REQUEST.getStatusCode());
+      final OSTSException exception = new OSTSException(STS_INVALID_ACTION)
+          .withMessage("Could not find operation " + action + " for version " +
+              (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version));
       getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
       throw exception;
     }
@@ -250,14 +245,13 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     final int numValidationErrors = validationErrors.size();
     if (numValidationErrors > 0) {
       //noinspection StringBufferReplaceableByString
-      final StringBuilder builder = new StringBuilder();
-      builder.append(numValidationErrors);
-      builder.append(" validation ");
-      builder.append(numValidationErrors > 1 ? "errors detected: " : "error detected: ");
-      builder.append(String.join(";", validationErrors));
+      final StringBuilder builder = new StringBuilder()
+          .append(numValidationErrors)
+          .append(" validation ")
+          .append(numValidationErrors > 1 ? "errors detected: " : "error detected: ")
+          .append(String.join(";", validationErrors));
       final String validationMessage = builder.toString();
-      final OSTSException exception = new OSTSException(
-          VALIDATION_ERROR, validationMessage, BAD_REQUEST.getStatusCode());
+      final OSTSException exception = new OSTSException(STS_VALIDATION_ERROR).withMessage(validationMessage);
       getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
       throw exception;
     }
@@ -285,28 +279,24 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         if (omException.getResult() == OMException.ResultCodes.ACCESS_DENIED ||
             omException.getResult() == OMException.ResultCodes.PERMISSION_DENIED ||
             omException.getResult() == OMException.ResultCodes.TOKEN_EXPIRED) {
-          throw new OSTSException(
-              ACCESS_DENIED, "User is not authorized to perform: sts:AssumeRole on resource: " + roleArn,
-              FORBIDDEN.getStatusCode());
+          throw new OSTSException(ACCESS_DENIED)
+              .withMessage("User is not authorized to perform: sts:AssumeRole on resource: " + roleArn);
         }
         if (omException.getResult() == OMException.ResultCodes.INVALID_TOKEN) {
-          throw new OSTSException(
-              INVALID_CLIENT_TOKEN_ID, "The security token included in the request is invalid.",
-              FORBIDDEN.getStatusCode());
+          throw new OSTSException(STS_INVALID_CLIENT_TOKEN_ID);
         }
         if (omException.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION ||
             omException.getResult() == OMException.ResultCodes.FEATURE_NOT_ENABLED) {
-          throw new OSTSException(UNSUPPORTED_OPERATION, omException.getMessage(), NOT_IMPLEMENTED.getStatusCode());
+          throw new OSTSException(STS_UNSUPPORTED_OPERATION).withMessage(omException.getMessage());
         }
         if (omException.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
-          throw new OSTSException(VALIDATION_ERROR, omException.getMessage(), BAD_REQUEST.getStatusCode());
+          throw new OSTSException(STS_VALIDATION_ERROR).withMessage(omException.getMessage());
         }
         if (omException.getResult() == OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT) {
-          throw new OSTSException(MALFORMED_POLICY_DOCUMENT, omException.getMessage(), BAD_REQUEST.getStatusCode());
+          throw new OSTSException(STS_MALFORMED_POLICY_DOCUMENT).withMessage(omException.getMessage());
         }
       }
-      throw new OSTSException(
-          INTERNAL_FAILURE, "An internal error has occurred.", INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
+      throw new OSTSException(STS_INTERNAL_FAILURE, e).withType("Receiver");
     } catch (Exception e) {
       getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, e));
       throw e;

@@ -222,6 +222,77 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT = "10m";
 
   /**
+   * Application-level ceiling on the number of ContainerIDs fetched from SCM
+   * per RPC call during container sync. The effective batch size is
+   * {@code min(this value, ipc.maximum.data.length / 12, totalContainerCount)},
+   * so raising this above the default is only meaningful if
+   * {@code ipc.maximum.data.length} has also been raised from its default.
+   *
+   * <p><b>Recon wire cost</b>: each ContainerID is ~12 bytes on the wire, so
+   * the default 1,000,000 produces ~12 MB per RPC.
+   *
+   * <p><b>Recon JVM heap</b>: each deserialized {@code ContainerID} object
+   * occupies ~32 bytes, so the default batch requires ~32 MB of heap on Recon.
+   * Reduce this value on memory-constrained Recon nodes.
+   *
+   * <p><b>SCM-side pressure</b>: on each RPC call SCM holds its container
+   * state read lock (a fair {@link java.util.concurrent.locks.ReentrantReadWriteLock})
+   * for the full duration of streaming N entries from its in-memory
+   * {@link java.util.TreeMap} and collecting them into a response list.
+   * Because the lock is fair, any concurrent write (container allocation,
+   * state transition) queuing for the write lock will be blocked for the
+   * entire batch duration — and new reads queue behind that waiting writer.
+   * Larger batches therefore increase worst-case container-allocation latency
+   * on SCM during sync. On write-heavy SCM nodes, prefer smaller batches with
+   * more calls over fewer large batches.
+   *
+   * <p>Default: 1,000,000 (~12 MB wire, ~32 MB JVM heap per batch on Recon;
+   * 4 calls for a 4 M-container cluster)
+   */
+  public static final String OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE =
+      "ozone.recon.scm.container.id.batch.size";
+  public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
+
+  /**
+   * JDBC fetch size for CSV exports.
+   * Default: 10,000 rows per fetch
+   */
+  public static final String OZONE_RECON_UNHEALTHY_CONTAINER_FETCH_SIZE =
+      "ozone.recon.unhealthy.container.fetch.size";
+  public static final int OZONE_RECON_UNHEALTHY_CONTAINER_FETCH_SIZE_DEFAULT = 10_000;
+
+  /**
+   * Max export jobs that can sit in the queue (waiting + executing) at once.
+   * Submissions beyond this limit are rejected with HTTP 429.
+   * Kept small because export is single-threaded and the unhealthy-container
+   * states it can be invoked for are bounded (~5).
+   * Default: 4
+   */
+  public static final String OZONE_RECON_EXPORT_MAX_JOBS_TOTAL =
+      "ozone.recon.export.max.jobs.total";
+  public static final int OZONE_RECON_EXPORT_MAX_JOBS_TOTAL_DEFAULT = 4;
+
+  /**
+   * Directory to store export CSV files.
+   * Default: /tmp/recon/exports
+   */
+  public static final String OZONE_RECON_EXPORT_DIRECTORY =
+      "ozone.recon.export.directory";
+
+  // Default is resolved at runtime as {ozone.recon.db.dir}/exports.
+  // Empty string signals ExportJobManager to compute the path dynamically.
+  public static final String OZONE_RECON_EXPORT_DIRECTORY_DEFAULT = "";
+
+  /**
+   * Maximum number of times a completed export TAR file can be downloaded.
+   * Prevents repeated downloads from filling up network bandwidth or being misused.
+   * Default: 3
+   */
+  public static final String OZONE_RECON_EXPORT_MAX_DOWNLOADS =
+      "ozone.recon.export.max.downloads";
+  public static final int OZONE_RECON_EXPORT_MAX_DOWNLOADS_DEFAULT = 3;
+
+  /**
    * Private constructor for utility class.
    */
   private ReconServerConfigKeys() {

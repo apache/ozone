@@ -105,8 +105,6 @@ class MultipartKeyHandler extends ObjectOperationHandler {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucket, ex);
       }
       throw ex;
     }

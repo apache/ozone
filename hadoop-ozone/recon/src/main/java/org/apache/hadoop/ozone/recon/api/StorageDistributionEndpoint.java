@@ -97,7 +97,7 @@ public class StorageDistributionEndpoint {
   public Response getStorageDistribution() {
     try {
       List<DatanodeStorageReport> nodeStorageReports = collectDatanodeReports();
-      GlobalStorageReport globalStorageReport = calculateGlobalStorageReport();
+      GlobalStorageReport globalStorageReport = calculateGlobalStorageReport(nodeStorageReports);
       OpenKeyBytesInfo totalOpenKeySize;
       try {
         totalOpenKeySize = calculateOpenKeySizes();
@@ -113,7 +113,7 @@ public class StorageDistributionEndpoint {
         LOG.error("Error calculating namespace metrics", e);
         // Initialize with default values
         namespaceMetrics.put("totalUsedNamespace", 0L);
-        namespaceMetrics.put("totalCommittedSize", 0L);
+        namespaceMetrics.put("totalFinalizedKeyBytes", 0L);
         namespaceMetrics.put("pendingDirectorySize", 0L);
         namespaceMetrics.put("pendingKeySize", 0L);
         namespaceMetrics.put("totalKeys", 0L);
@@ -221,38 +221,47 @@ public class StorageDistributionEndpoint {
     return ReconUtils.downloadCsv("datanode_storage_and_pending_deletion_stats.csv", headers, data, columns);
   }
 
-  private GlobalStorageReport calculateGlobalStorageReport() {
-    GlobalStorageReport.Builder globalStorageBuilder = GlobalStorageReport.newBuilder();
-    try {
-      SCMNodeStat stats = nodeManager.getStats();
-      if (stats == null) {
-        LOG.warn("Node manager stats are null, returning default values");
-        return globalStorageBuilder.build();
-      }
+  /**
+   * Aggregates the global storage report by summing fields from the already-collected
+   * per-DN list. This guarantees that {@code globalStorage} and {@code dataNodeUsage}
+   * always reflect the same in-memory snapshot, eliminating the race window that existed
+   * when a separate {@code nodeManager.getStats()} call was made after the DN list was read.
+   */
+  private GlobalStorageReport calculateGlobalStorageReport(List<DatanodeStorageReport> reports) {
+    long capacity = 0L;
+    long used = 0L;
+    long remaining = 0L;
+    long committed = 0L;
+    long minFreeSpace = 0L;
+    long reserved = 0L;
 
-      return globalStorageBuilder
-          .setTotalOzoneCapacity(stats.getCapacity() != null ? stats.getCapacity().get() : 0L)
-          .setTotalReservedSpace(stats.getReserved() != null ? stats.getReserved().get() : 0L)
-          .setTotalOzoneFreeSpace(stats.getRemaining() != null ? stats.getRemaining().get() : 0L)
-          .setTotalOzoneUsedSpace(stats.getScmUsed() != null ? stats.getScmUsed().get() : 0L)
-          .setTotalOzonePreAllocatedContainerSpace(stats.getCommitted() != null ? stats.getCommitted().get() : 0L)
-          .setTotalMinimumFreeSpace(stats.getFreeSpaceToSpare() != null ? stats.getFreeSpaceToSpare().get() : 0L)
-          .build();
-
-    } catch (Exception e) {
-      LOG.error("Error calculating global storage report", e);
-      return globalStorageBuilder.build();
+    for (DatanodeStorageReport report : reports) {
+      capacity += report.getCapacity();
+      used += report.getUsed();
+      remaining += report.getRemaining();
+      committed += report.getCommitted();
+      minFreeSpace += report.getMinimumFreeSpace();
+      reserved += report.getReserved();
     }
+
+    return GlobalStorageReport.newBuilder()
+        .setTotalOzoneCapacity(capacity)
+        .setTotalReservedSpace(reserved)
+        .setTotalOzoneFreeSpace(remaining)
+        .setTotalOzoneUsedSpace(used)
+        .setTotalOzoneCommittedSpace(committed)
+        .setTotalMinimumFreeSpace(minFreeSpace)
+        .build();
   }
 
   private Map<String, Long> calculateNamespaceMetrics(OpenKeyBytesInfo totalOpenKeySize) throws IOException {
     Map<String, Long> metrics = new HashMap<>();
     Map<String, Long> totalPendingAtOmSide = reconGlobalMetricsService.calculatePendingSizes();
-    long totalCommittedSize = calculateCommittedSize();
+    long totalFinalizedKeyBytes = calculateFinalizedKeyBytesSize();
     long pendingDirectorySize = totalPendingAtOmSide.getOrDefault("pendingDirectorySize", 0L);
     long pendingKeySize = totalPendingAtOmSide.getOrDefault("pendingKeySize", 0L);
     long totalUsedNamespace = pendingDirectorySize + pendingKeySize +
-        totalOpenKeySize.getTotalOpenKeyBytes() + totalCommittedSize;
+        totalOpenKeySize.getTotalOpenKeyBytes() + totalFinalizedKeyBytes;
 
     long totalKeys = 0L;
     // Keys from OBJECT_STORE buckets.
@@ -267,7 +276,7 @@ public class StorageDistributionEndpoint {
     if (fileRecord != null) {
       totalKeys += fileRecord.getValue();
     }
-    metrics.put("totalCommittedSize", totalCommittedSize);
+    metrics.put("totalFinalizedKeyBytes", totalFinalizedKeyBytes);
     metrics.put("totalUsedNamespace", totalUsedNamespace);
     metrics.put("totalKeys", totalKeys);
     return metrics;
@@ -281,7 +290,7 @@ public class StorageDistributionEndpoint {
 
     // Safely get values from namespaceMetrics with null checks
     Long totalUsedNamespace = namespaceMetrics.get("totalUsedNamespace");
-    Long totalCommittedSize = namespaceMetrics.get("totalCommittedSize");
+    Long totalFinalizedKeyBytes = namespaceMetrics.get("totalFinalizedKeyBytes");
     Long totalKeys = namespaceMetrics.get("totalKeys");
 
     return StorageCapacityDistributionResponse.newBuilder()
@@ -291,7 +300,7 @@ public class StorageDistributionEndpoint {
                     totalUsedNamespace != null ? totalUsedNamespace : 0L,
                     totalKeys != null ? totalKeys : 0L))
             .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
-                    totalOpenKeySize, totalCommittedSize != null ? totalCommittedSize : 0L))
+                    totalOpenKeySize, totalFinalizedKeyBytes != null ? totalFinalizedKeyBytes : 0L))
             .build();
   }
 
@@ -310,7 +319,7 @@ public class StorageDistributionEndpoint {
     return new OpenKeyBytesInfo(openKeyDataSize, totalMPUKeySize);
   }
 
-  private long calculateCommittedSize() {
+  private long calculateFinalizedKeyBytesSize() {
     try {
       Response rootResponse = nsSummaryEndpoint.getDiskUsage("/", false, true, false);
       if (rootResponse.getStatus() != Response.Status.OK.getStatusCode()) {
@@ -320,7 +329,7 @@ public class StorageDistributionEndpoint {
       DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
       return duRootRes != null ? duRootRes.getSizeWithReplica() : 0L;
     } catch (IOException e) {
-      LOG.error("IOException while calculating committed size", e);
+      LOG.error("IOException while calculating finalized keys size", e);
       return 0L;
     }
   }

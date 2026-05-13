@@ -145,14 +145,14 @@ public final class S3STSUtils {
     final String roleName = resource.substring("role/".length());
 
     //noinspection StringBufferReplaceableByString
-    final StringBuilder stringBuilder = new StringBuilder("arn:");
-    stringBuilder.append(partition);
-    stringBuilder.append(":sts::");
-    stringBuilder.append(accountId);
-    stringBuilder.append(":assumed-role/");
-    stringBuilder.append(roleName);
-    stringBuilder.append('/');
-    stringBuilder.append(roleSessionName);
+    final StringBuilder stringBuilder = new StringBuilder("arn:")
+        .append(partition)
+        .append(":sts::")
+        .append(accountId)
+        .append(":assumed-role/")
+        .append(roleName)
+        .append('/')
+        .append(roleSessionName);
     return stringBuilder.toString();
   }
 

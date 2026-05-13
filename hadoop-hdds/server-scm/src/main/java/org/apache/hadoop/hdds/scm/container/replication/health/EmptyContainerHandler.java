@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
@@ -31,7 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This handler deletes a container if it's closed and empty (0 key count)
+ * This handler deletes a container if it's closed or quasi-closed and empty (0 key count)
  * and all its replicas are empty.
  */
 public class EmptyContainerHandler extends AbstractCheck {
@@ -45,8 +46,8 @@ public class EmptyContainerHandler extends AbstractCheck {
   }
 
   /**
-   * Deletes a container if it's closed and empty (0 key count) and all its
-   * replicas are closed and empty.
+   * Deletes a container if it's closed or quasi-closed and empty (0 key count) and all its
+   * replicas are empty.
    * @param request ContainerCheckRequest object representing the container
    * @return true if the specified container is empty, otherwise false
    */
@@ -73,6 +74,37 @@ public class EmptyContainerHandler extends AbstractCheck {
         // Update the container's state
         replicationManager.updateContainerState(
             containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
+      }
+      return true;
+    } else if (isContainerEmptyAndQuasiClosed(containerInfo, replicas)) {
+      request.getReport().incrementAndSample(ContainerHealthState.EMPTY, containerInfo);
+      if (!request.isReadOnly()) {
+        String originIds = replicas.stream()
+            .map(r -> r.getOriginDatanodeId().toString())
+            .collect(Collectors.joining(", "));
+        long maxReplicaBCSID = replicas.stream()
+            .filter(r -> r.getSequenceId() != null)
+            .mapToLong(ContainerReplica::getSequenceId)
+            .max()
+            .orElse(containerInfo.getSequenceId());
+        
+        // Update container bcsId to max replica bcsId before deletion
+        // This ensures resurrection logic uses the correct bcsId for stale replica detection
+        if (maxReplicaBCSID > containerInfo.getSequenceId()) {
+          LOG.info("Updating bcsId for empty QUASI_CLOSED container {} from {} to {} before deletion",
+              containerInfo.containerID(), containerInfo.getSequenceId(), maxReplicaBCSID);
+          containerInfo.updateSequenceId(maxReplicaBCSID);
+        }
+        
+        LOG.info("Deleting empty QUASI_CLOSED container {} (container BCSID={}, max replica BCSID={}) with {} " +
+            "replicas from originIds: [{}]. If resurrected, container will transition to QUASI_CLOSED",
+            containerInfo.containerID(), containerInfo.getSequenceId(), maxReplicaBCSID,
+            replicas.size(), originIds);
+        // Update the container's state
+        replicationManager.updateContainerState(
+                containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
+        // Delete replicas AFTER transitioning to DELETING state
+        deleteContainerReplicas(containerInfo, replicas);
       }
       return true;
     } else if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED
@@ -114,20 +146,44 @@ public class EmptyContainerHandler extends AbstractCheck {
   }
 
   /**
-   * Deletes the specified container's replicas if they are closed and empty.
+   * Returns true if the container is empty and QUASI_CLOSED.
+   * For QUASI_CLOSED containers, replicas can be in QUASI_CLOSED, OPEN,
+   * CLOSING, or UNHEALTHY states. We check if all replicas are empty regardless
+   * of their state.
+   *
+   * @param container Container to check
+   * @param replicas Set of ContainerReplica
+   * @return true if the container is considered empty and quasi-closed, false otherwise
+   */
+  private boolean isContainerEmptyAndQuasiClosed(final ContainerInfo container,
+      final Set<ContainerReplica> replicas) {
+    return container.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED &&
+            !replicas.isEmpty() &&
+            replicas.stream().allMatch(ContainerReplica::isEmpty);
+  }
+
+  /**
+   * Deletes the specified container's replicas if they are empty.
+   * For CLOSED containers, replicas must also be CLOSED.
+   * For QUASI_CLOSED containers, replicas can be in any state (QUASI_CLOSED, OPEN, CLOSING, UNHEALTHY),
+   * but delete commands should be sent to replicas in stable states (QUASI_CLOSED or CLOSED).
    *
    * @param containerInfo ContainerInfo to delete
    * @param replicas Set of ContainerReplica
    */
   private void deleteContainerReplicas(final ContainerInfo containerInfo,
       final Set<ContainerReplica> replicas) {
-    Preconditions.assertSame(HddsProtos.LifeCycleState.CLOSED,
-        containerInfo.getState(), "container state");
-
     for (ContainerReplica rp : replicas) {
-      Preconditions.assertSame(ContainerReplicaProto.State.CLOSED,
-          rp.getState(), "replica state");
       Preconditions.assertSame(true, rp.isEmpty(), "replica empty");
+
+      // Only send delete commands to replicas in CLOSED/QUASI_CLOSED states
+      if (rp.getState() != ContainerReplicaProto.State.QUASI_CLOSED
+          && rp.getState() != ContainerReplicaProto.State.CLOSED) {
+        LOG.info("Skipping delete command for replica in {} state for empty container {} on datanode {}. " +
+            "Will retry after replica transitions to QUASI_CLOSED or CLOSED.",
+            rp.getState(), containerInfo.containerID(), rp.getDatanodeDetails());
+        continue;
+      }
 
       try {
         replicationManager.sendDeleteCommand(containerInfo,

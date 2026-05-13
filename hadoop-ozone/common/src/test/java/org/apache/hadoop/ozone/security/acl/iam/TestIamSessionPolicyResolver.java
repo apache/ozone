@@ -2222,28 +2222,28 @@ public class TestIamSessionPolicyResolver {
 
   private static String createJsonStringLargerThan2048Characters() {
     final StringBuilder jsonBuilder = new StringBuilder();
-    jsonBuilder.append("{\n");
-    jsonBuilder.append("  \"Statement\": [{\n");
-    jsonBuilder.append("    \"Effect\": \"Allow\",\n");
-    jsonBuilder.append("    \"Action\": \"s3:ListBucket\",\n");
-    jsonBuilder.append("    \"Resource\": \"arn:aws:s3:::");
+    jsonBuilder.append("{\n")
+        .append("  \"Statement\": [{\n")
+        .append("    \"Effect\": \"Allow\",\n")
+        .append("    \"Action\": \"s3:ListBucket\",\n")
+        .append("    \"Resource\": \"arn:aws:s3:::");
     // Add enough characters to exceed 2048
     while (jsonBuilder.length() < 2048) {
       jsonBuilder.append("very-long-bucket-name-that-exceeds-the-limit-");
     }
-    jsonBuilder.append("\"\n");
-    jsonBuilder.append("  }]\n");
-    jsonBuilder.append('}');
+    jsonBuilder.append("\"\n")
+        .append("  }]\n")
+        .append('}');
     return jsonBuilder.toString();
   }
 
   private static String create2048CharJsonString() {
     final StringBuilder jsonBuilder = new StringBuilder();
-    jsonBuilder.append("{\n");
-    jsonBuilder.append("  \"Statement\": [{\n");
-    jsonBuilder.append("    \"Effect\": \"Allow\",\n");
-    jsonBuilder.append("    \"Action\": \"s3:ListBucket\",\n");
-    jsonBuilder.append("    \"Resource\": \"arn:aws:s3:::");
+    jsonBuilder.append("{\n")
+        .append("  \"Statement\": [{\n")
+        .append("    \"Effect\": \"Allow\",\n")
+        .append("    \"Action\": \"s3:ListBucket\",\n")
+        .append("    \"Resource\": \"arn:aws:s3:::");
     // Add characters to reach exactly 2048 (accounting for closing brackets and newlines)
     // Closing part: "\"\n  }]\n}" = 8 chars
     while (jsonBuilder.length() < 2048 - 8) {

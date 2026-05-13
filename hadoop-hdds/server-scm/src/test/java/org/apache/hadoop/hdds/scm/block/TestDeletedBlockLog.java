@@ -231,7 +231,8 @@ public class TestDeletedBlockLog {
       updateContainerMetadata(containerID, state);
       for (int j = 0; j < BLOCKS_PER_TXN; j++)  {
         long localID = localIDBase + j;
-        blocks.add(new DeletedBlock(new BlockID(containerID, localID), blockSize + j, blockSize + j));
+        blocks.add(new DeletedBlock(new BlockID(containerID, localID),
+            blockSize + j, blockSize + j, blockSize + j));
       }
       blockMap.put(containerID, blocks);
     }
@@ -733,7 +734,8 @@ public class TestDeletedBlockLog {
     Map<Long, List<DeletedBlock>> deletedBlocksMap = new HashMap<>();
     long localId = RandomUtils.secure().randomLong();
     List<DeletedBlock> blockIDList = new ArrayList<>();
-    blockIDList.add(new DeletedBlock(new BlockID(containerID, localId), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+    blockIDList.add(new DeletedBlock(new BlockID(containerID, localId),
+        SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
     deletedBlocksMap.put(containerID, blockIDList);
     addTransactions(deletedBlocksMap, true);
     blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
@@ -808,7 +810,8 @@ public class TestDeletedBlockLog {
     long containerID = 1000000;
     List<DeletedBlock> blocks = new ArrayList<>();
     for (int i = 0; i < blockCount; i++) {
-      blocks.add(new DeletedBlock(new BlockID(containerID, 100000000 + i), 128 * 1024 * 1024, 128 * 1024 * 1024));
+      blocks.add(new DeletedBlock(new BlockID(containerID, 100000000 + i),
+          128 * 1024 * 1024, 128 * 1024 * 1024, 128 * 1024 * 1024));
     }
     List<Long> localIdList = blocks.stream().map(b -> b.getBlockID().getLocalID()).collect(Collectors.toList());
     DeletedBlocksTransaction tx1 = DeletedBlocksTransaction.newBuilder()
@@ -818,6 +821,7 @@ public class TestDeletedBlockLog {
         .setCount(0)
         .setTotalBlockSize(blocks.stream().mapToLong(DeletedBlock::getSize).sum())
         .setTotalBlockReplicatedSize(blocks.stream().mapToLong(DeletedBlock::getReplicatedSize).sum())
+        .setTotalSizePerReplica(blocks.stream().mapToLong(DeletedBlock::getSizePerReplica).sum())
         .build();
     DeletedBlocksTransaction tx2 = DeletedBlocksTransaction.newBuilder()
         .setTxID(txID)

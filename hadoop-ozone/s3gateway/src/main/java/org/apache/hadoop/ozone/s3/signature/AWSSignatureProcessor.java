@@ -153,7 +153,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private String getPayloadHash(Map<String, String> headers, SignatureInfo signatureInfo)
       throws OS3Exception, NoSuchAlgorithmException, IOException {
     if (signatureInfo.getVersion() == Version.V2) {
-      throw S3_AUTHINFO_CREATION_ERROR;
+      throw S3ErrorTable.newError(S3_AUTHINFO_CREATION_ERROR);
     }
     if (signatureInfo.getService().equals("s3")) {
       if (!signatureInfo.isSignPayload()) {
@@ -169,7 +169,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       if (contentSignatureHeaderValue == null) {
         LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
             + " header for signed payload");
-        throw S3_AUTHINFO_CREATION_ERROR;
+        throw S3ErrorTable.newError(S3_AUTHINFO_CREATION_ERROR);
       }
       // Simply return the header value of x-amz-content-sha256 as the payload hash
       // These are the possible cases:
@@ -210,8 +210,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     int n;
     while ((n = in.read(chunk)) != -1) {
       if (totalRead + n > OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE) {
-        throw new OSTSException(
-            PAYLOAD_TOO_LARGE.getCode(), PAYLOAD_TOO_LARGE.getErrorMessage(), PAYLOAD_TOO_LARGE.getHttpCode());
+        throw new OSTSException(PAYLOAD_TOO_LARGE);
       }
       buffer.write(chunk, 0, n);
       totalRead += n;
@@ -309,7 +308,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
     @Override
     public String remove(Object key) {
-      return delegate.remove(key.toString());
+      return delegate.remove(key.toString().toLowerCase());
     }
 
     @Override

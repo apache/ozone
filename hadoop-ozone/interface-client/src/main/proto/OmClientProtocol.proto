@@ -156,9 +156,10 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
-  AssumeRole = 143;
-  RevokeSTSToken = 144;
-  DeleteRevokedSTSTokens = 145;
+  SubmitSnapshotDiff = 143;
+  AssumeRole = 144;
+  RevokeSTSToken = 145;
+  DeleteRevokedSTSTokens = 146;
 }
 
 enum SafeMode {
@@ -309,10 +310,11 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
-  optional AssumeRoleRequest                assumeRoleRequest              = 144;
-  optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 145;
-  optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 146;
-  optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 147;
+  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest      = 144;
+  optional AssumeRoleRequest                assumeRoleRequest              = 145;
+  optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 146;
+  optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 147;
+  optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 148;
 }
 
 message OMResponse {
@@ -446,9 +448,10 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse       = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse       = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse    = 142;
-  optional AssumeRoleResponse                assumeRoleResponse             = 143;
-  optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 144;
-  optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 145;
+  optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse     = 143;
+  optional AssumeRoleResponse                assumeRoleResponse             = 144;
+  optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 145;
+  optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 146;
 }
 
 enum Status {
@@ -579,8 +582,13 @@ enum Status {
 
     TOO_MANY_SNAPSHOTS = 98;
 
-    REVOKED_TOKEN = 99;
-    MALFORMED_POLICY_DOCUMENT = 100;
+    ETAG_MISMATCH = 99;
+
+    ETAG_NOT_AVAILABLE = 100;
+
+    ATOMIC_WRITE_CONFLICT = 101;
+    REVOKED_TOKEN = 102;
+    MALFORMED_POLICY_DOCUMENT = 103;
 }
 
 /**
@@ -1098,6 +1106,11 @@ message KeyArgs {
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
     optional uint64 expectedDataGeneration = 23;
+
+    // expectedETag, when set, indicates that the existing key must have
+    // the given ETag for the operation to succeed. This is used for
+    // S3 conditional writes with the If-Match header.
+    optional string expectedETag = 24;
 }
 
 message KeyLocation {
@@ -2049,6 +2062,15 @@ message SnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional string token = 5;
   optional uint32 pageSize = 6;
+  optional bool forceFullDiff = 7 [deprecated = true];
+  optional bool disableNativeDiff = 8 [deprecated = true];
+}
+
+message SubmitSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
   optional bool forceFullDiff = 7;
   optional bool disableNativeDiff = 8;
 }
@@ -2188,6 +2210,7 @@ message SnapshotDiffResponse {
     REJECTED = 4;
     FAILED = 5;
     CANCELLED = 6;
+    NOT_FOUND = 7;
   }
 
   enum SubStatus {
@@ -2203,6 +2226,10 @@ message SnapshotDiffResponse {
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
   optional SubStatus subStatus = 5;
+}
+
+message SubmitSnapshotDiffResponse {
+  optional string response = 1;
 }
 
 message CancelSnapshotDiffResponse {

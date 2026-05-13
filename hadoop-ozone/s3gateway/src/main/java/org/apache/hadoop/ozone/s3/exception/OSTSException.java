@@ -47,13 +47,26 @@ public class OSTSException extends OS3Exception {
 
   private String type = "Sender";
 
-  public OSTSException(String codeVal, String messageVal, int httpCode) {
-    super(codeVal, messageVal, httpCode);
+  public OSTSException(S3ErrorTable error) {
+    super(error, null, null);
   }
 
-  public OSTSException(String codeVal, String messageVal, int httpCode, String typeVal) {
-    this(codeVal, messageVal, httpCode);
+  public OSTSException(S3ErrorTable error, Exception cause) {
+    super(error, cause, null);
+  }
+
+  @Override
+  public OSTSException withMessage(String message) {
+    super.withMessage(message);
+    return this;
+  }
+
+  /**
+   * STS fault party (e.g. {@code Sender} vs {@code Receiver}); defaults to {@code Sender}.
+   */
+  public OSTSException withType(String typeVal) {
     this.type = typeVal;
+    return this;
   }
 
   public String getType() {

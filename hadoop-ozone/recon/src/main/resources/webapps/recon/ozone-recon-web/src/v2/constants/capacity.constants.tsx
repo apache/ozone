@@ -25,7 +25,7 @@ export const DEFAULT_CAPACITY_UTILIZATION: UtilizationResponse = {
     totalOzoneCapacity: 0,
     totalOzoneFreeSpace: 0,
     totalOzoneUsedSpace: 0,
-    totalOzonePreAllocatedContainerSpace: 0,
+    totalOzoneCommittedSpace: 0,
     totalMinimumFreeSpace: 0
   },
   globalNamespace: {
@@ -38,7 +38,7 @@ export const DEFAULT_CAPACITY_UTILIZATION: UtilizationResponse = {
       openKeyAndFileBytes: 0,
       multipartOpenKeyBytes: 0
     },
-    committedKeyBytes: 0
+    finalizedKeyBytes: 0
   },
   dataNodeUsage: []
 };

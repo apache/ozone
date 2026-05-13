@@ -28,12 +28,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.invoker.DeletedBlockLogStateManagerInvoker;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -153,18 +153,8 @@ public class DeletedBlockLogStateManagerImpl
           (k, v) -> v != null && v > tid ? v : tid);
       transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
     }
-    transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
-    containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
-  }
-
-  @Override
-  public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs) throws IOException {
-    Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
-    for (DeletedBlocksTransaction tx : txs) {
-      long tid = tx.getTxID();
-      containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
-          (k, v) -> v != null && v > tid ? v : tid);
-      transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
+    if (summary != null) {
+      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
     }
     containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
   }
@@ -178,36 +168,9 @@ public class DeletedBlockLogStateManagerImpl
     for (Long txID : txIDs) {
       transactionBuffer.removeFromBuffer(deletedTable, txID);
     }
-    transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
-  }
-
-  @Override
-  public void removeTransactionsFromDB(ArrayList<Long> txIDs) throws IOException {
-    if (deletingTxIDs != null) {
-      deletingTxIDs.addAll(txIDs);
+    if (summary != null) {
+      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
     }
-    for (Long txID : txIDs) {
-      transactionBuffer.removeFromBuffer(deletedTable, txID);
-    }
-  }
-
-  @Deprecated
-  @Override
-  public void increaseRetryCountOfTransactionInDB(
-      ArrayList<Long> txIDs) throws IOException {
-    // We don't store retry count in DB anymore.
-    // This method is being retained to ensure backward compatibility and prevent
-    // issues during minor upgrades. It will be removed in the future, during a major release.
-  }
-
-  @Deprecated
-  @Override
-  public int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
-      throws IOException {
-    // We don't reset retry count anymore.
-    // This method is being retained to ensure backward compatibility and prevent
-    // issues during minor upgrades. It will be removed in the future, during a major release.
-    return 0;
   }
 
   @Override
@@ -277,8 +240,7 @@ public class DeletedBlockLogStateManagerImpl
       final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
           deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);
 
-      return scmRatisServer.getProxyHandler(RequestType.BLOCK,
-          DeletedBlockLogStateManager.class, impl);
+      return scmRatisServer.getProxyHandler(new DeletedBlockLogStateManagerInvoker(impl, scmRatisServer));
     }
   }
 }

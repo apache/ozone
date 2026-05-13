@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -67,14 +68,34 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     doPreExecute(volumeName, bucketName);
   }
 
-  @Test
-  public void preExecuteRejectsInvalidBucketName() {
-    // Verify invalid bucket name throws exception
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "b1",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  })
+  public void preExecuteRejectsInvalidBucketNameLengthWhenStrictS3Enabled(
+      String bucketName) {
+    when(ozoneManager.isStrictS3()).thenReturn(true);
+
     OMException omException = assertThrows(OMException.class,
-        () -> doPreExecute("volume1", "b1"));
-    assertEquals(
-        "bucket name 'b1' is too short, valid length is 3-63 characters",
-        omException.getMessage());
+        () -> doPreExecute("volume1", bucketName));
+
+    assertThat(omException.getMessage())
+        .contains("bucket name")
+        .contains("valid length is 3-63 characters");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "b1",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  })
+  public void preExecuteAllowsInvalidLengthBucketNameWhenStrictS3Disabled(
+      String bucketName) throws Exception {
+
+    when(ozoneManager.isStrictS3()).thenReturn(false);
+
+    doPreExecute("volume1", bucketName);
   }
 
   @Test

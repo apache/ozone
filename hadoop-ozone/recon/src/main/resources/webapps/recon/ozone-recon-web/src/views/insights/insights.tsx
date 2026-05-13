@@ -156,13 +156,18 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         filteredData = filteredData.filter(item => selectedBucketValues.has(item.bucket));
       }
 
-      const xyFileCountMap: Map<number, number> = filteredData.reduce(
+      const unsortedFileCountMap: Map<number, number> = filteredData.reduce(
         (map: Map<number, number>, current) => {
           const fileSize = current.fileSize;
           const oldCount = map.has(fileSize) ? map.get(fileSize)! : 0;
           map.set(fileSize, oldCount + current.count);
           return map;
         }, new Map<number, number>());
+      // Sort by file size so that labels and bar values are both in ascending
+      // size order, preventing label-value misalignment.
+      const xyFileCountMap = new Map(
+        [...unsortedFileCountMap.entries()].sort((a, b) => a[0] - b[0])
+      );
       // Calculate the previous power of 2 to find the lower bound of the range
       // Ex: for 2048, the lower bound is 1024
       const xFileCountValues = Array.from(xyFileCountMap.keys()).map(value => {
@@ -174,13 +179,16 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
         return `${lowerbound} - ${upperbound}`;
       });
 
-      const xyContainerCountMap: Map<number, number> = containerCountResponse.reduce(
+      const unsortedContainerCountMap: Map<number, number> = containerCountResponse.reduce(
         (map: Map<number, number>, current) => {
           const containerSize = current.containerSize;
           const oldCount = map.has(containerSize) ? map.get(containerSize)! : 0;
           map.set(containerSize, oldCount + current.count);
           return map;
         }, new Map<number, number>());
+      const xyContainerCountMap = new Map(
+        [...unsortedContainerCountMap.entries()].sort((a, b) => a[0] - b[0])
+      );
       // Calculate the previous power of 2 to find the lower bound of the range
       // Ex: for 2048, the lower bound is 1024
       const xContainerCountValues = Array.from(xyContainerCountMap.keys()).map(value => {

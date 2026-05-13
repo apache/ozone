@@ -72,11 +72,11 @@ import picocli.CommandLine.Option;
 @Command(name = "cgdn",
     description = "Offline container metadata generator for Ozone Datanodes.",
     optionListHeading =
-        "\nExecute this command with different parameters for each datanodes. "
+        "%nExecute this command with different parameters for each datanodes. "
             + "For example if you have 10 datanodes, use "
             + "'ozone vapor cgdn --index=1 --datanodes=10', 'ozone vapor"
             + " cgdn --index=2 --datanodes=10', 'ozone vapor cgdn "
-            + "--index=3 --datanodes=10', ...\n\n",
+            + "--index=3 --datanodes=10', ...%n%n",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)

@@ -188,15 +188,15 @@ public class OFSPath {
     Objects.requireNonNull(authority, "authority == null");
     StringBuilder sb = new StringBuilder();
     if (!isMount()) {
-      sb.append(volumeName);
-      sb.append(OZONE_URI_DELIMITER);
+      sb.append(volumeName)
+          .append(OZONE_URI_DELIMITER);
       if (!bucketName.isEmpty()) {
-        sb.append(bucketName);
-        sb.append(OZONE_URI_DELIMITER);
+        sb.append(bucketName)
+            .append(OZONE_URI_DELIMITER);
       }
     } else {
-      sb.append(mountName);
-      sb.append(OZONE_URI_DELIMITER);
+      sb.append(mountName)
+          .append(OZONE_URI_DELIMITER);
     }
     if (!keyName.isEmpty()) {
       sb.append(keyName);

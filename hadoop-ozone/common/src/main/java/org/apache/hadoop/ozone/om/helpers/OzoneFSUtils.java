@@ -308,8 +308,8 @@ public final class OzoneFSUtils {
   public static String appendFileNameToKeyPath(String keyName,
                                                String fileName) {
     StringBuilder newToKeyName = new StringBuilder(keyName);
-    newToKeyName.append(OZONE_URI_DELIMITER);
-    newToKeyName.append(fileName);
+    newToKeyName.append(OZONE_URI_DELIMITER)
+        .append(fileName);
     return newToKeyName.toString();
   }
 

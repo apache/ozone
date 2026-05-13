@@ -64,6 +64,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // Original S3/list prefix when keyName is empty (root listing). Used for STS
   // auth to check LIST on this prefix instead of "*".
   private final String listPrefix;
+  private final String expectedETag;
 
   private OmKeyArgs(Builder b) {
     super(b);
@@ -86,6 +87,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
     this.listPrefix = b.listPrefix;
+    this.expectedETag = b.expectedETag;
   }
 
   public boolean getIsMultipartKey() {
@@ -176,6 +178,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return listPrefix;
   }
 
+  public String getExpectedETag() {
+    return expectedETag;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -221,6 +227,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
     }
+    if (expectedETag != null) {
+      builder.setExpectedETag(expectedETag);
+    }
     return builder.build();
   }
 
@@ -247,9 +256,26 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
     private String listPrefix = null;
+    private String expectedETag;
 
     public Builder() {
       this(AclListBuilder.empty());
+    }
+
+    @SuppressWarnings("checkstyle:parameternumber")
+    public Builder(String volumeName, String bucketName, String keyName,
+        long dataSize, ReplicationConfig replicationConfig,
+        Map<String, String> metadata, Map<String, String> tags,
+        boolean latestVersionLocation) {
+      this();
+      setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setDataSize(dataSize)
+          .setReplicationConfig(replicationConfig)
+          .addAllMetadataGdpr(metadata)
+          .addAllTags(tags)
+          .setLatestVersionLocation(latestVersionLocation);
     }
 
     private Builder(AclListBuilder acls) {
@@ -276,6 +302,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.forceUpdateContainerCacheFromSCM =
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.expectedETag = obj.expectedETag;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
       this.listPrefix = obj.listPrefix;
@@ -414,6 +441,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setListPrefix(String prefix) {
       this.listPrefix = prefix;
+      return this;
+    }
+
+    public Builder setExpectedETag(String eTag) {
+      this.expectedETag = eTag;
       return this;
     }
 

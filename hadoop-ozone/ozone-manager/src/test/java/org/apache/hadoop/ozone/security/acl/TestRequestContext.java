@@ -61,6 +61,7 @@ public class TestRequestContext {
     final String serviceId = "testServiceId";
     final String ownerName = "testOwner";
     final String sessionPolicy = "{\"Statement\":[{\"Effect\":\"Allow\"}]}";
+    final String s3Action = "GetObject";
 
     final RequestContext original = RequestContext.newBuilder()
         .setHost(host)
@@ -71,6 +72,7 @@ public class TestRequestContext {
         .setOwnerName(ownerName)
         .setRecursiveAccessCheck(true)
         .setSessionPolicy(sessionPolicy)
+        .setS3Action(s3Action)
         .build();
 
     // Use toBuilder to create a new builder
@@ -88,6 +90,7 @@ public class TestRequestContext {
     assertTrue(original.isRecursiveAccessCheck(), "RecursiveAccessCheck should be preserved");
     assertEquals(original.getSessionPolicy(), requestCtxFromToBuilder.getSessionPolicy(),
         "SessionPolicy should be preserved");
+    assertEquals(original.getS3Action(), requestCtxFromToBuilder.getS3Action(), "S3 action should be preserved");
   }
 
   @Test
@@ -113,6 +116,7 @@ public class TestRequestContext {
         .setOwnerName("owner2")
         .setRecursiveAccessCheck(true)
         .setSessionPolicy("{\"Statement\":[]}")
+        .setS3Action("DeleteObject")
         .build();
 
     // Verify original is unchanged
@@ -122,6 +126,7 @@ public class TestRequestContext {
     assertEquals("owner1", original.getOwnerName(), "Original owner name should be unchanged");
     assertFalse(original.isRecursiveAccessCheck(), "Original recursive flag should be unchanged");
     assertNull(original.getSessionPolicy(), "Original session policy should be unchanged");
+    assertNull(original.getS3Action(), "Original S3 action should be unchanged");
 
     // Verify modified has new values
     assertEquals("host2", modified.getHost(), "Modified host should be updated");
@@ -130,5 +135,6 @@ public class TestRequestContext {
     assertEquals("owner2", modified.getOwnerName(), "Modified owner should be updated");
     assertTrue(modified.isRecursiveAccessCheck(), "Modified recursive flag should be updated");
     assertEquals("{\"Statement\":[]}", modified.getSessionPolicy(), "Modified session policy should be updated");
+    assertEquals("DeleteObject", modified.getS3Action(), "Modified S3 action should be updated");
   }
 }
