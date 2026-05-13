@@ -899,6 +899,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         throw new OMException(
             "OMClientRequest has session token but no token identifier in OzoneManager", INVALID_REQUEST);
       }
+      if (stsTokenIdentifier.isWebIdentity()) {
+        final String effectiveUser = stsTokenIdentifier.getEffectiveUser();
+        if (effectiveUser != null && !effectiveUser.isEmpty()) {
+          return effectiveUser;
+        }
+        throw new OMException(
+            "Invalid STS Token format - could not find effectiveUser",
+            INVALID_REQUEST);
+      }
       final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
       if (originalAccessKeyId != null && !originalAccessKeyId.isEmpty()) {
         return originalAccessKeyId;

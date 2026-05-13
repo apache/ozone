@@ -112,7 +112,7 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     ozoneManager.getMetadataManager().getS3RevokedStsTokenTable().addCacheEntry(
         new CacheKey<>(sessionToken), CacheValue.get(context.getIndex(), CLOCK.millis()));
 
-    LOG.info("Marked STS session token '{}' as revoked.", sessionToken);
+    LOG.info("Marked STS session token as revoked.");
     return omClientResponse;
   }
 }

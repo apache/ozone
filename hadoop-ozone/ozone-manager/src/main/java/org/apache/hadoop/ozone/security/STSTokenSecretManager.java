@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.security;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Set;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -100,6 +101,47 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
     final Token<STSTokenIdentifier> token = generateToken(identifier);
     return token.encodeToUrlString();
   }
+
+  /**
+   * Create a WebIdentity-backed STS token and return it as an encoded string.
+   */
+  public String createWebIdentitySTSTokenString(String tempAccessKeyId,
+      String roleArn, int durationSeconds, String secretAccessKey,
+      String sessionPolicy, String effectiveUser, String issuer, String subject,
+      String audience, Set<String> groups, Set<String> roles,
+      String roleSessionName, String providerId, String tokenFingerprint,
+      Clock clock) throws IOException {
+    final Instant expiration = clock.instant().plusSeconds(durationSeconds);
+    return createWebIdentitySTSTokenString(tempAccessKeyId, roleArn, expiration,
+        secretAccessKey, sessionPolicy, effectiveUser, issuer, subject,
+        audience, groups, roles, roleSessionName, providerId,
+        tokenFingerprint);
+  }
+
+  /**
+   * Create a WebIdentity-backed STS token with a precomputed expiration.
+   *
+   * This is used by OM Ratis apply/replay paths where the leader has already
+   * validated the WebIdentityToken and replicated only sanitized deterministic
+   * session data.
+   */
+  public String createWebIdentitySTSTokenString(String tempAccessKeyId,
+      String roleArn, Instant expiration, String secretAccessKey,
+      String sessionPolicy, String effectiveUser, String issuer, String subject,
+      String audience, Set<String> groups, Set<String> roles,
+      String roleSessionName, String providerId, String tokenFingerprint)
+      throws IOException {
+    final ManagedSecretKey currentSecretKey =
+        secretKeyClient.getCurrentSecretKey();
+    final byte[] encryptionKey =
+        currentSecretKey.getSecretKey().getEncoded();
+
+    final STSTokenIdentifier identifier = new STSTokenIdentifier(
+        tempAccessKeyId, roleArn, expiration, secretAccessKey, sessionPolicy,
+        effectiveUser, issuer, subject, audience, groups, roles,
+        roleSessionName, providerId, tokenFingerprint, encryptionKey);
+
+    final Token<STSTokenIdentifier> token = generateToken(identifier);
+    return token.encodeToUrlString();
+  }
 }
-
-

@@ -28,6 +28,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -98,6 +101,38 @@ public class TestSTSSecurityUtil {
     assertThat(result.isExpired(clock.instant())).isFalse();
     final long expirationEpochMillis = result.getExpiry().toEpochMilli();
     assertThat(expirationEpochMillis).isEqualTo(clock.millis() + (DURATION_SECONDS * 1000));
+  }
+
+  @Test
+  public void testConstructValidateAndDecryptWebIdentitySTSTokenSuccess()
+      throws IOException {
+    final String tokenString =
+        tokenSecretManager.createWebIdentitySTSTokenString(
+            TEMP_ACCESS_KEY, ROLE_ARN, DURATION_SECONDS, SECRET_ACCESS_KEY,
+            SESSION_POLICY, "tomato-user",
+            "https://keycloak.example.com/realms/ozone", "subject-123",
+            "ozone", set("ozone-tomato"), set("role:writer"),
+            "tomato-session", "keycloak", "fingerprint", clock);
+
+    final STSTokenIdentifier result =
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString,
+            secretKeyClient, clock);
+
+    assertThat(result.isWebIdentity()).isTrue();
+    assertThat(result.getOwnerId()).isEqualTo(TEMP_ACCESS_KEY);
+    assertThat(result.getOriginalAccessKeyId()).isNull();
+    assertThat(result.getEffectiveUser()).isEqualTo("tomato-user");
+    assertThat(result.getIssuer()).isEqualTo(
+        "https://keycloak.example.com/realms/ozone");
+    assertThat(result.getSubject()).isEqualTo("subject-123");
+    assertThat(result.getAudience()).isEqualTo("ozone");
+    assertThat(result.getGroups()).containsExactly("ozone-tomato");
+    assertThat(result.getRoles()).containsExactly("role:writer");
+    assertThat(result.getRoleSessionName()).isEqualTo("tomato-session");
+    assertThat(result.getProviderId()).isEqualTo("keycloak");
+    assertThat(result.getTokenFingerprint()).isEqualTo("fingerprint");
+    assertThat(result.getSecretAccessKey()).isEqualTo(SECRET_ACCESS_KEY);
+    assertThat(result.getSessionPolicy()).isEqualTo(SESSION_POLICY);
   }
 
   @Test
@@ -366,6 +401,63 @@ public class TestSTSSecurityUtil {
   }
 
   @Test
+  public void testEnsureEssentialFieldsAllowsWebIdentityWithoutOriginalAccessKeyId()
+      throws Exception {
+    final STSTokenIdentifier tokenIdentifier = webIdentityToken(
+        "tomato-user", "issuer", "subject", "audience");
+
+    STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier);
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInWebIdentityTokenMissingEffectiveUser() {
+    final STSTokenIdentifier tokenIdentifier = webIdentityToken(
+        null, "issuer", "subject", "audience");
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.ensureEssentialFieldsArePresentInToken(
+            tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - effectiveUser is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInWebIdentityTokenMissingIssuer() {
+    final STSTokenIdentifier tokenIdentifier = webIdentityToken(
+        "tomato-user", null, "subject", "audience");
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.ensureEssentialFieldsArePresentInToken(
+            tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - issuer is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInWebIdentityTokenMissingSubject() {
+    final STSTokenIdentifier tokenIdentifier = webIdentityToken(
+        "tomato-user", "issuer", null, "audience");
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.ensureEssentialFieldsArePresentInToken(
+            tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - subject is null/empty");
+  }
+
+  @Test
+  public void testEnsureEssentialFieldsArePresentInWebIdentityTokenMissingAudience() {
+    final STSTokenIdentifier tokenIdentifier = webIdentityToken(
+        "tomato-user", "issuer", "subject", null);
+
+    assertThatThrownBy(() ->
+        STSSecurityUtil.ensureEssentialFieldsArePresentInToken(
+            tokenIdentifier))
+        .isInstanceOf(SecretManager.InvalidToken.class)
+        .hasMessage("Invalid STS token - audience is null/empty");
+  }
+
+  @Test
   public void testEnsureEssentialFieldsArePresentInTokenMissingSecretAccessKey() {
     final STSTokenIdentifier tokenIdentifier = new STSTokenIdentifier(
         TEMP_ACCESS_KEY, ORIGINAL_ACCESS_KEY, ROLE_ARN, clock.instant(), null, SESSION_POLICY, ENCRYPTION_KEY);
@@ -373,5 +465,18 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() -> STSSecurityUtil.ensureEssentialFieldsArePresentInToken(tokenIdentifier))
         .isInstanceOf(SecretManager.InvalidToken.class)
         .hasMessage("Invalid STS token - secretAccessKey is null/empty");
+  }
+
+  private static STSTokenIdentifier webIdentityToken(String effectiveUser,
+      String issuer, String subject, String audience) {
+    return new STSTokenIdentifier(
+        TEMP_ACCESS_KEY, ROLE_ARN, Instant.now(), SECRET_ACCESS_KEY,
+        SESSION_POLICY, effectiveUser, issuer, subject, audience,
+        set("ozone-tomato"), set("role:writer"), "session", "provider",
+        "fingerprint", ENCRYPTION_KEY);
+  }
+
+  private static Set<String> set(String... values) {
+    return new LinkedHashSet<>(Arrays.asList(values));
   }
 }

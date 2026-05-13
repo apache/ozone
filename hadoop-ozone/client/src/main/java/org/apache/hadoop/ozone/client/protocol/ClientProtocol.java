@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -1386,6 +1387,23 @@ public interface ClientProtocol {
    */
   AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
       String awsIamSessionPolicy, String requestId) throws IOException;
+
+  /**
+   * Process the AssumeRoleWithWebIdentity operation.
+   *
+   * @param roleArn                 The ARN of the role to assume
+   * @param roleSessionName         The session name for this operation
+   * @param durationSeconds         The requested token validity in seconds
+   * @param webIdentityToken        The OIDC web identity token
+   * @param providerId              Optional provider id
+   * @param requestId               The requestId from the STS endpoint
+   * @return response information containing temporary credentials
+   * @throws IOException            if an error occurs during the operation
+   */
+  AssumeRoleWithWebIdentityResponseInfo assumeRoleWithWebIdentity(
+      String roleArn, String roleSessionName, int durationSeconds,
+      String webIdentityToken, String providerId, String requestId)
+      throws IOException;
 
   /**
    * Revokes an STS token.

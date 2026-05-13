@@ -49,6 +49,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
@@ -98,7 +99,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
   static {
     try {
-      JAXB_CONTEXT = JAXBContext.newInstance(S3AssumeRoleResponseXml.class);
+      JAXB_CONTEXT = JAXBContext.newInstance(S3AssumeRoleResponseXml.class,
+          S3AssumeRoleWithWebIdentityResponseXml.class);
     } catch (JAXBException e) {
       throw new RuntimeException("Failed to initialize JAXBContext: " + e, e);
     }
@@ -278,11 +280,53 @@ public class S3STSEndpoint extends S3STSEndpointBase {
           VALIDATION_ERROR, validationMessage, BAD_REQUEST.getStatusCode());
     }
 
-    // S3G has parsed and routed the request. The OM request path will validate
-    // the JWT and issue credentials; S3G must not trust or log the token here.
-    throw new OSTSException(UNSUPPORTED_OPERATION,
-        "AssumeRoleWithWebIdentity OM runtime is not implemented yet.",
-        NOT_IMPLEMENTED.getStatusCode());
+    final int duration = durationSeconds == null
+        ? S3STSUtils.DEFAULT_DURATION_SECONDS : durationSeconds;
+    final String assumedRoleUserArn =
+        S3STSUtils.toAssumedRoleUserArn(roleArn, roleSessionName);
+    try {
+      final AssumeRoleWithWebIdentityResponseInfo responseInfo = getClient()
+          .getObjectStore()
+          .assumeRoleWithWebIdentity(roleArn, roleSessionName, duration,
+              webIdentityToken, providerId, requestId);
+      final String responseXml = generateAssumeRoleWithWebIdentityResponse(
+          assumedRoleUserArn, responseInfo, requestId);
+      return Response.ok(responseXml)
+          .header("Content-Type", "text/xml")
+          .build();
+    } catch (IOException e) {
+      LOG.error("Error during AssumeRoleWithWebIdentity processing", e);
+      if (e instanceof OMException) {
+        final OMException omException = (OMException) e;
+        if (omException.getResult() == OMException.ResultCodes.ACCESS_DENIED ||
+            omException.getResult() == OMException.ResultCodes.PERMISSION_DENIED ||
+            omException.getResult() == OMException.ResultCodes.TOKEN_EXPIRED) {
+          throw new OSTSException(
+              ACCESS_DENIED,
+              "User is not authorized to perform: "
+                  + "sts:AssumeRoleWithWebIdentity on resource: " + roleArn,
+              FORBIDDEN.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.INVALID_TOKEN) {
+          throw new OSTSException(
+              INVALID_CLIENT_TOKEN_ID,
+              "The web identity token included in the request is invalid.",
+              FORBIDDEN.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION ||
+            omException.getResult() == OMException.ResultCodes.FEATURE_NOT_ENABLED) {
+          throw new OSTSException(UNSUPPORTED_OPERATION,
+              omException.getMessage(), NOT_IMPLEMENTED.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
+          throw new OSTSException(VALIDATION_ERROR, omException.getMessage(),
+              BAD_REQUEST.getStatusCode());
+        }
+      }
+      throw new OSTSException(
+          INTERNAL_FAILURE, "An internal error has occurred.",
+          INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
+    }
   }
 
   private boolean isWebIdentityEnabled() {
@@ -443,6 +487,56 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       return stringWriter.toString();
     } catch (JAXBException e) {
       throw new IOException("Failed to marshal AssumeRole response", e);
+    }
+  }
+
+  private String generateAssumeRoleWithWebIdentityResponse(
+      String assumedRoleUserArn,
+      AssumeRoleWithWebIdentityResponseInfo responseInfo, String requestId)
+      throws IOException {
+    final String expiration = DateTimeFormatter.ISO_INSTANT.format(
+        Instant.ofEpochSecond(responseInfo.getExpirationEpochSeconds())
+            .atOffset(ZoneOffset.UTC).toInstant());
+
+    try {
+      final S3AssumeRoleWithWebIdentityResponseXml response =
+          new S3AssumeRoleWithWebIdentityResponseXml();
+      final S3AssumeRoleWithWebIdentityResponseXml
+          .AssumeRoleWithWebIdentityResult result =
+          new S3AssumeRoleWithWebIdentityResponseXml
+              .AssumeRoleWithWebIdentityResult();
+      final S3AssumeRoleWithWebIdentityResponseXml.Credentials credentials =
+          new S3AssumeRoleWithWebIdentityResponseXml.Credentials();
+      credentials.setAccessKeyId(responseInfo.getAccessKeyId());
+      credentials.setSecretAccessKey(responseInfo.getSecretAccessKey());
+      credentials.setSessionToken(responseInfo.getSessionToken());
+      credentials.setExpiration(expiration);
+      result.setCredentials(credentials);
+      result.setSubjectFromWebIdentityToken(
+          responseInfo.getSubjectFromWebIdentityToken());
+      result.setAudience(responseInfo.getAudience());
+      if (StringUtils.isNotBlank(responseInfo.getProvider())) {
+        result.setProvider(responseInfo.getProvider());
+      }
+      final S3AssumeRoleWithWebIdentityResponseXml.AssumedRoleUser user =
+          new S3AssumeRoleWithWebIdentityResponseXml.AssumedRoleUser();
+      user.setAssumedRoleId(responseInfo.getAssumedRoleId());
+      user.setArn(assumedRoleUserArn);
+      result.setAssumedRoleUser(user);
+      response.setResult(result);
+      final S3AssumeRoleWithWebIdentityResponseXml.ResponseMetadata meta =
+          new S3AssumeRoleWithWebIdentityResponseXml.ResponseMetadata();
+      meta.setRequestId(requestId);
+      response.setResponseMetadata(meta);
+
+      final Marshaller marshaller = JAXB_CONTEXT.createMarshaller();
+      marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+      final StringWriter stringWriter = new StringWriter();
+      marshaller.marshal(response, stringWriter);
+      return stringWriter.toString();
+    } catch (JAXBException e) {
+      throw new IOException(
+          "Failed to marshal AssumeRoleWithWebIdentity response", e);
     }
   }
 }

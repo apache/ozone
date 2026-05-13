@@ -136,11 +136,24 @@ AssumeRoleWithWebIdentity
   -> Ranger or configured authorizer
 ```
 
-The first implementation slice intentionally stops before the OM runtime path:
-S3G can parse `Action=AssumeRoleWithWebIdentity`, validate the basic STS
-parameters, and return a clear unsupported error once the request reaches the
-placeholder. The next stage must add the OM request/protobuf path and move JWT
-validation, identity mapping, authorization, and credential issuance into OM.
+The OM runtime slice adds the WebIdentity request/protobuf path while preserving
+the existing `AssumeRole` flow. S3G parses and routes
+`Action=AssumeRoleWithWebIdentity`, but OM remains the authoritative validator
+and issuer.
+
+The raw `WebIdentityToken` is accepted only in the external OM RPC request. The
+OM leader validates it in `S3AssumeRoleWithWebIdentityRequest.preExecute()`,
+maps claims into a sanitized identity/session request, authorizes role
+assumption, generates temporary credential material using the existing STS
+helpers, and returns an `UpdateAssumeRoleWithWebIdentityRequest` for Ratis
+replication. The replicated request must not contain the raw JWT.
+
+`validateAndUpdateCache()` consumes only the sanitized update request. It must
+not call Keycloak, refresh JWKS, revalidate JWTs, or otherwise depend on current
+external IdP state during Ratis apply or replay. Credential expiration is
+computed by the leader before replication and stored as
+`credentialExpirationEpochSeconds` so replay does not depend on the apply-time
+clock.
 
 Temporary credentials must not be stored only in S3G memory. S3G can have
 multiple replicas and can restart. The issuing and validation authority must be
@@ -206,7 +219,8 @@ Flow:
    edge: action, version, role ARN syntax, role session name, duration bounds,
    and presence of `WebIdentityToken`.
 5. S3G forwards `RoleArn`, `RoleSessionName`, `WebIdentityToken`,
-   `DurationSeconds`, `ProviderId`, and request context to OM.
+   `DurationSeconds`, `ProviderId`, and request context to OM in the external
+   RPC request only.
 6. OM validates the JWT:
    - token is a signed JWT;
    - `alg=none` is rejected;
@@ -224,7 +238,19 @@ Flow:
    - token expiration.
 8. OM builds an assume-role authorization request and calls Ranger or the
    configured Ozone authorizer before issuing any credential.
-9. If authorized, OM issues temporary S3 credentials:
+9. OM strips the raw JWT before Ratis replication and submits only sanitized
+   identity/session fields:
+   - role ARN and role session name;
+   - provider id;
+   - effective user;
+   - subject, issuer, audience;
+   - groups and roles;
+   - web identity token expiration;
+   - token fingerprint;
+   - requested/effective duration;
+   - credential expiration;
+   - derived session policy.
+10. If authorized, OM issues temporary S3 credentials:
    - `Credentials.AccessKeyId`;
    - `Credentials.SecretAccessKey`;
    - `Credentials.SessionToken`;
@@ -233,8 +259,8 @@ Flow:
    - `AssumedRoleUser`;
    - `Audience`;
    - `Provider`.
-10. The client uses those credentials with ordinary AWS SigV4 against S3G.
-11. S3G and OM validate the temporary credential, recover the assumed identity
+11. The client uses those credentials with ordinary AWS SigV4 against S3G.
+12. S3G and OM validate the temporary credential, recover the assumed identity
    and session policy, and pass them to the authorizer for every S3 operation.
 
 ## Configuration

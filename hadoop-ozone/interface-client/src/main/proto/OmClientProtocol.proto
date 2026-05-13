@@ -159,6 +159,7 @@ enum Type {
   AssumeRole = 143;
   RevokeSTSToken = 144;
   DeleteRevokedSTSTokens = 145;
+  AssumeRoleWithWebIdentity = 146;
 }
 
 enum SafeMode {
@@ -313,6 +314,8 @@ message OMRequest {
   optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 145;
   optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 146;
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 147;
+  optional AssumeRoleWithWebIdentityRequest assumeRoleWithWebIdentityRequest = 148;
+  optional UpdateAssumeRoleWithWebIdentityRequest updateAssumeRoleWithWebIdentityRequest = 149;
 }
 
 message OMResponse {
@@ -449,6 +452,7 @@ message OMResponse {
   optional AssumeRoleResponse                assumeRoleResponse             = 143;
   optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 144;
   optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 145;
+  optional AssumeRoleWithWebIdentityResponse assumeRoleWithWebIdentityResponse = 146;
 }
 
 enum Status {
@@ -1537,6 +1541,20 @@ message OMTokenProto {
     optional string originalAccessKeyId = 18;
     optional string secretAccessKey     = 19;
     optional string sessionPolicy       = 20;
+    enum STSAuthType {
+      ASSUME_ROLE = 1;
+      WEB_IDENTITY = 2;
+    };
+    optional STSAuthType stsAuthType    = 21 [default = ASSUME_ROLE];
+    optional string effectiveUser       = 22;
+    optional string issuer              = 23;
+    optional string subject             = 24;
+    optional string audience            = 25;
+    repeated string groups              = 26;
+    repeated string roles               = 27;
+    optional string roleSessionName     = 28;
+    optional string providerId          = 29;
+    optional string tokenFingerprint    = 30;
 }
 
 message SecretKeyProto {
@@ -2432,6 +2450,53 @@ message UpdateAssumeRoleRequest {
   required string tempAccessKeyId         = 6;
   required string secretAccessKey         = 7;
   required string roleId                  = 8;
+}
+
+message AssumeRoleWithWebIdentityRequest {
+  required string roleArn                 = 1;
+  required string roleSessionName         = 2;
+  optional int32 durationSeconds          = 3 [default = 3600];
+  required string webIdentityToken        = 4;
+  optional string providerId              = 5;
+  required string requestId               = 6;
+}
+
+message AssumeRoleWithWebIdentityResponse {
+  required string accessKeyId                     = 1;
+  required string secretAccessKey                 = 2;
+  required string sessionToken                    = 3;
+  required uint64 expirationEpochSeconds          = 4;
+  required string assumedRoleId                   = 5;
+  required string subjectFromWebIdentityToken     = 6;
+  required string audience                        = 7;
+  optional string provider                        = 8;
+}
+
+/**
+  This request is created by the OM leader after validating the incoming
+  WebIdentityToken. It is the only WebIdentity request form that may be
+  replicated through Ratis; it must never contain the raw JWT.
+*/
+message UpdateAssumeRoleWithWebIdentityRequest {
+  required string roleArn                         = 1;
+  required string roleSessionName                 = 2;
+  required int32 durationSeconds                  = 3;
+  optional string providerId                      = 4;
+  required string requestId                       = 5;
+  required string tempAccessKeyId                 = 6;
+  required string secretAccessKey                 = 7;
+  required string roleId                          = 8;
+  required string effectiveUser                   = 9;
+  required string subject                         = 10;
+  required string issuer                          = 11;
+  required string audience                        = 12;
+  repeated string groups                          = 13;
+  repeated string roles                           = 14;
+  required uint64 webIdentityTokenExpiresAt       = 15;
+  required uint64 authenticatedAt                 = 16;
+  required string tokenFingerprint                = 17;
+  required string sessionPolicy                   = 18;
+  required uint64 credentialExpirationEpochSeconds = 19;
 }
 
 message RevokeSTSTokenRequest {

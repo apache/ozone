@@ -280,6 +280,7 @@ public final class OmUtils {
     case AbortMultiPartUpload:
     case GetS3Secret:
     case AssumeRole:
+    case AssumeRoleWithWebIdentity:
     case GetDelegationToken:
     case RenewDelegationToken:
     case CancelDelegationToken:
@@ -440,6 +441,7 @@ public final class OmUtils {
     case PutObjectTagging:
     case DeleteObjectTagging:
     case AssumeRole:
+    case AssumeRoleWithWebIdentity:
     case RevokeSTSToken:
     case DeleteRevokedSTSTokens:
     case ServiceList: // OM leader should have the most up-to-date OM service list info

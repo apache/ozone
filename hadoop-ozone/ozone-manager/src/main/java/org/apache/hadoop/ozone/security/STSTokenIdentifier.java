@@ -25,7 +25,10 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -41,11 +44,29 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMToken
 public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   public static final Text KIND_NAME = new Text("STSToken");
 
+  /**
+   * Identifies the authentication path that produced an STS token.
+   */
+  public enum AuthType {
+    ASSUME_ROLE,
+    WEB_IDENTITY
+  }
+
   // STS-specific fields
+  private AuthType authType = AuthType.ASSUME_ROLE;
   private String roleArn;
   private String originalAccessKeyId;
   private String secretAccessKey;
   private String sessionPolicy;
+  private String effectiveUser;
+  private String issuer;
+  private String subject;
+  private String audience;
+  private Set<String> groups = Collections.emptySet();
+  private Set<String> roles = Collections.emptySet();
+  private String roleSessionName;
+  private String providerId;
+  private String tokenFingerprint;
 
   // Encryption key derived from ManagedSecretKey for this token
   private transient byte[] encryptionKey;
@@ -75,10 +96,36 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   public STSTokenIdentifier(String tempAccessKeyId, String originalAccessKeyId, String roleArn, Instant expiry,
       String secretAccessKey, String sessionPolicy, byte[] encryptionKey) {
     super(tempAccessKeyId, expiry);
+    this.authType = AuthType.ASSUME_ROLE;
     this.originalAccessKeyId = originalAccessKeyId;
     this.roleArn = roleArn;
     this.secretAccessKey = secretAccessKey;
     this.sessionPolicy = sessionPolicy;
+    this.encryptionKey = encryptionKey != null ? encryptionKey.clone() : null;
+  }
+
+  /**
+   * Create a new WebIdentity-backed STS token identifier.
+   */
+  public STSTokenIdentifier(String tempAccessKeyId, String roleArn,
+      Instant expiry, String secretAccessKey, String sessionPolicy,
+      String effectiveUser, String issuer, String subject, String audience,
+      Set<String> groups, Set<String> roles, String roleSessionName,
+      String providerId, String tokenFingerprint, byte[] encryptionKey) {
+    super(tempAccessKeyId, expiry);
+    this.authType = AuthType.WEB_IDENTITY;
+    this.roleArn = roleArn;
+    this.secretAccessKey = secretAccessKey;
+    this.sessionPolicy = sessionPolicy;
+    this.effectiveUser = effectiveUser;
+    this.issuer = issuer;
+    this.subject = subject;
+    this.audience = audience;
+    this.groups = immutableSet(groups);
+    this.roles = immutableSet(roles);
+    this.roleSessionName = roleSessionName;
+    this.providerId = providerId;
+    this.tokenFingerprint = tokenFingerprint;
     this.encryptionKey = encryptionKey != null ? encryptionKey.clone() : null;
   }
 
@@ -126,10 +173,25 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
         .setMaxDate(getExpiry().toEpochMilli())
         .setOwner(getOwnerId() != null ? getOwnerId() : "")
         .setAccessKeyId(getOwnerId() != null ? getOwnerId() : "")
-        .setOriginalAccessKeyId(originalAccessKeyId != null ? originalAccessKeyId : "")
-        .setRoleArn(roleArn != null ? roleArn : "")
-        .setSecretAccessKey(secretAccessKey != null ? encryptSensitiveField(secretAccessKey) : "")
-        .setSessionPolicy(sessionPolicy != null ? sessionPolicy : "");
+        .setStsAuthType(toProtoAuthType(authType));
+
+    setIfNotEmpty(builder::setOriginalAccessKeyId, originalAccessKeyId);
+    setIfNotEmpty(builder::setRoleArn, roleArn);
+    if (secretAccessKey != null) {
+      builder.setSecretAccessKey(encryptSensitiveField(secretAccessKey));
+    }
+    if (sessionPolicy != null) {
+      builder.setSessionPolicy(sessionPolicy);
+    }
+    setIfNotEmpty(builder::setEffectiveUser, effectiveUser);
+    setIfNotEmpty(builder::setIssuer, issuer);
+    setIfNotEmpty(builder::setSubject, subject);
+    setIfNotEmpty(builder::setAudience, audience);
+    builder.addAllGroups(groups);
+    builder.addAllRoles(roles);
+    setIfNotEmpty(builder::setRoleSessionName, roleSessionName);
+    setIfNotEmpty(builder::setProviderId, providerId);
+    setIfNotEmpty(builder::setTokenFingerprint, tokenFingerprint);
 
     return builder.build();
   }
@@ -145,12 +207,13 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
 
     setOwnerId(token.getOwner());
     setExpiry(Instant.ofEpochMilli(token.getMaxDate()));
+    this.authType = fromProtoAuthType(token.getStsAuthType());
 
     if (token.hasOriginalAccessKeyId()) {
-      this.originalAccessKeyId = token.getOriginalAccessKeyId();
+      this.originalAccessKeyId = emptyToNull(token.getOriginalAccessKeyId());
     }
     if (token.hasRoleArn()) {
-      this.roleArn = token.getRoleArn();
+      this.roleArn = emptyToNull(token.getRoleArn());
     }
     if (token.hasSecretKeyId()) {
       try {
@@ -168,6 +231,31 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
 
     if (token.hasSessionPolicy()) {
       this.sessionPolicy = token.getSessionPolicy();
+    } else {
+      this.sessionPolicy = "";
+    }
+    if (token.hasEffectiveUser()) {
+      this.effectiveUser = emptyToNull(token.getEffectiveUser());
+    }
+    if (token.hasIssuer()) {
+      this.issuer = emptyToNull(token.getIssuer());
+    }
+    if (token.hasSubject()) {
+      this.subject = emptyToNull(token.getSubject());
+    }
+    if (token.hasAudience()) {
+      this.audience = emptyToNull(token.getAudience());
+    }
+    this.groups = immutableSet(token.getGroupsList());
+    this.roles = immutableSet(token.getRolesList());
+    if (token.hasRoleSessionName()) {
+      this.roleSessionName = emptyToNull(token.getRoleSessionName());
+    }
+    if (token.hasProviderId()) {
+      this.providerId = emptyToNull(token.getProviderId());
+    }
+    if (token.hasTokenFingerprint()) {
+      this.tokenFingerprint = emptyToNull(token.getTokenFingerprint());
     }
   }
 
@@ -222,12 +310,56 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     return roleArn;
   }
 
+  public AuthType getAuthType() {
+    return authType;
+  }
+
+  public boolean isWebIdentity() {
+    return authType == AuthType.WEB_IDENTITY;
+  }
+
   public String getSecretAccessKey() {
     return secretAccessKey;
   }
 
   public String getOriginalAccessKeyId() {
     return originalAccessKeyId;
+  }
+
+  public String getEffectiveUser() {
+    return effectiveUser;
+  }
+
+  public String getIssuer() {
+    return issuer;
+  }
+
+  public String getSubject() {
+    return subject;
+  }
+
+  public String getAudience() {
+    return audience;
+  }
+
+  public Set<String> getGroups() {
+    return groups;
+  }
+
+  public Set<String> getRoles() {
+    return roles;
+  }
+
+  public String getRoleSessionName() {
+    return roleSessionName;
+  }
+
+  public String getProviderId() {
+    return providerId;
+  }
+
+  public String getTokenFingerprint() {
+    return tokenFingerprint;
   }
 
   /**
@@ -263,23 +395,79 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
     }
 
     final STSTokenIdentifier that = (STSTokenIdentifier) o;
-    return Objects.equals(roleArn, that.roleArn) && Objects.equals(secretAccessKey, that.secretAccessKey) &&
+    return authType == that.authType &&
+        Objects.equals(roleArn, that.roleArn) && Objects.equals(secretAccessKey, that.secretAccessKey) &&
         Objects.equals(originalAccessKeyId, that.originalAccessKeyId) &&
-        Objects.equals(sessionPolicy, that.sessionPolicy);
+        Objects.equals(sessionPolicy, that.sessionPolicy) &&
+        Objects.equals(effectiveUser, that.effectiveUser) &&
+        Objects.equals(issuer, that.issuer) &&
+        Objects.equals(subject, that.subject) &&
+        Objects.equals(audience, that.audience) &&
+        Objects.equals(groups, that.groups) &&
+        Objects.equals(roles, that.roles) &&
+        Objects.equals(roleSessionName, that.roleSessionName) &&
+        Objects.equals(providerId, that.providerId) &&
+        Objects.equals(tokenFingerprint, that.tokenFingerprint);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        super.hashCode(), roleArn, secretAccessKey, originalAccessKeyId, sessionPolicy);
+        super.hashCode(), authType, roleArn, secretAccessKey, originalAccessKeyId,
+        sessionPolicy, effectiveUser, issuer, subject, audience, groups, roles,
+        roleSessionName, providerId, tokenFingerprint);
   }
 
   @Override
   public String toString() {
     // Intentionally left off secretAccessKey
     return "STSTokenIdentifier{" + "tempAccessKeyId='" + getOwnerId() + "'" +
+        ", authType=" + authType +
         ", originalAccessKeyId='" + originalAccessKeyId + "', roleArn='" + roleArn + "'" +
+        ", effectiveUser='" + effectiveUser + "', issuer='" + issuer + "'" +
+        ", subject='" + subject + "', audience='" + audience + "'" +
+        ", groups=" + groups + ", roles=" + roles +
+        ", roleSessionName='" + roleSessionName + "', providerId='" + providerId + "'" +
+        ", tokenFingerprint='" + tokenFingerprint + "'" +
         ", expiry='" + getExpiry() + "', secretKeyId='" + getSecretKeyId() + "'" +
         ", sessionPolicy='" + sessionPolicy + "'}";
+  }
+
+  private static OMTokenProto.STSAuthType toProtoAuthType(AuthType value) {
+    return value == AuthType.WEB_IDENTITY
+        ? OMTokenProto.STSAuthType.WEB_IDENTITY
+        : OMTokenProto.STSAuthType.ASSUME_ROLE;
+  }
+
+  private static AuthType fromProtoAuthType(OMTokenProto.STSAuthType value) {
+    return value == OMTokenProto.STSAuthType.WEB_IDENTITY
+        ? AuthType.WEB_IDENTITY : AuthType.ASSUME_ROLE;
+  }
+
+  private static Set<String> immutableSet(Iterable<String> values) {
+    if (values == null) {
+      return Collections.emptySet();
+    }
+    LinkedHashSet<String> set = new LinkedHashSet<>();
+    for (String value : values) {
+      if (value != null && !value.isEmpty()) {
+        set.add(value);
+      }
+    }
+    return Collections.unmodifiableSet(set);
+  }
+
+  private static void setIfNotEmpty(StringSetter setter, String value) {
+    if (value != null && !value.isEmpty()) {
+      setter.set(value);
+    }
+  }
+
+  private static String emptyToNull(String value) {
+    return value == null || value.isEmpty() ? null : value;
+  }
+
+  private interface StringSetter {
+    void set(String value);
   }
 }

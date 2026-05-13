@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
@@ -100,6 +101,17 @@ public class TestS3STSEndpoint {
             "session-token",
             Instant.now().plusSeconds(3600).getEpochSecond(),
             "AROA1234567890123456:test-session"));
+    when(objectStore.assumeRoleWithWebIdentity(anyString(), anyString(),
+        anyInt(), anyString(), any(), anyString()))
+        .thenReturn(new AssumeRoleWithWebIdentityResponseInfo(
+            "ASIAWEBIDENTITY123456",
+            "webIdentitySecretAccessKey",
+            "web-identity-session-token",
+            Instant.now().plusSeconds(3600).getEpochSecond(),
+            "AROA1234567890123456:test-session",
+            "subject-123",
+            "ozone",
+            "keycloak"));
     when(clientStub.getObjectStore()).thenReturn(objectStore);
 
     endpoint = new S3STSEndpoint();
@@ -373,6 +385,8 @@ public class TestS3STSEndpoint {
     verifyNoInteractions(auditLogger);
     verify(objectStore, never()).assumeRole(anyString(), anyString(),
         anyInt(), any(), anyString());
+    verify(objectStore, never()).assumeRoleWithWebIdentity(
+        anyString(), anyString(), anyInt(), anyString(), any(), anyString());
 
     ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
@@ -393,6 +407,8 @@ public class TestS3STSEndpoint {
     verifyNoInteractions(auditLogger);
     verify(objectStore, never()).assumeRole(anyString(), anyString(),
         anyInt(), any(), anyString());
+    verify(objectStore, never()).assumeRoleWithWebIdentity(
+        anyString(), anyString(), anyInt(), anyString(), any(), anyString());
 
     ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError",
@@ -404,19 +420,36 @@ public class TestS3STSEndpoint {
       throws Exception {
     enableWebIdentity();
 
-    final OSTSException ex = assertThrows(OSTSException.class, () ->
-        endpoint.get("AssumeRoleWithWebIdentity", ROLE_ARN,
-            ROLE_SESSION_NAME, 3600, "2011-06-15", null,
-            "sensitive-token-material", "keycloak"));
+    final Response response = endpoint.get("AssumeRoleWithWebIdentity",
+        ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null,
+        "sensitive-token-material", "keycloak");
 
-    assertEquals(501, ex.getHttpCode());
+    assertEquals(200, response.getStatus());
     verifyNoInteractions(auditLogger);
-    verify(objectStore, never()).assumeRole(anyString(), anyString(),
-        anyInt(), any(), anyString());
+    verify(objectStore).assumeRoleWithWebIdentity(ROLE_ARN,
+        ROLE_SESSION_NAME, 3600, "sensitive-token-material", "keycloak",
+        REQUEST_ID);
 
-    ex.setRequestId(REQUEST_ID);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "UnsupportedOperation",
-        "AssumeRoleWithWebIdentity OM runtime is not implemented yet.");
+    final Document doc = parseXml((String) response.getEntity());
+    final Element root = doc.getDocumentElement();
+    assertEquals("AssumeRoleWithWebIdentityResponse", root.getLocalName());
+    assertEquals(STS_NS, root.getNamespaceURI());
+    assertNotNull(doc.getElementsByTagNameNS(
+        STS_NS, "AssumeRoleWithWebIdentityResult").item(0));
+    assertEquals("ASIAWEBIDENTITY123456",
+        doc.getElementsByTagName("AccessKeyId").item(0).getTextContent());
+    assertEquals("webIdentitySecretAccessKey",
+        doc.getElementsByTagName("SecretAccessKey").item(0)
+            .getTextContent());
+    assertEquals("web-identity-session-token",
+        doc.getElementsByTagName("SessionToken").item(0).getTextContent());
+    assertEquals("subject-123",
+        doc.getElementsByTagName("SubjectFromWebIdentityToken").item(0)
+            .getTextContent());
+    assertEquals("ozone",
+        doc.getElementsByTagName("Audience").item(0).getTextContent());
+    assertEquals("keycloak",
+        doc.getElementsByTagName("Provider").item(0).getTextContent());
   }
 
   @Test

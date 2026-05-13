@@ -75,12 +75,14 @@ public final class S3SecurityUtil {
 
           // Ensure the token is not revoked
           if (isRevokedStsToken(token, ozoneManager)) {
-            LOG.info("Session token has been revoked: {}, {}", stsTokenIdentifier.getTempAccessKeyId(), token);
+            LOG.info("Session token has been revoked for tempAccessKeyId: {}",
+                stsTokenIdentifier.getTempAccessKeyId());
             throw new OMException("STS token has been revoked", REVOKED_TOKEN);
           }
 
           // Ensure the principal that created the STS token (originalAccessKeyId) has not been revoked
-          if (isOriginalAccessKeyIdRevoked(stsTokenIdentifier, ozoneManager)) {
+          if (!stsTokenIdentifier.isWebIdentity() &&
+              isOriginalAccessKeyIdRevoked(stsTokenIdentifier, ozoneManager)) {
             LOG.info("OriginalAccessKeyId for session token has been revoked: {}, {}",
                 stsTokenIdentifier.getOriginalAccessKeyId(), stsTokenIdentifier.getTempAccessKeyId());
             throw new OMException("STS token no longer valid: OriginalAccessKeyId principal revoked", REVOKED_TOKEN);
@@ -151,8 +153,8 @@ public final class S3SecurityUtil {
         s3Authentication.getStringToSign(), s3Authentication.getSignature(), secretAccessKey)) {
       return;
     }
-    throw new OMException(
-        "STS token validation failed for token: " + omRequest.getS3Authentication().getSessionToken(), INVALID_TOKEN);
+    throw new OMException("STS token signature validation failed",
+        INVALID_TOKEN);
   }
 
   /**
