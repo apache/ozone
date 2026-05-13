@@ -67,7 +67,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    * Max attempts to acquire {@link Container#writeLock()} while verifying this set's id → container mapping
    * is same (e.g. another thread may {@link #updateContainer} / DiskBalancer swap the instance).
    */
-  private static final int MAX_CONTAINER_MAP_SWAP_RETRIES = 10;
+  private static final int MAX_CONTAINER_MAP_SWAP_RETRIES = 5;
 
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
