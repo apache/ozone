@@ -371,6 +371,9 @@ Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Up
     # Switch back to the service catalog principal for running S3/STS requests.
     Kinit test user               ${ICEBERG_SVC_CATALOG_USER}   ${ICEBERG_SVC_CATALOG_USER}.keytab
 
+    # Long-lived 15-minute STS credential to test STS token expiration and proper error message
+    Assume Role And Store Expired STS Token Credentials         perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
+
 Assume Role for Limited-Scope Token
     # All access role is limited to read-only via session policy
     FOR    ${bucket}    ${role_arn}    IN
@@ -1056,6 +1059,45 @@ STS session policy s3:* on * must allow ListAllMyBuckets, Create/ListBucket, and
     Should Not Contain           ${output}                      AccessDenied
     ${output} =                  Execute                        aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket ${bucket} --profile sts
     Should Not Contain           ${output}                      AccessDenied
+
+Expired STS temporary credentials must return ExpiredToken on S3 APIs
+    # Increase timeout to account for 15 minute STS token expiration plus the time to execute the api calls
+    [Timeout]                     25 minutes
+    ${dummy_mpu_upload_id} =      Set Variable                  dummyExpiredStsMpuUploadId01
+
+    Wait Until Minimum Expired STS Token Lifetime Elapsed
+    Configure Expired STS Token S3 Profile
+
+    Execute S3api Expect Expired Token                          list-buckets --output json
+    Execute S3api Expect Expired Token Head Operation           head-bucket --bucket ${ICEBERG_BUCKET_OBS}    HeadBucket
+    Execute S3api Expect Expired Token                          list-objects-v2 --bucket ${ICEBERG_BUCKET_OBS} --output json
+    Execute S3api Expect Expired Token                          list-objects --bucket ${ICEBERG_BUCKET_OBS} --output json
+    Execute S3api Expect Expired Token                          get-object --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} ${TEMP_DIR}/expired-sts-token-get-object.out
+
+    Create File                   ${TEMP_DIR}/expired-sts-token-put-object-body.txt    expired sts token put body
+
+    Execute S3api Expect Expired Token                          put-object --bucket ${ICEBERG_BUCKET_OBS} --key sts-expired-sts-token-put.txt --body ${TEMP_DIR}/expired-sts-token-put-object-body.txt
+    Execute S3api Expect Expired Token Head Operation           head-object --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE}    HeadObject
+    Execute S3api Expect Expired Token                          delete-object --bucket ${ICEBERG_BUCKET_OBS} --key sts-expired-sts-token-delete-marker.txt
+
+    ${bucket_suffix} =            Generate Random String        8   [LOWER]
+    ${exp_bucket} =               Set Variable                  sts-bucket-expired-sts-token-${bucket_suffix}
+
+    Execute S3api Expect Expired Token                          create-bucket --bucket ${exp_bucket}
+    Execute S3api Expect Expired Token                          delete-bucket --bucket ${exp_bucket}
+    Execute S3api Expect Expired Token                          get-bucket-acl --bucket ${ICEBERG_BUCKET_OBS}
+    Execute S3api Expect Expired Token                          put-bucket-acl --bucket ${ICEBERG_BUCKET_OBS} --grant-read ''
+    Execute S3api Expect Expired Token                          list-multipart-uploads --bucket ${ICEBERG_BUCKET_OBS}
+    Execute S3api Expect Expired Token                          create-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key sts-expired-sts-token-mpu.txt
+    Execute S3api Expect Expired Token                          upload-part --bucket ${ICEBERG_BUCKET_OBS} --key sts-expired-sts-token-mpu.txt --part-number 1 --body ${TEMP_DIR}/expired-sts-token-put-object-body.txt --upload-id ${dummy_mpu_upload_id}
+    Execute S3api Expect Expired Token                          upload-part-copy --bucket ${ICEBERG_BUCKET_OBS} --key sts-expired-sts-token-mpu-copy.txt --part-number 1 --upload-id ${dummy_mpu_upload_id} --copy-source ${ICEBERG_BUCKET_OBS}/${ICEBERG_BUCKET_TESTFILE}
+    Execute S3api Expect Expired Token                          list-parts --bucket ${ICEBERG_BUCKET_OBS} --key sts-expired-sts-token-mpu.txt --upload-id ${dummy_mpu_upload_id}
+    Execute S3api Expect Expired Token                          abort-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key sts-expired-sts-token-mpu.txt --upload-id ${dummy_mpu_upload_id}
+    Execute S3api Expect Expired Token                          complete-multipart-upload --bucket ${ICEBERG_BUCKET_OBS} --key sts-expired-sts-token-mpu.txt --upload-id ${dummy_mpu_upload_id} --multipart-upload '{"Parts":[{"ETag":"d41d8cd98f00b204e9800998ecf8427e","PartNumber":1}]}'
+    Execute S3api Expect Expired Token                          copy-object --bucket ${ICEBERG_BUCKET_OBS} --copy-source ${ICEBERG_BUCKET_OBS}/${ICEBERG_BUCKET_TESTFILE} --key sts-expired-sts-token-copy-dest.txt
+    Execute S3api Expect Expired Token                          get-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE}
+    Execute S3api Expect Expired Token                          put-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE} --tagging '{"TagSet":[{"Key":"tag-key-expired-sts-token","Value":"tag-value-expired-sts-token"}]}'
+    Execute S3api Expect Expired Token                          delete-object-tagging --bucket ${ICEBERG_BUCKET_OBS} --key ${ICEBERG_BUCKET_TESTFILE}
 
 Revoking Permanent User Must Revoke Existing Session Token
     # Create session tokens for both buckets, verify they work, then revoke permanent user secret and verify both fail.
