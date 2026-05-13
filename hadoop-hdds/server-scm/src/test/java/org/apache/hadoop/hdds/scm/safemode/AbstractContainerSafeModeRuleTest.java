@@ -50,7 +50,6 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 public abstract class AbstractContainerSafeModeRuleTest {
   private List<ContainerInfo> containers;
-  private AbstractContainerSafeModeRule rule;
   private SCMSafeModeManager safeModeManager;
   private ConfigurationSource conf;
   private ContainerManager containerManager;
@@ -81,7 +80,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
     containers.add(mockContainer(LifeCycleState.OPEN, 1L));
     containers.add(mockContainer(LifeCycleState.CLOSED, 2L));
     containers.add(mockContainer(LifeCycleState.CLOSED, 8L));
-    rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
     assertEquals(2, rule.getTotalNumberOfContainers(), "Total number of containers should be 2");
     containers.add(mockContainer(LifeCycleState.CLOSED, 2L));
@@ -100,7 +99,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
       names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
   public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
     containers.add(mockContainer(state, 1L));
-    rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
 
     boolean expected = state != LifeCycleState.QUASI_CLOSED && state != LifeCycleState.CLOSED;
@@ -111,7 +110,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
   public void testProcessContainer() {
     long containerId = 123L;
     containers.add(mockContainer(LifeCycleState.CLOSED, containerId));
-    rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
@@ -143,7 +142,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
   @Test
   public void testAllContainersClosed() {
     containers.add(mockContainer(LifeCycleState.CLOSED, 1L));
-    rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
     containers.add(mockContainer(LifeCycleState.CLOSED, 11L));
     containers.add(mockContainer(LifeCycleState.CLOSED, 32L));
@@ -158,7 +157,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
   public void testAllContainersOpen() {
     containers.add(mockContainer(LifeCycleState.OPEN, 11L));
     containers.add(mockContainer(LifeCycleState.OPEN, 32L));
-    rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
 
     assertEquals(1.0, rule.getCurrentContainerThreshold(), "Threshold should be 1.0 when all containers are open");
@@ -176,7 +175,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
   public void testDuplicateContainerIdsInReports() {
     long containerId = 42L;
     containers.add(mockContainer(LifeCycleState.OPEN, containerId));
-    rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
 
     ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
@@ -200,7 +199,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
   public void testValidateBasedOnReportProcessingTrue() {
     long containerId = 1L;
     containers.add(mockContainer(LifeCycleState.OPEN, containerId));
-    rule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(true);
 
     ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
