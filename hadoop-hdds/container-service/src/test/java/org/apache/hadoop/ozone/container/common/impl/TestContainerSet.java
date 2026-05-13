@@ -33,6 +33,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -419,27 +420,53 @@ public class TestContainerSet {
 
   /**
    * Mapping is swapped once (DiskBalancer moves container from C1 to C2) while the lock is being
-   * acquired. acquireContainerLock detects the mismatch (current=C2 ≠ candidate=C1), locks C2 first,
-   * then releases C1 — returning C2 already locked.
+   * acquired. The first attempt detects the mismatch (current=C2 ≠ candidate=C1), releases C1's lock,
+   * and retries. The second attempt finds C2 stable and returns it locked.
    */
   @Test
-  public void testHandlesMappingSwapAtomically() {
+  public void testRetriesOnMappingSwapThenSucceeds() {
     ContainerSet cs = spy(newContainerSet());
     Container<?> c1 = mock(Container.class);
     Container<?> c2 = mock(Container.class);
-    // First call → c1 (candidate); second call (post-lock re-check) → c2 (DiskBalancer swapped)
+    // Sequence: c1 (candidate retry-0), c2 (current retry-0 → mismatch),
+    // c2 (candidate retry-1), c2 (current retry-1 → match)
     int[] n = {0};
-    doAnswer(inv -> n[0]++ == 0 ? c1 : c2).when(cs).getContainer(1L);
+    Container<?>[] seq = {c1, c2, c2, c2};
+    doAnswer(inv -> seq[Math.min(n[0]++, seq.length - 1)]).when(cs).getContainer(1L);
 
     Container<?> result = cs.acquireContainerLock(1L);
 
     assertSame(c2, result);
-    // c1 was locked (candidate), then unlocked after c2 was locked
+    // c1 was locked then released during the retry
     verify(c1).writeLock();
     verify(c1).writeUnlock();
-    // c2 is locked and held by the caller
+    // c2 was locked and is held by the caller
     verify(c2).writeLock();
     verify(c2, never()).writeUnlock();
+  }
+
+  /**
+   * The mapping keeps changing on every retry. After {@link ContainerSet#maxContainerMapSwapRetries()}
+   * retries, null is returned. All intermediate locks on C1 must be released (no lock leak).
+   */
+  @Test
+  public void testExhaustsMaxRetriesReturnsNull() {
+    ContainerSet cs = spy(newContainerSet());
+    Container<?> c1 = mock(Container.class);
+    Container<?> c2 = mock(Container.class);
+    // Alternate: c1 as candidate, c2 as current → always mismatched → all retries fail
+    int[] n = {0};
+    doAnswer(inv -> n[0]++ % 2 == 0 ? c1 : c2).when(cs).getContainer(1L);
+
+    Container<?> result = cs.acquireContainerLock(1L);
+
+    assertNull(result);
+    int maxRetries = ContainerSet.maxContainerMapSwapRetries();
+    // c1 is locked and released once per retry
+    verify(c1, times(maxRetries)).writeLock();
+    verify(c1, times(maxRetries)).writeUnlock();
+    // c2 is only ever seen as "current" — it is never locked
+    verify(c2, never()).writeLock();
   }
 
   /**
