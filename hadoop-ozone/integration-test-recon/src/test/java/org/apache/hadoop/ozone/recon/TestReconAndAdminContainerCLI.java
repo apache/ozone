@@ -107,9 +107,9 @@ class TestReconAndAdminContainerCLI {
 
   /** Pause between SCM/Recon checks while waiting for matching reports. */
   private static final int RM_RECON_COMPARE_POLL_INTERVAL_MS = 1000;
-  /** Max wait (Recon can trail SCM briefly; CI load makes this worse). */
+  /** Max wait (Recon can trail SCM briefly). */
   private static final int RM_RECON_COMPARE_WAIT_MS = 90_000;
-  /** Matching reports must hold this many polls in a row so one lucky tick does not pass the test. */
+  /** Matching reports must hold this many polls in a row. */
   private static final int RM_RECON_COMPARE_STABLE_POLLS = 2;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
