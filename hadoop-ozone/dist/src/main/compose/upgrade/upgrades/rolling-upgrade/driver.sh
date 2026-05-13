@@ -74,47 +74,34 @@ rolling_restart_service() {
 ## @description Restart all services with the target image.
 ## @param stage prefix, used for the generated data as prefix, also for the OUTPUT_NAME
 ## @param target image
+## @param restart order: forward (default) or reverse
 rolling_restart_all_services() {
   local stage_prefix="$1"
   local target_image="$2"
+  local restart_order="${3:-forward}"
+  # forward order of the services
+  local services=(scm1 scm2 scm3 recon dn1 dn2 dn3 dn4 dn5 om1 om2 om3 s3g1 s3g2 s3g3)
   local s
+  local i
 
   # Prepare the requested image
   prepare_for_image "${target_image}"
   echo "--- PREPARED ${target_image} IMAGE ---"
 
-  # SCMs first
-  for s in scm2 scm1 scm3; do
-    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
-    echo "--- RESTARTING ${s} WITH IMAGE ${target_image} ---"
-    rolling_restart_service "$s" "$stage_prefix"
-  done
-
-  # Recon
-  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-recon"
-  echo "--- RESTARTING recon WITH IMAGE ${target_image} ---"
-  rolling_restart_service "recon" "$stage_prefix"
-
-  # DNs
-  for s in dn1 dn2 dn3 dn4 dn5; do
-    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
-    echo "--- RESTARTING ${s} WITH IMAGE ${target_image} ---"
-    rolling_restart_service "$s" "$stage_prefix"
-  done
-
-  # OMs
-  for s in om1 om2 om3; do
-    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
-    echo "--- RESTARTING ${s} WITH IMAGE ${target_image} ---"
-    rolling_restart_service "$s" "$stage_prefix"
-  done
-
-  # S3 Gateways (s3g is HAProxy and does not need to be upgraded)
-  for s in s3g1 s3g2 s3g3; do
-    OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
-    echo "--- RESTARTING ${s} WITH IMAGE ${target_image} ---"
-    rolling_restart_service "$s" "$stage_prefix"
-  done
+  if [[ "$restart_order" == "reverse" ]]; then
+    for ((i=${#services[@]}-1; i>=0; i--)); do
+      s="${services[$i]}"
+      OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
+      echo "--- RESTARTING ${s} WITH IMAGE ${target_image} ---"
+      rolling_restart_service "$s" "$stage_prefix"
+    done
+  else
+    for s in "${services[@]}"; do
+      OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-${stage_prefix}-${s}"
+      echo "--- RESTARTING ${s} WITH IMAGE ${target_image} ---"
+      rolling_restart_service "$s" "$stage_prefix"
+    done
+  fi
 }
 
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
@@ -133,7 +120,7 @@ OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-pre-finalized"
 callback with_this_version_pre_finalized
 
 echo "--- ROLLING DOWNGRADE TO $OZONE_UPGRADE_FROM ---"
-rolling_restart_all_services "3-downgrade" "$OZONE_UPGRADE_FROM"
+rolling_restart_all_services "3-downgrade" "$OZONE_UPGRADE_FROM" "reverse"
 
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-downgraded"
 callback with_old_version_downgraded
