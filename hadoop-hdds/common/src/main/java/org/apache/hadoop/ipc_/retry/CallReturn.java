@@ -15,9 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.io.retry;
+package org.apache.hadoop.ipc_.retry;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.io.retry.RetryPolicy;
 
 /** The call return from a method invocation. */
 class CallReturn {

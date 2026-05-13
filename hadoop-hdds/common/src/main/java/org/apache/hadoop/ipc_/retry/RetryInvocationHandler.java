@@ -15,14 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.io.retry;
+package org.apache.hadoop.ipc_.retry;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.io.retry.AtMostOnce;
+import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
+import org.apache.hadoop.io.retry.Idempotent;
+import org.apache.hadoop.io.retry.MultiException;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
-import org.apache.hadoop.ipc.*;
-import org.apache.hadoop.ipc.Client.ConnectionId;
+import org.apache.hadoop.ipc_.*;
+import org.apache.hadoop.ipc_.Client.ConnectionId;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
