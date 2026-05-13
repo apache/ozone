@@ -44,31 +44,6 @@ public class AsyncCallHandler {
   private static final ThreadLocal<AsyncGet<Object, Throwable>>
       ASYNC_RETURN = new ThreadLocal<>();
 
-  /**
-   * @return the async return value from {@link AsyncCallHandler}.
-   * @param <T> T.
-   * @param <R> R.
-   */
-  @SuppressWarnings("unchecked")
-  public static <R, T extends  Throwable> AsyncGet<R, T> getAsyncReturn() {
-    final AsyncGet<R, T> asyncGet = (AsyncGet<R, T>)ASYNC_RETURN.get();
-    if (asyncGet != null) {
-      ASYNC_RETURN.set(null);
-      return asyncGet;
-    } else {
-      return (AsyncGet<R, T>) getLowerLayerAsyncReturn();
-    }
-  }
-
-  /**
-   * For the lower rpc layers to set the async return value.
-   * @param asyncReturn asyncReturn.
-   */
-  public static void setLowerLayerAsyncReturn(
-      AsyncGet<?, Exception> asyncReturn) {
-    LOWER_LAYER_ASYNC_RETURN.set(asyncReturn);
-  }
-
   private static AsyncGet<?, Exception> getLowerLayerAsyncReturn() {
     final AsyncGet<?, Exception> asyncGet = LOWER_LAYER_ASYNC_RETURN.get();
     Preconditions.checkNotNull(asyncGet);
@@ -344,9 +319,5 @@ public class AsyncCallHandler {
       }
     };
     ASYNC_RETURN.set(asyncGet);
-  }
-
-  public static long getGracePeriod() {
-    return AsyncCallQueue.Processor.GRACE_PERIOD;
   }
 }

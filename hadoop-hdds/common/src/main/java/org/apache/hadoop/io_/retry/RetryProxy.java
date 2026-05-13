@@ -18,10 +18,8 @@
 package org.apache.hadoop.io_.retry;
 
 import java.lang.reflect.Proxy;
-import java.util.Map;
 import org.apache.hadoop.io.retry.DefaultFailoverProxyProvider;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 
 /**
@@ -67,49 +65,5 @@ public class RetryProxy {
         new RetryInvocationHandler<T>(proxyProvider, retryPolicy)
         );
   }
-  
-  /**
-   * Create a proxy for an interface of an implementation class
-   * using the a set of retry policies specified by method name.
-   * If no retry policy is defined for a method then a default of
-   * {@link RetryPolicies#TRY_ONCE_THEN_FAIL} is used.
-   * 
-   * @param iface the interface that the retry will implement
-   * @param <T> T.
-   * @param implementation the instance whose methods should be retried
-   * @param methodNameToPolicyMap a map of method names to retry policies
-   * @return the retry proxy
-   */
-  public static <T> Object create(Class<T> iface, T implementation,
-                              Map<String,RetryPolicy> methodNameToPolicyMap) {
-    return create(iface,
-        new DefaultFailoverProxyProvider<T>(iface, implementation),
-        methodNameToPolicyMap,
-        RetryPolicies.TRY_ONCE_THEN_FAIL);
-  }
 
-  /**
-   * Create a proxy for an interface of implementations of that interface using
-   * the given {@link FailoverProxyProvider} and the a set of retry policies
-   * specified by method name. If no retry policy is defined for a method then a
-   * default of {@link RetryPolicies#TRY_ONCE_THEN_FAIL} is used.
-   * 
-   * @param iface the interface that the retry will implement
-   * @param proxyProvider provides implementation instances whose methods should be retried
-   * @param methodNameToPolicyMap map of method names to retry policies
-   * @param defaultPolicy defaultPolicy.
-   * @param <T> T.
-   * @return the retry proxy
-   */
-  public static <T> Object create(Class<T> iface,
-      FailoverProxyProvider<T> proxyProvider,
-      Map<String, RetryPolicy> methodNameToPolicyMap,
-      RetryPolicy defaultPolicy) {
-    return Proxy.newProxyInstance(
-        proxyProvider.getInterface().getClassLoader(),
-        new Class<?>[] { iface },
-        new RetryInvocationHandler<T>(proxyProvider, defaultPolicy,
-            methodNameToPolicyMap)
-        );
-  }
 }
