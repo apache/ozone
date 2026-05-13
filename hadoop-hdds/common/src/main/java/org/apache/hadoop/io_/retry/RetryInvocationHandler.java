@@ -18,7 +18,6 @@
 package org.apache.hadoop.io_.retry;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.retry.AtMostOnce;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
@@ -46,7 +45,6 @@ import java.util.Map;
 /**
  * A {@link RpcInvocationHandler} which supports client side retry .
  */
-@InterfaceAudience.Private
 public class RetryInvocationHandler<T> implements RpcInvocationHandler {
   public static final Logger LOG = LoggerFactory.getLogger(
       RetryInvocationHandler.class);
