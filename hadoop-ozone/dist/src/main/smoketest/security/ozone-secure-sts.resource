@@ -23,10 +23,12 @@ Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
 
 *** Variables ***
-${RANGER_ENDPOINT_URL}            ${EMPTY}
-${STS_ENDPOINT_URL}               http://s3g:9880/sts
-${S3G_ENDPOINT_URL}               http://s3g:9878
-${ROLE_SESSION_NAME}              sts-session-name
+${RANGER_ENDPOINT_URL}                      ${EMPTY}
+${STS_ENDPOINT_URL}                         http://s3g:9880/sts
+${S3G_ENDPOINT_URL}                         http://s3g:9878
+${ROLE_SESSION_NAME}                        sts-session-name
+${EXPIRED_STS_TOKEN_PROFILE}                expired_sts_token
+${EXPIRED_STS_TOKEN_MIN_ELAPSED_SECONDS}    902
 
 *** Keywords ***
 Configure AWS Profile
@@ -114,6 +116,51 @@ Assume Role And Get Temporary Credentials
     ${time_diff} =                Subtract Date From Date       ${expiration}    ${now}
     Should Be True                ${time_diff} >= ${minimum_expected}           Expected expiration to be at least ${minimum_expected}s in the future, but was ${time_diff}s
     Should Be True                ${time_diff} <= ${maximum_expected}           Expected expiration to be at most ${maximum_expected}s in the future, but was ${time_diff}s
+
+Assume Role And Store Expired STS Token Credentials
+    # Issue a 900s STS credential and store it in EXPIRED_STS_TOKEN_* globals only (it should never be used/modified until the "Expired STS temporary credentials return ExpiredToken on S3 APIs" test).
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${role_arn}  ${duration_seconds}=900
+    Configure AWS Profile         permanent  ${perm_access_key_id}  ${perm_secret_key}
+    ${suffix} =                   Generate Random String        8    [LOWER]
+    ${role_session_name} =        Set Variable                  expired-sts-token-${suffix}
+
+    ${cmd} =                      Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${role_session_name} --duration-seconds ${duration_seconds} --output json --profile permanent
+
+    ${json} =                     Execute                       ${cmd}
+    Should Contain                ${json}                       Credentials
+
+    ${issued_epoch} =             Get Current Date              result_format=epoch  time_zone=UTC
+
+    ${expiredStsAccessKeyId} =    Execute                       printf '%s' '${json}' | jq -r '.Credentials.AccessKeyId'
+    ${expiredStsSecretKey} =      Execute                       printf '%s' '${json}' | jq -r '.Credentials.SecretAccessKey'
+    ${expiredStsSessionToken} =   Execute                       printf '%s' '${json}' | jq -r '.Credentials.SessionToken'
+    Should Start With             ${expiredStsAccessKeyId}      ASIA
+    Set Global Variable           ${EXPIRED_STS_TOKEN_ACCESS_KEY_ID}         ${expiredStsAccessKeyId}
+    Set Global Variable           ${EXPIRED_STS_TOKEN_SECRET_ACCESS_KEY}     ${expiredStsSecretKey}
+    Set Global Variable           ${EXPIRED_STS_TOKEN_SESSION_TOKEN}         ${expiredStsSessionToken}
+    Set Global Variable           ${EXPIRED_STS_TOKEN_ISSUED_EPOCH}          ${issued_epoch}
+
+Wait Until Minimum Expired STS Token Lifetime Elapsed
+    # Matches the ±2s skew tolerance used for AssumeRole duration checks: require 900 + 2 seconds before calling S3.
+    ${now} =                      Get Current Date              result_format=epoch  time_zone=UTC
+    ${elapsed} =                  Evaluate                      float('${now}') - float('${EXPIRED_STS_TOKEN_ISSUED_EPOCH}')
+    ${remaining} =                Evaluate                      ${EXPIRED_STS_TOKEN_MIN_ELAPSED_SECONDS} - ${elapsed}
+    Run Keyword If                ${remaining} > 0              Sleep  ${remaining}
+
+Configure Expired STS Token S3 Profile
+    Configure AWS Profile         ${EXPIRED_STS_TOKEN_PROFILE}  ${EXPIRED_STS_TOKEN_ACCESS_KEY_ID}  ${EXPIRED_STS_TOKEN_SECRET_ACCESS_KEY}  ${EXPIRED_STS_TOKEN_SESSION_TOKEN}
+
+Execute S3api Expect Expired Token
+    [Arguments]                   ${command_tail}
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} ${command_tail} --profile ${EXPIRED_STS_TOKEN_PROFILE}
+    Should Contain                ${output}                     ExpiredToken
+
+Execute S3api Expect Expired Token Head Operation
+    [Arguments]                   ${command_tail}               ${expected_aws_operation_name}
+    [Documentation]               head-bucket and head-object omit S3 XML error bodies so we can't check for ExpiredToken in the body.  awscli surfaces HTTP 400 and the operation label (HeadBucket / HeadObject) instead of ExpiredToken. Assert status and operation together to avoid matching unrelated 400s.
+    ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} ${command_tail} --profile ${EXPIRED_STS_TOKEN_PROFILE}
+    Should Contain                ${output}                     (400)
+    Should Contain                ${output}                     ${expected_aws_operation_name}
 
 Assume Role And Configure STS Profile
     [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${role_arn}=${ROLE_ARN_OBS}  ${role_session_name}=${ROLE_SESSION_NAME}  ${duration_seconds}=900
