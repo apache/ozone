@@ -276,6 +276,21 @@ class TestRewriteTablePathOzoneAction {
   }
 
   @Test
+  void endVersionRejectsDeletedVersionFile() {
+    List<String> metadataPaths = metadataLogEntryPaths(table);
+    String existingName = RewriteTablePathUtil.fileName(metadataPaths.get(0));
+    table.io().deleteFile(metadataPaths.get(0));
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> new RewriteTablePathOzoneAction(table)
+            .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+            .endVersion(existingName)
+            .execute());
+
+    assertThat(exception).hasMessageContaining("does not exist");
+  }
+
+  @Test
   void statsFileCopyPlanReturnsEmptySetForEmptyStats() {
     Set<Pair<String, String>> copyPlan =
         RewriteTablePathOzoneUtils.statsFileCopyPlan(List.of(), List.of());
