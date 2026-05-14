@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.security.symmetric;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.hadoop.io.retry.RetryPolicies.exponentialBackoffRetry;
+import static org.apache.hadoop.io_.retry.RetryPolicies.exponentialBackoffRetry;
 import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAIL;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
