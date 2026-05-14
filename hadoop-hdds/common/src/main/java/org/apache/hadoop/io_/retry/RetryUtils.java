@@ -15,16 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.io.retry;
+package org.apache.hadoop.io_.retry;
 
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.retry.RetryPolicies.MultipleLinearRandomRetry;
-import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.io_.retry.RetryPolicies.MultipleLinearRandomRetry;
+import org.apache.hadoop.ipc_.RemoteException;
 
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.ipc.RetriableException;
+import org.apache.hadoop.ipc_.RetriableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

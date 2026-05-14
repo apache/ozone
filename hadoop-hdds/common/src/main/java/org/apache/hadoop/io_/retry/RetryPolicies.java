@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.io.retry;
+package org.apache.hadoop.io_.retry;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -34,10 +34,11 @@ import java.util.concurrent.TimeUnit;
 
 import javax.security.sasl.SaslException;
 
-import org.apache.hadoop.ipc.ObserverRetryOnActiveException;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ipc.RetriableException;
-import org.apache.hadoop.ipc.StandbyException;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc_.ObserverRetryOnActiveException;
+import org.apache.hadoop.ipc_.RemoteException;
+import org.apache.hadoop.ipc_.RetriableException;
+import org.apache.hadoop.ipc_.StandbyException;
 import org.apache.hadoop.net.ConnectTimeoutException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
