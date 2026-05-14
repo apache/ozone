@@ -423,7 +423,7 @@ public class TestContainerSet {
    */
   @Test
   public void testRetriesOnMappingSwapThenSucceeds()
-      throws StorageContainerException{
+      throws StorageContainerException {
     ContainerSet cs = spy(newContainerSet());
     Container<?> c1 = mock(Container.class);
     Container<?> c2 = mock(Container.class);
@@ -450,7 +450,7 @@ public class TestContainerSet {
    */
   @Test
   public void testExhaustsMaxRetriesReturnsNull()
-      throws StorageContainerException{
+      throws StorageContainerException {
     ContainerSet cs = spy(newContainerSet());
     Container<?> c1 = mock(Container.class);
     Container<?> c2 = mock(Container.class);
