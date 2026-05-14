@@ -33,20 +33,20 @@ public class TestSequenceIdType {
   @Test
   @SuppressWarnings("deprecation")
   public void testStringSyncWithEnumConstants() {
-    // Even though we changed to an Enum, these underlying strings are
-    // persisted in RocksDB. Do not change them.
-    assertEquals("localId", SequenceIdType.LOCAL_ID.getDbKey());
-    assertEquals("delTxnId", SequenceIdType.DEL_TXN_ID.getDbKey());
-    assertEquals("containerId", SequenceIdType.CONTAINER_ID.getDbKey());
-    assertEquals("CertificateId", SequenceIdType.CERTIFICATE_ID.getDbKey());
-    assertEquals("rootCertificateId", SequenceIdType.ROOT_CERTIFICATE_ID.getDbKey());
+    // Ensure enum names exactly match the persisted keys in RocksDB.
+    // These strings are persisted RocksDB keys, do not change them.
+    assertEquals("localId", SequenceIdType.localId.name());
+    assertEquals("delTxnId", SequenceIdType.delTxnId.name());
+    assertEquals("containerId", SequenceIdType.containerId.name());
+    assertEquals("CertificateId", SequenceIdType.CertificateId.name());
+    assertEquals("rootCertificateId", SequenceIdType.rootCertificateId.name());
   }
 
   @Test
   public void testIfNewEnumConstantGetsAdded() {
     Set<String> expectedNames = new HashSet<>(Arrays.asList(
-        "LOCAL_ID", "DEL_TXN_ID", "CONTAINER_ID",
-        "CERTIFICATE_ID", "ROOT_CERTIFICATE_ID"));
+        "localId", "delTxnId", "containerId",
+        "CertificateId", "rootCertificateId"));
 
     Set<String> actualNames = new HashSet<>();
     for (SequenceIdType type : SequenceIdType.values()) {

@@ -240,7 +240,7 @@ public class DeletedBlockLogImpl
       long currentBatchSizeBytes = 0;
       for (Map.Entry<Long, List<DeletedBlock>> entry :
           containerBlocksMap.entrySet()) {
-        long nextTXID = sequenceIdGen.getNextId(SequenceIdType.DEL_TXN_ID);
+        long nextTXID = sequenceIdGen.getNextId(SequenceIdType.delTxnId);
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
             entry.getKey(), entry.getValue());
         txsToBeAdded.add(tx);

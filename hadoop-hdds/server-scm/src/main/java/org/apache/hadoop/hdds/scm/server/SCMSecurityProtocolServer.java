@@ -481,7 +481,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   private String getNextCertificateId() throws IOException {
-    return String.valueOf(sequenceIdGen.getNextId(SequenceIdType.CERTIFICATE_ID));
+    return String.valueOf(sequenceIdGen.getNextId(SequenceIdType.CertificateId));
   }
 
   @VisibleForTesting

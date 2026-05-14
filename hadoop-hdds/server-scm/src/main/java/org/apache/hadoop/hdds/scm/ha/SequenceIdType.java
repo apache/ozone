@@ -18,41 +18,24 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 /**
- * Represents the sequence ID types managed by {@link SequenceIdGenerator} and their persisted RocksDB keys.
+ * Represents the sequence ID types managed by {@link SequenceIdGenerator}
+ * The enum constant names are kept exactly as their persisted RocksDB keys.
  */
 public enum SequenceIdType {
 
-  LOCAL_ID("localId"),
-
-  DEL_TXN_ID("delTxnId"),
-
-  CONTAINER_ID("containerId"),
-
-  /** Certificate ID for all services, including root certificates. */
-  CERTIFICATE_ID("CertificateId"),
+  localId,
+  delTxnId,
+  containerId,
 
   /**
-   * @deprecated Use {@link #CERTIFICATE_ID} instead.
+   * Certificate ID for all services, including root certificates.
+   */
+  CertificateId,
+
+  /**
+   * @deprecated Use {@link #CertificateId} instead.
    */
   @Deprecated
-  ROOT_CERTIFICATE_ID("rootCertificateId");
-
-  /**
-   * The key string stored in the RocksDB sequenceId table.
-   */
-  private final String dbKey;
-
-  SequenceIdType(String dbKey) {
-    this.dbKey = dbKey;
-  }
-
-  /**
-   * Returns the key string used to persist this sequence ID in RocksDB.
-   * This value must not be changed to keep backward compatibility with
-   * existing databases.
-   */
-  public String getDbKey() {
-    return dbKey;
-  }
+  rootCertificateId;
 
 }
