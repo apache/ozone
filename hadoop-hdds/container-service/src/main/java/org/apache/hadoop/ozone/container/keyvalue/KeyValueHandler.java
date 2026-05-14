@@ -2312,7 +2312,7 @@ public class KeyValueHandler extends Handler {
     if (containerLocked == null) {
       // null means container locking retries exhausted ;
       // container not-found throws StorageContainerException.
-      LOG.info("Exceeded {} retries to lock container {}; Now DN will resend for delete with " +
+      LOG.info("Exceeded {} retries to lock container {}; Now SCM will resend for delete with " +
               "the current container replica", ContainerSet.maxContainerMapSwapRetries(),
           containerId);
       return;
