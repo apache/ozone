@@ -1961,7 +1961,7 @@ public abstract class Server {
     }
 
     /**
-     * Some exceptions ({@link RetriableException} and {@link StandbyException})
+     * Some exceptions (e.g. {@link RetriableException})
      * that are wrapped as a cause of parameter e are unwrapped so that they can
      * be sent as the true cause to the client side. In case of
      * {@link InvalidToken} we go one level deeper to get the true cause.
@@ -1973,8 +1973,6 @@ public abstract class Server {
       Throwable cause = e;
       while (cause != null) {
         if (cause instanceof RetriableException) {
-          return cause;
-        } else if (cause instanceof StandbyException) {
           return cause;
         } else if (cause instanceof InvalidToken) {
           // FIXME: hadoop method signatures are restricting the SASL
@@ -1999,7 +1997,7 @@ public abstract class Server {
      *         failure, premature or invalid connection context, or other state 
      *         errors. This exception needs to be sent to the client. This 
      *         exception will wrap {@link RetriableException}, 
-     *         {@link InvalidToken}, {@link StandbyException} or 
+     *         {@link InvalidToken}, or
      *         {@link SaslException}.
      * @throws IOException if sending reply fails
      * @throws InterruptedException
@@ -3137,8 +3135,6 @@ public abstract class Server {
       SaslRpcServer.init(conf);
       saslPropsResolver = SaslPropertiesResolver.getInstance(conf);
     }
-    
-    this.exceptionsHandler.addTerseLoggingExceptions(StandbyException.class);
   }
 
   private synchronized void doKerberosRelogin() throws IOException {
