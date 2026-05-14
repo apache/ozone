@@ -874,4 +874,26 @@ public final class HddsUtils {
     String scmServiceId = getScmServiceId(configuration);
     return getSCMNodeIds(configuration, scmServiceId);
   }
+
+  /**
+   * If {@code error} exposes an {@link AccessControlException} , returns one line error message.
+   */
+  public static String formatAccessControlExceptionLine(Throwable error) {
+    for (Throwable t = error; t != null; t = t.getCause()) {
+      if (t instanceof AccessControlException) {
+        return t.toString();
+      }
+    }
+    String msg = error != null ? error.getMessage() : null;
+    if (msg != null) {
+      String marker = AccessControlException.class.getName() + ": ";
+      int i = msg.indexOf(marker);
+      if (i >= 0) {
+        int end = msg.indexOf('\n', i);
+        String line = end < 0 ? msg.substring(i) : msg.substring(i, end);
+        return line.trim();
+      }
+    }
+    return null;
+  }
 }

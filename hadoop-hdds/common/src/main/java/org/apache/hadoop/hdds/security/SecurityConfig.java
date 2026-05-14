@@ -24,8 +24,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_CIPHERS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROTOCOLS;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_PROVIDER_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT;
@@ -83,10 +85,14 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.Security;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -144,6 +150,8 @@ public class SecurityConfig {
       Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
   private final Duration caAckTimeout;
   private final SslProvider grpcSSLProvider;
+  private final String[] grpcTlsProtocols;
+  private final List<String> grpcTlsCiphers;
   private final Duration rootCaCertificatePollingInterval;
   private final boolean autoCARotationEnabled;
   private final Duration expiredCertificateCheckInterval;
@@ -282,6 +290,18 @@ public class SecurityConfig {
     this.grpcSSLProvider = SslProvider.valueOf(
         configuration.get(HDDS_GRPC_TLS_PROVIDER,
             HDDS_GRPC_TLS_PROVIDER_DEFAULT));
+
+    String protocolsValue = configuration.get(HDDS_GRPC_TLS_PROTOCOLS);
+    this.grpcTlsProtocols =
+        StringUtils.isBlank(protocolsValue)
+        ? null
+        : configuration.getTrimmedStrings(HDDS_GRPC_TLS_PROTOCOLS);
+
+    String ciphersValue = configuration.get(HDDS_GRPC_TLS_CIPHERS);
+    this.grpcTlsCiphers =
+        StringUtils.isBlank(ciphersValue)
+        ? null
+        : Collections.unmodifiableList(Arrays.asList(configuration.getTrimmedStrings(HDDS_GRPC_TLS_CIPHERS)));
   }
 
   public static synchronized void initSecurityProvider(ConfigurationSource configuration) {
@@ -570,6 +590,22 @@ public class SecurityConfig {
    */
   public SslProvider getGrpcSslProvider() {
     return grpcSSLProvider;
+  }
+
+  /**
+   * Returns TLS protocol versions for gRPC servers,
+   * or null for provider defaults.
+   */
+  public String[] getGrpcTlsProtocols() {
+    return grpcTlsProtocols == null ? null : Arrays.copyOf(grpcTlsProtocols, grpcTlsProtocols.length);
+  }
+
+  /**
+   * Returns TLS cipher suites for gRPC servers,
+   * or null for provider defaults.
+   */
+  public List<String> getGrpcTlsCiphers() {
+    return grpcTlsCiphers;
   }
 
   public boolean useExternalCACertificate(String component) {

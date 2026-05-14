@@ -94,7 +94,7 @@ public class SnapshotDiffJob {
     this.largestEntryKey = largestEntryKey;
   }
 
-  public static Codec<SnapshotDiffJob> getCodec() {
+  public static Codec<SnapshotDiffJob> codec() {
     return CODEC;
   }
 
@@ -228,10 +228,10 @@ public class SnapshotDiffJob {
       sb.append(", reason: ").append(reason);
     }
     if (status.equals(JobStatus.IN_PROGRESS) && subStatus != null) {
-      sb.append(", subStatus: ").append(status);
+      sb.append(", subStatus: ").append(subStatus);
       if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO) ||
           subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS)) {
-        sb.append(String.format(", keysProcessedPercent: %.2f", keysProcessedPct));
+        sb.append(String.format(", keysProcessedPct: %.2f", keysProcessedPct));
       }
     }
     return sb.toString();
@@ -291,6 +291,9 @@ public class SnapshotDiffJob {
     if (largestEntryKey != null) {
       builder.setLargestEntryKey(largestEntryKey);
     }
+    if (StringUtils.isNotEmpty(reason)) {
+      builder.setMessage(reason);
+    }
 
     return builder.build();
   }
@@ -302,7 +305,7 @@ public class SnapshotDiffJob {
     SubStatus subStatus = (diffJobProto.hasSubStatus()) ?
         SubStatus.fromProtoBuf(diffJobProto.getSubStatus()) : null;
     String largestEntryKey = diffJobProto.hasLargestEntryKey() ? diffJobProto.getLargestEntryKey() : null;
-    return new SnapshotDiffJob(
+    SnapshotDiffJob job = new SnapshotDiffJob(
         diffJobProto.getCreationTime(),
         diffJobProto.getJobId(),
         status,
@@ -316,6 +319,10 @@ public class SnapshotDiffJob {
         subStatus,
         diffJobProto.getKeysProcessedPct(),
         largestEntryKey);
+    if (diffJobProto.hasMessage()) {
+      job.setReason(diffJobProto.getMessage());
+    }
+    return job;
   }
 
   /**

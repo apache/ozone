@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
@@ -688,6 +689,7 @@ public class SCMClientProtocolServer implements
         if (datanodeInfo != null) {
           nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
           nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+          addFailedVolumes(nodeBuilder, datanodeInfo);
         }
         result.add(nodeBuilder.build());
       }
@@ -720,6 +722,7 @@ public class SCMClientProtocolServer implements
         if (datanodeInfo != null) {
           nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
           nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+          addFailedVolumes(nodeBuilder, datanodeInfo);
         }
         result = nodeBuilder.build();
       }
@@ -733,6 +736,15 @@ public class SCMClientProtocolServer implements
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.QUERY_NODE, auditMap));
     return result;
+  }
+
+  private static void addFailedVolumes(HddsProtos.Node.Builder nodeBuilder,
+      DatanodeInfo datanodeInfo) {
+    for (StorageReportProto report : datanodeInfo.getStorageReports()) {
+      if (report.hasFailed() && report.getFailed()) {
+        nodeBuilder.addFailedVolumes(report.getStorageLocation());
+      }
+    }
   }
 
   @Override

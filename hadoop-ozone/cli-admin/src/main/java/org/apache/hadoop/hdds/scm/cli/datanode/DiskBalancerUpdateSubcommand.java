@@ -58,10 +58,15 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
       arity = "1")
   private Boolean stopAfterDiskEven;
 
+  @Option(names = {"-c", "--container-states"},
+      description = "Comma-separated container lifecycle state names eligible for disk balancing "
+          + "(e.g. CLOSED,QUASI_CLOSED). Must be uppercase enum names.")
+  private String containerStates;
+
   @Override
   protected String validateParameters() {
-    if (threshold == null && bandwidthInMB == null && 
-        parallelThread == null && stopAfterDiskEven == null) {
+    if (threshold == null && bandwidthInMB == null &&
+        parallelThread == null && stopAfterDiskEven == null && containerStates == null) {
       return "At least one configuration parameter must be specified for configuration update.";
     }
     return null;
@@ -105,6 +110,9 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
     }
     if (stopAfterDiskEven != null) {
       builder.setStopAfterDiskEven(stopAfterDiskEven);
+    }
+    if (containerStates != null) {
+      builder.setContainerStates(containerStates);
     }
     return builder.build();
   }
@@ -163,6 +171,9 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
     }
     if (stopAfterDiskEven != null) {
       configMap.put("stopAfterDiskEven", stopAfterDiskEven);
+    }
+    if (containerStates != null) {
+      configMap.put("containerStates", containerStates);
     }
     return configMap.isEmpty() ? null : configMap;
   }

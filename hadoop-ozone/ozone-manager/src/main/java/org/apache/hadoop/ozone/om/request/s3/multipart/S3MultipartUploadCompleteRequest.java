@@ -276,6 +276,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
 
+      // Conditional write validation (If-None-Match / If-Match).
+      // BUCKET_LOCK is held, so validation and commit are atomic.
+      // Only 412 PreconditionFailed is possible; 409 Conflict cannot occur.
+      OmKeyInfo existingKeyInfo =
+          getOmKeyInfoFromKeyTable(dbOzoneKey, keyName, omMetadataManager);
+      validateAtomicRewrite(existingKeyInfo, keyArgs);
+      validateIfMatchETag(keyArgs, existingKeyInfo);
+
       if (!partsList.isEmpty()) {
         final OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap
             = multipartKeyInfo.getPartKeyInfoMap();

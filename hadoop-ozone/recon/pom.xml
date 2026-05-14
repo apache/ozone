@@ -259,6 +259,18 @@
       <artifactId>sqlite-jdbc</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.fasterxml.jackson.module</groupId>
+      <artifactId>jackson-module-jaxb-annotations</artifactId>
+      <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <!-- using jakarta.xml.bind instead -->
+          <groupId>javax.xml.bind</groupId>
+          <artifactId>jaxb-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-assistedinject</artifactId>
       <scope>runtime</scope>

@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
@@ -99,8 +98,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       return handler.handleGetRequest(context, bucketName);
     } catch (OMException ex) {
-      OS3Exception code = translateException(ex);
-      throw newError(code, bucketName, ex);
+      throw newError(bucketName, ex);
     }
   }
 
@@ -136,7 +134,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       boolean shallow = listKeysShallowEnabled
           && OZONE_URI_DELIMITER.equals(delimiter);
 
-      bucket = getBucket(bucketName);
+      bucket = context.getVolume().getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
@@ -271,8 +269,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       return handler.handlePutRequest(context, bucketName, body);
     } catch (OMException ex) {
-      OS3Exception code = translateException(ex);
-      throw newError(code, bucketName, ex);
+      throw newError(bucketName, ex);
     }
   }
 
@@ -293,11 +290,14 @@ public class BucketEndpoint extends BucketOperationHandler {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
     try {
-      OzoneBucket bucket = getBucket(bucketName);
+      OzoneBucket bucket = getVolume().getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       auditReadSuccess(s3GAction);
       getMetrics().updateHeadBucketSuccessStats(startNanos);
       return Response.ok().build();
+    } catch (OMException e) {
+      auditReadFailure(s3GAction, e);
+      throw newError(bucketName, e);
     } catch (Exception e) {
       auditReadFailure(s3GAction, e);
       throw e;
@@ -317,8 +317,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     try {
       return handler.handleDeleteRequest(context, bucketName);
     } catch (OMException ex) {
-      OS3Exception code = translateException(ex);
-      throw newError(code, bucketName, ex);
+      throw newError(bucketName, ex);
     }
   }
 
@@ -342,7 +341,7 @@ public class BucketEndpoint extends BucketOperationHandler {
   ) throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
 
-    OzoneBucket bucket = getBucket(bucketName);
+    OzoneBucket bucket = getVolume().getBucket(bucketName);
     MultiDeleteResponse result = new MultiDeleteResponse();
     List<String> deleteKeys = new ArrayList<>();
 
@@ -426,19 +425,5 @@ public class BucketEndpoint extends BucketOperationHandler {
         .add(this)
         .build();
     handler = new AuditingBucketOperationHandler(chain);
-  }
-
-  private static OS3Exception translateException(OMException ex) {
-    if (isAccessDenied(ex)) {
-      return S3ErrorTable.ACCESS_DENIED;
-    } else if (ex.getResult() == ResultCodes.BUCKET_NOT_EMPTY) {
-      return S3ErrorTable.BUCKET_NOT_EMPTY;
-    } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-      return S3ErrorTable.NO_SUCH_BUCKET;
-    } else if (ex.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
-      return S3ErrorTable.INVALID_BUCKET_NAME;
-    } else {
-      return INTERNAL_ERROR;
-    }
   }
 }

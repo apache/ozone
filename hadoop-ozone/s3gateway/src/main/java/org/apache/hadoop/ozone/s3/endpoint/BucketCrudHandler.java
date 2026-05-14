@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import java.io.IOException;
 import java.io.InputStream;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -62,10 +63,16 @@ public class BucketCrudHandler extends BucketOperationHandler {
 
     context.setAction(S3GAction.CREATE_BUCKET);
 
-    String location = createS3Bucket(bucketName);
-    getMetrics().updateCreateBucketSuccessStats(context.getStartNanos());
-    return Response.status(HttpStatus.SC_OK).header("Location", location)
-        .build();
+    try {
+      getClient().getObjectStore().createS3Bucket(bucketName);
+      getMetrics().updateCreateBucketSuccessStats(context.getStartNanos());
+      return Response.status(HttpStatus.SC_OK)
+          .header(HttpHeaders.LOCATION, "/" + bucketName)
+          .build();
+    } catch (Exception e) {
+      getMetrics().updateCreateBucketFailureStats(context.getStartNanos());
+      throw e;
+    }
   }
 
   /**
@@ -83,10 +90,10 @@ public class BucketCrudHandler extends BucketOperationHandler {
 
     try {
       if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
-        OzoneBucket bucket = getBucket(bucketName);
+        OzoneBucket bucket = context.getVolume().getBucket(bucketName);
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
-      deleteS3Bucket(bucketName);
+      context.getVolume().deleteBucket(bucketName);
     } catch (Exception ex) {
       getMetrics().updateDeleteBucketFailureStats(context.getStartNanos());
       throw ex;

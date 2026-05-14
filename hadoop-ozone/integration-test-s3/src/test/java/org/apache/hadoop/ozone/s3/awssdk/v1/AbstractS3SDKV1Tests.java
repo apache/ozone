@@ -41,6 +41,8 @@ import com.amazonaws.services.s3.model.Bucket;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
+import com.amazonaws.services.s3.model.CopyObjectRequest;
+import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
@@ -88,6 +90,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -101,6 +104,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -121,6 +125,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.NonHATests;
@@ -133,6 +138,8 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -490,6 +497,105 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testCopyObject() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putResult = s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", putResult.getETag());
+
+    CopyObjectResult copyResult = s3Client.copyObject(sourceBucketName, sourceKey, destBucketName, destKey);
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", copyResult.getETag());
+  }
+
+  @Test
+  public void testCopyObjectWithSourceIfMatch() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putResult = s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+    String sourceETag = putResult.getETag();
+
+    CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
+        .withMatchingETagConstraint(sourceETag);
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertEquals(sourceETag, copyResult.getETag());
+  }
+
+  @Test
+  public void testCopyObjectWithSourceIfMatchFail() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+
+    CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
+        .withMatchingETagConstraint("wrong-etag");
+
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertNull(copyResult);
+  }
+
+  @Test
+  public void testCopyObjectWithSourceIfNoneMatch() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putResult = s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+    String sourceETag = putResult.getETag();
+
+    CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
+        .withNonmatchingETagConstraint("different-etag");
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertEquals(sourceETag, copyResult.getETag());
+  }
+
+  @Test
+  public void testCopyObjectWithSourceIfNoneMatchFail() {
+    final String sourceBucketName = getBucketName("source");
+    final String destBucketName = getBucketName("dest");
+    final String sourceKey = getKeyName("source");
+    final String destKey = getKeyName("dest");
+    final String content = "bar";
+    s3Client.createBucket(sourceBucketName);
+    s3Client.createBucket(destBucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putResult = s3Client.putObject(sourceBucketName, sourceKey, is, new ObjectMetadata());
+    String sourceETag = putResult.getETag();
+
+    CopyObjectRequest copyRequest = new CopyObjectRequest(sourceBucketName, sourceKey, destBucketName, destKey)
+        .withNonmatchingETagConstraint(sourceETag);
+    
+    CopyObjectResult copyResult = s3Client.copyObject(copyRequest);
+    assertNull(copyResult);
+  }
+
+  @Test
   public void testPutObjectWithMD5Header() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -513,17 +619,24 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", object.getObjectMetadata().getETag());
   }
 
-  @Test
-  public void testPutObjectWithWrongMD5Header() throws Exception {
+  static Stream<Arguments> wrongContentMD5Provider() throws Exception {
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    return Stream.of(
+        Arguments.of(wrongMd5Base64, S3ErrorTable.BAD_DIGEST.getCode()),
+        Arguments.of("invalid-base64", S3ErrorTable.INVALID_DIGEST.getCode())
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testPutObjectWithWrongMD5Header(String wrongMd5Base64, String expectedErrorCode) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     final String content = "bar";
     s3Client.createBucket(bucketName);
-
-    // Use wrong content to calculate MD5
-    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
-    byte[] wrongMd5Bytes = calculateDigest(new ByteArrayInputStream(wrongContentBytes), 0, wrongContentBytes.length);
-    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
 
     byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
     InputStream is = new ByteArrayInputStream(contentBytes);
@@ -536,7 +649,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(400, ase.getStatusCode());
-    assertEquals("BadDigest", ase.getErrorCode());
+    assertEquals(expectedErrorCode, ase.getErrorCode());
 
     // Verify the object was not uploaded
     assertFalse(s3Client.doesObjectExist(bucketName, keyName));
@@ -597,8 +710,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     }
   }
 
-  @Test
-  public void testMultipartUploadPartWithWrongMD5Header() throws Exception {
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testMultipartUploadPartWithWrongMD5Header(String wrongMd5Base64, String expectedErrorCode) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(bucketName);
@@ -612,11 +726,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     String partContent = "partdata";
     byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
 
-    byte[] wrongMd5Bytes = calculateDigest(
-        new ByteArrayInputStream("wrongdata".getBytes(StandardCharsets.UTF_8)), 0, 9);
-    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
-
-    // Upload part with wrong MD5 should fail
+    // Upload part with wrong/invalid MD5 should fail
     InputStream partInputStream = new ByteArrayInputStream(partBytes);
     ObjectMetadata metadata = new ObjectMetadata();
     metadata.setContentMD5(wrongMd5Base64);
@@ -636,7 +746,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(400, ase.getStatusCode());
-    assertEquals("BadDigest", ase.getErrorCode());
+    assertEquals(expectedErrorCode, ase.getErrorCode());
 
     // Abort the multipart upload
     AbortMultipartUploadRequest abortRequest = new AbortMultipartUploadRequest(bucketName, keyName, uploadId);
@@ -644,6 +754,208 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     // Verify object was not created
     assertFalse(s3Client.doesObjectExist(bucketName, keyName));
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfNoneMatch() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // Initiate and complete multipart upload with If-None-Match: *
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "part1data";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-None-Match: * (key doesn't exist, should succeed)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-None-Match", "*");
+
+    CompleteMultipartUploadResult result = s3Client.completeMultipartUpload(completeRequest);
+    assertNotNull(result.getETag());
+
+    // Verify object was created
+    assertTrue(s3Client.doesObjectExist(bucketName, keyName));
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfNoneMatchFail() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // First, create an existing key
+    s3Client.putObject(bucketName, keyName,
+        new ByteArrayInputStream("existing".getBytes(StandardCharsets.UTF_8)),
+        new ObjectMetadata());
+
+    // Initiate multipart upload for same key
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "part1data";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-None-Match: * (key exists, should fail)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-None-Match", "*");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.completeMultipartUpload(completeRequest));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfMatch() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // First, create an existing key and get its ETag
+    PutObjectResult existingResult = s3Client.putObject(bucketName, keyName,
+        new ByteArrayInputStream("existing".getBytes(StandardCharsets.UTF_8)),
+        new ObjectMetadata());
+    String existingETag = existingResult.getETag();
+
+    // Initiate multipart upload for same key
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "newcontent";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-Match: <existingETag> (should succeed)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-Match", "\"" + existingETag + "\"");
+
+    CompleteMultipartUploadResult result = s3Client.completeMultipartUpload(completeRequest);
+    assertNotNull(result.getETag());
+    assertNotEquals(existingETag, stripQuotes(result.getETag()));
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfMatchFail() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // First, create an existing key
+    s3Client.putObject(bucketName, keyName,
+        new ByteArrayInputStream("existing".getBytes(StandardCharsets.UTF_8)),
+        new ObjectMetadata());
+
+    // Initiate multipart upload for same key
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "newcontent";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-Match: wrong-etag (should fail)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-Match", "\"wrong-etag\"");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.completeMultipartUpload(completeRequest));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+  }
+
+  @Test
+  public void testCompleteMultipartUploadIfMatchMissingKeyFail() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // Initiate multipart upload (key doesn't exist)
+    InitiateMultipartUploadRequest initRequest =
+        new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Upload a part
+    String partContent = "newcontent";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(new ByteArrayInputStream(partBytes))
+        .withPartSize(partBytes.length);
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Complete with If-Match on non-existent key (should fail)
+    List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    completeRequest.putCustomRequestHeader("If-Match", "\"some-etag\"");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.completeMultipartUpload(completeRequest));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
   }
 
   @Test

@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.PendingContainerTracker;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -113,6 +114,8 @@ public class MockNodeManager implements NodeManager {
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
   private int numPipelinePerDatanode;
+  private PendingContainerTracker pendingContainerTracker;
+  private final OzoneConfiguration conf = new OzoneConfiguration();
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -123,7 +126,9 @@ public class MockNodeManager implements NodeManager {
     this.node2ContainerMap = new NodeStateMap();
     this.dnsToUuidMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
-    this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
+    this.clusterMap = new NetworkTopologyImpl(conf);
+    this.pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024,
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null);
   }
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
@@ -263,7 +268,7 @@ public class MockNodeManager implements NodeManager {
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
         DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-            UpgradeUtils.defaultLayoutVersionProto());
+            UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();
@@ -342,7 +347,7 @@ public class MockNodeManager implements NodeManager {
         nodeStatus = NodeStatus.inServiceDead();
       }
       DatanodeInfo di = new DatanodeInfo(entry.getKey(), nodeStatus,
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       long capacity = entry.getValue().getCapacity().get();
       long used = entry.getValue().getScmUsed().get();
@@ -431,7 +436,7 @@ public class MockNodeManager implements NodeManager {
     }
 
     DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-        UpgradeUtils.defaultLayoutVersionProto());
+        UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     long capacity = nodeMetricMap.get(dd).getCapacity().get();
     long used = nodeMetricMap.get(dd).getScmUsed().get();
     long remaining = nodeMetricMap.get(dd).getRemaining().get();
@@ -446,6 +451,15 @@ public class MockNodeManager implements NodeManager {
     di.updateMetaDataStorageReports(
         new ArrayList<>(Arrays.asList(metaStorage1)));
     return di;
+  }
+
+  @Override
+  public void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
+    DatanodeDetails dd = nodeMetricMap.keySet().stream()
+        .filter(d -> d.getID().equals(datanodeID))
+        .findFirst().orElse(null);
+    DatanodeInfo info = getDatanodeInfo(dd);
+    pendingContainerTracker.recordPendingAllocationForDatanode(info, containerID);
   }
 
   /**
@@ -750,7 +764,8 @@ public class MockNodeManager implements NodeManager {
                                     NodeReportProto nodeReport,
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
-    final DatanodeInfo info = new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy(), layoutInfo);
+    final DatanodeInfo info = new DatanodeInfo(datanodeDetails,
+        NodeStatus.inServiceHealthy(), layoutInfo, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     try {
       node2ContainerMap.addNode(info);
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),
@@ -939,6 +954,18 @@ public class MockNodeManager implements NodeManager {
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
+  }
+
+  @Override
+  public boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID) {
+    DatanodeDetails dd = nodeMetricMap.keySet().stream()
+        .filter(d -> d.getID().equals(datanodeID))
+        .findFirst().orElse(null);
+    DatanodeInfo info = getDatanodeInfo(dd);
+    if (info == null) {
+      return false;
+    }
+    return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(info);
   }
 
   /**

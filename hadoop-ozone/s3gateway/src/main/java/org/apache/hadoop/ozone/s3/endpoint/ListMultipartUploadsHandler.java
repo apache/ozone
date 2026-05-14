@@ -50,13 +50,14 @@ class ListMultipartUploadsHandler extends BucketOperationHandler {
     final String uploadIdMarker = queryParams().get(QueryParams.UPLOAD_ID_MARKER);
 
     if (maxUploads < 1) {
-      throw newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads",
-          new Exception("max-uploads must be positive"));
+      OS3Exception e = newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads");
+      e.setErrorMessage("max-uploads must be positive");
+      throw e;
     }
 
     long startNanos = context.getStartNanos();
 
-    OzoneBucket bucket = getBucket(bucketName);
+    OzoneBucket bucket = context.getVolume().getBucket(bucketName);
 
     try {
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
