@@ -147,14 +147,25 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
-      
+
+      if (multipartKeyInfo == null) {
+        // This can occur when user started uploading part by the time commit
+        // of that part happens, in between the user might have requested
+        // abort multipart upload. If we just throw exception, then the data
+        // will not be garbage collected, so move this part to delete table
+        // and throw error
+        // Move this part to delete table.
+        throw new OMException("No such Multipart upload is with specified " +
+            "uploadId " + uploadID,
+            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
+
       if (!ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
           && multipartKeyInfo.getSchemaVersion() != 0) {
         throw new OMException("MPU parts-table split behavior is not allowed " +
           "before cluster finalization for commit part request.",
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
-  
 
       openKey = getOpenKey(volumeName, bucketName, keyName, omMetadataManager,
               clientID);
@@ -188,18 +199,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       int partNumber = keyArgs.getMultipartNumber();
       partName = getPartName(ozoneKey, uploadID, partNumber);
-
-      if (multipartKeyInfo == null) {
-        // This can occur when user started uploading part by the time commit
-        // of that part happens, in between the user might have requested
-        // abort multipart upload. If we just throw exception, then the data
-        // will not be garbage collected, so move this part to delete table
-        // and throw error
-        // Move this part to delete table.
-        throw new OMException("No such Multipart upload is with specified " +
-            "uploadId " + uploadID,
-            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
-      }
 
       oldPartKeyInfo = multipartKeyInfo.getPartKeyInfo(partNumber);
 
