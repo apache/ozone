@@ -1512,7 +1512,7 @@ public class KeyValueHandler extends Handler {
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
     long containerID = container.getContainerData().getContainerID();
-    Container<?> lockedContainer = containerSet.acquireContainerLock(containerID);
+    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
     if (lockedContainer == null) {
       // null means container retries exhausted ;
       // container not-found throws StorageContainerException.
@@ -1582,7 +1582,7 @@ public class KeyValueHandler extends Handler {
   public void closeContainer(Container container)
       throws IOException {
     long containerID = container.getContainerData().getContainerID();
-    Container<?> lockedContainer = containerSet.acquireContainerLock(containerID);
+    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
     if (lockedContainer == null) {
       // null means container locking retries exhausted ;
       // container not-found throws StorageContainerException.
@@ -2308,7 +2308,7 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
     final long containerId = container.getContainerData().getContainerID();
     long startTime = clock.millis();
-    Container<?> containerLocked = containerSet.acquireContainerLock(containerId);
+    Container<?> containerLocked = containerSet.getContainerWithWriteLock(containerId);
     if (containerLocked == null) {
       // null means container locking retries exhausted ;
       // container not-found throws StorageContainerException.

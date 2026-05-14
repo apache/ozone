@@ -88,7 +88,7 @@ import org.junit.jupiter.api.io.TempDir;
  * The balancer thread holds a <em>read</em> lock on the old replica while it copies the
  * container and then calls {@link ContainerSet#updateContainer} so the map points at the new
  * replica on another disk. Concurrent delete / block-deletion / unhealthy / close paths resolve
- * the live container by id via {@link ContainerSet#acquireContainerLock} and then operate on
+ * the live container by id via {@link ContainerSet#getContainerWithWriteLock} and then operate on
  * that instance so paths, DB, and state match the destination replica.
  */
 @Timeout(60)
@@ -311,7 +311,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
 
   /**
    * BlockDeletingTask queued with stale ref of KeyValueContainerData still resolves
-   * the live replica by id; after {@code acquireContainerLock}, it uses the destination
+   * the live replica by id; after {@code getContainerWithWriteLock}, it uses the destination
    * replica's DB and paths (updated {@code containerData} field).
    */
   @ContainerTestVersionInfo.ContainerTest
@@ -356,7 +356,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
     BlockDeletingTask blockDeletingTask =
         new BlockDeletingTask(blockDeletingService, blockInfo, checksumTreeManager, 1);
 
-    // Run block deletion concurrently; acquireContainerLock targets the live map entry on the destination.
+    // Run block deletion concurrently; getContainerWithWriteLock targets the live map entry on the destination.
     CountDownLatch blockThreadStarted = new CountDownLatch(1);
     CompletableFuture<Void> blockDone = CompletableFuture.runAsync(() -> {
       blockThreadStarted.countDown();
@@ -390,7 +390,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
   /**
    * {@link KeyValueHandler#markContainerUnhealthy} with a stale container
    * reference while DiskBalancer has already run {@link ContainerSet#updateContainer}
-   * (map = destination). Without {@link ContainerSet#acquireContainerLock}, the handler would
+   * (map = destination). Without {@link ContainerSet#getContainerWithWriteLock}, the handler would
    * take writeLock on the old object and mark it unhealthy after {@code markContainerForDelete}
    * turns it {@link State#DELETED}, sending a false UNHEALTHY ICR for a replica SCM no longer tracks.
    * With the fix, the live map entry (destination) is locked and marked {@link State#UNHEALTHY}.
@@ -457,7 +457,7 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
    * SCM closeContainer with a stale source container while the map already references
    * the destination after {@link ContainerSet#updateContainer}. Without resolving the live instance,
    * the close would run on the source after it is DELETED and throw, leaving the destination
-   * {@link State#QUASI_CLOSED}. With {@link ContainerSet#acquireContainerLock}, the destination
+   * {@link State#QUASI_CLOSED}. With {@link ContainerSet#getContainerWithWriteLock}, the destination
    * is closed to {@link State#CLOSED}.
    */
   @ContainerTestVersionInfo.ContainerTest

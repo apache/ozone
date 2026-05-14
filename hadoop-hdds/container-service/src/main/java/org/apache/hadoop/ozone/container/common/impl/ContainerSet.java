@@ -302,7 +302,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @throws StorageContainerException with {@code CONTAINER_NOT_FOUND}
    */
   @Nullable
-  public Container<?> acquireContainerLock(long containerId) throws StorageContainerException {
+  public Container<?> getContainerWithWriteLock(long containerId) throws StorageContainerException {
     for (int retry = 0; retry < MAX_CONTAINER_MAP_SWAP_RETRIES; retry++) {
       Container<?> candidate = getContainer(containerId);
       if (candidate == null) {

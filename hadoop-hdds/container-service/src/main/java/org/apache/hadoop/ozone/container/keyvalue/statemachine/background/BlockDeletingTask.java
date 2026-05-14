@@ -143,7 +143,7 @@ public class BlockDeletingTask implements BackgroundTask {
     ContainerSet cs = ozoneContainer.getContainerSet();
     final long containerId = containerData.getContainerID();
 
-    Container<?> container = cs.acquireContainerLock(containerId);
+    Container<?> container = cs.getContainerWithWriteLock(containerId);
     if (container == null) {
       // null means container locking retries exhausted ;
       // container not-found throws StorageContainerException.

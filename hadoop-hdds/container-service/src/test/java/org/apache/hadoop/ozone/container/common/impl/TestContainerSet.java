@@ -378,7 +378,7 @@ public class TestContainerSet {
   }
 
   // -------------------------------------------------------------------------
-  // acquireContainerLock tests
+  // getContainerWithWriteLock tests
   // -------------------------------------------------------------------------
 
   /**
@@ -391,7 +391,7 @@ public class TestContainerSet {
     Container<?> c1 = mock(Container.class);
     doAnswer(inv -> c1).when(cs).getContainer(1L);
 
-    Container<?> result = cs.acquireContainerLock(1L);
+    Container<?> result = cs.getContainerWithWriteLock(1L);
 
     assertSame(c1, result);
     verify(c1).writeLock();
@@ -411,7 +411,7 @@ public class TestContainerSet {
     // First call → candidate c1; second call (re-check after lock) → null (container removed)
     doAnswer(inv -> callCount[0]++ == 0 ? c1 : null).when(cs).getContainer(1L);
 
-    assertThrows(StorageContainerException.class, () -> cs.acquireContainerLock(1L));
+    assertThrows(StorageContainerException.class, () -> cs.getContainerWithWriteLock(1L));
     verify(c1).writeLock();
     verify(c1).writeUnlock();  // lock must be released before throwing
   }
@@ -433,7 +433,7 @@ public class TestContainerSet {
     Container<?>[] seq = {c1, c2, c2, c2};
     doAnswer(inv -> seq[Math.min(n[0]++, seq.length - 1)]).when(cs).getContainer(1L);
 
-    Container<?> result = cs.acquireContainerLock(1L);
+    Container<?> result = cs.getContainerWithWriteLock(1L);
 
     assertSame(c2, result);
     // c1 was locked then released during the retry
@@ -458,7 +458,7 @@ public class TestContainerSet {
     int[] n = {0};
     doAnswer(inv -> n[0]++ % 2 == 0 ? c1 : c2).when(cs).getContainer(1L);
 
-    Container<?> result = cs.acquireContainerLock(1L);
+    Container<?> result = cs.getContainerWithWriteLock(1L);
 
     assertNull(result);
     int maxRetries = ContainerSet.maxContainerMapSwapRetries();

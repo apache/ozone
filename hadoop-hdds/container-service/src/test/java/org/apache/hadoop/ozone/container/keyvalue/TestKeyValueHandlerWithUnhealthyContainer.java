@@ -235,7 +235,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         .build();
     kvData.setVolume(hddsVolume);
     KeyValueContainer container = new KeyValueContainer(kvData, conf);
-    when(containerSet.acquireContainerLock(eq(1L))).thenAnswer(invocation -> {
+    when(containerSet.getContainerWithWriteLock(eq(1L))).thenAnswer(invocation -> {
       container.writeLock();
       return container;
     });
