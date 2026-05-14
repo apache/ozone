@@ -401,21 +401,19 @@ public class TestContainerSet {
   /**
    * Container is present when first fetched, but removed from the map after writeLock is acquired
    * (second getContainer check returns null).
-   * Expect null, and that writeLock was called then immediately writeUnlock was called (no lock leak).
+   * Expect StorageContainerException(CONTAINER_NOT_FOUND), and the lock released before throwing (no lock leak).
    */
   @Test
-  public void testContainerRemovedAfterWriteLock() throws StorageContainerException {
+  public void testContainerRemovedAfterWriteLock() {
     ContainerSet cs = spy(newContainerSet());
     Container<?> c1 = mock(Container.class);
     int[] callCount = {0};
     // First call → candidate c1; second call (re-check after lock) → null (container removed)
     doAnswer(inv -> callCount[0]++ == 0 ? c1 : null).when(cs).getContainer(1L);
 
-    Container<?> result = cs.acquireContainerLock(1L);
-
-    assertNull(result);
+    assertThrows(StorageContainerException.class, () -> cs.acquireContainerLock(1L));
     verify(c1).writeLock();
-    verify(c1).writeUnlock();  // lock must be released before returning null
+    verify(c1).writeUnlock();  // lock must be released before throwing
   }
 
   /**
@@ -424,7 +422,8 @@ public class TestContainerSet {
    * and retries. The second attempt finds C2 stable and returns it locked.
    */
   @Test
-  public void testRetriesOnMappingSwapThenSucceeds() {
+  public void testRetriesOnMappingSwapThenSucceeds()
+      throws StorageContainerException{
     ContainerSet cs = spy(newContainerSet());
     Container<?> c1 = mock(Container.class);
     Container<?> c2 = mock(Container.class);
@@ -450,7 +449,8 @@ public class TestContainerSet {
    * retries, null is returned. All intermediate locks on C1 must be released (no lock leak).
    */
   @Test
-  public void testExhaustsMaxRetriesReturnsNull() {
+  public void testExhaustsMaxRetriesReturnsNull()
+      throws StorageContainerException{
     ContainerSet cs = spy(newContainerSet());
     Container<?> c1 = mock(Container.class);
     Container<?> c2 = mock(Container.class);

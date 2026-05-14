@@ -295,25 +295,28 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   /**
    * Locks the container mapped to {@code containerId} for write, and verifies that the instance locked is still
-   * the one stored in this set. If the mapping is swapped or the container no longer exists, unlocks and retries up to
+   * the one stored in this set. If the mapping is swapped, unlocks and retries up to
    * {@link #maxContainerMapSwapRetries()} times, then returns {@code null}.
    *
-   * @return the locked container, or {@code null} if none mapped, or mapping could not be stabilized
+   * @return the locked container, or {@code null} if the mapping could not be stabilized after all retries
+   * @throws StorageContainerException with {@code CONTAINER_NOT_FOUND}
    */
   @Nullable
-  public Container<?> acquireContainerLock(long containerId) {
+  public Container<?> acquireContainerLock(long containerId) throws StorageContainerException {
     for (int retry = 0; retry < MAX_CONTAINER_MAP_SWAP_RETRIES; retry++) {
       Container<?> candidate = getContainer(containerId);
       if (candidate == null) {
-        LOG.info("Container {} no longer present in ContainerSet, skipping.", containerId);
-        return null;
+        throw new StorageContainerException(
+            "Container " + containerId + " not found in ContainerSet.",
+            ContainerProtos.Result.CONTAINER_NOT_FOUND);
       }
       candidate.writeLock();
       Container<?> current = getContainer(containerId);
       if (current == null) {
         candidate.writeUnlock();
-        LOG.info("Container {} no longer exists in ContainerSet while acquiring lock.", containerId);
-        return null;
+        throw new StorageContainerException(
+            "Container " + containerId + " not found in ContainerSet.",
+            ContainerProtos.Result.CONTAINER_NOT_FOUND);
       }
       if (current != candidate) {
         candidate.writeUnlock();
@@ -325,6 +328,8 @@ public class ContainerSet implements Iterable<Container<?>> {
       }
       return candidate;
     }
+    LOG.warn("Container {} mapping kept changing after {} attempts; giving up.",
+        containerId, MAX_CONTAINER_MAP_SWAP_RETRIES);
     return null;
   }
 

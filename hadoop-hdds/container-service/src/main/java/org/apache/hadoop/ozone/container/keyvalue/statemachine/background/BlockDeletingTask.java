@@ -145,7 +145,10 @@ public class BlockDeletingTask implements BackgroundTask {
 
     Container<?> container = cs.acquireContainerLock(containerId);
     if (container == null) {
-      LOG.warn("Exceeded {} attempts locking live container {}; giving up.", ContainerSet.maxContainerMapSwapRetries(),
+      // null means container locking retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.info("Exceeded {} retries to lock container {}; Now DN will resend for delete with " +
+              "the current container replica", ContainerSet.maxContainerMapSwapRetries(),
           containerId);
       return new ContainerBackgroundTaskResult();
     }
