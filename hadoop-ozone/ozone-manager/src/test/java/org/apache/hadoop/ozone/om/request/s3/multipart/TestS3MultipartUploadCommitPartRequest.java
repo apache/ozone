@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -210,9 +209,19 @@ public class TestS3MultipartUploadCommitPartRequest
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
+    createParentPath(volumeName, bucketName);
+
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
+        bucketName, keyName);
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
+    OMClientResponse initiateResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
+            1L);
 
     long clientID = Time.now();
-    String multipartUploadID = UUID.randomUUID().toString();
+    String multipartUploadID = initiateResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
 
     OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
         bucketName, keyName, clientID, multipartUploadID, 1);
@@ -227,13 +236,8 @@ public class TestS3MultipartUploadCommitPartRequest
     OMClientResponse omClientResponse =
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
 
-    if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      assertSame(omClientResponse.getOMResponse().getStatus(),
-          OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND);
-    } else {
-      assertSame(omClientResponse.getOMResponse().getStatus(),
-          OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
-    }
+    assertSame(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
 
   }
 
