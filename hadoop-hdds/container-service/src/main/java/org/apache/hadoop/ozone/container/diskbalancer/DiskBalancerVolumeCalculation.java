@@ -70,13 +70,22 @@ public final class DiskBalancerVolumeCalculation {
    * @throws IllegalArgumentException if total capacity is zero
    */
   public static double getIdealUsage(List<VolumeFixedUsage> volumes) {
+    if (volumes == null || volumes.isEmpty()) {
+      return 0.0;
+    }
+
     long totalCapacity = 0L, totalEffectiveUsed = 0L;
-    
+
     for (VolumeFixedUsage volumeUsage : volumes) {
       totalCapacity += volumeUsage.getUsage().getCapacity();
       totalEffectiveUsed += volumeUsage.getEffectiveUsed();
     }
-    
+
+    if (totalCapacity <= 0) {
+      throw new IllegalArgumentException(
+          "total capacity must be greater than 0");
+    }
+
     return ((double) (totalEffectiveUsed)) / totalCapacity;
   }
   
