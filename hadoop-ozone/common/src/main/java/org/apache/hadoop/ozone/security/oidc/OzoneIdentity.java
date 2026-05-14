@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Normalized identity produced by an external authentication provider.
@@ -114,7 +115,7 @@ public final class OzoneIdentity {
   }
 
   private static String requireNonBlank(String value, String name) {
-    if (value == null || value.trim().isEmpty()) {
+    if (StringUtils.isBlank(value)) {
       throw new IllegalArgumentException(name + " must not be empty");
     }
     return value;

@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import net.jcip.annotations.Immutable;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Represents an STS AssumeRoleWithWebIdentity request that has already been
@@ -178,7 +179,7 @@ public class AssumeRoleWithWebIdentityRequest {
   }
 
   private static String requireNonBlank(String value, String name) {
-    if (value == null || value.trim().isEmpty()) {
+    if (StringUtils.isBlank(value)) {
       throw new IllegalArgumentException(name + " must not be empty");
     }
     return value;

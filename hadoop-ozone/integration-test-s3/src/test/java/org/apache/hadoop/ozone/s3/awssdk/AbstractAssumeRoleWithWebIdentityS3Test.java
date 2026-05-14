@@ -49,11 +49,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.crypto.KeyGenerator;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -138,7 +140,8 @@ abstract class AbstractAssumeRoleWithWebIdentityS3Test
 
   @Override
   protected void onClusterReady() throws Exception {
-    try (OzoneClient client = getCluster().newClient()) {
+    try (OzoneClient client =
+             Objects.requireNonNull(getCluster().newClient())) {
       client.getObjectStore().createS3Bucket(ALLOWED_BUCKET);
       client.getObjectStore().createS3Bucket(DENIED_BUCKET);
     }
@@ -173,7 +176,7 @@ abstract class AbstractAssumeRoleWithWebIdentityS3Test
 
   protected void assertTemporaryCredentialsAuthorizeS3Operations(
       StsCredentials credentials) {
-    try (S3Client s3 = s3Client(credentials)) {
+    try (S3Client s3 = Objects.requireNonNull(s3Client(credentials))) {
       String key = "allowed.txt";
       s3.putObject(PutObjectRequest.builder()
               .bucket(ALLOWED_BUCKET)
@@ -372,13 +375,12 @@ abstract class AbstractAssumeRoleWithWebIdentityS3Test
     @Override
     public String generateAssumeRoleWithWebIdentitySessionPolicy(
         AssumeRoleWithWebIdentityRequest request) throws OMException {
-      lastAssumeRoleRequest = request;
+      recordAssumeRoleRequest(request);
       if (!"tomato-user".equals(request.getUser())
           || !request.getGroups().contains("ozone-tomato")
           || !ROLE_ARN.equals(request.getRoleArn())
           || !PROVIDER_ID.equals(request.getProviderId())
-          || request.getSubject() == null
-          || request.getSubject().trim().isEmpty()) {
+          || StringUtils.isBlank(request.getSubject())) {
         throw new OMException("WebIdentity role assumption denied",
             OMException.ResultCodes.ACCESS_DENIED);
       }
@@ -390,6 +392,11 @@ abstract class AbstractAssumeRoleWithWebIdentityS3Test
           + "\"Resource\":[\"arn:aws:s3:::" + ALLOWED_BUCKET
           + "\",\"arn:aws:s3:::" + ALLOWED_BUCKET + "/*\"]"
           + "}]}";
+    }
+
+    private static void recordAssumeRoleRequest(
+        AssumeRoleWithWebIdentityRequest request) {
+      lastAssumeRoleRequest = request;
     }
   }
 

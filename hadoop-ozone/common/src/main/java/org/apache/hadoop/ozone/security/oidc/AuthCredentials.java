@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.security.oidc;
 
+import org.apache.commons.lang3.StringUtils;
+
 /**
  * Authentication material accepted by Ozone identity providers.
  */
@@ -29,7 +31,7 @@ public final class AuthCredentials {
   }
 
   public static AuthCredentials bearerToken(String token) {
-    if (token == null || token.trim().isEmpty()) {
+    if (StringUtils.isBlank(token)) {
       throw new IllegalArgumentException("Bearer token must not be empty");
     }
     return new AuthCredentials(token);

@@ -40,6 +40,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * OIDC identity provider backed by locally validated signed JWTs.
@@ -73,7 +74,7 @@ public final class OidcJwtIdentityProvider implements OzoneIdentityProvider {
   public OzoneIdentity authenticate(AuthCredentials credentials)
       throws OidcAuthenticationException {
     if (credentials == null || credentials.getBearerToken() == null
-        || credentials.getBearerToken().trim().isEmpty()) {
+        || StringUtils.isBlank(credentials.getBearerToken())) {
       throw new OidcAuthenticationException("Missing OIDC bearer token");
     }
 
@@ -239,7 +240,7 @@ public final class OidcJwtIdentityProvider implements OzoneIdentityProvider {
   private String extractStringClaim(JWTClaimsSet claims, String claimPath)
       throws OidcAuthenticationException {
     Object value = claimValue(claims, claimPath);
-    if (!(value instanceof String) || ((String) value).trim().isEmpty()) {
+    if (!(value instanceof String) || StringUtils.isBlank((String) value)) {
       throw new OidcAuthenticationException(
           "OIDC token is missing required claim");
     }

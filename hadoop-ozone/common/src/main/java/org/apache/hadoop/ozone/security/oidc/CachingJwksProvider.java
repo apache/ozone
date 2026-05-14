@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Thread-safe JWKS cache with refresh-on-unknown-kid semantics.
@@ -78,7 +79,7 @@ public final class CachingJwksProvider implements JwksProvider {
   public List<JWK> getKeys(String keyId) throws OidcAuthenticationException {
     refreshIfNeeded(false);
     List<JWK> keys = findKeys(jwkSet, keyId);
-    if (keys.isEmpty() && keyId != null && !keyId.trim().isEmpty()) {
+    if (keys.isEmpty() && StringUtils.isNotBlank(keyId)) {
       refreshForUnknownKidIfNeeded();
       keys = findKeys(jwkSet, keyId);
     }
@@ -140,7 +141,7 @@ public final class CachingJwksProvider implements JwksProvider {
     if (set == null) {
       return Collections.emptyList();
     }
-    if (keyId == null || keyId.trim().isEmpty()) {
+    if (StringUtils.isBlank(keyId)) {
       return Collections.unmodifiableList(new ArrayList<>(set.getKeys()));
     }
     JWK key = set.getKeyByKeyId(keyId);

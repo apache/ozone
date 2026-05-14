@@ -44,13 +44,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMToken
 public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   public static final Text KIND_NAME = new Text("STSToken");
 
-  /**
-   * Identifies the authentication path that produced an STS token.
-   */
-  public enum AuthType {
-    ASSUME_ROLE,
-    WEB_IDENTITY
-  }
+  // Service name for STS tokens
+  public static final String STS_SERVICE = "STS";
 
   // STS-specific fields
   private AuthType authType = AuthType.ASSUME_ROLE;
@@ -71,8 +66,13 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   // Encryption key derived from ManagedSecretKey for this token
   private transient byte[] encryptionKey;
 
-  // Service name for STS tokens
-  public static final String STS_SERVICE = "STS";
+  /**
+   * Identifies the authentication path that produced an STS token.
+   */
+  public enum AuthType {
+    ASSUME_ROLE,
+    WEB_IDENTITY
+  }
 
   /**
    * Create an empty STS token identifier.

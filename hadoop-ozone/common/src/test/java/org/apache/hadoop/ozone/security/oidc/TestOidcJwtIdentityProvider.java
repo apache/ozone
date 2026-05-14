@@ -50,6 +50,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -356,7 +357,7 @@ public class TestOidcJwtIdentityProvider {
   private static JwksProvider jwksProvider(RSAKey... keys) {
     JWKSet jwkSet = jwkSet(keys);
     return keyId -> {
-      if (keyId == null || keyId.trim().isEmpty()) {
+      if (StringUtils.isBlank(keyId)) {
         return new ArrayList<>(jwkSet.getKeys());
       }
       JWK key = jwkSet.getKeyByKeyId(keyId);

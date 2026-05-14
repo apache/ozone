@@ -73,20 +73,40 @@ public class S3AssumeRoleWithWebIdentityResponseXml {
     @XmlElement(name = "Provider")
     private String provider;
 
+    public Credentials getCredentials() {
+      return credentials;
+    }
+
     public void setCredentials(Credentials credentials) {
       this.credentials = credentials;
+    }
+
+    public String getSubjectFromWebIdentityToken() {
+      return subjectFromWebIdentityToken;
     }
 
     public void setSubjectFromWebIdentityToken(String value) {
       this.subjectFromWebIdentityToken = value;
     }
 
+    public AssumedRoleUser getAssumedRoleUser() {
+      return assumedRoleUser;
+    }
+
     public void setAssumedRoleUser(AssumedRoleUser assumedRoleUser) {
       this.assumedRoleUser = assumedRoleUser;
     }
 
+    public String getAudience() {
+      return audience;
+    }
+
     public void setAudience(String audience) {
       this.audience = audience;
+    }
+
+    public String getProvider() {
+      return provider;
     }
 
     public void setProvider(String provider) {
@@ -111,16 +131,32 @@ public class S3AssumeRoleWithWebIdentityResponseXml {
     @XmlElement(name = "Expiration")
     private String expiration;
 
+    public String getAccessKeyId() {
+      return accessKeyId;
+    }
+
     public void setAccessKeyId(String accessKeyId) {
       this.accessKeyId = accessKeyId;
+    }
+
+    public String getSecretAccessKey() {
+      return secretAccessKey;
     }
 
     public void setSecretAccessKey(String secretAccessKey) {
       this.secretAccessKey = secretAccessKey;
     }
 
+    public String getSessionToken() {
+      return sessionToken;
+    }
+
     public void setSessionToken(String sessionToken) {
       this.sessionToken = sessionToken;
+    }
+
+    public String getExpiration() {
+      return expiration;
     }
 
     public void setExpiration(String expiration) {
@@ -139,8 +175,16 @@ public class S3AssumeRoleWithWebIdentityResponseXml {
     @XmlElement(name = "Arn")
     private String arn;
 
+    public String getAssumedRoleId() {
+      return assumedRoleId;
+    }
+
     public void setAssumedRoleId(String assumedRoleId) {
       this.assumedRoleId = assumedRoleId;
+    }
+
+    public String getArn() {
+      return arn;
     }
 
     public void setArn(String arn) {
@@ -155,6 +199,10 @@ public class S3AssumeRoleWithWebIdentityResponseXml {
   public static class ResponseMetadata {
     @XmlElement(name = "RequestId")
     private String requestId;
+
+    public String getRequestId() {
+      return requestId;
+    }
 
     public void setRequestId(String requestId) {
       this.requestId = requestId;

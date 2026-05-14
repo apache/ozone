@@ -62,10 +62,11 @@ class TestAssumeRoleWithWebIdentityKeycloakIT
   }
 
   @AfterAll
-  static void stopKeycloak() {
-    if (keycloak != null) {
-      keycloak.stop();
-      keycloak = null;
+  static synchronized void stopKeycloak() {
+    GenericContainer<?> container = keycloak;
+    keycloak = null;
+    if (container != null) {
+      container.stop();
     }
   }
 
