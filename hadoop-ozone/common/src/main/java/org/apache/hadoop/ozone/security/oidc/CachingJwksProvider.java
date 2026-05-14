@@ -33,11 +33,16 @@ import java.util.List;
  */
 public final class CachingJwksProvider implements JwksProvider {
 
+  private static final Duration DEFAULT_UNKNOWN_KID_REFRESH_DEBOUNCE =
+      Duration.ofSeconds(5);
+
   private final JwksFetcher fetcher;
   private final Duration refreshInterval;
+  private final Duration unknownKidRefreshDebounce;
   private final Clock clock;
   private volatile JWKSet jwkSet;
   private volatile Instant loadedAt = Instant.EPOCH;
+  private volatile Instant lastUnknownKidRefreshAt = Instant.EPOCH;
 
   public CachingJwksProvider(JwksFetcher fetcher, Duration refreshInterval) {
     this(fetcher, refreshInterval, Clock.systemUTC());
@@ -45,6 +50,12 @@ public final class CachingJwksProvider implements JwksProvider {
 
   CachingJwksProvider(JwksFetcher fetcher, Duration refreshInterval,
       Clock clock) {
+    this(fetcher, refreshInterval, DEFAULT_UNKNOWN_KID_REFRESH_DEBOUNCE,
+        clock);
+  }
+
+  CachingJwksProvider(JwksFetcher fetcher, Duration refreshInterval,
+      Duration unknownKidRefreshDebounce, Clock clock) {
     if (fetcher == null) {
       throw new IllegalArgumentException("JWKS fetcher must not be null");
     }
@@ -52,8 +63,14 @@ public final class CachingJwksProvider implements JwksProvider {
       throw new IllegalArgumentException(
           "JWKS refresh interval must not be negative");
     }
+    if (unknownKidRefreshDebounce == null
+        || unknownKidRefreshDebounce.isNegative()) {
+      throw new IllegalArgumentException(
+          "Unknown kid refresh debounce must not be negative");
+    }
     this.fetcher = fetcher;
     this.refreshInterval = refreshInterval;
+    this.unknownKidRefreshDebounce = unknownKidRefreshDebounce;
     this.clock = clock;
   }
 
@@ -62,7 +79,7 @@ public final class CachingJwksProvider implements JwksProvider {
     refreshIfNeeded(false);
     List<JWK> keys = findKeys(jwkSet, keyId);
     if (keys.isEmpty() && keyId != null && !keyId.trim().isEmpty()) {
-      refreshIfNeeded(true);
+      refreshForUnknownKidIfNeeded();
       keys = findKeys(jwkSet, keyId);
     }
     return keys;
@@ -87,6 +104,31 @@ public final class CachingJwksProvider implements JwksProvider {
       try {
         jwkSet = fetcher.fetch();
         loadedAt = now;
+      } catch (IOException | ParseException e) {
+        throw new OidcAuthenticationException(
+            "Unable to refresh OIDC JWKS", e);
+      }
+    }
+  }
+
+  private void refreshForUnknownKidIfNeeded()
+      throws OidcAuthenticationException {
+    Instant now = clock.instant();
+    if (now.isBefore(lastUnknownKidRefreshAt.plus(
+        unknownKidRefreshDebounce))) {
+      return;
+    }
+
+    synchronized (this) {
+      now = clock.instant();
+      if (now.isBefore(lastUnknownKidRefreshAt.plus(
+          unknownKidRefreshDebounce))) {
+        return;
+      }
+      try {
+        jwkSet = fetcher.fetch();
+        loadedAt = now;
+        lastUnknownKidRefreshAt = now;
       } catch (IOException | ParseException e) {
         throw new OidcAuthenticationException(
             "Unable to refresh OIDC JWKS", e);

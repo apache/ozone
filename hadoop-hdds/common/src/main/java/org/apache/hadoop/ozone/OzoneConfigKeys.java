@@ -481,6 +481,18 @@ public final class OzoneConfigKeys {
       "ozone.sts.web.identity.jwks.refresh.interval";
   public static final String
       OZONE_STS_WEB_IDENTITY_JWKS_REFRESH_INTERVAL_DEFAULT = "10m";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_CONNECT_TIMEOUT =
+      "ozone.sts.web.identity.jwks.connect.timeout";
+  public static final String
+      OZONE_STS_WEB_IDENTITY_JWKS_CONNECT_TIMEOUT_DEFAULT = "5s";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_READ_TIMEOUT =
+      "ozone.sts.web.identity.jwks.read.timeout";
+  public static final String
+      OZONE_STS_WEB_IDENTITY_JWKS_READ_TIMEOUT_DEFAULT = "5s";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_SIZE_LIMIT =
+      "ozone.sts.web.identity.jwks.size.limit";
+  public static final String
+      OZONE_STS_WEB_IDENTITY_JWKS_SIZE_LIMIT_DEFAULT = "1MB";
   public static final String OZONE_STS_WEB_IDENTITY_REQUIRE_HTTPS =
       "ozone.sts.web.identity.require.https";
   public static final boolean OZONE_STS_WEB_IDENTITY_REQUIRE_HTTPS_DEFAULT =

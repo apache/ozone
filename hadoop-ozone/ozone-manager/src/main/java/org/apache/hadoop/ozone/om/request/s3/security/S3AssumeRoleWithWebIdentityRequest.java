@@ -271,7 +271,10 @@ public class S3AssumeRoleWithWebIdentityRequest extends OMClientRequest {
     try {
       URL jwksUrl = new URL(oidcConfig.getJwksUri());
       return new OidcJwtIdentityProvider(oidcConfig,
-          new CachingJwksProvider(new UrlJwksFetcher(jwksUrl),
+          new CachingJwksProvider(new UrlJwksFetcher(jwksUrl,
+              oidcConfig.getJwksConnectTimeout(),
+              oidcConfig.getJwksReadTimeout(),
+              oidcConfig.getJwksSizeLimit()),
               oidcConfig.getJwksRefreshInterval()));
     } catch (MalformedURLException e) {
       throw new OMException(OZONE_STS_WEB_IDENTITY_JWKS_URI

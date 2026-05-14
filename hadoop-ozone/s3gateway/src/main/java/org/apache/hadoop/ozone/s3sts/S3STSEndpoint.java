@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.s3sts;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.FORBIDDEN;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_IMPLEMENTED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -127,6 +127,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
    */
   @GET
   @Produces(MediaType.APPLICATION_XML)
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public Response get(
       @QueryParam("Action") String action,
       @QueryParam("RoleArn") String roleArn,
@@ -162,6 +163,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
    */
   @POST
   @Produces(MediaType.APPLICATION_XML)
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public Response post(
       @FormParam("Action") String action,
       @FormParam("RoleArn") String roleArn,
@@ -184,6 +186,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         version, awsIamSessionPolicy, null, null);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private Response handleSTSRequest(String action, String roleArn, String roleSessionName,
       Integer durationSeconds, String version, String awsIamSessionPolicy,
       String webIdentityToken, String providerId) throws OS3Exception {

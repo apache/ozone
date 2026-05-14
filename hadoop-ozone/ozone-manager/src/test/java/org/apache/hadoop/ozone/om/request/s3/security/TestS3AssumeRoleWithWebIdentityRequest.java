@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_AUDIENCE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ISSUER_URI;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_JWKS_URI;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,11 +57,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateAssumeRoleWithWebIdentityRequest;
 import org.apache.hadoop.ozone.security.STSTokenSecretManager;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.oidc.AuthCredentials;
 import org.apache.hadoop.ozone.security.oidc.OidcAuthenticationException;
 import org.apache.hadoop.ozone.security.oidc.OzoneIdentity;
 import org.apache.hadoop.ozone.security.oidc.OzoneIdentityProvider;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
@@ -278,7 +279,29 @@ public class TestS3AssumeRoleWithWebIdentityRequest {
     assertThat(identityProvider.getCapturedToken()).isNull();
   }
 
+  @Test
+  public void testExceptionCauseChainDoesNotExposeTokenMaterial() {
+    final String sensitiveToken = "raw.jwt.SecretAccessKey.SessionToken."
+        + "AuthorizationHeader";
+    configuration.set(OZONE_STS_WEB_IDENTITY_JWKS_URI,
+        "https://keycloak.example.com/realms/ozone/certs");
+    final S3AssumeRoleWithWebIdentityRequest request =
+        new S3AssumeRoleWithWebIdentityRequest(
+            externalRequest(3600, sensitiveToken), CLOCK);
+
+    assertThatThrownBy(() -> request.preExecute(ozoneManager))
+        .isInstanceOf(OMException.class)
+        .satisfies(e -> assertThrowableChainDoesNotContain(e,
+            sensitiveToken, "SecretAccessKey", "SessionToken",
+            "AuthorizationHeader"));
+  }
+
   private static OMRequest externalRequest(int durationSeconds) {
+    return externalRequest(durationSeconds, RAW_JWT);
+  }
+
+  private static OMRequest externalRequest(int durationSeconds,
+      String webIdentityToken) {
     return OMRequest.newBuilder()
         .setCmdType(Type.AssumeRoleWithWebIdentity)
         .setClientId("client-1")
@@ -290,9 +313,21 @@ public class TestS3AssumeRoleWithWebIdentityRequest {
                 .setDurationSeconds(durationSeconds)
                 .setProviderId(PROVIDER_ID)
                 .setRequestId(REQUEST_ID)
-                .setWebIdentityToken(RAW_JWT)
+                .setWebIdentityToken(webIdentityToken)
                 .build())
         .build();
+  }
+
+  private static void assertThrowableChainDoesNotContain(Throwable throwable,
+      String... sensitiveValues) {
+    Throwable current = throwable;
+    while (current != null) {
+      String text = String.valueOf(current);
+      for (String sensitiveValue : sensitiveValues) {
+        assertThat(text).doesNotContain(sensitiveValue);
+      }
+      current = current.getCause();
+    }
   }
 
   private static OzoneIdentity identity(long expiresInSeconds) {

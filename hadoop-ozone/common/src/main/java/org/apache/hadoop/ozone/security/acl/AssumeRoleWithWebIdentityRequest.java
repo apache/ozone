@@ -50,6 +50,7 @@ public class AssumeRoleWithWebIdentityRequest {
   private final String providerId;
   private final Set<AssumeRoleRequest.OzoneGrant> grants;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public AssumeRoleWithWebIdentityRequest(String host, InetAddress ip,
       String user, Set<String> groups, Set<String> roles, String roleArn,
       String roleSessionName, String issuer, String subject, String audience,

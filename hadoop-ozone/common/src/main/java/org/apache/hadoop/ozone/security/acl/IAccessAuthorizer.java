@@ -77,6 +77,11 @@ public interface IAccessAuthorizer {
    * attributes only. The final role-assumption authorization decision and the
    * returned session policy must come from this authorizer.</p>
    *
+   * <p>Deployments using an external Ranger Ozone plugin need a companion
+   * plugin implementation of this method. Without it, this default method
+   * fails closed with {@link OMException.ResultCodes#NOT_SUPPORTED_OPERATION}
+   * and Ozone STS will not issue WebIdentity temporary credentials.</p>
+   *
    * @param request   the web identity role assumption request shape
    * @return          a String representing the permissions granted according to
    *                  the authorizer.

@@ -107,6 +107,7 @@ public class STSTokenIdentifier extends ShortLivedTokenIdentifier {
   /**
    * Create a new WebIdentity-backed STS token identifier.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public STSTokenIdentifier(String tempAccessKeyId, String roleArn,
       Instant expiry, String secretAccessKey, String sessionPolicy,
       String effectiveUser, String issuer, String subject, String audience,

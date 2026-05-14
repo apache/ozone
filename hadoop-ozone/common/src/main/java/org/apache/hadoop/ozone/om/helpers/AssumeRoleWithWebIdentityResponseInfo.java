@@ -36,6 +36,7 @@ public class AssumeRoleWithWebIdentityResponseInfo {
   private final String audience;
   private final String provider;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public AssumeRoleWithWebIdentityResponseInfo(String accessKeyId,
       String secretAccessKey, String sessionToken, long expirationEpochSeconds,
       String assumedRoleId, String subjectFromWebIdentityToken, String audience,

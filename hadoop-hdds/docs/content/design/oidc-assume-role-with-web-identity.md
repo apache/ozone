@@ -278,6 +278,9 @@ ozone.sts.web.identity.groups.claim=groups
 ozone.sts.web.identity.roles.claim=realm_access.roles
 ozone.sts.web.identity.clock.skew=60s
 ozone.sts.web.identity.jwks.refresh.interval=10m
+ozone.sts.web.identity.jwks.connect.timeout=5s
+ozone.sts.web.identity.jwks.read.timeout=5s
+ozone.sts.web.identity.jwks.size.limit=1MB
 ozone.sts.web.identity.require.https=true
 ozone.sts.web.identity.allow.insecure.http.for.tests=false
 ```
@@ -300,7 +303,11 @@ The reusable validation module is intentionally small:
   exception messages.
 
 The module does not call Keycloak for every S3 request. JWKS validation is local,
-with refresh on cache expiry and unknown key id.
+with refresh on cache expiry and unknown key id. The default JWKS refresh
+interval is 10 minutes. Unknown key ids may trigger an earlier refresh, but
+repeated unknown kids are debounced to avoid refresh storms from attacker
+supplied token headers. JWKS fetches use bounded connect/read timeouts and a
+bounded response size.
 
 ## Ranger Authorization Points
 
@@ -322,6 +329,12 @@ The common request-shape extension point is
 `IAccessAuthorizer.generateAssumeRoleWithWebIdentitySessionPolicy()` as the
 default authorizer hook. Existing authorizers are not forced to implement this
 immediately because the new method has a fail-closed default implementation.
+For production Ranger deployments, the external Ranger Ozone plugin must add a
+companion override for this method. The `RangerOzoneAuthorizer` class is
+provided by Apache Ranger, not this Ozone repository. Without a WebIdentity
+capable Ranger/Ozone authorizer, the default hook returns
+`NOT_SUPPORTED_OPERATION`, Ozone fails closed, and no WebIdentity temporary
+credentials are issued.
 
 The second authorization point is every S3 operation made with the temporary
 credentials. OM must recover the assumed identity and session policy from the
@@ -352,6 +365,11 @@ The existing STS runtime uses self-contained session tokens containing the
 encrypted secret access key, original identity, role ARN, session policy,
 expiration, signing key id, and MAC. `AssumeRoleWithWebIdentity` should reuse
 that issuer and validator instead of creating a parallel token format.
+The sanitized replicated OM request still carries temporary credential material
+through Ratis in the same way as the existing `AssumeRole` implementation.
+Operators must protect OM metadata, Ratis logs, snapshots, and backups as
+sensitive security material. The raw WebIdentity JWT must not be replicated or
+stored in OM metadata.
 
 In `origin/HDDS-13323-sts`, `STSTokenIdentifier` stores the
 `originalAccessKeyId` because `AssumeRole` starts from an existing S3 access

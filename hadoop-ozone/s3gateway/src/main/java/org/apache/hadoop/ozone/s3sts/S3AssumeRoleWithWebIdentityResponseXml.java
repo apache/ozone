@@ -53,6 +53,7 @@ public class S3AssumeRoleWithWebIdentityResponseXml {
     this.responseMetadata = responseMetadata;
   }
 
+  /** XML model for the AssumeRoleWithWebIdentityResult element. */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlType(name = "AssumeRoleWithWebIdentityResultType",
       namespace = "https://sts.amazonaws.com/doc/2011-06-15/")
@@ -93,6 +94,7 @@ public class S3AssumeRoleWithWebIdentityResponseXml {
     }
   }
 
+  /** XML model for temporary STS credentials. */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlType(name = "AssumeRoleWithWebIdentityCredentialsType",
       namespace = "https://sts.amazonaws.com/doc/2011-06-15/")
@@ -126,6 +128,7 @@ public class S3AssumeRoleWithWebIdentityResponseXml {
     }
   }
 
+  /** XML model for the assumed role user. */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlType(name = "AssumeRoleWithWebIdentityAssumedRoleUserType",
       namespace = "https://sts.amazonaws.com/doc/2011-06-15/")
@@ -145,6 +148,7 @@ public class S3AssumeRoleWithWebIdentityResponseXml {
     }
   }
 
+  /** XML model for response metadata. */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlType(name = "AssumeRoleWithWebIdentityResponseMetadataType",
       namespace = "https://sts.amazonaws.com/doc/2011-06-15/")

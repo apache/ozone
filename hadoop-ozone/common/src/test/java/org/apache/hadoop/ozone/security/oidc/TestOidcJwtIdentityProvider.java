@@ -29,7 +29,10 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.PlainJWT;
 import com.nimbusds.jwt.SignedJWT;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
@@ -212,6 +215,23 @@ public class TestOidcJwtIdentityProvider {
   }
 
   @Test
+  public void unknownKidRefreshIsDebounced() throws Exception {
+    AtomicInteger fetches = new AtomicInteger();
+    CachingJwksProvider jwksProvider = new CachingJwksProvider(() -> {
+      fetches.incrementAndGet();
+      return jwkSet(primaryKey);
+    }, Duration.ofMinutes(10), Duration.ofSeconds(5), CLOCK);
+    OidcJwtIdentityProvider provider = provider(config(), jwksProvider);
+
+    assertThrows(OidcAuthenticationException.class, () ->
+        provider.authenticate(AuthCredentials.bearerToken(token(rotatedKey))));
+    assertThrows(OidcAuthenticationException.class, () ->
+        provider.authenticate(AuthCredentials.bearerToken(token(wrongKey))));
+
+    assertThat(fetches).hasValue(2);
+  }
+
+  @Test
   public void keyRotationWorks() throws Exception {
     AtomicInteger fetches = new AtomicInteger();
     CachingJwksProvider jwksProvider = new CachingJwksProvider(() -> {
@@ -289,6 +309,17 @@ public class TestOidcJwtIdentityProvider {
         .authenticate(AuthCredentials.bearerToken(jwt));
 
     assertThat(identity.getGroups()).isEmpty();
+  }
+
+  @Test
+  public void jwksFetcherEnforcesSizeLimit() throws Exception {
+    Path jwksFile = Files.createTempFile("ozone-test-jwks", ".json");
+    Files.write(jwksFile,
+        jwkSet(primaryKey).toString().getBytes(StandardCharsets.UTF_8));
+    UrlJwksFetcher fetcher = new UrlJwksFetcher(jwksFile.toUri().toURL(),
+        Duration.ofSeconds(5), Duration.ofSeconds(5), 8);
+
+    assertThrows(IOException.class, fetcher::fetch);
   }
 
   @Test

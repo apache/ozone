@@ -30,6 +30,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
@@ -97,6 +98,29 @@ public class TestS3STSWebIdentityAuthBypassFilter {
     assertEquals(body, read(streamCaptor.getValue()));
   }
 
+  @Test
+  public void adversarialActionValuesDoNotSkipAwsAuth() throws Exception {
+    assertDoesNotSkipPost("Action=AssumeRoleWithWebIdentity%20");
+    assertDoesNotSkipPost("action=assumerolewithwebidentity");
+    assertDoesNotSkipPost("Action=AssumeRoleWithWebIdentity%00");
+    assertDoesNotSkipPost("Action=AssumeRoleWithWebIdentity"
+        + "&Action=AssumeRole");
+    assertDoesNotSkipPost("{\"Action\":\"AssumeRoleWithWebIdentity\"}");
+    assertDoesNotSkipPost("Version=2011-06-15");
+    assertDoesNotSkipPost("Action=");
+  }
+
+  @Test
+  public void duplicateQueryActionDoesNotSkipAwsAuth() throws Exception {
+    S3STSWebIdentityAuthBypassFilter filter = filter(true);
+    ContainerRequestContext context = contextWithQueryActions(
+        "AssumeRoleWithWebIdentity", "AssumeRole");
+
+    filter.filter(context);
+
+    verify(context, never()).setProperty(anyString(), any());
+  }
+
   private static S3STSWebIdentityAuthBypassFilter filter(boolean enabled) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_STS_WEB_IDENTITY_ENABLED, enabled);
@@ -104,6 +128,15 @@ public class TestS3STSWebIdentityAuthBypassFilter {
         new S3STSWebIdentityAuthBypassFilter();
     filter.setOzoneConfiguration(conf);
     return filter;
+  }
+
+  private static void assertDoesNotSkipPost(String body) throws Exception {
+    S3STSWebIdentityAuthBypassFilter filter = filter(true);
+    ContainerRequestContext context = context(HttpMethod.POST, null, body);
+
+    filter.filter(context);
+
+    verify(context, never()).setProperty(anyString(), any());
   }
 
   private static ContainerRequestContext context(String method,
@@ -122,6 +155,19 @@ public class TestS3STSWebIdentityAuthBypassFilter {
       when(context.getEntityStream()).thenReturn(new ByteArrayInputStream(
           body.getBytes(StandardCharsets.UTF_8)));
     }
+    return context;
+  }
+
+  private static ContainerRequestContext contextWithQueryActions(
+      String... queryActions) {
+    ContainerRequestContext context = mock(ContainerRequestContext.class);
+    UriInfo uriInfo = mock(UriInfo.class);
+    MultivaluedHashMap<String, String> queryParams =
+        new MultivaluedHashMap<>();
+    queryParams.put("Action", Arrays.asList(queryActions));
+    when(context.getMethod()).thenReturn(HttpMethod.GET);
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(uriInfo.getQueryParameters()).thenReturn(queryParams);
     return context;
   }
 

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.container.ContainerRequestContext;
 
@@ -48,7 +49,8 @@ final class S3STSWebIdentityRequestParser {
       throws IOException {
     String method = context.getMethod();
     if (HttpMethod.GET.equalsIgnoreCase(method)) {
-      return context.getUriInfo().getQueryParameters().getFirst(ACTION);
+      return singleAction(context.getUriInfo().getQueryParameters()
+          .get(ACTION));
     }
     if (HttpMethod.POST.equalsIgnoreCase(method)) {
       return getFormAction(context);
@@ -66,6 +68,7 @@ final class S3STSWebIdentityRequestParser {
     byte[] body = readFully(stream);
     context.setEntityStream(new ByteArrayInputStream(body));
     String form = new String(body, StandardCharsets.UTF_8);
+    String action = null;
     for (String pair : form.split("&")) {
       int equals = pair.indexOf('=');
       if (equals < 0) {
@@ -73,10 +76,13 @@ final class S3STSWebIdentityRequestParser {
       }
       String name = decode(pair.substring(0, equals));
       if (ACTION.equals(name)) {
-        return decode(pair.substring(equals + 1));
+        if (action != null) {
+          return null;
+        }
+        action = decode(pair.substring(equals + 1));
       }
     }
-    return null;
+    return action;
   }
 
   private static byte[] readFully(InputStream stream) throws IOException {
@@ -91,5 +97,9 @@ final class S3STSWebIdentityRequestParser {
 
   private static String decode(String value) throws IOException {
     return URLDecoder.decode(value, StandardCharsets.UTF_8.name());
+  }
+
+  private static String singleAction(List<String> values) {
+    return values != null && values.size() == 1 ? values.get(0) : null;
   }
 }

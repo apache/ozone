@@ -111,6 +111,7 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
   /**
    * Create a WebIdentity-backed STS token and return it as an encoded string.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public String createWebIdentitySTSTokenString(String tempAccessKeyId,
       String roleArn, int durationSeconds, String secretAccessKey,
       String sessionPolicy, String effectiveUser, String issuer, String subject,
@@ -131,6 +132,7 @@ public class STSTokenSecretManager extends ShortLivedTokenSecretManager<STSToken
    * validated the WebIdentityToken and replicated only sanitized deterministic
    * session data.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public String createWebIdentitySTSTokenString(String tempAccessKeyId,
       String roleArn, Instant expiration, String secretAccessKey,
       String sessionPolicy, String effectiveUser, String issuer, String subject,
