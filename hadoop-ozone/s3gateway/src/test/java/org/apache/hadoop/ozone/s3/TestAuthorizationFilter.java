@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -53,8 +54,10 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
+import org.apache.hadoop.ozone.s3.signature.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.signature.StringToSignProducer;
 import org.apache.kerby.util.Hex;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -70,6 +73,21 @@ public class TestAuthorizationFilter {
       format(LocalDateTime.now());
 
   private static final String CURDATE = DATE_FORMATTER.format(LocalDate.now());
+
+  @Test
+  void skipsAwsAuthWhenExplicitlyRequested() throws Exception {
+    ContainerRequestContext context = mock(ContainerRequestContext.class);
+    SignatureProcessor signatureProcessor = mock(SignatureProcessor.class);
+    SignatureInfo signatureInfo = mock(SignatureInfo.class);
+    when(context.getProperty(AuthorizationFilter.SKIP_AWS_AUTH_PROPERTY))
+        .thenReturn(Boolean.TRUE);
+
+    authorizationFilter.setSignatureParser(signatureProcessor);
+    authorizationFilter.setSignatureInfo(signatureInfo);
+    authorizationFilter.filter(context);
+
+    verifyNoInteractions(signatureProcessor, signatureInfo);
+  }
 
   private static Stream<Arguments>testAuthFilterFailuresInput() {
     return Stream.of(

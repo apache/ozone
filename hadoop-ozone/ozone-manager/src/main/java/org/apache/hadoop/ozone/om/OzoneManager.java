@@ -39,6 +39,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
@@ -898,6 +902,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (stsTokenIdentifier == null) {
         throw new OMException(
             "OMClientRequest has session token but no token identifier in OzoneManager", INVALID_REQUEST);
+      }
+      if (stsTokenIdentifier.isWebIdentity()) {
+        final String effectiveUser = stsTokenIdentifier.getEffectiveUser();
+        if (effectiveUser != null && !effectiveUser.isEmpty()) {
+          return effectiveUser;
+        }
+        throw new OMException(
+            "Invalid STS Token format - could not find effectiveUser",
+            INVALID_REQUEST);
       }
       final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
       if (originalAccessKeyId != null && !originalAccessKeyId.isEmpty()) {
@@ -1905,6 +1918,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void start() throws IOException {
     Map<String, String> auditMap = new HashMap();
     auditMap.put("OmState", omState.name());
+    logInsecureWebIdentityHttpWarning();
     if (omState == State.BOOTSTRAPPING) {
       if (isBootstrapping) {
         auditMap.put("Bootstrap", "normal");
@@ -2011,6 +2025,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.STARTUP, auditMap));
+  }
+
+  private void logInsecureWebIdentityHttpWarning() {
+    if (configuration.getBoolean(OZONE_STS_WEB_IDENTITY_ENABLED,
+        OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT)
+        && configuration.getBoolean(
+            OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS,
+            OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS_DEFAULT)) {
+      LOG.warn("STS WebIdentity is configured with {}=true. This permits "
+              + "insecure HTTP issuer/JWKS URIs for tests only and is unsafe "
+              + "for production deployments.",
+          OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS);
+    }
   }
 
   /**

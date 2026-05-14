@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -2683,6 +2684,34 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     return AssumeRoleResponseInfo.fromProtobuf(
         handleError(submitRequest(omRequest)).getAssumeRoleResponse());
+  }
+
+  @Override
+  public AssumeRoleWithWebIdentityResponseInfo assumeRoleWithWebIdentity(
+      String roleArn, String roleSessionName, int durationSeconds,
+      String webIdentityToken, String providerId, String requestId)
+      throws IOException {
+    final OzoneManagerProtocolProtos.AssumeRoleWithWebIdentityRequest.Builder
+        request =
+        OzoneManagerProtocolProtos.AssumeRoleWithWebIdentityRequest
+            .newBuilder()
+            .setRoleArn(roleArn)
+            .setRoleSessionName(roleSessionName)
+            .setDurationSeconds(durationSeconds)
+            .setWebIdentityToken(webIdentityToken)
+            .setRequestId(requestId);
+    if (providerId != null && !providerId.isEmpty()) {
+      request.setProviderId(providerId);
+    }
+
+    final OMRequest omRequest =
+        createOMRequest(Type.AssumeRoleWithWebIdentity)
+            .setAssumeRoleWithWebIdentityRequest(request)
+            .build();
+
+    return AssumeRoleWithWebIdentityResponseInfo.fromProtobuf(
+        handleError(submitRequest(omRequest))
+            .getAssumeRoleWithWebIdentityResponse());
   }
 
   @Override

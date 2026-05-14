@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -806,6 +807,14 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
       String awsIamSessionPolicy, String requestId) throws IOException {
+    return null;
+  }
+
+  @Override
+  public AssumeRoleWithWebIdentityResponseInfo assumeRoleWithWebIdentity(
+      String roleArn, String roleSessionName, int durationSeconds,
+      String webIdentityToken, String providerId, String requestId)
+      throws IOException {
     return null;
   }
 

@@ -27,6 +27,9 @@ import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
@@ -74,11 +77,16 @@ public class TestSTSTokenIdentifier {
     assertThat(proto.getSecretAccessKey()).isNotEqualTo("secretKey");   // must be encrypted
     assertThat(proto.getSessionPolicy()).isEqualTo("sessionPolicy");
     assertThat(proto.getSecretKeyId()).isEqualTo(secretKeyId.toString());
+    assertThat(proto.getStsAuthType()).isEqualTo(
+        OMTokenProto.STSAuthType.ASSUME_ROLE);
 
     final STSTokenIdentifier parsedTokenIdentifier = new STSTokenIdentifier();
     parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
     parsedTokenIdentifier.fromProtoBuf(proto);
 
+    assertThat(parsedTokenIdentifier.getAuthType()).isEqualTo(
+        STSTokenIdentifier.AuthType.ASSUME_ROLE);
+    assertThat(parsedTokenIdentifier.isWebIdentity()).isFalse();
     assertThat(parsedTokenIdentifier.getOwnerId()).isEqualTo("tempAccess");
     assertThat(parsedTokenIdentifier.getExpiry()).isEqualTo(expiry);
     assertThat(parsedTokenIdentifier.getOriginalAccessKeyId()).isEqualTo("origAccess");
@@ -88,6 +96,68 @@ public class TestSTSTokenIdentifier {
     assertThat(parsedTokenIdentifier.getSessionPolicy()).isEqualTo("sessionPolicy");
     assertThat(parsedTokenIdentifier).isEqualTo(originalTokenIdentifier);
     assertThat(parsedTokenIdentifier.hashCode()).isEqualTo(originalTokenIdentifier.hashCode());
+  }
+
+  @Test
+  public void testWebIdentityProtoBufRoundTrip() throws IOException {
+    final Instant expiry =
+        Instant.now().plusSeconds(7200).truncatedTo(ChronoUnit.MILLIS);
+    final STSTokenIdentifier originalTokenIdentifier =
+        new STSTokenIdentifier(
+            "tempAccess", "arn:aws:iam::123456789012:role/WebRole",
+            expiry, "secretKey", "sessionPolicy", "tomato-user",
+            "https://keycloak.example.com/realms/ozone", "subject-123",
+            "ozone", set("ozone-tomato"), set("role:writer"),
+            "tomato-session", "keycloak", "fingerprint", ENCRYPTION_KEY);
+    final UUID secretKeyId = UUID.randomUUID();
+    originalTokenIdentifier.setSecretKeyId(secretKeyId);
+
+    final OMTokenProto proto = originalTokenIdentifier.toProtoBuf();
+    assertThat(proto.getStsAuthType()).isEqualTo(
+        OMTokenProto.STSAuthType.WEB_IDENTITY);
+    assertThat(proto.getOwner()).isEqualTo("tempAccess");
+    assertThat(proto.getOriginalAccessKeyId()).isEmpty();
+    assertThat(proto.getRoleArn()).isEqualTo(
+        "arn:aws:iam::123456789012:role/WebRole");
+    assertThat(proto.getSecretAccessKey()).isNotEqualTo("secretKey");
+    assertThat(proto.getEffectiveUser()).isEqualTo("tomato-user");
+    assertThat(proto.getIssuer()).isEqualTo(
+        "https://keycloak.example.com/realms/ozone");
+    assertThat(proto.getSubject()).isEqualTo("subject-123");
+    assertThat(proto.getAudience()).isEqualTo("ozone");
+    assertThat(proto.getGroupsList()).containsExactly("ozone-tomato");
+    assertThat(proto.getRolesList()).containsExactly("role:writer");
+    assertThat(proto.getRoleSessionName()).isEqualTo("tomato-session");
+    assertThat(proto.getProviderId()).isEqualTo("keycloak");
+    assertThat(proto.getTokenFingerprint()).isEqualTo("fingerprint");
+
+    final STSTokenIdentifier parsedTokenIdentifier =
+        new STSTokenIdentifier();
+    parsedTokenIdentifier.setEncryptionKey(ENCRYPTION_KEY);
+    parsedTokenIdentifier.fromProtoBuf(proto);
+
+    assertThat(parsedTokenIdentifier.getAuthType()).isEqualTo(
+        STSTokenIdentifier.AuthType.WEB_IDENTITY);
+    assertThat(parsedTokenIdentifier.isWebIdentity()).isTrue();
+    assertThat(parsedTokenIdentifier.getOriginalAccessKeyId()).isNull();
+    assertThat(parsedTokenIdentifier.getEffectiveUser())
+        .isEqualTo("tomato-user");
+    assertThat(parsedTokenIdentifier.getIssuer()).isEqualTo(
+        "https://keycloak.example.com/realms/ozone");
+    assertThat(parsedTokenIdentifier.getSubject()).isEqualTo("subject-123");
+    assertThat(parsedTokenIdentifier.getAudience()).isEqualTo("ozone");
+    assertThat(parsedTokenIdentifier.getGroups()).containsExactly(
+        "ozone-tomato");
+    assertThat(parsedTokenIdentifier.getRoles()).containsExactly(
+        "role:writer");
+    assertThat(parsedTokenIdentifier.getRoleSessionName())
+        .isEqualTo("tomato-session");
+    assertThat(parsedTokenIdentifier.getProviderId()).isEqualTo("keycloak");
+    assertThat(parsedTokenIdentifier.getTokenFingerprint())
+        .isEqualTo("fingerprint");
+    assertThat(parsedTokenIdentifier.getSecretAccessKey())
+        .isEqualTo("secretKey");
+    assertThat(parsedTokenIdentifier).isEqualTo(originalTokenIdentifier);
   }
 
   @Test
@@ -409,11 +479,16 @@ public class TestSTSTokenIdentifier {
     stsTokenIdentifier.setSecretKeyId(uuid);
 
     final String stsTokenIdentifierStr = stsTokenIdentifier.toString();
-    final String expectedString = "STSTokenIdentifier{" + "tempAccessKeyId='tempAccessKeyId'" +
-        ", originalAccessKeyId='originalAccessKeyId'" + ", roleArn='roleArn'" + ", expiry='" + expiry +
-        "', secretKeyId='" + uuid + "', sessionPolicy='sessionPolicy'" + '}';
 
-    assertEquals(expectedString, stsTokenIdentifierStr);
+    assertThat(stsTokenIdentifierStr)
+        .contains("tempAccessKeyId='tempAccessKeyId'")
+        .contains("authType=ASSUME_ROLE")
+        .contains("originalAccessKeyId='originalAccessKeyId'")
+        .contains("roleArn='roleArn'")
+        .contains("expiry='" + expiry + "'")
+        .contains("secretKeyId='" + uuid + "'")
+        .contains("sessionPolicy='sessionPolicy'")
+        .doesNotContain("secretAccessKey");
   }
 
   @Test
@@ -449,6 +524,8 @@ public class TestSTSTokenIdentifier {
     assertThat(stsTokenIdentifier).isEqualTo(stsTokenIdentifier2);
     assertThat(stsTokenIdentifier.hashCode()).isEqualTo(stsTokenIdentifier2.hashCode());
   }
+
+  private static Set<String> set(String... values) {
+    return new LinkedHashSet<>(Arrays.asList(values));
+  }
 }
-
-

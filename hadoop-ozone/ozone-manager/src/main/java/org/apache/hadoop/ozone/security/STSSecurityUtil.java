@@ -154,6 +154,10 @@ public final class STSSecurityUtil {
     final Token<STSTokenIdentifier> token = new Token<>();
     try {
       token.decodeFromUrlString(encodedToken);
+      if (!encodedToken.equals(token.encodeToUrlString())) {
+        throw new SecretManager.InvalidToken(
+            "Failed to decode STS token string: non-canonical token encoding");
+      }
       return token;
     } catch (IOException e) {
       throw new SecretManager.InvalidToken("Failed to decode STS token string: " + e);
@@ -172,12 +176,29 @@ public final class STSSecurityUtil {
     if (StringUtils.isEmpty(stsTokenIdentifier.getRoleArn())) {
       throw new SecretManager.InvalidToken("Invalid STS token - roleArn is null/empty");
     }
-    if (StringUtils.isEmpty(stsTokenIdentifier.getOriginalAccessKeyId())) {
-      throw new SecretManager.InvalidToken("Invalid STS token - originalAccessKeyId is null/empty");
+    if (stsTokenIdentifier.isWebIdentity()) {
+      if (StringUtils.isEmpty(stsTokenIdentifier.getEffectiveUser())) {
+        throw new SecretManager.InvalidToken(
+            "Invalid STS token - effectiveUser is null/empty");
+      }
+      if (StringUtils.isEmpty(stsTokenIdentifier.getIssuer())) {
+        throw new SecretManager.InvalidToken(
+            "Invalid STS token - issuer is null/empty");
+      }
+      if (StringUtils.isEmpty(stsTokenIdentifier.getSubject())) {
+        throw new SecretManager.InvalidToken(
+            "Invalid STS token - subject is null/empty");
+      }
+      if (StringUtils.isEmpty(stsTokenIdentifier.getAudience())) {
+        throw new SecretManager.InvalidToken(
+            "Invalid STS token - audience is null/empty");
+      }
+    } else if (StringUtils.isEmpty(stsTokenIdentifier.getOriginalAccessKeyId())) {
+      throw new SecretManager.InvalidToken(
+          "Invalid STS token - originalAccessKeyId is null/empty");
     }
     if (StringUtils.isEmpty(stsTokenIdentifier.getSecretAccessKey())) {
       throw new SecretManager.InvalidToken("Invalid STS token - secretAccessKey is null/empty");
     }
   }
 }
-

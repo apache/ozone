@@ -445,6 +445,64 @@ public final class OzoneConfigKeys {
       "ozone.security.enabled";
   public static final boolean OZONE_SECURITY_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_STS_WEB_IDENTITY_ENABLED =
+      "ozone.sts.web.identity.enabled";
+  public static final boolean OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT = false;
+  public static final String OZONE_STS_WEB_IDENTITY_ISSUER_URI =
+      "ozone.sts.web.identity.issuer.uri";
+  public static final String OZONE_STS_WEB_IDENTITY_ISSUER_URI_DEFAULT = "";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_URI =
+      "ozone.sts.web.identity.jwks.uri";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_URI_DEFAULT = "";
+  public static final String OZONE_STS_WEB_IDENTITY_AUDIENCE =
+      "ozone.sts.web.identity.audience";
+  public static final String OZONE_STS_WEB_IDENTITY_AUDIENCE_DEFAULT = "";
+  public static final String OZONE_STS_WEB_IDENTITY_USERNAME_CLAIM =
+      "ozone.sts.web.identity.username.claim";
+  public static final String OZONE_STS_WEB_IDENTITY_USERNAME_CLAIM_DEFAULT =
+      "preferred_username";
+  public static final String OZONE_STS_WEB_IDENTITY_SUBJECT_CLAIM =
+      "ozone.sts.web.identity.subject.claim";
+  public static final String OZONE_STS_WEB_IDENTITY_SUBJECT_CLAIM_DEFAULT =
+      "sub";
+  public static final String OZONE_STS_WEB_IDENTITY_GROUPS_CLAIM =
+      "ozone.sts.web.identity.groups.claim";
+  public static final String OZONE_STS_WEB_IDENTITY_GROUPS_CLAIM_DEFAULT =
+      "groups";
+  public static final String OZONE_STS_WEB_IDENTITY_ROLES_CLAIM =
+      "ozone.sts.web.identity.roles.claim";
+  public static final String OZONE_STS_WEB_IDENTITY_ROLES_CLAIM_DEFAULT =
+      "realm_access.roles";
+  public static final String OZONE_STS_WEB_IDENTITY_CLOCK_SKEW =
+      "ozone.sts.web.identity.clock.skew";
+  public static final String OZONE_STS_WEB_IDENTITY_CLOCK_SKEW_DEFAULT =
+      "60s";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_REFRESH_INTERVAL =
+      "ozone.sts.web.identity.jwks.refresh.interval";
+  public static final String
+      OZONE_STS_WEB_IDENTITY_JWKS_REFRESH_INTERVAL_DEFAULT = "10m";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_CONNECT_TIMEOUT =
+      "ozone.sts.web.identity.jwks.connect.timeout";
+  public static final String
+      OZONE_STS_WEB_IDENTITY_JWKS_CONNECT_TIMEOUT_DEFAULT = "5s";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_READ_TIMEOUT =
+      "ozone.sts.web.identity.jwks.read.timeout";
+  public static final String
+      OZONE_STS_WEB_IDENTITY_JWKS_READ_TIMEOUT_DEFAULT = "5s";
+  public static final String OZONE_STS_WEB_IDENTITY_JWKS_SIZE_LIMIT =
+      "ozone.sts.web.identity.jwks.size.limit";
+  public static final String
+      OZONE_STS_WEB_IDENTITY_JWKS_SIZE_LIMIT_DEFAULT = "1MB";
+  public static final String OZONE_STS_WEB_IDENTITY_REQUIRE_HTTPS =
+      "ozone.sts.web.identity.require.https";
+  public static final boolean OZONE_STS_WEB_IDENTITY_REQUIRE_HTTPS_DEFAULT =
+      true;
+  public static final String
+      OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS =
+      "ozone.sts.web.identity.allow.insecure.http.for.tests";
+  public static final boolean
+      OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS_DEFAULT = false;
+
   public static final String OZONE_HTTP_SECURITY_ENABLED_KEY =
       "ozone.security.http.kerberos.enabled";
   public static final boolean OZONE_HTTP_SECURITY_ENABLED_DEFAULT = false;

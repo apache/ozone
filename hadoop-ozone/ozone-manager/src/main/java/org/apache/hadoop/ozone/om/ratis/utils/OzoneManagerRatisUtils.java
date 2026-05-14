@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3AssumeRoleRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.S3AssumeRoleWithWebIdentityRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSTSTokenRequest;
@@ -203,6 +204,9 @@ public final class OzoneManagerRatisUtils {
     case AssumeRole:
       ozoneManager.checkS3STSEnabled();
       return new S3AssumeRoleRequest(omRequest, CLOCK);
+    case AssumeRoleWithWebIdentity:
+      ozoneManager.checkS3STSEnabled();
+      return new S3AssumeRoleWithWebIdentityRequest(omRequest, CLOCK);
     case RevokeSTSToken:
       return new S3RevokeSTSTokenRequest(omRequest);
     case DeleteRevokedSTSTokens:

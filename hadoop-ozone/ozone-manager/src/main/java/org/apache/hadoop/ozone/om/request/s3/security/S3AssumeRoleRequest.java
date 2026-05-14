@@ -101,12 +101,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     // HA mode therefore will have identical audit logs with the same tempAccessKeyId.
 
     // Generate temporary AWS credentials using cryptographically strong SecureRandom
-    final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
-        CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH, STS_ACCESS_KEY_ID_LENGTH);
-    final String secretAccessKey = generateSecureRandomStringUsingChars(
-        CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
-    final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
-        CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH, STS_ROLE_ID_LENGTH);
+    final String tempAccessKeyId = generateTempAccessKeyId();
+    final String secretAccessKey = generateSecretAccessKey();
+    final String roleId = generateRoleId();
 
     // Build UpdateAssumeRoleRequest with leader-generated credentials
     final UpdateAssumeRoleRequest.Builder updateAssumeRoleRequestBuilder =
@@ -301,5 +298,23 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       sb.append(chars.charAt(SECURE_RANDOM.nextInt(charsLength)));
     }
     return sb.toString();
+  }
+
+  static String generateTempAccessKeyId() {
+    return STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
+        CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH,
+        STS_ACCESS_KEY_ID_LENGTH);
+  }
+
+  static String generateSecretAccessKey() {
+    return generateSecureRandomStringUsingChars(
+        CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH,
+        STS_SECRET_ACCESS_KEY_LENGTH);
+  }
+
+  static String generateRoleId() {
+    return ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
+        CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH,
+        STS_ROLE_ID_LENGTH);
   }
 }

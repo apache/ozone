@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -765,6 +766,17 @@ public class ObjectStore {
   public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
       String awsIamSessionPolicy, String requestId) throws IOException {
     return proxy.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, requestId);
+  }
+
+  /**
+   * Process the AssumeRoleWithWebIdentity operation.
+   */
+  public AssumeRoleWithWebIdentityResponseInfo assumeRoleWithWebIdentity(
+      String roleArn, String roleSessionName, int durationSeconds,
+      String webIdentityToken, String providerId, String requestId)
+      throws IOException {
+    return proxy.assumeRoleWithWebIdentity(roleArn, roleSessionName,
+        durationSeconds, webIdentityToken, providerId, requestId);
   }
 
   /**

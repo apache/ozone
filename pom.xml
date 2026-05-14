@@ -224,6 +224,7 @@
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
     <test.build.data>${test.build.dir}</test.build.data>
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
+    <testcontainers.version>1.21.3</testcontainers.version>
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
     <testsThreadCount>4</testsThreadCount>
     <!-- test groups excluded in CI (except in dedicated profiles for flaky) -->
@@ -1569,6 +1570,11 @@
             <artifactId>spring-jcl</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers</artifactId>
+        <version>${testcontainers.version}</version>
       </dependency>
       <dependency>
         <groupId>org.vafer</groupId>

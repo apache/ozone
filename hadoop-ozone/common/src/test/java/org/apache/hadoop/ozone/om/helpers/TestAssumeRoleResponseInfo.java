@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleResponse;
 import org.junit.jupiter.api.Test;
@@ -186,12 +188,14 @@ public class TestAssumeRoleResponseInfo {
         ACCESS_KEY_ID, SECRET_ACCESS_KEY, SESSION_TOKEN, EXPIRATION_EPOCH_SECONDS, ASSUMED_ROLE_ID);
 
     final String toString = response.toString();
-    final String expectedString = "AssumeRoleResponseInfo{" + "accessKeyId='" + ACCESS_KEY_ID  +
-        "', secretAccessKey='" + SECRET_ACCESS_KEY + "', sessionToken='" + SESSION_TOKEN +
-        "', expirationEpochSeconds=" + EXPIRATION_EPOCH_SECONDS + ", assumedRoleId='" + ASSUMED_ROLE_ID + "'}";
 
     assertNotNull(toString);
-    assertEquals(expectedString, toString);
+    assertTrue(toString.contains("accessKeyId='" + ACCESS_KEY_ID + "'"));
+    assertTrue(toString.contains("secretAccessKey=<redacted>"));
+    assertTrue(toString.contains("sessionToken=<redacted>"));
+    assertTrue(toString.contains("expirationEpochSeconds=" + EXPIRATION_EPOCH_SECONDS));
+    assertTrue(toString.contains("assumedRoleId='" + ASSUMED_ROLE_ID + "'"));
+    assertFalse(toString.contains(SECRET_ACCESS_KEY));
+    assertFalse(toString.contains(SESSION_TOKEN));
   }
 }
-

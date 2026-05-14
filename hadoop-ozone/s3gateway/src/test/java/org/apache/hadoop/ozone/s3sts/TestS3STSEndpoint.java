@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3sts;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
@@ -77,6 +79,7 @@ public class TestS3STSEndpoint {
 
   @BeforeEach
   public void setup() throws Exception {
+    OzoneConfigurationHolder.resetConfiguration();
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(OZONE_S3_ADMINISTRATORS, "test-user");
     OzoneConfigurationHolder.setConfiguration(config);
@@ -98,6 +101,17 @@ public class TestS3STSEndpoint {
             "session-token",
             Instant.now().plusSeconds(3600).getEpochSecond(),
             "AROA1234567890123456:test-session"));
+    when(objectStore.assumeRoleWithWebIdentity(anyString(), anyString(),
+        anyInt(), anyString(), any(), anyString()))
+        .thenReturn(new AssumeRoleWithWebIdentityResponseInfo(
+            "ASIAWEBIDENTITY123456",
+            "webIdentitySecretAccessKey",
+            "web-identity-session-token",
+            Instant.now().plusSeconds(3600).getEpochSecond(),
+            "AROA1234567890123456:test-session",
+            "subject-123",
+            "ozone",
+            "keycloak"));
     when(clientStub.getObjectStore()).thenReturn(objectStore);
 
     endpoint = new S3STSEndpoint();
@@ -361,6 +375,84 @@ public class TestS3STSEndpoint {
   }
 
   @Test
+  public void testStsAssumeRoleWithWebIdentityDisabled() throws Exception {
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRoleWithWebIdentity", ROLE_ARN,
+            ROLE_SESSION_NAME, 3600, "2011-06-15", null,
+            "sensitive-token-material", "keycloak"));
+
+    assertEquals(501, ex.getHttpCode());
+    verifyNoInteractions(auditLogger);
+    verify(objectStore, never()).assumeRole(anyString(), anyString(),
+        anyInt(), any(), anyString());
+    verify(objectStore, never()).assumeRoleWithWebIdentity(
+        anyString(), anyString(), anyInt(), anyString(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
+        "Operation AssumeRoleWithWebIdentity is not supported yet.");
+  }
+
+  @Test
+  public void testStsAssumeRoleWithWebIdentityMissingToken()
+      throws Exception {
+    enableWebIdentity();
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRoleWithWebIdentity", ROLE_ARN,
+            ROLE_SESSION_NAME, 3600, "2011-06-15", null, null,
+            "keycloak"));
+
+    assertEquals(400, ex.getHttpCode());
+    verifyNoInteractions(auditLogger);
+    verify(objectStore, never()).assumeRole(anyString(), anyString(),
+        anyInt(), any(), anyString());
+    verify(objectStore, never()).assumeRoleWithWebIdentity(
+        anyString(), anyString(), anyInt(), anyString(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError",
+        "webIdentityToken");
+  }
+
+  @Test
+  public void testStsAssumeRoleWithWebIdentityRoutesWhenEnabled()
+      throws Exception {
+    enableWebIdentity();
+
+    final Response response = endpoint.get("AssumeRoleWithWebIdentity",
+        ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null,
+        "sensitive-token-material", "keycloak");
+
+    assertEquals(200, response.getStatus());
+    verifyNoInteractions(auditLogger);
+    verify(objectStore).assumeRoleWithWebIdentity(ROLE_ARN,
+        ROLE_SESSION_NAME, 3600, "sensitive-token-material", "keycloak",
+        REQUEST_ID);
+
+    final Document doc = parseXml((String) response.getEntity());
+    final Element root = doc.getDocumentElement();
+    assertEquals("AssumeRoleWithWebIdentityResponse", root.getLocalName());
+    assertEquals(STS_NS, root.getNamespaceURI());
+    assertNotNull(doc.getElementsByTagNameNS(
+        STS_NS, "AssumeRoleWithWebIdentityResult").item(0));
+    assertEquals("ASIAWEBIDENTITY123456",
+        doc.getElementsByTagName("AccessKeyId").item(0).getTextContent());
+    assertEquals("webIdentitySecretAccessKey",
+        doc.getElementsByTagName("SecretAccessKey").item(0)
+            .getTextContent());
+    assertEquals("web-identity-session-token",
+        doc.getElementsByTagName("SessionToken").item(0).getTextContent());
+    assertEquals("subject-123",
+        doc.getElementsByTagName("SubjectFromWebIdentityToken").item(0)
+            .getTextContent());
+    assertEquals("ozone",
+        doc.getElementsByTagName("Audience").item(0).getTextContent());
+    assertEquals("keycloak",
+        doc.getElementsByTagName("Provider").item(0).getTextContent());
+  }
+
+  @Test
   public void testStsMissingRoleSessionName() throws Exception {
     final OSTSException ex = assertThrows(OSTSException.class, () ->
         endpoint.get("AssumeRole", ROLE_ARN, null, 3600, "2011-06-15", null));
@@ -568,6 +660,13 @@ public class TestS3STSEndpoint {
     documentBuilderFactory.setNamespaceAware(true);
     final DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
     return documentBuilder.parse(new InputSource(new StringReader(xml)));
+  }
+
+  private static void enableWebIdentity() {
+    OzoneConfigurationHolder.resetConfiguration();
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(OZONE_STS_WEB_IDENTITY_ENABLED, true);
+    OzoneConfigurationHolder.setConfiguration(config);
   }
 
   private static void assertStsErrorXml(String xml, String expectedNamespace, String expectedType, String expectedCode,

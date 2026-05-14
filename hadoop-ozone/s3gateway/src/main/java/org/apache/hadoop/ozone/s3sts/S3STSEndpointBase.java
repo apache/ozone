@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.s3.AuthorizationFilter;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 
@@ -63,6 +64,11 @@ public class S3STSEndpointBase implements Auditor {
 
   @PostConstruct
   public void initialization() {
+    if (context != null && Boolean.TRUE.equals(context.getProperty(
+        AuthorizationFilter.SKIP_AWS_AUTH_PROPERTY))) {
+      return;
+    }
+
     S3Auth s3Auth = new S3Auth(signatureInfo.getStringToSign(),
         signatureInfo.getSignature(),
         signatureInfo.getAwsAccessId(), signatureInfo.getAwsAccessId());

@@ -85,6 +85,7 @@ public enum OMAction implements AuditAction {
 
   // STS Actions
   S3_ASSUME_ROLE,
+  S3_ASSUME_ROLE_WITH_WEB_IDENTITY,
   REVOKE_STS_TOKEN,
 
   CREATE_TENANT,

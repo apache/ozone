@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -1191,6 +1192,26 @@ public interface OzoneManagerProtocol
   default AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
       String awsIamSessionPolicy, String requestId) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require this to be implemented");
+  }
+
+  /**
+   * Process the AssumeRoleWithWebIdentity operation.
+   *
+   * @param roleArn                 The ARN of the role to assume
+   * @param roleSessionName         The session name for this operation
+   * @param durationSeconds         The requested token validity in seconds
+   * @param webIdentityToken        The OIDC web identity token
+   * @param providerId              Optional provider id
+   * @param requestId               The requestId from the STS endpoint
+   * @return response information containing temporary credentials
+   * @throws IOException            if an error occurs during the operation
+   */
+  default AssumeRoleWithWebIdentityResponseInfo assumeRoleWithWebIdentity(
+      String roleArn, String roleSessionName, int durationSeconds,
+      String webIdentityToken, String providerId, String requestId)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "OzoneManager does not require this to be implemented");
   }
 
   /**

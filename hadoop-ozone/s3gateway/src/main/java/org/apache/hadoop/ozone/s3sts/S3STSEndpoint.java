@@ -21,6 +21,8 @@ import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.FORBIDDEN;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_IMPLEMENTED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -47,8 +49,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleWithWebIdentityResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
+import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
@@ -95,7 +99,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
   static {
     try {
-      JAXB_CONTEXT = JAXBContext.newInstance(S3AssumeRoleResponseXml.class);
+      JAXB_CONTEXT = JAXBContext.newInstance(S3AssumeRoleResponseXml.class,
+          S3AssumeRoleWithWebIdentityResponseXml.class);
     } catch (JAXBException e) {
       throw new RuntimeException("Failed to initialize JAXBContext: " + e, e);
     }
@@ -122,15 +127,27 @@ public class S3STSEndpoint extends S3STSEndpointBase {
    */
   @GET
   @Produces(MediaType.APPLICATION_XML)
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public Response get(
       @QueryParam("Action") String action,
       @QueryParam("RoleArn") String roleArn,
       @QueryParam("RoleSessionName") String roleSessionName,
       @QueryParam("DurationSeconds") Integer durationSeconds,
       @QueryParam("Version") String version,
-      @QueryParam("Policy") String awsIamSessionPolicy) throws OS3Exception {
+      @QueryParam("Policy") String awsIamSessionPolicy,
+      @QueryParam("WebIdentityToken") String webIdentityToken,
+      @QueryParam("ProviderId") String providerId) throws OS3Exception {
 
-    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds, version, awsIamSessionPolicy);
+    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds,
+        version, awsIamSessionPolicy, webIdentityToken, providerId);
+  }
+
+  @VisibleForTesting
+  public Response get(String action, String roleArn, String roleSessionName,
+      Integer durationSeconds, String version, String awsIamSessionPolicy)
+      throws OS3Exception {
+    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds,
+        version, awsIamSessionPolicy, null, null);
   }
 
   /**
@@ -146,19 +163,33 @@ public class S3STSEndpoint extends S3STSEndpointBase {
    */
   @POST
   @Produces(MediaType.APPLICATION_XML)
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public Response post(
       @FormParam("Action") String action,
       @FormParam("RoleArn") String roleArn,
       @FormParam("RoleSessionName") String roleSessionName,
       @FormParam("DurationSeconds") Integer durationSeconds,
       @FormParam("Version") String version,
-      @FormParam("Policy") String awsIamSessionPolicy) throws OS3Exception {
+      @FormParam("Policy") String awsIamSessionPolicy,
+      @FormParam("WebIdentityToken") String webIdentityToken,
+      @FormParam("ProviderId") String providerId) throws OS3Exception {
 
-    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds, version, awsIamSessionPolicy);
+    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds,
+        version, awsIamSessionPolicy, webIdentityToken, providerId);
   }
 
+  @VisibleForTesting
+  public Response post(String action, String roleArn, String roleSessionName,
+      Integer durationSeconds, String version, String awsIamSessionPolicy)
+      throws OS3Exception {
+    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds,
+        version, awsIamSessionPolicy, null, null);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private Response handleSTSRequest(String action, String roleArn, String roleSessionName,
-      Integer durationSeconds, String version, String awsIamSessionPolicy) throws OS3Exception {
+      Integer durationSeconds, String version, String awsIamSessionPolicy,
+      String webIdentityToken, String providerId) throws OS3Exception {
     final String requestId = requestIdentifier.getRequestId();
     // NOTE: invalid, missing or unsupported actions are not added to the audit log
     try {
@@ -173,10 +204,12 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       switch (action) {
       case ASSUME_ROLE_ACTION:
         return handleAssumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, version, requestId);
+      case ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION:
+        return handleAssumeRoleWithWebIdentity(roleArn, roleSessionName,
+            durationSeconds, webIdentityToken, providerId, version, requestId);
       // These operations are not supported yet
       case GET_SESSION_TOKEN_ACTION:
       case ASSUME_ROLE_WITH_SAML_ACTION:
-      case ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION:
       case GET_CALLER_IDENTITY_ACTION:
       case DECODE_AUTHORIZATION_MESSAGE_ACTION:
       case GET_ACCESS_KEY_INFO_ACTION:
@@ -195,6 +228,115 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       throw new OSTSException(
           INTERNAL_FAILURE, "An internal error has occurred.", INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
     }
+  }
+
+  private Response handleAssumeRoleWithWebIdentity(String roleArn,
+      String roleSessionName, Integer durationSeconds, String webIdentityToken,
+      String providerId, String version, String requestId)
+      throws OSTSException {
+    final String action = "AssumeRoleWithWebIdentity";
+    if (!isWebIdentityEnabled()) {
+      throw new OSTSException(
+          INVALID_ACTION, "Operation " + action + " is not supported yet.",
+          NOT_IMPLEMENTED.getStatusCode());
+    }
+
+    if (version == null || !version.equals(EXPECTED_VERSION)) {
+      throw new OSTSException(
+          INVALID_ACTION, "Could not find operation " + action
+          + " for version "
+          + (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: "
+          + EXPECTED_VERSION : version), BAD_REQUEST.getStatusCode());
+    }
+
+    final Set<String> validationErrors = new HashSet<>();
+    try {
+      S3STSUtils.validateDuration(durationSeconds);
+    } catch (OMException e) {
+      validationErrors.add(e.getMessage());
+    }
+
+    try {
+      AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
+    } catch (OMException e) {
+      validationErrors.add(e.getMessage());
+    }
+
+    try {
+      S3STSUtils.validateRoleSessionName(roleSessionName);
+    } catch (OMException e) {
+      validationErrors.add(e.getMessage());
+    }
+
+    if (StringUtils.isBlank(webIdentityToken)) {
+      validationErrors.add("Value null at 'webIdentityToken' failed to "
+          + "satisfy constraint: Member must not be null");
+    }
+
+    if (!validationErrors.isEmpty()) {
+      final String validationMessage = validationErrors.size()
+          + " validation "
+          + (validationErrors.size() > 1 ? "errors detected: "
+          : "error detected: ")
+          + String.join(";", validationErrors);
+      throw new OSTSException(
+          VALIDATION_ERROR, validationMessage, BAD_REQUEST.getStatusCode());
+    }
+
+    final int duration = durationSeconds == null
+        ? S3STSUtils.DEFAULT_DURATION_SECONDS : durationSeconds;
+    final String assumedRoleUserArn =
+        S3STSUtils.toAssumedRoleUserArn(roleArn, roleSessionName);
+    try {
+      final AssumeRoleWithWebIdentityResponseInfo responseInfo = getClient()
+          .getObjectStore()
+          .assumeRoleWithWebIdentity(roleArn, roleSessionName, duration,
+              webIdentityToken, providerId, requestId);
+      final String responseXml = generateAssumeRoleWithWebIdentityResponse(
+          assumedRoleUserArn, responseInfo, requestId);
+      return Response.ok(responseXml)
+          .header("Content-Type", "text/xml")
+          .build();
+    } catch (IOException e) {
+      LOG.error("Error during AssumeRoleWithWebIdentity processing", e);
+      if (e instanceof OMException) {
+        final OMException omException = (OMException) e;
+        if (omException.getResult() == OMException.ResultCodes.ACCESS_DENIED ||
+            omException.getResult() == OMException.ResultCodes.PERMISSION_DENIED ||
+            omException.getResult() == OMException.ResultCodes.TOKEN_EXPIRED) {
+          throw new OSTSException(
+              ACCESS_DENIED,
+              "User is not authorized to perform: "
+                  + "sts:AssumeRoleWithWebIdentity on resource: " + roleArn,
+              FORBIDDEN.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.INVALID_TOKEN) {
+          throw new OSTSException(
+              INVALID_CLIENT_TOKEN_ID,
+              "The web identity token included in the request is invalid.",
+              FORBIDDEN.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION ||
+            omException.getResult() == OMException.ResultCodes.FEATURE_NOT_ENABLED) {
+          throw new OSTSException(UNSUPPORTED_OPERATION,
+              omException.getMessage(), NOT_IMPLEMENTED.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
+          throw new OSTSException(VALIDATION_ERROR, omException.getMessage(),
+              BAD_REQUEST.getStatusCode());
+        }
+      }
+      throw new OSTSException(
+          INTERNAL_FAILURE, "An internal error has occurred.",
+          INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
+    }
+  }
+
+  private boolean isWebIdentityEnabled() {
+    return OzoneConfigurationHolder.configuration() != null
+        && OzoneConfigurationHolder.configuration().getBoolean(
+            OZONE_STS_WEB_IDENTITY_ENABLED,
+            OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT);
   }
 
   private Response handleAssumeRole(String roleArn, String roleSessionName, Integer durationSeconds,
@@ -350,5 +492,54 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       throw new IOException("Failed to marshal AssumeRole response", e);
     }
   }
-}
 
+  private String generateAssumeRoleWithWebIdentityResponse(
+      String assumedRoleUserArn,
+      AssumeRoleWithWebIdentityResponseInfo responseInfo, String requestId)
+      throws IOException {
+    final String expiration = DateTimeFormatter.ISO_INSTANT.format(
+        Instant.ofEpochSecond(responseInfo.getExpirationEpochSeconds())
+            .atOffset(ZoneOffset.UTC).toInstant());
+
+    try {
+      final S3AssumeRoleWithWebIdentityResponseXml response =
+          new S3AssumeRoleWithWebIdentityResponseXml();
+      final S3AssumeRoleWithWebIdentityResponseXml
+          .AssumeRoleWithWebIdentityResult result =
+          new S3AssumeRoleWithWebIdentityResponseXml
+              .AssumeRoleWithWebIdentityResult();
+      final S3AssumeRoleWithWebIdentityResponseXml.Credentials credentials =
+          new S3AssumeRoleWithWebIdentityResponseXml.Credentials();
+      credentials.setAccessKeyId(responseInfo.getAccessKeyId());
+      credentials.setSecretAccessKey(responseInfo.getSecretAccessKey());
+      credentials.setSessionToken(responseInfo.getSessionToken());
+      credentials.setExpiration(expiration);
+      result.setCredentials(credentials);
+      result.setSubjectFromWebIdentityToken(
+          responseInfo.getSubjectFromWebIdentityToken());
+      result.setAudience(responseInfo.getAudience());
+      if (StringUtils.isNotBlank(responseInfo.getProvider())) {
+        result.setProvider(responseInfo.getProvider());
+      }
+      final S3AssumeRoleWithWebIdentityResponseXml.AssumedRoleUser user =
+          new S3AssumeRoleWithWebIdentityResponseXml.AssumedRoleUser();
+      user.setAssumedRoleId(responseInfo.getAssumedRoleId());
+      user.setArn(assumedRoleUserArn);
+      result.setAssumedRoleUser(user);
+      response.setResult(result);
+      final S3AssumeRoleWithWebIdentityResponseXml.ResponseMetadata meta =
+          new S3AssumeRoleWithWebIdentityResponseXml.ResponseMetadata();
+      meta.setRequestId(requestId);
+      response.setResponseMetadata(meta);
+
+      final Marshaller marshaller = JAXB_CONTEXT.createMarshaller();
+      marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+      final StringWriter stringWriter = new StringWriter();
+      marshaller.marshal(response, stringWriter);
+      return stringWriter.toString();
+    } catch (JAXBException e) {
+      throw new IOException(
+          "Failed to marshal AssumeRoleWithWebIdentity response", e);
+    }
+  }
+}
