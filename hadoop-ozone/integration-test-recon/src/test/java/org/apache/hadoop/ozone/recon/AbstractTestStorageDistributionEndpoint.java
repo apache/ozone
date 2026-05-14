@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -142,15 +143,16 @@ public abstract class AbstractTestStorageDistributionEndpoint {
    * Subclasses call this from their own {@code @BeforeAll} static method.
    */
   protected static void initializeCluster(int numDatanodes) throws Exception {
+    BlockDeletingServiceMetrics.unRegister();
     conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setLong(OZONE_SCM_HA_RATIS_SNAPSHOT_GAP, 1L);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 50, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL, 500, TimeUnit.MILLISECONDS);
-    conf.set(ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY, "5s");
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.set(ReconServerConfigKeys.OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY, "2s");
 
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     scmConfig.setBlockDeletionInterval(Duration.ofMillis(100));
@@ -158,7 +160,12 @@ public abstract class AbstractTestStorageDistributionEndpoint {
     conf.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
 
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    dnConf.setBlockDeletionInterval(Duration.ofMillis(30000));
+    // In FSO layout a directory delete triggers two deletion pathways (direct
+    // KeyDeletingService + async DirectoryDeletingService), so the same blocks
+    // appear pending across TWO successive BlockDeletingService cycles before
+    // TotalPendingBlockBytes reaches 0.  With 5 s cycles the metric is 0 by
+    // t=10 s; Recon catches it at t≈12 s — well within the 20 s waitFor limits.
+    dnConf.setBlockDeletionInterval(Duration.ofMillis(5000));
     conf.setFromObject(dnConf);
 
     recon = new ReconService(conf);
