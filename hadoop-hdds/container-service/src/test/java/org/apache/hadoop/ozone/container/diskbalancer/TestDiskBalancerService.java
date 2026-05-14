@@ -520,8 +520,8 @@ public class TestDiskBalancerService {
             new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
         Arguments.of("  QUASI_CLOSED  ", true,
             new HashSet<>(Arrays.asList(State.QUASI_CLOSED)), null),
-        Arguments.of("CLOSING,CLOSED", true,
-            new HashSet<>(Arrays.asList(State.CLOSING, State.CLOSED)), null),
+        Arguments.of("CLOSING,CLOSED", false, new HashSet<>(Arrays.
+                asList(State.CLOSING, State.CLOSED)), "State CLOSING is not movable"),
         Arguments.of("  QUASI_CLOSED,CLOSED ", true,
             new HashSet<>(Arrays.asList(State.CLOSED, State.QUASI_CLOSED)), null),
         Arguments.of("  QUASI_CLOSED , CLOSED ", true,

@@ -856,6 +856,115 @@ public class TestHddsDispatcher {
     }
   }
 
+  /**
+   * Verifies the soft/hard min-free-space split on the write path:
+   *
+   * <p>Setup (capacity=500 bytes):
+   * <pre>
+   *   minFreeSpace bytes floor = 1  (ratio always dominates)
+   *   softRatio = 10%  → softSpare = 50 bytes (reported to SCM)
+   *   hardRatio =  6%  → hardSpare = 30 bytes (local write enforcement)
+   *   softBand          = 20 bytes
+   *   writeChunk size   ≈ 36 bytes (UUID string)
+   * </pre>
+   *
+   * <p>Three scenarios exercised in sequence using the same volume by calling
+   * {@code hddsVolume.incrementUsedSpace(delta)} to update the CachingSpaceUsageSource cache:
+   * <ol>
+   *   <li>Well above both limits (usedSpace=400, available=100): write passes, no metric fires.</li>
+   *   <li>Inside the soft band (usedSpace=425, available=75): write passes (75-30=45 &gt; 36),
+   *       {@code numWriteRequestsInSoftBandMinFreeSpace} incremented (75-50=25 &lt; 36).</li>
+   *   <li>Below hard limit (usedSpace=465, available=35): write rejected with DISK_OUT_OF_SPACE
+   *       (35-30=5 &lt; 36), {@code numWriteRequestsRejectedHardMinFreeSpace} incremented.</li>
+   * </ol>
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testWriteChunkEnforcesSoftHardMinFreeSpace(
+      ContainerLayoutVersion layoutVersion) throws Exception {
+    String testDirPath = testDir.getPath();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // 1-byte floor so the percentage ratios always dominate
+    conf.setStorageSize(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        1.0, StorageUnit.BYTES);
+    // soft spare = 10% of 500 = 50 bytes; hard spare = 6% of 500 = 30 bytes; band = 20 bytes
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 0.1f);
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT, 0.06f);
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    UUID scmId = UUID.randomUUID();
+    AtomicLong usedSpace = new AtomicLong(400); // available = 100, well above both limits
+    SpaceUsageSource spaceUsage = MockSpaceUsageSource.of(500, usedSpace);
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    HddsVolume.Builder volumeBuilder =
+        new HddsVolume.Builder(testDirPath).datanodeUuid(dd.getUuidString())
+            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE).clusterID("test");
+    volumeBuilder.usageCheckFactory(factory);
+    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(volumeBuilder.build()));
+    volumeSet.getVolumesList().get(0).setState(StorageVolume.VolumeState.NORMAL);
+    volumeSet.getVolumesList().get(0).start();
+    HddsVolume hddsVolume = StorageVolumeUtil
+        .getHddsVolumesList(volumeSet.getVolumesList()).get(0);
+    try {
+      KeyValueContainerData containerData = new KeyValueContainerData(1L,
+          layoutVersion, 50, UUID.randomUUID().toString(), dd.getUuidString());
+      Container container = new KeyValueContainer(containerData, conf);
+      StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
+          .forEach(v -> v.setDbParentDir(tempDir.toFile()));
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), scmId.toString());
+      ContainerSet containerSet = newContainerSet();
+      containerSet.addContainer(container);
+      StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      Map<ContainerType, Handler> handlers = Maps.newHashMap();
+      for (ContainerType containerType : ContainerType.values()) {
+        handlers.put(containerType,
+            Handler.getHandlerForContainerType(containerType, conf,
+                dd.getUuidString(), containerSet, volumeSet, volumeChoosingPolicy,
+                metrics, NO_OP_ICR_SENDER, new ContainerChecksumTreeManager(conf)));
+      }
+      HddsDispatcher hddsDispatcher = new HddsDispatcher(
+          conf, containerSet, volumeSet, handlers, context, metrics, null);
+      hddsDispatcher.setClusterId(scmId.toString());
+      // --- Scenario 1: well above both limits (available=100) ---
+      // available(100) - hardSpare(30) = 70 > writeSize(~36): passes
+      // available(100) - softSpare(50) = 50 > writeSize(~36): not in soft band
+      ContainerCommandResponseProto response =
+          hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      assertEquals(0,
+          hddsVolume.getVolumeInfoStats().getNumWriteRequestsInSoftBandMinFreeSpace());
+      assertEquals(0,
+          hddsVolume.getVolumeInfoStats().getNumWriteRequestsRejectedHardMinFreeSpace());
+      // --- Scenario 2: inside the soft band (usedSpace → 425, available=75) ---
+      // available(75) - hardSpare(30) = 45 > writeSize(~36): passes hard check
+      // available(75) - softSpare(50) = 25 < writeSize(~36): soft-band metric fires
+      // Use incrementUsedSpace so the CachingSpaceUsageSource internal cache is updated;
+      hddsVolume.incrementUsedSpace(25); // 400 → 425
+      response = hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      assertEquals(1,
+          hddsVolume.getVolumeInfoStats().getNumWriteRequestsInSoftBandMinFreeSpace());
+      assertEquals(0,
+          hddsVolume.getVolumeInfoStats().getNumWriteRequestsRejectedHardMinFreeSpace());
+      // --- Scenario 3: below hard limit (usedSpace → 465, available=35) ---
+      // available(35) - hardSpare(30) = 5 < writeSize(~36): DISK_OUT_OF_SPACE
+      hddsVolume.incrementUsedSpace(40); // 425 → 465
+      response = hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 3L), null);
+      assertEquals(ContainerProtos.Result.DISK_OUT_OF_SPACE, response.getResult());
+      assertEquals(1,
+          hddsVolume.getVolumeInfoStats().getNumWriteRequestsInSoftBandMinFreeSpace());
+      assertEquals(1,
+          hddsVolume.getVolumeInfoStats().getNumWriteRequestsRejectedHardMinFreeSpace());
+    } finally {
+      volumeSet.shutdown();
+      ContainerMetrics.remove();
+    }
+  }
+
   static DispatcherContext newContext(Op op) {
     return newContext(op, WriteChunkStage.COMBINED);
   }

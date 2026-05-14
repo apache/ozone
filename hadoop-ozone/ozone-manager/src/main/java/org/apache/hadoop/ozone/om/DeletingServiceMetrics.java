@@ -89,6 +89,10 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong kdsLastRunTimestamp;
   @Metric("Key Deleting Service current run timestamp in ms")
   private MutableGaugeLong kdsCurRunTimestamp;
+  @Metric("Directory Deleting Service last run start timestamp in ms")
+  private MutableGaugeLong ddsLastRunTimestamp;
+  @Metric("Directory Deleting Service current run start timestamp in ms")
+  private MutableGaugeLong ddsCurRunTimestamp;
 
   /*
    * Deletion service last run metrics.
@@ -109,6 +113,19 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong snapKeysIteratedLast;
   @Metric("Snapshot: No. of not reclaimable keys the last run")
   private MutableGaugeLong snapKeysNotReclaimableLast;
+
+  @Metric("AOS: deleted directories sent for purge in the last DirectoryDeletingService run")
+  private MutableGaugeLong ddsAosDirsSentForPurgeLast;
+  @Metric("AOS: sub-directories in the last DirectoryDeletingService run (mark/purge as applicable)")
+  private MutableGaugeLong ddsAosSubDirsLast;
+  @Metric("AOS: sub-files in the last DirectoryDeletingService run")
+  private MutableGaugeLong ddsAosSubFilesLast;
+  @Metric("Snapshot: deleted directories sent for purge in the last DirectoryDeletingService run")
+  private MutableGaugeLong ddsSnapDirsSentForPurgeLast;
+  @Metric("Snapshot: sub-directories in the last DirectoryDeletingService run (mark/purge as applicable)")
+  private MutableGaugeLong ddsSnapSubDirsLast;
+  @Metric("Snapshot: sub-files in the last DirectoryDeletingService run")
+  private MutableGaugeLong ddsSnapSubFilesLast;
 
   /**
    * Metric to track the term ID of the last key that was purged from the
@@ -219,6 +236,26 @@ public final class DeletingServiceMetrics {
 
   public void setKdsCurRunTimestamp(long timestamp) {
     this.kdsCurRunTimestamp.set(timestamp);
+  }
+
+  public void setDdsLastRunTimestamp(long timestamp) {
+    this.ddsLastRunTimestamp.set(timestamp);
+  }
+
+  public void setDdsCurRunTimestamp(long timestamp) {
+    this.ddsCurRunTimestamp.set(timestamp);
+  }
+
+  public void updateAosDdsLastRunMetrics(long dirsSentForPurge, long subDirs, long subFiles) {
+    this.ddsAosDirsSentForPurgeLast.set(dirsSentForPurge);
+    this.ddsAosSubDirsLast.set(subDirs);
+    this.ddsAosSubFilesLast.set(subFiles);
+  }
+
+  public void updateSnapDdsLastRunMetrics(long dirsSentForPurge, long subDirs, long subFiles) {
+    this.ddsSnapDirsSentForPurgeLast.set(dirsSentForPurge);
+    this.ddsSnapSubDirsLast.set(subDirs);
+    this.ddsSnapSubFilesLast.set(subFiles);
   }
 
   private void resetMetrics() {

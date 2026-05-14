@@ -737,20 +737,6 @@ public abstract class Server {
     return CallQueueManager.convertSchedulerClass(schedulerClass);
   }
 
-  /*
-   * Refresh the call queue
-   */
-  public synchronized void refreshCallQueue(Configuration conf) {
-    // Create the next queue
-    String prefix = getQueueClassPrefix();
-    this.maxQueueSize = handlerCount * conf.getInt(
-        CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_KEY,
-        CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_DEFAULT);
-    callQueue.swapQueue(getSchedulerClass(prefix, conf),
-        getQueueClass(prefix, conf), maxQueueSize, prefix, conf);
-    callQueue.setClientBackoffEnabled(getClientBackoffEnable(prefix, conf));
-  }
-
   /**
    * Get from config if client backoff is enabled on that port.
    */

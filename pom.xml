@@ -2340,7 +2340,7 @@
               <goal>prepare-agent</goal>
             </goals>
             <configuration>
-              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*</includes>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*,org.apache.hadoop.ipc_.*,org.apache.hadoop.security_.*</includes>
             </configuration>
           </execution>
         </executions>

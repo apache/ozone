@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.iceberg;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
@@ -36,6 +38,7 @@ import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.GenericManifestFile;
 import org.apache.iceberg.GenericPartitionFieldSummary;
+import org.apache.iceberg.GenericStatisticsFile;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.InternalData;
 import org.apache.iceberg.ManifestFile;
@@ -44,6 +47,7 @@ import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StaticTableOperations;
+import org.apache.iceberg.StatisticsFile;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadata.MetadataLogEntry;
@@ -202,6 +206,51 @@ class TestRewriteTablePathOzoneAction {
     assertAllInternalPathsRewritten(csvPairs, targetPrefix);
   }
 
+  @Test
+  void statsFileCopyPlanReturnsEmptySetForEmptyStats() {
+    Set<Pair<String, String>> copyPlan =
+        RewriteTablePathOzoneUtils.statsFileCopyPlan(List.of(), List.of());
+
+    assertTrue(copyPlan.isEmpty());
+  }
+
+  @Test
+  void statsFileCopyPlanRejectsMismatchedStatsCount() {
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> RewriteTablePathOzoneUtils.statsFileCopyPlan(
+            List.of(statisticsFile("before-1.stats", 100)),
+            List.of()));
+
+    assertThat(exception)
+        .hasMessageContaining("Before and after path rewrite, statistic files count should be same");
+  }
+
+  @Test
+  void statsFileCopyPlanRejectsMismatchedStatsFileSize() {
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> RewriteTablePathOzoneUtils.statsFileCopyPlan(
+            List.of(statisticsFile("before-1.stats", 100)),
+            List.of(statisticsFile("after-1.stats", 200))));
+
+    assertThat(exception)
+        .hasMessageContaining("Before and after path rewrite, statistic files size should be same");
+  }
+
+  @Test
+  void statsFileCopyPlanReturnsBeforeToAfterPathPairs() {
+    Set<Pair<String, String>> copyPlan = RewriteTablePathOzoneUtils.statsFileCopyPlan(
+        List.of(
+            statisticsFile("before-1.stats", 100),
+            statisticsFile("before-2.stats", 200)),
+        List.of(
+            statisticsFile("after-1.stats", 100),
+            statisticsFile("after-2.stats", 200)));
+
+    assertEquals(Set.of(
+        Pair.of("before-1.stats", "after-1.stats"),
+        Pair.of("before-2.stats", "after-2.stats")), copyPlan);
+  }
+
   /**
    * For every staged file in the CSV copy plan, asserts that internal paths are rewritten
    * to the target prefix:
@@ -357,5 +406,9 @@ class TestRewriteTablePathOzoneAction {
         .withRecordCount(1)
         .withFormat(FileFormat.PARQUET)
         .build();
+  }
+
+  private static StatisticsFile statisticsFile(String path, long fileSizeInBytes) {
+    return new GenericStatisticsFile(1L, path, fileSizeInBytes, 0L, List.of());
   }
 }
