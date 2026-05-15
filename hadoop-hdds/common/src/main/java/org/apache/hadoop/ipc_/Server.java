@@ -3012,25 +3012,7 @@ public abstract class Server {
     }
   }
   
-  protected Server(String bindAddress, int port,
-                  Class<? extends Writable> paramClass, int handlerCount, 
-                  Configuration conf)
-    throws IOException 
-  {
-    this(bindAddress, port, paramClass, handlerCount, -1, -1, conf, Integer
-        .toString(port), null, null);
-  }
-  
-  protected Server(String bindAddress, int port,
-      Class<? extends Writable> rpcRequestClass, int handlerCount,
-      int numReaders, int queueSizePerHandler, Configuration conf,
-      String serverName, SecretManager<? extends TokenIdentifier> secretManager)
-    throws IOException {
-    this(bindAddress, port, rpcRequestClass, handlerCount, numReaders, 
-        queueSizePerHandler, conf, serverName, secretManager, null);
-  }
-  
-  /** 
+  /**
    * Constructs a server listening on the named port and address.  Parameters passed must
    * be of the named class.  The <code>handlerCount</code> determines
    * the number of handler threads that will be used to process calls.

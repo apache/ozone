@@ -1303,15 +1303,6 @@ public class Client implements AutoCloseable {
         CommonConfigurationKeys.IPC_CLIENT_ASYNC_CALLS_MAX_DEFAULT);
   }
 
-  /**
-   * Construct an IPC client with the default SocketFactory.
-   * @param valueClass input valueClass.
-   * @param conf input Configuration.
-   */
-  public Client(Class<? extends Writable> valueClass, Configuration conf) {
-    this(valueClass, conf, NetUtils.getDefaultSocketFactory(conf));
-  }
-
   @Override
   public String toString() {
     return getClass().getSimpleName() + "-"
