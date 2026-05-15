@@ -243,18 +243,16 @@ public class DiskBalancerService extends BackgroundService {
 
   private void applyDiskBalancerInfo(DiskBalancerInfo diskBalancerInfo)
       throws IOException {
-    // verify ContainerStates first
-    DiskBalancerConfiguration validated = new DiskBalancerConfiguration();
-    validated.setContainerStates(diskBalancerInfo.getContainerStates());
+    DiskBalancerConfiguration validated = diskBalancerInfo.toConfiguration();
     // First store in local file, then update in memory variables
     writeDiskBalancerInfoTo(diskBalancerInfo, diskBalancerInfoFile);
 
     updateOperationalStateFromInfo(diskBalancerInfo);
 
-    setThreshold(diskBalancerInfo.getThreshold());
-    setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
-    setParallelThread(diskBalancerInfo.getParallelThread());
-    setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
+    setThreshold(validated.getThreshold());
+    setBandwidthInMB(validated.getDiskBandwidthInMB());
+    setParallelThread(validated.getParallelThread());
+    setStopAfterDiskEven(validated.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
     setContainerStates(validated.getMovableContainerStates());
 

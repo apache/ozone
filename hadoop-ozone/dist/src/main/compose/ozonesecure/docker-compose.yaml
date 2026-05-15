@@ -67,7 +67,8 @@ services:
       - 9862:9862
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
+      OZONE_OM_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
+      OZONE_OPTS:
     command: ["/opt/hadoop/bin/ozone","om"]
   httpfs:
     <<: *common-config
