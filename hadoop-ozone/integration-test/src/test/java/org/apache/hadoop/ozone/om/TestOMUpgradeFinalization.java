@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
@@ -71,9 +72,6 @@ class TestOMUpgradeFinalization {
   void testOMUpgradeFinalizationWithOneOMDown() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.layoutVersion());
-    // Finalization is triggered when SCM is finalized, so we first start it unfinalized and then finalize it to trigger
-    // the OM finalization.
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     try (MiniOzoneHAClusterImpl cluster = newCluster(conf)) {
       cluster.waitForClusterToBeReady();
@@ -101,8 +99,9 @@ class TestOMUpgradeFinalization {
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_PREPARE, AuditEventStatus.SUCCESS);
         omClient.cancelOzoneManagerPrepare();
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_CANCEL, AuditEventStatus.SUCCESS);
-        // Send the finalize command to SCM which triggers the OM finalize when SCM reports it is complete.
-        cluster.getStorageContainerLocationClient().finalizeUpgrade();
+        // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
+        cluster.getOzoneManager().getMetadataManager().getMetaTable()
+            .addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
 
         waitForFinalization(omClient);
         AuditLogTestUtils.verifySystemAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);

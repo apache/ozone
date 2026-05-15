@@ -33,7 +33,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -54,6 +57,7 @@ public class TestOMUpgradeFinalizeService {
 
   private OzoneManager ozoneManager;
   private OMVersionManager versionManager;
+  private TypedTable<String, String> metaTable;
   private ScmClient scmClient;
   private StorageContainerLocationProtocol containerClient;
   private OzoneManagerRatisServer omRatisServer;
@@ -62,8 +66,14 @@ public class TestOMUpgradeFinalizeService {
   @BeforeEach
   void setUp() {
     ozoneManager = mock(OzoneManager.class);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    metaTable = mock(TypedTable.class);
     when(ozoneManager.getThreadNamePrefix()).thenReturn("");
     when(ozoneManager.getOMNodeId()).thenReturn("clientId");
+    when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getMetaTable()).thenReturn(metaTable);
+    // For most tests, set the finalization command as having been received
+    when(metaTable.getCacheValue(any())).thenReturn(CacheValue.get(1, "ignored"));
 
     versionManager = mock(OMVersionManager.class);
     // preExecute() calls ozoneManager.getVersionManager().getApparentVersion().serialize()
@@ -112,11 +122,11 @@ public class TestOMUpgradeFinalizeService {
   }
 
   /**
-   * When the OM is the leader, finalization is needed, and SCM reports
+   * When the OM is the leader, finalization is needed, the finalization command is given and SCM reports
    * shouldFinalize=true, a FinalizeUpgrade request should be submitted via Ratis.
    */
   @Test
-  void testFinalizationTriggeredWhenScmIsFinalized() throws Exception {
+  void testFinalizationTriggeredWhenScmIsFinalizedAndFinalizationInProgress() throws Exception {
     when(ozoneManager.isLeaderReady()).thenReturn(true);
     when(versionManager.needsFinalization()).thenReturn(true);
 
@@ -127,7 +137,15 @@ public class TestOMUpgradeFinalizeService {
         .setNumDatanodesTotal(3)
         .build();
     when(containerClient.queryUpgradeStatus()).thenReturn(scmStatus);
+    // Finalization command not given yet
+    when(metaTable.getCacheValue(any())).thenReturn(null);
 
+    service.runPeriodicalTaskNow();
+
+    verifyNoInteractions(containerClient);
+    verifyNoInteractions(omRatisServer);
+
+    when(metaTable.getCacheValue(any())).thenReturn(CacheValue.get(1, "ignored"));
     service.runPeriodicalTaskNow();
 
     verify(containerClient).queryUpgradeStatus();

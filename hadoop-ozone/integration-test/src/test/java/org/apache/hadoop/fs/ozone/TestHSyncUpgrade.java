@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -113,8 +114,6 @@ public class TestHSyncUpgrade {
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OMLayoutFeature.MULTITENANCY_SCHEMA.layoutVersion());
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY,
-        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
     conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
@@ -215,7 +214,9 @@ public class TestHSyncUpgrade {
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
-    cluster.getStorageContainerLocationClient().finalizeUpgrade();
+    // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
+    cluster.getOzoneManager().getMetadataManager().getMetaTable()
+        .addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
     OMUpgradeTestUtils.waitForFinalization(omClient);
   }
 

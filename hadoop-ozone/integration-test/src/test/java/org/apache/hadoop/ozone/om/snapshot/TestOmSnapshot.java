@@ -234,8 +234,6 @@ public abstract class TestOmSnapshot {
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
     conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY,
-        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
     conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, -1);
@@ -329,7 +327,9 @@ public abstract class TestOmSnapshot {
   private void finalizeOMUpgrade() throws Exception {
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
-    cluster.getStorageContainerLocationClient().finalizeUpgrade();
+    // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
+    cluster.getOzoneManager().getMetadataManager().getMetaTable()
+        .addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
     OMUpgradeTestUtils.waitForFinalization(omClient);
   }
 

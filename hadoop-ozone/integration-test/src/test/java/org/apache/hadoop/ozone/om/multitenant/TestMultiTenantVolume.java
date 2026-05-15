@@ -75,7 +75,6 @@ public class TestMultiTenantVolume {
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, true);
     conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes();
@@ -146,7 +145,9 @@ public class TestMultiTenantVolume {
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
-    cluster.getStorageContainerLocationClient().finalizeUpgrade();
+    // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
+    cluster.getOzoneManager().getMetadataManager().getMetaTable()
+        .addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
     OMUpgradeTestUtils.waitForFinalization(omClient);
   }
 
