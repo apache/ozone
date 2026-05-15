@@ -199,9 +199,11 @@ public class TestDiskBalancerService {
     svc.shutdown();
   }
 
-  @ContainerTestVersionInfo.ContainerTest
+  @ParameterizedTest
+  @MethodSource("invalidDiskBalancerInfo")
   public void testRefreshRejectsInvalidDiskBalancerInfo(
-      ContainerTestVersionInfo versionInfo) throws Exception {
+      ContainerTestVersionInfo versionInfo, DiskBalancerInfo diskBalancerInfo)
+      throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
     ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -213,16 +215,20 @@ public class TestDiskBalancerService {
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
     assertThrows(IllegalArgumentException.class,
-        () -> svc.refresh(new DiskBalancerInfo(
-            DiskBalancerRunningStatus.RUNNING, 0.0d, 100L, 5, true)));
-    assertThrows(IllegalArgumentException.class,
-        () -> svc.refresh(new DiskBalancerInfo(
-            DiskBalancerRunningStatus.RUNNING, 10.0d, 0L, 5, true)));
-    assertThrows(IllegalArgumentException.class,
-        () -> svc.refresh(new DiskBalancerInfo(
-            DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 0, true)));
+        () -> svc.refresh(diskBalancerInfo));
 
     svc.shutdown();
+  }
+
+  public static Stream<Arguments> invalidDiskBalancerInfo() {
+    return ContainerTestVersionInfo.getLayoutList().stream()
+        .flatMap(versionInfo -> Stream.of(
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 0.0d, 100L, 5, true)),
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 10.0d, 0L, 5, true)),
+            Arguments.arguments(versionInfo, new DiskBalancerInfo(
+                DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 0, true))));
   }
 
   @ContainerTestVersionInfo.ContainerTest
