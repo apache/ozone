@@ -200,6 +200,32 @@ public class TestDiskBalancerService {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testRefreshRejectsInvalidDiskBalancerInfo(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> svc.refresh(new DiskBalancerInfo(
+            DiskBalancerRunningStatus.RUNNING, 0.0d, 100L, 5, true)));
+    assertThrows(IllegalArgumentException.class,
+        () -> svc.refresh(new DiskBalancerInfo(
+            DiskBalancerRunningStatus.RUNNING, 10.0d, 0L, 5, true)));
+    assertThrows(IllegalArgumentException.class,
+        () -> svc.refresh(new DiskBalancerInfo(
+            DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 0, true)));
+
+    svc.shutdown();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testPolicyClassInitialization(ContainerTestVersionInfo versionInfo) throws IOException {
     setLayoutAndSchemaForTest(versionInfo);
     ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
