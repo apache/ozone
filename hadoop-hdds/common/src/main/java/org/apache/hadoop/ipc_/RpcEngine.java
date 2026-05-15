@@ -26,50 +26,12 @@ import javax.net.SocketFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc_.Client.ConnectionId;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
 /** An RPC implementation. */
 public interface RpcEngine {
-
-  /**
-   * Construct a client-side proxy object.
-   *
-   * @param <T> Generics Type T.
-   * @param protocol input protocol.
-   * @param clientVersion input clientVersion.
-   * @param addr input addr.
-   * @param ticket input ticket.
-   * @param conf input Configuration.
-   * @param factory input factory.
-   * @param rpcTimeout input rpcTimeout.
-   * @param connectionRetryPolicy input connectionRetryPolicy.
-   * @throws IOException raised on errors performing I/O.
-   * @return ProtocolProxy.
-   */
-  <T> ProtocolProxy<T> getProxy(Class<T> protocol,
-                  long clientVersion, InetSocketAddress addr,
-                  UserGroupInformation ticket, Configuration conf,
-                  SocketFactory factory, int rpcTimeout,
-                  RetryPolicy connectionRetryPolicy) throws IOException;
-
-  /**
-   * Construct a client-side proxy object with a ConnectionId.
-   *
-   * @param <T> Generics Type T.
-   * @param protocol input protocol.
-   * @param clientVersion input clientVersion.
-   * @param connId input ConnectionId.
-   * @param conf input Configuration.
-   * @param factory input factory.
-   * @throws IOException raised on errors performing I/O.
-   * @return ProtocolProxy.
-   */
-  <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
-      Client.ConnectionId connId, Configuration conf, SocketFactory factory)
-      throws IOException;
 
   /**
    * Construct a client-side proxy object.
