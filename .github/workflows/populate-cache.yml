@@ -22,6 +22,8 @@ on:
     branches:
       - master
       - ozone-1.4
+      - ozone-2.0
+      - ozone-2.1
     paths:
       - 'pom.xml'
       - '**/pom.xml'
