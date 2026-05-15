@@ -187,7 +187,6 @@ import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
@@ -705,7 +704,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmLayoutVersionManager = new HDDSLayoutVersionManager(
         scmStorageConfig.getApparentVersion(), new ScmUpgradeActionProvider(), null);
-    VersionedDatanodeFeatures.initialize(scmLayoutVersionManager);
 
     UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
         finalizationExecutor;

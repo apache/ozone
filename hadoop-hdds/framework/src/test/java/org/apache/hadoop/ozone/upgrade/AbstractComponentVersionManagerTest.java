@@ -56,6 +56,18 @@ public abstract class AbstractComponentVersionManagerTest {
 
   protected abstract ComponentVersion expectedSoftwareVersion();
 
+  @Test
+  public abstract void testClasspathScanDiscoversUpgradeActions() throws Exception;
+
+  @Test
+  public abstract void testFinalizeRunsSuppliedUpgradeAction() throws Exception;
+
+  @Test
+  public abstract void testUpgradeActionFailureAbortsFinalize() throws Exception;
+
+  @Test
+  public abstract void testPersistFailureRollsBack() throws Exception;
+
   @AfterEach
   public void cleanupMetricsSource() {
     DefaultMetricsSystem.instance().unregisterSource(ComponentVersionManagerMetrics.METRICS_SOURCE_NAME);

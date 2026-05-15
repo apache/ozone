@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -95,8 +95,8 @@ final class UpgradeUtils {
 
   public static Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutFeature(
       DatanodeDetails dnDetail, OzoneConfiguration conf) throws IOException {
-    DatanodeLayoutStorage layoutStorage =
-        new DatanodeLayoutStorage(conf, dnDetail.getUuidString());
+    DatanodeStorage layoutStorage =
+        new DatanodeStorage(conf, dnDetail.getUuidString());
     HDDSLayoutVersionManager layoutVersionManager =
         new HDDSLayoutVersionManager(layoutStorage.getApparentVersion(), null, null);
 

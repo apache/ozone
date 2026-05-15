@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -71,13 +71,13 @@ public final class UpgradeTestHelper {
   public static DatanodeStateMachine startPreFinalizedDatanode(
       OzoneConfiguration conf, Path tempFolder,
       DatanodeStateMachine dsm, InetSocketAddress address,
-      int metadataLayoutVersion)
+      int apparentVersion)
       throws Exception {
     // Set layout version.
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFolder.toString());
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        metadataLayoutVersion);
+        apparentVersion);
     layoutStorage.initialize();
     if (dsm != null) {
       dsm.close();
@@ -86,10 +86,10 @@ public final class UpgradeTestHelper {
     // Build and start the datanode.
     DatanodeDetails dd = ContainerTestUtils.createDatanodeDetails();
     dsm = new DatanodeStateMachine(dd, conf);
-    int actualMlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
+    int actualApparentVersion = dsm.getVersionManager().getApparentVersion().serialize();
     assertEquals(
-        metadataLayoutVersion,
-        actualMlv);
+        apparentVersion,
+        actualApparentVersion);
 
 
     callVersionEndpointTask(conf, dsm.getContainer(), address);
@@ -98,7 +98,7 @@ public final class UpgradeTestHelper {
 
   public static DatanodeStateMachine restartDatanode(
       OzoneConfiguration conf, DatanodeStateMachine dsm, boolean shouldSetDbParentDir,
-      Path tempFolder, InetSocketAddress address, int expectedMlv, boolean exactMatch)
+      Path tempFolder, InetSocketAddress address, int expectedApparentVersion, boolean exactMatch)
       throws Exception {
     // Stop existing datanode.
     DatanodeDetails dd = dsm.getDatanodeDetails();
@@ -110,11 +110,11 @@ public final class UpgradeTestHelper {
       StorageVolumeUtil.getHddsVolumesList(dsm.getContainer().getVolumeSet().getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));
     }
-    int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
+    int apparentVersion = dsm.getVersionManager().getApparentVersion().serialize();
     if (exactMatch) {
-      assertEquals(expectedMlv, mlv);
+      assertEquals(expectedApparentVersion, apparentVersion);
     } else {
-      assertThat(expectedMlv).isLessThanOrEqualTo(mlv);
+      assertThat(expectedApparentVersion).isLessThanOrEqualTo(apparentVersion);
     }
 
     callVersionEndpointTask(conf, dsm.getContainer(), address);

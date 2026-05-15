@@ -27,24 +27,22 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 /**
  * Utility class to retrieve the version of a feature that corresponds to the
- * metadata layout version specified by the provided
- * {@link HDDSLayoutVersionManager}.
+ * apparent version specified by the provided
+ * {@link DatanodeVersionManager}.
  */
 public final class VersionedDatanodeFeatures {
-  private static HDDSLayoutVersionManager versionManager;
+  private static DatanodeVersionManager versionManager;
 
   private VersionedDatanodeFeatures() { }
 
-  public static void initialize(
-      HDDSLayoutVersionManager manager) {
+  public static void initialize(DatanodeVersionManager manager) {
     versionManager = manager;
   }
 
@@ -181,14 +179,14 @@ public final class VersionedDatanodeFeatures {
           HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS);
     }
 
-    private static boolean shouldPersistPort(DatanodeDetails.Port port, DatanodeLayoutStorage datanodeLayoutStorage) {
+    private static boolean shouldPersistPort(DatanodeDetails.Port port, DatanodeStorage datanodeLayoutStorage) {
       HDDSLayoutFeature portVersion = PORT_TO_VERSION.get(port.getName());
       return portVersion == null || portVersion.isSupportedBy(datanodeLayoutStorage.getApparentVersion());
     }
 
     public static Map<String, Integer> getPortsToPersist(DatanodeDetails datanodeDetails, ConfigurationSource conf)
         throws IOException {
-      DatanodeLayoutStorage datanodeLayoutStorage = new DatanodeLayoutStorage(conf, datanodeDetails.getUuidString());
+      DatanodeStorage datanodeLayoutStorage = new DatanodeStorage(conf, datanodeDetails.getUuidString());
       Map<String, Integer> portDetails = new LinkedHashMap<>();
 
       final List<DatanodeDetails.Port> ports = datanodeDetails.getPorts();

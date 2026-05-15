@@ -84,7 +84,7 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
@@ -287,7 +287,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         LOG.info("Hdds Datanode login successful.");
       }
 
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+      DatanodeStorage layoutStorage = new DatanodeStorage(conf,
           datanodeDetails.getUuidString());
       if (layoutStorage.getState() != INITIALIZED) {
         layoutStorage.initialize();

@@ -30,10 +30,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +49,7 @@ public final class RegisterEndpointTask implements
   private DatanodeDetails datanodeDetails;
   private final OzoneContainer datanodeContainerManager;
   private StateContext stateContext;
-  private HDDSLayoutVersionManager layoutVersionManager;
+  private final DatanodeVersionManager versionManager;
 
   /**
    * Creates a register endpoint task.
@@ -57,21 +57,15 @@ public final class RegisterEndpointTask implements
    * @param rpcEndPoint - endpoint
    * @param ozoneContainer - container
    * @param context - State context
-   * @param versionManager - layout version Manager
    */
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
       OzoneContainer ozoneContainer,
-      StateContext context, HDDSLayoutVersionManager versionManager) {
+      StateContext context) {
     this.rpcEndPoint = rpcEndPoint;
     this.datanodeContainerManager = ozoneContainer;
     this.stateContext = context;
-    if (versionManager != null) {
-      this.layoutVersionManager = versionManager;
-    } else {
-      this.layoutVersionManager =
-          context.getParent().getLayoutVersionManager();
-    }
+    this.versionManager = context.getParent().getVersionManager();
   }
 
   /**
@@ -115,9 +109,9 @@ public final class RegisterEndpointTask implements
           .equals(EndpointStateMachine.EndPointStates.REGISTER)) {
         LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
             .setMetadataLayoutVersion(
-                layoutVersionManager.getMetadataLayoutVersion())
+                versionManager.getApparentVersion().serialize())
             .setSoftwareLayoutVersion(
-                layoutVersionManager.getSoftwareLayoutVersion())
+                versionManager.getSoftwareVersion().serialize())
             .build();
         ContainerReportsProto containerReport =
             datanodeContainerManager.getController().getContainerReport();
@@ -177,7 +171,6 @@ public final class RegisterEndpointTask implements
     private DatanodeDetails datanodeDetails;
     private OzoneContainer container;
     private StateContext context;
-    private HDDSLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -204,17 +197,6 @@ public final class RegisterEndpointTask implements
      */
     public Builder setConfig(ConfigurationSource config) {
       this.conf = config;
-      return this;
-    }
-
-    /**
-     * Sets the LayoutVersionManager.
-     *
-     * @param lvm config
-     * @return Builder.
-     */
-    public Builder setLayoutVersionManager(HDDSLayoutVersionManager lvm) {
-      this.versionManager = lvm;
       return this;
     }
 
@@ -277,8 +259,7 @@ public final class RegisterEndpointTask implements
       }
 
       RegisterEndpointTask task = new RegisterEndpointTask(this
-          .endPointStateMachine, this.container, this.context,
-          this.versionManager);
+          .endPointStateMachine, this.container, this.context);
       task.setDatanodeDetails(datanodeDetails);
       return task;
     }

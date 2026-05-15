@@ -50,6 +50,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -91,7 +92,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -154,6 +155,17 @@ public class SCMNodeManager implements NodeManager {
   private static final String TOTALCAPACITY = "CAPACITY";
   private static final String DNUUID = "UUID";
   private static final String VERSION = "VERSION";
+
+  /**
+   * TODO HDDS-15129 Remove when SCM uses the new versioning framework
+   * Datanodes on {@link HDDSVersion} report {@link HDDSVersion#ZDU} as software version ({@code 100}), while
+   * SCM still on {@link org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature} reports the legacy maximum ({@code 10}
+   * today).
+   * Without this bridge, registration fails and heartbeats log {@code dnSlv > scmSlv} as an invalid node.
+   */
+  private static boolean shouldFenceDatanode(int dnSoftwareVersion, int scmSoftwareVersion) {
+    return dnSoftwareVersion > scmSoftwareVersion && dnSoftwareVersion != HDDSVersion.ZDU.serialize();
+  }
 
   /**
    * Constructs SCM machine Manager.
@@ -396,8 +408,9 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto layoutInfo) {
-    if (layoutInfo.getSoftwareLayoutVersion() !=
-        scmLayoutVersionManager.getSoftwareLayoutVersion()) {
+    int dnSlvRegister = layoutInfo.getSoftwareLayoutVersion();
+    int scmSlvRegister = scmLayoutVersionManager.getSoftwareLayoutVersion();
+    if (shouldFenceDatanode(dnSlvRegister, scmSlvRegister)) {
       return RegisteredCommand.newBuilder()
           .setErrorCode(ErrorCode.errorNodeNotPermitted)
           .setDatanode(datanodeDetails)
@@ -758,7 +771,9 @@ public class SCMNodeManager implements NodeManager {
 
     // A datanode with a larger software layout version is from a future
     // version of ozone. It should not have been added to the cluster.
-    if (dnSlv > scmSlv) {
+    // TODO HDDS-15129 REMOVE WHEN SCM USES new versioning framework.
+    //  For now, do not treat datanodes with ZDU future software version as invalid.
+    if (shouldFenceDatanode(dnSlv, scmSlv)) {
       LOG.error("Invalid data node in the cluster : {}. " +
               "DataNode SoftwareLayoutVersion = {}, SCM " +
               "SoftwareLayoutVersion = {}",
@@ -781,8 +796,8 @@ public class SCMNodeManager implements NodeManager {
     LOG.warn("Data node {} has a MetadataLayoutVersion = {}, SCM MetadataLayoutVersion = {}. Sending finalize",
         datanodeDetails.getHostName(), dnMlv, scmMlv);
 
-    FinalizeNewLayoutVersionCommand finalizeCmd =
-        new FinalizeNewLayoutVersionCommand(true,
+    FinalizeVersionCommand finalizeCmd =
+        new FinalizeVersionCommand(true,
             LayoutVersionProto.newBuilder()
                 .setSoftwareLayoutVersion(dnSlv)
                 .setMetadataLayoutVersion(dnSlv).build());

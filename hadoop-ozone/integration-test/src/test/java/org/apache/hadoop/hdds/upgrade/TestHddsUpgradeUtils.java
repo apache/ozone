@@ -17,25 +17,19 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.admin.upgrade.UpgradeUtil;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.slf4j.Logger;
@@ -52,9 +46,9 @@ public final class TestHddsUpgradeUtils {
 
   public static void waitForFinalizationFromClient(StorageContainerLocationProtocol scmClient) throws Exception {
     LambdaTestUtils.await(60_000, 1_000, () -> {
-      boolean isComplete = UpgradeUtil.isFinalizationComplete(scmClient);
-      LOG.info("Waiting for upgrade finalization to complete from client.Current status is {}.", isComplete);
-      return isComplete;
+      HddsProtos.UpgradeStatus status = scmClient.queryUpgradeStatus();
+      LOG.info("Waiting for upgrade finalization to complete from client. Current status is:\n{}", status);
+      return status.getShouldFinalize();
     });
   }
 
@@ -97,26 +91,6 @@ public final class TestHddsUpgradeUtils {
   }
 
   /*
-   * Helper function to test Pre-Upgrade conditions on all the DataNodes.
-   */
-  public static void testPreUpgradeConditionsDataNodes(
-      List<HddsDatanodeService> datanodes) {
-    for (HddsDatanodeService dataNode : datanodes) {
-      DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      HDDSLayoutVersionManager dnVersionManager =
-          dsm.getLayoutVersionManager();
-      assertEquals(0, dnVersionManager.getMetadataLayoutVersion());
-    }
-
-    int countContainers = 0;
-    for (HddsDatanodeService dataNode : datanodes) {
-      DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      countContainers += dsm.getContainer().getContainerSet().containerCount();
-    }
-    assertThat(countContainers).isGreaterThanOrEqualTo(1);
-  }
-
-  /*
    * Helper function to test Post-Upgrade conditions on all the DataNodes.
    */
   public static void testPostUpgradeConditionsDataNodes(
@@ -124,14 +98,8 @@ public final class TestHddsUpgradeUtils {
     try {
       GenericTestUtils.waitFor(() -> {
         for (HddsDatanodeService dataNode : datanodes) {
-          DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-          try {
-            if ((dsm.queryUpgradeStatus().status() != FINALIZATION_DONE) &&
-                (dsm.queryUpgradeStatus().status() != ALREADY_FINALIZED)) {
-              return false;
-            }
-          } catch (IOException e) {
-            LOG.error("Failed to query datanode upgrade status.", e);
+          DatanodeVersionManager versionManager = dataNode.getDatanodeStateMachine().getVersionManager();
+          if (versionManager.needsFinalization()) {
             return false;
           }
         }
@@ -144,42 +112,14 @@ public final class TestHddsUpgradeUtils {
     int countContainers = 0;
     for (HddsDatanodeService dataNode : datanodes) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      HDDSLayoutVersionManager dnVersionManager =
-          dsm.getLayoutVersionManager();
-      assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
-          dnVersionManager.getMetadataLayoutVersion());
-      assertThat(dnVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
+      DatanodeVersionManager dnVersionManager =
+          dsm.getVersionManager();
+      assertEquals(dnVersionManager.getSoftwareVersion(),
+          dnVersionManager.getApparentVersion());
+      assertThat(dnVersionManager.getApparentVersion().serialize())
+          .isGreaterThanOrEqualTo(1);
       countContainers += dsm.getContainer().getContainerSet().containerCount();
     }
     assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
-  }
-
-  public static void testDataNodesStateOnSCM(List<StorageContainerManager> scms,
-      int expectedDatanodeCount, HddsProtos.NodeState state) {
-    scms.forEach(scm -> testDataNodesStateOnSCM(scm, expectedDatanodeCount, state));
-  }
-
-  /*
-   * Helper function to test DataNode state on the SCM. Note that due to
-   * timing constraints, sometime the node-state can transition to the next
-   * state. This function expects the DataNode to be in NodeState "state" or
-   * "alternateState". Some tests can enforce a unique NodeState test by
-   * setting "alternateState = null".
-   */
-  public static void testDataNodesStateOnSCM(StorageContainerManager scm,
-      int expectedDatanodeCount, HddsProtos.NodeState state) {
-    int countNodes = 0;
-    for (DatanodeDetails dn : scm.getScmNodeManager().getAllNodes()) {
-      try {
-        HddsProtos.NodeState dnState =
-            scm.getScmNodeManager().getNodeStatus(dn).getHealth();
-        assertSame(state, dnState);
-      } catch (NodeNotFoundException e) {
-        e.printStackTrace();
-        fail("Node not found");
-      }
-      ++countNodes;
-    }
-    assertEquals(expectedDatanodeCount, countNodes);
   }
 }
