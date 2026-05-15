@@ -47,6 +47,8 @@ import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingResult;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -1101,6 +1103,42 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       }
       assertEquals(content, bos.toString("UTF-8"));
     }
+  }
+
+  static Stream<Arguments> onlyTagKeyCasesV1() {
+    Map<String, String> fooBarEmptyBar = new HashMap<>();
+    fooBarEmptyBar.put("foo", "bar");
+    fooBarEmptyBar.put("bar", null);
+    return Stream.of(
+        Arguments.of(
+            new ObjectTagging(Collections.singletonList(new Tag("tag1", null))),
+            Collections.singletonMap("tag1", null)),
+        Arguments.of(
+            new ObjectTagging(Arrays.asList(new Tag("foo", "bar"), new Tag("bar", null))),
+            fooBarEmptyBar)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("onlyTagKeyCasesV1")
+  public void testPutObjectWithOnlyTagKey(ObjectTagging objectTagging,
+      Map<String, String> expectedTags) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(bucketName);
+
+    try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
+      PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, keyName, is, new ObjectMetadata())
+          .withTagging(objectTagging);
+      s3Client.putObject(putObjectRequest);
+    }
+
+    GetObjectTaggingResult taggingResult = s3Client.getObjectTagging(
+        new GetObjectTaggingRequest(bucketName, keyName));
+    Map<String, String> actualTags = taggingResult.getTagSet().stream()
+        .collect(Collectors.toMap(Tag::getKey, Tag::getValue));
+    assertEquals(expectedTags, actualTags);
   }
 
   @Test
