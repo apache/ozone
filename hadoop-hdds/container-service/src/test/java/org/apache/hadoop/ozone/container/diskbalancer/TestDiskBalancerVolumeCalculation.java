@@ -49,17 +49,63 @@ class TestDiskBalancerVolumeCalculation {
   }
 
   @Test
-  void getIdealUsageRejectsZeroTotalCapacity() throws IOException {
+  void getIdealUsageReturnsZeroForZeroTotalCapacity() throws IOException {
     HddsVolume zeroCapacityVolume = createVolume("zero-capacity", 0, 0);
+
+    assertEquals(0.0, DiskBalancerVolumeCalculation.getIdealUsage(
+        Collections.singletonList(
+            DiskBalancerVolumeCalculation.newVolumeFixedUsage(
+                zeroCapacityVolume, null))));
+  }
+
+  @Test
+  void getIdealUsageRejectsNegativeCapacity() throws IOException {
+    HddsVolume negativeCapacityVolume = createVolume(
+        "negative-capacity", -1, 0);
 
     IllegalArgumentException exception = assertThrows(
         IllegalArgumentException.class,
         () -> DiskBalancerVolumeCalculation.getIdealUsage(
             Collections.singletonList(
                 DiskBalancerVolumeCalculation.newVolumeFixedUsage(
-                    zeroCapacityVolume, null))));
+                    negativeCapacityVolume, null))));
 
-    assertEquals("total capacity must be greater than 0", exception.getMessage());
+    assertEquals("Negative capacity = -1: " + negativeCapacityVolume,
+        exception.getMessage());
+  }
+
+  @Test
+  void getIdealUsageRejectsNegativeEffectiveUsed() throws IOException {
+    HddsVolume volume = createVolume("negative-effective-used", 100, 100);
+    DiskBalancerVolumeCalculation.VolumeFixedUsage volumeUsage =
+        DiskBalancerVolumeCalculation.newVolumeFixedUsage(
+            volume, Collections.singletonMap(volume, -1L));
+
+    IllegalArgumentException exception = assertThrows(
+        IllegalArgumentException.class,
+        () -> DiskBalancerVolumeCalculation.getIdealUsage(
+            Collections.singletonList(volumeUsage)));
+
+    assertEquals("Negative effective used = " + volumeUsage.getEffectiveUsed()
+        + ": " + volume, exception.getMessage());
+  }
+
+  @Test
+  void getIdealUsageRejectsEffectiveUsedGreaterThanCapacity()
+      throws IOException {
+    HddsVolume volume = createVolume("effective-used-exceeds-capacity", 100, 0);
+    DiskBalancerVolumeCalculation.VolumeFixedUsage volumeUsage =
+        DiskBalancerVolumeCalculation.newVolumeFixedUsage(
+            volume, Collections.singletonMap(volume, 1L));
+
+    IllegalArgumentException exception = assertThrows(
+        IllegalArgumentException.class,
+        () -> DiskBalancerVolumeCalculation.getIdealUsage(
+            Collections.singletonList(volumeUsage)));
+
+    assertEquals("Effective used = " + volumeUsage.getEffectiveUsed()
+        + " > capacity = " + volumeUsage.getUsage().getCapacity() + ": "
+        + volume, exception.getMessage());
   }
 
   private HddsVolume createVolume(String name, long capacity, long available)
