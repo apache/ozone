@@ -30,7 +30,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.concurrent.AsyncGet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,6 @@ import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -50,8 +48,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ProtobufRpcEngine implements RpcEngine {
   public static final Logger LOG =
       LoggerFactory.getLogger(ProtobufRpcEngine.class);
-  private static final ThreadLocal<AsyncGet<Message, Exception>>
-      ASYNC_RETURN_MESSAGE = new ThreadLocal<>();
 
   static { // Register the rpcRequest deserializer for ProtobufRpcEngine
     org.apache.hadoop.ipc_.Server.registerProtocolEngine(
@@ -60,10 +56,6 @@ public class ProtobufRpcEngine implements RpcEngine {
   }
 
   private static final ClientCache CLIENTS = new ClientCache();
-
-  public static AsyncGet<Message, Exception> getAsyncReturnMessage() {
-    return ASYNC_RETURN_MESSAGE.get();
-  }
 
   @Override
   @SuppressWarnings("unchecked")
@@ -232,26 +224,7 @@ public class ProtobufRpcEngine implements RpcEngine {
         LOG.debug("Call: " + method.getName() + " took " + callTime + "ms");
       }
       
-      if (Client.isAsynchronousMode()) {
-        final AsyncGet<RpcWritable.Buffer, IOException> arr
-            = Client.getAsyncRpcResponse();
-        final AsyncGet<Message, Exception> asyncGet
-            = new AsyncGet<Message, Exception>() {
-          @Override
-          public Message get(long timeout, TimeUnit unit) throws Exception {
-            return getReturnMessage(method, arr.get(timeout, unit));
-          }
-
-          @Override
-          public boolean isDone() {
-            return arr.isDone();
-          }
-        };
-        ASYNC_RETURN_MESSAGE.set(asyncGet);
-        return null;
-      } else {
-        return getReturnMessage(method, val);
-      }
+      return getReturnMessage(method, val);
     }
 
     protected Writable constructRpcRequest(Method method, Message theRequest) {
