@@ -341,9 +341,6 @@ public class ProtobufRpcEngine implements RpcEngine {
   
   public static class Server extends RPC.Server {
 
-    static final ThreadLocal<ProtobufRpcEngineCallback> currentCallback =
-        new ThreadLocal<>();
-
     static final ThreadLocal<CallInfo> currentCallInfo = new ThreadLocal<>();
 
     static class CallInfo {
@@ -354,43 +351,6 @@ public class ProtobufRpcEngine implements RpcEngine {
         this.server = server;
         this.methodName = methodName;
       }
-    }
-
-    static class ProtobufRpcEngineCallbackImpl
-        implements ProtobufRpcEngineCallback {
-
-      private final RPC.Server server;
-      private final Call call;
-      private final String methodName;
-      private final long setupTime;
-
-      public ProtobufRpcEngineCallbackImpl() {
-        this.server = currentCallInfo.get().server;
-        this.call = Server.getCurCall().get();
-        this.methodName = currentCallInfo.get().methodName;
-        this.setupTime = Time.now();
-      }
-
-      @Override
-      public void setResponse(Message message) {
-        long processingTime = Time.now() - setupTime;
-        call.setDeferredResponse(RpcWritable.wrap(message));
-        server.updateDeferredMetrics(methodName, processingTime);
-      }
-
-      @Override
-      public void error(Throwable t) {
-        long processingTime = Time.now() - setupTime;
-        String detailedMetricsName = t.getClass().getSimpleName();
-        server.updateDeferredMetrics(detailedMetricsName, processingTime);
-        call.setDeferredError(t);
-      }
-    }
-
-    public static ProtobufRpcEngineCallback registerForDeferredResponse() {
-      ProtobufRpcEngineCallback callback = new ProtobufRpcEngineCallbackImpl();
-      currentCallback.set(callback);
-      return callback;
     }
 
     /**
@@ -526,13 +486,6 @@ public class ProtobufRpcEngine implements RpcEngine {
           currentCallInfo.set(new CallInfo(server, methodName));
           currentCall.setDetailedMetricsName(methodName);
           result = service.callBlockingMethod(methodDescriptor, null, param);
-          // Check if this needs to be a deferred response,
-          // by checking the ThreadLocal callback being set
-          if (currentCallback.get() != null) {
-            currentCall.deferResponse();
-            currentCallback.set(null);
-            return null;
-          }
         } catch (ServiceException e) {
           Exception exception = (Exception) e.getCause();
           currentCall.setDetailedMetricsName(
