@@ -1250,6 +1250,25 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testHeadObjectReturnsTaggingCount() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("obj"));
+
+    List<Tag> tags = Arrays.asList(
+        Tag.builder().key("tag1").value("v1").build(),
+        Tag.builder().key("tag2").value("v2").build());
+
+    s3Client.putObjectTagging(b -> b.bucket(bucketName).key(keyName)
+        .tagging(Tagging.builder().tagSet(tags).build()));
+
+    HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertNotNull(head.tagCount());
+    assertEquals(tags.size(), head.tagCount().intValue());
+  }
+
+  @Test
   public void testResumableDownloadWithEtagMismatch() throws Exception {
     // Arrange
     final String bucketName = getBucketName("resumable");

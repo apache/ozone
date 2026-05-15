@@ -35,6 +35,7 @@ import com.amazonaws.AmazonServiceException;
 import com.amazonaws.AmazonServiceException.ErrorType;
 import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.Headers;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.Bucket;
@@ -70,6 +71,7 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.model.SetObjectAclRequest;
+import com.amazonaws.services.s3.model.SetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.Tag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
@@ -1099,6 +1101,28 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       }
       assertEquals(content, bos.toString("UTF-8"));
     }
+  }
+
+  @Test
+  public void testHeadObjectReturnsTaggingCount() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "head-object-tag-count";
+    s3Client.createBucket(bucketName);
+
+    s3Client.putObject(bucketName, keyName,
+        new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)), new ObjectMetadata());
+
+    List<Tag> tags = Arrays.asList(new Tag("tag1", "v1"), new Tag("tag2", "v2"));
+    s3Client.setObjectTagging(
+        new SetObjectTaggingRequest(bucketName, keyName, new ObjectTagging(tags)));
+
+    ObjectMetadata head = s3Client.getObjectMetadata(bucketName, keyName);
+    // AWS SDK v1: getTaggingCount() exists on S3Object (GET), not on ObjectMetadata (HEAD).
+    // x-amz-tagging-count is exposed via raw metadata.
+    Object tagCountHeader = head.getRawMetadataValue(Headers.S3_TAGGING_COUNT);
+    assertNotNull(tagCountHeader);
+    assertEquals(tags.size(), Integer.parseInt(tagCountHeader.toString()));
   }
 
   @Test
