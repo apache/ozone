@@ -120,6 +120,7 @@ import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectTaggingRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectTaggingResponse;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -241,6 +242,28 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     assertEquals(content, objectBytes.asUtf8String());
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @Test
+  public void testGetObjectTaggingReturnsTagsSortedByKey() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.empty());
+
+    List<Tag> tagsPutOrder = Arrays.asList(
+        Tag.builder().key("key2").value("val2").build(),
+        Tag.builder().key("key").value("val").build());
+    s3Client.putObjectTagging(b -> b.bucket(bucketName).key(keyName)
+        .tagging(Tagging.builder().tagSet(tagsPutOrder).build()));
+
+    GetObjectTaggingResponse taggingResult = s3Client.getObjectTagging(b -> b.bucket(bucketName).key(keyName));
+    List<Tag> tagSet = taggingResult.tagSet();
+    assertEquals(2, tagSet.size());
+    assertEquals("key", tagSet.get(0).key());
+    assertEquals("val", tagSet.get(0).value());
+    assertEquals("key2", tagSet.get(1).key());
+    assertEquals("val2", tagSet.get(1).value());
   }
 
   @Test

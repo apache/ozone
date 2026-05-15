@@ -46,6 +46,8 @@ import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingResult;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -70,6 +72,7 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.model.SetObjectAclRequest;
+import com.amazonaws.services.s3.model.SetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.Tag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
@@ -1099,6 +1102,27 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       }
       assertEquals(content, bos.toString("UTF-8"));
     }
+  }
+
+  @Test
+  public void testGetObjectTaggingReturnsTagsSortedByKey() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "");
+
+    List<Tag> tagsPutOrder = Arrays.asList(new Tag("key2", "val2"), new Tag("key", "val"));
+    s3Client.setObjectTagging(
+        new SetObjectTaggingRequest(bucketName, keyName, new ObjectTagging(tagsPutOrder)));
+
+    GetObjectTaggingResult taggingResult =
+        s3Client.getObjectTagging(new GetObjectTaggingRequest(bucketName, keyName));
+    List<Tag> tagSet = taggingResult.getTagSet();
+    assertEquals(2, tagSet.size());
+    assertEquals("key", tagSet.get(0).getKey());
+    assertEquals("val", tagSet.get(0).getValue());
+    assertEquals("key2", tagSet.get(1).getKey());
+    assertEquals("val2", tagSet.get(1).getValue());
   }
 
   @Test
