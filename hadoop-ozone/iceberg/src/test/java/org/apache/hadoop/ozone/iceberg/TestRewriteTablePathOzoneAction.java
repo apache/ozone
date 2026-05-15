@@ -37,14 +37,17 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.GenericManifestFile;
 import org.apache.iceberg.GenericPartitionFieldSummary;
 import org.apache.iceberg.GenericStatisticsFile;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.InternalData;
+import org.apache.iceberg.ManifestContent;
 import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.ManifestFiles;
+import org.apache.iceberg.ManifestReader;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.Schema;
@@ -388,7 +391,18 @@ class TestRewriteTablePathOzoneAction {
             .map(Pair::first)
             .findFirst();
         if (manifestStagingPath.isPresent()) {
-          assertManifestDataPathsRewritten(manifestStagingPath.get(), manifest, target);
+          String originalPath = manifest.path().replace(targetPrefix, sourcePrefix);
+          ManifestFile original = Mockito.spy(manifest);
+          Mockito.doReturn(originalPath).when(original).path();
+          
+          ManifestFile staged = Mockito.spy(manifest);
+          Mockito.doReturn(manifestStagingPath.get()).when(staged).path();
+
+          if (manifest.content() == ManifestContent.DATA) {
+            assertDataManifestPathsRewritten(staged, original, target);
+          } else if (manifest.content() == ManifestContent.DELETES) {
+            assertDeleteManifestPathsRewritten(staged, original, target);
+          }
         }
       }
     }
@@ -396,33 +410,49 @@ class TestRewriteTablePathOzoneAction {
         "Rewritten manifest list should reference the same manifest files as the original");
   }
 
-  private void assertManifestDataPathsRewritten(String stagingManifestPath, ManifestFile manifestEntry, 
+  private void assertDataManifestPathsRewritten(ManifestFile staged, ManifestFile original,
       String target) throws IOException {
-    String originalPath = manifestEntry.path().replace(targetPrefix, sourcePrefix);
-    ManifestFile original = Mockito.spy(manifestEntry);
-    Mockito.doReturn(originalPath).when(original).path();
-
     Set<String> expectedFileNames = new HashSet<>();
-    try (CloseableIterable<String> paths = ManifestFiles.readPaths(original, table.io())) {
-      for (String p : paths) {
-        expectedFileNames.add(RewriteTablePathUtil.fileName(p));
+    try (ManifestReader<DataFile> reader = ManifestFiles.read(original, table.io())) {
+      for (DataFile df : reader) {
+        expectedFileNames.add(RewriteTablePathUtil.fileName(df.location()));
       }
     }
 
-    ManifestFile staged = Mockito.spy(manifestEntry);
-    Mockito.doReturn(stagingManifestPath).when(staged).path();
-
     Set<String> actualFileNames = new HashSet<>();
-    try (CloseableIterable<String> dataPaths = ManifestFiles.readPaths(staged, table.io())) {
-      for (String dataPath : dataPaths) {
-        assertTrue(dataPath.startsWith(target),
-            "Data file path inside staged manifest should start with target prefix: " + dataPath);
-        actualFileNames.add(RewriteTablePathUtil.fileName(dataPath));
+    try (ManifestReader<DataFile> reader = ManifestFiles.read(staged, table.io())) {
+      for (DataFile dataPath : reader) {
+        assertTrue(dataPath.location().startsWith(target),
+            "Data file path inside staged data manifest should start with target prefix: " + dataPath);
+        actualFileNames.add(RewriteTablePathUtil.fileName(dataPath.location()));
       }
     }
 
     assertEquals(expectedFileNames, actualFileNames,
-        "Rewritten manifest should reference the same data files as the original");
+        "Rewritten data manifest should reference the same data files as the original");
+  }
+
+  private void assertDeleteManifestPathsRewritten(ManifestFile staged, ManifestFile original, 
+      String target) throws IOException {
+    Set<String> expectedFileNames = new HashSet<>();
+    try (ManifestReader<DeleteFile> reader = ManifestFiles.readDeleteManifest(original, table.io(), table.specs())) {
+      for (DeleteFile df : reader) {
+        expectedFileNames.add(RewriteTablePathUtil.fileName(df.location()));
+      }
+    }
+
+    Set<String> actualFileNames = new HashSet<>();
+    try (ManifestReader<DeleteFile> reader = ManifestFiles.readDeleteManifest(staged, table.io(), table.specs())) {
+      for (DeleteFile df : reader) {
+        assertTrue(df.location().startsWith(target),
+            "Delete file path inside staged delete manifest should start with target prefix: "
+                + df.location());
+        actualFileNames.add(RewriteTablePathUtil.fileName(df.location()));
+      }
+    }
+
+    assertEquals(expectedFileNames, actualFileNames,
+        "Rewritten delete manifest should reference the same delete files (by name) as the original");
   }
 
   private static List<String> metadataLogEntryPaths(Table tbl) {

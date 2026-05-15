@@ -59,6 +59,8 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.util.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An implementation of {@link RewriteTablePath} for Apache Ozone backed Iceberg tables.
@@ -70,6 +72,9 @@ import org.apache.iceberg.util.Pair;
  * and all rewritten files are staged in a temporary directory.</p>
  */
 public class RewriteTablePathOzoneAction implements RewriteTablePath {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RewriteTablePathOzoneAction.class);
 
   private String sourcePrefix;
   private String targetPrefix;
@@ -245,7 +250,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
         rewriteManifestLists(validSnapshots, endMetadata, manifestsToRewrite);
 
     RewriteContentFileResult rewriteManifestResult =
-        rewriteManifests(deltaSnapshots, endMetadata, rewriteManifestListResult.toRewrite());
+        rewriteManifests(deltaSnapshotIds, endMetadata, rewriteManifestListResult.toRewrite());
 
     Set<Pair<String, String>> copyPlan = new HashSet<>();
     copyPlan.addAll(rewriteVersionResult.copyPlan());
@@ -337,6 +342,8 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
               }
 
             } catch (Exception e) {
+              LOG.error("Failed to read manifests for snapshot {} at {}",
+                  snapshotId, manifestListLocation, e);
               throw new RuntimeException(
                   "Failed to read manifests for snapshot " + snapshotId, e);
             } finally {
@@ -478,7 +485,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   }
 
   /** Aggregated result of rewriting content files (data and delete manifests). */
-  public static class RewriteContentFileResult extends RewriteResult<ContentFile<?>> {
+  static class RewriteContentFileResult extends RewriteResult<ContentFile<?>> {
     @Override
     public RewriteContentFileResult append(RewriteResult<ContentFile<?>> r1) {
       this.copyPlan().addAll(r1.copyPlan());
@@ -486,13 +493,13 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
       return this;
     }
 
-    public RewriteContentFileResult appendDataFile(RewriteResult<DataFile> r1) {
+    RewriteContentFileResult appendDataFile(RewriteResult<DataFile> r1) {
       this.copyPlan().addAll(r1.copyPlan());
       this.toRewrite().addAll(r1.toRewrite());
       return this;
     }
 
-    public RewriteContentFileResult appendDeleteFile(RewriteResult<DeleteFile> r1) {
+    RewriteContentFileResult appendDeleteFile(RewriteResult<DeleteFile> r1) {
       this.copyPlan().addAll(r1.copyPlan());
       this.toRewrite().addAll(r1.toRewrite());
       return this;
@@ -500,13 +507,10 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   }
 
   private RewriteContentFileResult rewriteManifests(
-      Set<Snapshot> deltaSnapshots, TableMetadata tableMetadata, Set<ManifestFile> toRewrite) {
+      Set<Long> deltaSnapshotIds, TableMetadata tableMetadata, Set<ManifestFile> toRewrite) {
     if (toRewrite.isEmpty()) {
       return new RewriteContentFileResult();
     }
-
-    Set<Long> deltaSnapshotIds =
-        deltaSnapshots.stream().map(Snapshot::snapshotId).collect(Collectors.toSet());
 
     int maxInFlight = parallelism * MAX_INFLIGHT_MULTIPLIER;
     Semaphore semaphore = new Semaphore(maxInFlight);
@@ -602,6 +606,8 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
               targetPrefix));
       break;
     default:
+      LOG.error("Unsupported manifest type: {} for manifest: {}",
+          manifestFile.content(), manifestFile.path());
       throw new UnsupportedOperationException(
           "Unsupported manifest type: " + manifestFile.content());
     }
@@ -632,6 +638,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
           sourcePrefix,
           targetPrefix);
     } catch (IOException e) {
+      LOG.error("Failed to rewrite data manifest: {}", manifestFile.path(), e);
       throw new RuntimeIOException(e);
     }
   }
@@ -661,6 +668,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
           targetPrefix,
           stagingLocation);
     } catch (IOException e) {
+      LOG.error("Failed to rewrite delete manifest: {}", manifestFile.path(), e);
       throw new RuntimeIOException(e);
     }
   }
