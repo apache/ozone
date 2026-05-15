@@ -283,22 +283,6 @@ public class ProtobufRpcEngine implements RpcEngine {
       return remoteId;
     }
 
-    protected long getClientProtocolVersion() {
-      return clientProtocolVersion;
-    }
-
-    protected String getProtocolName() {
-      return protocolName;
-    }
-  }
-
-  static Client getClient(Configuration conf) {
-    return CLIENTS.getClient(conf, SocketFactory.getDefault(),
-        RpcWritable.Buffer.class);
-  }
-  
-  public static void clearClientCache() {
-    CLIENTS.clearCache();
   }
 
   @Override
@@ -530,6 +514,7 @@ public class ProtobufRpcEngine implements RpcEngine {
     private volatile RequestHeaderProto requestHeader;
     private Message payload;
 
+    @SuppressWarnings("unused") // required for Server#procesRpcRequest
     public RpcProtobufRequest() {
     }
 
