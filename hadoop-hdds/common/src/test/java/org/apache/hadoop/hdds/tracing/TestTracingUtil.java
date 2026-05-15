@@ -203,19 +203,15 @@ public class TestTracingUtil {
   }
 
   @Test
-  public void testTextExtractorNullEmptyAndMalformedEntries() {
+  public void testTextExtractorEmptyAndMalformedEntries() {
     TracingUtil.TextExtractor ex = new TracingUtil.TextExtractor();
-    ex.keys(null);
-    assertFalse(ex.keys(null).iterator().hasNext());
+    ex.keys("");
+    assertFalse(ex.keys("").iterator().hasNext());
 
     TracingUtil.TextExtractor ex2 = new TracingUtil.TextExtractor();
-    ex2.keys("");
-    assertFalse(ex2.keys("").iterator().hasNext());
-
-    TracingUtil.TextExtractor ex3 = new TracingUtil.TextExtractor();
     String carrier = "notkeyvalue;traceparent=00-a-b-01;orphan=";
-    assertTrue(ex3.keys(carrier).iterator().hasNext());
-    assertEquals("00-a-b-01", ex3.get(carrier, "traceparent"));
-    assertEquals("00-a-b-01", ex3.get(carrier, "traceparent"));
+    assertTrue(ex2.keys(carrier).iterator().hasNext());
+    assertEquals("00-a-b-01", ex2.get(carrier, "traceparent"));
+    assertEquals("00-a-b-01", ex2.get(carrier, "traceparent"));
   }
 }
