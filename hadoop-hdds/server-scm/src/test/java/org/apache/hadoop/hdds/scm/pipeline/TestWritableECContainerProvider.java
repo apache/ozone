@@ -196,6 +196,23 @@ public class TestWritableECContainerProvider {
 
   @ParameterizedTest
   @MethodSource("policies")
+  void testPipelinesCreatedBasedOnTotalDiskCountWithFractionalFactor(
+      PipelineChoosePolicy policy) throws IOException {
+    provider = createSubject(policy);
+    double factor = 0.5;
+    providerConf.setMinimumPipelines(1);
+    providerConf.setPipelinePerVolumeFactor(factor);
+    nodeManager.setNumHealthyVolumes(20);
+
+    int volumeCount = nodeManager.totalHealthyVolumeCount();
+    int pipelineLimit =
+        (int) (factor * volumeCount / repConfig.getRequiredNodes());
+    Set<ContainerInfo> allocated = assertDistinctContainers(pipelineLimit);
+    assertReusesExisting(allocated, pipelineLimit);
+  }
+
+  @ParameterizedTest
+  @MethodSource("policies")
   void testPipelinesCreatedUpToMinLimitAndRandomPipelineReturned(
       PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
