@@ -296,6 +296,7 @@ import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
+import org.apache.hadoop.ozone.om.security.ManagedS3AccessKeySecretRetrievalManager;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
@@ -492,6 +493,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
   private final boolean isS3STSEnabled;
+  private final ManagedS3AccessKeyConfig managedS3AccessKeyConfig;
+  private final ManagedS3AccessKeySecretRetrievalManager
+      managedS3AccessKeySecretRetrievalManager;
   private ExitManager exitManager;
 
   private OzoneManagerPrepareState prepareState;
@@ -536,6 +540,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Objects.requireNonNull(conf, "conf == null");
     setConfiguration(conf);
+    this.managedS3AccessKeyConfig = managedS3AccessKeyConfig(conf);
     TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
     TracingReconfigurationCallback tracingReconfigurationCallback =
         TracingReconfigurationCallback.init("OzoneManager", tracingConfig);
@@ -682,6 +687,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Fail to create Key Provider");
     }
     validateManagedS3AccessKeyKmsStartup(conf, kmsProvider);
+    this.managedS3AccessKeySecretRetrievalManager =
+        new ManagedS3AccessKeySecretRetrievalManager(
+            managedS3AccessKeyConfig.getRetrievalHandleTtl(),
+            managedS3AccessKeyConfig.getRetrievalHandleMaxEntries());
     if (secConfig.isSecurityEnabled()) {
       omComponent = OM_DAEMON + "-" + omId;
       HddsProtos.OzoneManagerDetailsProto omInfo =
@@ -1965,6 +1974,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public KeyProviderCryptoExtension getKmsProvider() {
     return kmsProvider;
+  }
+
+  public ManagedS3AccessKeyConfig getManagedS3AccessKeyConfig() {
+    return managedS3AccessKeyConfig;
+  }
+
+  public ManagedS3AccessKeySecretRetrievalManager
+      getManagedS3AccessKeySecretRetrievalManager() {
+    return managedS3AccessKeySecretRetrievalManager;
   }
 
   public PrefixManager getPrefixManager() {

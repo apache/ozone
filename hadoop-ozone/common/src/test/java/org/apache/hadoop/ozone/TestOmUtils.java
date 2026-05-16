@@ -384,4 +384,46 @@ public class TestOmUtils {
       }
     }
   }
+
+  @Test
+  public void testManagedS3AccessKeyReadAndFollowerClassification() {
+    String clientId = UUID.randomUUID().toString();
+
+    assertReadOnlyLeaderOnly(
+        OzoneManagerProtocolProtos.Type.ListManagedS3AccessKeys, clientId);
+    assertReadOnlyLeaderOnly(
+        OzoneManagerProtocolProtos.Type.InfoManagedS3AccessKey, clientId);
+    assertReadOnlyLeaderOnly(
+        OzoneManagerProtocolProtos.Type.RetrieveManagedS3AccessKeySecret,
+        clientId);
+
+    assertWrite(
+        OzoneManagerProtocolProtos.Type.CreateManagedS3AccessKey, clientId);
+    assertWrite(
+        OzoneManagerProtocolProtos.Type.DisableManagedS3AccessKey, clientId);
+    assertWrite(
+        OzoneManagerProtocolProtos.Type.RotateManagedS3AccessKey, clientId);
+    assertWrite(
+        OzoneManagerProtocolProtos.Type.DeleteManagedS3AccessKey, clientId);
+  }
+
+  private static void assertReadOnlyLeaderOnly(
+      OzoneManagerProtocolProtos.Type type, String clientId) {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(type)
+        .setClientId(clientId)
+        .build();
+    assertTrue(OmUtils.isReadOnly(request));
+    assertFalse(OmUtils.shouldSendToFollower(request));
+  }
+
+  private static void assertWrite(
+      OzoneManagerProtocolProtos.Type type, String clientId) {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(type)
+        .setClientId(clientId)
+        .build();
+    assertFalse(OmUtils.isReadOnly(request));
+    assertFalse(OmUtils.shouldSendToFollower(request));
+  }
 }

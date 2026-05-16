@@ -63,6 +63,13 @@ public class OMSetSecretRequest extends OMClientRequest {
 
     final String accessId = request.getAccessId();
 
+    if (omMetadataManager.getS3ManagedAccessKeyTable().get(accessId) !=
+        null) {
+      throw new OMException("accessId '" + accessId +
+          "' already exists as a managed S3 access key",
+          OMException.ResultCodes.MANAGED_S3_ACCESS_KEY_ALREADY_EXISTS);
+    }
+
     // First check accessId existence
     final OmDBAccessIdInfo accessIdInfo = omMetadataManager
         .getTenantAccessIdTable().get(accessId);
@@ -111,6 +118,13 @@ public class OMSetSecretRequest extends OMClientRequest {
     try {
       omClientResponse = ozoneManager.getS3SecretManager()
           .doUnderLock(accessId, s3SecretManager -> {
+
+            if (ozoneManager.getMetadataManager()
+                .getS3ManagedAccessKeyTable().get(accessId) != null) {
+              throw new OMException("accessId '" + accessId +
+                  "' already exists as a managed S3 access key",
+                  OMException.ResultCodes.MANAGED_S3_ACCESS_KEY_ALREADY_EXISTS);
+            }
 
             // Update legacy S3SecretTable, if the accessId entry exists
             if (!s3SecretManager.hasS3Secret(accessId)) {

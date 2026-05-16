@@ -39,6 +39,8 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -218,7 +220,7 @@ public class ProtobufRpcEngine implements RpcEngine {
       if (LOG.isTraceEnabled()) {
         LOG.trace(Thread.currentThread().getId() + ": Call -> " +
             remoteId + ": " + method.getName() +
-            " {" + TextFormat.shortDebugString((Message) args[1]) + "}");
+            " {" + safeShortDebugString((Message) args[1]) + "}");
       }
 
 
@@ -285,7 +287,7 @@ public class ProtobufRpcEngine implements RpcEngine {
         if (LOG.isTraceEnabled()) {
           LOG.trace(Thread.currentThread().getId() + ": Response <- " +
               remoteId + ": " + method.getName() +
-                " {" + TextFormat.shortDebugString(returnMessage) + "}");
+                " {" + safeShortDebugString(returnMessage) + "}");
         }
 
       } catch (Throwable e) {
@@ -313,6 +315,69 @@ public class ProtobufRpcEngine implements RpcEngine {
       Message prototype = (Message) newInstMethod.invoke(null, (Object[]) null);
       returnTypes.put(method.getName(), prototype);
       return prototype;
+    }
+
+    private static String safeShortDebugString(Message message) {
+      return TextFormat.shortDebugString(redactSensitiveFields(message));
+    }
+
+    private static Message redactSensitiveFields(Message message) {
+      Message.Builder builder = message.toBuilder();
+      for (Descriptors.FieldDescriptor field :
+          message.getDescriptorForType().getFields()) {
+        if (!field.isRepeated() && !builder.hasField(field)) {
+          continue;
+        }
+        if (field.isRepeated() &&
+            ((List<?>) builder.getField(field)).isEmpty()) {
+          continue;
+        }
+        if (isSensitiveField(field)) {
+          redactField(builder, field);
+        } else if (field.getJavaType() ==
+            Descriptors.FieldDescriptor.JavaType.MESSAGE) {
+          redactNestedMessageField(builder, field);
+        }
+      }
+      return builder.build();
+    }
+
+    private static boolean isSensitiveField(
+        Descriptors.FieldDescriptor field) {
+      String name = field.getName().toLowerCase();
+      return name.equals("customsecret") ||
+          name.equals("plaintextsecret") ||
+          name.equals("retrievalhandle") ||
+          name.equals("encryptedsecretkey") ||
+          name.equals("policydocument");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void redactNestedMessageField(Message.Builder builder,
+        Descriptors.FieldDescriptor field) {
+      if (field.isRepeated()) {
+        List<Message> redacted = new ArrayList<Message>();
+        for (Message nested : (List<Message>) builder.getField(field)) {
+          redacted.add(redactSensitiveFields(nested));
+        }
+        builder.setField(field, redacted);
+      } else if (builder.hasField(field)) {
+        builder.setField(field,
+            redactSensitiveFields((Message) builder.getField(field)));
+      }
+    }
+
+    private static void redactField(Message.Builder builder,
+        Descriptors.FieldDescriptor field) {
+      if (field.getJavaType() ==
+          Descriptors.FieldDescriptor.JavaType.BYTE_STRING) {
+        builder.setField(field, ByteString.copyFromUtf8("<redacted>"));
+      } else if (field.getJavaType() ==
+          Descriptors.FieldDescriptor.JavaType.STRING) {
+        builder.setField(field, "<redacted>");
+      } else {
+        builder.clearField(field);
+      }
     }
 
     @Override //RpcInvocationHandler

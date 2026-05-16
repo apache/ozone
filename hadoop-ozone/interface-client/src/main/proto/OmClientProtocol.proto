@@ -160,6 +160,13 @@ enum Type {
   AssumeRole = 144;
   RevokeSTSToken = 145;
   DeleteRevokedSTSTokens = 146;
+  CreateManagedS3AccessKey = 147;
+  ListManagedS3AccessKeys = 148;
+  InfoManagedS3AccessKey = 149;
+  DisableManagedS3AccessKey = 150;
+  RotateManagedS3AccessKey = 151;
+  DeleteManagedS3AccessKey = 152;
+  RetrieveManagedS3AccessKeySecret = 153;
 }
 
 enum SafeMode {
@@ -315,6 +322,15 @@ message OMRequest {
   optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 146;
   optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 147;
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 148;
+  optional CreateManagedS3AccessKeyRequest  createManagedS3AccessKeyRequest = 149;
+  optional UpdateCreateManagedS3AccessKeyRequest updateCreateManagedS3AccessKeyRequest = 150;
+  optional ListManagedS3AccessKeysRequest   listManagedS3AccessKeysRequest = 151;
+  optional InfoManagedS3AccessKeyRequest    infoManagedS3AccessKeyRequest  = 152;
+  optional DisableManagedS3AccessKeyRequest disableManagedS3AccessKeyRequest = 153;
+  optional RotateManagedS3AccessKeyRequest  rotateManagedS3AccessKeyRequest = 154;
+  optional UpdateRotateManagedS3AccessKeyRequest updateRotateManagedS3AccessKeyRequest = 155;
+  optional DeleteManagedS3AccessKeyRequest  deleteManagedS3AccessKeyRequest = 156;
+  optional RetrieveManagedS3AccessKeySecretRequest retrieveManagedS3AccessKeySecretRequest = 157;
 }
 
 message OMResponse {
@@ -452,6 +468,13 @@ message OMResponse {
   optional AssumeRoleResponse                assumeRoleResponse             = 144;
   optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 145;
   optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 146;
+  optional CreateManagedS3AccessKeyResponse  createManagedS3AccessKeyResponse = 147;
+  optional ListManagedS3AccessKeysResponse   listManagedS3AccessKeysResponse = 148;
+  optional InfoManagedS3AccessKeyResponse    infoManagedS3AccessKeyResponse = 149;
+  optional DisableManagedS3AccessKeyResponse disableManagedS3AccessKeyResponse = 150;
+  optional RotateManagedS3AccessKeyResponse  rotateManagedS3AccessKeyResponse = 151;
+  optional DeleteManagedS3AccessKeyResponse  deleteManagedS3AccessKeyResponse = 152;
+  optional RetrieveManagedS3AccessKeySecretResponse retrieveManagedS3AccessKeySecretResponse = 153;
 }
 
 enum Status {
@@ -589,6 +612,12 @@ enum Status {
     ATOMIC_WRITE_CONFLICT = 101;
     REVOKED_TOKEN = 102;
     MALFORMED_POLICY_DOCUMENT = 103;
+    MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE = 104;
+    MANAGED_S3_ACCESS_KEY_ALREADY_EXISTS = 105;
+    MANAGED_S3_ACCESS_KEY_NOT_FOUND = 106;
+    MANAGED_S3_ACCESS_KEY_DISABLED = 107;
+    MANAGED_S3_ACCESS_KEY_EXPIRED = 108;
+    MANAGED_S3_ACCESS_KEY_OPERATION_NOT_SUPPORTED = 109;
 }
 
 /**
@@ -1938,6 +1967,115 @@ message S3ManagedAccessKeyInfoProto {
     optional bool disabled = 9 [default = false];
     optional string createdBy = 10;
     optional string policyDocument = 11;
+}
+
+message ManagedS3AccessKeyMetadataProto {
+    optional string accessKeyId = 1;
+    optional string secretKeyId = 2;
+    optional string effectiveUser = 3;
+    repeated string groups = 4;
+    optional string description = 5;
+    optional uint64 createdAt = 6;
+    optional uint64 expiresAt = 7;
+    optional bool disabled = 8 [default = false];
+    optional string createdBy = 9;
+    optional string policySha256 = 10;
+}
+
+message ManagedS3AccessKeySecretEnvelope {
+    required uint32 envelopeVersion = 1;
+    required string algorithm = 2;
+    optional string keyProviderId = 3;
+    required string keyName = 4;
+    required string keyVersionName = 5;
+    required bytes encryptedDataKey = 6;
+    optional bytes edekIv = 7;
+    required bytes dataIv = 8;
+    required bytes ciphertext = 9;
+    optional bytes authTag = 10;
+    required uint32 aadContextVersion = 11;
+    optional uint64 createdAt = 12;
+    repeated hadoop.hdds.KeyValue providerMetadata = 13;
+}
+
+message CreateManagedS3AccessKeyRequest {
+    optional string accessKeyId = 1;
+    required string effectiveUser = 2;
+    optional string description = 3;
+    optional uint64 expiresAt = 4;
+    optional string policyDocument = 5;
+    optional string customSecret = 6;
+}
+
+message CreateManagedS3AccessKeyResponse {
+    required ManagedS3AccessKeyMetadataProto metadata = 1;
+    required string retrievalHandle = 2;
+}
+
+message UpdateCreateManagedS3AccessKeyRequest {
+    required S3ManagedAccessKeyInfoProto info = 1;
+}
+
+message ListManagedS3AccessKeysRequest {
+    optional string prefix = 1;
+    optional string startAccessKeyId = 2;
+    optional uint32 maxKeys = 3;
+}
+
+message ListManagedS3AccessKeysResponse {
+    repeated ManagedS3AccessKeyMetadataProto metadata = 1;
+    optional bool isTruncated = 2 [default = false];
+}
+
+message InfoManagedS3AccessKeyRequest {
+    required string accessKeyId = 1;
+}
+
+message InfoManagedS3AccessKeyResponse {
+    required ManagedS3AccessKeyMetadataProto metadata = 1;
+}
+
+message DisableManagedS3AccessKeyRequest {
+    required string accessKeyId = 1;
+}
+
+message DisableManagedS3AccessKeyResponse {
+    required ManagedS3AccessKeyMetadataProto metadata = 1;
+}
+
+message RotateManagedS3AccessKeyRequest {
+    required string accessKeyId = 1;
+    optional uint64 expiresAt = 2;
+    optional string customSecret = 3;
+}
+
+message RotateManagedS3AccessKeyResponse {
+    required ManagedS3AccessKeyMetadataProto metadata = 1;
+    required string retrievalHandle = 2;
+}
+
+message UpdateRotateManagedS3AccessKeyRequest {
+    required S3ManagedAccessKeyInfoProto info = 1;
+    required string expectedPreviousSecretKeyId = 2;
+    required bytes expectedPreviousEncryptedSecretKeySha256 = 3;
+}
+
+message DeleteManagedS3AccessKeyRequest {
+    required string accessKeyId = 1;
+}
+
+message DeleteManagedS3AccessKeyResponse {
+    required string accessKeyId = 1;
+}
+
+message RetrieveManagedS3AccessKeySecretRequest {
+    required string accessKeyId = 1;
+    required string retrievalHandle = 2;
+}
+
+message RetrieveManagedS3AccessKeySecretResponse {
+    required string accessKeyId = 1;
+    required string plaintextSecret = 2;
 }
 
 message GetS3SecretRequest {

@@ -66,7 +66,11 @@ import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.CreateManagedS3AccessKeyRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.DeleteManagedS3AccessKeyRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.DisableManagedS3AccessKeyRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.RotateManagedS3AccessKeyRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3AssumeRoleRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
@@ -200,6 +204,20 @@ public final class OzoneManagerRatisUtils {
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
+    case CreateManagedS3AccessKey:
+      if (omRequest.hasUpdateCreateManagedS3AccessKeyRequest()) {
+        return new CreateManagedS3AccessKeyRequest.Update(omRequest);
+      }
+      return new CreateManagedS3AccessKeyRequest(omRequest);
+    case RotateManagedS3AccessKey:
+      if (omRequest.hasUpdateRotateManagedS3AccessKeyRequest()) {
+        return new RotateManagedS3AccessKeyRequest.Update(omRequest);
+      }
+      return new RotateManagedS3AccessKeyRequest(omRequest);
+    case DisableManagedS3AccessKey:
+      return new DisableManagedS3AccessKeyRequest(omRequest);
+    case DeleteManagedS3AccessKey:
+      return new DeleteManagedS3AccessKeyRequest(omRequest);
     case AssumeRole:
       ozoneManager.checkS3STSEnabled();
       return new S3AssumeRoleRequest(omRequest, CLOCK);

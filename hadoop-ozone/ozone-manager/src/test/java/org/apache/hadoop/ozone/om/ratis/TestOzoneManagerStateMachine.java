@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.security.ManagedS3AccessKeySecretRetrievalManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -751,6 +752,26 @@ public class TestOzoneManagerStateMachine {
     // Different node is leader → should NOT warm up cache
     verify(om, never()).initializeEdekCache(any());
     verify(om).omHAMetricsInit("om2");
+  }
+
+  @Test
+  public void testNotifyLeaderChangedClearsManagedS3SecretHandles() {
+    ManagedS3AccessKeySecretRetrievalManager retrievalManager =
+        mock(ManagedS3AccessKeySecretRetrievalManager.class);
+    when(om.getManagedS3AccessKeySecretRetrievalManager())
+        .thenReturn(retrievalManager);
+    when(om.buildAuditMessageForSuccess(any(), any()))
+        .thenReturn(dummyAuditMessage());
+
+    RaftPeerId localPeerId = RaftPeerId.valueOf("om1");
+    RaftPeerId leaderPeerId = RaftPeerId.valueOf("om2");
+    RaftGroupId groupId = RaftGroupId.randomId();
+    RaftGroupMemberId memberId = RaftGroupMemberId.valueOf(localPeerId,
+        groupId);
+
+    sm.notifyLeaderChanged(memberId, leaderPeerId);
+
+    verify(retrievalManager).clear();
   }
 
   @Test

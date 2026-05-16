@@ -269,32 +269,36 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
       final S3SecretValue s3SecretValue = S3SecretValue.of(accessId, awsSecret, transactionLogIndex);
 
-      // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
           .setTenantId(tenantId)
           .setUserPrincipal(userPrincipal)
           .setIsAdmin(false)
           .setIsDelegatedAdmin(false)
           .build();
-      omMetadataManager.getTenantAccessIdTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          CacheValue.get(transactionLogIndex, omDBAccessIdInfo));
 
-      // Add to principalToAccessIdsTable
+      final OmDBUserPrincipalInfo updatedPrincipalInfo;
       if (principalInfo == null) {
-        principalInfo = new OmDBUserPrincipalInfo.Builder()
+        updatedPrincipalInfo = new OmDBUserPrincipalInfo.Builder()
             .setAccessIds(new TreeSet<>(Collections.singleton(accessId)))
             .build();
       } else {
-        principalInfo.addAccessId(accessId);
+        updatedPrincipalInfo = new OmDBUserPrincipalInfo.Builder()
+            .setAccessIds(new TreeSet<>(principalInfo.getAccessIds()))
+            .build();
+        updatedPrincipalInfo.addAccessId(accessId);
       }
-      omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
-          new CacheKey<>(userPrincipal),
-          CacheValue.get(transactionLogIndex, principalInfo));
 
       // Expect accessId absence from S3SecretTable
       ozoneManager.getS3SecretManager()
           .doUnderLock(accessId, s3SecretManager -> {
+            if (omMetadataManager.getS3ManagedAccessKeyTable()
+                .get(accessId) != null) {
+              LOG.error("accessId '{}' already exists as a managed S3 " +
+                  "access key", accessId);
+              throw new OMException("accessId '" + accessId +
+                  "' already exists as a managed S3 access key",
+                  ResultCodes.MANAGED_S3_ACCESS_KEY_ALREADY_EXISTS);
+            }
             if (s3SecretManager.hasS3Secret(accessId)) {
               LOG.error("accessId '{}' already exists in S3SecretTable",
                   accessId);
@@ -302,6 +306,16 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
                   "' already exists in S3SecretTable",
                   ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
             }
+
+            // Add to tenantAccessIdTable
+            omMetadataManager.getTenantAccessIdTable().addCacheEntry(
+                new CacheKey<>(accessId),
+                CacheValue.get(transactionLogIndex, omDBAccessIdInfo));
+
+            // Add to principalToAccessIdsTable
+            omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
+                new CacheKey<>(userPrincipal),
+                CacheValue.get(transactionLogIndex, updatedPrincipalInfo));
 
             s3SecretManager
                 .updateCache(accessId, s3SecretValue);
@@ -320,7 +334,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
               .build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(
           omResponse.build(), s3SecretValue, userPrincipal,
-          accessId, omDBAccessIdInfo, principalInfo,
+          accessId, omDBAccessIdInfo, updatedPrincipalInfo,
           ozoneManager.getS3SecretManager());
     } catch (IOException | InvalidPathException ex) {
       exception = ex;

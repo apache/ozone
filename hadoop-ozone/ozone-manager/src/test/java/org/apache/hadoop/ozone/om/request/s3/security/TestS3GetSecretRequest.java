@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -34,9 +35,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -59,6 +62,7 @@ import org.apache.hadoop.ozone.om.TenantOp;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
+import org.apache.hadoop.ozone.om.helpers.S3ManagedAccessKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
@@ -538,8 +542,57 @@ public class TestS3GetSecretRequest {
        the entry is already inserted to DB in the previous request.
        The entry will get overwritten if it isn't null.
        See {@link S3GetSecretResponse#addToDBBatch}.
-     */
+    */
     assertNull(s3GetSecretResponse.getS3SecretValue());
+  }
+
+  @Test
+  public void testTenantAssignRejectsManagedAccessKeyCollisionWithoutMutation()
+      throws IOException {
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+    when(omMultiTenantManager.isTenantAdmin(ugiAlice, TENANT_ID, false))
+        .thenReturn(true);
+
+    final OMLayoutVersionManager lvm =
+        new OMLayoutVersionManager(OMLayoutVersionManager.maxLayoutVersion());
+    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+
+    OMTenantCreateRequest omTenantCreateRequest =
+        new OMTenantCreateRequest(
+            new OMTenantCreateRequest(
+                createTenantRequest(TENANT_ID)
+            ).preExecute(ozoneManager)
+        );
+    OMClientResponse createResponse =
+        omTenantCreateRequest.validateAndUpdateCache(ozoneManager, 1L);
+    assertTrue(createResponse.getOMResponse().getSuccess());
+
+    omMetadataManager.getS3ManagedAccessKeyTable().put(ACCESS_ID_BOB,
+        managedAccessKeyInfo(ACCESS_ID_BOB));
+
+    when(omMultiTenantManager.getTenantVolumeName(TENANT_ID))
+        .thenReturn(TENANT_ID);
+
+    OMTenantAssignUserAccessIdRequest assignRequest =
+        new OMTenantAssignUserAccessIdRequest(
+            new OMTenantAssignUserAccessIdRequest(
+                assignUserToTenantRequest(TENANT_ID,
+                    USER_BOB_SHORT, ACCESS_ID_BOB)
+            ).preExecute(ozoneManager)
+        );
+
+    OMClientResponse assignResponse =
+        assignRequest.validateAndUpdateCache(ozoneManager, 2L);
+
+    assertFalse(assignResponse.getOMResponse().getSuccess());
+    assertEquals(OzoneManagerProtocolProtos.Status
+            .MANAGED_S3_ACCESS_KEY_ALREADY_EXISTS,
+        assignResponse.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getTenantAccessIdTable()
+        .get(ACCESS_ID_BOB));
+    assertNull(omMetadataManager.getPrincipalToAccessIdsTable()
+        .get(USER_BOB_SHORT));
+    assertNull(ozoneManager.getS3SecretManager().getSecret(ACCESS_ID_BOB));
   }
 
   private S3Secret processSuccessSecretRequest(
@@ -597,5 +650,21 @@ public class TestS3GetSecretRequest {
 
     fail("Should have thrown OMException because alice should not " +
         "have the permission to get bob's secret in this test case!");
+  }
+
+  private S3ManagedAccessKeyInfo managedAccessKeyInfo(String accessId) {
+    return S3ManagedAccessKeyInfo.newBuilder()
+        .setAccessKeyId(accessId)
+        .setEncryptedSecretKey(ByteString.copyFromUtf8("encrypted-envelope"))
+        .setSecretKeyId("kms-key@0")
+        .setEffectiveUser(USER_BOB_SHORT)
+        .setGroups(Collections.singletonList("group1"))
+        .setDescription("managed key")
+        .setCreatedAt(1L)
+        .setExpiresAt(0L)
+        .setDisabled(false)
+        .setCreatedBy(USER_ALICE)
+        .setPolicyDocument("")
+        .build();
   }
 }

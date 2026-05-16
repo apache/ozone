@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.google.protobuf.ByteString;
 import java.io.ByteArrayOutputStream;
@@ -29,8 +30,22 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ChecksumTypeProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateManagedS3AccessKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateManagedS3AccessKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MD5MD5Crc32FileChecksumProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ManagedS3AccessKeyMetadataProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetrieveManagedS3AccessKeySecretRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetrieveManagedS3AccessKeySecretResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RotateManagedS3AccessKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ManagedAccessKeyInfoProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateCreateManagedS3AccessKeyRequest;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -91,5 +106,115 @@ public final class TestOMPBHelper {
     System.out.println("computed: " + StringUtils.bytes2Hex(computed.asReadOnlyByteBuffer()));
     assertEquals(MD5Hash.MD5_LEN, computed.size());
     assertEquals(md5.substring(0, MD5Hash.MD5_LEN), computed);
+  }
+
+  @Test
+  void processForDebugRedactsManagedS3AccessKeyCreateRequest() {
+    String debug = OMPBHelper.processForDebug(OMRequest.newBuilder()
+        .setCmdType(Type.CreateManagedS3AccessKey)
+        .setClientId("client")
+        .setCreateManagedS3AccessKeyRequest(
+            CreateManagedS3AccessKeyRequest.newBuilder()
+                .setEffectiveUser("user")
+                .setCustomSecret("custom-secret-sentinel")
+                .setPolicyDocument("policy-sentinel"))
+        .build());
+
+    assertFalse(debug.contains("custom-secret-sentinel"));
+    assertFalse(debug.contains("policy-sentinel"));
+  }
+
+  @Test
+  void processForDebugRedactsManagedS3AccessKeyUpdateRequest() {
+    String debug = OMPBHelper.processForDebug(OMRequest.newBuilder()
+        .setCmdType(Type.CreateManagedS3AccessKey)
+        .setClientId("client")
+        .setUpdateCreateManagedS3AccessKeyRequest(
+            UpdateCreateManagedS3AccessKeyRequest.newBuilder()
+                .setInfo(S3ManagedAccessKeyInfoProto.newBuilder()
+                    .setAccessKeyId("access-key")
+                    .setEncryptedSecretKey(
+                        ByteString.copyFromUtf8("envelope-sentinel"))
+                    .setPolicyDocument("policy-sentinel")))
+        .build());
+
+    assertFalse(debug.contains("envelope-sentinel"));
+    assertFalse(debug.contains("policy-sentinel"));
+  }
+
+  @Test
+  void processForDebugRedactsManagedS3AccessKeyRotateRequest() {
+    String debug = OMPBHelper.processForDebug(OMRequest.newBuilder()
+        .setCmdType(Type.RotateManagedS3AccessKey)
+        .setClientId("client")
+        .setRotateManagedS3AccessKeyRequest(
+            RotateManagedS3AccessKeyRequest.newBuilder()
+                .setAccessKeyId("access-key")
+                .setCustomSecret("rotate-secret-sentinel"))
+        .build());
+
+    assertFalse(debug.contains("rotate-secret-sentinel"));
+  }
+
+  @Test
+  void processForDebugRedactsManagedS3AccessKeyRetrieveRequest() {
+    String debug = OMPBHelper.processForDebug(OMRequest.newBuilder()
+        .setCmdType(Type.RetrieveManagedS3AccessKeySecret)
+        .setClientId("client")
+        .setRetrieveManagedS3AccessKeySecretRequest(
+            RetrieveManagedS3AccessKeySecretRequest.newBuilder()
+                .setAccessKeyId("access-key")
+                .setRetrievalHandle("handle-sentinel"))
+        .build());
+
+    assertFalse(debug.contains("handle-sentinel"));
+  }
+
+  @Test
+  void processForDebugRedactsManagedS3AccessKeyResponses() {
+    String createDebug = OMPBHelper.processForDebug(OMResponse.newBuilder()
+        .setCmdType(Type.CreateManagedS3AccessKey)
+        .setStatus(Status.OK)
+        .setCreateManagedS3AccessKeyResponse(
+            CreateManagedS3AccessKeyResponse.newBuilder()
+                .setRetrievalHandle("handle-sentinel")
+                .setMetadata(ManagedS3AccessKeyMetadataProto.newBuilder()
+                    .setAccessKeyId("access-key")))
+        .build());
+
+    String retrieveDebug = OMPBHelper.processForDebug(OMResponse.newBuilder()
+        .setCmdType(Type.RetrieveManagedS3AccessKeySecret)
+        .setStatus(Status.OK)
+        .setRetrieveManagedS3AccessKeySecretResponse(
+            RetrieveManagedS3AccessKeySecretResponse.newBuilder()
+                .setAccessKeyId("access-key")
+                .setPlaintextSecret("plaintext-sentinel"))
+        .build());
+
+    assertFalse(createDebug.contains("handle-sentinel"));
+    assertFalse(retrieveDebug.contains("plaintext-sentinel"));
+  }
+
+  @Test
+  void smProtoToStringRedactsManagedS3AccessKeyUpdateRequest() {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateManagedS3AccessKey)
+        .setClientId("client")
+        .setUpdateCreateManagedS3AccessKeyRequest(
+            UpdateCreateManagedS3AccessKeyRequest.newBuilder()
+                .setInfo(S3ManagedAccessKeyInfoProto.newBuilder()
+                    .setAccessKeyId("access-key")
+                    .setEncryptedSecretKey(
+                        ByteString.copyFromUtf8("envelope-sentinel"))
+                    .setPolicyDocument("policy-sentinel")))
+        .build();
+    StateMachineLogEntryProto entry = StateMachineLogEntryProto.newBuilder()
+        .setLogData(OMRatisHelper.convertRequestToByteString(request))
+        .build();
+
+    String debug = OMRatisHelper.smProtoToString(entry);
+
+    assertFalse(debug.contains("envelope-sentinel"));
+    assertFalse(debug.contains("policy-sentinel"));
   }
 }

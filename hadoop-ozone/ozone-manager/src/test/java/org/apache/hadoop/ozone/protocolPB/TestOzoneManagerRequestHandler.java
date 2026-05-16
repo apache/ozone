@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +31,8 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ipc_.ExternalCall;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -43,11 +47,17 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.security.ManagedS3AccessKeySecretRetrievalManager;
+import org.apache.hadoop.ozone.om.security.ManagedS3AccessKeySecretRetrievalManager.Operation;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.security.ManagedS3AccessKeyConfig;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -59,6 +69,11 @@ import org.mockito.Mockito;
  * Test class to test out OzoneManagerRequestHandler.
  */
 public class TestOzoneManagerRequestHandler {
+
+  @AfterEach
+  public void clearRemoteUser() {
+    Server.getCurCall().remove();
+  }
 
   private OzoneManagerRequestHandler getRequestHandler(int limitListKeySize) {
     OmConfig config = OzoneConfiguration.newInstanceOf(OmConfig.class);
@@ -90,6 +105,20 @@ public class TestOzoneManagerRequestHandler {
 
   private OzoneFileStatus getMockedOzoneFileStatus() {
     return new OzoneFileStatus(getMockedOmKeyInfo(), 256, false);
+  }
+
+  private static final class StubCall extends ExternalCall<String> {
+    private final UserGroupInformation ugi;
+
+    StubCall(UserGroupInformation ugi) {
+      super(null);
+      this.ugi = ugi;
+    }
+
+    @Override
+    public UserGroupInformation getRemoteUser() {
+      return ugi;
+    }
   }
 
   /**
@@ -147,6 +176,118 @@ public class TestOzoneManagerRequestHandler {
     default:
       break;
     }
+  }
+
+  @Test
+  public void testRetrieveManagedS3AccessKeySecretSucceedsOnce()
+      throws IOException {
+    OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+    ManagedS3AccessKeySecretRetrievalManager retrievalManager =
+        new ManagedS3AccessKeySecretRetrievalManager(
+            Duration.ofSeconds(60), 10);
+    String handle = retrievalManager.store("alice", "access-key",
+        Operation.CREATE, "secret-sentinel".getBytes(StandardCharsets.UTF_8));
+    ManagedS3AccessKeyConfig config = ManagedS3AccessKeyConfig.newBuilder()
+        .setEnabled(true)
+        .setEncryptionKeyName("key")
+        .build();
+    OMLayoutVersionManager versionManager =
+        Mockito.mock(OMLayoutVersionManager.class);
+    Mockito.when(versionManager.isAllowed(
+        OMLayoutFeature.MANAGED_LOCAL_S3_ACCESS_KEYS)).thenReturn(true);
+    Mockito.when(ozoneManager.getManagedS3AccessKeyConfig())
+        .thenReturn(config);
+    Mockito.when(ozoneManager.getManagedS3AccessKeySecretRetrievalManager())
+        .thenReturn(retrievalManager);
+    Mockito.when(ozoneManager.getVersionManager()).thenReturn(versionManager);
+    Mockito.when(ozoneManager.isAdminAuthorizationEnabled())
+        .thenReturn(false);
+
+    OzoneManagerRequestHandler requestHandler =
+        new OzoneManagerRequestHandler(ozoneManager);
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type
+                .RetrieveManagedS3AccessKeySecret)
+            .setClientId("client")
+            .setUserInfo(OzoneManagerProtocolProtos.UserInfo.newBuilder()
+                .setUserName("alice"))
+            .setRetrieveManagedS3AccessKeySecretRequest(
+                OzoneManagerProtocolProtos
+                    .RetrieveManagedS3AccessKeySecretRequest.newBuilder()
+                    .setAccessKeyId("access-key")
+                    .setRetrievalHandle(handle))
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse response =
+        requestHandler.handleReadRequest(request);
+
+    Assertions.assertTrue(response.getSuccess());
+    Assertions.assertEquals("secret-sentinel",
+        response.getRetrieveManagedS3AccessKeySecretResponse()
+            .getPlaintextSecret());
+
+    OzoneManagerProtocolProtos.OMResponse secondResponse =
+        requestHandler.handleReadRequest(request);
+
+    Assertions.assertFalse(secondResponse.getSuccess());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status
+            .MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE,
+        secondResponse.getStatus());
+    Assertions.assertFalse(
+        secondResponse.hasRetrieveManagedS3AccessKeySecretResponse());
+  }
+
+  @Test
+  public void testManagedS3AccessKeyReadUsesAuthenticatedRemoteUser()
+      throws IOException {
+    OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+    ManagedS3AccessKeySecretRetrievalManager retrievalManager =
+        new ManagedS3AccessKeySecretRetrievalManager(
+            Duration.ofSeconds(60), 10);
+    String handle = retrievalManager.store("om-admin", "access-key",
+        Operation.CREATE, "secret-sentinel".getBytes(StandardCharsets.UTF_8));
+    ManagedS3AccessKeyConfig config = ManagedS3AccessKeyConfig.newBuilder()
+        .setEnabled(true)
+        .setEncryptionKeyName("key")
+        .build();
+    OMLayoutVersionManager versionManager =
+        Mockito.mock(OMLayoutVersionManager.class);
+    Mockito.when(versionManager.isAllowed(
+        OMLayoutFeature.MANAGED_LOCAL_S3_ACCESS_KEYS)).thenReturn(true);
+    Mockito.when(ozoneManager.getManagedS3AccessKeyConfig())
+        .thenReturn(config);
+    Mockito.when(ozoneManager.getManagedS3AccessKeySecretRetrievalManager())
+        .thenReturn(retrievalManager);
+    Mockito.when(ozoneManager.getVersionManager()).thenReturn(versionManager);
+    Mockito.when(ozoneManager.isAdminAuthorizationEnabled())
+        .thenReturn(true);
+    Mockito.when(ozoneManager.isAdmin(Mockito.any())).thenReturn(false);
+    Server.getCurCall().set(new StubCall(
+        UserGroupInformation.createRemoteUser("bob")));
+
+    OzoneManagerRequestHandler requestHandler =
+        new OzoneManagerRequestHandler(ozoneManager);
+    OzoneManagerProtocolProtos.OMRequest request =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type
+                .RetrieveManagedS3AccessKeySecret)
+            .setClientId("client")
+            .setUserInfo(OzoneManagerProtocolProtos.UserInfo.newBuilder()
+                .setUserName("om-admin"))
+            .setRetrieveManagedS3AccessKeySecretRequest(
+                OzoneManagerProtocolProtos
+                    .RetrieveManagedS3AccessKeySecretRequest.newBuilder()
+                    .setAccessKeyId("access-key")
+                    .setRetrievalHandle(handle))
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse response =
+        requestHandler.handleReadRequest(request);
+
+    Assertions.assertFalse(response.getSuccess());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.UNAUTHORIZED,
+        response.getStatus());
   }
 
   @ParameterizedTest

@@ -77,7 +77,16 @@ public class OMExecutionFlow {
     }
 
     // 2. submit request to ratis
-    OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit, isWrite);
+    OMResponse response;
+    try {
+      response = ozoneManager.getOmRatisServer().submitRequest(
+          requestToSubmit, isWrite);
+    } catch (ServiceException ex) {
+      if (omClientRequest != null) {
+        omClientRequest.handleRequestFailure(ozoneManager);
+      }
+      throw ex;
+    }
     if (!response.getSuccess() && omClientRequest != null) {
       omClientRequest.handleRequestFailure(ozoneManager);
     }

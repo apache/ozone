@@ -65,6 +65,7 @@ public final class OMPBHelper {
   private static final Logger LOG = LoggerFactory.getLogger(OMPBHelper.class);
   public static final ByteString REDACTED =
       ByteString.copyFromUtf8("<redacted>");
+  private static final String REDACTED_TEXT = "<redacted>";
 
   private OMPBHelper() {
     // no instances
@@ -368,7 +369,49 @@ public final class OMPBHelper {
   }
 
   public static String processForDebug(OMRequest msg) {
-    return TextFormat.shortDebugString(msg);
+    if (msg == null) {
+      return null;
+    }
+
+    OMRequest.Builder builder = msg.toBuilder();
+
+    if (builder.hasCreateManagedS3AccessKeyRequest()) {
+      OzoneManagerProtocolProtos.CreateManagedS3AccessKeyRequest.Builder
+          request = builder.getCreateManagedS3AccessKeyRequestBuilder();
+      if (request.hasCustomSecret()) {
+        request.setCustomSecret(REDACTED_TEXT);
+      }
+      if (request.hasPolicyDocument()) {
+        request.setPolicyDocument(REDACTED_TEXT);
+      }
+    }
+
+    if (builder.hasUpdateCreateManagedS3AccessKeyRequest()) {
+      redactManagedS3AccessKeyInfo(
+          builder.getUpdateCreateManagedS3AccessKeyRequestBuilder()
+              .getInfoBuilder());
+    }
+
+    if (builder.hasRotateManagedS3AccessKeyRequest()) {
+      OzoneManagerProtocolProtos.RotateManagedS3AccessKeyRequest.Builder
+          request = builder.getRotateManagedS3AccessKeyRequestBuilder();
+      if (request.hasCustomSecret()) {
+        request.setCustomSecret(REDACTED_TEXT);
+      }
+    }
+
+    if (builder.hasUpdateRotateManagedS3AccessKeyRequest()) {
+      redactManagedS3AccessKeyInfo(
+          builder.getUpdateRotateManagedS3AccessKeyRequestBuilder()
+              .getInfoBuilder());
+    }
+
+    if (builder.hasRetrieveManagedS3AccessKeySecretRequest()) {
+      builder.getRetrieveManagedS3AccessKeySecretRequestBuilder()
+          .setRetrievalHandle(REDACTED_TEXT);
+    }
+
+    return TextFormat.shortDebugString(builder);
   }
 
   public static String processForDebug(OMResponse msg) {
@@ -385,6 +428,30 @@ public final class OMPBHelper {
       return TextFormat.shortDebugString(builder);
     }
 
-    return TextFormat.shortDebugString(msg);
+    OMResponse.Builder builder = msg.toBuilder();
+    if (builder.hasCreateManagedS3AccessKeyResponse()) {
+      builder.getCreateManagedS3AccessKeyResponseBuilder()
+          .setRetrievalHandle(REDACTED_TEXT);
+    }
+    if (builder.hasRotateManagedS3AccessKeyResponse()) {
+      builder.getRotateManagedS3AccessKeyResponseBuilder()
+          .setRetrievalHandle(REDACTED_TEXT);
+    }
+    if (builder.hasRetrieveManagedS3AccessKeySecretResponse()) {
+      builder.getRetrieveManagedS3AccessKeySecretResponseBuilder()
+          .setPlaintextSecret(REDACTED_TEXT);
+    }
+
+    return TextFormat.shortDebugString(builder);
+  }
+
+  private static void redactManagedS3AccessKeyInfo(
+      OzoneManagerProtocolProtos.S3ManagedAccessKeyInfoProto.Builder builder) {
+    if (builder.hasEncryptedSecretKey()) {
+      builder.setEncryptedSecretKey(REDACTED);
+    }
+    if (builder.hasPolicyDocument()) {
+      builder.setPolicyDocument(REDACTED_TEXT);
+    }
   }
 }

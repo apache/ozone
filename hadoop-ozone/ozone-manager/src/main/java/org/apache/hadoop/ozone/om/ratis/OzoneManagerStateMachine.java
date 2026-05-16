@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.security.ManagedS3AccessKeySecretRetrievalManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -207,6 +208,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
                                   RaftPeerId newLeaderId) {
+    ManagedS3AccessKeySecretRetrievalManager retrievalManager =
+        ozoneManager.getManagedS3AccessKeySecretRetrievalManager();
+    if (retrievalManager != null) {
+      retrievalManager.clear();
+    }
     RaftPeerId currentPeerId = groupMemberId.getPeerId();
     if (newLeaderId.equals(currentPeerId)) {
       // warmup cache

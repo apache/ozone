@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.protocolPB;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createErrorResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.InfoManagedS3AccessKey;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.ListManagedS3AccessKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RetrieveManagedS3AccessKeySecret;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -190,6 +193,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         }
       }
 
+      if (isManagedS3AccessKeyLeaderOnlyRead(request)) {
+        OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
+        return handler.handleReadRequest(request);
+      }
+
       if (OmUtils.isReadOnly(request)) {
         return submitReadRequestToOM(request);
       }
@@ -212,6 +220,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       OzoneManager.setS3Auth(null);
       OzoneManager.setStsTokenIdentifier(null);
     }
+  }
+
+  private static boolean isManagedS3AccessKeyLeaderOnlyRead(
+      OMRequest request) {
+    return request.getCmdType().equals(RetrieveManagedS3AccessKeySecret) ||
+        request.getCmdType().equals(ListManagedS3AccessKeys) ||
+        request.getCmdType().equals(InfoManagedS3AccessKey);
   }
 
   @VisibleForTesting

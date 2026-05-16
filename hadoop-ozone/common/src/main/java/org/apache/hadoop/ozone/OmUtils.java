@@ -261,6 +261,9 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    case ListManagedS3AccessKeys:
+    case InfoManagedS3AccessKey:
+    case RetrieveManagedS3AccessKeySecret:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -325,6 +328,10 @@ public final class OmUtils {
     case PutObjectTagging:
     case DeleteObjectTagging:
     case DeleteRevokedSTSTokens:
+    case CreateManagedS3AccessKey:
+    case DisableManagedS3AccessKey:
+    case RotateManagedS3AccessKey:
+    case DeleteManagedS3AccessKey:
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -443,6 +450,10 @@ public final class OmUtils {
     case AssumeRole:
     case RevokeSTSToken:
     case DeleteRevokedSTSTokens:
+    case CreateManagedS3AccessKey:
+    case DisableManagedS3AccessKey:
+    case RotateManagedS3AccessKey:
+    case DeleteManagedS3AccessKey:
     case ServiceList: // OM leader should have the most up-to-date OM service list info
     case RangerBGSync: // Ranger Background Sync task is only run on leader
     case SnapshotDiff:
@@ -457,6 +468,12 @@ public final class OmUtils {
     case StartQuotaRepair:
     case GetQuotaRepairStatus:
       // Quota repair lifecycle request should be initiated by the leader
+    case ListManagedS3AccessKeys:
+    case InfoManagedS3AccessKey:
+    case RetrieveManagedS3AccessKeySecret:
+      // Managed access key admin reads are leader-only in v1. Retrieval is
+      // handled by a command-specific direct leader path and must never use
+      // follower or generic linearizable read handling.
     case DBUpdates: // We are currently only interested on the leader DB info
     case UnknownCommand:
       return false;

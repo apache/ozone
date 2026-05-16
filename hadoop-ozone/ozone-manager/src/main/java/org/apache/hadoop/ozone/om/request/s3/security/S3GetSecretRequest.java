@@ -153,6 +153,13 @@ public class S3GetSecretRequest extends OMClientRequest {
             if (s3SecretValue == null) {
               // Not found in S3SecretTable.
               if (createIfNotExist) {
+                if (ozoneManager.getMetadataManager()
+                    .getS3ManagedAccessKeyTable().get(accessId) != null) {
+                  throw new OMException("accessId '" + accessId +
+                      "' already exists as a managed S3 access key",
+                      OMException.ResultCodes
+                          .MANAGED_S3_ACCESS_KEY_ALREADY_EXISTS);
+                }
                 // Add new entry in this case
                 assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), context.getIndex());
                 // Add cache entry first.

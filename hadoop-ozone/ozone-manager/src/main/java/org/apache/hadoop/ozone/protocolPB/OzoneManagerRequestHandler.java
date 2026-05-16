@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MANAGED_LOCAL_S3_ACCESS_KEYS;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
@@ -41,7 +43,9 @@ import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -60,10 +64,17 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRespon
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -84,6 +95,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.S3ManagedAccessKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
@@ -98,6 +110,7 @@ import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.security.ManagedS3AccessKeySecretEnvelopeCodec;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
@@ -117,6 +130,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObje
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoManagedS3AccessKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoManagedS3AccessKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -126,6 +141,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListManagedS3AccessKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListManagedS3AccessKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobRequest;
@@ -148,6 +165,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetrieveManagedS3AccessKeySecretRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetrieveManagedS3AccessKeySecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
@@ -168,6 +187,7 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -190,7 +210,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public OMResponse handleReadRequest(OMRequest request) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Received OMRequest: {}, ", request);
+      LOG.debug("Received OMRequest: {}, ",
+          OMPBHelper.processForDebug(request));
     }
     Type cmdType = request.getCmdType();
     OMResponse.Builder responseBuilder = OmResponseUtil.getOMResponseBuilder(
@@ -366,6 +387,22 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case RefetchSecretKey:
         responseBuilder.setRefetchSecretKeyResponse(refetchSecretKey());
+        break;
+      case ListManagedS3AccessKeys:
+        responseBuilder.setListManagedS3AccessKeysResponse(
+            listManagedS3AccessKeys(
+                request.getListManagedS3AccessKeysRequest(), request));
+        break;
+      case InfoManagedS3AccessKey:
+        responseBuilder.setInfoManagedS3AccessKeyResponse(
+            infoManagedS3AccessKey(
+                request.getInfoManagedS3AccessKeyRequest(), request));
+        break;
+      case RetrieveManagedS3AccessKeySecret:
+        responseBuilder.setRetrieveManagedS3AccessKeySecretResponse(
+            retrieveManagedS3AccessKeySecret(
+                request.getRetrieveManagedS3AccessKeySecretRequest(),
+                request));
         break;
       case SetSafeMode:
         SetSafeModeResponse setSafeModeResponse =
@@ -1090,6 +1127,212 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         RefetchSecretKeyResponse.newBuilder()
             .setId(ProtobufUtils.toProtobuf(uuid)).build();
     return response;
+  }
+
+  private ListManagedS3AccessKeysResponse listManagedS3AccessKeys(
+      ListManagedS3AccessKeysRequest request, OMRequest omRequest)
+      throws IOException {
+    checkManagedS3AccessKeyReadAllowed(omRequest);
+    String prefix = StringUtils.trimToEmpty(request.getPrefix());
+    String startAccessKeyId = StringUtils.trimToEmpty(
+        request.getStartAccessKeyId());
+    int maxKeys = request.hasMaxKeys() && request.getMaxKeys() > 0 ?
+        request.getMaxKeys() : 1000;
+
+    List<org.apache.hadoop.ozone.protocol.proto
+        .OzoneManagerProtocolProtos.ManagedS3AccessKeyMetadataProto>
+        results = new ArrayList<>();
+    boolean truncated = false;
+    try (TableIterator<String, ? extends Table.KeyValue<String,
+        S3ManagedAccessKeyInfo>> iterator =
+             impl.getMetadataManager().getS3ManagedAccessKeyTable()
+                 .iterator(prefix)) {
+      if (StringUtils.isNotEmpty(startAccessKeyId)) {
+        iterator.seek(startAccessKeyId);
+      }
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, S3ManagedAccessKeyInfo> entry =
+            iterator.next();
+        String accessKeyId = entry.getKey();
+        if (StringUtils.isNotEmpty(prefix) &&
+            !accessKeyId.startsWith(prefix)) {
+          break;
+        }
+        if (StringUtils.isNotEmpty(startAccessKeyId) &&
+            accessKeyId.compareTo(startAccessKeyId) <= 0) {
+          continue;
+        }
+        if (results.size() == maxKeys) {
+          truncated = true;
+          break;
+        }
+        results.add(org.apache.hadoop.ozone.om.request.s3.security
+            .ManagedS3AccessKeyRequestHelper.toMetadata(entry.getValue()));
+      }
+    }
+    auditManagedRead(omRequest, OMAction.LIST_MANAGED_S3_ACCESS_KEYS,
+        new HashMap<>(), null);
+    return ListManagedS3AccessKeysResponse.newBuilder()
+        .addAllMetadata(results)
+        .setIsTruncated(truncated)
+        .build();
+  }
+
+  private InfoManagedS3AccessKeyResponse infoManagedS3AccessKey(
+      InfoManagedS3AccessKeyRequest request, OMRequest omRequest)
+      throws IOException {
+    checkManagedS3AccessKeyReadAllowed(omRequest);
+    S3ManagedAccessKeyInfo info = impl.getMetadataManager()
+        .getS3ManagedAccessKeyTable().get(request.getAccessKeyId());
+    if (info == null) {
+      OMException ex = new OMException("Managed S3 access key '" +
+          request.getAccessKeyId() + "' not found",
+          ResultCodes.MANAGED_S3_ACCESS_KEY_NOT_FOUND);
+      auditManagedRead(omRequest, OMAction.INFO_MANAGED_S3_ACCESS_KEY,
+          managedReadAuditMap(request.getAccessKeyId()), ex);
+      throw ex;
+    }
+    auditManagedRead(omRequest, OMAction.INFO_MANAGED_S3_ACCESS_KEY,
+        managedReadAuditMap(request.getAccessKeyId()), null);
+    return InfoManagedS3AccessKeyResponse.newBuilder()
+        .setMetadata(org.apache.hadoop.ozone.om.request.s3.security
+            .ManagedS3AccessKeyRequestHelper.toMetadata(info))
+        .build();
+  }
+
+  private RetrieveManagedS3AccessKeySecretResponse
+      retrieveManagedS3AccessKeySecret(
+      RetrieveManagedS3AccessKeySecretRequest request, OMRequest omRequest)
+      throws IOException {
+    byte[] secret = null;
+    Exception exception = null;
+    Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("accessKeyId", request.getAccessKeyId());
+    auditMap.put("retrievalHandleHash",
+        impl.getManagedS3AccessKeySecretRetrievalManager()
+            .handleHashPrefix(request.getRetrievalHandle()));
+    String caller = null;
+    try {
+      caller = remoteCaller(omRequest);
+      if (!impl.getManagedS3AccessKeyConfig().isEnabled()) {
+        throw new OMException("Managed S3 access keys are disabled",
+            ResultCodes.MANAGED_S3_ACCESS_KEY_OPERATION_NOT_SUPPORTED);
+      }
+      if (!impl.getVersionManager().isAllowed(MANAGED_LOCAL_S3_ACCESS_KEYS)) {
+        throw new OMException("Managed S3 access-key operations are not " +
+            "allowed before layout finalization",
+            ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+      if (impl.isAdminAuthorizationEnabled() &&
+          !impl.isAdmin(UserGroupInformation.createRemoteUser(caller))) {
+        throw new OMException("Only Ozone administrators may retrieve " +
+            "managed S3 access-key secrets", ResultCodes.UNAUTHORIZED);
+      }
+      secret = impl.getManagedS3AccessKeySecretRetrievalManager()
+          .retrieve(caller, request.getAccessKeyId(),
+              request.getRetrievalHandle());
+      return RetrieveManagedS3AccessKeySecretResponse.newBuilder()
+          .setAccessKeyId(request.getAccessKeyId())
+          .setPlaintextSecret(new String(secret, UTF_8))
+          .build();
+    } catch (IOException | RuntimeException ex) {
+      exception = ex;
+      throw ex;
+    } finally {
+      auditRetrieve(omRequest, caller, auditMap, exception);
+      ManagedS3AccessKeySecretEnvelopeCodec.clear(secret);
+    }
+  }
+
+  private String remoteCaller(OMRequest request) throws IOException {
+    UserGroupInformation remoteUser = ProtobufRpcEngine.Server.getRemoteUser();
+    if (remoteUser != null &&
+        StringUtils.isNotBlank(remoteUser.getUserName())) {
+      return remoteUser.getUserName();
+    }
+    if (request.hasUserInfo() &&
+        StringUtils.isNotBlank(request.getUserInfo().getUserName())) {
+      return request.getUserInfo().getUserName();
+    }
+    throw new OMException("Missing request user", ResultCodes.UNAUTHORIZED);
+  }
+
+  private String auditUser(OMRequest request) {
+    try {
+      return remoteCaller(request);
+    } catch (IOException ignored) {
+      return null;
+    }
+  }
+
+  private String auditRemoteAddress(OMRequest request) {
+    InetAddress remoteIp = ProtobufRpcEngine.Server.getRemoteIp();
+    if (remoteIp != null) {
+      return remoteIp.getHostAddress();
+    }
+    return request.hasUserInfo() ? request.getUserInfo()
+        .getRemoteAddress() : null;
+  }
+
+  private void checkManagedS3AccessKeyReadAllowed(OMRequest request)
+      throws IOException {
+    if (!impl.getManagedS3AccessKeyConfig().isEnabled()) {
+      throw new OMException("Managed S3 access keys are disabled",
+          ResultCodes.MANAGED_S3_ACCESS_KEY_OPERATION_NOT_SUPPORTED);
+    }
+    if (!impl.getVersionManager().isAllowed(MANAGED_LOCAL_S3_ACCESS_KEYS)) {
+      throw new OMException("Managed S3 access-key operations are not " +
+          "allowed before layout finalization",
+          ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+    }
+    String caller = remoteCaller(request);
+    if (impl.isAdminAuthorizationEnabled() &&
+        !impl.isAdmin(UserGroupInformation.createRemoteUser(caller))) {
+      throw new OMException("Only Ozone administrators may list or inspect " +
+          "managed S3 access keys", ResultCodes.UNAUTHORIZED);
+    }
+  }
+
+  private Map<String, String> managedReadAuditMap(String accessKeyId) {
+    Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("accessKeyId", accessKeyId);
+    return auditMap;
+  }
+
+  private void auditManagedRead(OMRequest request, OMAction action,
+      Map<String, String> auditMap, Exception exception) {
+    try {
+      AuditMessage message = new AuditMessage.Builder()
+          .setUser(auditUser(request))
+          .atIp(auditRemoteAddress(request))
+          .forOperation(action)
+          .withParams(auditMap)
+          .withResult(exception == null ? AuditEventStatus.SUCCESS :
+              AuditEventStatus.FAILURE)
+          .withException(exception)
+          .build();
+      impl.getAuditLogger().logWrite(message);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to audit managed S3 access-key read", e);
+    }
+  }
+
+  private void auditRetrieve(OMRequest request, String caller,
+      Map<String, String> auditMap, Exception exception) {
+    try {
+      AuditMessage message = new AuditMessage.Builder()
+          .setUser(caller != null ? caller : auditUser(request))
+          .atIp(auditRemoteAddress(request))
+          .forOperation(OMAction.RETRIEVE_MANAGED_S3_ACCESS_KEY_SECRET)
+          .withParams(auditMap)
+          .withResult(exception == null ? AuditEventStatus.SUCCESS :
+              AuditEventStatus.FAILURE)
+          .withException(exception)
+          .build();
+      impl.getAuditLogger().logWrite(message);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to audit managed S3 access-key secret retrieval", e);
+    }
   }
 
   @RequestFeatureValidator(

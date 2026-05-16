@@ -599,6 +599,34 @@
               {
                 "name": "DeleteObjectTagging",
                 "integer": 142
+              },
+              {
+                "name": "CreateManagedS3AccessKey",
+                "integer": 147
+              },
+              {
+                "name": "ListManagedS3AccessKeys",
+                "integer": 148
+              },
+              {
+                "name": "InfoManagedS3AccessKey",
+                "integer": 149
+              },
+              {
+                "name": "DisableManagedS3AccessKey",
+                "integer": 150
+              },
+              {
+                "name": "RotateManagedS3AccessKey",
+                "integer": 151
+              },
+              {
+                "name": "DeleteManagedS3AccessKey",
+                "integer": 152
+              },
+              {
+                "name": "RetrieveManagedS3AccessKeySecret",
+                "integer": 153
               }
             ]
           },
@@ -1005,6 +1033,38 @@
               {
                 "name": "TOO_MANY_SNAPSHOTS",
                 "integer": 98
+              },
+              {
+                "name": "REVOKED_TOKEN",
+                "integer": 102
+              },
+              {
+                "name": "MALFORMED_POLICY_DOCUMENT",
+                "integer": 103
+              },
+              {
+                "name": "MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE",
+                "integer": 104
+              },
+              {
+                "name": "MANAGED_S3_ACCESS_KEY_ALREADY_EXISTS",
+                "integer": 105
+              },
+              {
+                "name": "MANAGED_S3_ACCESS_KEY_NOT_FOUND",
+                "integer": 106
+              },
+              {
+                "name": "MANAGED_S3_ACCESS_KEY_DISABLED",
+                "integer": 107
+              },
+              {
+                "name": "MANAGED_S3_ACCESS_KEY_EXPIRED",
+                "integer": 108
+              },
+              {
+                "name": "MANAGED_S3_ACCESS_KEY_OPERATION_NOT_SUPPORTED",
+                "integer": 109
               }
             ]
           },
@@ -1965,6 +2025,60 @@
                 "name": "SetSnapshotPropertyRequests",
                 "type": "SetSnapshotPropertyRequest",
                 "is_repeated": true
+              },
+              {
+                "id": 149,
+                "name": "createManagedS3AccessKeyRequest",
+                "type": "CreateManagedS3AccessKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 150,
+                "name": "updateCreateManagedS3AccessKeyRequest",
+                "type": "UpdateCreateManagedS3AccessKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 151,
+                "name": "listManagedS3AccessKeysRequest",
+                "type": "ListManagedS3AccessKeysRequest",
+                "optional": true
+              },
+              {
+                "id": 152,
+                "name": "infoManagedS3AccessKeyRequest",
+                "type": "InfoManagedS3AccessKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 153,
+                "name": "disableManagedS3AccessKeyRequest",
+                "type": "DisableManagedS3AccessKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 154,
+                "name": "rotateManagedS3AccessKeyRequest",
+                "type": "RotateManagedS3AccessKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 155,
+                "name": "updateRotateManagedS3AccessKeyRequest",
+                "type": "UpdateRotateManagedS3AccessKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 156,
+                "name": "deleteManagedS3AccessKeyRequest",
+                "type": "DeleteManagedS3AccessKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 157,
+                "name": "retrieveManagedS3AccessKeySecretRequest",
+                "type": "RetrieveManagedS3AccessKeySecretRequest",
+                "optional": true
               }
             ]
           },
@@ -2599,6 +2713,48 @@
                 "id": 142,
                 "name": "deleteObjectTaggingResponse",
                 "type": "DeleteObjectTaggingResponse",
+                "optional": true
+              },
+              {
+                "id": 147,
+                "name": "createManagedS3AccessKeyResponse",
+                "type": "CreateManagedS3AccessKeyResponse",
+                "optional": true
+              },
+              {
+                "id": 148,
+                "name": "listManagedS3AccessKeysResponse",
+                "type": "ListManagedS3AccessKeysResponse",
+                "optional": true
+              },
+              {
+                "id": 149,
+                "name": "infoManagedS3AccessKeyResponse",
+                "type": "InfoManagedS3AccessKeyResponse",
+                "optional": true
+              },
+              {
+                "id": 150,
+                "name": "disableManagedS3AccessKeyResponse",
+                "type": "DisableManagedS3AccessKeyResponse",
+                "optional": true
+              },
+              {
+                "id": 151,
+                "name": "rotateManagedS3AccessKeyResponse",
+                "type": "RotateManagedS3AccessKeyResponse",
+                "optional": true
+              },
+              {
+                "id": 152,
+                "name": "deleteManagedS3AccessKeyResponse",
+                "type": "DeleteManagedS3AccessKeyResponse",
+                "optional": true
+              },
+              {
+                "id": 153,
+                "name": "retrieveManagedS3AccessKeySecretResponse",
+                "type": "RetrieveManagedS3AccessKeySecretResponse",
                 "optional": true
               }
             ]
@@ -6916,6 +7072,438 @@
                 "name": "policyDocument",
                 "type": "string",
                 "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ManagedS3AccessKeyMetadataProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "secretKeyId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "effectiveUser",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "groups",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "description",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "createdAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "expiresAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "disabled",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "name": "createdBy",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "policySha256",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ManagedS3AccessKeySecretEnvelope",
+            "fields": [
+              {
+                "id": 1,
+                "name": "envelopeVersion",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "algorithm",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "keyProviderId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "keyName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "keyVersionName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 6,
+                "name": "encryptedDataKey",
+                "type": "bytes",
+                "required": true
+              },
+              {
+                "id": 7,
+                "name": "edekIv",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "dataIv",
+                "type": "bytes",
+                "required": true
+              },
+              {
+                "id": 9,
+                "name": "ciphertext",
+                "type": "bytes",
+                "required": true
+              },
+              {
+                "id": 10,
+                "name": "authTag",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "aadContextVersion",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 12,
+                "name": "createdAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "providerMetadata",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "CreateManagedS3AccessKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "effectiveUser",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "description",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "expiresAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "policyDocument",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "customSecret",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "CreateManagedS3AccessKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "metadata",
+                "type": "ManagedS3AccessKeyMetadataProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "retrievalHandle",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "UpdateCreateManagedS3AccessKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "info",
+                "type": "S3ManagedAccessKeyInfoProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ListManagedS3AccessKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "prefix",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "startAccessKeyId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "maxKeys",
+                "type": "uint32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListManagedS3AccessKeysResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "metadata",
+                "type": "ManagedS3AccessKeyMetadataProto",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "isTruncated",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "InfoManagedS3AccessKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "InfoManagedS3AccessKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "metadata",
+                "type": "ManagedS3AccessKeyMetadataProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DisableManagedS3AccessKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DisableManagedS3AccessKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "metadata",
+                "type": "ManagedS3AccessKeyMetadataProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "RotateManagedS3AccessKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "expiresAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "customSecret",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RotateManagedS3AccessKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "metadata",
+                "type": "ManagedS3AccessKeyMetadataProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "retrievalHandle",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "UpdateRotateManagedS3AccessKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "info",
+                "type": "S3ManagedAccessKeyInfoProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "expectedPreviousSecretKeyId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "expectedPreviousEncryptedSecretKeySha256",
+                "type": "bytes",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteManagedS3AccessKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteManagedS3AccessKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "RetrieveManagedS3AccessKeySecretRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "retrievalHandle",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "RetrieveManagedS3AccessKeySecretResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "plaintextSecret",
+                "type": "string",
+                "required": true
               }
             ]
           },
