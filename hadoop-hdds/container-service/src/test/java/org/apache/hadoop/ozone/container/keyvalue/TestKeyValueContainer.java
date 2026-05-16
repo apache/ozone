@@ -545,16 +545,16 @@ public class TestKeyValueContainer {
     assertThrows(IOException.class, () -> container.importContainerData(
         new ByteArrayInputStream(new byte[0]), failingPacker));
 
-    assertFalse(new File(container.getContainerData().getContainerPath())
-        .exists());
+    assertThat(new File(container.getContainerData().getContainerPath()))
+        .doesNotExist();
     File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
         container.getContainerData(), container.getContainerData().getVolume())
         .toFile();
-    assertTrue(deletedContainerDir.exists());
-    assertTrue(new File(deletedContainerDir, OzoneConsts.STORAGE_DIR_CHUNKS)
-        .exists());
-    assertTrue(new File(deletedContainerDir, OzoneConsts.CONTAINER_META_PATH)
-        .exists());
+    assertThat(deletedContainerDir).exists();
+    assertThat(new File(deletedContainerDir, OzoneConsts.STORAGE_DIR_CHUNKS))
+        .exists();
+    assertThat(new File(deletedContainerDir, OzoneConsts.CONTAINER_META_PATH))
+        .exists();
   }
 
   private void checkContainerFilesPresent(KeyValueContainerData data,
