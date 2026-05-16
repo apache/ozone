@@ -335,7 +335,6 @@ public class DiskBalancerService extends BackgroundService {
     writeDiskBalancerInfoFile(diskBalancerInfo, path);
   }
 
-  @VisibleForTesting
   static void writeDiskBalancerInfoFile(DiskBalancerInfo diskBalancerInfo,
       File path) throws IOException {
     Path target = path.toPath().toAbsolutePath();
