@@ -451,6 +451,53 @@ public final class OzoneConfigKeys {
       "ozone.security.enabled";
   public static final boolean OZONE_SECURITY_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_S3_ACCESS_KEY_ENABLED =
+      "ozone.s3.accesskey.enabled";
+  public static final boolean OZONE_S3_ACCESS_KEY_ENABLED_DEFAULT = false;
+  public static final String OZONE_S3_ACCESS_KEY_DEFAULT_LIFETIME =
+      "ozone.s3.accesskey.default.lifetime";
+  public static final String OZONE_S3_ACCESS_KEY_DEFAULT_LIFETIME_DEFAULT =
+      "90d";
+  public static final String OZONE_S3_ACCESS_KEY_MAX_LIFETIME =
+      "ozone.s3.accesskey.max.lifetime";
+  public static final String OZONE_S3_ACCESS_KEY_MAX_LIFETIME_DEFAULT =
+      "365d";
+  public static final String OZONE_S3_ACCESS_KEY_ALLOW_CUSTOM_SECRET =
+      "ozone.s3.accesskey.allow.custom.secret";
+  public static final boolean
+      OZONE_S3_ACCESS_KEY_ALLOW_CUSTOM_SECRET_DEFAULT = false;
+  public static final String OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH =
+      "ozone.s3.accesskey.secret.min.length";
+  public static final int OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH_DEFAULT = 32;
+  public static final String
+      OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED =
+      "ozone.s3.accesskey.insecure.cluster.admin.allowed";
+  public static final boolean
+      OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED_DEFAULT = false;
+  public static final String OZONE_S3_ACCESS_KEY_LOCAL_POLICY_ENABLED =
+      "ozone.s3.accesskey.local.policy.enabled";
+  public static final boolean
+      OZONE_S3_ACCESS_KEY_LOCAL_POLICY_ENABLED_DEFAULT = false;
+  public static final String OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_SIZE =
+      "ozone.s3.accesskey.local.policy.max.size";
+  public static final String OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_SIZE_DEFAULT =
+      "128KB";
+  public static final String OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_STATEMENTS =
+      "ozone.s3.accesskey.local.policy.max.statements";
+  public static final int
+      OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_STATEMENTS_DEFAULT = 50;
+  public static final String
+      OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_ACTIONS_PER_STATEMENT =
+      "ozone.s3.accesskey.local.policy.max.actions.per.statement";
+  public static final int
+      OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_ACTIONS_PER_STATEMENT_DEFAULT = 100;
+  public static final String
+      OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_RESOURCES_PER_STATEMENT =
+      "ozone.s3.accesskey.local.policy.max.resources.per.statement";
+  public static final int
+      OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_RESOURCES_PER_STATEMENT_DEFAULT =
+      100;
+
   public static final String OZONE_HTTP_SECURITY_ENABLED_KEY =
       "ozone.security.http.kerberos.enabled";
   public static final boolean OZONE_HTTP_SECURITY_ENABLED_DEFAULT = false;

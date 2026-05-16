@@ -2151,6 +2151,111 @@
     </description>
   </property>
   <property>
+    <name>ozone.s3.accesskey.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Enables configuration and startup safety checks for OM-managed local S3
+      access keys. This setting does not by itself implement credential
+      creation or runtime request validation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.default.lifetime</name>
+    <value>90d</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Default lifetime for managed local S3 access keys when no shorter
+      lifetime is requested. Unit suffixes such as s, m, h, and d are accepted.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.max.lifetime</name>
+    <value>365d</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Maximum lifetime accepted for managed local S3 access keys. The default
+      lifetime must not exceed this value.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.allow.custom.secret</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Allows operators to provide a custom secret when creating a managed local
+      S3 access key. This setting only declares the intended policy for managed
+      key lifecycle operations.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.secret.min.length</name>
+    <value>32</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Minimum custom secret length accepted for managed local S3 access keys
+      when custom secrets are allowed.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.insecure.cluster.admin.allowed</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Allows managed local S3 access-key administration in a non-secure
+      cluster. This is unsafe and does not waive the requirement to enable
+      ozone.s3.accesskey.local.policy.enabled when
+      ozone.s3.accesskey.enabled is true in a non-secure cluster.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.local.policy.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Enables local JSON policy configuration for managed local S3 access keys.
+      Local policy is mandatory when managed local S3 access keys are enabled
+      in a non-secure cluster; ozone.s3.accesskey.insecure.cluster.admin.allowed
+      does not bypass this requirement.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.local.policy.max.size</name>
+    <value>128KB</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Maximum size of a local JSON policy document for a managed local S3
+      access key.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.local.policy.max.statements</name>
+    <value>50</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Maximum number of statements accepted in a local JSON policy document for
+      a managed local S3 access key.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.local.policy.max.actions.per.statement</name>
+    <value>100</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Maximum number of actions accepted in one statement of a managed local S3
+      access-key local JSON policy.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.local.policy.max.resources.per.statement</name>
+    <value>100</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Maximum number of resources accepted in one statement of a managed local
+      S3 access-key local JSON policy.
+    </description>
+  </property>
+  <property>
     <name>ozone.security.http.kerberos.enabled</name>
     <value>false</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>

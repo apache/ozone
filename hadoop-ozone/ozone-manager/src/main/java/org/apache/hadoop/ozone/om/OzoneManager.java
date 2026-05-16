@@ -41,8 +41,12 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_USERS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_LOCAL_POLICY_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
@@ -313,6 +317,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantS
 import org.apache.hadoop.ozone.protocolPB.OMAdminProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OMInterServiceProtocolServerSideImpl;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.ozone.security.ManagedS3AccessKeyConfig;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -538,6 +543,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMHANodeDetails.loadOMHAConfig(configuration);
 
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
+    validateManagedS3AccessKeyStartup(conf,
+        this.isSecurityEnabled || testSecureOmFlag);
     this.peerNodesMap = omhaNodeDetails.getPeerNodesMap();
     this.omNodeDetails = omhaNodeDetails.getLocalNodeDetails();
     omStorage = new OMStorage(conf);
@@ -971,6 +978,39 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public static OzoneManager createOm(OzoneConfiguration conf,
       StartupOption startupOption) throws IOException, AuthenticationException {
     return new OzoneManager(conf, startupOption);
+  }
+
+  @VisibleForTesting
+  static void validateManagedS3AccessKeyStartup(OzoneConfiguration conf,
+      boolean effectiveSecurityEnabled) {
+    final ManagedS3AccessKeyConfig accessKeyConfig;
+    try {
+      accessKeyConfig = ManagedS3AccessKeyConfig.from(conf);
+    } catch (IllegalArgumentException e) {
+      throw new ConfigurationException(
+          "Invalid managed S3 access key configuration", e);
+    }
+
+    if (!accessKeyConfig.isEnabled() || effectiveSecurityEnabled) {
+      return;
+    }
+
+    if (!accessKeyConfig.isInsecureClusterAdminAllowed()) {
+      throw new ConfigurationException(
+          OZONE_S3_ACCESS_KEY_ENABLED + " requires "
+              + OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED
+              + "=true when " + OZONE_SECURITY_ENABLED_KEY + "=false");
+    }
+
+    if (!accessKeyConfig.isLocalPolicyEnabled()) {
+      throw new ConfigurationException(
+          OZONE_S3_ACCESS_KEY_ENABLED + " requires "
+              + OZONE_S3_ACCESS_KEY_LOCAL_POLICY_ENABLED + "=true when "
+              + OZONE_SECURITY_ENABLED_KEY + "=false; "
+              + OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED
+              + " does not bypass "
+              + OZONE_S3_ACCESS_KEY_LOCAL_POLICY_ENABLED);
+    }
   }
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
