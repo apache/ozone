@@ -1926,6 +1926,20 @@ message S3Secret {
     required string awsSecret = 2;
 }
 
+message S3ManagedAccessKeyInfoProto {
+    optional string accessKeyId = 1;
+    optional bytes encryptedSecretKey = 2;
+    optional string secretKeyId = 3;
+    optional string effectiveUser = 4;
+    repeated string groups = 5;
+    optional string description = 6;
+    optional uint64 createdAt = 7;
+    optional uint64 expiresAt = 8;
+    optional bool disabled = 9 [default = false];
+    optional string createdBy = 10;
+    optional string policyDocument = 11;
+}
+
 message GetS3SecretRequest {
     required string kerberosID = 1;  // HDDS-6339: This really means accessId
     optional bool createIfNotExist = 2;

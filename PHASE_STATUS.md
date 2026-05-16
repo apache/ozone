@@ -50,3 +50,53 @@ Remaining follow-ups:
 - Runtime credential validation, policy evaluation, CLI commands, KMS/encryption
   lifecycle, and S3 request-path behavior remain intentionally out of scope for
   Phase 1.
+
+## Phase 2 - Completed
+
+Scope completed:
+- Added the storage proto/model for managed local S3 access-key metadata.
+- Registered the `s3ManagedAccessKeyTable` OM metadata table.
+- Added the typed metadata-manager table accessor and initialization.
+- Added a layout-version marker without enabling credential validation.
+- Added compatibility handling for old checkpoints that do not yet contain the
+  new optional table.
+- Added focused model, metadata-manager, layout, checkpoint, and Recon tests.
+
+Files changed:
+- `hadoop-ozone/interface-client/src/main/proto/OmClientProtocol.proto`
+- `hadoop-ozone/interface-client/src/main/resources/proto.lock`
+- `hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/S3ManagedAccessKeyInfo.java`
+- `hadoop-ozone/common/src/test/java/org/apache/hadoop/ozone/om/helpers/TestS3ManagedAccessKeyInfoCodec.java`
+- `hadoop-ozone/interface-storage/src/main/java/org/apache/hadoop/ozone/om/OMMetadataManager.java`
+- `hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/OmMetadataManagerImpl.java`
+- `hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/codec/OMDBDefinition.java`
+- `hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/upgrade/OMLayoutFeature.java`
+- `hadoop-ozone/ozone-manager/src/test/java/org/apache/hadoop/ozone/om/TestOmMetadataManager.java`
+- `hadoop-ozone/ozone-manager/src/test/java/org/apache/hadoop/ozone/om/upgrade/TestOMVersionManager.java`
+- `hadoop-ozone/recon/src/test/java/org/apache/hadoop/ozone/recon/recovery/TestReconOmMetadataManagerImpl.java`
+- `PHASE_STATUS.md`
+
+Tests and checks run:
+- `python3 -c 'import json; json.load(open("hadoop-ozone/interface-client/src/main/resources/proto.lock")); print("proto.lock JSON OK")'` - passed.
+- `python3 -m json.tool hadoop-ozone/interface-client/src/main/resources/proto.lock >/tmp/proto.lock.check` - passed.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-ozone/interface-client,hadoop-ozone/common,hadoop-ozone/interface-storage,hadoop-ozone/ozone-manager -am -DskipTests compile` - passed.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-ozone/common -am -Dtest=TestS3ManagedAccessKeyInfoCodec test` - passed.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-ozone/ozone-manager -am -Dtest=TestOMDBDefinition,TestOmMetadataManager,TestOMVersionManager test` - passed.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-ozone/recon -am -Dtest=TestReconOmMetadataManagerImpl test` - passed.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-ozone/common,hadoop-ozone/interface-storage,hadoop-ozone/ozone-manager,hadoop-ozone/recon -DskipTests checkstyle:check` - passed.
+- `git diff --check` - passed.
+
+Blockers found and fixed:
+- None.
+
+Remaining follow-ups:
+- Future write-capable phases must gate managed-key behavior on the
+  `MANAGED_LOCAL_S3_ACCESS_KEYS` layout feature until finalization.
+- Phase 2 intentionally adds no OM admin lifecycle, S3G credential validation,
+  secret generation/encryption lifecycle, policy evaluator, CLI commands, or
+  STS/legacy compatibility behavior.
+- A negative test for old checkpoints missing a required OM column family would
+  further lock in that only the new optional table is repaired.
+- The old read-only checkpoint compatibility path creates the missing optional
+  column family before reopening read-only; physically read-only legacy
+  checkpoint directories remain an integration gap.

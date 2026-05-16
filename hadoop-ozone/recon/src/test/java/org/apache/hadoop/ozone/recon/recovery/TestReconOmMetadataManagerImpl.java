@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -39,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3ManagedAccessKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,6 +49,9 @@ import org.junit.jupiter.api.io.TempDir;
  * Test Recon OM Metadata Manager implementation.
  */
 public class TestReconOmMetadataManagerImpl {
+
+  private static final String MANAGED_ACCESS_KEY_ID =
+      "managed-access-key-recon";
 
   @TempDir
   private Path temporaryFolder;
@@ -85,6 +90,8 @@ public class TestReconOmMetadataManagerImpl {
         .get("/sampleVol/bucketOne/key_one"));
     assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
+    assertNotNull(reconOMMetadataManager.getS3ManagedAccessKeyTable()
+        .get(MANAGED_ACCESS_KEY_ID));
   }
 
   @Test
@@ -133,6 +140,8 @@ public class TestReconOmMetadataManagerImpl {
         .get("/sampleVol/bucketOne/key_one"));
     assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_two"));
+    assertNotNull(reconOMMetadataManager.getS3ManagedAccessKeyTable()
+        .get(MANAGED_ACCESS_KEY_ID));
 
     //Take a new checkpoint of OM DB.
     DBCheckpoint newCheckpoint = omMetadataManager.getStore()
@@ -197,6 +206,18 @@ public class TestReconOmMetadataManagerImpl {
             .setKeyName("key_two")
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
+            .build());
+    omMetadataManager.getS3ManagedAccessKeyTable().put(MANAGED_ACCESS_KEY_ID,
+        S3ManagedAccessKeyInfo.newBuilder()
+            .setAccessKeyId(MANAGED_ACCESS_KEY_ID)
+            .setEncryptedSecretKey(ByteString.copyFromUtf8("encrypted-recon"))
+            .setSecretKeyId("recon-secret-key-id")
+            .setEffectiveUser("recon-user")
+            .setDescription("recon managed key")
+            .setCreatedAt(123456789L)
+            .setExpiresAt(123456999L)
+            .setCreatedBy("recon-test")
+            .setPolicyDocument("{\"Statement\":[]}")
             .build());
 
     return omMetadataManager;

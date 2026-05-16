@@ -6843,6 +6843,83 @@
             ]
           },
           {
+            "name": "S3ManagedAccessKeyInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "accessKeyId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "encryptedSecretKey",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "secretKeyId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "effectiveUser",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "groups",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "description",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "createdAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "expiresAt",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "disabled",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              },
+              {
+                "id": 10,
+                "name": "createdBy",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "policyDocument",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "GetS3SecretRequest",
             "fields": [
               {

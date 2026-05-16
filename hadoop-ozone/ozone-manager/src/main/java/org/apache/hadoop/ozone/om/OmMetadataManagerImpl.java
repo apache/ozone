@@ -82,6 +82,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -117,6 +118,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.S3ManagedAccessKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
@@ -139,6 +141,7 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.Persisted
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ratis.util.ExitUtils;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -171,6 +174,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, OmKeyInfo> deletedDirTable;
 
   private Table<String, S3SecretValue> s3SecretTable;
+  private Table<String, S3ManagedAccessKeyInfo> s3ManagedAccessKeyTable;
   private Table<OzoneTokenIdentifier, Long> dTokenTable;
   private Table<String, OmPrefixInfo> prefixTable;
   private Table<String, TransactionInfo> transactionInfoTable;
@@ -278,13 +282,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     omEpoch = 0;
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
-    this.store = newDBStoreBuilder(conf, name, dir)
-        .setOpenReadOnly(readOnly)
-        .disableDefaultCFAutoCompaction(true)
-        .setMaxNumberOfOpenFiles(maxOpenFiles)
-        .setEnableCompactionDag(false, null)
-        .setCreateCheckpointDirs(false)
-        .setEnableRocksDbMetrics(true)
+    if (readOnly) {
+      createMissingS3ManagedAccessKeyTableIfNeeded(conf, dir, name,
+          maxOpenFiles);
+    }
+
+    this.store = newCheckpointDBStoreBuilder(conf, name, dir, readOnly,
+        maxOpenFiles)
         .build();
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
@@ -456,6 +460,53 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return DBStoreBuilder.newBuilder(conf, OMDBDefinition.get(), name, dir.toPath());
   }
 
+  private static DBStoreBuilder newCheckpointDBStoreBuilder(
+      OzoneConfiguration conf, String name, File dir, boolean readOnly,
+      int maxOpenFiles) {
+    return newDBStoreBuilder(conf, name, dir)
+        .setOpenReadOnly(readOnly)
+        .disableDefaultCFAutoCompaction(true)
+        .setMaxNumberOfOpenFiles(maxOpenFiles)
+        .setEnableCompactionDag(false, null)
+        .setCreateCheckpointDirs(false)
+        .setEnableRocksDbMetrics(true);
+  }
+
+  private static void createMissingS3ManagedAccessKeyTableIfNeeded(
+      OzoneConfiguration conf, File dir, String name, int maxOpenFiles)
+      throws IOException {
+    final String optionalTable = OMDBDefinition.S3_MANAGED_ACCESS_KEY_TABLE;
+    final File dbPath = new File(dir, name);
+    final Set<String> existingColumnFamilies;
+    try {
+      existingColumnFamilies = RocksDatabase
+          .listColumnFamiliesEmptyOptions(dbPath.getAbsolutePath())
+          .stream()
+          .map(bytes -> org.apache.hadoop.hdds.StringUtils.bytes2String(bytes))
+          .collect(Collectors.toSet());
+    } catch (RocksDBException e) {
+      throw new IOException("Failed to list column families in " + dbPath, e);
+    }
+
+    if (existingColumnFamilies.contains(optionalTable)) {
+      return;
+    }
+
+    existingColumnFamilies.remove(DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME);
+    Set<String> requiredColumnFamilies =
+        new HashSet<>(OMDBDefinition.get().getColumnFamilyNames());
+    requiredColumnFamilies.remove(optionalTable);
+    if (!existingColumnFamilies.containsAll(requiredColumnFamilies)) {
+      return;
+    }
+
+    try (DBStore ignored = newCheckpointDBStoreBuilder(
+        conf, name, dir, false, maxOpenFiles).build()) {
+      LOG.info("Created missing optional OM column family {} in {}",
+          optionalTable, dbPath);
+    }
+  }
+
   /**
    * Initialize OM Tables.
    *
@@ -484,6 +535,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     dTokenTable = initializer.get(OMDBDefinition.DELEGATION_TOKEN_TABLE_DEF);
     s3SecretTable = initializer.get(OMDBDefinition.S3_SECRET_TABLE_DEF);
+    s3ManagedAccessKeyTable =
+        initializer.get(OMDBDefinition.S3_MANAGED_ACCESS_KEY_TABLE_DEF);
     prefixTable = initializer.get(OMDBDefinition.PREFIX_TABLE_DEF);
 
     transactionInfoTable = initializer.get(OMDBDefinition.TRANSACTION_INFO_TABLE_DEF);
@@ -1714,6 +1767,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
+  }
+
+  @Override
+  public Table<String, S3ManagedAccessKeyInfo> getS3ManagedAccessKeyTable() {
+    return s3ManagedAccessKeyTable;
   }
 
   @Override

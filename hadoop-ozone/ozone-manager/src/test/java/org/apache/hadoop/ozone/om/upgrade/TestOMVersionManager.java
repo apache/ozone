@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MANAGED_LOCAL_S3_ACCESS_KEYS;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.SNAPSHOT_DEFRAG;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_UPGRADE_CLASS_PACKAGE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -70,19 +72,25 @@ public class TestOMVersionManager {
       throws Exception {
     OMLayoutFeature[] values = OMLayoutFeature.values();
     int currVersion = -1;
-    OMLayoutFeature lastFeature = null;
     for (OMLayoutFeature lf : values) {
       assertEquals(currVersion + 1, lf.layoutVersion());
       currVersion = lf.layoutVersion();
-      lastFeature = lf;
     }
-    lastFeature.addAction(arg -> {
+    SNAPSHOT_DEFRAG.addAction(arg -> {
       String v = arg.getVersion();
     });
 
     OzoneManager omMock = mock(OzoneManager.class);
-    lastFeature.action().get().execute(omMock);
+    SNAPSHOT_DEFRAG.action().get().execute(omMock);
     verify(omMock, times(1)).getVersion();
+  }
+
+  @Test
+  public void testManagedLocalS3AccessKeysLayoutFeature() {
+    assertEquals(10, MANAGED_LOCAL_S3_ACCESS_KEYS.layoutVersion());
+    assertEquals("Managed local S3 access keys",
+        MANAGED_LOCAL_S3_ACCESS_KEYS.description());
+    assertFalse(MANAGED_LOCAL_S3_ACCESS_KEYS.action().isPresent());
   }
 
   @Test

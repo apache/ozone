@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.S3ManagedAccessKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
@@ -58,6 +59,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * |              userTable |             /user :- UserVolumeInfo           |
  * |            dTokenTable |      OzoneTokenID :- renew_time               |
  * |          s3SecretTable | s3g_access_key_id :- s3Secret                 |
+ * |s3ManagedAccessKeyTable | access_key_id :- S3ManagedAccessKeyInfo      |
  * | s3RevokedStsTokenTable | sts_session_token :- insertionTimeMillis      |
  * |------------------------------------------------------------------------|
  * }
@@ -164,6 +166,13 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
       = new DBColumnFamilyDefinition<>(S3_SECRET_TABLE,
           StringCodec.get(),
           S3SecretValue.getCodec());
+
+  public static final String S3_MANAGED_ACCESS_KEY_TABLE = "s3ManagedAccessKeyTable";
+  /** s3ManagedAccessKeyTable: access_key_id :- S3ManagedAccessKeyInfo. */
+  public static final DBColumnFamilyDefinition<String, S3ManagedAccessKeyInfo> S3_MANAGED_ACCESS_KEY_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(S3_MANAGED_ACCESS_KEY_TABLE,
+          StringCodec.get(),
+          S3ManagedAccessKeyInfo.getCodec());
 
   public static final String S3_REVOKED_STS_TOKEN_TABLE = "s3RevokedStsTokenTable";
   /** s3RevokedStsTokenTable: sts_session_token :- insertionTimeMillis.*/
@@ -350,6 +359,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           OPEN_KEY_TABLE_DEF,
           PREFIX_TABLE_DEF,
           PRINCIPAL_TO_ACCESS_IDS_TABLE_DEF,
+          S3_MANAGED_ACCESS_KEY_TABLE_DEF,
           S3_SECRET_TABLE_DEF,
           SNAPSHOT_INFO_TABLE_DEF,
           SNAPSHOT_RENAMED_TABLE_DEF,

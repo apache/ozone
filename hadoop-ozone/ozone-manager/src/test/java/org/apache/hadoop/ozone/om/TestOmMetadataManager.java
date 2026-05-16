@@ -39,6 +39,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_MANAGED_ACCESS_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
@@ -60,14 +61,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
+import com.google.protobuf.ByteString;
 import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -80,6 +85,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -95,6 +105,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.S3ManagedAccessKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -129,6 +140,7 @@ public class TestOmMetadataManager {
       MULTIPART_INFO_TABLE,
       MULTIPART_PARTS_TABLE,
       S3_SECRET_TABLE,
+      S3_MANAGED_ACCESS_KEY_TABLE,
       DELEGATION_TOKEN_TABLE,
       PREFIX_TABLE,
       TRANSACTION_INFO_TABLE,
@@ -1090,6 +1102,82 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testS3ManagedAccessKeyTablePutAndGet() throws Exception {
+    S3ManagedAccessKeyInfo keyInfo =
+        createS3ManagedAccessKeyInfo("managed-access-key-1");
+
+    omMetadataManager.getS3ManagedAccessKeyTable()
+        .put(keyInfo.getAccessKeyId(), keyInfo);
+
+    assertEquals(keyInfo, omMetadataManager.getS3ManagedAccessKeyTable()
+        .get(keyInfo.getAccessKeyId()));
+  }
+
+  @Test
+  public void testS3ManagedAccessKeyCheckpointRoundTrip() throws Exception {
+    S3ManagedAccessKeyInfo keyInfo =
+        createS3ManagedAccessKeyInfo("managed-access-key-checkpoint");
+    omMetadataManager.getS3ManagedAccessKeyTable()
+        .put(keyInfo.getAccessKeyId(), keyInfo);
+
+    DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
+    try (OmMetadataManagerImpl checkpointManager =
+             OmMetadataManagerImpl.createCheckpointMetadataManager(
+                 ozoneConfiguration, checkpoint)) {
+      assertEquals(keyInfo, checkpointManager.getS3ManagedAccessKeyTable()
+          .get(keyInfo.getAccessKeyId()));
+    } finally {
+      checkpoint.cleanupCheckpoint();
+    }
+  }
+
+  @Test
+  public void testOldActiveDbMissingS3ManagedAccessKeyTable()
+      throws Exception {
+    File legacyDir = new File(folder, "legacy-active");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_DB_DIRS, legacyDir.getAbsolutePath());
+    try (DBStore ignored = createLegacyOmStore(conf, legacyDir)) {
+      assertNotNull(ignored);
+    }
+
+    try (OmMetadataManagerImpl metadataManager =
+             new OmMetadataManagerImpl(conf, null)) {
+      S3ManagedAccessKeyInfo keyInfo =
+          createS3ManagedAccessKeyInfo("managed-access-key-active");
+      metadataManager.getS3ManagedAccessKeyTable()
+          .put(keyInfo.getAccessKeyId(), keyInfo);
+
+      assertEquals(keyInfo, metadataManager.getS3ManagedAccessKeyTable()
+          .get(keyInfo.getAccessKeyId()));
+    }
+  }
+
+  @Test
+  public void testOldReadOnlyCheckpointMissingS3ManagedAccessKeyTable()
+      throws Exception {
+    File legacyDir = new File(folder, "legacy-checkpoint");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_DB_DIRS, legacyDir.getAbsolutePath());
+
+    DBCheckpoint checkpoint;
+    try (DBStore legacyStore = createLegacyOmStore(conf, legacyDir)) {
+      checkpoint = legacyStore.getCheckpoint(true);
+    }
+
+    try (OmMetadataManagerImpl checkpointManager =
+             OmMetadataManagerImpl.createCheckpointMetadataManager(
+                 conf, checkpoint)) {
+      assertNotNull(checkpointManager.getS3ManagedAccessKeyTable());
+      assertTrue(checkpointManager.getS3ManagedAccessKeyTable().isEmpty());
+      assertNull(checkpointManager.getS3ManagedAccessKeyTable()
+          .get("missing-managed-access-key"));
+    } finally {
+      checkpoint.cleanupCheckpoint();
+    }
+  }
+
+  @Test
   public void testListSnapshot() throws Exception {
     String vol1 = "vol1";
     String bucket1 = "bucket1";
@@ -1336,5 +1424,54 @@ public class TestOmMetadataManager {
 
     // Invalid sessionToken should return null for getIfExist
     assertNull(revokedTable.getIfExist("INVALID_SESSION_TOKEN"));
+  }
+
+  private static S3ManagedAccessKeyInfo createS3ManagedAccessKeyInfo(
+      String accessKeyId) {
+    return S3ManagedAccessKeyInfo.newBuilder()
+        .setAccessKeyId(accessKeyId)
+        .setEncryptedSecretKey(
+            ByteString.copyFromUtf8("encrypted-" + accessKeyId))
+        .setSecretKeyId("secret-key-id")
+        .setEffectiveUser("alice")
+        .setGroups(Arrays.asList("dev", "ops"))
+        .setDescription("test managed key")
+        .setCreatedAt(123456789L)
+        .setExpiresAt(123456999L)
+        .setDisabled(false)
+        .setCreatedBy("om-admin")
+        .setPolicyDocument("{\"Statement\":[]}")
+        .build();
+  }
+
+  private static DBStore createLegacyOmStore(
+      OzoneConfiguration conf, File metaDir) throws IOException {
+    if (!metaDir.exists()) {
+      assertTrue(metaDir.mkdirs());
+    }
+    return DBStoreBuilder.newBuilder(conf, legacyOmDbDefinition(),
+        OMDBDefinition.get().getName(), metaDir.toPath()).build();
+  }
+
+  private static DBDefinition legacyOmDbDefinition() {
+    Map<String, DBColumnFamilyDefinition<?, ?>> columnFamilies =
+        new LinkedHashMap<>();
+    for (DBColumnFamilyDefinition<?, ?> definition :
+        OMDBDefinition.get().getColumnFamilies()) {
+      if (!S3_MANAGED_ACCESS_KEY_TABLE.equals(definition.getName())) {
+        columnFamilies.put(definition.getName(), definition);
+      }
+    }
+    return new DBDefinition.WithMap(Collections.unmodifiableMap(columnFamilies)) {
+      @Override
+      public String getName() {
+        return OMDBDefinition.get().getName();
+      }
+
+      @Override
+      public String getLocationConfigKey() {
+        return OMDBDefinition.get().getLocationConfigKey();
+      }
+    };
   }
 }

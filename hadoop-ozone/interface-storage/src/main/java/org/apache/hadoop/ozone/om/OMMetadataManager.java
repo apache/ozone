@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.S3ManagedAccessKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -500,6 +501,13 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return meta table reference.
    */
   Table<String, String> getMetaTable();
+
+  /**
+   * Gets the S3ManagedAccessKeyTable.
+   *
+   * @return Table.
+   */
+  Table<String, S3ManagedAccessKeyInfo> getS3ManagedAccessKeyTable();
 
   /**
    * Gets the S3RevokedStsTokenTable.

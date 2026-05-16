@@ -44,7 +44,8 @@ public enum OMLayoutFeature implements LayoutFeature {
   QUOTA(6, "Ozone quota re-calculate"),
   HBASE_SUPPORT(7, "Full support of hsync, lease recovery and listOpenFiles APIs for HBase"),
   DELEGATION_TOKEN_SYMMETRIC_SIGN(8, "Delegation token signed by symmetric key"),
-  SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot");
+  SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot"),
+  MANAGED_LOCAL_S3_ACCESS_KEYS(10, "Managed local S3 access keys");
 
   ///////////////////////////////  /////////////////////////////
 
