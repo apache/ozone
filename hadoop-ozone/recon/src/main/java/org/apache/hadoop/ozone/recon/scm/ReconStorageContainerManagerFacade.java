@@ -891,6 +891,28 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
+  /**
+   * Moves the active snapshot to Recon's stable SCM DB name so that the next
+   * Recon restart reopens the snapshot-backed DB instead of creating a new one.
+   */
+  private File renameSnapshotToReconScmDb(File dbFile) throws IOException {
+    File reconScmDb = new File(dbFile.getParentFile(),
+        ReconSCMDBDefinition.RECON_SCM_DB_NAME);
+    if (dbFile.equals(reconScmDb)) {
+      return dbFile;
+    }
+    if (reconScmDb.exists()) {
+      FileUtils.deleteDirectory(reconScmDb);
+    }
+    if (!dbFile.renameTo(reconScmDb)) {
+      throw new IOException("Unable to rename SCM snapshot db from " +
+          dbFile.getAbsolutePath() + " to " + reconScmDb.getAbsolutePath());
+    }
+    LOG.info("SCM snapshot linked to Recon DB at {}.",
+        reconScmDb.getAbsolutePath());
+    return reconScmDb;
+  }
+
   private void initializeNewRdbStore(File dbFile) throws IOException {
     final DBStore oldStore = dbStore;
     final File oldDbLocation = oldStore != null ? oldStore.getDbLocation() :
@@ -924,8 +946,9 @@ public class ReconStorageContainerManagerFacade
       dbStore = newStore;
       IOUtils.close(LOG, oldStore);
       cleanupOldSCMDB(oldDbLocation, dbFile);
+      File activeDbLocation = renameSnapshotToReconScmDb(dbFile);
       LOG.info("Created SCM DB handle from snapshot at {}.",
-          dbFile.getAbsolutePath());
+          activeDbLocation.getAbsolutePath());
     } catch (IOException | RuntimeException ex) {
       IOUtils.close(LOG, newStore);
       LOG.error("Unable to initialize Recon SCM DB snapshot store.", ex);
