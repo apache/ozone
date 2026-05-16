@@ -469,6 +469,18 @@ public final class OzoneConfigKeys {
   public static final String OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH =
       "ozone.s3.accesskey.secret.min.length";
   public static final int OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH_DEFAULT = 32;
+  public static final String OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME =
+      "ozone.s3.accesskey.encryption.key.name";
+  public static final String
+      OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME_DEFAULT = "";
+  public static final String OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_TTL =
+      "ozone.s3.accesskey.retrieval.handle.ttl";
+  public static final String
+      OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_TTL_DEFAULT = "60s";
+  public static final String OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_MAX_ENTRIES =
+      "ozone.s3.accesskey.retrieval.handle.max.entries";
+  public static final int
+      OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_MAX_ENTRIES_DEFAULT = 1024;
   public static final String
       OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED =
       "ozone.s3.accesskey.insecure.cluster.admin.allowed";

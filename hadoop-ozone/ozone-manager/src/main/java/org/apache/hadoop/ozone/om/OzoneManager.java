@@ -42,6 +42,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRAT
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_GROUPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READ_BLACKLIST_USERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_LOCAL_POLICY_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -680,6 +681,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       kmsProvider = null;
       LOG.error("Fail to create Key Provider");
     }
+    validateManagedS3AccessKeyKmsStartup(conf, kmsProvider);
     if (secConfig.isSecurityEnabled()) {
       omComponent = OM_DAEMON + "-" + omId;
       HddsProtos.OzoneManagerDetailsProto omInfo =
@@ -983,13 +985,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   static void validateManagedS3AccessKeyStartup(OzoneConfiguration conf,
       boolean effectiveSecurityEnabled) {
-    final ManagedS3AccessKeyConfig accessKeyConfig;
-    try {
-      accessKeyConfig = ManagedS3AccessKeyConfig.from(conf);
-    } catch (IllegalArgumentException e) {
-      throw new ConfigurationException(
-          "Invalid managed S3 access key configuration", e);
-    }
+    final ManagedS3AccessKeyConfig accessKeyConfig =
+        managedS3AccessKeyConfig(conf);
 
     if (!accessKeyConfig.isEnabled() || effectiveSecurityEnabled) {
       return;
@@ -1010,6 +1007,83 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               + OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED
               + " does not bypass "
               + OZONE_S3_ACCESS_KEY_LOCAL_POLICY_ENABLED);
+    }
+  }
+
+  @VisibleForTesting
+  static void validateManagedS3AccessKeyKmsStartup(OzoneConfiguration conf) {
+    final ManagedS3AccessKeyConfig accessKeyConfig =
+        managedS3AccessKeyConfig(conf);
+    if (!accessKeyConfig.isEnabled()) {
+      return;
+    }
+
+    try {
+      validateManagedS3AccessKeyKmsStartup(accessKeyConfig,
+          createKeyProviderExt(conf));
+    } catch (IOException e) {
+      throw new ConfigurationException(
+          OZONE_S3_ACCESS_KEY_ENABLED + " requires a usable "
+              + CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
+          e);
+    }
+  }
+
+  @VisibleForTesting
+  static void validateManagedS3AccessKeyKmsStartup(OzoneConfiguration conf,
+      KeyProviderCryptoExtension provider) {
+    validateManagedS3AccessKeyKmsStartup(managedS3AccessKeyConfig(conf),
+        provider);
+  }
+
+  private static ManagedS3AccessKeyConfig managedS3AccessKeyConfig(
+      OzoneConfiguration conf) {
+    final ManagedS3AccessKeyConfig accessKeyConfig;
+    try {
+      accessKeyConfig = ManagedS3AccessKeyConfig.from(conf);
+    } catch (IllegalArgumentException e) {
+      throw new ConfigurationException(
+          "Invalid managed S3 access key configuration", e);
+    }
+    return accessKeyConfig;
+  }
+
+  private static void validateManagedS3AccessKeyKmsStartup(
+      ManagedS3AccessKeyConfig accessKeyConfig,
+      KeyProviderCryptoExtension provider) {
+    if (!accessKeyConfig.isEnabled()) {
+      return;
+    }
+
+    if (provider == null) {
+      throw new ConfigurationException(
+          OZONE_S3_ACCESS_KEY_ENABLED + " requires "
+              + CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH
+              + " to configure a usable KeyProviderCryptoExtension");
+    }
+    if (provider.isTransient()) {
+      throw new ConfigurationException(
+          OZONE_S3_ACCESS_KEY_ENABLED + " requires a durable "
+              + CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);
+    }
+
+    final String encryptionKeyName = accessKeyConfig.getEncryptionKeyName();
+    try {
+      if (provider.getMetadata(encryptionKeyName) == null) {
+        throw new ConfigurationException(
+            OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME + " key "
+                + encryptionKeyName + " does not exist");
+      }
+      if (provider.getCurrentKey(encryptionKeyName) == null) {
+        throw new ConfigurationException(
+            OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME + " key "
+                + encryptionKeyName + " has no current key version");
+      }
+    } catch (IOException e) {
+      throw new ConfigurationException(
+          OZONE_S3_ACCESS_KEY_ENABLED + " cannot validate "
+              + OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME + " key "
+              + encryptionKeyName, e);
     }
   }
 
@@ -1248,7 +1322,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return testSecureOmFlag;
   }
 
-  private KeyProviderCryptoExtension createKeyProviderExt(
+  private static KeyProviderCryptoExtension createKeyProviderExt(
       OzoneConfiguration conf) throws IOException {
     KeyProvider keyProvider = KMSUtil.createKeyProvider(conf,
         CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH);

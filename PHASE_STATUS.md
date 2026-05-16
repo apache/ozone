@@ -51,6 +51,51 @@ Remaining follow-ups:
   lifecycle, and S3 request-path behavior remain intentionally out of scope for
   Phase 1.
 
+## Phase 1b - Completed
+
+Scope completed:
+- Added managed access-key encryption key-name configuration with an empty
+  disabled-mode default.
+- Added one-time retrieval-handle TTL and max-entry configuration for the
+  accepted Option B plaintext transport model.
+- Extended the config helper to validate encryption key-name requirements and
+  retrieval-handle bounds.
+- Added OM startup validation for enabled-mode KMS prerequisites: usable
+  durable Hadoop KeyProviderCryptoExtension, existing configured key, and
+  current key version availability.
+- Updated the design doc to use the two-step retrieval-handle model.
+
+Files changed:
+- `hadoop-hdds/common/src/main/java/org/apache/hadoop/ozone/OzoneConfigKeys.java`
+- `hadoop-hdds/common/src/main/resources/ozone-default.xml`
+- `hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/security/ManagedS3AccessKeyConfig.java`
+- `hadoop-ozone/common/src/test/java/org/apache/hadoop/ozone/security/TestManagedS3AccessKeyConfig.java`
+- `hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/OzoneManager.java`
+- `hadoop-ozone/ozone-manager/src/test/java/org/apache/hadoop/ozone/om/TestOzoneManagerManagedS3AccessKeyStartup.java`
+- `hadoop-hdds/docs/content/design/managed-local-s3-access-keys.md`
+- `PHASE_STATUS.md`
+
+Tests and checks run:
+- `git diff --check` - passed.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-ozone/common -am -Dtest=TestManagedS3AccessKeyConfig test` - passed after blocker fix.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-ozone/ozone-manager -am -Dtest=TestOzoneManagerManagedS3AccessKeyStartup test` - passed.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-ozone/integration-test -am -Dtest=TestOzoneConfigurationFields test` - passed.
+- `mvn -Dmaven.repo.local=/tmp/m2-ozone -pl hadoop-hdds/common,hadoop-ozone/common,hadoop-ozone/ozone-manager -DskipTests checkstyle:check` - passed.
+
+Blockers found and fixed:
+- Fixed `TestManagedS3AccessKeyConfig.xmlDefaultsMatchConstants` to assert the
+  effective empty/default value for `<value/>`, because Hadoop configuration
+  returns `null` for empty XML values.
+
+Remaining follow-ups:
+- Phase 3/4 must validate operation-level envelope generation/decryption
+  behavior before create/rotate; Phase 1b only verifies provider initialization,
+  durable provider status, key existence, and current key-version availability.
+- `RetrieveManagedS3AccessKeySecret` and retrieval-handle map behavior remain
+  intentionally unimplemented until the combined Phase 3/4 lifecycle work.
+- S3 request-path validation, LocalJsonPolicyEvaluator, CLI commands, and
+  HDDS-15273 / STS behavior remain intentionally untouched.
+
 ## Phase 2 - Completed
 
 Scope completed:

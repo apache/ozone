@@ -2198,6 +2198,39 @@
     </description>
   </property>
   <property>
+    <name>ozone.s3.accesskey.encryption.key.name</name>
+    <value/>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Name of the existing Hadoop KeyProvider / KMS key used to encrypt managed
+      local S3 access-key secrets. This must be non-empty when
+      ozone.s3.accesskey.enabled is true. Key creation is an operator
+      responsibility; OM does not create this key automatically.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.retrieval.handle.ttl</name>
+    <value>60s</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Time-to-live for one-time managed S3 access-key secret retrieval handles.
+      The value must be positive and must not exceed 300s. This setting is
+      inert until managed access-key create/rotate and retrieval RPCs are
+      implemented.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3.accesskey.retrieval.handle.max.entries</name>
+    <value>1024</value>
+    <tag>OZONE, SECURITY, S3</tag>
+    <description>
+      Maximum number of one-time managed S3 access-key secret retrieval handles
+      retained in OM leader memory. The value must be positive. This setting is
+      inert until managed access-key create/rotate and retrieval RPCs are
+      implemented.
+    </description>
+  </property>
+  <property>
     <name>ozone.s3.accesskey.insecure.cluster.admin.allowed</name>
     <value>false</value>
     <tag>OZONE, SECURITY, S3</tag>

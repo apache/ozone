@@ -60,6 +60,9 @@ ozone.s3.accesskey.default.lifetime=90d
 ozone.s3.accesskey.max.lifetime=365d
 ozone.s3.accesskey.allow.custom.secret=false
 ozone.s3.accesskey.secret.min.length=32
+ozone.s3.accesskey.encryption.key.name=
+ozone.s3.accesskey.retrieval.handle.ttl=60s
+ozone.s3.accesskey.retrieval.handle.max.entries=1024
 ozone.s3.accesskey.insecure.cluster.admin.allowed=false
 ozone.s3.accesskey.local.policy.enabled=false
 ozone.s3.accesskey.local.policy.max.size=128KB
@@ -67,6 +70,37 @@ ozone.s3.accesskey.local.policy.max.statements=50
 ozone.s3.accesskey.local.policy.max.actions.per.statement=100
 ozone.s3.accesskey.local.policy.max.resources.per.statement=100
 ```
+
+The managed access-key encryption provider is configured through the standard
+Hadoop key provider path:
+
+```text
+hadoop.security.key.provider.path
+```
+
+`ozone.s3.accesskey.encryption.key.name` is empty by default. Empty is legal
+only when `ozone.s3.accesskey.enabled=false`.
+
+If `ozone.s3.accesskey.enabled=true`:
+
+```text
+ozone.s3.accesskey.encryption.key.name must be non-empty
+hadoop.security.key.provider.path must configure a usable KeyProviderCryptoExtension
+the provider must be durable, not transient
+the configured key must already exist
+OM must fail fast if any requirement is missing or unavailable
+```
+
+OM must not auto-create the encryption key. Key creation and key-version
+retention are operator / KMS-admin responsibilities. A future operator guide may
+show an example key name such as `ozone-s3-managed-access-keys`, but that is an
+example value, not an implicit default.
+
+`ozone.s3.accesskey.retrieval.handle.ttl` defaults to 60 seconds. It must be
+positive and must not exceed 300 seconds.
+`ozone.s3.accesskey.retrieval.handle.max.entries` defaults to 1024 and must be
+positive. These retrieval-handle limits are inert until create/rotate and
+`RetrieveManagedS3AccessKeySecret` are implemented.
 
 ## Non-Secure Startup Gates
 
@@ -96,6 +130,21 @@ Reason:
 `ozone.s3.accesskey.insecure.cluster.admin.allowed=true` only permits unsafe
 admin lifecycle operations in non-secure clusters. It does not permit
 unrestricted managed access keys.
+
+Non-secure admin identity is not strong. This mode is not recommended for
+production admin lifecycle operations. It is intended only for explicitly
+opted-in standalone or Kubernetes S3G-only deployments where operators expose
+only S3G and restrict backend Ozone endpoints such as OM RPC, SCM, Datanodes,
+and administrative APIs.
+
+Explicitly enabled non-secure managed-key mode still requires the same Hadoop
+`KeyProviderCryptoExtension` / KMS-style provider. Non-secure mode does not
+permit plaintext storage or unencrypted managed secrets. For standalone or
+development Kubernetes deployments, a local durable provider such as a
+JCEKS-backed Hadoop key provider may be used if configured through
+`hadoop.security.key.provider.path` and if it supports the required envelope
+operations. If no usable provider exists, OM startup fails when
+`ozone.s3.accesskey.enabled=true`.
 
 ## Architecture
 
@@ -140,9 +189,16 @@ createdBy
 policyDocument
 ```
 
-`secretKeyId` identifies the OM/SCM-managed encryption key used to encrypt
-`encryptedSecretKey`. Existing rows retain the key reference required to
-decrypt them, while new rows can use the current encryption key.
+`encryptedSecretKey` is a serialized self-contained encrypted secret envelope
+blob, not raw ciphertext. The Phase 2 data model remains unchanged; no new
+top-level envelope metadata fields are added in v1.
+
+`secretKeyId` identifies the durable encryption-key version used for that row.
+It is diagnostic and quick-reference encryption metadata, not identity or
+policy state. `secretKeyId` is not sufficient by itself for decryption; the
+envelope blob is authoritative for decryption metadata. Existing rows retain
+the key-version reference required to decrypt them, while new rows can use the
+current encryption-key version.
 
 `groups` is resolved by OM from the existing group mapping for `effectiveUser`
 at access-key creation time and stored as a snapshot. Groups are not
@@ -292,9 +348,11 @@ to each other.
 
 Collision prevention must account for the configured legacy
 `S3SecretStoreProvider`, not only the local `s3SecretTable`. If an external
-legacy S3 secret provider cannot answer existence checks reliably, managed
-access-key create must fail closed or require an explicit unsupported-provider
-warning/gate.
+legacy S3 secret provider can reliably answer existence checks, OM may use
+that provider's existence check under the shared namespace lock. If the
+provider cannot reliably answer existence checks, managed access-key create
+must fail closed or be explicitly unsupported with that provider. Best-effort
+collision checking is not allowed.
 
 Validation and use of existing legacy S3 secrets remains unchanged.
 
@@ -313,9 +371,11 @@ admin diagnostic path should identify the conflict
 ```text
 CLI sends create request with secretMode=AUTO
 OM preExecute() generates secret with SecureRandom
-OM preExecute() encrypts secret
-Ratis request contains encrypted secret only
-create/rotate response returns plaintext secret once
+OM preExecute() obtains envelope material from KeyProviderCryptoExtension
+OM preExecute() encrypts secret into encryptedSecretKey envelope blob
+Ratis request contains encryptedSecretKey, secretKeyId, and non-secret metadata
+create/rotate Ratis response returns non-secret metadata plus retrievalHandle
+RetrieveManagedS3AccessKeySecret(retrievalHandle) returns plaintext once
 ```
 
 Custom secret is allowed only if:
@@ -332,25 +392,90 @@ Plaintext secret is never logged, audited, persisted, or included in
 ## Secret Encryption Key Lifecycle
 
 `encryptedSecretKey` is encrypted by OM before the Ratis-applied request is
-created.
+created. It is a serialized, versioned, self-contained encrypted secret
+envelope blob, not raw ciphertext.
 
-`secretKeyId` identifies the encryption key used to encrypt
-`encryptedSecretKey`.
+`secretKeyId` identifies the encryption-key version used to encrypt
+`encryptedSecretKey` for that row. It is top-level metadata for diagnostics and
+quick reference. It is not sufficient by itself for decryption; the envelope
+blob is authoritative for durable decryption metadata.
 
-The encryption key source must be durable across OM restart and HA failover. It
-must work in both secure clusters and explicitly-enabled non-secure
-managed-access-key mode.
+Only `encryptedSecretKey` and `secretKeyId` are persisted. Plaintext managed
+secrets are never persisted.
+
+The envelope blob must contain all durable metadata needed to decrypt the
+managed S3 secret later. At minimum, as applicable to the chosen provider, the
+envelope contains:
+
+```text
+envelope format version
+encryption algorithm
+key provider type/name
+key name
+key version name / secretKeyId
+encrypted data encryption key / EDEK or equivalent wrapped key material
+EDEK IV or provider-specific IV if required
+data IV / nonce
+ciphertext
+authentication tag if not embedded in ciphertext
+AAD / encryption context version
+```
+
+Managed access-key encryption uses Ozone/OM's existing Hadoop
+`KeyProviderCryptoExtension` / KMS-style provider initialized from
+`hadoop.security.key.provider.path`.
+
+The configured encryption key is named by:
+
+```text
+ozone.s3.accesskey.encryption.key.name
+```
+
+The configured key must already exist. OM must not silently create it.
+Key creation is an operator / KMS-admin responsibility.
+
+The implementation must not invent custom crypto and must not depend on the
+SCM rotating secret-key service for this feature.
+
+When `ozone.s3.accesskey.enabled=true`, OM startup validation must verify:
+
+```text
+ozone.s3.accesskey.encryption.key.name is configured
+KeyProviderCryptoExtension can be initialized from hadoop.security.key.provider.path
+the provider is durable, not transient
+the configured key exists
+the current key version is available
+the provider supports generating/decrypting encrypted keys or the equivalent
+  envelope operation required by the implementation
+```
+
+Phase 1b startup validation checks the configured key name, provider
+initialization, durable provider status, configured key existence, and current
+key version availability. Operation-level envelope support is validated by Phase
+3/4 create/rotate before using the provider, because Phase 1b does not execute
+envelope operations.
 
 Failure rules:
 
 ```text
+feature enabled but encryption key name unset:
+  OM startup fails closed
+
 encryption key provider unavailable:
-  create/rotate fail closed
+  OM startup fails closed when ozone.s3.accesskey.enabled=true, or
+  create/rotate fail closed if provider loss is detected at request time
 
 current encryption key unavailable:
-  create/rotate fail closed
+  OM startup fails closed when ozone.s3.accesskey.enabled=true
+  create/rotate fail closed if provider loss is detected at request time
+
+configured key does not exist:
+  OM startup fails closed
 
 existing row references missing or unavailable secretKeyId:
+  credential validation fails closed
+
+existing row has missing or invalid envelope metadata:
   credential validation fails closed
 ```
 
@@ -358,41 +483,129 @@ OM must never fall back to plaintext secret storage. OM must never accept
 unencrypted managed access-key secrets.
 
 Encryption keys must be retained for at least as long as any
-`S3ManagedAccessKeyInfo` row references their `secretKeyId`.
+non-deleted `S3ManagedAccessKeyInfo` row references their `secretKeyId`.
+Managed access keys must not outlive the ability to decrypt their encrypted
+secret.
+
+Operator requirement:
+
+```text
+Do not retire or delete KMS key versions while managed access-key rows
+reference them.
+```
+
+OM cannot safely validate a managed key if its referenced KMS key version has
+been deleted or is unavailable. Validation fails closed.
 
 Key rotation semantics:
 
 ```text
-new create/rotate operations use the current encryption key
+create operations use the current encryption-key version
+rotate operations may use the current encryption-key version
+rotate updates secretKeyId if the current encryption-key version changed
 existing rows remain decryptable through their stored secretKeyId
-old encryption keys cannot be retired while referenced by any non-expired,
-  present managed access key
+old encryption-key versions cannot be retired while referenced by any
+  non-deleted managed access key
 ```
 
 `ozone.s3.accesskey.max.lifetime` and encryption-key retention must be
 compatible. A managed access key must not outlive the ability to decrypt its
 encrypted secret.
 
-Checkpoints, snapshots, RocksDB, and Ratis logs contain only encrypted secret
-material and `secretKeyId`, never plaintext secret.
+Checkpoints, snapshots, RocksDB, and Ratis logs contain only the encrypted
+secret envelope blob and `secretKeyId`, never plaintext secret.
 
-Non-secure mode does not weaken secret encryption. If the required
+Non-secure mode does not weaken secret encryption. It still requires the same
+`KeyProviderCryptoExtension` / KMS-style provider. If the required
 encryption-key infrastructure is not initialized, OM must fail fast when
 `ozone.s3.accesskey.enabled=true`.
 
-## Create and Rotate Plaintext Response Semantics
+Create semantics:
 
-Create and rotate may return the plaintext secret once in the response.
+```text
+OM preExecute() generates plaintext S3 secret in memory
+OM obtains encrypted data key / envelope material from KeyProviderCryptoExtension
+  for ozone.s3.accesskey.encryption.key.name
+OM encrypts plaintext S3 secret into encryptedSecretKey envelope blob
+Ratis-applied request contains encryptedSecretKey, secretKeyId, and non-secret
+  metadata only
+Ratis-applied request must not contain plaintext secret
+```
 
-If OM retry cache replays the same client request, it may return the same
-plaintext secret only for the same idempotent request according to existing OM
-retry-cache semantics.
+Rotate semantics:
+
+```text
+OM generates a new plaintext S3 secret in memory
+OM uses the current encryption key version from the configured
+  KeyProviderCryptoExtension
+OM writes a new encryptedSecretKey envelope blob
+OM updates secretKeyId if the KMS key version changed
+OM may update expiresAt only if explicitly supplied and bounded by max lifetime
+accessKeyId, effectiveUser, groups snapshot, and policyDocument remain immutable
+```
+
+`secretKeyId` is encryption metadata, not identity or policy state.
+
+Decrypt / validation semantics:
+
+```text
+OM parses encryptedSecretKey envelope blob
+OM resolves the required key provider, key, and key version from the envelope
+OM decrypts or unwraps as needed using KeyProviderCryptoExtension
+missing provider, key, key version, or envelope metadata fails closed
+invalid provider, key, key version, or envelope metadata fails closed
+no plaintext fallback
+no unencrypted managed secrets
+no best-effort decryption
+```
+
+## Create, Rotate, And Secret Retrieval Semantics
+
+Create and rotate must not return plaintext secret material in the normal
+Ratis-applied `OMResponse`. The normal create/rotate Ratis response contains
+only non-secret metadata plus a `retrievalHandle`.
+
+The plaintext secret is retrieved through a separate non-Ratis read RPC:
+
+```text
+RetrieveManagedS3AccessKeySecret(retrievalHandle)
+```
+
+The create/rotate request path is:
+
+```text
+OM preExecute() may generate plaintext secret in memory
+OM encrypts the secret before creating the Ratis-applied request
+Ratis-applied request contains only encrypted envelope blob and metadata
+normal create/rotate OMResponse contains non-secret metadata plus retrievalHandle
+normal Ratis retry cache replays retrievalHandle, never plaintext
+leader stores plaintext in a leader-local in-memory retrieval map
+```
+
+The retrieval RPC semantics are:
+
+```text
+RetrieveManagedS3AccessKeySecret is leader-routed / LINEARIZABLE_LEADER_ONLY
+RetrieveManagedS3AccessKeySecret reads only the leader-local in-memory map
+retrievalHandle is single-use
+retrievalHandle expires by ozone.s3.accesskey.retrieval.handle.ttl
+retrieval map is bounded by ozone.s3.accesskey.retrieval.handle.max.entries
+retrievalHandle is bound to caller identity and accessKeyId
+```
+
+Unknown, expired, already-consumed, wrong-caller, or failover-lost handles
+return `MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE`.
+
+Leader failover loses the plaintext retrieval map. If the handle is lost after
+a successful create or rotate, OM must not reveal the old plaintext secret
+again. The admin must rotate again if the plaintext response was lost.
 
 Plaintext secret must never be written to Ratis log, RocksDB, checkpoints,
-audit logs, `toString()`, or errors.
+audit logs, server logs, normal `OMResponse`, normal retry-cache objects,
+`toString()`, exceptions, or TRACE/debug output.
 
-If retry-cache behavior cannot safely return plaintext, create/rotate retry
-must return a clear non-secret response and force the admin to rotate again.
+If existing OM read-RPC routing or retry-cache architecture cannot support this
+safely, implementation must stop and seek approval before coding.
 
 ## Admin CLI
 
@@ -437,8 +650,12 @@ policyDocument
 
 ```text
 encryptedSecretKey
+secretKeyId, if the current encryption-key version changed
 expiresAt, if explicitly supplied
 ```
+
+`secretKeyId` is encryption metadata. It is not identity state and it is not
+policy state.
 
 To change policy, create a new key and disable/delete the old key.
 
@@ -689,9 +906,10 @@ names while preserving bucket-vs-object semantics.
 
 ```text
 rotate replaces the secret atomically
+rotate may update secretKeyId when the encryption-key version changes
 old secret is invalid immediately
 no grace period in v1
-rotate returns new plaintext secret once
+rotate returns a new retrievalHandle for one-time secret retrieval
 ```
 
 Rotation may set `expiresAt` to any value in:
@@ -742,8 +960,8 @@ encryptedSecretKey
 signing material
 ```
 
-For create/rotate, the plaintext secret is returned only in the response and
-must be redacted from logs, audit, `toString()`, and errors.
+For create/rotate, the plaintext secret is returned only by the one-time
+retrieval RPC and must be redacted from logs, audit, `toString()`, and errors.
 
 ## Security Boundary and Direct Access Warning
 
@@ -764,6 +982,11 @@ direct backend access
 Operators relying on this model must expose only S3G to clients and restrict
 backend Ozone endpoints using Kubernetes NetworkPolicy, firewall rules, or
 service policy.
+
+This warning is especially important in explicitly enabled non-secure mode:
+`ozone.s3.accesskey.insecure.cluster.admin.allowed=true` permits unsafe admin
+lifecycle operations, but it does not provide strong admin authentication and
+does not make backend Ozone endpoints safe to expose.
 
 This is not official Ozone Multi-Tenancy and does not replace Ranger-based
 multi-tenancy.
@@ -810,14 +1033,14 @@ STS path must always take precedence when `x-amz-security-token` is present.
    schema, HA/follower freshness invariant, and fail-closed startup gates.
 2. Phase 2: proto/model/table for `S3ManagedAccessKeyInfo` with
    layout/checkpoint awareness.
-3. Phase 3: OM admin lifecycle requests with shared namespace locking:
-   create/list/info/disable/rotate/delete.
-4. Phase 4: OM-side secret generation, encryption, and redaction.
-5. Phase 5: credential resolution, STS precedence, non-secure fail-closed
+3. Combined Phase 3/4: OM admin lifecycle requests with shared namespace
+   locking, OM-side secret generation, encryption, one-time retrieval-handle
+   semantics, and redaction: create/list/info/disable/rotate/delete.
+4. Phase 5: credential resolution, STS precedence, non-secure fail-closed
    behavior, and effective identity.
-6. Phase 6: `LocalJsonPolicyEvaluator`.
-7. Phase 7: CLI shell commands.
-8. Phase 8: docs and E2E tests.
+5. Phase 6: `LocalJsonPolicyEvaluator`.
+6. Phase 7: CLI shell commands.
+7. Phase 8: docs and E2E tests.
 
 ## Likely Implementation Areas
 
@@ -846,93 +1069,139 @@ docs/security S3 docs
    are both explicitly enabled.
 5. `insecure.cluster.admin.allowed=true` does not bypass local-policy
    requirement.
-6. Admin-only create/list/info/disable/rotate/delete in secure mode.
-7. Non-admin cannot create key.
-8. Users cannot list/info their own keys in v1.
-9. Create key with OM-generated secret.
-10. Create/rotate fails if encryption key provider is unavailable.
-11. Create/rotate fails if current encryption key is unavailable.
-12. Credential validation fails closed if referenced `secretKeyId` is missing.
-13. OM restart preserves ability to validate managed keys.
-14. Old encryption key is retained while rows reference it.
-15. Plaintext secret is absent from Ratis logs, RocksDB, checkpoints, audit,
-    `toString()`, and errors.
-16. Create key with custom secret only if enabled.
-17. Reject custom secret if disabled.
-18. Enforce secret min length.
-19. Enforce max lifetime.
-20. Create rejects collision with managed table.
-21. Create rejects collision with legacy `s3SecretTable`.
-22. Legacy secret creation rejects collision with managed table.
-23. Concurrent managed create and legacy secret create for the same
-    `accessKeyId` cannot both succeed.
-24. External/legacy provider collision check path is exercised or explicitly
-    gated.
-25. Non-secure + managed access keys + local policy rejects unknown
+6. OM fails startup if `accesskey.enabled=true` and
+   `ozone.s3.accesskey.encryption.key.name` is unset.
+7. OM fails startup if `accesskey.enabled=true` and
+   `hadoop.security.key.provider.path` is missing or unusable.
+8. OM fails startup if the configured KMS key does not exist.
+9. OM fails startup if the current KMS key version is unavailable.
+10. Non-secure managed-key mode still requires a usable key provider.
+
+Phase 1b config tests also cover retrieval-handle defaults and bounds:
+`ozone.s3.accesskey.retrieval.handle.ttl` defaults to 60 seconds and rejects
+zero, negative, and values above 300 seconds.
+`ozone.s3.accesskey.retrieval.handle.max.entries` defaults to 1024 and rejects
+zero or negative values.
+
+11. Non-secure admin lifecycle mode is explicitly unsafe, is not recommended
+   for production, and requires backend Ozone endpoints to be restricted.
+12. Admin-only create/list/info/disable/rotate/delete in secure mode.
+13. Non-admin cannot create key.
+14. Users cannot list/info their own keys in v1.
+15. Create key with OM-generated secret.
+16. Create/rotate fails if encryption key provider is unavailable at request
+    time.
+17. Create/rotate uses `ozone.s3.accesskey.encryption.key.name`.
+18. Create/rotate fails if current encryption key version is unavailable.
+19. Rotate updates `secretKeyId` when the current KMS key version changes.
+20. Envelope blob round-trip contains enough metadata to decrypt after OM
+    restart.
+21. Missing envelope metadata fails closed.
+22. Missing or invalid envelope metadata fails closed.
+23. Credential validation fails closed if referenced `secretKeyId` is missing.
+24. Missing key version or key material fails closed.
+25. OM restart preserves ability to validate managed keys.
+26. Old encryption-key versions are retained while non-deleted rows reference
+    them.
+27. Plaintext secret is absent from Ratis logs, RocksDB, checkpoints, audit,
+    server logs, TRACE/debug output, `toString()`, and errors.
+28. Ratis-applied request does not contain plaintext.
+29. Normal `OMResponse` and normal retry-cache object do not contain plaintext.
+30. Create/rotate response contains retrievalHandle, not plaintext.
+31. Normal Ratis retry cache replays retrievalHandle, never plaintext.
+32. `RetrieveManagedS3AccessKeySecret(retrievalHandle)` returns plaintext
+    once.
+33. Retrieval handle is single-use and bound to caller identity and
     `accessKeyId`.
-26. Non-secure + managed access keys does not fall back to arbitrary legacy
+34. Unknown, expired, already-consumed, wrong-caller, or failover-lost
+    retrieval handle returns `MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE`.
+35. Leader failover loses the plaintext retrieval map and does not reveal the
+    old plaintext secret.
+36. Create key with custom secret only if enabled.
+37. Reject custom secret if disabled.
+38. Enforce secret min length.
+39. Enforce max lifetime.
+40. Rotate may update `secretKeyId` when the current encryption-key version
+    changed.
+41. Rotate does not change `accessKeyId`, `effectiveUser`, groups snapshot, or
+    `policyDocument`.
+42. Create rejects collision with managed table.
+43. Create rejects collision with legacy `s3SecretTable`.
+44. Managed create rejects collision with a reliable external legacy
+    `S3SecretStoreProvider` existence check.
+45. Managed create fails closed or is unsupported if an external legacy
+    provider cannot reliably answer existence checks.
+46. Legacy secret creation rejects collision with managed table.
+47. Concurrent managed create and legacy secret create for the same
+    `accessKeyId` cannot both succeed.
+48. External/legacy provider collision check path is exercised or explicitly
+    gated.
+49. Non-secure + managed access keys + local policy rejects unknown
+    `accessKeyId`.
+50. Non-secure + managed access keys does not fall back to arbitrary legacy
     credentials.
-27. Expired managed key denied.
-28. Disabled managed key denied.
-29. Disabled managed row does not fall through to legacy path.
-30. Expired managed row does not fall through to legacy path.
-31. Disabled/expired managed row does not fall through to non-secure dummy
+51. Expired managed key denied.
+52. Disabled managed key denied.
+53. Disabled managed row does not fall through to legacy path.
+54. Expired managed row does not fall through to legacy path.
+55. Disabled/expired managed row does not fall through to non-secure dummy
     credential behavior.
-32. HA/follower request after disable fails.
-33. HA/follower request after rotate with old secret fails.
-34. HA/follower request after delete does not use stale managed row.
-35. Managed auth context is cleared between requests.
-36. After delete, the same `accessKeyId` can be created again as a managed key
+56. HA/follower request after disable fails.
+57. HA/follower request after rotate with old secret fails.
+58. HA/follower request after delete does not use stale managed row.
+59. Managed auth context is cleared between requests.
+60. After delete, the same `accessKeyId` can be created again as a managed key
     because the managed row no longer exists.
-37. After delete, if a legacy `getsecret` entry with the same `accessKeyId`
+61. After delete, if a legacy `getsecret` entry with the same `accessKeyId`
     exists, secure-cluster resolver falls through to legacy `S3SecretManager`
     on subsequent requests.
-38. Secure cluster fallback to legacy `S3SecretManager` still works when no
+62. Secure cluster fallback to legacy `S3SecretManager` still works when no
     managed key exists.
-39. Wrong secret returns `SignatureDoesNotMatch` or equivalent.
-40. Non-empty invalid session token fails and does not fall back to managed key.
-41. Session token present with managed `accessKeyId` still uses STS path.
-42. `local.policy.enabled=true` requires policy.
-43. `local.policy.enabled=false` rejects `policyDocument`.
-44. Policy size bound enforced in `preExecute()`.
-45. Max statements/actions/resources enforced in `preExecute()`.
-46. Malformed JSON policy fails before Ratis-applied request.
-47. Unknown top-level policy field rejected.
-48. Unknown statement field rejected.
-49. `Principal` rejected.
-50. `Condition` rejected.
-51. `NotAction` rejected.
-52. `NotResource` rejected.
-53. Invalid `Effect` rejected.
-54. Empty `Statement` rejected.
-55. Empty `Action` / `Resource` rejected.
-56. Unknown action fails before Ratis-applied request.
-57. Invalid resource syntax fails before Ratis-applied request.
-58. Canonicalized policy hash is stable.
-59. Prefix resource patterns work.
-60. Bucket wildcard rejected.
-61. Bucket ARN does not grant object action.
-62. Object ARN does not grant bucket action.
-63. Deny overrides allow.
-64. Allowed bucket Put/Get/List succeeds with local JSON policy.
-65. Denied bucket fails.
-66. Local JSON policy runs in non-secure mode for managed-access-key S3
+63. Wrong secret returns `SignatureDoesNotMatch` or equivalent.
+64. Non-empty invalid session token fails and does not fall back to managed key.
+65. Session token present with managed `accessKeyId` still uses STS path.
+66. `local.policy.enabled=true` requires policy.
+67. `local.policy.enabled=false` rejects `policyDocument`.
+68. Policy size bound enforced in `preExecute()`.
+69. Max statements/actions/resources enforced in `preExecute()`.
+70. Malformed JSON policy fails before Ratis-applied request.
+71. Unknown top-level policy field rejected.
+72. Unknown statement field rejected.
+73. `Principal` rejected.
+74. `Condition` rejected.
+75. `NotAction` rejected.
+76. `NotResource` rejected.
+77. Invalid `Effect` rejected.
+78. Empty `Statement` rejected.
+79. Empty `Action` / `Resource` rejected.
+80. Unknown action fails before Ratis-applied request.
+81. Invalid resource syntax fails before Ratis-applied request.
+82. Canonicalized policy hash is stable.
+83. Prefix resource patterns work.
+84. Bucket wildcard rejected.
+85. Bucket ARN does not grant object action.
+86. Object ARN does not grant bucket action.
+87. Deny overrides allow.
+88. Allowed bucket Put/Get/List succeeds with local JSON policy.
+89. Denied bucket fails.
+90. Local JSON policy runs in non-secure mode for managed-access-key S3
     requests.
-67. `accessKeyId != effectiveUser`; authorization uses `effectiveUser/groups`.
-68. Groups snapshot semantics.
-69. Rotate invalidates old secret immediately.
-70. Rotate returns new plaintext secret once.
-71. Rotate may set expiry relative to rotation time.
-72. Rotate cannot exceed max lifetime.
-73. Rotate does not change `policyDocument`.
-74. Policy change requires new key in v1.
-75. Create/rotate retry behavior does not persist plaintext and does not leak
-    the secret.
-76. Audit logs include `policySha256`.
-77. Audit logs redact plaintext secret.
-78. Create/rotate `toString()` and errors do not contain plaintext secret.
-79. STS session token path takes precedence in secure mode.
-80. Existing `S3SecretManager/getsecret` validation path unchanged.
-81. `HDDS-15273` WebIdentity STS path unchanged.
-82. S3G does not store credentials.
-83. S3G does not make final authorization decisions.
+91. `accessKeyId != effectiveUser`; authorization uses `effectiveUser/groups`.
+92. Groups snapshot semantics.
+93. Rotate invalidates old secret immediately.
+94. Rotate returns a new retrievalHandle for one-time secret retrieval.
+95. Rotate may set expiry relative to rotation time.
+96. Rotate cannot exceed max lifetime.
+97. Rotate does not change `policyDocument`.
+98. Policy change requires new key in v1.
+99. Create/rotate retry behavior persists only retrievalHandle and does not
+    leak plaintext.
+100. Audit logs include `policySha256`.
+101. Audit logs redact plaintext secret.
+102. Create/rotate `toString()` and errors do not contain plaintext secret.
+103. Create/rotate logs and TRACE/debug output redact plaintext secret.
+104. STS session token path takes precedence in secure mode.
+105. Existing `S3SecretManager/getsecret` validation path unchanged.
+106. `HDDS-15273` WebIdentity STS path unchanged.
+107. S3G does not store credentials.
+108. S3G does not make final authorization decisions.

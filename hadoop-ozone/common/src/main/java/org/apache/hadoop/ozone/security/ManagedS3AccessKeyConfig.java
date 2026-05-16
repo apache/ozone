@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_DEFAUL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_DEFAULT_LIFETIME_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_LOCAL_POLICY_ENABLED;
@@ -37,6 +39,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_LOCAL_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_LOCAL_POLICY_MAX_STATEMENTS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_MAX_LIFETIME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_MAX_LIFETIME_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_MAX_ENTRIES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_MAX_ENTRIES_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_TTL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_TTL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH_DEFAULT;
 
@@ -50,11 +56,17 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
  */
 public final class ManagedS3AccessKeyConfig {
 
+  private static final Duration RETRIEVAL_HANDLE_TTL_MAX =
+      Duration.ofSeconds(300);
+
   private final boolean enabled;
   private final Duration defaultLifetime;
   private final Duration maxLifetime;
   private final boolean allowCustomSecret;
   private final int secretMinLength;
+  private final String encryptionKeyName;
+  private final Duration retrievalHandleTtl;
+  private final int retrievalHandleMaxEntries;
   private final boolean insecureClusterAdminAllowed;
   private final boolean localPolicyEnabled;
   private final int localPolicyMaxSizeBytes;
@@ -72,6 +84,20 @@ public final class ManagedS3AccessKeyConfig {
     this.allowCustomSecret = builder.allowCustomSecret;
     this.secretMinLength = requirePositive(builder.secretMinLength,
         OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH);
+    this.encryptionKeyName = normalize(builder.encryptionKeyName);
+    if (enabled && encryptionKeyName.isEmpty()) {
+      throw new IllegalArgumentException(
+          OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME
+              + " must be configured when "
+              + OZONE_S3_ACCESS_KEY_ENABLED + "=true");
+    }
+    this.retrievalHandleTtl = requireMax(
+        requirePositive(builder.retrievalHandleTtl,
+            OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_TTL),
+        RETRIEVAL_HANDLE_TTL_MAX, OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_TTL);
+    this.retrievalHandleMaxEntries = requirePositive(
+        builder.retrievalHandleMaxEntries,
+        OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_MAX_ENTRIES);
     this.insecureClusterAdminAllowed = builder.insecureClusterAdminAllowed;
     this.localPolicyEnabled = builder.localPolicyEnabled;
     this.localPolicyMaxSizeBytes = requirePositive(
@@ -103,6 +129,15 @@ public final class ManagedS3AccessKeyConfig {
         .setSecretMinLength(integer(conf,
             OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH,
             OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH_DEFAULT))
+        .setEncryptionKeyName(conf.getTrimmed(
+            OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME,
+            OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME_DEFAULT))
+        .setRetrievalHandleTtl(duration(conf,
+            OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_TTL,
+            OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_TTL_DEFAULT))
+        .setRetrievalHandleMaxEntries(integer(conf,
+            OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_MAX_ENTRIES,
+            OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_MAX_ENTRIES_DEFAULT))
         .setInsecureClusterAdminAllowed(conf.getBoolean(
             OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED,
             OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED_DEFAULT))
@@ -146,6 +181,18 @@ public final class ManagedS3AccessKeyConfig {
 
   public int getSecretMinLength() {
     return secretMinLength;
+  }
+
+  public String getEncryptionKeyName() {
+    return encryptionKeyName;
+  }
+
+  public Duration getRetrievalHandleTtl() {
+    return retrievalHandleTtl;
+  }
+
+  public int getRetrievalHandleMaxEntries() {
+    return retrievalHandleMaxEntries;
   }
 
   public boolean isInsecureClusterAdminAllowed() {
@@ -226,6 +273,13 @@ public final class ManagedS3AccessKeyConfig {
     return value;
   }
 
+  private static Duration requireMax(Duration value, Duration max, String key) {
+    if (value.compareTo(max) > 0) {
+      throw new IllegalArgumentException(key + " must not exceed " + max);
+    }
+    return value;
+  }
+
   private static void requireDefaultLifetimeWithinMax(Duration defaultLifetime,
       Duration maxLifetime) {
     if (defaultLifetime.compareTo(maxLifetime) > 0) {
@@ -233,6 +287,10 @@ public final class ManagedS3AccessKeyConfig {
           OZONE_S3_ACCESS_KEY_DEFAULT_LIFETIME + " must not exceed "
               + OZONE_S3_ACCESS_KEY_MAX_LIFETIME);
     }
+  }
+
+  private static String normalize(String value) {
+    return value == null ? "" : value.trim();
   }
 
   /**
@@ -247,6 +305,11 @@ public final class ManagedS3AccessKeyConfig {
         OZONE_S3_ACCESS_KEY_ALLOW_CUSTOM_SECRET_DEFAULT;
     private int secretMinLength =
         OZONE_S3_ACCESS_KEY_SECRET_MIN_LENGTH_DEFAULT;
+    private String encryptionKeyName =
+        OZONE_S3_ACCESS_KEY_ENCRYPTION_KEY_NAME_DEFAULT;
+    private Duration retrievalHandleTtl = Duration.ofSeconds(60);
+    private int retrievalHandleMaxEntries =
+        OZONE_S3_ACCESS_KEY_RETRIEVAL_HANDLE_MAX_ENTRIES_DEFAULT;
     private boolean insecureClusterAdminAllowed =
         OZONE_S3_ACCESS_KEY_INSECURE_CLUSTER_ADMIN_ALLOWED_DEFAULT;
     private boolean localPolicyEnabled =
@@ -284,6 +347,21 @@ public final class ManagedS3AccessKeyConfig {
 
     public Builder setSecretMinLength(int value) {
       this.secretMinLength = value;
+      return this;
+    }
+
+    public Builder setEncryptionKeyName(String value) {
+      this.encryptionKeyName = value;
+      return this;
+    }
+
+    public Builder setRetrievalHandleTtl(Duration value) {
+      this.retrievalHandleTtl = value;
+      return this;
+    }
+
+    public Builder setRetrievalHandleMaxEntries(int value) {
+      this.retrievalHandleMaxEntries = value;
       return this;
     }
 
