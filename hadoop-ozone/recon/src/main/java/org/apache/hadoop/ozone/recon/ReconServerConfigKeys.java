@@ -138,11 +138,11 @@ public final class  ReconServerConfigKeys {
    *
    * <p>When {@code |(SCM_total_containers - SCM_open_containers) -
    * (Recon_total_containers - Recon_open_containers)|} exceeds this value the
-   * targeted 4-pass sync becomes expensive (many batched RPC rounds). The
-   * periodic scheduler records the condition through logs and metrics rather
-   * than automatically replacing the SCM DB snapshot. The comparison
-   * intentionally excludes OPEN containers because missing OPEN containers are
-   * short-lived and can be repaired incrementally.
+   * targeted sync becomes expensive (many batched RPC rounds). The periodic
+   * scheduler records the condition through logs and metrics and still runs the
+   * targeted sync, rather than automatically replacing the SCM DB snapshot. The
+   * comparison intentionally excludes OPEN containers because missing OPEN
+   * containers are short-lived and can be repaired incrementally.
    *
    * <p>Default: 1,000,000. In large clusters (millions of containers) operators
    * may raise this further since the targeted sync handles per-state
@@ -195,7 +195,7 @@ public final class  ReconServerConfigKeys {
    * How often the incremental (targeted) SCM container sync runs.
    *
    * <p>Each cycle calls {@code decideSyncAction()} — two lightweight count
-   * RPCs to SCM — and then either runs the 4-pass incremental sync or takes
+   * RPCs to SCM — and then either runs targeted container sync or takes
    * no action. This periodic task does not download a full SCM DB snapshot
    * automatically.
    *
@@ -280,9 +280,9 @@ public final class  ReconServerConfigKeys {
   public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
 
   /**
-   * Page size for Pass 4 (DELETED retirement) in each TARGETED_SYNC cycle.
+   * Page size for DELETED reconciliation in each TARGETED_SYNC cycle.
    *
-   * <p>Pass 4 paginates SCM's DELETED list using {@code getListOfContainerInfos},
+   * <p>DELETED sync paginates SCM's DELETED list using {@code getListOfContainerInfos},
    * which returns {@code ContainerInfo} objects (~86 bytes each on wire, no
    * pipeline or DatanodeDetails). The safe IPC upper bound at 128 MB default is
    * {@code 128 MB / 128 bytes = 1,048,576} containers per page.

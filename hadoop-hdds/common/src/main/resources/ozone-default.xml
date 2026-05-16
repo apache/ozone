@@ -3611,9 +3611,10 @@
     <tag>OZONE, RECON, SCM</tag>
     <description>
       Non-OPEN container count drift threshold above which Recon records a
-      large-drift event through logs and metrics instead of automatically
-      replacing the SCM DB snapshot. Missing OPEN containers stay on the
-      incremental path because they are short-lived and can be repaired cheaply.
+      large-drift event through logs and metrics and runs targeted sync instead
+      of automatically replacing the SCM DB snapshot. Missing OPEN containers
+      stay on the incremental path because they are short-lived and can be
+      repaired cheaply.
     </description>
   </property>
   <property>

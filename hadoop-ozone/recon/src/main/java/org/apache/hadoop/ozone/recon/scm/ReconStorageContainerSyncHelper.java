@@ -53,47 +53,40 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Helper class that performs targeted incremental sync between SCM and Recon
- * container metadata. Executes four passes per sync cycle, all completing in
- * a single cycle with local pagination — no cross-cycle cursor state except
- * for Pass 2 (see below):
+ * container metadata. Each sync cycle scans the SCM states Recon can safely
+ * reconcile (OPEN, QUASI_CLOSED, CLOSED and DELETED), all completing in a
+ * single cycle with local pagination. SCM CLOSING and DELETING are skipped
+ * deliberately because they are intermediate states.
  *
  * <ol>
- *   <li><b>Pass 1 — CLOSED (SCM-driven, add + correct):</b> paginates SCM's
- *       CLOSED container ID list; for each page, one batch RPC adds all absent
- *       containers, and local state-machine transitions correct containers stuck
- *       in OPEN, CLOSING, or QUASI_CLOSED in Recon but already CLOSED in SCM.</li>
- *   <li><b>Pass 2 — OPEN (SCM-driven, add only, incremental cursor):</b> scans
- *       only newly created OPEN containers starting from the last-seen ID
- *       ({@code pass2OpenStartContainerId}). OPEN container IDs are monotonic so
- *       rescanning from 1 every cycle would be wasteful; the cursor advances
- *       forward only and never needs to go backward.</li>
- *   <li><b>Pass 3 — QUASI_CLOSED (SCM-driven, add + correct):</b> paginates SCM's
- *       QUASI_CLOSED list; adds absent containers (fast path via pipeline-capable
- *       batch RPC; fallback via {@code addContainerInfoFallback} for containers
- *       with zero viable replicas whose pipeline cannot be resolved) and corrects
- *       containers stuck OPEN or CLOSING in Recon.</li>
- *   <li><b>Pass 4 — DELETED retirement (SCM-driven, transition only):</b>
- *       paginates SCM's DELETED list using {@code getListOfContainerInfos}
- *       (metadata only, no pipeline resolution). For each container SCM reports
- *       as DELETED, Recon drives the container atomically from
-   *       CLOSED/QUASI_CLOSED → DELETING → DELETED in a single call. The
-   *       DELETING list is intentionally skipped to avoid leaving Recon in an
-   *       intermediate DELETING state across cycles.</li>
+ *   <li><b>OPEN:</b> scans only newly created OPEN containers starting from the
+ *       last-seen ID ({@code pass2OpenStartContainerId}). Existing containers in
+ *       later Recon states are not moved backwards to OPEN.</li>
+ *   <li><b>QUASI_CLOSED and CLOSED:</b> paginate SCM state lists; add absent
+ *       containers and advance existing Recon containers through valid local
+ *       state-machine transitions. If Recon has DELETED but SCM reports one of
+ *       these states, Recon rebuilds the container record from SCM metadata.</li>
+ *   <li><b>DELETED:</b> paginates SCM's DELETED list using
+ *       {@code getListOfContainerInfos}. For each container SCM reports as
+ *       DELETED, Recon drives the container to DELETED in a single call. The
+ *       DELETING list is intentionally skipped to avoid leaving Recon in an
+ *       intermediate DELETING state across cycles.</li>
  * </ol>
  *
  * <h3>Scalability at 100M containers</h3>
  * <ul>
- *   <li>{@link #decideSyncAction()} uses {@link
- *       org.apache.hadoop.hdds.scm.container.ContainerManager#getTotalContainerCount()}
- *       (O(number of states), all O(1) per-state lookups) — never calls
- *       {@code getContainers()} which would allocate a large
+   *   <li>{@link #decideSyncAction()} sums per-state counts (O(number of
+   *       states), all O(1) lookups) — never calls {@code getContainers()}
+   *       which would allocate a large
  *       {@code List<ContainerInfo>} on every decision tick.</li>
- *   <li>Pass 1 and Pass 3 issue <b>one</b> {@code getExistContainerWithPipelinesInBatch}
- *       RPC per sub-batch of absent containers — not one per absent container.
+ *   <li>Live-state sync issues <b>one</b>
+ *       {@code getExistContainerWithPipelinesInBatch} RPC per sub-batch of
+ *       absent containers — not one per absent container.
  *       Sub-batch size is bounded by {@link #safeContainerWithPipelineBatchSize}
  *       to keep the CWP response within the 128 MB IPC limit.</li>
- *   <li>Pass 4 uses {@code getListOfContainerInfos} against SCM's DELETED list
- *       only, bounded by {@link #safeContainerInfoBatchSize(int)}.</li>
+ *   <li>DELETED sync uses {@code getListOfContainerInfos} against SCM's
+ *       DELETED list only, bounded by {@link #safeContainerInfoBatchSize(int)}.
+ *       </li>
  * </ul>
  */
 class ReconStorageContainerSyncHelper {
@@ -103,7 +96,7 @@ class ReconStorageContainerSyncHelper {
    * Used to compute the maximum number of IDs that fit in one
    * {@code getListOfContainerIDs} RPC call, where both the request (IDs sent
    * to SCM) and the response (IDs returned by SCM) carry only ContainerID entries.
-   * Applies to Pass 1, Pass 2, Pass 3 pagination and Pass 4
+   * Applies to live-state pagination and DELETED ID lists
    * (DELETED ID list).
    */
   private static final long CONTAINER_ID_PROTO_SIZE_BYTES = 12;
@@ -151,7 +144,7 @@ class ReconStorageContainerSyncHelper {
    * <p>{@code IPC_MAXIMUM_DATA_LENGTH_DEFAULT = 134,217,728 bytes = 128 MB}
    * (verified from Hadoop 3.x {@code CommonConfigurationKeys}).
    * <pre>
-   *   Single-state CWP call (Pass 1/3 absent-container adds):
+   *   Single-state CWP call (absent-container adds):
    *     128 MB / 1024 bytes = 131,072 containers per call
    *     (actual bytes: 131,072 × 490 ≈ 61 MB — well within limit)
    * </pre>
@@ -161,7 +154,7 @@ class ReconStorageContainerSyncHelper {
   private static final long CONTAINER_WITH_PIPELINE_PROTO_SIZE_BYTES = 1024;
 
   /**
-   * Monotonic cursor for Pass 2 (OPEN add-only sync). OPEN containers are
+   * Monotonic cursor for OPEN add-only sync. OPEN containers are
    * created with increasing container IDs, so each cycle only needs to scan
    * from the last-seen ID onward rather than rescanning the full OPEN set.
    *
@@ -193,18 +186,11 @@ class ReconStorageContainerSyncHelper {
     NO_ACTION,
 
     /**
-     * Small or per-state drift detected — run the four-pass targeted sync.
+     * Drift detected — run the targeted sync.
      * This is the normal steady-state response: cheaper than a full snapshot
      * and sufficient for the vast majority of drift scenarios.
      */
-    TARGETED_SYNC,
-
-    /**
-     * Large non-OPEN drift exceeded the configured threshold. The periodic
-     * scheduler records this condition through logs and metrics, but does not
-     * automatically download an SCM DB snapshot.
-     */
-    LARGE_DRIFT_THRESHOLD_EXCEEDED
+    TARGETED_SYNC
   }
 
   ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
@@ -230,10 +216,9 @@ class ReconStorageContainerSyncHelper {
    * <p>Decision logic:
    * <ol>
    *   <li>If {@code |(SCM_total - SCM_open) - (Recon_total - Recon_open)| >
-   *       ozone.recon.scm.container.threshold} (default 1,000,000): return
-   *       {@link SyncAction#LARGE_DRIFT_THRESHOLD_EXCEEDED}. Large drift in
-   *       non-OPEN containers is surfaced through logs and metrics instead of
-   *       triggering an automatic SCM DB snapshot replacement.</li>
+   *       ozone.recon.scm.container.threshold} (default 1,000,000): record the
+   *       large-drift event through logs and metrics, then return
+   *       {@link SyncAction#TARGETED_SYNC}.</li>
    *   <li>If OPEN drift is positive: return
    *       {@link SyncAction#TARGETED_SYNC}. This keeps OPEN-only gaps on the
    *       incremental path because missing OPEN containers can be repaired
@@ -249,15 +234,16 @@ class ReconStorageContainerSyncHelper {
    *       </ul>
    *       If drift in either stable state reaches the threshold:
    *       return {@link SyncAction#TARGETED_SYNC}.</li>
-   *   <li>DELETED-only total-count drift does not trigger targeted sync. Pass 4
-   *       can converge SCM-reported DELETED containers into Recon, but it cannot
-   *       remove extra DELETED containers that SCM no longer lists.</li>
+   *   <li>DELETED-only total-count drift does not trigger targeted sync.
+   *       DELETED sync can converge SCM-reported DELETED containers into Recon,
+   *       but it cannot remove extra DELETED containers that SCM no longer
+   *       lists.</li>
    *   <li>Otherwise: return {@link SyncAction#NO_ACTION}.</li>
    * </ol>
    *
    * <p>Repairable per-state drift deliberately routes to targeted sync, not a
-   * full snapshot — the targeted sync's per-state passes correct these
-   * conditions efficiently without replacing the entire database.
+   * full snapshot — targeted sync corrects these conditions efficiently without
+   * replacing the entire database.
    *
    * @return the recommended {@link SyncAction}
    * @throws IOException if SCM RPC calls to retrieve counts fail
@@ -275,8 +261,6 @@ class ReconStorageContainerSyncHelper {
     // the Check 1 non-OPEN drift and Check 2 repairable per-state drift checks.
     // QUASI_CLOSED and CLOSED are read later in Check 3 where they are first
     // needed.
-    // getTotalContainerCount() sums all LifeCycleState values via the same O(1)
-    // per-state lookups.
     long reconOpen =
         containerManager.getContainerStateCount(HddsProtos.LifeCycleState.OPEN);
     long reconTotal = containerManager.getTotalContainerCount();
@@ -290,12 +274,11 @@ class ReconStorageContainerSyncHelper {
     long nonOpenDrift = Math.abs(scmNonOpen - reconNonOpen);
 
     if (nonOpenDrift > largeThreshold) {
-      LOG.warn("Tiered sync decision: LARGE_DRIFT_THRESHOLD_EXCEEDED. "
+      LOG.warn("Tiered sync decision: TARGETED_SYNC. "
               + "Non-OPEN container drift {} exceeds threshold {} "
               + "(SCM_non_OPEN={}, Recon_non_OPEN={}, SCM_total={}, Recon_total={}). "
-              + "Periodic full SCM DB snapshot download is disabled; "
-              + "skipping automatic SCM checkpoint replacement and recording "
-              + "large-drift threshold-exceeded event. Check Recon metrics "
+              + "Recording large-drift threshold-exceeded event and running "
+              + "targeted sync. Check Recon metrics "
               + "fullScmDbSnapshotThresholdExceededCount, "
               + "lastFullScmDbSnapshotThresholdExceededNonOpenDrift, and "
               + "intervalSinceLastFullScmDbSnapshotThresholdExceededMs.",
@@ -303,7 +286,7 @@ class ReconStorageContainerSyncHelper {
       if (metrics != null) {
         metrics.recordFullSnapshotThresholdExceededEvent(nonOpenDrift);
       }
-      return SyncAction.LARGE_DRIFT_THRESHOLD_EXCEEDED;
+      return SyncAction.TARGETED_SYNC;
     }
     // --- Check 2: OPEN drift is always repairable through targeted sync. ---
     long openDrift = Math.abs(scmOpen - reconOpen);
@@ -373,69 +356,44 @@ class ReconStorageContainerSyncHelper {
   }
 
   /**
-   * Runs all four sync passes and returns {@code true} if all passes completed
-   * without a fatal error.
+   * Runs targeted sync for SCM states Recon can safely reconcile.
    */
   public boolean syncWithSCMContainerInfo() {
-    boolean pass1 = syncClosedContainers();
-    boolean pass2 = syncOpenContainersIncrementally();
-    boolean pass3 = syncQuasiClosedContainers();
-    boolean pass4 = retireDeletedContainers();
-    return pass1 && pass2 && pass3 && pass4;
+    boolean open = syncContainersForState(HddsProtos.LifeCycleState.OPEN, true);
+    boolean quasiClosed =
+        syncContainersForState(HddsProtos.LifeCycleState.QUASI_CLOSED, false);
+    boolean closed =
+        syncContainersForState(HddsProtos.LifeCycleState.CLOSED, false);
+    boolean deleted = syncDeletedContainers();
+    return open && quasiClosed && closed && deleted;
   }
 
-  // ---------------------------------------------------------------------------
-  // Pass 1: CLOSED containers — add missing, correct stale OPEN/CLOSING/QUASI_CLOSED
-  // ---------------------------------------------------------------------------
-
   /**
-   * Fetches SCM's full CLOSED container ID list (paginated) and for each page:
-   * <ol>
-   *   <li>Splits the page into absent-from-Recon and present-in-Recon sets.</li>
-   *   <li>One or more sub-batch RPCs ({@code getExistContainerWithPipelinesInBatch}),
-   *       each bounded by {@link #safeContainerWithPipelineBatchSize}, add all
-   *       absent containers. This is critical for large clusters where a per-container
-   *       RPC would otherwise fire N times for N missing containers per page.</li>
-   *   <li>For containers returned: {@code addNewContainer()}.</li>
-   *   <li>For containers excluded (pipeline unresolvable): {@code addContainerInfoFallback()}
-   *       — targeted, expected near-zero in healthy clusters.</li>
-   *   <li>For present containers whose state is stale (OPEN/CLOSING/QUASI_CLOSED):
-   *       state-machine corrections using local in-memory transitions only — no SCM RPCs.</li>
-   * </ol>
+   * Paginates one SCM lifecycle state and reconciles each returned container ID.
    */
-  private boolean syncClosedContainers() {
+  private boolean syncContainersForState(HddsProtos.LifeCycleState scmState,
+                                         boolean incrementalOpen) {
     try {
-      long totalClosed = scmServiceProvider.getContainerCount(
-          HddsProtos.LifeCycleState.CLOSED);
-      if (totalClosed == 0) {
-        LOG.debug("No CLOSED containers found in SCM.");
+      long total = scmServiceProvider.getContainerCount(scmState);
+      if (total == 0) {
+        LOG.debug("{} sync: no containers found in SCM.", scmState);
         return true;
       }
 
-      // Compute batchSize once from totalClosed and reuse across all pages.
-      // Calling getContainerCount(CLOSED) on every page would add one extra
-      // RPC per page — e.g. 100 extra RPCs for 100M containers at 1M/page.
-      // The count is stable enough for the duration of this sync pass.
-      int batchSize = (int) getContainerCountPerCall(totalClosed);
-
-      ContainerID startContainerId = ContainerID.valueOf(1);
+      int batchSize = (int) getContainerCountPerCall(total);
+      long initialStart = incrementalOpen ? pass2OpenStartContainerId.get() : 1L;
+      ContainerID startContainerId = ContainerID.valueOf(initialStart);
       long retrieved = 0;
       int addedCount = 0;
-      int correctedCount = 0;
+      int reconciledCount = 0;
 
       while (true) {
         List<ContainerID> batch = scmServiceProvider.getListOfContainerIDs(
-            startContainerId, batchSize, HddsProtos.LifeCycleState.CLOSED);
+            startContainerId, batchSize, scmState);
         if (batch == null || batch.isEmpty()) {
-          break; // no more CLOSED containers at or above startContainerId
+          break;
         }
 
-        LOG.info("Pass 1 (CLOSED): processing batch of {} containers.", batch.size());
-
-        // ── Phase A: batch-add absent containers ──────────────────────────────────
-        // Partition the page into absent (need to add) and present (may need
-        // state correction). This single pass avoids repeated containerExist()
-        // calls in Phase B.
         List<Long> absentIds = new ArrayList<>();
         List<ContainerID> presentIds = new ArrayList<>();
         for (ContainerID containerID : batch) {
@@ -448,278 +406,143 @@ class ReconStorageContainerSyncHelper {
 
         if (!absentIds.isEmpty()) {
           addedCount += batchedAddMissingContainers(
-              absentIds, HddsProtos.LifeCycleState.CLOSED, "Pass 1");
+              absentIds, scmState, scmState + " sync");
         }
 
-        // ── Phase B: state-correct present containers ─────────────────────────────
-        // All operations here are local state-machine transitions (no SCM RPCs).
-        // Only stale containers (OPEN/CLOSING/QUASI_CLOSED in Recon but CLOSED in SCM)
-        // require action; already-CLOSED containers are no-ops.
         for (ContainerID containerID : presentIds) {
-          correctedCount += correctClosedContainerState(containerID);
+          reconciledCount += reconcileExistingContainer(containerID, scmState);
         }
 
         long lastID = batch.get(batch.size() - 1).getId();
-        startContainerId = ContainerID.valueOf(lastID + 1);
+        long nextID = lastID + 1;
+        if (incrementalOpen) {
+          pass2OpenStartContainerId.set(nextID);
+        }
+        startContainerId = ContainerID.valueOf(nextID);
         retrieved += batch.size();
       }
 
-      LOG.info("Pass 1 (CLOSED): sync complete, checked {}, added {}, corrected {}.",
-          retrieved, addedCount, correctedCount);
+      LOG.info("{} sync complete from start {}, checked {}, added {}, reconciled {}.",
+          scmState, initialStart, retrieved, addedCount, reconciledCount);
       return true;
     } catch (Exception e) {
-      LOG.error("Pass 1 (CLOSED): unexpected error during sync.", e);
+      LOG.error("{} sync: unexpected error.", scmState, e);
       return false;
     }
   }
 
-  /**
-   * Corrects the lifecycle state of a container that is present in Recon but
-   * whose state lags behind SCM's CLOSED state. All transitions are local
-   * in-memory state-machine operations — no SCM RPCs are issued.
-   *
-   * <p>Valid correction paths:
-   * <pre>
-   *   OPEN        → CLOSING (FINALIZE)  → CLOSED (CLOSE)   returns 1
-   *   CLOSING     → CLOSED  (CLOSE)                        returns 1
-   *   QUASI_CLOSED → CLOSED (FORCE_CLOSE)                  returns 1
-   *   CLOSED      → no-op                                  returns 0
-   * </pre>
-   *
-   * @return 1 if any correction was applied, 0 if already CLOSED or correction failed
-   */
-  private int correctClosedContainerState(ContainerID containerID) {
+  private int reconcileExistingContainer(ContainerID containerID,
+                                         HddsProtos.LifeCycleState scmState) {
     try {
       ContainerInfo reconContainer = containerManager.getContainer(containerID);
       HddsProtos.LifeCycleState reconState = reconContainer.getState();
-
-      if (reconState == HddsProtos.LifeCycleState.OPEN) {
-        LOG.info("Pass 1 (CLOSED): container {} is OPEN in Recon but CLOSED in SCM. "
-            + "Correcting state.", containerID);
-        // OPEN → CLOSING; also decrements pipelineToOpenContainer counter.
-        containerManager.transitionOpenToClosing(containerID, reconContainer);
-        reconState = HddsProtos.LifeCycleState.CLOSING;
+      if (reconState == scmState) {
+        return 0;
       }
 
-      if (reconState == HddsProtos.LifeCycleState.CLOSING) {
-        containerManager.updateContainerState(containerID, CLOSE);
-        LOG.info("Pass 1 (CLOSED): container {} corrected to CLOSED "
-            + "(was CLOSING).", containerID);
-        return 1;  // correction applied — was CLOSING or OPEN before this call
+      switch (scmState) {
+      case OPEN:
+        LOG.debug("Skipping container {} because SCM reports OPEN while Recon "
+            + "already has state {}.", containerID, reconState);
+        return 0;
+      case QUASI_CLOSED:
+        return reconcileToQuasiClosed(containerID, reconContainer, reconState);
+      case CLOSED:
+        return reconcileToClosed(containerID, reconContainer, reconState);
+      default:
+        LOG.debug("Skipping container {} for unsupported SCM sync state {}.",
+            containerID, scmState);
+        return 0;
       }
-
-      if (reconState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
-        containerManager.updateContainerState(containerID, FORCE_CLOSE);
-        LOG.info("Pass 1 (CLOSED): container {} corrected from QUASI_CLOSED to CLOSED "
-            + "via FORCE_CLOSE.", containerID);
-        return 1;
-      }
-
-      return 0;  // already CLOSED or past CLOSED — no action needed
     } catch (ContainerNotFoundException e) {
-      LOG.warn("Pass 1 (CLOSED): container {} vanished from Recon between partition "
-          + "and state correction.", containerID, e);
-    } catch (InvalidStateTransitionException | IOException e) {
-      LOG.warn("Pass 1 (CLOSED): failed to correct state for container {}.", containerID, e);
+      LOG.debug("Container {} vanished from Recon during {} sync.",
+          containerID, scmState);
     }
     return 0;
   }
 
-  // ---------------------------------------------------------------------------
-  // Pass 2: Incremental add-only sync for OPEN containers
-  // Pass 3: Full add + state-correction sync for QUASI_CLOSED containers
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Fetches only the newly created OPEN containers from SCM, starting at the
-   * last-seen OPEN container ID from the previous cycle, and adds any that are
-   * absent from Recon.
-   *
-   * <p>This deliberately avoids rescanning the full OPEN set every cycle.
-   * OPEN container IDs are monotonic, so once Recon has scanned through a
-   * given ID range it can continue from the next ID in later cycles. This
-   * keeps OPEN drift on an incremental path while CLOSED/QUASI_CLOSED still use
-   * full state scans for correction.
-   */
-  private boolean syncOpenContainersIncrementally() {
+  private int reconcileToQuasiClosed(ContainerID containerID,
+                                     ContainerInfo reconContainer,
+                                     HddsProtos.LifeCycleState reconState) {
     try {
-      long totalOpen = scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.OPEN);
-      if (totalOpen == 0) {
-        LOG.debug("Pass 2 (OPEN): no containers found in SCM.");
-        return true;
+      if (reconState == HddsProtos.LifeCycleState.DELETED) {
+        return rebuildContainerFromScm(containerID,
+            HddsProtos.LifeCycleState.QUASI_CLOSED);
       }
-
-      long retrieved = 0;
-      int addedCount = 0;
-      long batchSize = Math.min(totalOpen, getStatePaginationBatchSize());
-      ContainerID startContainerId = ContainerID.valueOf(pass2OpenStartContainerId.get());
-
-      while (true) {
-        List<ContainerID> batch = scmServiceProvider.getListOfContainerIDs(
-            startContainerId, (int) batchSize, HddsProtos.LifeCycleState.OPEN);
-        if (batch == null || batch.isEmpty()) {
-          LOG.info("Pass 2 (OPEN): sync complete from cursor {}, checked {}, added {}.",
-              pass2OpenStartContainerId.get(), retrieved, addedCount);
-          return true;
-        }
-
-        addedCount += addMissingContainersForState(batch, HddsProtos.LifeCycleState.OPEN);
-        retrieved += batch.size();
-
-        long lastID = batch.get(batch.size() - 1).getId();
-        pass2OpenStartContainerId.set(lastID + 1);
-        startContainerId = ContainerID.valueOf(pass2OpenStartContainerId.get());
+      if (reconState == HddsProtos.LifeCycleState.OPEN) {
+        containerManager.transitionOpenToClosing(containerID, reconContainer);
+        reconState = HddsProtos.LifeCycleState.CLOSING;
       }
-    } catch (Exception e) {
-      LOG.error("Pass 2 (OPEN): unexpected error during sync.", e);
-      return false;
+      if (reconState == HddsProtos.LifeCycleState.CLOSING) {
+        containerManager.updateContainerState(containerID, QUASI_CLOSE);
+        LOG.info("Container {} corrected to QUASI_CLOSED based on SCM state.",
+            containerID);
+        return 1;
+      }
+      LOG.debug("Skipping container {} because SCM reports QUASI_CLOSED while "
+          + "Recon has state {}.", containerID, reconState);
+    } catch (InvalidStateTransitionException | IOException e) {
+      LOG.warn("Failed to reconcile container {} to QUASI_CLOSED.",
+          containerID, e);
     }
+    return 0;
   }
 
-  /**
-   * Adds any containers in {@code batch} that are absent from Recon.
-   * Called exclusively from Pass 2 (OPEN containers).
-   *
-   * <p>For OPEN containers, if {@code getExistContainerWithPipelinesInBatch}
-   * excludes a container (pipeline not yet resolvable), it is skipped with no
-   * fallback. Because the {@link #pass2OpenStartContainerId} cursor is monotonic
-   * and never goes backward, the skipped container is only re-visited on Recon
-   * restart (cursor resets to 1) or when the container transitions to
-   * CLOSED/QUASI_CLOSED and Pass 1 or Pass 3 picks it up. No null-pipeline
-   * fallback is safe for OPEN because {@link ReconContainerManager#addNewContainer}
-   * requires a valid pipeline to register the container correctly.
-   *
-   * @param batch page of container IDs to check
-   * @param state the lifecycle state — must be OPEN when called from Pass 2
-   * @return number of containers successfully added
-   */
-  private int addMissingContainersForState(List<ContainerID> batch,
-                                           HddsProtos.LifeCycleState state) {
-    // NOTE: ContainerWithPipeline.pipeline is *required* in the proto2 schema
-    // so getExistContainerWithPipelinesInBatch cannot return a null pipeline.
-    // OPEN containers excluded because createPipelineForRead failed are skipped.
-    // They will only be re-scanned if Recon restarts (resetting the monotonic
-    // cursor to 1) or if the container transitions to CLOSED/QUASI_CLOSED and
-    // is caught by Pass 1 or Pass 3 in a future TARGETED_SYNC cycle.
-    List<Long> missingIds = new ArrayList<>();
-    for (ContainerID containerID : batch) {
-      if (!containerManager.containerExist(containerID)) {
-        missingIds.add(containerID.getId());
+  private int reconcileToClosed(ContainerID containerID,
+                                ContainerInfo reconContainer,
+                                HddsProtos.LifeCycleState reconState) {
+    try {
+      if (reconState == HddsProtos.LifeCycleState.DELETED) {
+        return rebuildContainerFromScm(containerID, HddsProtos.LifeCycleState.CLOSED);
       }
+      if (reconState == HddsProtos.LifeCycleState.OPEN) {
+        containerManager.transitionOpenToClosing(containerID, reconContainer);
+        reconState = HddsProtos.LifeCycleState.CLOSING;
+      }
+      if (reconState == HddsProtos.LifeCycleState.CLOSING) {
+        containerManager.updateContainerState(containerID, CLOSE);
+        LOG.info("Container {} corrected to CLOSED based on SCM state.",
+            containerID);
+        return 1;
+      }
+      if (reconState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+        containerManager.updateContainerState(containerID, FORCE_CLOSE);
+        LOG.info("Container {} corrected from QUASI_CLOSED to CLOSED based "
+            + "on SCM state.", containerID);
+        return 1;
+      }
+      LOG.debug("Skipping container {} because SCM reports CLOSED while Recon "
+          + "has state {}.", containerID, reconState);
+    } catch (InvalidStateTransitionException | IOException e) {
+      LOG.warn("Failed to reconcile container {} to CLOSED.", containerID, e);
     }
-    if (missingIds.isEmpty()) {
+    return 0;
+  }
+
+  private int rebuildContainerFromScm(ContainerID containerID,
+                                      HddsProtos.LifeCycleState scmState) {
+    try {
+      List<ContainerInfo> infos = scmServiceProvider.getListOfContainerInfos(
+          containerID, 1, scmState);
+      if (infos.isEmpty() || !infos.get(0).containerID().equals(containerID)) {
+        LOG.debug("Container {} no longer in SCM state {}; skipping rebuild.",
+            containerID, scmState);
+        return 0;
+      }
+      containerManager.deleteContainer(containerID);
+      containerManager.addNewContainer(new ContainerWithPipeline(infos.get(0), null));
+      LOG.info("Rebuilt container {} in Recon from DELETED to SCM state {}.",
+          containerID, scmState);
+      return 1;
+    } catch (IOException e) {
+      LOG.warn("Failed to rebuild container {} from SCM state {}.",
+          containerID, scmState, e);
       return 0;
     }
-    return batchedAddMissingContainers(missingIds, state, "Pass 2 (OPEN)");
   }
 
   // ---------------------------------------------------------------------------
-  // Pass 3: QUASI_CLOSED — add missing containers and correct stale states
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Fetches SCM's full QUASI_CLOSED container ID list (paginated) and for
-   * each entry:
-   * <ul>
-   *   <li>If absent from Recon: calls {@code addNewContainer()}.</li>
-   *   <li>If present in Recon as OPEN: advances via FINALIZE → QUASI_CLOSE.</li>
-   *   <li>If present in Recon as CLOSING: advances via QUASI_CLOSE.</li>
-   *   <li>If already QUASI_CLOSED (or past): no action.</li>
-   * </ul>
-   *
-   * <p>Correcting OPEN/CLOSING → QUASI_CLOSED handles the case where Recon
-   * missed the QUASI_CLOSE transition while it was down or lagging. Without
-   * this correction, {@link #decideSyncAction()} could detect QUASI_CLOSED count
-   * drift but simply adding missing containers would not fix the issue — the
-   * container already exists in Recon, just stuck in the wrong state.
-   */
-  private boolean syncQuasiClosedContainers() {
-    try {
-      long totalQuasiClosed = scmServiceProvider.getContainerCount(
-          HddsProtos.LifeCycleState.QUASI_CLOSED);
-      if (totalQuasiClosed == 0) {
-        LOG.debug("Pass 3 (QUASI_CLOSED): no containers found in SCM.");
-        return true;
-      }
-
-      // Compute batchSize once — same reasoning as in syncClosedContainers().
-      int batchSize = (int) getContainerCountPerCall(totalQuasiClosed);
-
-      ContainerID startContainerId = ContainerID.valueOf(1);
-      long retrieved = 0;
-      int addedCount = 0;
-      int correctedCount = 0;
-
-      while (true) {
-        List<ContainerID> batch = scmServiceProvider.getListOfContainerIDs(
-            startContainerId, batchSize, HddsProtos.LifeCycleState.QUASI_CLOSED);
-        if (batch == null || batch.isEmpty()) {
-          break; // no more QUASI_CLOSED containers at or above startContainerId
-        }
-
-        // ── Phase A: batch-add absent containers ─────────────────────────────────
-        // Same pattern as Pass 1: use batchedAddMissingContainers for auto
-        // sub-batching within safeContainerWithPipelineBatchSize.
-        List<Long> absentIds = new ArrayList<>();
-        List<ContainerID> presentIds = new ArrayList<>();
-        for (ContainerID containerID : batch) {
-          if (!containerManager.containerExist(containerID)) {
-            absentIds.add(containerID.getId());
-          } else {
-            presentIds.add(containerID);
-          }
-        }
-
-        if (!absentIds.isEmpty()) {
-          addedCount += batchedAddMissingContainers(
-              absentIds, HddsProtos.LifeCycleState.QUASI_CLOSED, "Pass 3");
-        }
-
-        // ── Phase B: state-correct present containers ─────────────────────────────
-        // Local state-machine transitions only — no SCM RPCs.
-        for (ContainerID containerID : presentIds) {
-          try {
-            ContainerInfo reconContainer = containerManager.getContainer(containerID);
-            HddsProtos.LifeCycleState reconState = reconContainer.getState();
-
-            if (reconState == HddsProtos.LifeCycleState.OPEN) {
-              containerManager.transitionOpenToClosing(containerID, reconContainer);
-              reconState = HddsProtos.LifeCycleState.CLOSING;
-              LOG.info("Pass 3 (QUASI_CLOSED): container {} advanced OPEN → CLOSING.",
-                  containerID);
-            }
-            if (reconState == HddsProtos.LifeCycleState.CLOSING) {
-              containerManager.updateContainerState(containerID, QUASI_CLOSE);
-              correctedCount++;
-              LOG.info("Pass 3 (QUASI_CLOSED): container {} corrected to QUASI_CLOSED.",
-                  containerID);
-            }
-            // Already QUASI_CLOSED (or past): no action needed.
-          } catch (ContainerNotFoundException e) {
-            LOG.warn("Pass 3 (QUASI_CLOSED): container {} vanished from Recon between "
-                + "partition and state correction.", containerID, e);
-          } catch (InvalidStateTransitionException | IOException e) {
-            LOG.warn("Pass 3 (QUASI_CLOSED): failed to correct state for container {}.",
-                containerID, e);
-          }
-        }
-
-        long lastID = batch.get(batch.size() - 1).getId();
-        startContainerId = ContainerID.valueOf(lastID + 1);
-        retrieved += batch.size();
-      }
-
-      LOG.info("Pass 3 (QUASI_CLOSED): sync complete, checked {}, added {}, corrected {}.",
-          retrieved, addedCount, correctedCount);
-      return true;
-    } catch (IOException e) {
-      LOG.error("Pass 3 (QUASI_CLOSED): unexpected error during sync.", e);
-      return false;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Pass 4: DELETED retirement — SCM-driven, transition only, never "add"
+  // DELETED sync — SCM-driven, transition only for existing containers.
   // ---------------------------------------------------------------------------
 
   /**
@@ -736,12 +559,12 @@ class ReconStorageContainerSyncHelper {
    * cross-cycle intermediate state.
    *
    * <p>Uses {@code getListOfContainerInfos} rather than
-   * {@code getExistContainerWithPipelinesInBatch} because Pass 4 needs the
+   * {@code getExistContainerWithPipelinesInBatch} because DELETED sync needs the
    * DELETED container metadata but does not need pipeline resolution.
    *
    * @return {@code true} if all RPC calls completed without error
    */
-  private boolean retireDeletedContainers() {
+  private boolean syncDeletedContainers() {
     try {
       // getListOfContainerInfos returns ContainerInfo objects (~86 bytes each
       // on wire). Use safeContainerInfoBatchSize (not safeContainerWithPipelineBatchSize)
@@ -779,10 +602,10 @@ class ReconStorageContainerSyncHelper {
             page.get(page.size() - 1).containerID().getId() + 1);
       }
 
-      LOG.info("Pass 4 (DELETED retirement): sync complete, retired={}.", retiredCount);
+      LOG.info("DELETED sync complete, retired={}.", retiredCount);
       return true;
     } catch (Exception e) {
-      LOG.error("Pass 4 (DELETED retirement): unexpected error.", e);
+      LOG.error("DELETED sync: unexpected error.", e);
       return false;
     }
   }
@@ -808,10 +631,10 @@ class ReconStorageContainerSyncHelper {
           containerManager.addNewContainer(
               new ContainerWithPipeline(scmInfo, null));
           retiredCount++;
-          LOG.info("Pass 4 (DELETED retirement): added missing DELETED container {} "
+          LOG.info("DELETED sync: added missing DELETED container {} "
               + "(full lifecycle occurred while Recon was down).", containerID);
         } catch (IOException e) {
-          LOG.warn("Pass 4 (DELETED retirement): failed to add missing DELETED "
+          LOG.warn("DELETED sync: failed to add missing DELETED "
               + "container {}.", containerID, e);
         }
         continue;
@@ -825,7 +648,7 @@ class ReconStorageContainerSyncHelper {
         }
         // reconState == DELETED: already terminal, nothing to do.
       } catch (ContainerNotFoundException e) {
-        LOG.debug("Pass 4 (DELETED retirement): container {} vanished from Recon "
+        LOG.debug("DELETED sync: container {} vanished from Recon "
             + "between existence check and retirement.", containerID);
       }
     }
@@ -836,8 +659,8 @@ class ReconStorageContainerSyncHelper {
    * Drives a container in Recon from any non-terminal lifecycle state to
    * DELETED by applying the minimum valid state machine transitions.
    *
-   * <p>This handles all states that can arrive at Pass 4 after the three
-   * preceding passes have already run:
+   * <p>This handles all states that can arrive while processing SCM's DELETED
+   * list:
    * <pre>
    *   OPEN         → CLOSING (FINALIZE via transitionOpenToClosing)
    *                → CLOSED  (CLOSE)
@@ -889,11 +712,11 @@ class ReconStorageContainerSyncHelper {
       // DELETING → DELETED.
       containerManager.updateContainerState(containerID, CLEANUP);
 
-      LOG.info("Pass 4 (DELETED retirement): container {} transitioned "
+      LOG.info("DELETED sync: container {} transitioned "
           + "{} → DELETED in Recon (SCM state: {}).",
           containerID, reconInfo.getState(), scmState);
     } catch (InvalidStateTransitionException | IOException e) {
-      LOG.warn("Pass 4 (DELETED retirement): failed to retire container {} "
+      LOG.warn("DELETED sync: failed to retire container {} "
           + "from {} toward DELETED.", containerID, reconInfo.getState(), e);
     }
   }
@@ -932,12 +755,12 @@ class ReconStorageContainerSyncHelper {
    *       {@code getListOfContainerInfos} RPC each, expected near-zero in healthy
    *       clusters). For OPEN, excluded containers are silently skipped — they
    *       are only re-visited on Recon restart or when they transition to a
-   *       non-OPEN state caught by Pass 1 or Pass 3.</li>
+   *       supported non-OPEN state.</li>
    * </ul>
    *
    * @param absentIds IDs confirmed absent from Recon (may be up to 1M)
    * @param state     lifecycle state of all IDs in {@code absentIds}
-   * @param passLabel log prefix (e.g. "Pass 1 (CLOSED)")
+   * @param passLabel log prefix
    * @return total number of containers successfully added
    */
   private int batchedAddMissingContainers(List<Long> absentIds,
@@ -1010,7 +833,7 @@ class ReconStorageContainerSyncHelper {
    *
    * @param containerID the container to add
    * @param state       the expected SCM lifecycle state (CLOSED or QUASI_CLOSED)
-   * @param passLabel   logging label (e.g. "Pass 1", "Pass 3")
+   * @param passLabel   logging label
    * @return {@code true} if the container was successfully added
    */
   private boolean addContainerInfoFallback(ContainerID containerID,
@@ -1061,12 +884,12 @@ class ReconStorageContainerSyncHelper {
    * carry {@code ContainerID} entries at {@link #CONTAINER_ID_PROTO_SIZE_BYTES}
    * bytes each, so a single size constant bounds both directions correctly.
    *
-   * <p>Applies to Pass 1, Pass 2, and Pass 3 pagination.
+   * <p>Applies to live-state pagination.
    *
    * @param upperBound cap on the returned batch size; pass the total container
    *                   count in a state when paginating that state, or a
    *                   configured batch size limit when the caller owns the
-   *                   upper bound (e.g. Pass 4 uses the configured deleted-check
+   *                   upper bound (e.g. DELETED sync uses the configured deleted-check
    *                   batch size rather than the DELETED container total)
    * @return safe batch size ≤ {@code upperBound} and ≤ IPC / per-call limits
    */

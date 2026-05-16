@@ -185,6 +185,23 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   /**
+   * Returns the total number of containers across all lifecycle states.
+   *
+   * <p>This mirrors SCM's {@code ContainerManager#getTotalContainerCount()}
+   * implementation: it sums per-state counts, where each lookup is O(1),
+   * instead of loading container records.
+   *
+   * @return total container count
+   */
+  public long getTotalContainerCount() {
+    long total = 0;
+    for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
+      total += getContainerStateCount(state);
+    }
+    return total;
+  }
+
+  /**
    * Transitions a container from OPEN to CLOSING, keeping the per-pipeline
    * open-container count in {@link #pipelineToOpenContainer} accurate.
    *

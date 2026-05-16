@@ -34,10 +34,9 @@ import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
  * <p>Available endpoints:
  * <ul>
  *   <li>{@code GET  /api/v1/triggerdbsync/om}  — triggers full OM DB sync</li>
- *   <li>{@code POST /api/v1/triggerdbsync/scm} — triggers targeted SCM
- *       container sync (four-pass incremental: add missing CLOSED/OPEN/
- *       QUASI_CLOSED containers, correct stale OPEN state, retire DELETED
- *       containers)</li>
+   *   <li>{@code POST /api/v1/triggerdbsync/scm} — triggers targeted SCM
+   *       container sync (add missing OPEN/QUASI_CLOSED/CLOSED containers,
+   *       reconcile existing states, retire DELETED containers)</li>
  * </ul>
  */
 @Path("/triggerdbsync")
@@ -72,27 +71,24 @@ public class TriggerDBSyncEndpoint {
   /**
    * Triggers an immediate targeted SCM container sync.
    *
-   * <p>Runs the four-pass incremental sync unconditionally (bypassing the
+   * <p>Runs the incremental sync unconditionally (bypassing the
    * periodic drift-based decision):
    * <ol>
-   *   <li>Pass 1 (CLOSED): adds missing CLOSED containers and corrects
-   *       containers stuck as OPEN or CLOSING in Recon.</li>
-   *   <li>Pass 2 (OPEN): adds OPEN containers that Recon never received
-   *       (e.g., created while Recon was down).</li>
-   *   <li>Pass 3 (QUASI_CLOSED): adds QUASI_CLOSED containers absent from
-   *       Recon.</li>
-   *   <li>Pass 4 (DELETED retirement): transitions containers that SCM has
-   *       marked DELETED from their current Recon state (CLOSED/QUASI_CLOSED)
-   *       forward to DELETED in Recon's metadata store.</li>
+   *   <li>OPEN: adds missing OPEN containers without moving existing Recon
+   *       containers backwards.</li>
+   *   <li>QUASI_CLOSED/CLOSED: adds missing containers and advances existing
+   *       Recon containers through valid lifecycle transitions.</li>
+   *   <li>DELETED: transitions containers that SCM has marked DELETED forward
+   *       to DELETED in Recon's metadata store.</li>
    * </ol>
    *
    * <p>This endpoint is useful for immediately resolving known discrepancies
-   * without waiting for the next periodic sync cycle (default: every 1h).
+   * without waiting for the next periodic sync cycle (default: every 6h).
    * For large-scale drift (hundreds of containers), consider triggering a
    * full SCM DB snapshot sync instead via the Recon admin REST API.
    *
-   * @return {@code true} if all four passes completed without fatal errors,
-   *         {@code false} if one or more passes encountered errors (partial
+   * @return {@code true} if sync completed without fatal errors,
+   *         {@code false} if one or more phases encountered errors (partial
    *         sync may have occurred; check Recon logs for details).
    */
   @POST

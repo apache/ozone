@@ -229,7 +229,7 @@ public class TestReconSCMContainerSyncIntegration
     }
 
     @Test
-    void oneAboveThresholdReturnsLargeDriftThresholdExceeded() throws Exception {
+    void oneAboveThresholdReturnsTargetedSync() throws Exception {
       int threshold = getConf().getInt(
           OZONE_RECON_SCM_CONTAINER_THRESHOLD,
           OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT);
@@ -237,19 +237,17 @@ public class TestReconSCMContainerSyncIntegration
       when(mockScm.getContainerCount()).thenReturn((long) threshold + 1L);
       // Recon is empty → drift == threshold + 1
 
-      assertEquals(SyncAction.LARGE_DRIFT_THRESHOLD_EXCEEDED,
-          syncHelper.decideSyncAction());
+      assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
 
     @Test
-    void largeTotalDriftReturnsLargeDriftThresholdExceeded() throws Exception {
+    void largeTotalDriftReturnsTargetedSync() throws Exception {
       // Recon empty, SCM is above the default threshold.
       when(mockScm.getContainerCount()).thenReturn(
           (long) OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT + 1L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
 
-      assertEquals(SyncAction.LARGE_DRIFT_THRESHOLD_EXCEEDED,
-          syncHelper.decideSyncAction());
+      assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
 
     @Test
@@ -259,11 +257,10 @@ public class TestReconSCMContainerSyncIntegration
       ReconStorageContainerSyncHelper customHelper = new ReconStorageContainerSyncHelper(
           mockScm, getConf(), getContainerManager());
 
-      // Drift = 51 -> LARGE_DRIFT_THRESHOLD_EXCEEDED with custom threshold 50
+      // Drift = 51 -> TARGETED_SYNC with custom threshold 50
       when(mockScm.getContainerCount()).thenReturn(51L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
-      assertEquals(SyncAction.LARGE_DRIFT_THRESHOLD_EXCEEDED,
-          customHelper.decideSyncAction());
+      assertEquals(SyncAction.TARGETED_SYNC, customHelper.decideSyncAction());
 
       // Drift = 50 → TARGETED_SYNC (50 is at threshold, not above)
       seedRecon(1, 1, CLOSED); // Recon now has 1, SCM 51 → drift = 50
@@ -297,15 +294,14 @@ public class TestReconSCMContainerSyncIntegration
     }
 
     @Test
-    void largeNonOpenDriftReturnsLargeDriftThresholdExceeded() throws Exception {
+    void largeNonOpenDriftReturnsTargetedSync() throws Exception {
       // Most of SCM's drift is in stable states, so the scheduler should
-      // surface the large-drift condition instead of running targeted sync.
+      // surface the large-drift condition and run targeted sync.
       when(mockScm.getContainerCount()).thenReturn(
           (long) OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT + 50_000L);
       when(mockScm.getContainerCount(OPEN)).thenReturn(49_999L);
 
-      assertEquals(SyncAction.LARGE_DRIFT_THRESHOLD_EXCEEDED,
-          syncHelper.decideSyncAction());
+      assertEquals(SyncAction.TARGETED_SYNC, syncHelper.decideSyncAction());
     }
 
     @Test

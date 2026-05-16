@@ -444,11 +444,10 @@ public class ReconStorageContainerManagerFacade
     // — and then:
     //
     //   non-OPEN drift > threshold (default 1,000,000)
-    //       → warn and expose the drift via metrics; full snapshot is not
-    //         downloaded automatically by this periodic task
+    //       → targeted sync, with the large-drift event exposed via metrics
     //
-    //   OPEN drift > 0
-    //       → targeted sync: 4-pass incremental repair
+   //   OPEN drift > 0
+    //       → targeted sync: add newly observed OPEN containers
     //
     //   QUASI_CLOSED or CLOSED drift >= threshold (default 1)
     //       → targeted sync: corrects containers stuck in a stale lifecycle state
@@ -480,10 +479,8 @@ public class ReconStorageContainerManagerFacade
         ReconStorageContainerSyncHelper.SyncAction action =
             containerSyncHelper.decideSyncAction();
         switch (action) {
-        case LARGE_DRIFT_THRESHOLD_EXCEEDED:
-          break;
         case TARGETED_SYNC:
-          LOG.info("Tiered sync decision: TARGETED_SYNC. Running 4-pass incremental sync.");
+          LOG.info("Tiered sync decision: TARGETED_SYNC. Running incremental sync.");
           boolean success = runTargetedSyncWithMetrics();
           if (!success) {
             LOG.warn("Targeted sync completed with one or more pass failures. "
@@ -618,16 +615,16 @@ public class ReconStorageContainerManagerFacade
   }
 
   /**
-   * Runs the four-pass targeted sync unconditionally (all states: CLOSED,
-   * OPEN, QUASI_CLOSED, and DELETED). This method is the direct
+   * Runs the targeted sync unconditionally (SCM states: OPEN, QUASI_CLOSED,
+   * CLOSED, and DELETED). This method is the direct
    * entry point for the REST trigger endpoint
    * {@code POST /api/v1/triggerdbsync/scm} and for any caller that explicitly
    * wants an incremental sync rather than a drift-evaluated decision.
    *
    * <p>For the periodic scheduler the tiered
    * {@link ReconStorageContainerSyncHelper#decideSyncAction()} path is used
-   * instead, which may report large drift, run targeted sync, or skip work
-   * entirely depending on observed drift.
+   * instead, which may run targeted sync or skip work depending on observed
+   * drift.
    */
   public boolean triggerTargetedSCMContainerSync() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {

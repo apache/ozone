@@ -242,6 +242,10 @@ public final class ContainerStateManagerImpl
         containers.addContainer(container);
         if (container.getState() == LifeCycleState.OPEN) {
           if (container.getPipelineID() == null) {
+            // This can happen in Recon when SCM returns an OPEN container after
+            // its pipeline metadata has already been cleaned up. Keep the
+            // container record, but skip pipeline registration because there is
+            // no pipeline ID to look up.
             LOG.warn("Found container {} which is in OPEN state without a "
                 + "pipeline ID. Skipping pipeline registration during SCM "
                 + "start.", container);
