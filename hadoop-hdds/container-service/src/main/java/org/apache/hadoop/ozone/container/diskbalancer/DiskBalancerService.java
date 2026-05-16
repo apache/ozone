@@ -332,11 +332,6 @@ public class DiskBalancerService extends BackgroundService {
   private synchronized void writeDiskBalancerInfoTo(
       DiskBalancerInfo diskBalancerInfo, File path)
       throws IOException {
-    writeDiskBalancerInfoFile(diskBalancerInfo, path);
-  }
-
-  static void writeDiskBalancerInfoFile(DiskBalancerInfo diskBalancerInfo,
-      File path) throws IOException {
     Path target = path.toPath().toAbsolutePath();
     Path parent = target.getParent();
     if (parent == null) {
