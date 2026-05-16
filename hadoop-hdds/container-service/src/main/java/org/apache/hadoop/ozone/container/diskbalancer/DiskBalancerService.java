@@ -332,13 +332,12 @@ public class DiskBalancerService extends BackgroundService {
   private synchronized void writeDiskBalancerInfoTo(
       DiskBalancerInfo diskBalancerInfo, File path)
       throws IOException {
-    writeDiskBalancerInfoAtomically(
-        diskBalancerInfo, path, DiskBalancerYaml::createDiskBalancerInfoFile);
+    writeDiskBalancerInfoFile(diskBalancerInfo, path);
   }
 
   @VisibleForTesting
-  static void writeDiskBalancerInfoAtomically(DiskBalancerInfo diskBalancerInfo,
-      File path, DiskBalancerInfoWriter writer) throws IOException {
+  static void writeDiskBalancerInfoFile(DiskBalancerInfo diskBalancerInfo,
+      File path) throws IOException {
     Path target = path.toPath().toAbsolutePath();
     Path parent = target.getParent();
     if (parent == null) {
@@ -353,37 +352,13 @@ public class DiskBalancerService extends BackgroundService {
           "Unable to create DiskBalancerInfo directories: " + parent, e);
     }
 
-    final Path tempFile;
     try {
-      tempFile = Files.createTempFile(parent, path.getName(), ".tmp");
+      DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo,
+          target.toFile());
     } catch (IOException e) {
       throw new IOException(
-          "Unable to create temporary DiskBalancerInfo file under: "
-              + parent, e);
+          "Unable to write DiskBalancerInfo file: " + target, e);
     }
-    boolean moved = false;
-    try {
-      writer.write(diskBalancerInfo, tempFile.toFile());
-      try {
-        Files.move(tempFile, target, StandardCopyOption.ATOMIC_MOVE,
-            StandardCopyOption.REPLACE_EXISTING);
-      } catch (IOException e) {
-        throw new IOException(
-            "Unable to overwrite the DiskBalancerInfo file: " + target, e);
-      }
-      moved = true;
-    } finally {
-      if (!moved) {
-        Files.deleteIfExists(tempFile);
-      }
-    }
-  }
-
-  @VisibleForTesting
-  @FunctionalInterface
-  interface DiskBalancerInfoWriter {
-    void write(DiskBalancerInfo diskBalancerInfo, File path)
-        throws IOException;
   }
 
   public void setThreshold(double threshold) {

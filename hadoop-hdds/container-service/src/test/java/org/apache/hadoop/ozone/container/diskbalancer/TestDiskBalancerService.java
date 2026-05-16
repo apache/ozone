@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.TMP_DIR_NAME;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -380,27 +381,20 @@ public class TestDiskBalancerService {
   }
 
   @Test
-  public void testDiskBalancerInfoAtomicWritePreservesExistingFileOnFailure()
+  public void testDiskBalancerInfoWriteCreatesParentDirectory()
       throws Exception {
-    File infoFile = tmpDir.resolve("diskBalancer.info").toFile();
-    DiskBalancerInfo oldInfo = new DiskBalancerInfo(
-        DiskBalancerRunningStatus.STOPPED, 10.0d, 100L, 5, true);
-    DiskBalancerInfo newInfo = new DiskBalancerInfo(
-        DiskBalancerRunningStatus.RUNNING, 20.0d, 200L, 10, false);
-    DiskBalancerYaml.createDiskBalancerInfoFile(oldInfo, infoFile);
+    File infoFile = tmpDir.resolve("nested").resolve("diskBalancer.info")
+        .toFile();
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
 
-    IOException exception = assertThrows(IOException.class,
-        () -> DiskBalancerService.writeDiskBalancerInfoAtomically(
-            newInfo, infoFile, (info, path) -> {
-              throw new IOException("simulated write failure");
-            }));
+    DiskBalancerService.writeDiskBalancerInfoFile(info, infoFile);
 
-    assertEquals("simulated write failure", exception.getMessage());
-    assertEquals(oldInfo, DiskBalancerYaml.readDiskBalancerInfoFile(infoFile));
+    assertEquals(info, DiskBalancerYaml.readDiskBalancerInfoFile(infoFile));
   }
 
   @Test
-  public void testDiskBalancerInfoAtomicWriteReportsDirectoryCreationFailure()
+  public void testDiskBalancerInfoWriteReportsDirectoryCreationFailure()
       throws Exception {
     File parent = tmpDir.resolve("diskBalancer-parent").toFile();
     assertTrue(parent.createNewFile());
@@ -409,15 +403,14 @@ public class TestDiskBalancerService {
         DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
 
     IOException exception = assertThrows(IOException.class,
-        () -> DiskBalancerService.writeDiskBalancerInfoAtomically(
-            info, infoFile, DiskBalancerYaml::createDiskBalancerInfoFile));
+        () -> DiskBalancerService.writeDiskBalancerInfoFile(info, infoFile));
 
-    assertTrue(exception.getMessage()
-        .startsWith("Unable to create DiskBalancerInfo directories: "));
+    assertThat(exception)
+        .hasMessageStartingWith("Unable to create DiskBalancerInfo directories: ");
   }
 
   @Test
-  public void testDiskBalancerInfoAtomicWriteReportsOverwriteFailure()
+  public void testDiskBalancerInfoWriteReportsFileWriteFailure()
       throws Exception {
     File infoFile = tmpDir.resolve("diskBalancer.info").toFile();
     assertTrue(infoFile.mkdirs());
@@ -426,11 +419,10 @@ public class TestDiskBalancerService {
         DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
 
     IOException exception = assertThrows(IOException.class,
-        () -> DiskBalancerService.writeDiskBalancerInfoAtomically(
-            info, infoFile, DiskBalancerYaml::createDiskBalancerInfoFile));
+        () -> DiskBalancerService.writeDiskBalancerInfoFile(info, infoFile));
 
-    assertTrue(exception.getMessage()
-        .startsWith("Unable to overwrite the DiskBalancerInfo file: "));
+    assertThat(exception)
+        .hasMessageStartingWith("Unable to write DiskBalancerInfo file: ");
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,
