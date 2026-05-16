@@ -379,6 +379,60 @@ public class TestDiskBalancerService {
         100, 5000);
   }
 
+  @Test
+  public void testDiskBalancerInfoAtomicWritePreservesExistingFileOnFailure()
+      throws Exception {
+    File infoFile = tmpDir.resolve("diskBalancer.info").toFile();
+    DiskBalancerInfo oldInfo = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.STOPPED, 10.0d, 100L, 5, true);
+    DiskBalancerInfo newInfo = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 20.0d, 200L, 10, false);
+    DiskBalancerYaml.createDiskBalancerInfoFile(oldInfo, infoFile);
+
+    IOException exception = assertThrows(IOException.class,
+        () -> DiskBalancerService.writeDiskBalancerInfoAtomically(
+            newInfo, infoFile, (info, path) -> {
+              throw new IOException("simulated write failure");
+            }));
+
+    assertEquals("simulated write failure", exception.getMessage());
+    assertEquals(oldInfo, DiskBalancerYaml.readDiskBalancerInfoFile(infoFile));
+  }
+
+  @Test
+  public void testDiskBalancerInfoAtomicWriteReportsDirectoryCreationFailure()
+      throws Exception {
+    File parent = tmpDir.resolve("diskBalancer-parent").toFile();
+    assertTrue(parent.createNewFile());
+    File infoFile = new File(parent, "diskBalancer.info");
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
+
+    IOException exception = assertThrows(IOException.class,
+        () -> DiskBalancerService.writeDiskBalancerInfoAtomically(
+            info, infoFile, DiskBalancerYaml::createDiskBalancerInfoFile));
+
+    assertTrue(exception.getMessage()
+        .startsWith("Unable to create DiskBalancerInfo directories: "));
+  }
+
+  @Test
+  public void testDiskBalancerInfoAtomicWriteReportsOverwriteFailure()
+      throws Exception {
+    File infoFile = tmpDir.resolve("diskBalancer.info").toFile();
+    assertTrue(infoFile.mkdirs());
+    assertTrue(new File(infoFile, "existing").createNewFile());
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
+
+    IOException exception = assertThrows(IOException.class,
+        () -> DiskBalancerService.writeDiskBalancerInfoAtomically(
+            info, infoFile, DiskBalancerYaml::createDiskBalancerInfoFile));
+
+    assertTrue(exception.getMessage()
+        .startsWith("Unable to overwrite the DiskBalancerInfo file: "));
+  }
+
   private OzoneContainer mockDependencies(ContainerSet containerSet,
       KeyValueHandler keyValueHandler, ContainerController controller) {
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);

@@ -332,17 +332,55 @@ public class DiskBalancerService extends BackgroundService {
   private synchronized void writeDiskBalancerInfoTo(
       DiskBalancerInfo diskBalancerInfo, File path)
       throws IOException {
-    if (path.exists()) {
-      if (!path.delete() || !path.createNewFile()) {
-        throw new IOException("Unable to overwrite the DiskBalancerInfo file.");
-      }
-    } else {
-      if (!path.getParentFile().exists() &&
-          !path.getParentFile().mkdirs()) {
-        throw new IOException("Unable to create DiskBalancerInfo directories.");
+    writeDiskBalancerInfoAtomically(
+        diskBalancerInfo, path, DiskBalancerYaml::createDiskBalancerInfoFile);
+  }
+
+  @VisibleForTesting
+  static void writeDiskBalancerInfoAtomically(DiskBalancerInfo diskBalancerInfo,
+      File path, DiskBalancerInfoWriter writer) throws IOException {
+    Path target = path.toPath().toAbsolutePath();
+    Path parent = target.getParent();
+    if (parent != null) {
+      try {
+        Files.createDirectories(parent);
+      } catch (IOException e) {
+        throw new IOException(
+            "Unable to create DiskBalancerInfo directories: " + parent, e);
       }
     }
-    DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo, path);
+
+    final Path tempFile;
+    try {
+      tempFile = Files.createTempFile(parent, path.getName(), ".tmp");
+    } catch (IOException e) {
+      throw new IOException(
+          "Unable to create temporary DiskBalancerInfo file under: "
+              + parent, e);
+    }
+    boolean moved = false;
+    try {
+      writer.write(diskBalancerInfo, tempFile.toFile());
+      try {
+        Files.move(tempFile, target, StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+      } catch (IOException e) {
+        throw new IOException(
+            "Unable to overwrite the DiskBalancerInfo file: " + target, e);
+      }
+      moved = true;
+    } finally {
+      if (!moved) {
+        Files.deleteIfExists(tempFile);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  @FunctionalInterface
+  interface DiskBalancerInfoWriter {
+    void write(DiskBalancerInfo diskBalancerInfo, File path)
+        throws IOException;
   }
 
   public void setThreshold(double threshold) {
