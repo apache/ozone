@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.StreamBuffer;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -255,7 +257,10 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         commitUploadPartInfo =
             omClient.commitMultipartUploadPart(buildKeyArgs(), openID);
       } else {
-        omClient.commitKey(buildKeyArgs(), openID);
+        final OptionalLong modificationTime = omClient.commitKeyWithModificationTime(buildKeyArgs(), openID);
+        if (modificationTime.isPresent()) {
+          metadata.put(OzoneConsts.MODIFICATION_TIME, String.valueOf(modificationTime.getAsLong()));
+        }
       }
     } else {
       LOG.warn("Closing KeyDataStreamOutput, but key args is null");

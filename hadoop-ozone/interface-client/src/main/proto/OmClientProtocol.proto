@@ -1585,7 +1585,8 @@ message CommitKeyRequest {
 }
 
 message CommitKeyResponse {
-
+    // Modification time of the committed key, set by OM during preExecute.
+    optional uint64 modificationTime = 1;
 }
 
 message AllocateBlockRequest {
@@ -1790,6 +1791,8 @@ message MultipartCommitUploadPartResponse {
     optional string partName = 1;
     // This one is returned as Etag for S3.
     optional string eTag = 2;
+    // Modification time of the committed part key, set by OM during preExecute.
+    optional uint64 modificationTime = 3;
 }
 
 message MultipartUploadCompleteRequest {
@@ -2338,6 +2341,17 @@ message S3Authentication {
     // If present, indicates this request uses STS temporary credentials
     // and carries the base64-encoded session token for validation.
     optional string sessionToken = 4;
+    // The following fields are resolved from the STS session token by OM.
+    // They are used to enforce STS session policies during Ratis apply.
+    // They must be written or cleared by the OM leader when the token is validated.
+    optional string resolvedStsSessionPolicy = 5;
+    optional string resolvedStsRoleArn = 6;
+    optional string resolvedStsOriginalAccessKeyId = 7;
+    optional string resolvedStsTempAccessKeyId = 8;
+    optional string resolvedStsSecretKeyId = 9;
+    // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
+    // in finer-grained STS permissions.
+    optional string s3Action = 10;
 }
 
 message RecoverLeaseRequest {

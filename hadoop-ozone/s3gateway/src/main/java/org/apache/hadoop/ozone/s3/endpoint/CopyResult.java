@@ -15,29 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.helpers;
-
-import java.util.OptionalLong;
+package org.apache.hadoop.ozone.s3.endpoint;
 
 /**
- * This class holds information about the response from commit multipart
- * upload part request.
+ * Result of a copy operation.
  */
-public class OmMultipartCommitUploadPartInfo {
-
-  private final String partName;
-
+public class CopyResult {
   private final String eTag;
+  private final long size;
+  private final long modificationTime;
 
-  private final Long modificationTime;
-
-  public OmMultipartCommitUploadPartInfo(String partName, String eTag) {
-    this(partName, eTag, null);
-  }
-
-  public OmMultipartCommitUploadPartInfo(String partName, String eTag, Long modificationTime) {
-    this.partName = partName;
+  public CopyResult(String eTag, long size, long modificationTime) {
     this.eTag = eTag;
+    this.size = size;
     this.modificationTime = modificationTime;
   }
 
@@ -45,11 +35,11 @@ public class OmMultipartCommitUploadPartInfo {
     return eTag;
   }
 
-  public String getPartName() {
-    return partName;
+  public long getSize() {
+    return size;
   }
 
-  public OptionalLong getModificationTime() {
-    return modificationTime == null ? OptionalLong.empty() : OptionalLong.of(modificationTime);
+  public long getModificationTime() {
+    return modificationTime;
   }
 }
