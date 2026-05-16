@@ -347,12 +347,38 @@ equivalent OM write lock. Collision checks and writes must be atomic relative
 to each other.
 
 Collision prevention must account for the configured legacy
-`S3SecretStoreProvider`, not only the local `s3SecretTable`. If an external
-legacy S3 secret provider can reliably answer existence checks, OM may use
-that provider's existence check under the shared namespace lock. If the
-provider cannot reliably answer existence checks, managed access-key create
-must fail closed or be explicitly unsupported with that provider. Best-effort
-collision checking is not allowed.
+`S3SecretStoreProvider`, not only the local `s3SecretTable`.
+
+For the local/default legacy provider backed by `s3SecretTable`:
+
+```text
+managed access-key create:
+  check s3ManagedAccessKeyTable
+  check legacy s3SecretTable / S3SecretManager
+
+legacy secret creation / setsecret / getsecret creation:
+  check s3ManagedAccessKeyTable
+
+all checks and writes:
+  use S3_SECRET_LOCK or an equivalent shared per-accessKeyId namespace lock
+```
+
+For external or non-local `S3SecretStoreProvider` implementations:
+
+```text
+if provider can reliably answer accessKeyId existence:
+  use that existence check under the same namespace-lock semantics
+
+if provider cannot reliably answer accessKeyId existence:
+  managed access-key create fails closed or is unsupported with that provider
+```
+
+No best-effort collision checking is allowed. No silent coexistence is allowed.
+Phase 3/4 may initially support managed access-key create only with the
+local/default `S3SecretStoreProvider`; if a non-local provider is configured
+and cannot prove collision safety, create must fail with
+`NOT_SUPPORTED_OPERATION` or an explicit managed access-key
+operation-not-supported status.
 
 Validation and use of existing legacy S3 secrets remains unchanged.
 
@@ -404,22 +430,49 @@ Only `encryptedSecretKey` and `secretKeyId` are persisted. Plaintext managed
 secrets are never persisted.
 
 The envelope blob must contain all durable metadata needed to decrypt the
-managed S3 secret later. At minimum, as applicable to the chosen provider, the
-envelope contains:
+managed S3 secret later. Phase 3/4 must define a concrete v1 serialized
+envelope message before request handlers are implemented.
+
+`ManagedS3AccessKeySecretEnvelope` v1:
 
 ```text
-envelope format version
-encryption algorithm
-key provider type/name
-key name
-key version name / secretKeyId
-encrypted data encryption key / EDEK or equivalent wrapped key material
-EDEK IV or provider-specific IV if required
-data IV / nonce
-ciphertext
-authentication tag if not embedded in ciphertext
-AAD / encryption context version
+envelopeVersion: integer, required, currently 1
+algorithm: string or enum, required, currently AES/GCM/NoPadding
+keyProviderPathHash or keyProviderId: optional diagnostic metadata, non-secret
+keyName: string, required, from ozone.s3.accesskey.encryption.key.name
+keyVersionName: string, required, also copied to top-level secretKeyId
+encryptedDataKey / EDEK: bytes, required, provider-wrapped data encryption key
+edekIv: bytes, optional if required by KeyProviderCryptoExtension
+dataIv / nonce: bytes, required
+ciphertext: bytes, required
+authTag: bytes, optional if separate from ciphertext
+aadContextVersion: integer, required
+createdAt: optional diagnostic timestamp
+providerMetadata: optional map only if needed by KeyProviderCryptoExtension
 ```
+
+The envelope is stored as bytes in
+`S3ManagedAccessKeyInfo.encryptedSecretKey`. No new top-level
+`S3ManagedAccessKeyInfo` envelope metadata fields are added in v1.
+`secretKeyId` remains quick-reference metadata only. The envelope is
+authoritative for durable decryption metadata.
+
+AAD is required. The v1 AAD context binds the encrypted secret to immutable row
+metadata:
+
+```text
+purpose: ozone-managed-s3-access-key
+envelopeVersion
+accessKeyId
+effectiveUser
+createdAt
+keyName
+keyVersionName / secretKeyId
+```
+
+The implementation must define a deterministic canonical serialization for the
+AAD context, or delegate it to a helper with round-trip and tamper tests.
+Changing the canonical AAD serialization requires a new `aadContextVersion`.
 
 Managed access-key encryption uses Ozone/OM's existing Hadoop
 `KeyProviderCryptoExtension` / KMS-style provider initialized from
@@ -436,6 +489,99 @@ Key creation is an operator / KMS-admin responsibility.
 
 The implementation must not invent custom crypto and must not depend on the
 SCM rotating secret-key service for this feature.
+
+## Hadoop KeyProviderCryptoExtension Envelope Flow
+
+When using Hadoop `KeyProviderCryptoExtension` / KMS-style provider,
+create/rotate use envelope encryption as follows:
+
+1. OM `preExecute()` generates the managed S3 secret plaintext in memory.
+2. OM calls:
+
+   ```java
+   KeyProviderCryptoExtension.generateEncryptedKey(
+       ozone.s3.accesskey.encryption.key.name)
+   ```
+
+   to obtain an `EncryptedKeyVersion` / EDEK for the configured key.
+3. OM calls:
+
+   ```java
+   KeyProviderCryptoExtension.decryptEncryptedKey(edek)
+   ```
+
+   to recover plaintext data-encryption-key material in memory.
+4. OM uses the plaintext DEK to AES/GCM-encrypt the managed S3 secret.
+5. OM builds the serialized `encryptedSecretKey` envelope blob.
+6. The Ratis-applied request contains only:
+
+   ```text
+   encryptedSecretKey envelope blob
+   secretKeyId
+   non-secret metadata
+   ```
+
+7. The Ratis-applied request must not contain:
+
+   ```text
+   managed S3 secret plaintext
+   plaintext DEK
+   unwrapped key material
+   ```
+
+8. OM zeroizes or otherwise clears plaintext S3 secret material and plaintext
+   DEK material in a `finally` block as soon as the envelope is built.
+9. `validateAndUpdateCache()` must not call KMS, RNG,
+   `generateEncryptedKey(...)`, or `decryptEncryptedKey(...)`. It only applies
+   already-encrypted metadata from the Ratis-applied request.
+
+Required KMS permissions:
+
+```text
+create/rotate:
+  require permission to generate or wrap encrypted key material:
+    generateEncryptedKey(...)
+
+  require permission to decrypt or unwrap the EDEK to plaintext DEK:
+    decryptEncryptedKey(...)
+
+reason:
+  OM must encrypt the managed S3 secret before Ratis submission. With the
+  KeyProviderCryptoExtension envelope pattern, generateEncryptedKey(...)
+  produces an EDEK, but OM still needs plaintext DEK material in memory to
+  AES/GCM-encrypt the managed secret.
+
+validation/decryption:
+  require permission to decrypt or unwrap the EDEK referenced by the envelope
+    decryptEncryptedKey(...)
+
+permission denied or operation unavailable:
+  fail closed
+
+either create/rotate operation unavailable or denied:
+  create/rotate fail closed before Ratis submission
+```
+
+The serialized `encryptedSecretKey` envelope blob must include enough durable
+metadata to decrypt after restart/failover:
+
+```text
+envelopeVersion
+algorithm, for example AES/GCM/NoPadding
+keyName
+keyVersionName / secretKeyId
+serialized EDEK / encrypted data key material
+data IV / nonce
+ciphertext
+auth tag, if not embedded in ciphertext
+AAD context version
+provider metadata, if required by KeyProviderCryptoExtension
+```
+
+The envelope must not include plaintext DEK.
+
+`secretKeyId` remains diagnostic / quick-reference metadata. The envelope is
+authoritative for decryption metadata.
 
 When `ozone.s3.accesskey.enabled=true`, OM startup validation must verify:
 
@@ -476,6 +622,33 @@ existing row references missing or unavailable secretKeyId:
   credential validation fails closed
 
 existing row has missing or invalid envelope metadata:
+  credential validation fails closed
+
+malformed envelope:
+  credential validation fails closed
+
+unsupported envelope version:
+  credential validation fails closed
+
+missing or unsupported algorithm:
+  credential validation fails closed
+
+missing keyName or keyVersionName:
+  credential validation fails closed
+
+missing encryptedDataKey / EDEK:
+  credential validation fails closed
+
+missing data nonce / IV:
+  credential validation fails closed
+
+missing ciphertext:
+  credential validation fails closed
+
+authentication tag failure:
+  credential validation fails closed
+
+KMS permission failure:
   credential validation fails closed
 ```
 
@@ -549,11 +722,37 @@ accessKeyId, effectiveUser, groups snapshot, and policyDocument remain immutable
 Decrypt / validation semantics:
 
 ```text
-OM parses encryptedSecretKey envelope blob
-OM resolves the required key provider, key, and key version from the envelope
-OM decrypts or unwraps as needed using KeyProviderCryptoExtension
-missing provider, key, key version, or envelope metadata fails closed
-invalid provider, key, key version, or envelope metadata fails closed
+1. OM parses encryptedSecretKey envelope.
+2. OM extracts EDEK and key metadata.
+3. OM calls decryptEncryptedKey(...) to unwrap the DEK.
+4. OM decrypts the managed S3 secret in memory.
+5. OM validates SigV4.
+6. OM clears plaintext secret and plaintext DEK material as soon as possible.
+
+provider unavailable:
+  fail closed
+
+key name missing:
+  fail closed
+
+key version missing:
+  fail closed
+
+EDEK missing or malformed:
+  fail closed
+
+decryptEncryptedKey(...) fails:
+  fail closed
+
+AES/GCM authentication fails:
+  fail closed
+
+envelope version unsupported:
+  fail closed
+
+algorithm unsupported:
+  fail closed
+
 no plaintext fallback
 no unencrypted managed secrets
 no best-effort decryption
@@ -582,10 +781,43 @@ normal Ratis retry cache replays retrievalHandle, never plaintext
 leader stores plaintext in a leader-local in-memory retrieval map
 ```
 
+`RetrieveManagedS3AccessKeySecret` uses a command-specific server path. It must
+not use the generic `LINEARIZABLE_LEADER_ONLY` read path if that path can route
+through Ratis read handling or fall back based on server config.
+
+The selected HA semantics are Option A:
+
+```text
+non-leader or not-ready leader:
+  return the existing OM leader / failover error
+  client may retry against the leader
+
+leader that owns the in-memory retrieval map:
+  perform the command-specific direct read handling
+
+leader that does not have the handle:
+  fail closed with MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE
+```
+
+This matches existing OM HA client conventions while ensuring plaintext is
+never returned from a follower or from a generic read path.
+
+The retrieve command-specific path must:
+
+```text
+perform an explicit leader-ready check
+run only on the leader that owns the in-memory retrieval map
+call the direct request handler path, such as handler.handleReadRequest, after
+  the leader-ready check
+never call omExecutionFlow.submit(..., false)
+never enter the Ratis write path
+never enter the Ratis retry-cache path
+never put plaintext into normal OMResponse or normal Ratis response objects
+```
+
 The retrieval RPC semantics are:
 
 ```text
-RetrieveManagedS3AccessKeySecret is leader-routed / LINEARIZABLE_LEADER_ONLY
 RetrieveManagedS3AccessKeySecret reads only the leader-local in-memory map
 retrievalHandle is single-use
 retrievalHandle expires by ozone.s3.accesskey.retrieval.handle.ttl
@@ -593,8 +825,56 @@ retrieval map is bounded by ozone.s3.accesskey.retrieval.handle.max.entries
 retrievalHandle is bound to caller identity and accessKeyId
 ```
 
-Unknown, expired, already-consumed, wrong-caller, or failover-lost handles
-return `MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE`.
+Handle-specific failures all return
+`MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE`:
+
+```text
+unknown handle
+expired handle
+already-consumed handle
+wrong caller
+accessKeyId mismatch
+failover-lost handle
+leader-local map missing entry
+```
+
+The leader-local retrieval map semantics are:
+
+```text
+map location:
+  leader-local, in-memory only
+
+successful retrieval:
+  atomically remove the entry before returning plaintext
+
+expiration:
+  entries expire after ozone.s3.accesskey.retrieval.handle.ttl
+
+capacity:
+  max entries is ozone.s3.accesskey.retrieval.handle.max.entries
+
+create/rotate before storing a new entry:
+  purge expired entries
+  if still full, fail before Ratis submission
+
+commit rule:
+  do not commit managed key create/rotate if OM cannot store the retrieval
+  handle entry needed for the admin to retrieve the generated secret
+
+handle entropy:
+  generated with SecureRandom
+  at least 128 bits of entropy
+
+handle binding:
+  caller identity
+  accessKeyId
+  operation type create/rotate
+  creation timestamp and expiry
+
+Ratis submission failure after pending handle creation:
+  remove the pending handle if possible
+  TTL expiry is fallback cleanup
+```
 
 Leader failover loses the plaintext retrieval map. If the handle is lost after
 a successful create or rotate, OM must not reveal the old plaintext secret
@@ -606,6 +886,37 @@ audit logs, server logs, normal `OMResponse`, normal retry-cache objects,
 
 If existing OM read-RPC routing or retry-cache architecture cannot support this
 safely, implementation must stop and seek approval before coding.
+
+## Redaction Requirements
+
+The following values are sensitive and must be redacted from logs, audit,
+`toString()`, errors, debug output, and TRACE output:
+
+```text
+plaintext managed S3 secret
+custom plaintext secret in CreateManagedS3AccessKeyRequest
+custom plaintext secret in RotateManagedS3AccessKeyRequest
+RetrieveManagedS3AccessKeySecretResponse plaintextSecret
+encryptedSecretKey envelope blob
+```
+
+`retrievalHandle` is a short-lived bearer handle. It must not be logged in
+full. Audit may include only a hash or short prefix if needed for diagnostics.
+
+`policyDocument` must not be logged by default. Audit uses `policySha256`
+computed over the canonical policy document.
+
+`OMPBHelper.processForDebug` or the equivalent debug/TRACE preprocessing must
+redact:
+
+```text
+CreateManagedS3AccessKeyRequest custom plaintext secret
+RotateManagedS3AccessKeyRequest custom plaintext secret
+RetrieveManagedS3AccessKeySecretResponse plaintextSecret
+full retrievalHandle
+encryptedSecretKey envelope blob
+policyDocument
+```
 
 ## Admin CLI
 
@@ -1042,6 +1353,68 @@ STS path must always take precedence when `x-amz-security-token` is present.
 6. Phase 7: CLI shell commands.
 7. Phase 8: docs and E2E tests.
 
+## Phase 3/4 Proto And API Plan
+
+Phase 3/4 must define new managed access-key proto messages before any
+create/rotate handler code is written:
+
+```text
+CreateManagedS3AccessKeyRequest
+CreateManagedS3AccessKeyResponse
+UpdateCreateManagedS3AccessKeyRequest
+ListManagedS3AccessKeysRequest
+ListManagedS3AccessKeysResponse
+InfoManagedS3AccessKeyRequest
+InfoManagedS3AccessKeyResponse
+DisableManagedS3AccessKeyRequest
+DisableManagedS3AccessKeyResponse
+RotateManagedS3AccessKeyRequest
+RotateManagedS3AccessKeyResponse
+UpdateRotateManagedS3AccessKeyRequest
+DeleteManagedS3AccessKeyRequest
+DeleteManagedS3AccessKeyResponse
+RetrieveManagedS3AccessKeySecretRequest
+RetrieveManagedS3AccessKeySecretResponse
+ManagedS3AccessKeySecretEnvelope
+```
+
+The proto/API rules are:
+
+```text
+Create/rotate external request:
+  may contain plaintext only before preExecute
+
+UpdateCreate/UpdateRotate Ratis request:
+  contains encrypted envelope only
+  contains secretKeyId and non-secret metadata
+  never contains plaintext
+
+Create/rotate normal response:
+  contains non-secret metadata plus retrievalHandle
+  never contains plaintext
+
+RetrieveManagedS3AccessKeySecretResponse:
+  only response allowed to contain plaintext
+  must not be Ratis-submitted
+  must use the command-specific direct leader-only path
+```
+
+New status/error planning:
+
+```text
+MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE
+S3_ACCESS_KEY_ALREADY_EXISTS or equivalent
+MANAGED_S3_ACCESS_KEY_NOT_FOUND or equivalent
+MANAGED_S3_ACCESS_KEY_DISABLED or equivalent invalid-key status
+MANAGED_S3_ACCESS_KEY_EXPIRED or equivalent invalid-key status
+MANAGED_S3_ACCESS_KEY_OPERATION_NOT_SUPPORTED, if needed for unsupported
+  external providers
+```
+
+Status additions must be append-only and proto-lock compatible. Matching
+`OMException.ResultCodes` additions must preserve the existing ordinal mapping
+between `OMException.ResultCodes` and proto `Status`.
+
 ## Likely Implementation Areas
 
 ```text
@@ -1205,3 +1578,48 @@ zero or negative values.
 106. `HDDS-15273` WebIdentity STS path unchanged.
 107. S3G does not store credentials.
 108. S3G does not make final authorization decisions.
+
+Additional Phase 3/4 readiness tests:
+
+1. `RetrieveManagedS3AccessKeySecret` does not call
+   `omExecutionFlow.submit(..., false)`.
+2. Retrieve is rejected or redirected on non-leader / not-ready leader
+   according to the selected Option A leader/failover semantics.
+3. Retrieve never enters the Ratis retry-cache path.
+4. Retrieve never enters the Ratis write path.
+5. Concrete envelope round-trip decrypts after OM restart.
+6. Malformed envelope fails closed.
+7. Unsupported envelope version fails closed.
+8. Missing algorithm, keyName, keyVersionName, EDEK, data IV/nonce, or
+   ciphertext fails closed.
+9. Authentication tag failure fails closed.
+10. KMS permission, decrypt, unwrap, provider, key, or key-version failure
+    fails closed.
+11. `OMPBHelper.processForDebug` does not contain custom plaintext secret from
+    create or rotate requests.
+12. `OMPBHelper.processForDebug` does not contain retrieve response plaintext.
+13. Audit/log/`toString`/errors do not contain plaintext, encrypted envelope,
+    full policy document, or full retrievalHandle.
+14. Retrieval map full purges expired entries.
+15. Retrieval map full after purge causes create/rotate to fail before Ratis
+    submission.
+16. Retrieval entry is removed after successful retrieve.
+17. Retrieval entry expires after TTL.
+18. Wrong caller, failover-lost, unknown, and already-used handles return
+    `MANAGED_S3_ACCESS_KEY_SECRET_UNAVAILABLE`.
+19. External `S3SecretStoreProvider` without reliable existence check is
+    unsupported or fails closed.
+20. Create/rotate calls `generateEncryptedKey(...)` before building the
+    envelope.
+21. Create/rotate calls `decryptEncryptedKey(...)` to obtain plaintext DEK.
+22. Create/rotate fails closed if `generateEncryptedKey(...)` fails.
+23. Create/rotate fails closed if `decryptEncryptedKey(...)` fails.
+24. Create/rotate Ratis request does not contain plaintext S3 secret.
+25. Create/rotate Ratis request does not contain plaintext DEK.
+26. `validateAndUpdateCache()` does not call KMS or RNG.
+27. Malformed EDEK fails closed.
+28. Missing EDEK fails closed.
+29. Missing key version fails closed.
+30. AES/GCM auth failure fails closed.
+31. Plaintext S3 secret and plaintext DEK are cleared on success.
+32. Plaintext S3 secret and plaintext DEK are cleared on exception path.
