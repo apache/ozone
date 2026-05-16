@@ -29,10 +29,8 @@ import java.util.concurrent.TimeUnit;
 import javax.security.sasl.SaslException;
 
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc_.ObserverRetryOnActiveException;
 import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ipc_.RetriableException;
-import org.apache.hadoop.ipc_.StandbyException;
 import org.apache.hadoop.net.ConnectTimeoutException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
@@ -269,7 +267,6 @@ public class RetryPolicies {
   
   /**
    * Fail over and retry in the case of:
-   *   Remote StandbyException (server is up, but is not the active server)
    *   Immediate socket exceptions (e.g. no route to host, econnrefused)
    *   Socket exceptions after initial connection when operation is idempotent
    * 
@@ -339,9 +336,7 @@ public class RetryPolicies {
           e instanceof EOFException ||
           e instanceof NoRouteToHostException ||
           e instanceof UnknownHostException ||
-          e instanceof StandbyException ||
-          e instanceof ConnectTimeoutException ||
-          shouldFailoverOnException(e)) {
+          e instanceof ConnectTimeoutException) {
         return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
             getFailoverOrRetrySleepTime(failovers));
       } else if (e instanceof RetriableException
@@ -391,16 +386,6 @@ public class RetryPolicies {
 
   private static long calculateExponentialTime(long time, int retries) {
     return calculateExponentialTime(time, retries, Long.MAX_VALUE);
-  }
-
-  private static boolean shouldFailoverOnException(Exception e) {
-    if (!(e instanceof RemoteException)) {
-      return false;
-    }
-    Exception unwrapped = ((RemoteException)e).unwrapRemoteException(
-        StandbyException.class,
-        ObserverRetryOnActiveException.class);
-    return unwrapped instanceof StandbyException;
   }
 
   private static boolean isSaslFailure(Exception e) {
