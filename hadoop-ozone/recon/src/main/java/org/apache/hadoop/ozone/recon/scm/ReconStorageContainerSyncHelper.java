@@ -953,8 +953,4 @@ class ReconStorageContainerSyncHelper {
     long responseLimit = hadoopRPCSize / CONTAINER_WITH_PIPELINE_PROTO_SIZE_BYTES;
     return (int) Math.min(requested, responseLimit);
   }
-
-  private long getStatePaginationBatchSize() {
-    return getContainerCountPerCall(Long.MAX_VALUE);
-  }
 }

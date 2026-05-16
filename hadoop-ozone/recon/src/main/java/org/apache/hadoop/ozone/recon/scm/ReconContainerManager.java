@@ -193,6 +193,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
    *
    * @return total container count
    */
+  @Override
   public long getTotalContainerCount() {
     long total = 0;
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
