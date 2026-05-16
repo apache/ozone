@@ -67,3 +67,6 @@ no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+
+# Periodic snapshot defrag for smoketest snapshot/snapshot-defrag.robot (HDDS-15181)
+OZONE-SITE.XML_ozone.snapshot.defrag.service.interval=30s

@@ -1511,10 +1511,17 @@ public class KeyValueHandler extends Handler {
   @Override
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
-    container.writeLock();
     long containerID = container.getContainerData().getContainerID();
+    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
+    if (lockedContainer == null) {
+      // null means container retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.warn("Exceeded {} attempts locking live container {}; skipping markContainerUnhealthy.",
+          ContainerSet.maxContainerMapSwapRetries(), containerID);
+      return;
+    }
     try {
-      if (container.getContainerState() == State.UNHEALTHY) {
+      if (lockedContainer.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
             containerID);
         return;
@@ -1522,25 +1529,25 @@ public class KeyValueHandler extends Handler {
       // If the volume is unhealthy, no action is needed. The container has
       // already been discarded and SCM notified. Once a volume is failed, it
       // cannot be restored without a restart.
-      HddsVolume containerVolume = container.getContainerData().getVolume();
+      HddsVolume containerVolume = lockedContainer.getContainerData().getVolume();
       if (containerVolume.isFailed()) {
         LOG.debug("Ignoring unhealthy container {} detected on an " +
             "already failed volume {}", containerID, containerVolume);
         return;
       }
-      container.markContainerUnhealthy();
+      lockedContainer.markContainerUnhealthy();
     } catch (StorageContainerException ex) {
       LOG.warn("Unexpected error while marking container {} unhealthy",
           containerID, ex);
     } finally {
-      container.writeUnlock();
+      lockedContainer.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container);
+    updateContainerChecksumFromMetadataIfNeeded(lockedContainer);
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
-    ContainerLogger.logUnhealthy(container.getContainerData(), reason);
-    sendICR(container);
+    ContainerLogger.logUnhealthy(lockedContainer.getContainerData(), reason);
+    sendICR(lockedContainer);
   }
 
   @Override
@@ -1574,17 +1581,24 @@ public class KeyValueHandler extends Handler {
   @Override
   public void closeContainer(Container container)
       throws IOException {
-    container.writeLock();
+    long containerID = container.getContainerData().getContainerID();
+    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
+    if (lockedContainer == null) {
+      // null means container locking retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.warn("Exceeded {} attempts locking live container {}; skipping closeContainer.",
+          ContainerSet.maxContainerMapSwapRetries(), containerID);
+      return;
+    }
     try {
-      final State state = container.getContainerState();
+      final State state = lockedContainer.getContainerState();
       // Close call is idempotent.
       if (state == State.CLOSED) {
         return;
       }
       if (state == State.UNHEALTHY) {
         throw new StorageContainerException(
-            "Cannot close container #" + container.getContainerData()
-                .getContainerID() + " while in " + state + " state.",
+            "Cannot close container #" + containerID + " while in " + state + " state.",
             ContainerProtos.Result.CONTAINER_UNHEALTHY);
       }
       // The container has to be either in CLOSING or in QUASI_CLOSED state.
@@ -1593,16 +1607,15 @@ public class KeyValueHandler extends Handler {
             state == State.INVALID ? INVALID_CONTAINER_STATE :
                 CONTAINER_INTERNAL_ERROR;
         throw new StorageContainerException(
-            "Cannot close container #" + container.getContainerData()
-                .getContainerID() + " while in " + state + " state.", error);
+            "Cannot close container #" + containerID + " while in " + state + " state.", error);
       }
-      container.close();
+      lockedContainer.close();
     } finally {
-      container.writeUnlock();
+      lockedContainer.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container);
-    ContainerLogger.logClosed(container.getContainerData());
-    sendICR(container);
+    updateContainerChecksumFromMetadataIfNeeded(lockedContainer);
+    ContainerLogger.logClosed(lockedContainer.getContainerData());
+    sendICR(lockedContainer);
   }
 
   @Override
@@ -2293,24 +2306,33 @@ public class KeyValueHandler extends Handler {
 
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
+    final long containerId = container.getContainerData().getContainerID();
     long startTime = clock.millis();
-    container.writeLock();
+    Container<?> containerLocked = containerSet.getContainerWithWriteLock(containerId);
+    if (containerLocked == null) {
+      // null means container locking retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.info("Exceeded {} retries to lock container {}; Now SCM will resend for delete with " +
+              "the current container replica", ContainerSet.maxContainerMapSwapRetries(),
+          containerId);
+      return;
+    }
     try {
-      final ContainerData data = container.getContainerData();
-      if (container.getContainerData().getVolume().isFailed()) {
+      final ContainerData data = containerLocked.getContainerData();
+      if (containerLocked.getContainerData().getVolume().isFailed()) {
         // if the  volume in which the container resides fails
         // don't attempt to delete/move it. When a volume fails,
         // failedVolumeListener will pick it up and clear the container
         // from the container set.
         LOG.info("Delete container issued on containerID {} which is in a " +
-                "failed volume. Skipping", container.getContainerData()
+                "failed volume. Skipping", containerLocked.getContainerData()
             .getContainerID());
         return;
       }
       // If force is false, we check container state.
       if (!force) {
         // Check if container is open
-        if (container.getContainerData().isOpen()) {
+        if (containerLocked.getContainerData().isOpen()) {
           throw new StorageContainerException(
               "Deletion of Open Container is not allowed.",
               DELETE_ON_OPEN_CONTAINER);
@@ -2319,14 +2341,14 @@ public class KeyValueHandler extends Handler {
         // If the container is not empty, it should not be deleted unless the
         // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
-        if (container.hasBlocks()) {
+        if (containerLocked.hasBlocks()) {
           metrics.incContainerDeleteFailedNonEmpty();
           LOG.error("Received container deletion command for non-empty {}: {}", data, data.getStatistics());
           // blocks table for future debugging.
           // List blocks
-          logBlocksIfNonZero(container);
+          logBlocksIfNonZero(containerLocked);
           // Log chunks
-          logBlocksFoundOnDisk(container);
+          logBlocksFoundOnDisk(containerLocked);
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
@@ -2334,9 +2356,9 @@ public class KeyValueHandler extends Handler {
       } else {
         metrics.incContainersForceDelete();
       }
-      if (container.getContainerData() instanceof KeyValueContainerData) {
+      if (containerLocked.getContainerData() instanceof KeyValueContainerData) {
         KeyValueContainerData keyValueContainerData =
-            (KeyValueContainerData) container.getContainerData();
+            (KeyValueContainerData) containerLocked.getContainerData();
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
         // Steps to delete
@@ -2350,21 +2372,20 @@ public class KeyValueHandler extends Handler {
           if (waitTime > maxDeleteLockWaitMs) {
             LOG.warn("An attempt to delete container {} took {} ms acquiring locks and pre-checks. " +
                     "The delete has been skipped and should be retried automatically by SCM.",
-                container.getContainerData().getContainerID(), waitTime);
+                containerLocked.getContainerData().getContainerID(), waitTime);
             return;
           }
-          container.markContainerForDelete();
-          long containerId = container.getContainerData().getContainerID();
+          containerLocked.markContainerForDelete();
           containerSet.removeContainer(containerId);
-          ContainerLogger.logDeleted(container.getContainerData(), force);
+          ContainerLogger.logDeleted(containerLocked.getContainerData(), force);
           KeyValueContainerUtil.removeContainer(keyValueContainerData, conf);
         } catch (IOException ioe) {
           LOG.error("Failed to move container under " + hddsVolume
               .getDeletedContainerDir());
           String errorMsg =
-              "Failed to move container" + container.getContainerData()
+              "Failed to move container" + containerLocked.getContainerData()
                   .getContainerID();
-          triggerVolumeScanAndThrowException(container, errorMsg,
+          triggerVolumeScanAndThrowException(containerLocked, errorMsg,
               CONTAINER_INTERNAL_ERROR);
         }
       }
@@ -2374,20 +2395,20 @@ public class KeyValueHandler extends Handler {
       // All other IO Exceptions should be treated as if the container is not
       // empty as a defensive check.
       LOG.error("Could not determine if the container {} is empty",
-          container.getContainerData().getContainerID(), e);
+          containerLocked.getContainerData().getContainerID(), e);
       String errorMsg =
-          "Failed to read container dir" + container.getContainerData()
+          "Failed to read container dir" + containerLocked.getContainerData()
               .getContainerID();
-      triggerVolumeScanAndThrowException(container, errorMsg,
+      triggerVolumeScanAndThrowException(containerLocked, errorMsg,
           CONTAINER_INTERNAL_ERROR);
     } finally {
-      container.writeUnlock();
+      containerLocked.writeUnlock();
     }
     // Avoid holding write locks for disk operations
-    sendICR(container);
-    long bytesUsed = container.getContainerData().getBytesUsed();
-    HddsVolume volume = container.getContainerData().getVolume();
-    container.delete();
+    sendICR(containerLocked);
+    long bytesUsed = containerLocked.getContainerData().getBytesUsed();
+    HddsVolume volume = containerLocked.getContainerData().getVolume();
+    containerLocked.delete();
     volume.decrementUsedSpace(bytesUsed);
   }
 

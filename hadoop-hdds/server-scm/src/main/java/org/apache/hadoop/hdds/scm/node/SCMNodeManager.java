@@ -126,6 +126,7 @@ public class SCMNodeManager implements NodeManager {
   private final VersionInfo version;
   private final CommandQueue commandQueue;
   private final SCMNodeMetrics metrics;
+  private final PendingContainerTracker pendingContainerTracker;
   // Node manager MXBean
   private ObjectName nmInfoBean;
   private final SCMStorageConfig scmStorageConfig;
@@ -188,6 +189,11 @@ public class SCMNodeManager implements NodeManager {
     LOG.info("Entering startup safe mode.");
     registerMXBean();
     this.metrics = SCMNodeMetrics.create(this);
+    this.pendingContainerTracker = new PendingContainerTracker(
+        (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES),
+        5 * 60 * 1000, // TODO
+        this.metrics);
     this.clusterMap = networkTopology;
     this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(
@@ -1063,6 +1069,30 @@ public class SCMNodeManager implements NodeManager {
           dn.getUuid());
       return null;
     }
+  }
+
+  /**
+   * Effective space check aligned with container allocation: per-disk slot model minus
+   * SCM pending allocations.
+   */
+  @Override
+  public boolean hasSpaceForNewContainerAllocation(DatanodeID datanodeID) {
+    DatanodeInfo datanodeInfo = getNode(datanodeID);
+    if (datanodeInfo == null) {
+      LOG.warn("DatanodeInfo not found for node {}", datanodeID);
+      return false;
+    }
+    return pendingContainerTracker.hasEffectiveAllocatableSpaceForNewContainer(datanodeInfo);
+  }
+
+  @Override
+  public void recordPendingAllocationForDatanode(DatanodeID datanodeID, ContainerID containerID) {
+    DatanodeInfo datanodeInfo = getNode(datanodeID);
+    if (datanodeInfo == null) {
+      LOG.warn("DatanodeInfo not found for node {}", datanodeID);
+      return;
+    }
+    pendingContainerTracker.recordPendingAllocationForDatanode(datanodeInfo, containerID);
   }
 
   /**

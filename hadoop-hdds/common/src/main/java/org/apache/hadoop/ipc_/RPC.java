@@ -30,8 +30,6 @@ import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
 import java.io.Closeable;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,7 +43,6 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc_.Client.ConnectionId;
-import org.apache.hadoop.ipc_.protobuf.ProtocolInfoProtos.ProtocolInfoService;
 import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcErrorCodeProto;
 import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcStatusProto;
 import org.apache.hadoop.net.NetUtils;
@@ -57,7 +54,6 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 
-import com.google.protobuf.BlockingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +79,7 @@ public class RPC {
   final static int RPC_SERVICE_CLASS_DEFAULT = 0;
   public enum RpcKind {
     RPC_BUILTIN ((short) 1),         // Used for built in calls by tests
-    RPC_WRITABLE ((short) 2),        // Use WritableRpcEngine 
+    RPC_WRITABLE ((short) 2),        // ignored
     RPC_PROTOCOL_BUFFER ((short) 3); // Use ProtobufRpcEngine
     final static short MAX_SIZE = RPC_PROTOCOL_BUFFER.value; // used for array size
     private final short value;
@@ -109,38 +105,7 @@ public class RPC {
   }
   
   static final Logger LOG = LoggerFactory.getLogger(RPC.class);
-  
-  /**
-   * Get all superInterfaces that extend VersionedProtocol
-   * @param childInterfaces
-   * @return the super interfaces that extend VersionedProtocol
-   */
-  static Class<?>[] getSuperInterfaces(Class<?>[] childInterfaces) {
-    List<Class<?>> allInterfaces = new ArrayList<Class<?>>();
 
-    for (Class<?> childInterface : childInterfaces) {
-      if (VersionedProtocol.class.isAssignableFrom(childInterface)) {
-          allInterfaces.add(childInterface);
-          allInterfaces.addAll(
-              Arrays.asList(
-                  getSuperInterfaces(childInterface.getInterfaces())));
-      } else {
-        LOG.warn("Interface " + childInterface +
-              " ignored because it does not extend VersionedProtocol");
-      }
-    }
-    return allInterfaces.toArray(new Class[allInterfaces.size()]);
-  }
-  
-  /**
-   * Get all interfaces that the given protocol implements or extends
-   * which are assignable from VersionedProtocol.
-   */
-  static Class<?>[] getProtocolInterfaces(Class<?> protocol) {
-    Class<?>[] interfaces  = protocol.getInterfaces();
-    return getSuperInterfaces(interfaces);
-  }
-  
   /**
    * Get the protocol name.
    *  If the protocol class has a ProtocolAnnotation, then get the protocol
@@ -216,8 +181,7 @@ public class RPC {
       Configuration conf) {
     RpcEngine engine = PROTOCOL_ENGINES.get(protocol);
     if (engine == null) {
-      Class<?> impl = conf.getClass(ENGINE_PROP+"."+protocol.getName(),
-                                    WritableRpcEngine.class);
+      Class<?> impl = conf.getClass(ENGINE_PROP+"."+protocol.getName(), ProtobufRpcEngine.class);
       engine = (RpcEngine)ReflectionUtils.newInstance(impl, conf);
       PROTOCOL_ENGINES.put(protocol, engine);
     }
@@ -537,29 +501,6 @@ public class RPC {
         factory, getRpcTimeout(conf), null);
   }
 
-  /**
-   * Get a protocol proxy that contains a proxy connection to a remote server
-   * and a set of methods that are supported by the server.
-   *
-   * @param <T> Generics Type T
-   * @param protocol protocol class
-   * @param clientVersion client's version
-   * @param connId client connection identifier
-   * @param conf configuration
-   * @param factory socket factory
-   * @return the protocol proxy
-   * @throws IOException if the far end through a RemoteException
-   */
-  public static <T> ProtocolProxy<T> getProtocolProxy(Class<T> protocol,
-      long clientVersion, ConnectionId connId, Configuration conf,
-      SocketFactory factory) throws IOException {
-    if (UserGroupInformation.isSecurityEnabled()) {
-      SaslRpcServer.init(conf);
-    }
-    return getProtocolEngine(protocol, conf).getProxy(
-        protocol, clientVersion, connId, conf, factory);
-  }
-  
   /**
    * Construct a client-side proxy that implements the named protocol,
    * talking to a server at the named address.
@@ -1034,6 +975,19 @@ public class RPC {
      return protocolImplMapArray.get(rpcKind.ordinal());   
    }
    
+    /**
+     * Returns {@code true} only if at least one protocol has been registered
+     * on this server instance for the given {@link RPC.RpcKind}.
+     * Used to reject incoming requests for unsupported RPC kinds before any
+     * deserialization of the request payload takes place.
+     * @param rpcKind the RPC kind from the incoming request header.
+     * @return {@code true} if at least one protocol is registered for this kind.
+     */
+    boolean hasRegisteredProtocols(RPC.RpcKind rpcKind) {
+      Map<ProtoNameVer, ProtoClassProtoImpl> implMap = getProtocolImplMap(rpcKind);
+      return implMap != null && !implMap.isEmpty();
+    }
+
    // Register  protocol and its impl for rpc calls
    void registerProtocolAndImpl(RpcKind rpcKind, Class<?> protocolClass, 
        Object protocolImpl) {
@@ -1131,18 +1085,6 @@ public class RPC {
                      String portRangeConfig) throws IOException {
       super(bindAddress, port, paramClass, handlerCount, numReaders, queueSizePerHandler,
             conf, serverName, secretManager, portRangeConfig);
-      initProtocolMetaInfo(conf);
-    }
-    
-    private void initProtocolMetaInfo(Configuration conf) {
-      RPC.setProtocolEngine(conf, ProtocolMetaInfoPB.class,
-          ProtobufRpcEngine.class);
-      ProtocolMetaInfoServerSideTranslatorPB xlator = 
-          new ProtocolMetaInfoServerSideTranslatorPB(this);
-      BlockingService protocolInfoBlockingService = ProtocolInfoService
-          .newReflectiveBlockingService(xlator);
-      addProtocol(RpcKind.RPC_PROTOCOL_BUFFER, ProtocolMetaInfoPB.class,
-          protocolInfoBlockingService);
     }
     
     /**

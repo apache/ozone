@@ -33,6 +33,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,10 +43,10 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
@@ -70,7 +71,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -130,6 +130,8 @@ public class DiskBalancerService extends BackgroundService {
 
   private DiskBalancerServiceMetrics metrics;
 
+  private Set<State> movableContainerStates;
+
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
       int workerSize, ConfigurationSource conf) throws IOException {
@@ -153,8 +155,9 @@ public class DiskBalancerService extends BackgroundService {
       throw new IOException(e);
     }
 
-    replicaDeletionDelay = conf.getObject(DiskBalancerConfiguration.class)
-        .getReplicaDeletionDelay();
+    DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
+    replicaDeletionDelay = diskBalancerConfiguration.getReplicaDeletionDelay();
+    setContainerStates(diskBalancerConfiguration.getMovableContainerStates());
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
@@ -240,16 +243,18 @@ public class DiskBalancerService extends BackgroundService {
 
   private void applyDiskBalancerInfo(DiskBalancerInfo diskBalancerInfo)
       throws IOException {
+    DiskBalancerConfiguration validated = diskBalancerInfo.toConfiguration();
     // First store in local file, then update in memory variables
     writeDiskBalancerInfoTo(diskBalancerInfo, diskBalancerInfoFile);
 
     updateOperationalStateFromInfo(diskBalancerInfo);
 
-    setThreshold(diskBalancerInfo.getThreshold());
-    setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
-    setParallelThread(diskBalancerInfo.getParallelThread());
-    setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
+    setThreshold(validated.getThreshold());
+    setBandwidthInMB(validated.getDiskBandwidthInMB());
+    setParallelThread(validated.getParallelThread());
+    setStopAfterDiskEven(validated.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
+    setContainerStates(validated.getMovableContainerStates());
 
     // Default executorService is ScheduledThreadPoolExecutor, so we can
     // update the poll size by setting corePoolSize.
@@ -301,7 +306,7 @@ public class DiskBalancerService extends BackgroundService {
    * Read {@link DiskBalancerInfo} from a local info file.
    *
    * @param path DiskBalancerInfo file local path
-   * @return {@link DatanodeDetails}
+   * @return parsed {@link DiskBalancerInfo}
    * @throws IOException If the conf file is malformed or other I/O exceptions
    */
   private synchronized DiskBalancerInfo readDiskBalancerInfoFile(
@@ -360,6 +365,27 @@ public class DiskBalancerService extends BackgroundService {
     this.version = version;
   }
 
+  /**
+   * Applies container-state configuration.
+   * <p>
+   * Only the parsed set of {@link State} values is stored in memory. Status and YAML use a
+   * canonical comma-separated list (enum names sorted lexically), which may differ from the
+   * original input string.
+   */
+  public void setContainerStates(Set<State> containerStateSet) {
+    this.movableContainerStates = containerStateSet;
+  }
+
+  /**
+   * Stable comma-separated {@link State} names for persistence and RPC.
+   */
+  private static String formatContainerStates(Set<State> states) {
+    return states.stream()
+        .sorted(Comparator.comparing(State::name))
+        .map(State::name)
+        .collect(Collectors.joining(","));
+  }
+
   @Override
   public synchronized void start() {
     // Clean up any stale diskBalancer tmp directories from previous runs
@@ -397,7 +423,7 @@ public class DiskBalancerService extends BackgroundService {
 
     for (int i = 0; i < availableTaskCount; i++) {
       ContainerCandidate candidate = volumeContainerChoosingPolicy.chooseVolumesAndContainer(
-          ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold);
+          ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold, movableContainerStates);
       if (candidate != null) {
         HddsVolume sourceVolume = candidate.getSourceVolume();
         HddsVolume destVolume = candidate.getDestVolume();
@@ -484,23 +510,19 @@ public class DiskBalancerService extends BackgroundService {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
 
-      // Double check container state before acquiring lock to start move process.
-      // Container state may have changed after selection. Only CLOSED containers can be moved.
-      // QUASI_CLOSED is allowed when test mode is enabled, this is done to test in production
-      // these containers are rejected.
-      State containerState = container.getContainerData().getState();
-      boolean isTestMode = DefaultContainerChoosingPolicy.isTest();
-      if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
-        LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
-            containerId, containerState);
-        postCall(false, startTime);
-        return BackgroundTaskResult.EmptyTaskResult.newResult();
-      }
-
       // hold read lock on the container first, to avoid other threads to update the container state,
       // such as block deletion.
       container.readLock();
       try {
+        // Double check container state after acquiring lock to start move process.
+        // Container state may have changed after selection.
+        State containerState = container.getContainerData().getState();
+        if (!movableContainerStates.contains(containerState)) {
+          LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
+          moveSucceeded = false;
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        }
+
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
             .resolve(String.valueOf(containerId));
@@ -556,6 +578,10 @@ public class DiskBalancerService extends BackgroundService {
         // old caller can still hold the old Container object.
         ozoneContainer.getContainerSet().updateContainer(newContainer);
         destVolume.incrementUsedSpace(containerSize);
+
+        // Test injector: ContainerSet now references newContainer while this thread still holds
+        // readLock on the old replica.
+        pauseInjector();
         // Mark old container as DELETED and persist state.
         // markContainerForDelete require writeLock, so release readLock first
         container.readUnlock();
@@ -573,13 +599,7 @@ public class DiskBalancerService extends BackgroundService {
         metrics.incrSuccessBytes(containerSize);
         totalBalancedBytes.addAndGet(containerSize);
       } catch (IOException e) {
-        if (injector != null) {
-          try {
-            injector.pause();
-          } catch (IOException ex) {
-            // do nothing
-          }
-        }
+        pauseInjector();
         moveSucceeded = false;
         LOG.warn("Failed to move container {}", containerId, e);
         if (diskBalancerTmpDir != null) {
@@ -689,7 +709,8 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     DiskBalancerInfo info = new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
-        parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
+        parallelThread, stopAfterDiskEven, version, formatContainerStates(movableContainerStates),
+        metrics.getSuccessCount(),
         metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDataDensity);
     info.setIdealUsage(getIdealUsage(volumeUsages));
     info.setVolumeInfo(buildVolumeReportProto(volumeUsages));
@@ -834,6 +855,17 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
+  }
+
+  // call FaultInjector#pause when an injector is registered; ignore IOException.
+  private static void pauseInjector() {
+    if (injector != null) {
+      try {
+        injector.pause();
+      } catch (IOException ex) {
+        // do nothing
+      }
+    }
   }
 
   @VisibleForTesting

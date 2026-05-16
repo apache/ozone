@@ -32,8 +32,6 @@ import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.admin.om.lease.LeaseSubCommand;
 import org.apache.hadoop.ozone.admin.om.snapshot.SnapshotSubCommand;
 import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
@@ -75,20 +73,6 @@ public class OMAdmin implements AdminSubcommand {
     return parent;
   }
 
-  public ClientProtocol createClient(String omServiceId) throws Exception {
-    OzoneConfiguration conf = parent.getOzoneConf();
-    if (OmUtils.isOmHAServiceId(conf, omServiceId)) {
-      return OzoneClientFactory.getRpcClient(omServiceId, conf).getObjectStore()
-        .getClientProxy();
-    } else {
-      throw new OzoneClientException("This command works only on OzoneManager" +
-            " HA cluster. Service ID specified does not match" +
-            " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
-            "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
-            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + "\n");
-    }
-  }
-
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
       String omServiceID,
       String omHost,
@@ -123,7 +107,7 @@ public class OMAdmin implements AdminSubcommand {
             " HA cluster. Service ID specified does not match" +
             " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
             "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
-            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + "\n");
+            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + System.lineSeparator());
     }
   }
 

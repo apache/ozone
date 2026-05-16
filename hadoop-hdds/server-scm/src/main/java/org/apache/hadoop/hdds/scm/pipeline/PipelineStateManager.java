@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -113,5 +114,9 @@ public interface PipelineStateManager extends SCMHandler {
   @Override
   default RequestType getType() {
     return RequestType.PIPELINE;
+  }
+
+  static void main(String[] args) {
+    ScmInvokerCodeGenerator.generate(PipelineStateManager.class, true);
   }
 }

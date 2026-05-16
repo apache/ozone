@@ -45,34 +45,86 @@ final class S3ConditionalRequest {
   private S3ConditionalRequest() {
   }
 
-  static Response evaluateReadPreconditions(HttpHeaders headers,
-      String keyPath, OzoneKey key) throws OS3Exception {
+  /**
+   * Context for evaluating preconditions, defining which headers to check
+   * and how to handle cache validation scenarios.
+   */
+  enum PreconditionContext {
+    /**
+     * For GET/HEAD requests. Returns 304 Not Modified when If-None-Match
+     * matches or If-Modified-Since is not satisfied (cache validation).
+     */
+    READ(
+        S3Consts.IF_MATCH_HEADER,
+        S3Consts.IF_NONE_MATCH_HEADER,
+        S3Consts.IF_MODIFIED_SINCE_HEADER,
+        S3Consts.IF_UNMODIFIED_SINCE_HEADER),
+
+    /**
+     * For CopyObject source validation. Always throws 412 Precondition Failed
+     * when any condition is not met (no 304 responses).
+     */
+    COPY_SOURCE(
+        S3Consts.COPY_SOURCE_IF_MATCH,
+        S3Consts.COPY_SOURCE_IF_NONE_MATCH,
+        S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE,
+        S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE);
+
+    private final String ifMatchHeader;
+    private final String ifNoneMatchHeader;
+    private final String ifModifiedSinceHeader;
+    private final String ifUnmodifiedSinceHeader;
+
+    PreconditionContext(String ifMatchHeader, String ifNoneMatchHeader,
+        String ifModifiedSinceHeader, String ifUnmodifiedSinceHeader) {
+      this.ifMatchHeader = ifMatchHeader;
+      this.ifNoneMatchHeader = ifNoneMatchHeader;
+      this.ifModifiedSinceHeader = ifModifiedSinceHeader;
+      this.ifUnmodifiedSinceHeader = ifUnmodifiedSinceHeader;
+    }
+  }
+
+  /**
+   * Evaluates preconditions based on the given context.
+   *
+   * @param headers HTTP headers containing the conditional headers
+   * @param keyPath path of the key for error messages
+   * @param key the key metadata
+   * @param context determines which headers to check and response behavior
+   * @return Response with 304 status for READ context cache hits, null otherwise
+   * @throws OS3Exception with 412 Precondition Failed if conditions are not met
+   */
+  static Response evaluatePreconditions(HttpHeaders headers,
+      String keyPath, OzoneKey key, PreconditionContext context) throws OS3Exception {
     String currentETag = key.getMetadata().get(OzoneConsts.ETAG);
-    String ifMatch = headers.getHeaderString(S3Consts.IF_MATCH_HEADER);
+
+    String ifMatch = headers.getHeaderString(context.ifMatchHeader);
     if (ifMatch != null && !eTagMatches(ifMatch, currentETag)) {
       throw newError(PRECOND_FAILED, keyPath);
     }
 
-    String ifUnmodifiedSince = headers.getHeaderString(
-        S3Consts.IF_UNMODIFIED_SINCE_HEADER);
+    String ifUnmodifiedSince = headers.getHeaderString(context.ifUnmodifiedSinceHeader);
     if (ifMatch == null && ifUnmodifiedSince != null
         && !matchesIfUnmodifiedSince(key, ifUnmodifiedSince)) {
       throw newError(PRECOND_FAILED, keyPath);
     }
 
-    String ifNoneMatch = headers.getHeaderString(
-        S3Consts.IF_NONE_MATCH_HEADER);
+    String ifNoneMatch = headers.getHeaderString(context.ifNoneMatchHeader);
     if (ifNoneMatch != null) {
       if (eTagMatches(ifNoneMatch, currentETag)) {
+        if (context == PreconditionContext.COPY_SOURCE) {
+          throw newError(PRECOND_FAILED, keyPath);
+        }
         return buildNotModifiedResponse(key);
       }
       return null;
     }
 
-    String ifModifiedSince = headers.getHeaderString(
-        S3Consts.IF_MODIFIED_SINCE_HEADER);
-    if (ifModifiedSince != null && !matchesIfModifiedSince(key,
-        ifModifiedSince)) {
+    String ifModifiedSince = headers.getHeaderString(context.ifModifiedSinceHeader);
+    if (ifModifiedSince != null && !matchesIfModifiedSince(key, ifModifiedSince)) {
+      if (context == PreconditionContext.COPY_SOURCE) {
+        throw newError(PRECOND_FAILED, keyPath);
+      }
       return buildNotModifiedResponse(key);
     }
 

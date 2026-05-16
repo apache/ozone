@@ -963,8 +963,8 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final String dir2 = root + "/dir2";
-    final Path source = new Path(fs.getUri().toString() + dir1);
-    final Path destin = new Path(fs.getUri().toString() + dir2);
+    final Path source = pathUnderFsRoot(dir1);
+    final Path destin = pathUnderFsRoot(dir2);
 
     // creates destin
     fs.mkdirs(destin);
@@ -979,23 +979,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
    */
   @Test
   public void testRenameDirToItsOwnSubDir() throws Exception {
-    final String root = "/root";
-    final String dir1 = root + "/dir1";
-    final Path dir1Path = new Path(fs.getUri().toString() + dir1);
-    // Add a sub-dir1 to the directory to be moved.
-    final Path subDir1 = new Path(dir1Path, "sub_dir1");
-    fs.mkdirs(subDir1);
-    LOG.info("Created dir1 {}", subDir1);
-
-    final Path sourceRoot = new Path(fs.getUri().toString() + root);
-    LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
-    try {
-      fs.rename(sourceRoot, subDir1);
-      fail("Should throw exception : Cannot rename a directory to" +
-              " its own subdirectory");
-    } catch (IllegalArgumentException iae) {
-      // expected
-    }
+    renameDirToItsOwnSubDir();
   }
 
   /**
@@ -1006,11 +990,11 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final String dir2 = dir1 + "/dir2";
-    final Path dir2Path = new Path(fs.getUri().toString() + dir2);
+    final Path dir2Path = pathUnderFsRoot(dir2);
     fs.mkdirs(dir2Path);
 
     // File rename
-    Path file1 = new Path(fs.getUri().toString() + dir2 + "/file1");
+    Path file1 = pathUnderFsRoot(dir2 + "/file1");
     ContractTestUtils.touch(fs, file1);
 
     assertTrue(fs.rename(file1, file1));
@@ -1025,23 +1009,23 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   @Test
   public void testRenameToExistingDir() throws Exception {
     // created /a
-    final Path aSourcePath = new Path(fs.getUri().toString() + "/a");
+    final Path aSourcePath = pathUnderFsRoot("/a");
     fs.mkdirs(aSourcePath);
 
     // created /b
-    final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
+    final Path bDestinPath = pathUnderFsRoot("/b");
     fs.mkdirs(bDestinPath);
 
     // Add a sub-directory '/a/c' to '/a'. This is to verify that after
     // rename sub-directory also be moved.
-    final Path acPath = new Path(fs.getUri().toString() + "/a/c");
+    final Path acPath = pathUnderFsRoot("/a/c");
     fs.mkdirs(acPath);
 
     // Rename from /a to /b.
     assertTrue(fs.rename(aSourcePath, bDestinPath), "Rename failed");
 
-    final Path baPath = new Path(fs.getUri().toString() + "/b/a");
-    final Path bacPath = new Path(fs.getUri().toString() + "/b/a/c");
+    final Path baPath = pathUnderFsRoot("/b/a");
+    final Path bacPath = pathUnderFsRoot("/b/a/c");
     assertTrue(fs.exists(baPath), "Rename failed");
     assertTrue(fs.exists(bacPath), "Rename failed");
   }
@@ -1057,31 +1041,31 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   public void testRenameToNewSubDirShouldNotExist() throws Exception {
     // Case-5.a) Rename directory from /a to /b.
     // created /a
-    final Path aSourcePath = new Path(fs.getUri().toString() + "/a");
+    final Path aSourcePath = pathUnderFsRoot("/a");
     fs.mkdirs(aSourcePath);
 
     // created /b
-    final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
+    final Path bDestinPath = pathUnderFsRoot("/b");
     fs.mkdirs(bDestinPath);
 
     // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
     // throws exception as new destin /b/a already exists.
-    final Path baPath = new Path(fs.getUri().toString() + "/b/a/c");
+    final Path baPath = pathUnderFsRoot("/b/a/c");
     fs.mkdirs(baPath);
 
     assertFalse(fs.rename(aSourcePath, bDestinPath), "New destin sub-path /b/a already exists");
 
     // Case-5.b) Rename file from /a/b/c/file1 to /a.
     // Should be failed since /a/file1 exists.
-    final Path abcPath = new Path(fs.getUri().toString() + "/a/b/c");
+    final Path abcPath = pathUnderFsRoot("/a/b/c");
     fs.mkdirs(abcPath);
     Path abcFile1 = new Path(abcPath, "/file1");
     ContractTestUtils.touch(fs, abcFile1);
 
-    final Path aFile1 = new Path(fs.getUri().toString() + "/a/file1");
+    final Path aFile1 = pathUnderFsRoot("/a/file1");
     ContractTestUtils.touch(fs, aFile1);
 
-    final Path aDestinPath = new Path(fs.getUri().toString() + "/a");
+    final Path aDestinPath = pathUnderFsRoot("/a");
 
     assertFalse(fs.rename(abcFile1, aDestinPath), "New destin sub-path /b/a already exists");
   }
@@ -1092,12 +1076,12 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   @Test
   public void testRenameDirToFile() throws Exception {
     final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
+    Path rootPath = pathUnderFsRoot(root);
     fs.mkdirs(rootPath);
 
-    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    Path file1Destin = pathUnderFsRoot(root + "/file1");
     ContractTestUtils.touch(fs, file1Destin);
-    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
+    Path abcRootPath = pathUnderFsRoot("/a/b/c");
     fs.mkdirs(abcRootPath);
     assertFalse(fs.rename(abcRootPath, file1Destin), "key already exists /root_dir/file1");
   }
@@ -1108,25 +1092,20 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   @Test
   public void testRenameFile() throws Exception {
     final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
-    fs.mkdirs(rootPath);
+    renameFile(root);
+  }
 
-    Path file1Source = new Path(fs.getUri().toString() + root
-            + "/file1_Copy");
-    ContractTestUtils.touch(fs, file1Source);
-    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
-    assertTrue(fs.rename(file1Source, file1Destin), "Renamed failed");
-    assertTrue(fs.exists(file1Destin), "Renamed failed: /root/file1");
-
+  @Override
+  public void verifyRenameFile(Path workDir, Path expectedDest) throws IOException {
     /*
      * Reading several times, this is to verify that OmKeyInfo#keyName cached
      * entry is not modified. While reading back, OmKeyInfo#keyName will be
      * prepared and assigned to fullkeyPath name.
      */
     for (int i = 0; i < 10; i++) {
-      FileStatus[] fStatus = fs.listStatus(rootPath);
+      FileStatus[] fStatus = fs.listStatus(workDir);
       assertEquals(1, fStatus.length, "Renamed failed");
-      assertEquals(file1Destin, fStatus[0].getPath(), "Wrong path name!");
+      assertEquals(expectedDest, fStatus[0].getPath(), "Wrong path name!");
     }
   }
 
@@ -1136,16 +1115,12 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   @Test
   public void testRenameFileToDir() throws Exception {
     final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
-    fs.mkdirs(rootPath);
+    renameFileToDir(root);
+  }
 
-    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
-    ContractTestUtils.touch(fs, file1Destin);
-    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
-    fs.mkdirs(abcRootPath);
-    assertTrue(fs.rename(file1Destin, abcRootPath), "Renamed failed");
-    assertTrue(fs.exists(new Path(abcRootPath,
-            "file1")), "Renamed filed: /a/b/c/file1");
+  @Override
+  protected Path pathUnderFsRoot(String relativePath) {
+    return new Path(getFs().getUri().toString() + relativePath);
   }
 
   @Test
@@ -1156,8 +1131,8 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     String targetKeyName = fakeParentKey +  "/key2";
     TestDataUtil.createKey(ozoneBucket, sourceKeyName, new byte[0]);
 
-    Path sourcePath = new Path(fs.getUri().toString() + "/" + sourceKeyName);
-    Path targetPath = new Path(fs.getUri().toString() + "/" + targetKeyName);
+    Path sourcePath = pathUnderFsRoot("/" + sourceKeyName);
+    Path targetPath = pathUnderFsRoot("/" + targetKeyName);
     assertTrue(fs.rename(sourcePath, targetPath));
     assertFalse(fs.exists(sourcePath));
     assertTrue(fs.exists(targetPath));
@@ -1172,32 +1147,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
    */
   @Test
   public void testRenameDestinationParentDoesntExist() throws Exception {
-    final String root = "/root_dir";
-    final String dir1 = root + "/dir1";
-    final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(fs.getUri().toString() + dir2);
-    fs.mkdirs(dir2SourcePath);
-
-    // (a) parent of dst does not exist.  /root_dir/b/c
-    final Path destinPath = new Path(fs.getUri().toString() + root + "/b/c");
-    try {
-      fs.rename(dir2SourcePath, destinPath);
-      fail("Should fail as parent of dst does not exist!");
-    } catch (FileNotFoundException fnfe) {
-      // expected
-    }
-
-    // (b) parent of dst is a file. /root_dir/file1/c
-    Path filePath = new Path(fs.getUri().toString() + root + "/file1");
-    ContractTestUtils.touch(fs, filePath);
-
-    Path newDestinPath = new Path(filePath, "c");
-    try {
-      fs.rename(dir2SourcePath, newDestinPath);
-      fail("Should fail as parent of dst is a file!");
-    } catch (IOException ioe) {
-      // expected
-    }
+    renameDestinationParentDoesNotExist();
   }
 
   /**
@@ -1210,33 +1160,13 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
    */
   @Test
   public void testRenameToParentDir() throws Exception {
-    final String root = "/root_dir";
-    final String dir1 = root + "/dir1";
-    final String dir2 = dir1 + "/dir2";
-    final Path dir2SourcePath = new Path(fs.getUri().toString() + dir2);
-    fs.mkdirs(dir2SourcePath);
-    final Path destRootPath = new Path(fs.getUri().toString() + root);
-
-    Path file1Source = new Path(fs.getUri().toString() + dir1 + "/file2");
-    ContractTestUtils.touch(fs, file1Source);
-
-    // rename source directory to its parent directory(destination).
-    assertTrue(fs.rename(dir2SourcePath, destRootPath), "Rename failed");
-    final Path expectedPathAfterRename =
-            new Path(fs.getUri().toString() + root + "/dir2");
-    assertTrue(fs.exists(expectedPathAfterRename), "Rename failed");
-
-    // rename source file to its parent directory(destination).
-    assertTrue(fs.rename(file1Source, destRootPath), "Rename failed");
-    final Path expectedFilePathAfterRename =
-            new Path(fs.getUri().toString() + root + "/file2");
-    assertTrue(fs.exists(expectedFilePathAfterRename), "Rename failed");
+    renameToParentDir();
   }
 
   @Test
   public void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
-    final Path source = new Path(fs.getUri().toString() + dir);
+    final Path source = pathUnderFsRoot(dir);
     final Path dest = new Path(source.toString() + ".renamed");
     // Add a sub-dir to the directory to be moved.
     final Path subdir = new Path(source, "sub_dir1");
@@ -1252,7 +1182,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     // Test if one path belongs to other FileSystem.
     IllegalArgumentException exception = assertThrows(
         IllegalArgumentException.class,
-        () -> fs.rename(new Path(fs.getUri().toString() + "fake" + dir), dest));
+        () -> fs.rename(pathUnderFsRoot("fake" + dir), dest));
     assertThat(exception.getMessage()).contains("Wrong FS");
   }
 
@@ -2045,10 +1975,9 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   @Test
   public void testGetFileChecksumWithInvalidCombineMode() throws IOException {
     final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
+    Path rootPath = pathUnderFsRoot(root);
     fs.mkdirs(rootPath);
-    Path file = new Path(fs.getUri().toString() + root
-        + "/dummy");
+    Path file = pathUnderFsRoot(root + "/dummy");
     ContractTestUtils.touch(fs, file);
     OzoneClientConfig clientConfig = cluster.getConf().getObject(OzoneClientConfig.class);
     clientConfig.setChecksumCombineMode("NONE");

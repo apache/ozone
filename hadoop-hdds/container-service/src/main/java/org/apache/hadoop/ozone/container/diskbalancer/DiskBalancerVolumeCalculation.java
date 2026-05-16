@@ -67,16 +67,41 @@ public final class DiskBalancerVolumeCalculation {
    * @param volumes Immutable list of volumes
    * from each source volume during container moves
    * @return Ideal usage as a ratio (used space / total capacity)
-   * @throws IllegalArgumentException if total capacity is zero
    */
   public static double getIdealUsage(List<VolumeFixedUsage> volumes) {
-    long totalCapacity = 0L, totalEffectiveUsed = 0L;
-    
-    for (VolumeFixedUsage volumeUsage : volumes) {
-      totalCapacity += volumeUsage.getUsage().getCapacity();
-      totalEffectiveUsed += volumeUsage.getEffectiveUsed();
+    if (volumes == null || volumes.isEmpty()) {
+      return 0.0;
     }
-    
+
+    long totalCapacity = 0L, totalEffectiveUsed = 0L;
+
+    for (VolumeFixedUsage volumeUsage : volumes) {
+      final long capacity = volumeUsage.getUsage().getCapacity();
+      if (capacity < 0) {
+        throw new IllegalArgumentException(
+            "Negative capacity = " + capacity + ": " + volumeUsage.getVolume());
+      }
+
+      final long effectiveUsed = volumeUsage.getEffectiveUsed();
+      if (effectiveUsed < 0) {
+        throw new IllegalArgumentException(
+            "Negative effective used = " + effectiveUsed + ": "
+                + volumeUsage.getVolume());
+      }
+      if (effectiveUsed > capacity) {
+        throw new IllegalArgumentException(
+            "Effective used = " + effectiveUsed + " > capacity = "
+                + capacity + ": " + volumeUsage.getVolume());
+      }
+
+      totalCapacity += capacity;
+      totalEffectiveUsed += effectiveUsed;
+    }
+
+    if (totalCapacity == 0) {
+      return 0.0;
+    }
+
     return ((double) (totalEffectiveUsed)) / totalCapacity;
   }
   

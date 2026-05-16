@@ -87,7 +87,7 @@ public class TestSCMDbCheckpointServlet {
         .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    scmMetrics = StorageContainerManager.getMetrics();
+    scmMetrics = scm.getMetrics();
 
     requestMock = mock(HttpServletRequest.class);
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH))

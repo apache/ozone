@@ -728,6 +728,27 @@ public interface ClientProtocol {
       Map<Integer, String> partsMap) throws IOException;
 
   /**
+   * Complete Multipart upload with conditional write support.
+   * This will combine all the parts and make the key visible in ozone,
+   * but only if the specified preconditions are met.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param keyName key name
+   * @param uploadID multipart upload ID
+   * @param partsMap map of part numbers to ETags
+   * @param expectedDataGeneration expected data generation for conditional write
+   *        (use OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS for If-None-Match: *)
+   * @param expectedETag expected ETag for conditional write (for If-Match)
+   * @return OmMultipartUploadCompleteInfo
+   * @throws IOException if precondition fails or other I/O error occurs
+   */
+  OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName,
+      String bucketName, String keyName, String uploadID,
+      Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException;
+
+  /**
    * Abort Multipart upload request for the given key with given uploadID.
    * @param volumeName
    * @param bucketName

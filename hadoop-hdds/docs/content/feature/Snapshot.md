@@ -135,7 +135,7 @@ Manage snapshots using `ozone sh` or `ozone fs` (Hadoop-compatible) commands:
     ```shell
     ozone sh snapshot rename /vol1/bucket1 <oldName> <newName>
     ```
-    Requires bucket owner or admin.
+    Requires `ozone.om.snapshot.rename.allowed=true` on the OM side and bucket owner or admin privileges.
 
 *   **Snapshot Info:**
     ```shell

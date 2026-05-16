@@ -28,6 +28,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
@@ -35,6 +36,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -79,12 +81,42 @@ public final class Archiver {
     return output.toByteArray();
   }
 
+  private static TarArchiveEntry createBasicTarArchiveEntry(File file, String entryName)
+      throws IOException {
+    final Path path = file.toPath();
+
+    final TarArchiveEntry entry;
+    if (Files.isDirectory(path)) {
+      final int nameLength = entryName.length();
+      final String dirName = nameLength == 0 || entryName.charAt(nameLength - 1) != '/'
+          ? entryName + "/"
+          : entryName;
+      entry = new TarArchiveEntry(dirName, TarConstants.LF_DIR);
+      entry.setMode(TarArchiveEntry.DEFAULT_DIR_MODE);
+    } else {
+      entry = new TarArchiveEntry(entryName);
+      entry.setMode(TarArchiveEntry.DEFAULT_FILE_MODE);
+      entry.setSize(Files.size(path));
+    }
+
+    try {
+      BasicFileAttributes attrs = Files.readAttributes(
+          file.toPath(), BasicFileAttributes.class);
+      entry.setLastModifiedTime(attrs.lastModifiedTime());
+      entry.setLastAccessTime(attrs.lastAccessTime());
+      entry.setCreationTime(attrs.creationTime());
+    } catch (IOException e) {
+      entry.setModTime(file.lastModified()); // fallback
+    }
+    return entry;
+  }
+
   public static void includePath(Path dir, String subdir,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
 
     // Add a directory entry before adding files, in case the directory is
     // empty.
-    TarArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
+    TarArchiveEntry entry = createBasicTarArchiveEntry(dir.toFile(), subdir);
     archiveOutput.putArchiveEntry(entry);
     archiveOutput.closeArchiveEntry();
 
@@ -105,7 +137,7 @@ public final class Archiver {
   public static long includeFile(File file, String entryName,
       ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
     final long bytes;
-    TarArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
+    TarArchiveEntry entry = createBasicTarArchiveEntry(file, entryName);
     archiveOutput.putArchiveEntry(entry);
     try (InputStream input = Files.newInputStream(file.toPath())) {
       bytes = IOUtils.copy(input, archiveOutput, getBufferSize(file.length()));
@@ -138,7 +170,7 @@ public final class Archiver {
     long bytes = 0;
     try {
       Files.createLink(link.toPath(), file.toPath());
-      TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
+      TarArchiveEntry entry = createBasicTarArchiveEntry(link, entryName);
       archiveOutput.putArchiveEntry(entry);
       try (InputStream input = Files.newInputStream(link.toPath())) {
         bytes = IOUtils.copyLarge(input, archiveOutput);

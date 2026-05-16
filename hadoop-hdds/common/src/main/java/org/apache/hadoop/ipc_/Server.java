@@ -97,7 +97,9 @@ import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcSaslProto.SaslAuth;
 import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcSaslProto.SaslState;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security_.SaslMechanismFactory;
 import org.apache.hadoop.security.SaslPropertiesResolver;
+import org.apache.hadoop.security_.SaslRpcClient;
 import org.apache.hadoop.security_.SaslRpcServer;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.SecurityUtil;
@@ -733,20 +735,6 @@ public abstract class Server {
         DefaultRpcScheduler.class);
 
     return CallQueueManager.convertSchedulerClass(schedulerClass);
-  }
-
-  /*
-   * Refresh the call queue
-   */
-  public synchronized void refreshCallQueue(Configuration conf) {
-    // Create the next queue
-    String prefix = getQueueClassPrefix();
-    this.maxQueueSize = handlerCount * conf.getInt(
-        CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_KEY,
-        CommonConfigurationKeys.IPC_SERVER_HANDLER_QUEUE_SIZE_DEFAULT);
-    callQueue.swapQueue(getSchedulerClass(prefix, conf),
-        getQueueClass(prefix, conf), maxQueueSize, prefix, conf);
-    callQueue.setClientBackoffEnabled(getClientBackoffEnable(prefix, conf));
   }
 
   /**
@@ -1916,6 +1904,10 @@ public abstract class Server {
       return Server.this;
     }
 
+    public Configuration getConf() {
+      return Server.this.getConf();
+    }
+
     /* Return true if the connection has no outstanding rpc */
     private boolean isIdle() {
       return rpcCount.get() == 0;
@@ -2383,7 +2375,8 @@ public abstract class Server {
       RpcSaslProto negotiateMessage = negotiateResponse;
       // accelerate token negotiation by sending initial challenge
       // in the negotiation response
-      if (enabledAuthMethods.contains(AuthMethod.TOKEN)) {
+      if (enabledAuthMethods.contains(AuthMethod.TOKEN)
+          && SaslMechanismFactory.isDigestMechanism(AuthMethod.TOKEN)) {
         saslServer = createSaslServer(AuthMethod.TOKEN);
         byte[] challenge = saslServer.evaluateResponse(new byte[0]);
         RpcSaslProto.Builder negotiateBuilder =
@@ -2654,15 +2647,33 @@ public abstract class Server {
     private void processRpcRequest(RpcRequestHeaderProto header,
         RpcWritable.Buffer buffer) throws RpcServerException,
         InterruptedException {
-      Class<? extends Writable> rpcRequestClass = 
+      if (header.getRpcKind() == RpcKindProto.RPC_WRITABLE) {
+        final String err = "WritableRpcEngine is not supported.";
+        LOG.warn("{} Client: {}", err, getHostAddress());
+        throw new FatalRpcServerException(RpcErrorCodeProto.FATAL_INVALID_RPC_HEADER, err);
+      }
+      // Reject requests for RPC kinds with no registered protocols on this
+      // server instance. This prevents deserialization of untrusted payloads
+      // for unsupported kinds. See HADOOP-19864.
+      if (Server.this instanceof RPC.Server) {
+        RPC.Server server = (RPC.Server) Server.this;
+        final RPC.RpcKind kind = ProtoUtil.convert(header.getRpcKind());
+        if (!server.hasRegisteredProtocols(kind)) {
+          final String err = "No protocols registered on this server for RpcKind "
+              + header.getRpcKind()
+              + ". Rejecting request without deserialization.";
+          LOG.info("{} Client: {}", err, getHostAddress());
+          throw new FatalRpcServerException(
+              RpcErrorCodeProto.FATAL_INVALID_RPC_HEADER, err);
+        }
+      }
+      Class<? extends Writable> rpcRequestClass =
           getRpcRequestWrapper(header.getRpcKind());
       if (rpcRequestClass == null) {
-        LOG.warn("Unknown rpc kind "  + header.getRpcKind() + 
-            " from client " + getHostAddress());
-        final String err = "Unknown rpc kind in rpc header"  + 
-            header.getRpcKind();
+        LOG.warn("Unknown rpc kind {} from client {}", header.getRpcKind(), getHostAddress());
         throw new FatalRpcServerException(
-            RpcErrorCodeProto.FATAL_INVALID_RPC_HEADER, err);
+            RpcErrorCodeProto.FATAL_INVALID_RPC_HEADER,
+            "Unknown rpc kind in rpc header " + header.getRpcKind());
       }
       Writable rpcRequest;
       try { //Read the rpc request
@@ -2670,12 +2681,12 @@ public abstract class Server {
       } catch (RpcServerException rse) { // lets tests inject failures.
         throw rse;
       } catch (Throwable t) { // includes runtime exception from newInstance
-        LOG.warn("Unable to read call parameters for client " +
-                 getHostAddress() + "on connection protocol " +
-            this.protocolName + " for rpcKind " + header.getRpcKind(),  t);
-        String err = "IPC server unable to read call parameters: "+ t.getMessage();
+        LOG.warn(
+            "Unable to read call parameters for client {} on connection protocol {} for rpcKind {}",
+            getHostAddress(), this.protocolName, header.getRpcKind(), t);
         throw new FatalRpcServerException(
-            RpcErrorCodeProto.FATAL_DESERIALIZING_REQUEST, err);
+            RpcErrorCodeProto.FATAL_DESERIALIZING_REQUEST,
+            "IPC server unable to read call parameters: "+ t.getMessage());
       }
         
       CallerContext callerContext = null;
