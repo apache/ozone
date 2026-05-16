@@ -341,13 +341,16 @@ public class DiskBalancerService extends BackgroundService {
       File path, DiskBalancerInfoWriter writer) throws IOException {
     Path target = path.toPath().toAbsolutePath();
     Path parent = target.getParent();
-    if (parent != null) {
-      try {
-        Files.createDirectories(parent);
-      } catch (IOException e) {
-        throw new IOException(
-            "Unable to create DiskBalancerInfo directories: " + parent, e);
-      }
+    if (parent == null) {
+      throw new IOException(
+          "Unable to determine parent directory for DiskBalancerInfo file: "
+              + target);
+    }
+    try {
+      Files.createDirectories(parent);
+    } catch (IOException e) {
+      throw new IOException(
+          "Unable to create DiskBalancerInfo directories: " + parent, e);
     }
 
     final Path tempFile;
