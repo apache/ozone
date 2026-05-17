@@ -155,7 +155,7 @@ Legacy S3 client
   -> S3G forwards request to OM
   -> OM resolves credentials
   -> OM validates SigV4
-  -> OM resolves effectiveUser/groups
+  -> OM resolves effectiveUser
   -> OM applies base Ozone authorization when available
   -> OM applies local JSON policy when enabled
   -> OM executes or denies request
@@ -207,11 +207,49 @@ supported.
 
 ## Access Key and Effective Identity Semantics
 
-`accessKeyId` is credential lookup material only.
+Phase 5 separates credential lookup, S3 namespace routing, and Ozone
+authorization identity. Existing Ozone S3 call sites do not all use the S3
+access ID for the same purpose, so `effectiveUser` must not be treated as a
+drop-in replacement for the access ID everywhere.
 
-`effectiveUser` plus the stored group snapshot is the authorization identity.
-Base Ozone authorization and local JSON evaluation must use
-`effectiveUser/groups`, not `accessKeyId`.
+```text
+credentialAccessKeyId:
+  AWS access key from SigV4
+  used for lookup in s3ManagedAccessKeyTable
+  used for signature credential scope / credential lookup
+  audited as the credential identifier
+
+s3NamespaceAccessId:
+  S3 access identity used by existing S3 namespace / volume / bucket-link
+  routing where current Ozone code expects an S3 access ID
+  v1 managed access keys use:
+    s3NamespaceAccessId = accessKeyId
+  unless code inspection proves a specific call site requires effectiveUser
+
+effectiveUser:
+  Ozone authorization identity from S3ManagedAccessKeyInfo.effectiveUser
+  used for OMClientRequest.getUserInfo()
+  used for RequestContext authorization user
+  used for OmMetadataReader.checkAcls(...)
+  used for ACL UGI / authorization effects
+  used for owner / user principal effects
+  audited as the effective authorization user
+```
+
+Base Ozone authorization must use `effectiveUser`, not `accessKeyId`.
+S3 namespace / volume / bucket-link routing must continue to use
+`s3NamespaceAccessId` where current Ozone code expects an S3 access ID.
+Call sites that combine namespace lookup with authorization or user-principal
+effects must split those responsibilities rather than applying either identity
+globally.
+
+The stored group snapshot is metadata in Phase 5. Existing base authorization
+may continue to resolve groups through the existing Ozone/Hadoop/Ranger group
+mapping for `effectiveUser`. Phase 5 must not claim stored groups are enforced
+by base authorization unless a real `RequestContext` / `UserInfo` propagation
+path is implemented.
+
+`LocalJsonPolicyEvaluator` in Phase 6 may use the stored group snapshot.
 
 Audit entries should include both `accessKeyId` and `effectiveUser`.
 
@@ -236,13 +274,16 @@ credential resolution section.
 
 ## Credential Resolution
 
-If `x-amz-security-token` is present and non-empty, the request must enter STS
-session-token handling. If STS validation fails, the request fails closed. OM
-must not reinterpret the request as a managed static access key after failed
-STS validation.
+If `x-amz-security-token` is visible to OM and non-empty, the request must
+enter STS session-token handling. If STS validation fails, the request fails
+closed. OM must not reinterpret the request as a managed static access key
+after failed STS validation.
 
-Empty or whitespace-only `x-amz-security-token` is rejected as an invalid
-token.
+Blank or whitespace-only `x-amz-security-token` values visible to OM are
+rejected as invalid tokens. If the current S3G serialization drops a truly
+empty session token before OM sees it, Phase 5 treats that as absent under the
+existing behavior. Preserving truly empty token presence through S3G is future
+hardening and is out of scope for Phase 5.
 
 ### Secure Clusters
 
@@ -270,31 +311,66 @@ In non-secure clusters with:
 ozone.s3.accesskey.enabled=true
 ```
 
-OM resolves credentials as:
+Phase 5 keeps the managed-key S3 data path fail-closed until
+`LocalJsonPolicyEvaluator` is implemented in Phase 6.
+
+Reason:
 
 ```text
-1. Check s3ManagedAccessKeyTable.
-
-2. If no managed access key exists for accessKeyId:
-     fail closed with InvalidAccessKeyId or equivalent.
-
-3. Do not fall back to legacy non-secure S3 behavior that accepts arbitrary
-   credentials.
+non-secure managed-key mode requires local JSON policy
+LocalJsonPolicyEvaluator is Phase 6
 ```
 
-This prevents arbitrary `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` values
-from bypassing the managed access-key table.
+Therefore, in Phase 5:
+
+```text
+managed-key S3 request:
+  PERMISSION_DENIED / fail closed
+
+unknown accessKeyId:
+  PERMISSION_DENIED / fail closed
+
+legacy arbitrary non-secure credential fallback:
+  never allowed when ozone.s3.accesskey.enabled=true
+```
+
+Secure clusters with `ozone.s3.accesskey.local.policy.enabled=false` may use
+managed-key authentication plus existing base authorization in Phase 5.
+
+If `ozone.s3.accesskey.local.policy.enabled=true`, managed-key S3 data-path
+authorization fails closed with `PERMISSION_DENIED` in Phase 5 until
+`LocalJsonPolicyEvaluator` exists.
+
+Do not silently ignore `policyDocument`. If a stored managed row has a non-empty
+`policyDocument`, Phase 5 managed-key S3 data-path authorization fails closed
+with `PERMISSION_DENIED` unless the policy can be evaluated.
 
 ## HA and Read Freshness
 
-Managed access-key credential validation must use leader-fresh or linearizable
-metadata.
+Managed access-key credential validation is leader-only in Phase 5.
 
 A stale follower must not accept a disabled, deleted, expired, or rotated key.
-If the current OM request path can hit a follower, managed access-key
-validation must either be forwarded to the leader or use an existing Ozone
-linearizable-read / leader-read mechanism equivalent to the existing S3 secret
-or STS validation path.
+If `ozone.s3.accesskey.enabled=true` and the S3 request has no non-empty
+session token, OM must perform an explicit leader-ready / not-leader check
+before managed table lookup. If the request reaches a follower or not-ready OM,
+the request must return an existing leader / failover / not-leader style error
+so the client can retry against the leader.
+
+Do not authorize managed access keys from stale follower metadata.
+
+This leader-only check applies to managed-key validation. Existing legacy S3
+auth behavior remains unchanged when managed access keys are disabled, or when
+secure-cluster fallback to legacy validation is reached after a leader-fresh
+managed lookup confirms no managed row exists.
+
+Stale follower metadata must not decide:
+
+```text
+managed row absent -> legacy fallback
+managed row active -> allow
+managed row not disabled
+old encrypted secret after rotate
+```
 
 Disable, delete, and rotate operations must become authoritative for subsequent
 managed-key validation.
@@ -1347,11 +1423,421 @@ STS path must always take precedence when `x-amz-security-token` is present.
 3. Combined Phase 3/4: OM admin lifecycle requests with shared namespace
    locking, OM-side secret generation, encryption, one-time retrieval-handle
    semantics, and redaction: create/list/info/disable/rotate/delete.
-4. Phase 5: credential resolution, STS precedence, non-secure fail-closed
-   behavior, and effective identity.
+4. Phase 5: OM-side managed-key S3 credential resolution, STS precedence,
+   leader-fresh lookup, byte-array SigV4 validation, secure-cluster legacy
+   fallback, non-secure fail-closed behavior, and separated credential /
+   namespace / authorization identity.
 5. Phase 6: `LocalJsonPolicyEvaluator`.
 6. Phase 7: CLI shell commands.
 7. Phase 8: docs and E2E tests.
+
+## Phase 5 Credential Data-Path Plan
+
+Phase 5 adds OM-side managed access-key authentication for normal S3 requests.
+It does not implement local JSON policy evaluation, CLI commands, E2E tests,
+admin lifecycle changes, retrieval-handle changes, or HDDS-15273 / WebIdentity
+/ STS behavior changes. It also does not change S3G runtime serialization
+behavior; preserving truly empty session-token presence is future hardening.
+
+### Phase 5 Insertion Point
+
+Phase 5 inserts a `ManagedAccessKeyAuthenticator` in
+`S3SecurityUtil.validateS3Credential(...)`:
+
+```text
+1. If a session token is visible to OM:
+     blank / whitespace-only token fails as invalid
+     truly empty token dropped by current S3G serialization is treated as absent
+       under existing behavior
+
+2. If a non-empty x-amz-security-token is present:
+     run the existing STS path
+     STS success returns
+     STS failure fails closed
+     do not fall back to managed access key
+
+3. Else, if ozone.s3.accesskey.enabled=true:
+     perform explicit leader-ready / not-leader check
+     perform managed-key lookup only on the leader
+     this branch runs even when ozoneManager.isSecurityEnabled() is false
+
+4. If a managed row exists:
+     authenticate using the managed row
+     row-state, policy, KMS, envelope, decrypt, or signature failure is terminal
+     do not fall through to legacy S3SecretManager
+
+5. If no managed row exists:
+     secure cluster -> existing legacy S3SecretManager/getsecret fallback
+     non-secure managed-key mode -> PERMISSION_DENIED / fail closed
+```
+
+If the feature is disabled, existing S3/STS/legacy behavior is unchanged.
+When the feature is enabled, Phase 5 must not return early only because
+`ozoneManager.isSecurityEnabled()` is false; non-secure managed mode must fail
+closed before any non-secure "accept arbitrary credentials" behavior.
+
+### Phase 5 Managed Row Checks
+
+For a found managed row, Phase 5 must:
+
+```text
+require MANAGED_LOCAL_S3_ACCESS_KEYS layout feature to be available
+reject disabled rows
+reject expired rows
+reject rows with non-empty policyDocument until Phase 6
+reject local.policy.enabled=true until Phase 6
+decrypt encryptedSecretKey with ManagedS3AccessKeySecretEnvelopeCodec.decrypt
+validate SigV4 using the decrypted managed secret
+install an OM-local managed request identity context
+clear the managed request identity context in finally
+clear plaintext secret bytes in finally
+```
+
+KMS provider failure, missing key material, malformed envelope, tampered
+envelope, unsupported envelope version, decrypt failure, or GCM authentication
+failure must fail closed. These failures must not fall back to legacy
+`S3SecretManager`.
+
+In Phase 5, non-secure clusters with `ozone.s3.accesskey.enabled=true`, rows
+with non-empty `policyDocument`, and clusters with
+`ozone.s3.accesskey.local.policy.enabled=true` all fail closed with
+`OMException.ResultCodes.PERMISSION_DENIED` because `LocalJsonPolicyEvaluator`
+is not implemented until Phase 6.
+
+### Phase 5 Leader-Only Freshness Requirement
+
+Managed-aware S3 credential resolution is leader-only in Phase 5.
+
+When `ozone.s3.accesskey.enabled=true` and the S3 request has no non-empty
+session token, `S3SecurityUtil.validateS3Credential(...)` or the managed
+authenticator must perform an explicit leader-ready / not-leader check before
+any managed table lookup. The check must run before deciding managed-row
+absence, managed-row state, managed authentication success, or secure-cluster
+legacy fallback.
+
+If the request reaches a follower or not-ready OM, the request must fail with an
+existing OM leader / failover / not-leader style error and be retried against
+the leader.
+
+When `ozone.s3.accesskey.enabled=false`, Phase 5 does not add this
+managed-key leader-only check; existing S3/STS/legacy behavior is unchanged.
+When secure-cluster fallback to legacy `S3SecretManager` is reached after a
+leader-fresh managed lookup confirms no managed row exists, the existing legacy
+behavior remains unchanged.
+
+Phase 5 must not allow stale follower metadata to:
+
+```text
+decide managed row absence and fall back to legacy
+accept an active-looking row after disable or delete
+accept an old encrypted secret after rotate
+ignore expiration
+```
+
+### Phase 5 Managed Identity Context
+
+Phase 5 adds an OM-local managed identity context named
+`ManagedS3AccessKeyAuthContext`.
+
+The context contains:
+
+```text
+credentialAccessKeyId
+s3NamespaceAccessId
+effectiveUser
+groupsSnapshot
+policySha256 or policyDocumentPresent
+credentialType = MANAGED_S3_ACCESS_KEY
+```
+
+Contract:
+
+```text
+credentialAccessKeyId:
+  AWS access key from SigV4
+  used for lookup in s3ManagedAccessKeyTable
+  used for signature credential scope / credential lookup
+  audited as the credential identifier
+
+s3NamespaceAccessId:
+  S3 access identity used by existing S3 namespace / volume / bucket-link
+  routing where current Ozone code expects an S3 access ID
+  v1 managed access keys use s3NamespaceAccessId = accessKeyId unless code
+  inspection proves a specific call site requires effectiveUser
+
+effectiveUser:
+  Ozone authorization identity from S3ManagedAccessKeyInfo.effectiveUser
+  used for OMClientRequest.getUserInfo()
+  used for RequestContext authorization user
+  used for OmMetadataReader.checkAcls(...)
+  used for ACL UGI / authorization effects
+  used for owner / user principal effects
+  audited as the effective authorization user
+
+groupsSnapshot:
+  stored metadata for audit and future Phase 6 LocalJsonPolicyEvaluator
+
+credentialType:
+  distinguishes managed access-key auth from legacy S3 secret and STS auth
+```
+
+Phase 5 base authorization and request user construction must use
+`effectiveUser`, not `credentialAccessKeyId` or `s3NamespaceAccessId`.
+`effectiveUser` is an Ozone principal / base-authorization identity; it is not
+automatically an S3 access ID.
+For managed access keys, `effectiveUser` is used directly as the Ozone
+principal for base authorization unless the implementation has an explicit,
+reviewed reason to apply `accessIdToUserPrincipal(...)`.
+
+Phase 5 must not blindly change `OzoneManager.getS3AuthEffectiveAccessId()` to
+return `effectiveUser` for all managed-key paths, because existing consumers may
+use that value for S3 namespace routing. If the existing helper is ambiguous,
+Phase 5 should add explicit OM-internal helpers or equivalent separation, for
+example:
+
+```text
+getS3AuthCredentialAccessId()
+getS3AuthNamespaceAccessId()
+getS3AuthEffectiveUser()
+getS3AuthAuthorizationPrincipal()
+getS3AuthClientUserPrincipal()
+```
+
+Required call-site semantics:
+
+```text
+OMClientRequest.getUserInfo():
+  uses effectiveUser
+
+OmMetadataReader.checkAcls(...):
+  uses effectiveUser as the authorization identity
+
+OzoneManager.getS3VolumeContext(...):
+  namespace / tenant / S3 access lookup uses s3NamespaceAccessId
+  returned S3VolumeContext.userPrincipal uses effectiveUser
+  owner identity uses effectiveUser
+  KMS / user principal effects use effectiveUser
+  ACL UGI, RequestContext, and authorization effects use effectiveUser
+  do not use effectiveUser for S3 namespace lookup by assumption
+  do not use accessKeyId for authorization by assumption
+
+OzoneManager.resolveBucketLink(...):
+  bucket-link namespace resolution uses existing S3 namespace semantics /
+    s3NamespaceAccessId where the current code expects an S3 access ID
+  bucket names and requested namespace are not rewritten to effectiveUser
+  bucket-link ACL checks use effectiveUser
+  UGI, RequestContext, owner / user effects, and authorization decisions use
+    effectiveUser
+```
+
+Audit records both `credentialAccessKeyId` and `effectiveUser`.
+
+The stored group snapshot is metadata in Phase 5. Existing base authorization
+may continue to use the existing group mapping for `effectiveUser`. Phase 5
+must not claim stored groups are enforced by base authorization unless a real
+group propagation path is added. The stored group snapshot is available for
+audit and for Phase 6 local JSON policy evaluation.
+
+Required consumers / integration points:
+
+```text
+OzoneManager.getS3AuthEffectiveAccessId() or explicit replacements for
+  credential access ID, namespace access ID, and effective user
+OMClientRequest.getUserInfo()
+OmMetadataReader.checkAcls(...)
+OzoneManager.getS3VolumeContext(...)
+OzoneManager.resolveBucketLink(...)
+```
+
+`ManagedS3AccessKeyAuthContext` must be cleared in a `finally` block after each
+request, alongside existing S3 and STS request context cleanup.
+
+### Phase 5 Byte-Array SigV4 Validation
+
+The managed path must not convert the decrypted managed secret to immutable
+`String`.
+
+Phase 5 must add or use a byte-array SigV4 validation path:
+
+```text
+legacy String-based AWSV4AuthValidator path:
+  unchanged
+
+managed path:
+  accepts byte[] or equivalent mutable secret representation
+  derives HMAC/signing keys from byte arrays
+  does not reuse any AWSV4AuthValidator debug logging that logs derived
+    signing material, canonical secret material, or plaintext-dependent
+    intermediate values
+  does not log derived signing material
+  does not log plaintext secret
+  clears plaintext managed secret bytes in finally
+  clears intermediate HMAC/signing-key byte arrays where practical
+```
+
+Plaintext managed secrets must not appear in logs, audit, `toString()`,
+exceptions, TRACE/debug output, normal `OMResponse`, retry cache, Ratis WAL,
+RocksDB, or checkpoints.
+
+If `AWSV4AuthValidator` cannot be safely extended without broad behavior
+change, Phase 5 implementation must stop and report the blocker.
+
+### Phase 5 Package and API Boundary
+
+`ManagedAccessKeyAuthenticator` should live in the same OM-side S3
+security/auth package as `S3SecurityUtil`, or the closest existing OM-side S3
+authentication package if the implementation proves that is cleaner.
+
+It should reuse the existing Phase 3/4
+`ManagedS3AccessKeySecretEnvelopeCodec.decrypt(...)` helper. If current
+visibility is insufficient, expose only a minimal public decrypt-to-bytes helper
+on the existing codec, for example `decryptToBytes(...)`. The decrypt API must
+return a mutable `byte[]` or equivalent clearable secret representation. Do not
+move broad helper packages, duplicate KMS/envelope logic, or introduce package
+churn beyond what Phase 5 needs.
+
+### Phase 5 S3 Error Semantics
+
+Prefer existing S3-compatible mappings and avoid exposing precise managed-key
+state to clients.
+
+External data-path behavior:
+
+```text
+non-empty x-amz-security-token:
+  STS path wins
+  STS failure fails closed
+  no managed fallback
+
+blank or whitespace-only session token visible to OM:
+  OMException.ResultCodes.INVALID_TOKEN through the existing STS /
+    session-token failure path
+  no managed fallback
+  no legacy fallback
+
+truly empty session token dropped by current S3G serialization:
+  treat as absent under existing behavior
+  do not change S3G serialization in Phase 5
+
+managed row not found:
+  secure cluster -> legacy S3SecretManager fallback
+  non-secure managed mode -> PERMISSION_DENIED
+
+managed row disabled:
+  PERMISSION_DENIED
+  no legacy fallback
+
+managed row expired:
+  PERMISSION_DENIED
+  no legacy fallback
+
+KMS / provider / envelope / decrypt / malformed envelope failure:
+  PERMISSION_DENIED
+  no fallback
+
+wrong secret / SigV4 mismatch:
+  PERMISSION_DENIED
+
+local.policy.enabled=true and evaluator absent:
+  PERMISSION_DENIED
+
+stored non-empty policyDocument and evaluator absent:
+  PERMISSION_DENIED
+
+non-secure managed data-path in Phase 5:
+  PERMISSION_DENIED
+```
+
+Concrete Phase 5 OM result-code planning:
+
+```text
+leader / failover / not-ready:
+  use the existing OM leader / failover / not-leader exception path
+
+blank or whitespace-only session token visible to OM:
+  OMException.ResultCodes.INVALID_TOKEN through the existing STS /
+    session-token failure path
+  no managed fallback
+  no legacy fallback
+
+truly empty session token dropped by current S3G serialization:
+  treated as absent under existing behavior
+
+managed row absent in non-secure mode:
+  OMException.ResultCodes.PERMISSION_DENIED
+
+managed row disabled / expired:
+  OMException.ResultCodes.PERMISSION_DENIED
+
+KMS / provider / envelope / decrypt / malformed envelope failure:
+  OMException.ResultCodes.PERMISSION_DENIED
+
+wrong secret / SigV4 mismatch:
+  OMException.ResultCodes.PERMISSION_DENIED
+
+local.policy.enabled=true or policyDocument present before Phase 6:
+  OMException.ResultCodes.PERMISSION_DENIED
+
+non-secure managed data-path in Phase 5:
+  OMException.ResultCodes.PERMISSION_DENIED
+```
+
+Internal audit and logs may record a more precise reason, but they must not
+log plaintext secrets, full encrypted envelope blobs, full retrieval handles,
+or signing material. External S3 responses must not reveal whether the managed
+row was absent, disabled, expired, malformed, undecryptable, or present with an
+incorrect secret.
+
+Phase 5 must not use `INVALID_TOKEN` for managed-key data-path failures unless
+implementation proves it maps to safe S3 403 behavior across normal S3 endpoint
+families, including streaming PUT and multipart paths. The default Phase 5
+terminal managed-auth failure result is `PERMISSION_DENIED`.
+For managed-key data-path requests, all terminal managed-auth failures use
+`PERMISSION_DENIED` unless the request is in the STS-token branch, where
+existing STS behavior applies.
+
+### Phase 5 Implementation Scope
+
+Allowed after the Phase 5 planning review passes:
+
+```text
+OM-side ManagedAccessKeyAuthenticator
+insert in S3SecurityUtil.validateS3Credential(...) after non-empty STS token
+  handling and before legacy S3SecretManager fallback
+enforce STS precedence
+enforce leader-only managed-key lookup
+decrypt with ManagedS3AccessKeySecretEnvelopeCodec.decrypt(...)
+validate SigV4 with byte-array secret path
+do not reuse AWSV4AuthValidator debug logging of derived signing material on
+  the managed byte-array path
+resolve managed identity context:
+  credentialAccessKeyId
+  s3NamespaceAccessId
+  effectiveUser
+  groupsSnapshot
+ensure authorization identity uses effectiveUser
+ensure namespace routing uses s3NamespaceAccessId where required
+clear managed identity context in finally
+enforce disabled / expiresAt fail-closed
+fail closed on KMS / provider / envelope / decrypt errors
+preserve legacy fallback only when no managed row exists in secure cluster
+keep non-secure managed data-path fail-closed until Phase 6
+keep local.policy.enabled=true fail-closed until Phase 6
+```
+
+Out of scope for Phase 5:
+
+```text
+LocalJsonPolicyEvaluator
+JSON policy parsing / evaluation
+CLI
+E2E tests
+admin lifecycle changes
+retrieval handle changes
+HDDS-15273 / WebIdentity changes
+STS behavior changes except preserving precedence
+S3G runtime serialization changes
+```
 
 ## Phase 3/4 Proto And API Plan
 
@@ -1509,8 +1995,8 @@ zero or negative values.
     `accessKeyId` cannot both succeed.
 48. External/legacy provider collision check path is exercised or explicitly
     gated.
-49. Non-secure + managed access keys + local policy rejects unknown
-    `accessKeyId`.
+49. Phase 5 non-secure + managed access keys returns `PERMISSION_DENIED` until
+    `LocalJsonPolicyEvaluator` exists.
 50. Non-secure + managed access keys does not fall back to arbitrary legacy
     credentials.
 51. Expired managed key denied.
@@ -1519,65 +2005,120 @@ zero or negative values.
 54. Expired managed row does not fall through to legacy path.
 55. Disabled/expired managed row does not fall through to non-secure dummy
     credential behavior.
-56. HA/follower request after disable fails.
-57. HA/follower request after rotate with old secret fails.
-58. HA/follower request after delete does not use stale managed row.
-59. Managed auth context is cleared between requests.
-60. After delete, the same `accessKeyId` can be created again as a managed key
+56. Managed auth on a follower returns a leader / failover / not-leader style
+    error before managed table lookup.
+57. HA/follower request after disable does not authorize from stale metadata.
+58. HA/follower request after rotate with old secret does not authorize from
+    stale metadata.
+59. HA/follower request after delete does not use a stale managed row or decide
+    legacy fallback from stale metadata.
+60. Managed auth context is cleared between requests.
+61. After delete, the same `accessKeyId` can be created again as a managed key
     because the managed row no longer exists.
-61. After delete, if a legacy `getsecret` entry with the same `accessKeyId`
+62. After delete, if a legacy `getsecret` entry with the same `accessKeyId`
     exists, secure-cluster resolver falls through to legacy `S3SecretManager`
     on subsequent requests.
-62. Secure cluster fallback to legacy `S3SecretManager` still works when no
+63. Secure cluster fallback to legacy `S3SecretManager` still works when no
     managed key exists.
-63. Wrong secret returns `SignatureDoesNotMatch` or equivalent.
-64. Non-empty invalid session token fails and does not fall back to managed key.
-65. Session token present with managed `accessKeyId` still uses STS path.
-66. `local.policy.enabled=true` requires policy.
-67. `local.policy.enabled=false` rejects `policyDocument`.
-68. Policy size bound enforced in `preExecute()`.
-69. Max statements/actions/resources enforced in `preExecute()`.
-70. Malformed JSON policy fails before Ratis-applied request.
-71. Unknown top-level policy field rejected.
-72. Unknown statement field rejected.
-73. `Principal` rejected.
-74. `Condition` rejected.
-75. `NotAction` rejected.
-76. `NotResource` rejected.
-77. Invalid `Effect` rejected.
-78. Empty `Statement` rejected.
-79. Empty `Action` / `Resource` rejected.
-80. Unknown action fails before Ratis-applied request.
-81. Invalid resource syntax fails before Ratis-applied request.
-82. Canonicalized policy hash is stable.
-83. Prefix resource patterns work.
-84. Bucket wildcard rejected.
-85. Bucket ARN does not grant object action.
-86. Object ARN does not grant bucket action.
-87. Deny overrides allow.
-88. Allowed bucket Put/Get/List succeeds with local JSON policy.
-89. Denied bucket fails.
-90. Local JSON policy runs in non-secure mode for managed-access-key S3
+64. Wrong managed secret returns `PERMISSION_DENIED`. It does not fall back to
+    legacy.
+65. Non-empty invalid session token fails and does not fall back to managed key.
+66. Session token present with managed `accessKeyId` still uses STS path.
+67. `local.policy.enabled=true` requires policy.
+68. `local.policy.enabled=false` rejects `policyDocument`.
+69. Policy size bound enforced in `preExecute()`.
+70. Max statements/actions/resources enforced in `preExecute()`.
+71. Malformed JSON policy fails before Ratis-applied request.
+72. Unknown top-level policy field rejected.
+73. Unknown statement field rejected.
+74. `Principal` rejected.
+75. `Condition` rejected.
+76. `NotAction` rejected.
+77. `NotResource` rejected.
+78. Invalid `Effect` rejected.
+79. Empty `Statement` rejected.
+80. Empty `Action` / `Resource` rejected.
+81. Unknown action fails before Ratis-applied request.
+82. Invalid resource syntax fails before Ratis-applied request.
+83. Canonicalized policy hash is stable.
+84. Prefix resource patterns work.
+85. Bucket wildcard rejected.
+86. Bucket ARN does not grant object action.
+87. Object ARN does not grant bucket action.
+88. Deny overrides allow.
+89. Allowed bucket Put/Get/List succeeds with local JSON policy.
+90. Denied bucket fails.
+91. Local JSON policy runs in non-secure mode for managed-access-key S3
     requests.
-91. `accessKeyId != effectiveUser`; authorization uses `effectiveUser/groups`.
-92. Groups snapshot semantics.
-93. Rotate invalidates old secret immediately.
-94. Rotate returns a new retrievalHandle for one-time secret retrieval.
-95. Rotate may set expiry relative to rotation time.
-96. Rotate cannot exceed max lifetime.
-97. Rotate does not change `policyDocument`.
-98. Policy change requires new key in v1.
-99. Create/rotate retry behavior persists only retrievalHandle and does not
+92. `accessKeyId != effectiveUser`; Phase 5 credential lookup uses
+    `credentialAccessKeyId`, namespace routing uses `s3NamespaceAccessId`, and
+    authorization identity uses `effectiveUser`.
+93. Stored groups are metadata in Phase 5 and may be used by Phase 6 local JSON
+    policy evaluation.
+94. Rotate invalidates old secret immediately.
+95. Rotate returns a new retrievalHandle for one-time secret retrieval.
+96. Rotate may set expiry relative to rotation time.
+97. Rotate cannot exceed max lifetime.
+98. Rotate does not change `policyDocument`.
+99. Policy change requires new key in v1.
+100. Create/rotate retry behavior persists only retrievalHandle and does not
     leak plaintext.
-100. Audit logs include `policySha256`.
-101. Audit logs redact plaintext secret.
-102. Create/rotate `toString()` and errors do not contain plaintext secret.
-103. Create/rotate logs and TRACE/debug output redact plaintext secret.
-104. STS session token path takes precedence in secure mode.
-105. Existing `S3SecretManager/getsecret` validation path unchanged.
-106. `HDDS-15273` WebIdentity STS path unchanged.
-107. S3G does not store credentials.
-108. S3G does not make final authorization decisions.
+101. Audit logs include `policySha256`.
+102. Audit logs redact plaintext secret.
+103. Create/rotate `toString()` and errors do not contain plaintext secret.
+104. Create/rotate logs and TRACE/debug output redact plaintext secret.
+105. STS session token path takes precedence in secure mode.
+106. Existing `S3SecretManager/getsecret` validation path unchanged.
+107. `HDDS-15273` WebIdentity STS path unchanged.
+108. S3G does not store credentials.
+109. S3G does not make final authorization decisions.
+
+Additional Phase 5 readiness tests:
+
+1. STS token present -> STS path wins.
+2. Invalid non-empty STS token -> fail closed, no managed fallback.
+3. Blank/whitespace session token visible to OM -> `INVALID_TOKEN`, no
+   fallback.
+4. Empty session token dropped by S3G, if current behavior, is treated as
+   absent and documented by test.
+5. Managed success in secure cluster with `local.policy.enabled=false`.
+6. Managed absent in secure cluster -> legacy fallback.
+7. Managed absent in non-secure managed mode -> `PERMISSION_DENIED` / fail
+   closed.
+8. Managed disabled -> `PERMISSION_DENIED` / fail closed, no legacy fallback.
+9. Managed expired -> `PERMISSION_DENIED` / fail closed, no legacy fallback.
+10. Managed wrong secret -> `PERMISSION_DENIED`, no fallback.
+11. KMS decrypt failure -> `PERMISSION_DENIED` / fail closed.
+12. Malformed or tampered envelope -> `PERMISSION_DENIED` / fail closed.
+13. Managed auth on follower -> leader / failover / not-leader error before
+    managed table lookup; stale follower does not authorize.
+14. Rotate or disable followed by follower request does not allow stale key.
+15. `accessKeyId != effectiveUser`:
+    credential lookup uses `credentialAccessKeyId`;
+    namespace routing uses `s3NamespaceAccessId`;
+    authorization identity uses `effectiveUser`.
+16. `OzoneManager.getS3VolumeContext(...)`:
+    namespace lookup uses `s3NamespaceAccessId`;
+    returned `userPrincipal`, KMS user, owner, and authorization effects use
+    `effectiveUser`.
+17. `OzoneManager.resolveBucketLink(...)`:
+    namespace routing uses `s3NamespaceAccessId` where required;
+    ACL / UGI / RequestContext authorization effects use `effectiveUser`.
+18. Stored groups are metadata only in Phase 5.
+19. Managed plaintext secret is never converted to immutable `String` in the
+    managed validation path.
+20. Managed byte-array AWSV4 validation does not reuse debug logging of derived
+    signing material.
+21. Byte-array AWSV4 validation clears plaintext and intermediate bytes as far
+    as Java allows.
+22. Managed request context / thread-local cleared on success.
+23. Managed request context / thread-local cleared on failure.
+24. Feature disabled -> existing behavior unchanged.
+25. `local.policy.enabled=true` -> `PERMISSION_DENIED` until Phase 6.
+26. Stored non-empty `policyDocument` with no evaluator -> `PERMISSION_DENIED`.
+27. Non-secure managed mode -> `PERMISSION_DENIED` until Phase 6.
+28. Existing `S3SecretManager/getsecret` path unchanged.
+29. `HDDS-15273` WebIdentity STS path unchanged.
 
 Additional Phase 3/4 readiness tests:
 
