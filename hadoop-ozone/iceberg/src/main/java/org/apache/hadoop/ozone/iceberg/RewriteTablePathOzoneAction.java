@@ -211,7 +211,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   }
 
   private String rebuildMetadata() {
-    //TODO need to implement rewrite of manifest list , manifest files and position delete files.
+    //TODO need to implement rewrite of manifest files and position delete files.
     TableMetadata startMetadata = startVersionName != null
         ? new StaticTableOperations(startVersionName, table.io()).current()
         : null;
@@ -227,12 +227,14 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     Set<Long> deltaSnapshotIds =  deltaSnapshots.stream().map(Snapshot::snapshotId).collect(Collectors.toSet());
     Set<Snapshot> validSnapshots = new HashSet<>(RewriteTablePathOzoneUtils.snapshotSet(endMetadata));
     validSnapshots.removeAll(RewriteTablePathOzoneUtils.snapshotSet(startMetadata));
-    //TODO: manifestsToRewrite will be used while re-write of manifest-list files.
     Set<String> manifestsToRewrite = manifestsToRewrite(validSnapshots, 
         startMetadata != null ? deltaSnapshotIds : null);
+    RewriteResult<ManifestFile> rewriteManifestListResult = 
+        rewriteManifestLists(validSnapshots, endMetadata, manifestsToRewrite);
 
     Set<Pair<String, String>> copyPlan = new HashSet<>();
     copyPlan.addAll(rewriteVersionResult.copyPlan());
+    copyPlan.addAll(rewriteManifestListResult.copyPlan());
 
     return RewriteTablePathOzoneUtils.saveFileList(copyPlan, stagingDir, table.io());
   }
@@ -360,6 +362,91 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     }
 
     return manifestPaths;
+  }
+
+  private RewriteResult<ManifestFile> rewriteManifestList(
+      Snapshot snapshot, TableMetadata tableMetadata, Set<String> manifestsToRewrite) {
+    RewriteResult<ManifestFile> result = new RewriteResult<>();
+
+    String path = snapshot.manifestListLocation();
+    String outputPath = RewriteTablePathUtil.stagingPath(path, sourcePrefix, stagingDir);
+    RewriteResult<ManifestFile> rewriteResult =
+        RewriteTablePathUtil.rewriteManifestList(
+            snapshot,
+            table.io(),
+            tableMetadata,
+            manifestsToRewrite,
+            sourcePrefix,
+            targetPrefix,
+            stagingDir,
+            outputPath);
+
+    result.append(rewriteResult);
+    result
+        .copyPlan()
+        .add(Pair.of(outputPath, RewriteTablePathUtil.newPath(path, sourcePrefix, targetPrefix)));
+    return result;
+  }
+
+  private RewriteResult<ManifestFile> rewriteManifestLists(Set<Snapshot> validSnapshots, TableMetadata endMetadata,
+      Set<String> manifestsToRewrite) {
+
+    if (validSnapshots.isEmpty()) {
+      return new RewriteResult<>();
+    }
+
+    int maxInFlight = parallelism * MAX_INFLIGHT_MULTIPLIER;
+    Semaphore semaphore = new Semaphore(maxInFlight);
+    ExecutorCompletionService<RewriteResult<ManifestFile>> completionService =
+        new ExecutorCompletionService<>(executorService);
+
+    RewriteResult<ManifestFile> combined = new RewriteResult<>();
+    int submittedTasks = 0;
+    int completedTasks = 0;
+
+    try {
+      for (Snapshot snapshot : validSnapshots) {
+        semaphore.acquire();
+
+        boolean taskSubmitted = false;
+        try {
+          completionService.submit(() -> {
+            try {
+              return rewriteManifestList(snapshot, endMetadata, manifestsToRewrite);
+            } finally {
+              semaphore.release();
+            }
+          });
+          taskSubmitted = true;
+          submittedTasks++;
+        } finally {
+          if (!taskSubmitted) {
+            semaphore.release();
+          }
+        }
+
+        Future<RewriteResult<ManifestFile>> done;
+        while ((done = completionService.poll()) != null) {
+          combined.append(done.get());
+          completedTasks++;
+        }
+      }
+      
+      while (completedTasks < submittedTasks) {
+        combined.append(completionService.take().get());
+        completedTasks++;
+      }
+
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      executorService.shutdownNow();
+      throw new RuntimeException("Interrupted while rewriting manifest lists", e);
+    } catch (ExecutionException e) {
+      executorService.shutdownNow();
+      throw new RuntimeException("Failed to rewrite manifest list", e.getCause());
+    }
+
+    return combined;
   }
 
   private Set<Snapshot> deltaSnapshots(TableMetadata startMetadata, Set<Snapshot> allSnapshots) {

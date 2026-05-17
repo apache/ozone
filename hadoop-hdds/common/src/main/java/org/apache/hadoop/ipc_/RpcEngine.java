@@ -123,16 +123,4 @@ public interface RpcEngine {
                        String portRangeConfig,
                        AlignmentContext alignmentContext) throws IOException;
 
-  /**
-   * Returns a proxy for ProtocolMetaInfoPB, which uses the given connection
-   * id.
-   * @param connId, ConnectionId to be used for the proxy.
-   * @param conf, Configuration.
-   * @param factory, Socket factory.
-   * @return Proxy object.
-   * @throws IOException raised on errors performing I/O.
-   */
-  ProtocolProxy<ProtocolMetaInfoPB> getProtocolMetaInfoProxy(
-      ConnectionId connId, Configuration conf, SocketFactory factory)
-      throws IOException;
 }

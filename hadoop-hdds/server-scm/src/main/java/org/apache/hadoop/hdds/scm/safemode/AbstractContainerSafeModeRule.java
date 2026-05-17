@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -78,6 +79,27 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
         .filter(c -> c.getNumberOfKeys() > 0)
         .forEach(c -> containers.put(c.containerID(), c.getReplicationConfig().getMinimumNodes()));
     totalContainers.set(containers.size());
+    final long cutOff = (long) Math.ceil(getTotalNumberOfContainers() * getSafeModeCutoff());
+    getSafeModeMetrics().setNumContainerReportedThreshold(getContainerType(), cutOff);
+    SCMSafeModeManager.getLogger().info("Initialized {} Containers threshold count to {}.", getContainerType(), cutOff);
+  }
+
+  protected void reinitializeRule() {
+    // Remove closed containers that are moved to deleted state as DN will not report those containers during
+    // registration. Update totalContainers, cutoff and threshold based on reduced containers.
+    // Since ContainerSafeModeRule is updated with container list notified during DN registration only,
+    // So its not required to add newly created container after DN registration.
+    int oldContainerCount = containers.size();
+    Set<ContainerID> containerInfoSet = containerManager.getContainers(getContainerType()).stream()
+        .filter(this::isClosed)
+        .filter(c -> c.getNumberOfKeys() > 0)
+        .filter(c -> containers.containsKey(ContainerID.valueOf(c.getContainerID())))
+        .map(c -> ContainerID.valueOf(c.getContainerID()))
+        .collect(Collectors.toSet());
+    // remove deleted containers from containers list
+    containers.keySet().removeIf(c -> !containerInfoSet.contains(c));
+    // update new total with reducing removed containers
+    totalContainers.set(totalContainers.get() - (oldContainerCount - containers.size()));
     final long cutOff = (long) Math.ceil(getTotalNumberOfContainers() * getSafeModeCutoff());
     getSafeModeMetrics().setNumContainerReportedThreshold(getContainerType(), cutOff);
     SCMSafeModeManager.getLogger().info("Refreshed {} Containers threshold count to {}.", getContainerType(), cutOff);
@@ -136,7 +158,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   @Override
   public synchronized void refresh(boolean forceRefresh) {
     if (forceRefresh || !validate()) {
-      initializeRule();
+      reinitializeRule();
     }
   }
 

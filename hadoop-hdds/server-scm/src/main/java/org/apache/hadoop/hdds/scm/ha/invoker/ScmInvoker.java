@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler.translateExce
 import java.util.function.Function;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
@@ -65,6 +66,24 @@ public abstract class ScmInvoker<T extends SCMHandler> {
       final SCMRatisRequest request = SCMRatisRequest.of(
           getType(), method.name(), method.getParameterTypes(args.length), args);
       final SCMRatisResponse response = ratisHandler.submitRequest(request);
+      if (response.isSuccess()) {
+        return response.getResult();
+      }
+      throw response.getException();
+    } catch (Exception e) {
+      throw translateException(e);
+    }
+  }
+
+  /** For @Replicate CLIENT methods. */
+  final Object invokeReplicateClient(NameAndParameterTypes method, Object[] args) throws SCMException {
+    try {
+      final SCMRatisRequest request = SCMRatisRequest.of(
+          getType(), method.name(), method.getParameterTypes(args.length), args);
+      final SCMRatisResponse response = HASecurityUtils.submitScmRequestToRatis(
+          ratisHandler.getDivision().getGroup(),
+          ratisHandler.getGrpcTlsConfig(),
+          request.encode());
       if (response.isSuccess()) {
         return response.getResult();
       }

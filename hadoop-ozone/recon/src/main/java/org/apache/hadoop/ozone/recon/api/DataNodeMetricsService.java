@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -42,7 +41,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
@@ -123,7 +122,7 @@ public class DataNodeMetricsService {
       return;
     }
 
-    Set<DatanodeDetails> nodes = reconNodeManager.getNodeStats().keySet();
+    List<DatanodeInfo> nodes = reconNodeManager.getAllNodes();
     if (nodes.isEmpty()) {
       LOG.warn("No datanodes found to query");
       resetState();
@@ -151,7 +150,7 @@ public class DataNodeMetricsService {
   /**
    * Collects metrics from all datanodes. Processes completed tasks first, waits for all.
    */
-  private void collectMetrics(Set<DatanodeDetails> nodes) {
+  private void collectMetrics(List<DatanodeInfo> nodes) {
     try {
       CollectionContext context = submitMetricsCollectionTasks(nodes);
       processCollectionFutures(context);
@@ -167,14 +166,14 @@ public class DataNodeMetricsService {
    * Submits metrics collection tasks for all given datanodes.
    * @return A context object containing tracking structures for the submitted futures.
    */
-  private CollectionContext submitMetricsCollectionTasks(Set<DatanodeDetails> nodes) {
+  private CollectionContext submitMetricsCollectionTasks(List<DatanodeInfo> nodes) {
     // Initialize state
     List<DatanodePendingDeletionMetrics> results = new ArrayList<>(nodes.size());
     // Submit all collection tasks
     Map<DatanodePendingDeletionMetrics, Future<DatanodePendingDeletionMetrics>> futures = new HashMap<>();
 
     long submissionTime = System.currentTimeMillis();
-    for (DatanodeDetails node : nodes) {
+    for (DatanodeInfo node : nodes) {
       DataNodeMetricsCollectionTask task = new DataNodeMetricsCollectionTask(
           node, httpsEnabled, metricsServiceProviderFactory);
       DatanodePendingDeletionMetrics key = new DatanodePendingDeletionMetrics(

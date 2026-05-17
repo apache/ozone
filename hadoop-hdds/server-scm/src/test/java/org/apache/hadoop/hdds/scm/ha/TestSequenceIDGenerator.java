@@ -20,10 +20,10 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.anyString;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.util.Objects;
@@ -58,33 +58,33 @@ public class TestSequenceIDGenerator {
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     // the first batch is [1, 1000]
-    assertEquals(1L, sequenceIdGen.getNextId("someKey"));
-    assertEquals(2L, sequenceIdGen.getNextId("someKey"));
-    assertEquals(3L, sequenceIdGen.getNextId("someKey"));
+    assertEquals(1L, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(2L, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(3L, sequenceIdGen.getNextId(SequenceIdType.localId));
 
-    assertEquals(1L, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(2L, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(3L, sequenceIdGen.getNextId("otherKey"));
+    assertEquals(1L, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(2L, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(3L, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
 
     // default batchSize is 1000, the next batch is [1001, 2000]
     sequenceIdGen.invalidateBatch();
-    assertEquals(1001, sequenceIdGen.getNextId("someKey"));
-    assertEquals(1002, sequenceIdGen.getNextId("someKey"));
-    assertEquals(1003, sequenceIdGen.getNextId("someKey"));
+    assertEquals(1001, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(1002, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(1003, sequenceIdGen.getNextId(SequenceIdType.localId));
 
-    assertEquals(1001, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(1002, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(1003, sequenceIdGen.getNextId("otherKey"));
+    assertEquals(1001, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(1002, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(1003, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
 
     // default batchSize is 1000, the next batch is [2001, 3000]
     sequenceIdGen.invalidateBatch();
-    assertEquals(2001, sequenceIdGen.getNextId("someKey"));
-    assertEquals(2002, sequenceIdGen.getNextId("someKey"));
-    assertEquals(2003, sequenceIdGen.getNextId("someKey"));
+    assertEquals(2001, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(2002, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(2003, sequenceIdGen.getNextId(SequenceIdType.localId));
 
-    assertEquals(2001, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(2002, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(2003, sequenceIdGen.getNextId("otherKey"));
+    assertEquals(2001, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(2002, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(2003, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
   }
 
   @Test
@@ -103,33 +103,33 @@ public class TestSequenceIDGenerator {
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     // the first batch is [1, 100]
-    assertEquals(1L, sequenceIdGen.getNextId("someKey"));
-    assertEquals(2L, sequenceIdGen.getNextId("someKey"));
-    assertEquals(3L, sequenceIdGen.getNextId("someKey"));
+    assertEquals(1L, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(2L, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(3L, sequenceIdGen.getNextId(SequenceIdType.localId));
 
-    assertEquals(1L, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(2L, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(3L, sequenceIdGen.getNextId("otherKey"));
+    assertEquals(1L, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(2L, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(3L, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
 
     // the next batch is [101, 200]
     sequenceIdGen.invalidateBatch();
-    assertEquals(101, sequenceIdGen.getNextId("someKey"));
-    assertEquals(102, sequenceIdGen.getNextId("someKey"));
-    assertEquals(103, sequenceIdGen.getNextId("someKey"));
+    assertEquals(101, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(102, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(103, sequenceIdGen.getNextId(SequenceIdType.localId));
 
-    assertEquals(101, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(102, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(103, sequenceIdGen.getNextId("otherKey"));
+    assertEquals(101, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(102, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(103, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
 
     // the next batch is [201, 300]
     sequenceIdGen.invalidateBatch();
-    assertEquals(201, sequenceIdGen.getNextId("someKey"));
-    assertEquals(202, sequenceIdGen.getNextId("someKey"));
-    assertEquals(203, sequenceIdGen.getNextId("someKey"));
+    assertEquals(201, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(202, sequenceIdGen.getNextId(SequenceIdType.localId));
+    assertEquals(203, sequenceIdGen.getNextId(SequenceIdType.localId));
 
-    assertEquals(201, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(202, sequenceIdGen.getNextId("otherKey"));
-    assertEquals(203, sequenceIdGen.getNextId("otherKey"));
+    assertEquals(201, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(202, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
+    assertEquals(203, sequenceIdGen.getNextId(SequenceIdType.delTxnId));
   }
 
   @Test
@@ -159,18 +159,18 @@ public class TestSequenceIDGenerator {
       }
     };
 
-    assertEquals(1L, sequenceIdGen.getNextId("someKey"));
+    assertEquals(1L, sequenceIdGen.getNextId(SequenceIdType.localId));
 
     // Simulation currently this SCM is not a leader node,
     // So this SCM can only allocate IDs within the current batch
     // ([1, batchSize]), does not allow the allocation of IDs for the next batch
     // ([batchSize + 1, batchSize * 2])
-    when(stateManager.allocateBatch(anyString(), anyLong(), anyLong()))
-        .thenThrow(new SCMException(SCMException.ResultCodes.SCM_NOT_LEADER));
+    doThrow(new SCMException(SCMException.ResultCodes.SCM_NOT_LEADER))
+        .when(stateManager).allocateBatch(anyString(), anyLong(), anyLong());
 
     for (int i = 0; i < batchSize * 3; i++) {
       try {
-        long nextID = sequenceIdGen.getNextId("someKey");
+        long nextID = sequenceIdGen.getNextId(SequenceIdType.localId);
         if (nextID > batchSize) {
           fail("Should not allocate a blockID: " + nextID +
               " that exceeds the current Batch: " + batchSize);

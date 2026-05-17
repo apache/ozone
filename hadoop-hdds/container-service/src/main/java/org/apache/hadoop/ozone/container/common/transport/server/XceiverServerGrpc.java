@@ -50,6 +50,7 @@ import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
+import org.apache.ratis.thirdparty.io.netty.channel.ChannelOption;
 import org.apache.ratis.thirdparty.io.netty.channel.EventLoopGroup;
 import org.apache.ratis.thirdparty.io.netty.channel.ServerChannel;
 import org.apache.ratis.thirdparty.io.netty.channel.epoll.Epoll;
@@ -98,11 +99,13 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       this.port = 0;
     }
 
-    final int threadCountPerDisk =
-        conf.getObject(DatanodeConfiguration.class).getNumReadThreadPerVolume();
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    final int threadCountPerDisk = dnConf.getNumReadThreadPerVolume();
     final int numberOfDisks =
         HddsServerUtil.getDatanodeStorageDirs(conf).size();
     final int poolSize = threadCountPerDisk * numberOfDisks;
+    final int soBacklog = dnConf.getGrpcSoBacklog();
+    LOG.info("Datanode gRPC server SO_BACKLOG: {}", soBacklog);
 
     readExecutors = new ThreadPoolExecutor(poolSize, poolSize,
         60, TimeUnit.SECONDS,
@@ -134,6 +137,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .bossEventLoopGroup(eventLoopGroup)
         .workerEventLoopGroup(eventLoopGroup)
         .channelType(channelType)
+        .withOption(ChannelOption.SO_BACKLOG, soBacklog)
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
             xceiverService.bindServiceWithZeroCopy(),
