@@ -219,6 +219,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     } finally {
       OzoneManager.setS3Auth(null);
       OzoneManager.setStsTokenIdentifier(null);
+      OzoneManager.clearManagedS3AccessKeyAuthContext();
     }
   }
 

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Arrays;
@@ -74,5 +76,15 @@ public class TestAWSV4AuthValidator {
                                   String accessKey, Boolean testResult) {
     assertEquals(testResult, AWSV4AuthValidator.validateRequest(
         stringToSign, sign, accessKey));
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateRequestWithSecretBytesClearsSecret(
+      String stringToSign, String sign, String accessKey, Boolean testResult) {
+    byte[] secretBytes = accessKey.getBytes(UTF_8);
+    assertEquals(testResult, AWSV4AuthValidator.validateRequest(
+        stringToSign, sign, secretBytes));
+    assertArrayEquals(new byte[secretBytes.length], secretBytes);
   }
 }

@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.ManagedS3AccessKeyAuthContext;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -191,8 +192,10 @@ public abstract class OMClientRequest implements RequestAuditor {
           throw new IOException("Error with STS Token", e);
         }
       } else {
-        String principal = OzoneAclUtils.accessIdToUserPrincipal(
-            omRequest.getS3Authentication().getAccessId());
+        String principal = OzoneManager.getS3AuthAuthorizationPrincipal();
+        if (principal == null) {
+          principal = OzoneAclUtils.accessIdToUserPrincipal(accessKeyId);
+        }
         userInfo.setUserName(principal);
       }
     } else if (user != null) {
@@ -519,6 +522,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OMAuditLogger.Builder buildAuditMessage(AuditAction op,
       Map< String, String > auditMap, Throwable throwable,
       OzoneManagerProtocolProtos.UserInfo userInfo) {
+    addS3CredentialAuditFields(auditMap, userInfo);
     auditBuilder.getMessageBuilder()
         .setUser(userInfo != null ? userInfo.getUserName() : null)
         .atIp(userInfo != null ? userInfo.getRemoteAddress() : null)
@@ -529,6 +533,28 @@ public abstract class OMClientRequest implements RequestAuditor {
         .withException(throwable);
     auditBuilder.setAuditMap(auditMap);
     return auditBuilder;
+  }
+
+  private void addS3CredentialAuditFields(Map<String, String> auditMap,
+      OzoneManagerProtocolProtos.UserInfo userInfo) {
+    if (auditMap == null) {
+      return;
+    }
+    ManagedS3AccessKeyAuthContext managedContext =
+        OzoneManager.getManagedS3AccessKeyAuthContext();
+    if (managedContext != null) {
+      auditMap.put("s3CredentialAccessKeyId",
+          managedContext.getCredentialAccessKeyId());
+      auditMap.put("s3EffectiveUser", managedContext.getEffectiveUser());
+      return;
+    }
+    if (omRequest.hasS3Authentication() &&
+        !omRequest.getS3Authentication().hasSessionToken() &&
+        userInfo != null && userInfo.hasUserName()) {
+      auditMap.put("s3CredentialAccessKeyId",
+          omRequest.getS3Authentication().getAccessId());
+      auditMap.put("s3EffectiveUser", userInfo.getUserName());
+    }
   }
 
   @Override

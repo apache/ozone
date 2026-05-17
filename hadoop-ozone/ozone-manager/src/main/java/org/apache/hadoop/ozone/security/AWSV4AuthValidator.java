@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.hadoop.util.StringUtils;
@@ -105,6 +106,41 @@ final class AWSV4AuthValidator {
     return kSigning;
   }
 
+  private static byte[] getSigningKey(byte[] key, String strToSign) {
+    String[] signData = StringUtils.split(StringUtils.split(strToSign,
+        '\n')[2], '/');
+    String dateStamp = signData[0];
+    String regionName = signData[1];
+    String serviceName = signData[2];
+    byte[] prefixedKey = null;
+    byte[] kDate = null;
+    byte[] kRegion = null;
+    byte[] kService = null;
+    byte[] kSigning = null;
+    try {
+      prefixedKey = aws4PrefixedKey(key);
+      kDate = sign(prefixedKey, dateStamp);
+      kRegion = sign(kDate, regionName);
+      kService = sign(kRegion, serviceName);
+      kSigning = sign(kService, "aws4_request");
+      return Arrays.copyOf(kSigning, kSigning.length);
+    } finally {
+      clear(prefixedKey);
+      clear(kDate);
+      clear(kRegion);
+      clear(kService);
+      clear(kSigning);
+    }
+  }
+
+  private static byte[] aws4PrefixedKey(byte[] key) {
+    byte[] prefix = "AWS4".getBytes(StandardCharsets.UTF_8);
+    byte[] prefixedKey = new byte[prefix.length + key.length];
+    System.arraycopy(prefix, 0, prefixedKey, 0, prefix.length);
+    System.arraycopy(key, 0, prefixedKey, prefix.length, key.length);
+    return prefixedKey;
+  }
+
   /**
    * Validate request by comparing Signature from request. Returns true if
    * aws request is legit else returns false.
@@ -118,5 +154,30 @@ final class AWSV4AuthValidator {
     String expectedSignature = Hex.encode(sign(getSigningKey(userKey,
         strToSign), strToSign));
     return expectedSignature.equals(signature);
+  }
+
+  /**
+   * Managed-key SigV4 validation path. Clears the caller-owned secret bytes.
+   */
+  public static boolean validateRequest(String strToSign, String signature,
+      byte[] userKey) {
+    byte[] signingKey = null;
+    byte[] expectedSignatureBytes = null;
+    try {
+      signingKey = getSigningKey(userKey, strToSign);
+      expectedSignatureBytes = sign(signingKey, strToSign);
+      String expectedSignature = Hex.encode(expectedSignatureBytes);
+      return expectedSignature.equals(signature);
+    } finally {
+      clear(userKey);
+      clear(signingKey);
+      clear(expectedSignatureBytes);
+    }
+  }
+
+  private static void clear(byte[] value) {
+    if (value != null) {
+      Arrays.fill(value, (byte) 0);
+    }
   }
 }

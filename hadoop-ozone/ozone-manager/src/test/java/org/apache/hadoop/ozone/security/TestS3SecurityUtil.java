@@ -17,27 +17,36 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -45,11 +54,19 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.helpers.S3ManagedAccessKeyInfo;
+import org.apache.hadoop.ozone.om.security.ManagedS3AccessKeySecretEnvelopeCodec;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.TestClock;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.MockedStatic;
 
 /**
@@ -62,6 +79,13 @@ public class TestS3SecurityUtil {
 
   {
     ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
+  }
+
+  @AfterEach
+  public void tearDown() {
+    OzoneManager.setS3Auth(null);
+    OzoneManager.setStsTokenIdentifier(null);
+    OzoneManager.clearManagedS3AccessKeyAuthContext();
   }
 
   @Test
@@ -161,70 +185,446 @@ public class TestS3SecurityUtil {
             .setExpectedMessage("STS token validation failed - accessKeyId is invalid for session token"));
   }
 
-  private void validateS3CredentialHelper(TestConfig config) throws Exception {
-    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
-      when(ozoneManager.isSecurityEnabled()).thenReturn(true);
-      when(ozoneManager.getSecretKeyClient()).thenReturn(mock(SecretKeyClient.class));
+  @Test
+  public void testBlankSessionTokenFailsWithoutManagedFallback()
+      throws Exception {
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        new InMemoryTestTable<>())) {
+      OMRequest omRequest = createRequestWithSessionToken("accessId", "   ");
 
-      final OMMetadataManager metadataManager = config.metadataManager;
-      when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
-      if (metadataManager != null) {
-        when(metadataManager.getS3RevokedStsTokenTable()).thenReturn(config.revokedSTSTokenTable);
-      }
+      OMException ex = assertThrows(OMException.class,
+          () -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
 
-      // Mock S3SecretManager to handle originalAccessKeyId checks
-      final S3SecretManager s3SecretManager = mock(S3SecretManager.class);
-      when(ozoneManager.getS3SecretManager()).thenReturn(s3SecretManager);
-      if (config.shouldOriginalAccessKeyIdCheckThrowError) {
-        when(s3SecretManager.hasS3Secret(anyString())).thenThrow(
-            new IOException("An error occurred while checking if s3Secret exists"));
-      } else if (config.isOriginalAccessKeyIdRevoked) {
-        // Returning false means secret does NOT exist -> principal is revoked
-        when(s3SecretManager.hasS3Secret(anyString())).thenReturn(false);
-      } else {
-        // Returning true means secret exists -> principal is valid
-        when(s3SecretManager.hasS3Secret(anyString())).thenReturn(true);
-      }
+      assertEquals(INVALID_TOKEN, ex.getResult());
+      verifyManagedConfigNotRequested(ozoneManager);
+    }
+  }
 
-      final String sessionToken = "session-token";
-      if (config.isTokenRevoked && config.revokedSTSTokenTable != null) {
-        final long insertionTimeMillis = CLOCK.millis();
-        config.revokedSTSTokenTable.put(sessionToken, insertionTimeMillis);
-      }
+  @Test
+  public void testInvalidStsTokenFailsWithoutManagedFallback()
+      throws Exception {
+    OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        new InMemoryTestTable<>());
+    try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock =
+        mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS)) {
+      stsSecurityUtilMock.when(
+          () -> STSSecurityUtil.constructValidateAndDecryptSTSToken(
+              eq("session-token"), any(SecretKeyClient.class),
+              any(Clock.class)))
+          .thenThrow(new OMException("invalid sts token", INVALID_TOKEN));
 
-      final STSTokenIdentifier stsTokenIdentifier = createSTSTokenIdentifier();
+      OMException ex = assertThrows(OMException.class,
+          () -> S3SecurityUtil.validateS3Credential(
+              createRequestWithSessionToken(TEMP_ACCESS_KEY_ID, true),
+              ozoneManager));
 
-      try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock = mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS);
-           MockedStatic<AWSV4AuthValidator> awsV4AuthValidatorMock = mockStatic(
-               AWSV4AuthValidator.class, CALLS_REAL_METHODS)) {
+      assertEquals(INVALID_TOKEN, ex.getResult());
+      verifyManagedConfigNotRequested(ozoneManager);
+    }
+  }
 
-        stsSecurityUtilMock.when(
-            () -> STSSecurityUtil.constructValidateAndDecryptSTSToken(
-                eq(sessionToken), any(SecretKeyClient.class), any(Clock.class)))
-            .thenReturn(stsTokenIdentifier);
+  @Test
+  public void testNonSecureManagedDisabledSessionTokenPreservesExistingBehavior()
+      throws Exception {
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(false, false,
+        new InMemoryTestTable<>())) {
+      assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(
+          createRequestWithSessionToken("accessId", "session-token"),
+          ozoneManager));
 
-        // Mock AWS V4 signature validation
-        awsV4AuthValidatorMock.when(() -> AWSV4AuthValidator.validateRequest(anyString(), anyString(), anyString()))
-            .thenReturn(true);
+      verifySecretKeyClientNotRequested(ozoneManager);
+    }
+  }
 
-        final OMRequest omRequest = createRequestWithSessionToken(
-            config.requestAccessId, config.includeAccessId);
+  @Test
+  public void testManagedAbsentInSecureClusterFallsBackToLegacy()
+      throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        new InMemoryTestTable<>();
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable)) {
+      OzoneDelegationTokenSecretManager tokenManager =
+          mock(OzoneDelegationTokenSecretManager.class);
+      when(ozoneManager.getDelegationTokenMgr()).thenReturn(tokenManager);
 
-        if (config.expectedResult != null) {
-          final OMException omException = assertThrows(
-              OMException.class, () -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
-          assertEquals(config.expectedResult, omException.getResult());
-          if (config.expectedMessage != null) {
-            assertTrue(
-                omException.getMessage().contains(config.expectedMessage),
-                "Expected exception message to contain: '" + config.expectedMessage + "' but was: '" +
-                    omException.getMessage() + "'");
-          }
-        } else {
-          assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
-        }
+      assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(
+          createRequestWithoutSessionToken("missing-managed-key"),
+          ozoneManager));
+
+      verify(tokenManager).retrievePassword(any(OzoneTokenIdentifier.class));
+    }
+  }
+
+  @Test
+  public void testManagedAbsentInNonSecureClusterFailsClosed()
+      throws Exception {
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(false, true,
+        new InMemoryTestTable<>())) {
+      OMException ex = assertThrows(OMException.class,
+          () -> S3SecurityUtil.validateS3Credential(
+              createRequestWithoutSessionToken("missing-managed-key"),
+              ozoneManager));
+
+      assertEquals(PERMISSION_DENIED, ex.getResult());
+    }
+  }
+
+  @Test
+  public void testManagedDisabledFailsClosedWithoutLegacyFallback()
+      throws Exception {
+    assertManagedTerminalFailure(infoBuilder("managed-key")
+        .setDisabled(true)
+        .build());
+  }
+
+  @Test
+  public void testManagedExpiredFailsClosedWithoutLegacyFallback()
+      throws Exception {
+    assertManagedTerminalFailure(infoBuilder("managed-key")
+        .setExpiresAt(CLOCK.millis() - 1)
+        .build());
+  }
+
+  @Test
+  public void testManagedLocalPolicyEnabledFailsClosed()
+      throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        new InMemoryTestTable<>();
+    managedTable.put("managed-key", infoBuilder("managed-key").build());
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable, true)) {
+      OMException ex = assertThrows(OMException.class,
+          () -> S3SecurityUtil.validateS3Credential(
+              createRequestWithoutSessionToken("managed-key"), ozoneManager));
+
+      assertEquals(PERMISSION_DENIED, ex.getResult());
+      verifyLegacyFallbackNotRequested(ozoneManager);
+    }
+  }
+
+  @Test
+  public void testManagedPolicyDocumentFailsClosed()
+      throws Exception {
+    assertManagedTerminalFailure(infoBuilder("managed-key")
+        .setPolicyDocument("{\"Version\":\"2012-10-17\"}")
+        .build());
+  }
+
+  @Test
+  public void testManagedLayoutNotFinalizedFailsClosedBeforeTableLookup()
+      throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        spy(new InMemoryTestTable<>());
+    managedTable.put("managed-key", infoBuilder("managed-key").build());
+
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable)) {
+      when(ozoneManager.getVersionManager().isAllowed(
+          OMLayoutFeature.MANAGED_LOCAL_S3_ACCESS_KEYS)).thenReturn(false);
+
+      OMException ex = assertThrows(OMException.class,
+          () -> S3SecurityUtil.validateS3Credential(
+              createRequestWithoutSessionToken("managed-key"), ozoneManager));
+
+      assertEquals(NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+          ex.getResult());
+      verify(managedTable, never()).getIfExist(anyString());
+      verifyLegacyFallbackNotRequested(ozoneManager);
+    }
+  }
+
+  @Test
+  public void testManagedMetadataAccessKeyMismatchFailsClosed()
+      throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        new InMemoryTestTable<>();
+    managedTable.put("request-key", infoBuilder("stored-key").build());
+
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable)) {
+      OMException ex = assertThrows(OMException.class,
+          () -> S3SecurityUtil.validateS3Credential(
+              createRequestWithoutSessionToken("request-key"), ozoneManager));
+
+      assertEquals(PERMISSION_DENIED, ex.getResult());
+      verifyLegacyFallbackNotRequested(ozoneManager);
+    }
+  }
+
+  @Test
+  public void testManagedDecryptFailureFailsClosed()
+      throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        new InMemoryTestTable<>();
+    managedTable.put("managed-key", infoBuilder("managed-key").build());
+
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable)) {
+      try (MockedStatic<ManagedS3AccessKeySecretEnvelopeCodec> codecMock =
+          mockStatic(ManagedS3AccessKeySecretEnvelopeCodec.class,
+              CALLS_REAL_METHODS)) {
+        codecMock.when(() -> ManagedS3AccessKeySecretEnvelopeCodec.decrypt(
+                anyString(), anyString(), anyLong(), any(ByteString.class),
+                any(KeyProviderCryptoExtension.class)))
+            .thenThrow(new IOException("decrypt failed"));
+
+        OMException ex = assertThrows(OMException.class,
+            () -> S3SecurityUtil.validateS3Credential(
+                createRequestWithoutSessionToken("managed-key"), ozoneManager));
+
+        assertEquals(PERMISSION_DENIED, ex.getResult());
+        verifyLegacyFallbackNotRequested(ozoneManager);
       }
     }
+  }
+
+  @Test
+  public void testManagedWrongSecretFailsClosedWithoutLegacyFallback()
+      throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        new InMemoryTestTable<>();
+    managedTable.put("managed-key", infoBuilder("managed-key").build());
+
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable)) {
+      try (MockedStatic<ManagedS3AccessKeySecretEnvelopeCodec> codecMock =
+          mockStatic(ManagedS3AccessKeySecretEnvelopeCodec.class,
+              CALLS_REAL_METHODS);
+           MockedStatic<AWSV4AuthValidator> awsMock =
+               mockStatic(AWSV4AuthValidator.class, CALLS_REAL_METHODS)) {
+        codecMock.when(() -> ManagedS3AccessKeySecretEnvelopeCodec.decrypt(
+                anyString(), anyString(), anyLong(), any(ByteString.class),
+                any(KeyProviderCryptoExtension.class)))
+            .thenReturn("secret".getBytes(UTF_8));
+        awsMock.when(() -> AWSV4AuthValidator.validateRequest(
+                anyString(), anyString(), ArgumentMatchers.<byte[]>any()))
+            .thenReturn(false);
+
+        OMException ex = assertThrows(OMException.class,
+            () -> S3SecurityUtil.validateS3Credential(
+                createRequestWithoutSessionToken("managed-key"), ozoneManager));
+
+        assertEquals(PERMISSION_DENIED, ex.getResult());
+        verifyLegacyFallbackNotRequested(ozoneManager);
+      }
+    }
+  }
+
+  @Test
+  public void testManagedSuccessInstallsIdentityContext()
+      throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        new InMemoryTestTable<>();
+    managedTable.put("managed-key", infoBuilder("managed-key")
+        .setEffectiveUser("effective-user")
+        .addGroup("stored-group")
+        .build());
+
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable)) {
+      try (MockedStatic<ManagedS3AccessKeySecretEnvelopeCodec> codecMock =
+          mockStatic(ManagedS3AccessKeySecretEnvelopeCodec.class,
+              CALLS_REAL_METHODS);
+           MockedStatic<AWSV4AuthValidator> awsMock =
+               mockStatic(AWSV4AuthValidator.class, CALLS_REAL_METHODS)) {
+        codecMock.when(() -> ManagedS3AccessKeySecretEnvelopeCodec.decrypt(
+                anyString(), anyString(), anyLong(), any(ByteString.class),
+                any(KeyProviderCryptoExtension.class)))
+            .thenReturn("secret".getBytes(UTF_8));
+        awsMock.when(() -> AWSV4AuthValidator.validateRequest(
+                anyString(), anyString(), ArgumentMatchers.<byte[]>any()))
+            .thenReturn(true);
+        awsMock.clearInvocations();
+
+        assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(
+            createRequestWithoutSessionToken("managed-key"), ozoneManager));
+
+        ManagedS3AccessKeyAuthContext context =
+            OzoneManager.getManagedS3AccessKeyAuthContext();
+        assertEquals("managed-key", context.getCredentialAccessKeyId());
+        assertEquals("managed-key", context.getS3NamespaceAccessId());
+        assertEquals("effective-user", context.getEffectiveUser());
+        assertEquals(1, context.getGroupsSnapshot().size());
+        awsMock.verify(() -> AWSV4AuthValidator.validateRequest(
+            anyString(), anyString(), ArgumentMatchers.<byte[]>any()));
+        awsMock.verify(() -> AWSV4AuthValidator.validateRequest(
+            anyString(), anyString(), anyString()), never());
+      }
+    }
+  }
+
+  @Test
+  public void testManagedFollowerFailsBeforeTableLookup()
+      throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        spy(new InMemoryTestTable<>());
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable)) {
+      doThrow(new OMNotLeaderException(RaftPeerId.valueOf("om")))
+          .when(ozoneManager).checkLeaderStatus();
+
+      assertThrows(ServiceException.class,
+          () -> S3SecurityUtil.validateS3Credential(
+              createRequestWithoutSessionToken("managed-key"), ozoneManager));
+
+      verify(managedTable, never()).getIfExist(anyString());
+    }
+  }
+
+  private void validateS3CredentialHelper(TestConfig config) throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+    when(ozoneManager.getSecretKeyClient()).thenReturn(
+        mock(SecretKeyClient.class));
+
+    final OMMetadataManager metadataManager = config.metadataManager;
+    when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    if (metadataManager != null) {
+      when(metadataManager.getS3RevokedStsTokenTable()).thenReturn(
+          config.revokedSTSTokenTable);
+    }
+
+    // Mock S3SecretManager to handle originalAccessKeyId checks
+    final S3SecretManager s3SecretManager = mock(S3SecretManager.class);
+    when(ozoneManager.getS3SecretManager()).thenReturn(s3SecretManager);
+    if (config.shouldOriginalAccessKeyIdCheckThrowError) {
+      when(s3SecretManager.hasS3Secret(anyString())).thenThrow(
+          new IOException("An error occurred while checking if s3Secret " +
+              "exists"));
+    } else if (config.isOriginalAccessKeyIdRevoked) {
+      // Returning false means secret does NOT exist -> principal is revoked
+      when(s3SecretManager.hasS3Secret(anyString())).thenReturn(false);
+    } else {
+      // Returning true means secret exists -> principal is valid
+      when(s3SecretManager.hasS3Secret(anyString())).thenReturn(true);
+    }
+
+    final String sessionToken = "session-token";
+    if (config.isTokenRevoked && config.revokedSTSTokenTable != null) {
+      final long insertionTimeMillis = CLOCK.millis();
+      config.revokedSTSTokenTable.put(sessionToken, insertionTimeMillis);
+    }
+
+    final STSTokenIdentifier stsTokenIdentifier = createSTSTokenIdentifier();
+
+    try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock =
+        mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS);
+         MockedStatic<AWSV4AuthValidator> awsV4AuthValidatorMock =
+             mockStatic(AWSV4AuthValidator.class, CALLS_REAL_METHODS)) {
+      stsSecurityUtilMock.when(
+          () -> STSSecurityUtil.constructValidateAndDecryptSTSToken(
+              eq(sessionToken), any(SecretKeyClient.class), any(Clock.class)))
+          .thenReturn(stsTokenIdentifier);
+
+      // Mock AWS V4 signature validation
+      awsV4AuthValidatorMock.when(
+          () -> AWSV4AuthValidator.validateRequest(
+              anyString(), anyString(), anyString()))
+          .thenReturn(true);
+
+      final OMRequest omRequest = createRequestWithSessionToken(
+          config.requestAccessId, config.includeAccessId);
+
+      if (config.expectedResult != null) {
+        final OMException omException = assertThrows(
+            OMException.class, () -> S3SecurityUtil.validateS3Credential(
+                omRequest, ozoneManager));
+        assertEquals(config.expectedResult, omException.getResult());
+        if (config.expectedMessage != null) {
+          assertTrue(
+              omException.getMessage().contains(config.expectedMessage),
+              "Expected exception message to contain: '" +
+                  config.expectedMessage + "' but was: '" +
+                  omException.getMessage() + "'");
+        }
+      } else {
+        assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(
+            omRequest, ozoneManager));
+      }
+    }
+  }
+
+  private static void assertManagedTerminalFailure(
+      S3ManagedAccessKeyInfo info) throws Exception {
+    Table<String, S3ManagedAccessKeyInfo> managedTable =
+        new InMemoryTestTable<>();
+    managedTable.put(info.getAccessKeyId(), info);
+    try (OzoneManager ozoneManager = mockManagedOzoneManager(true, true,
+        managedTable)) {
+      OMException ex = assertThrows(OMException.class,
+          () -> S3SecurityUtil.validateS3Credential(
+              createRequestWithoutSessionToken(info.getAccessKeyId()),
+              ozoneManager));
+
+      assertEquals(PERMISSION_DENIED, ex.getResult());
+      verifyLegacyFallbackNotRequested(ozoneManager);
+    }
+  }
+
+  private static void verifyManagedConfigNotRequested(
+      OzoneManager ozoneManager) {
+    verify(ozoneManager, never()).getManagedS3AccessKeyConfig();
+  }
+
+  private static void verifySecretKeyClientNotRequested(
+      OzoneManager ozoneManager) {
+    verify(ozoneManager, never()).getSecretKeyClient();
+  }
+
+  private static void verifyLegacyFallbackNotRequested(
+      OzoneManager ozoneManager) throws IOException {
+    verify(ozoneManager, never()).getDelegationTokenMgr();
+  }
+
+  private static OzoneManager mockManagedOzoneManager(boolean securityEnabled,
+      boolean managedEnabled, Table<String, S3ManagedAccessKeyInfo> managedTable)
+      throws IOException {
+    return mockManagedOzoneManager(securityEnabled, managedEnabled,
+        managedTable, false);
+  }
+
+  private static OzoneManager mockManagedOzoneManager(boolean securityEnabled,
+      boolean managedEnabled, Table<String, S3ManagedAccessKeyInfo> managedTable,
+      boolean localPolicyEnabled) throws IOException {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    when(ozoneManager.isSecurityEnabled()).thenReturn(securityEnabled);
+    when(ozoneManager.getManagedS3AccessKeyConfig()).thenReturn(
+        managedConfig(managedEnabled, localPolicyEnabled));
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    when(metadataManager.getS3ManagedAccessKeyTable()).thenReturn(
+        managedTable);
+    when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    when(ozoneManager.getKmsProvider()).thenReturn(
+        mock(KeyProviderCryptoExtension.class));
+    when(ozoneManager.getSecretKeyClient()).thenReturn(
+        mock(SecretKeyClient.class));
+    OMLayoutVersionManager versionManager =
+        mock(OMLayoutVersionManager.class);
+    when(versionManager.isAllowed(OMLayoutFeature
+        .MANAGED_LOCAL_S3_ACCESS_KEYS)).thenReturn(true);
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
+    return ozoneManager;
+  }
+
+  private static ManagedS3AccessKeyConfig managedConfig(boolean enabled,
+      boolean localPolicyEnabled) {
+    return ManagedS3AccessKeyConfig.newBuilder()
+        .setEnabled(enabled)
+        .setEncryptionKeyName("managed-key")
+        .setLocalPolicyEnabled(localPolicyEnabled)
+        .build();
+  }
+
+  private static S3ManagedAccessKeyInfo.Builder infoBuilder(
+      String accessKeyId) {
+    return S3ManagedAccessKeyInfo.newBuilder()
+        .setAccessKeyId(accessKeyId)
+        .setEncryptedSecretKey(ByteString.copyFromUtf8("encrypted-secret"))
+        .setSecretKeyId("secret-key-id")
+        .setEffectiveUser("effective-user")
+        .setCreatedAt(CLOCK.millis())
+        .setExpiresAt(CLOCK.millis() + 3600_000)
+        .setCreatedBy("creator");
   }
 
   private STSTokenIdentifier createSTSTokenIdentifier() {
@@ -235,14 +635,39 @@ public class TestS3SecurityUtil {
   }
 
   private static OMRequest createRequestWithSessionToken(String accessId, boolean includeAccessId) {
+    return createRequestWithSessionToken(accessId, includeAccessId,
+        "session-token");
+  }
+
+  private static OMRequest createRequestWithSessionToken(String accessId,
+      String sessionToken) {
+    return createRequestWithSessionToken(accessId, true, sessionToken);
+  }
+
+  private static OMRequest createRequestWithSessionToken(String accessId,
+      boolean includeAccessId, String sessionToken) {
     final S3Authentication.Builder s3AuthenticationBuilder = S3Authentication.newBuilder()
         .setStringToSign("string-to-sign")
         .setSignature("signature")
-        .setSessionToken("session-token");
+        .setSessionToken(sessionToken);
     if (includeAccessId) {
       s3AuthenticationBuilder.setAccessId(accessId);
     }
     final S3Authentication s3Authentication = s3AuthenticationBuilder.build();
+
+    return OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.CreateVolume)
+        .setS3Authentication(s3Authentication)
+        .build();
+  }
+
+  private static OMRequest createRequestWithoutSessionToken(String accessId) {
+    final S3Authentication s3Authentication = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setStringToSign("string-to-sign")
+        .setSignature("signature")
+        .build();
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())

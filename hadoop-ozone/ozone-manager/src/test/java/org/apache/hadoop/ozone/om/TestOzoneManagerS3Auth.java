@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.security.ManagedS3AccessKeyAuthContext;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,7 @@ public class TestOzoneManagerS3Auth {
   public void tearDown() {
     OzoneManager.setS3Auth(null);
     OzoneManager.setStsTokenIdentifier(null);
+    OzoneManager.clearManagedS3AccessKeyAuthContext();
   }
 
   @Test
@@ -57,6 +59,26 @@ public class TestOzoneManagerS3Auth {
         .build();
     OzoneManager.setS3Auth(s3Auth);
 
+    assertEquals(accessId, OzoneManager.getS3AuthEffectiveAccessId());
+  }
+
+  @Test
+  public void testManagedS3AuthIdentitySplit() throws Exception {
+    final String accessId = "managed-access-id";
+    final String effectiveUser = "effective-user";
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setSignature("signature")
+        .setStringToSign("stringToSign")
+        .build();
+    OzoneManager.setS3Auth(s3Auth);
+    OzoneManager.setManagedS3AccessKeyAuthContext(
+        new ManagedS3AccessKeyAuthContext(accessId, accessId, effectiveUser,
+            java.util.Collections.singletonList("stored-group"), false));
+
+    assertEquals(accessId, OzoneManager.getS3AuthCredentialAccessId());
+    assertEquals(accessId, OzoneManager.getS3AuthNamespaceAccessId());
+    assertEquals(effectiveUser, OzoneManager.getS3AuthAuthorizationPrincipal());
     assertEquals(accessId, OzoneManager.getS3AuthEffectiveAccessId());
   }
 
@@ -120,4 +142,3 @@ public class TestOzoneManagerS3Auth {
     assertEquals("Invalid STS Token format - could not find originalAccessKeyId", ex.getMessage());
   }
 }
-

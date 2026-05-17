@@ -1564,6 +1564,9 @@ s3NamespaceAccessId:
   routing where current Ozone code expects an S3 access ID
   v1 managed access keys use s3NamespaceAccessId = accessKeyId unless code
   inspection proves a specific call site requires effectiveUser
+  v1 managed access keys are not tenant-bound; a managed access-key ID should
+  not be treated as a tenant access ID unless a later phase explicitly adds
+  that binding
 
 effectiveUser:
   Ozone authorization identity from S3ManagedAccessKeyInfo.effectiveUser
@@ -1673,6 +1676,8 @@ managed path:
   does not log plaintext secret
   clears plaintext managed secret bytes in finally
   clears intermediate HMAC/signing-key byte arrays where practical
+  acknowledges standard JCA limitations such as SecretKeySpec defensive copies
+    that are not directly zeroable
 ```
 
 Plaintext managed secrets must not appear in logs, audit, `toString()`,

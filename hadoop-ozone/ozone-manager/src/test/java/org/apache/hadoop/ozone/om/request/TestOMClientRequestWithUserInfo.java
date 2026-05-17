@@ -32,10 +32,13 @@ import io.grpc.Context;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -50,8 +53,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.security.ManagedS3AccessKeyAuthContext;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -94,6 +99,13 @@ public class TestOMClientRequestWithUserInfo {
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
 
     inetAddress = InetAddress.getByName("127.0.0.1");
+  }
+
+  @AfterEach
+  public void cleanupS3AuthContext() {
+    OzoneManager.setS3Auth(null);
+    OzoneManager.setStsTokenIdentifier(null);
+    OzoneManager.clearManagedS3AccessKeyAuthContext();
   }
 
   @Test
@@ -208,6 +220,67 @@ public class TestOMClientRequestWithUserInfo {
       OzoneManager.setStsTokenIdentifier(null);
       OzoneManager.setS3Auth(null);
     }
+  }
+
+  @Test
+  public void testUserInfoWithManagedS3AccessKey() throws IOException {
+    final String accessId = "managed-access-key";
+    final String effectiveUser = "effective-user";
+
+    final S3Authentication s3Authentication = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setSignature("Signature")
+        .setStringToSign("StringToSign")
+        .build();
+
+    OzoneManager.setS3Auth(s3Authentication);
+    OzoneManager.setManagedS3AccessKeyAuthContext(
+        new ManagedS3AccessKeyAuthContext(accessId, accessId, effectiveUser,
+            java.util.Collections.singletonList("stored-group"), false));
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setS3Authentication(s3Authentication)
+        .build();
+    final OMClientRequest omClientRequest =
+        new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+
+    final OzoneManagerProtocolProtos.UserInfo userInfo =
+        omClientRequest.getUserInfo();
+    assertEquals(effectiveUser, userInfo.getUserName());
+  }
+
+  @Test
+  public void testS3CredentialAuditFieldsWithoutThreadLocal() {
+    final String accessId = "managed-access-key";
+    final String effectiveUser = "effective-user";
+
+    final S3Authentication s3Authentication = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setSignature("Signature")
+        .setStringToSign("StringToSign")
+        .build();
+
+    final OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName(effectiveUser)
+            .build();
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setS3Authentication(s3Authentication)
+        .setUserInfo(userInfo)
+        .build();
+    final OMClientRequest omClientRequest =
+        new OMKeyCommitRequest(omRequest, mock(BucketLayout.class));
+    Map<String, String> auditMap = new LinkedHashMap<>();
+
+    omClientRequest.buildAuditMessage(OMAction.COMMIT_KEY, auditMap, null,
+        userInfo);
+
+    assertEquals(accessId, auditMap.get("s3CredentialAccessKeyId"));
+    assertEquals(effectiveUser, auditMap.get("s3EffectiveUser"));
   }
 
   @Test

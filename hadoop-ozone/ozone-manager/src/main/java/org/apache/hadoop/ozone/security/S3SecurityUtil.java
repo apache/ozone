@@ -26,6 +26,7 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneOffset;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -65,62 +66,101 @@ public final class S3SecurityUtil {
    */
   public static void validateS3Credential(OMRequest omRequest,
       OzoneManager ozoneManager) throws ServiceException, OMException {
-    if (ozoneManager.isSecurityEnabled()) {
-      // If STS session token is present, decode, decrypt and validate it once and save in thread-local
-      if (omRequest.getS3Authentication().hasSessionToken()) {
-        final String token = omRequest.getS3Authentication().getSessionToken();
-        if (!token.isEmpty()) {
-          final STSTokenIdentifier stsTokenIdentifier = STSSecurityUtil.constructValidateAndDecryptSTSToken(
-              token, ozoneManager.getSecretKeyClient(), CLOCK);
-
-          // Ensure the token is not revoked
-          if (isRevokedStsToken(token, ozoneManager)) {
-            LOG.info("Session token has been revoked: {}, {}", stsTokenIdentifier.getTempAccessKeyId(), token);
-            throw new OMException("STS token has been revoked", REVOKED_TOKEN);
-          }
-
-          // Ensure the principal that created the STS token (originalAccessKeyId) has not been revoked
-          if (isOriginalAccessKeyIdRevoked(stsTokenIdentifier, ozoneManager)) {
-            LOG.info("OriginalAccessKeyId for session token has been revoked: {}, {}",
-                stsTokenIdentifier.getOriginalAccessKeyId(), stsTokenIdentifier.getTempAccessKeyId());
-            throw new OMException("STS token no longer valid: OriginalAccessKeyId principal revoked", REVOKED_TOKEN);
-          }
-
-          // Ensure the access key ID in the request matches the one encoded in the token.
-          // This prevents using a valid token and secretKey to authenticate arbitrary accessKeyIds.
-          final String requestAccessId = omRequest.getS3Authentication().getAccessId();
-          if (!requestAccessId.equals(stsTokenIdentifier.getTempAccessKeyId())) {
-            throw new OMException(
-                "STS token validation failed - accessKeyId is invalid for session token", INVALID_TOKEN);
-          }
-
-          // HMAC signature and expiration were validated above.  Now validate AWS signature.
-          validateSTSTokenAwsSignature(stsTokenIdentifier, omRequest);
-          OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
-          return;
-        }
+    // If STS session token is present, decode, decrypt and validate it once
+    // and save in thread-local. Failure is terminal and never falls back.
+    if (omRequest.getS3Authentication().hasSessionToken()) {
+      if (!ozoneManager.isSecurityEnabled() &&
+          !isManagedS3AccessKeyEnabled(ozoneManager)) {
+        return;
       }
-
-      OzoneTokenIdentifier s3Token = constructS3Token(omRequest);
-      try {
-        // authenticate user with signature verification through
-        // delegationTokenMgr validateToken via retrievePassword
-        ozoneManager.getDelegationTokenMgr().retrievePassword(s3Token);
-      } catch (SecretManager.InvalidToken e) {
-        if (e.getCause() != null &&
-            (e.getCause().getClass() == OMNotLeaderException.class ||
-            e.getCause().getClass() == OMLeaderNotReadyException.class)) {
-          throw new ServiceException(e.getCause());
-        }
-
-        // TODO: Just check are we okay to log entire token in failure case.
-        OzoneManagerProtocolServerSideTranslatorPB.getLog().error(
-            "signatures do NOT match for S3 identifier:{}", s3Token, e);
-        throw new OMException("User " + s3Token.getAwsAccessId()
-            + " request authorization failure: signatures do NOT match",
-            INVALID_TOKEN);
-      }
+      validateStsCredential(omRequest, ozoneManager);
+      return;
     }
+
+    if (ManagedAccessKeyAuthenticator.authenticate(omRequest, ozoneManager)) {
+      return;
+    }
+
+    if (!ozoneManager.isSecurityEnabled()) {
+      return;
+    }
+
+    OzoneTokenIdentifier s3Token = constructS3Token(omRequest);
+    try {
+      // authenticate user with signature verification through
+      // delegationTokenMgr validateToken via retrievePassword
+      ozoneManager.getDelegationTokenMgr().retrievePassword(s3Token);
+    } catch (SecretManager.InvalidToken e) {
+      if (e.getCause() != null &&
+          (e.getCause().getClass() == OMNotLeaderException.class ||
+          e.getCause().getClass() == OMLeaderNotReadyException.class)) {
+        throw new ServiceException(e.getCause());
+      }
+
+      // TODO: Just check are we okay to log entire token in failure case.
+      OzoneManagerProtocolServerSideTranslatorPB.getLog().error(
+          "signatures do NOT match for S3 identifier:{}", s3Token, e);
+      throw new OMException("User " + s3Token.getAwsAccessId()
+          + " request authorization failure: signatures do NOT match",
+          INVALID_TOKEN);
+    }
+  }
+
+  private static boolean isManagedS3AccessKeyEnabled(
+      OzoneManager ozoneManager) {
+    ManagedS3AccessKeyConfig config =
+        ozoneManager.getManagedS3AccessKeyConfig();
+    return config != null && config.isEnabled();
+  }
+
+  private static void validateStsCredential(OMRequest omRequest,
+      OzoneManager ozoneManager) throws OMException {
+    final String token = omRequest.getS3Authentication().getSessionToken();
+    if (StringUtils.isBlank(token)) {
+      throw new OMException("STS token validation failed - session token is " +
+          "empty", INVALID_TOKEN);
+    }
+    if (!ozoneManager.isSecurityEnabled()) {
+      throw new OMException("STS token validation requires a secure cluster",
+          INVALID_TOKEN);
+    }
+
+    final STSTokenIdentifier stsTokenIdentifier =
+        STSSecurityUtil.constructValidateAndDecryptSTSToken(
+            token, ozoneManager.getSecretKeyClient(), CLOCK);
+
+    // Ensure the token is not revoked
+    if (isRevokedStsToken(token, ozoneManager)) {
+      LOG.info("Session token has been revoked: {}, {}",
+          stsTokenIdentifier.getTempAccessKeyId(), token);
+      throw new OMException("STS token has been revoked", REVOKED_TOKEN);
+    }
+
+    // Ensure the principal that created the STS token (originalAccessKeyId)
+    // has not been revoked
+    if (isOriginalAccessKeyIdRevoked(stsTokenIdentifier, ozoneManager)) {
+      LOG.info("OriginalAccessKeyId for session token has been revoked: {}, {}",
+          stsTokenIdentifier.getOriginalAccessKeyId(),
+          stsTokenIdentifier.getTempAccessKeyId());
+      throw new OMException("STS token no longer valid: " +
+          "OriginalAccessKeyId principal revoked", REVOKED_TOKEN);
+    }
+
+    // Ensure the access key ID in the request matches the one encoded in the
+    // token. This prevents using a valid token and secretKey to authenticate
+    // arbitrary accessKeyIds.
+    final String requestAccessId = omRequest.getS3Authentication()
+        .getAccessId();
+    if (!requestAccessId.equals(stsTokenIdentifier.getTempAccessKeyId())) {
+      throw new OMException(
+          "STS token validation failed - accessKeyId is invalid for " +
+              "session token", INVALID_TOKEN);
+    }
+
+    // HMAC signature and expiration were validated above. Now validate AWS
+    // signature.
+    validateSTSTokenAwsSignature(stsTokenIdentifier, omRequest);
+    OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
   }
 
   /**
