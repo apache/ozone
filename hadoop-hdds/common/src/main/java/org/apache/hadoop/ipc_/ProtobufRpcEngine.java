@@ -72,7 +72,7 @@ public class ProtobufRpcEngine implements RpcEngine {
       throws IOException {
     final Invoker invoker = new Invoker(protocol, connId, conf, factory);
     return new ProtocolProxy<T>(protocol, (T) Proxy.newProxyInstance(
-        protocol.getClassLoader(), new Class[] {protocol}, invoker), false);
+        protocol.getClassLoader(), new Class[] {protocol}, invoker));
   }
 
   public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
@@ -103,18 +103,7 @@ public class ProtobufRpcEngine implements RpcEngine {
         rpcTimeout, connectionRetryPolicy, fallbackToSimpleAuth,
         alignmentContext);
     return new ProtocolProxy<T>(protocol, (T) Proxy.newProxyInstance(
-        protocol.getClassLoader(), new Class[]{protocol}, invoker), false);
-  }
-  
-  @Override
-  public ProtocolProxy<ProtocolMetaInfoPB> getProtocolMetaInfoProxy(
-      ConnectionId connId, Configuration conf, SocketFactory factory)
-      throws IOException {
-    Class<ProtocolMetaInfoPB> protocol = ProtocolMetaInfoPB.class;
-    return new ProtocolProxy<ProtocolMetaInfoPB>(protocol,
-        (ProtocolMetaInfoPB) Proxy.newProxyInstance(protocol.getClassLoader(),
-            new Class[] { protocol }, new Invoker(protocol, connId, conf,
-                factory)), false);
+        protocol.getClassLoader(), new Class[]{protocol}, invoker));
   }
 
   protected static class Invoker implements RpcInvocationHandler {
