@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ratis.util.Preconditions;
 import org.yaml.snakeyaml.Yaml;
 
-
 /**
  * ContainerData is the in-memory representation of container metadata and is
  * represented on disk by the .container file.

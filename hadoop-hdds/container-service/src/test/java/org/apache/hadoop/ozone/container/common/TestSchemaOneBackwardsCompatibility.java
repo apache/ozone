@@ -597,7 +597,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
     // Changing the paths above affects the checksum, so it was also removed
     // from the container file and calculated at run time.
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+    ContainerDataYaml.getYamlForContainerType(
             kvData.getContainerType(),
         kvData.getReplicaIndex() > 0, kvData.getStorageType());
     kvData.computeAndSetContainerFileChecksum();
