@@ -154,21 +154,6 @@ public final class ContainerDataYaml {
     return containerData;
   }
 
-  /**
-   * Given a ContainerType this method returns a Yaml representation of
-   * the container properties.
-   *
-   * @param containerType    type of container
-   * @param withReplicaIndex in the container yaml
-   * @return Yamal representation of container properties
-   * @throws StorageContainerException if the type is unrecognized
-   */
-  public static Yaml getYamlForContainerType(ContainerType containerType,
-      boolean withReplicaIndex)
-      throws StorageContainerException {
-    return getYamlForContainerType(containerType, withReplicaIndex, null);
-  }
-
   public static Yaml getYamlForContainerType(ContainerType containerType,
       boolean withReplicaIndex, StorageType storageType)
       throws StorageContainerException {
