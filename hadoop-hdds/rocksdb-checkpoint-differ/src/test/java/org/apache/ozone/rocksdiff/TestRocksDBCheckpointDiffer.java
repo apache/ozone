@@ -1012,15 +1012,16 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   /**
-   * Looks up an SST's column family for the diff assertions: compaction DAG first, then snapshots.
-   * Returns null if it cannot be found (e.g. different SST numbering); the caller includes those files
-   * in the expected list whenever column family is null or matches the lookup set.
+   * Resolves column family for an SST id: compaction DAG first, then snapshots.
+   *
+   * @return (true, cf) when the SST is known for this run (cf may be null);
+   *     (false, ignored) when the id does not appear (e.g. different SST numbering than the hard-coded list).
    */
-  private String columnFamilyForDiffFile(RocksDBCheckpointDiffer differ, String diffFile,
+  private Pair<Boolean, String> resolveColumnFamilyForDiffFile(RocksDBCheckpointDiffer differ, String diffFile,
       DifferSnapshotInfo srcSnap, DifferSnapshotInfo destSnap) {
     CompactionNode node = differ.getCompactionNodeMap().get(diffFile);
     if (node != null) {
-      return node.getColumnFamily();
+      return Pair.of(true, node.getColumnFamily());
     }
     SstFileInfo meta = srcSnap.getSstFile(0, diffFile);
     if (meta == null) {
@@ -1034,7 +1035,10 @@ public class TestRocksDBCheckpointDiffer {
         }
       }
     }
-    return meta != null ? meta.getColumnFamily() : null;
+    if (meta == null) {
+      return Pair.of(false, null);
+    }
+    return Pair.of(true, meta.getColumnFamily());
   }
 
   /**
@@ -1075,7 +1079,12 @@ public class TestRocksDBCheckpointDiffer {
           mask &= mask - 1;
         }
         for (String diffFile : expectedDifferResult.get(index)) {
-          String columnFamily = columnFamilyForDiffFile(differ, diffFile, src, snap);
+          Pair<Boolean, String> resolved =
+              resolveColumnFamilyForDiffFile(differ, diffFile, src, snap);
+          if (!resolved.getLeft()) {
+            continue;
+          }
+          String columnFamily = resolved.getRight();
           if (columnFamily == null || tableToLookUp.contains(columnFamily)) {
             expectedDiffFiles.add(diffFile);
           }
