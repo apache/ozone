@@ -60,9 +60,8 @@ public abstract class AbstractContainerSafeModeRuleTest {
   private ConfigurationSource conf;
   private ContainerManager containerManager;
   private EventQueue eventQueue;
-  private AbstractContainerSafeModeRule rule;
+  private AbstractContainerSafeModeRule safeModeRule;
   private SafeModeMetrics safeModeMetrics;
-
 
   @BeforeEach
   public void setup() throws ContainerNotFoundException {
@@ -83,8 +82,8 @@ public abstract class AbstractContainerSafeModeRuleTest {
           .orElseThrow(ContainerNotFoundException::new);
     });
 
-    rule = createRule(eventQueue, conf, containerManager, safeModeManager);
-    rule.setValidateBasedOnReportProcessing(false);
+    safeModeRule = createRule(eventQueue, conf, containerManager, safeModeManager);
+    safeModeRule.setValidateBasedOnReportProcessing(false);
   }
 
   @Test
@@ -188,7 +187,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
     containers.add(mockContainer(LifeCycleState.OPEN, 1L));
     int count = 3;
     for (int i = 0; i < count; i++) {
-      rule.refresh(true);
+      safeModeRule.refresh(true);
     }
 
     ArgumentCaptor<Long> durationCaptor = ArgumentCaptor.forClass(Long.class);
@@ -202,7 +201,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
   public void testRefreshSkippedWhenValidWithoutForce() {
     containers.add(mockContainer(LifeCycleState.OPEN, 1L));
 
-    rule.refresh(false);
+    safeModeRule.refresh(false);
 
     verify(safeModeMetrics, never()).incNumContainerSafeModeRuleRefreshes();
     verify(safeModeMetrics, never()).setLastContainerSafeModeRuleRefreshDurationMs(any(), anyLong());
