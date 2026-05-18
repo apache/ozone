@@ -1108,11 +1108,11 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   static Stream<Arguments> onlyTagKeyCasesV1() {
     Map<String, String> fooBarEmptyBar = new HashMap<>();
     fooBarEmptyBar.put("foo", "bar");
-    fooBarEmptyBar.put("bar", null);
+    fooBarEmptyBar.put("bar", "");
     return Stream.of(
         Arguments.of(
             new ObjectTagging(Collections.singletonList(new Tag("tag1", null))),
-            Collections.singletonMap("tag1", null)),
+            Collections.singletonMap("tag1", "")),
         Arguments.of(
             new ObjectTagging(Arrays.asList(new Tag("foo", "bar"), new Tag("bar", null))),
             fooBarEmptyBar)
