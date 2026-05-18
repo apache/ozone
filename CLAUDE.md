@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository
 
-Apache Ozone — a scalable, distributed object/file store. This is a multi-module Maven project (`org.apache.ozone:ozone-main`, version `2.2.0-SNAPSHOT`). Two top-level Maven aggregators:
+Apache Ozone — a scalable, distributed object/file store. This is a multi-module Maven project; root coordinates and current version are in [`pom.xml`](./pom.xml) (`groupId` / `artifactId` / `version`). Two top-level Maven aggregators:
 
 - `hadoop-hdds/` — Hadoop Distributed Data Store: the storage layer (SCM, datanode container service, RocksDB integration, common protocols, crypto, framework). Load-bearing submodules: `server-scm`, `container-service`, `framework`, `managed-rocksdb`, `interface-{admin,client,server}`. See `hadoop-hdds/pom.xml` for the full list.
 - `hadoop-ozone/` — Ozone services and clients on top of HDDS. Load-bearing submodules: `ozone-manager` (OM), `s3gateway`, `recon` (UI/monitoring), `datanode`, `dist` (binary tarball + Docker compose configs), `integration-test*` (Java mini-cluster tests), plus `ozonefs*` (Hadoop-compatible FS adapters). See `hadoop-ozone/pom.xml` for the full list.
