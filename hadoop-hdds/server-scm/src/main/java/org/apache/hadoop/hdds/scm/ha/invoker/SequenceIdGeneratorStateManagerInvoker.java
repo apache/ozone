@@ -25,8 +25,8 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.StateManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.protocol.Message;
 
-/** Code generated for {@link StateManager}.  Do not modify. */
-public class SequenceIdStateManagerInvoker extends ScmInvoker<StateManager> {
+/** Code generated for {@link SequenceIdGenerator.StateManager}.  Do not modify. */
+public class SequenceIdGeneratorStateManagerInvoker extends ScmInvoker<StateManager> {
   enum ReplicateMethod implements NameAndParameterTypes {
     allocateBatch(new Class<?>[][] {
         null,
@@ -47,8 +47,8 @@ public class SequenceIdStateManagerInvoker extends ScmInvoker<StateManager> {
     }
   }
 
-  public SequenceIdStateManagerInvoker(StateManager impl, SCMRatisServer ratis) {
-    super(impl, SequenceIdStateManagerInvoker::newProxy, ratis);
+  public SequenceIdGeneratorStateManagerInvoker(StateManager impl, SCMRatisServer ratis) {
+    super(impl, SequenceIdGeneratorStateManagerInvoker::newProxy, ratis);
   }
 
   @Override
@@ -62,7 +62,7 @@ public class SequenceIdStateManagerInvoker extends ScmInvoker<StateManager> {
       @Override
       public Boolean allocateBatch(String arg0, Long arg1, Long arg2) throws SCMException {
         final Object[] args = {arg0, arg1, arg2};
-        return (Boolean) invoker.invokeReplicateDirect(ReplicateMethod.allocateBatch, args);
+        return (Boolean)invoker.invokeReplicateDirect(ReplicateMethod.allocateBatch, args);
       }
 
       @Override
@@ -71,7 +71,7 @@ public class SequenceIdStateManagerInvoker extends ScmInvoker<StateManager> {
       }
 
       @Override
-      public void reinitialize(Table<String, Long> arg0) throws IOException {
+      public void reinitialize(Table arg0) throws IOException {
         invoker.getImpl().reinitialize(arg0);
       }
     };
@@ -98,12 +98,13 @@ public class SequenceIdStateManagerInvoker extends ScmInvoker<StateManager> {
       break;
 
     case "reinitialize":
-      final Table<String, Long> arg4 = p.length > 0 ? (Table<String, Long>) p[0] : null;
+      final Table arg4 = p.length > 0 ? (Table) p[0] : null;
       getImpl().reinitialize(arg4);
       return Message.EMPTY;
 
     default:
-      throw new IllegalArgumentException("Method not found: " + methodName + " in StateManager");
+      throw new IllegalArgumentException("Method not found: " + methodName
+          + " in SequenceIdGenerator.StateManager");
     }
 
     return SCMRatisResponse.encode(returnValue, returnType);

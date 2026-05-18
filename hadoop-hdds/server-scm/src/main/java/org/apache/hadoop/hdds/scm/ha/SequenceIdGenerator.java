@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
-import org.apache.hadoop.hdds.scm.ha.invoker.SequenceIdStateManagerInvoker;
+import org.apache.hadoop.hdds.scm.ha.invoker.SequenceIdGeneratorStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -332,7 +332,7 @@ public class SequenceIdGenerator {
 
         final StateManager impl = new StateManagerImpl(table, buffer);
 
-        return ratisServer.getProxyHandler(new SequenceIdStateManagerInvoker(impl, ratisServer));
+        return ratisServer.getProxyHandler(new SequenceIdGeneratorStateManagerInvoker(impl, ratisServer));
       }
     }
   }

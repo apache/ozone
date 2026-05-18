@@ -74,7 +74,7 @@ public class StatefulServiceStateManagerInvoker extends ScmInvoker<StatefulServi
       }
 
       @Override
-      public void reinitialize(Table<String, ByteString> arg0) {
+      public void reinitialize(Table arg0) {
         invoker.getImpl().reinitialize(arg0);
       }
 
@@ -104,7 +104,7 @@ public class StatefulServiceStateManagerInvoker extends ScmInvoker<StatefulServi
       break;
 
     case "reinitialize":
-      final Table<String, ByteString> arg2 = p.length > 0 ? (Table<String, ByteString>) p[0] : null;
+      final Table arg2 = p.length > 0 ? (Table) p[0] : null;
       getImpl().reinitialize(arg2);
       return Message.EMPTY;
 
