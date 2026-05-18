@@ -158,6 +158,9 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   }
 
   private void validateInputs() {
+    RewriteTablePathOzoneUtils.checkNonNullNonEmpty(sourcePrefix, "Source prefix");
+    RewriteTablePathOzoneUtils.checkNonNullNonEmpty(targetPrefix, "Target prefix");
+
     if (sourcePrefix.equals(targetPrefix)) {
       throw new IllegalArgumentException(
           String.format(
@@ -289,7 +292,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     Set<Pair<String, String>> result = new HashSet<>();
     String stagingPath = RewriteTablePathUtil.stagingPath(versionFilePath, sourcePrefix, stagingDir);
     
-    System.out.println("Processing version file " + versionFilePath);
+    LOG.debug("Processing version file {}", versionFilePath);
     TableMetadata newTableMetadata = RewriteTablePathUtil.replacePaths(metadata, sourcePrefix, targetPrefix);
     TableMetadataParser.overwrite(newTableMetadata, table.io().newOutputFile(stagingPath));
     
