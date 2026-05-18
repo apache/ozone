@@ -109,9 +109,10 @@ public class OMUpgradeFinalizeService extends BackgroundService {
           String finalizationInProgress =
               ozoneManager.getMetadataManager().getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY);
           if (finalizationInProgress == null) {
-            LOG.debug("OMUpgradeFinalizeService: skipping check — finalization is not in progress.");
+            LOG.info("+++ OMUpgradeFinalizeService: skipping check — finalization is not in progress.");
             return BackgroundTaskResult.EmptyTaskResult.newResult();
           }
+          LOG.info("+++ OMUpgradeFinalizeService: finalization in progress and need finalization.");
 
           HddsProtos.UpgradeStatus upgradeStatus = scmClient.getContainerClient().queryUpgradeStatus();
           if (upgradeStatus.getShouldFinalize()) {
@@ -126,6 +127,8 @@ public class OMUpgradeFinalizeService extends BackgroundService {
             if (!response.getSuccess()) {
               LOG.error("Failed to send FinalizeUpgradeRequest to over Ratis. {}", response.getMessage());
             }
+          } else {
+            LOG.info("+++ SCM is not reporting as finalized");
           }
         } catch (Exception e) {
           LOG.error("An exception occurred while trying to check the SCM Upgrade status or finalize OM", e);
