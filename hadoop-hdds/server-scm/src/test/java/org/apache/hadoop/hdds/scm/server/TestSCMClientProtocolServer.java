@@ -33,6 +33,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -168,10 +169,8 @@ public class TestSCMClientProtocolServer {
     infos.add(newContainerWithLastUsedTime(5, base.plusMillis(1)));
     infos.add(newContainerWithLastUsedTime(10, base.plusMillis(2)));
 
-    SCMClientProtocolServer scmServer =
-        new SCMClientProtocolServer(new OzoneConfiguration(),
-            mockStorageContainerManager(infos),
-            mock(ReconfigurationHandler.class));
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(new OzoneConfiguration(),
+        mockStorageContainerManager(infos), mock(ReconfigurationHandler.class));
     try {
       List<Long> ids = new ArrayList<>();
       long start = 0;
@@ -187,7 +186,9 @@ public class TestSCMClientProtocolServer {
         }
         start = page.get(page.size() - 1).getContainerID() + 1;
       }
+      List<Long> expectedIds = Arrays.asList(5L, 10L, 100L);
       assertEquals(ids.size(), new HashSet<>(ids).size());
+      assertEquals(expectedIds, ids);
     } finally {
       scmServer.stop();
     }
@@ -221,9 +222,7 @@ public class TestSCMClientProtocolServer {
         .setContainerID(containerId)
         .setClock(Clock.fixed(fixedLastUsedInstant, ZoneOffset.UTC))
         .setPipelineID(PipelineID.randomId())
-        .setReplicationConfig(
-            RatisReplicationConfig
-                .getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
         .build();
   }
 
