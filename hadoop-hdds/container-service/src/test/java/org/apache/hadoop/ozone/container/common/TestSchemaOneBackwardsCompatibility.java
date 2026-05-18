@@ -70,7 +70,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * Tests processing of containers written with DB schema version 1,
