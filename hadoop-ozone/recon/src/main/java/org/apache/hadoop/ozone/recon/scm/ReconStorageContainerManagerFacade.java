@@ -388,8 +388,7 @@ public class ReconStorageContainerManagerFacade
     containerSyncHelper = new ReconStorageContainerSyncHelper(
         scmServiceProvider,
         ozoneConfiguration,
-        containerManager,
-        containerSyncMetrics
+        containerManager
     );
   }
 
@@ -439,27 +438,9 @@ public class ReconStorageContainerManagerFacade
     }
     // -----------------------------------------------------------------------
     // Scheduler (incremental/targeted sync): runs on the configured interval.
-    //
-    // Each cycle calls decideSyncAction() — two lightweight count RPCs to SCM
-    // — and then:
-    //
-    //   non-OPEN drift > threshold (default 1,000,000)
-    //       → targeted sync, with the large-drift event exposed via metrics
-    //
-   //   OPEN drift > 0
-    //       → targeted sync: add newly observed OPEN containers
-    //
-    //   QUASI_CLOSED or CLOSED drift >= threshold (default 1)
-    //       → targeted sync: corrects containers stuck in a stale lifecycle state
-    //
-    //   only non-repairable drift detected (for example, extra DELETED in Recon)
-    //       → no action this cycle
-    //
-    //   no drift detected
-    //       → no action this cycle
-    //
-    // Running this periodically detects and corrects container state
-    // discrepancies without an unconditional periodic full snapshot.
+    // Each cycle directly runs targeted reconciliation. The sync itself already
+    // fetches the SCM state counts needed for pagination, so a separate drift
+    // preflight would duplicate SCM calls before doing the same work.
     // -----------------------------------------------------------------------
     long syncInterval = ozoneConfiguration.getTimeDuration(
         OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY,
@@ -476,23 +457,10 @@ public class ReconStorageContainerManagerFacade
         return;
       }
       try {
-        ReconStorageContainerSyncHelper.SyncAction action =
-            containerSyncHelper.decideSyncAction();
-        switch (action) {
-        case TARGETED_SYNC:
-          LOG.info("Tiered sync decision: TARGETED_SYNC. Running incremental sync.");
-          boolean success = runTargetedSyncWithMetrics();
-          if (!success) {
-            LOG.warn("Targeted sync completed with one or more pass failures. "
-                + "Check logs above for details.");
-          }
-          break;
-        case NO_ACTION:
-          LOG.debug("Tiered sync decision: NO_ACTION. No drift detected this cycle.");
-          break;
-        default:
-          LOG.warn("Unknown SyncAction {}; skipping sync.", action);
-          break;
+        boolean success = runTargetedSyncWithMetrics();
+        if (!success) {
+          LOG.warn("Targeted sync completed with one or more phase failures. "
+              + "Check logs above for details.");
         }
       } catch (Throwable t) {
         LOG.error("Unexpected exception during periodic SCM container sync.", t);
@@ -619,12 +587,8 @@ public class ReconStorageContainerManagerFacade
    * CLOSED, and DELETED). This method is the direct
    * entry point for the REST trigger endpoint
    * {@code POST /api/v1/triggerdbsync/scm} and for any caller that explicitly
-   * wants an incremental sync rather than a drift-evaluated decision.
-   *
-   * <p>For the periodic scheduler the tiered
-   * {@link ReconStorageContainerSyncHelper#decideSyncAction()} path is used
-   * instead, which may run targeted sync or skip work depending on observed
-   * drift.
+   * wants an incremental sync immediately rather than waiting for the next
+   * scheduled run.
    */
   public boolean triggerTargetedSCMContainerSync() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {

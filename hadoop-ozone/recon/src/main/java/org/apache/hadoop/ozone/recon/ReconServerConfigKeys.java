@@ -133,20 +133,8 @@ public final class  ReconServerConfigKeys {
       OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "60s";
 
   /**
-   * Non-OPEN container count drift threshold above which the periodic
-   * incremental sync records a large-drift event.
-   *
-   * <p>When {@code |(SCM_total_containers - SCM_open_containers) -
-   * (Recon_total_containers - Recon_open_containers)|} exceeds this value the
-   * targeted sync becomes expensive (many batched RPC rounds). The periodic
-   * scheduler records the condition through logs and metrics and still runs the
-   * targeted sync, rather than automatically replacing the SCM DB snapshot. The
-   * comparison intentionally excludes OPEN containers because missing OPEN
-   * containers are short-lived and can be repaired incrementally.
-   *
-   * <p>Default: 1,000,000. In large clusters (millions of containers) operators
-   * may raise this further since the targeted sync handles per-state
-   * corrections efficiently even at higher drift levels.
+   * Container-count drift threshold used during initial SCM DB setup to decide
+   * whether Recon should refresh from an SCM snapshot before serving requests.
    */
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
@@ -194,10 +182,8 @@ public final class  ReconServerConfigKeys {
   /**
    * How often the incremental (targeted) SCM container sync runs.
    *
-   * <p>Each cycle calls {@code decideSyncAction()} — two lightweight count
-   * RPCs to SCM — and then either runs targeted container sync or takes
-   * no action. This periodic task does not download a full SCM DB snapshot
-   * automatically.
+   * <p>Each cycle runs targeted container sync directly. This periodic task
+   * does not download a full SCM DB snapshot automatically.
    *
    * <p>Default:
    * {@link #OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DEFAULT}. Set to a
@@ -305,50 +291,6 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE =
       "ozone.recon.scm.deleted.container.check.batch.size";
   public static final int OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT = 1_000_000;
-
-  /**
-   * Per-state drift threshold used by the tiered sync decision for stable
-   * lifecycle states.
-   *
-   * <p>Equal totals can still hide lifecycle state drift: a container that
-   * advanced from OPEN → QUASI_CLOSED → CLOSED in SCM is counted in both SCM
-   * and Recon's total, but Recon may still record it in the old state. OPEN
-   * drift always triggers targeted sync when it is non-zero; this threshold is
-   * applied to the following stable-state comparisons:
-   *
-   * <ul>
-   *   <li><b>QUASI_CLOSED</b>: catches containers stuck QUASI_CLOSED in Recon
-   *       after SCM has already moved them to CLOSED or beyond.  This case is
-   *       invisible to the OPEN check alone.</li>
-   *   <li><b>CLOSED</b>: catches repairable CLOSED count mismatch without using
-   *       all-state total drift, which may include non-repairable DELETED-only
-   *       differences.</li>
-   * </ul>
-   *
-   * <p>If the drift in <em>any</em> of the checked states reaches this
-   * threshold, a targeted sync is triggered. A full snapshot is deliberately
-   * NOT triggered because the targeted sync's per-state passes correct these
-   * conditions efficiently without replacing the entire database.
-   *
-   * <p>The check uses an inclusive {@code >=} comparison. A value of 1 means
-   * any single wrong-state container triggers TARGETED_SYNC at the next
-   * scheduled check.
-   * This is the recommended default because:
-   * <ul>
-   *   <li>TARGETED_SYNC runs at most once per scheduled interval (default 6h)
-   *       regardless of how many times drift is detected.</li>
-   *   <li>All four sync passes are idempotent — running unnecessarily has no
-   *       side effects and completes quickly in steady state.</li>
-   *   <li>A per-state threshold of 5 tolerates up to 4 wrong-state containers
-   *       permanently if total counts happen to match by coincidence, which
-   *       compromises Recon's monitoring accuracy.</li>
-   * </ul>
-   *
-   * <p>Default: 1.
-   */
-  public static final String OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD =
-      "ozone.recon.scm.per.state.drift.threshold";
-  public static final int OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT = 1;
 
   /**
    * JDBC fetch size for CSV exports.

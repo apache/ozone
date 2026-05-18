@@ -22,14 +22,12 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.util.Time;
 
 /**
- * Metrics for Recon SCM container sync decisions and targeted sync execution.
+ * Metrics for Recon SCM targeted sync execution.
  */
 @InterfaceAudience.Private
 @Metrics(about = "Recon SCM Container Sync Metrics", context = OzoneConsts.OZONE)
@@ -55,35 +53,12 @@ public final class ReconScmContainerSyncMetrics {
    */
   public static final int TARGETED_SYNC_STATUS_FAILURE = 3;
 
-  @Metric(about = "Count of events where non-OPEN container drift exceeded "
-      + "the full SCM DB snapshot threshold")
-  private MutableCounterLong fullScmDbSnapshotThresholdExceededCount;
-
-  @Metric(about = "Last non-OPEN container drift observed when the full SCM "
-      + "DB snapshot threshold was exceeded")
-  private MutableGaugeLong lastFullScmDbSnapshotThresholdExceededNonOpenDrift;
-
-  @Metric(about = "Time between the last two full SCM DB snapshot threshold "
-      + "exceeded events in milliseconds")
-  private MutableGaugeLong intervalSinceLastFullScmDbSnapshotThresholdExceededMs;
-
-  @Metric(about = "Last OPEN container drift that triggered targeted sync")
-  private MutableGaugeLong lastOpenContainerDrift;
-
-  @Metric(about = "Last QUASI_CLOSED container drift that triggered targeted sync")
-  private MutableGaugeLong lastQuasiClosedContainerDrift;
-
-  @Metric(about = "Last CLOSED container drift that triggered targeted sync")
-  private MutableGaugeLong lastClosedContainerDrift;
-
   @Metric(about = "Targeted sync status: 0=idle, 1=in progress, "
       + "2=success, 3=failure")
   private MutableGaugeInt targetedSyncStatus;
 
   @Metric(about = "Time taken by the last targeted sync in milliseconds")
   private MutableGaugeLong lastTargetedSyncDurationMs;
-
-  private long lastFullSnapshotThresholdExceededTimestampMs;
 
   private ReconScmContainerSyncMetrics() {
   }
@@ -100,60 +75,12 @@ public final class ReconScmContainerSyncMetrics {
     ms.unregisterSource(SOURCE_NAME);
   }
 
-  public synchronized void recordFullSnapshotThresholdExceededEvent(
-      long nonOpenDrift) {
-    fullScmDbSnapshotThresholdExceededCount.incr();
-    lastFullScmDbSnapshotThresholdExceededNonOpenDrift.set(nonOpenDrift);
-    long now = Time.monotonicNow();
-    if (lastFullSnapshotThresholdExceededTimestampMs > 0) {
-      intervalSinceLastFullScmDbSnapshotThresholdExceededMs.set(
-          now - lastFullSnapshotThresholdExceededTimestampMs);
-    }
-    lastFullSnapshotThresholdExceededTimestampMs = now;
-  }
-
-  public void recordOpenContainerDrift(long drift) {
-    lastOpenContainerDrift.set(drift);
-  }
-
-  public void recordQuasiClosedContainerDrift(long drift) {
-    lastQuasiClosedContainerDrift.set(drift);
-  }
-
-  public void recordClosedContainerDrift(long drift) {
-    lastClosedContainerDrift.set(drift);
-  }
-
   public void setTargetedSyncStatus(int status) {
     targetedSyncStatus.set(status);
   }
 
   public void setLastTargetedSyncDurationMs(long durationMs) {
     lastTargetedSyncDurationMs.set(durationMs);
-  }
-
-  public long getFullScmDbSnapshotThresholdExceededCount() {
-    return fullScmDbSnapshotThresholdExceededCount.value();
-  }
-
-  public long getLastFullScmDbSnapshotThresholdExceededNonOpenDrift() {
-    return lastFullScmDbSnapshotThresholdExceededNonOpenDrift.value();
-  }
-
-  public long getIntervalSinceLastFullScmDbSnapshotThresholdExceededMs() {
-    return intervalSinceLastFullScmDbSnapshotThresholdExceededMs.value();
-  }
-
-  public long getLastOpenContainerDrift() {
-    return lastOpenContainerDrift.value();
-  }
-
-  public long getLastQuasiClosedContainerDrift() {
-    return lastQuasiClosedContainerDrift.value();
-  }
-
-  public long getLastClosedContainerDrift() {
-    return lastClosedContainerDrift.value();
   }
 
   public int getTargetedSyncStatus() {

@@ -26,12 +26,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FO
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,7 +42,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,10 +70,6 @@ import org.slf4j.LoggerFactory;
  *
  * <h3>Scalability at 100M containers</h3>
  * <ul>
-   *   <li>{@link #decideSyncAction()} sums per-state counts (O(number of
-   *       states), all O(1) lookups) — never calls {@code getContainers()}
-   *       which would allocate a large
- *       {@code List<ContainerInfo>} on every decision tick.</li>
  *   <li>Live-state sync issues <b>one</b>
  *       {@code getExistContainerWithPipelinesInBatch} RPC per sub-batch of
  *       absent containers — not one per absent container.
@@ -173,186 +164,13 @@ class ReconStorageContainerSyncHelper {
   private final StorageContainerServiceProvider scmServiceProvider;
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconContainerManager containerManager;
-  private final ReconScmContainerSyncMetrics metrics;
-
-  /**
-   * Describes the action that the periodic scheduler should take based on the
-   * observed drift between SCM and Recon container metadata.
-   */
-  public enum SyncAction {
-    /**
-     * No drift detected — no sync work needed this cycle.
-     */
-    NO_ACTION,
-
-    /**
-     * Drift detected — run the targeted sync.
-     * This is the normal steady-state response: cheaper than a full snapshot
-     * and sufficient for the vast majority of drift scenarios.
-     */
-    TARGETED_SYNC
-  }
 
   ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
                                   OzoneConfiguration ozoneConfiguration,
                                   ReconContainerManager containerManager) {
-    this(scmServiceProvider, ozoneConfiguration, containerManager, null);
-  }
-
-  ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
-                                  OzoneConfiguration ozoneConfiguration,
-                                  ReconContainerManager containerManager,
-                                  ReconScmContainerSyncMetrics metrics) {
     this.scmServiceProvider = scmServiceProvider;
     this.ozoneConfiguration = ozoneConfiguration;
     this.containerManager = containerManager;
-    this.metrics = metrics;
-  }
-
-  /**
-   * Decides what sync action the periodic scheduler should take based on the
-   * observed drift between SCM and Recon.
-   *
-   * <p>Decision logic:
-   * <ol>
-   *   <li>If {@code |(SCM_total - SCM_open) - (Recon_total - Recon_open)| >
-   *       ozone.recon.scm.container.threshold} (default 1,000,000): record the
-   *       large-drift event through logs and metrics, then return
-   *       {@link SyncAction#TARGETED_SYNC}.</li>
-   *   <li>If OPEN drift is positive: return
-   *       {@link SyncAction#TARGETED_SYNC}. This keeps OPEN-only gaps on the
-   *       incremental path because missing OPEN containers can be repaired
-   *       cheaply without replacing the full SCM DB.</li>
-   *   <li>Check per-state drift for QUASI_CLOSED and CLOSED against
-   *       {@code ozone.recon.scm.per.state.drift.threshold} (default 1):
-   *       <ul>
-   *         <li><b>QUASI_CLOSED</b>: detects containers stuck QUASI_CLOSED in
-   *             Recon after SCM has advanced them to CLOSED.</li>
-   *         <li><b>CLOSED</b>: detects CLOSED count mismatch when total counts
-   *             are equal (e.g., OPEN and QUASI_CLOSED counts are also equal but
-   *             some containers are in the wrong bucket).</li>
-   *       </ul>
-   *       If drift in either stable state reaches the threshold:
-   *       return {@link SyncAction#TARGETED_SYNC}.</li>
-   *   <li>DELETED-only total-count drift does not trigger targeted sync.
-   *       DELETED sync can converge SCM-reported DELETED containers into Recon,
-   *       but it cannot remove extra DELETED containers that SCM no longer
-   *       lists.</li>
-   *   <li>Otherwise: return {@link SyncAction#NO_ACTION}.</li>
-   * </ol>
-   *
-   * <p>Repairable per-state drift deliberately routes to targeted sync, not a
-   * full snapshot — targeted sync corrects these conditions efficiently without
-   * replacing the entire database.
-   *
-   * @return the recommended {@link SyncAction}
-   * @throws IOException if SCM RPC calls to retrieve counts fail
-   */
-  public SyncAction decideSyncAction() throws IOException {
-    int largeThreshold = ozoneConfiguration.getInt(
-        OZONE_RECON_SCM_CONTAINER_THRESHOLD,
-        OZONE_RECON_SCM_CONTAINER_THRESHOLD_DEFAULT);
-    int perStateDriftThreshold = Math.max(1, ozoneConfiguration.getInt(
-        OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD,
-        OZONE_RECON_SCM_PER_STATE_DRIFT_THRESHOLD_DEFAULT));
-
-    // All per-state counts use O(1) getContainerStateCount() — no heap allocation,
-    // no container list loading. OPEN is read here because it is needed for both
-    // the Check 1 non-OPEN drift and Check 2 repairable per-state drift checks.
-    // QUASI_CLOSED and CLOSED are read later in Check 3 where they are first
-    // needed.
-    long reconOpen =
-        containerManager.getContainerStateCount(HddsProtos.LifeCycleState.OPEN);
-    long reconTotal = containerManager.getTotalContainerCount();
-
-    // --- Check 1: large non-OPEN drift exceeds threshold ---
-    long scmTotal = scmServiceProvider.getContainerCount();
-    long scmOpen = scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.OPEN);
-    long totalDrift = Math.abs(scmTotal - reconTotal);
-    long scmNonOpen = Math.max(0, scmTotal - scmOpen);
-    long reconNonOpen = Math.max(0, reconTotal - reconOpen);
-    long nonOpenDrift = Math.abs(scmNonOpen - reconNonOpen);
-
-    if (nonOpenDrift > largeThreshold) {
-      LOG.warn("Tiered sync decision: TARGETED_SYNC. "
-              + "Non-OPEN container drift {} exceeds threshold {} "
-              + "(SCM_non_OPEN={}, Recon_non_OPEN={}, SCM_total={}, Recon_total={}). "
-              + "Recording large-drift threshold-exceeded event and running "
-              + "targeted sync. Check Recon metrics "
-              + "fullScmDbSnapshotThresholdExceededCount, "
-              + "lastFullScmDbSnapshotThresholdExceededNonOpenDrift, and "
-              + "intervalSinceLastFullScmDbSnapshotThresholdExceededMs.",
-          nonOpenDrift, largeThreshold, scmNonOpen, reconNonOpen, scmTotal, reconTotal);
-      if (metrics != null) {
-        metrics.recordFullSnapshotThresholdExceededEvent(nonOpenDrift);
-      }
-      return SyncAction.TARGETED_SYNC;
-    }
-    // --- Check 2: OPEN drift is always repairable through targeted sync. ---
-    long openDrift = Math.abs(scmOpen - reconOpen);
-    if (openDrift > 0) {
-      LOG.info("OPEN container drift {} detected (SCM_OPEN={}, Recon_OPEN={}). "
-              + "Using targeted sync.",
-          openDrift, scmOpen, reconOpen);
-      if (metrics != null) {
-        recordPerStateDriftMetric(HddsProtos.LifeCycleState.OPEN, openDrift);
-      }
-      return SyncAction.TARGETED_SYNC;
-    }
-
-    // --- Check 3: stable-state drift that targeted sync can repair. ---
-    //
-    // Counts are read directly via O(1) per-state lookups — no
-    // derivation or subtraction. Each is an exact count from the per-state
-    // NavigableMap on Recon and from SCM's getContainerStateCount on SCM.
-    long scmQuasiClosed =
-        scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
-    long scmClosed =
-        scmServiceProvider.getContainerCount(HddsProtos.LifeCycleState.CLOSED);
-    long reconQuasiClosed =
-        containerManager.getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED);
-    long reconClosed =
-        containerManager.getContainerStateCount(HddsProtos.LifeCycleState.CLOSED);
-
-    for (Object[] entry : new Object[][]{
-        {HddsProtos.LifeCycleState.QUASI_CLOSED, scmQuasiClosed, reconQuasiClosed},
-        {HddsProtos.LifeCycleState.CLOSED, scmClosed, reconClosed}}) {
-      HddsProtos.LifeCycleState state = (HddsProtos.LifeCycleState) entry[0];
-      long scmCount = (long) entry[1];
-      long reconCount = (long) entry[2];
-      long drift = Math.abs(scmCount - reconCount);
-      if (drift >= perStateDriftThreshold) {
-        LOG.info("Per-state {} drift {} detected (SCM_{}={}, Recon_{}={}, threshold={}). "
-                + "Targeted sync will correct repairable state drift.",
-            state, drift, state, scmCount, state, reconCount, perStateDriftThreshold);
-        if (metrics != null) {
-          recordPerStateDriftMetric(state, drift);
-        }
-        return SyncAction.TARGETED_SYNC;
-      }
-    }
-
-    LOG.info("No repairable drift detected (total drift={}, non-OPEN drift={}). "
-            + "No sync needed.",
-        totalDrift, nonOpenDrift);
-    return SyncAction.NO_ACTION;
-  }
-
-  private void recordPerStateDriftMetric(HddsProtos.LifeCycleState state,
-                                         long drift) {
-    switch (state) {
-    case OPEN:
-      metrics.recordOpenContainerDrift(drift);
-      break;
-    case QUASI_CLOSED:
-      metrics.recordQuasiClosedContainerDrift(drift);
-      break;
-    case CLOSED:
-      metrics.recordClosedContainerDrift(drift);
-      break;
-    default:
-      break;
-    }
   }
 
   /**

@@ -3610,22 +3610,8 @@
     <value>1000000</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
-      Non-OPEN container count drift threshold above which Recon records a
-      large-drift event through logs and metrics and runs targeted sync instead
-      of automatically replacing the SCM DB snapshot. Missing OPEN containers
-      stay on the incremental path because they are short-lived and can be
-      repaired cheaply.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.scm.per.state.drift.threshold</name>
-    <value>1</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Per-state lifecycle drift threshold used by the targeted SCM container
-      sync decision for stable states. OPEN drift always triggers targeted sync
-      when non-zero; QUASI_CLOSED or CLOSED drift triggers targeted sync when it
-      reaches this value.
+      Container-count drift threshold used during initial SCM DB setup to decide
+      whether Recon should refresh from an SCM snapshot before serving requests.
     </description>
   </property>
   <property>
@@ -4625,11 +4611,13 @@
   </property>
   <property>
     <name>ozone.recon.scm.deleted.container.check.batch.size</name>
-    <value>500</value>
+    <value>1000000</value>
     <tag>OZONE, RECON, SCM, PERFORMANCE</tag>
     <description>
-      Maximum number of CLOSED or QUASI_CLOSED Recon containers checked against
-      SCM per incremental sync cycle for DELETING or DELETED retirement.
+      Maximum number of SCM DELETED containers fetched per page during targeted
+      Recon container sync. DELETED sync reads SCM's DELETED list and reconciles
+      Recon forward to DELETED; the configured value is capped by the Hadoop IPC
+      message-size limit.
     </description>
   </property>
   <property>
