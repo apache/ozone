@@ -696,7 +696,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     }
   }
 
-  private static class OzonePositionDeleteReaderWriter implements RewriteTablePathUtil.PositionDeleteReaderWriter {
+  static class OzonePositionDeleteReaderWriter implements RewriteTablePathUtil.PositionDeleteReaderWriter {
     @Override
     public CloseableIterable<Record> reader(
         InputFile inputFile, FileFormat format, PartitionSpec spec) {

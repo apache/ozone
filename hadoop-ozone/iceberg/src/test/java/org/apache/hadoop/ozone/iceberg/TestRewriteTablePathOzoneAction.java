@@ -53,6 +53,7 @@ import org.apache.iceberg.MetadataColumns;
 import org.apache.iceberg.MetricsConfig;
 import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionStatisticsFile;
 import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -61,6 +62,7 @@ import org.apache.iceberg.StatisticsFile;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadata.MetadataLogEntry;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.actions.RewriteTablePath;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
@@ -70,12 +72,16 @@ import org.apache.iceberg.deletes.PositionDeleteWriter;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.DeleteSchemaUtil;
+import org.apache.iceberg.io.InputFile;
+import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
 /**
@@ -112,7 +118,7 @@ class TestRewriteTablePathOzoneAction {
 
   @Test
   void fullTablePathRewrite() throws Exception {
-    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table)
+    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table, 2)
         .rewriteLocationPrefix(sourcePrefix, targetPrefix)
         .stagingLocation(stagingDir.toString() + "/")
         .execute();
@@ -317,6 +323,17 @@ class TestRewriteTablePathOzoneAction {
   }
 
   @Test
+  void usesCurrentMetadataIfEndVersionNotProvided() {
+    String currentMetadata = ((HasTableOperations) table).operations().current().metadataFileLocation();
+    RewriteTablePathOzoneAction action = new RewriteTablePathOzoneAction(table);
+    action.rewriteLocationPrefix(sourcePrefix, targetPrefix)
+        .stagingLocation(stagingDir + "/");
+
+    RewriteTablePath.Result result = action.execute();
+    assertThat(result.latestVersion()).isEqualTo(RewriteTablePathUtil.fileName(currentMetadata));
+  }
+
+  @Test
   void defaultStagingDirIsUnderTableMetadataLocation() {
     String metadataLocation = RewriteTablePathOzoneUtils.getMetadataLocation(table);
 
@@ -378,6 +395,110 @@ class TestRewriteTablePathOzoneAction {
         Pair.of("before-1.stats", "after-1.stats"),
         Pair.of("before-2.stats", "after-2.stats")), copyPlan);
   }
+
+  @Test
+  void rejectsTablesWithPartitionStatistics() {
+    TableMetadata baseMetadata = ((HasTableOperations) table).operations().current();
+    long snapshotId = baseMetadata.currentSnapshot().snapshotId();
+    PartitionStatisticsFile statsFile = Mockito.mock(PartitionStatisticsFile.class);
+    Mockito.when(statsFile.snapshotId()).thenReturn(snapshotId);
+    Mockito.when(statsFile.path()).thenReturn(sourcePrefix + "/metadata/dummy.stats");
+    Mockito.when(statsFile.fileSizeInBytes()).thenReturn(100L);
+    TableMetadata metadataWithStats = TableMetadata.buildFrom(baseMetadata)
+        .setPartitionStatistics(statsFile)
+        .build();
+
+    TableOperations ops = ((HasTableOperations) table).operations();
+    ops.commit(baseMetadata, metadataWithStats);
+
+    RewriteTablePath action = new RewriteTablePathOzoneAction(table)
+        .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+        .stagingLocation(stagingDir + "/");
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, action::execute);
+    assertThat(exception).hasMessageContaining("Partition statistics files are not supported yet.");
+  }
+
+  @Test
+  public void positionDeletesReaderUnsupportedFormat() {
+    InputFile mockInput = Mockito.mock(InputFile.class);
+    Mockito.when(mockInput.location()).thenReturn("s3://bucket/test.txt");
+    PartitionSpec spec = PartitionSpec.unpartitioned();
+    FileFormat mockUnsupportedFormat = Mockito.mock(FileFormat.class);
+    Mockito.when(mockUnsupportedFormat.toString()).thenReturn("txt");
+
+    UnsupportedOperationException exception = assertThrows(UnsupportedOperationException.class,
+        () -> RewriteTablePathOzoneAction.positionDeletesReader(mockInput, mockUnsupportedFormat, spec));
+
+    assertThat(exception).hasMessageContaining("Unsupported file format: txt");
+  }
+
+  @Test
+  public void positionDeletesWriterUnsupportedFormat() {
+    OutputFile mockOutput = Mockito.mock(OutputFile.class);
+    Mockito.when(mockOutput.location()).thenReturn("s3://bucket/test.txt");
+    PartitionSpec spec = PartitionSpec.unpartitioned();
+    FileFormat mockUnsupportedFormat = Mockito.mock(FileFormat.class);
+    Mockito.when(mockUnsupportedFormat.toString()).thenReturn("txt");
+
+    UnsupportedOperationException exception = assertThrows(UnsupportedOperationException.class,
+        () -> RewriteTablePathOzoneAction.positionDeletesWriter(
+            mockOutput, mockUnsupportedFormat, spec, null, null));
+
+    assertThat(exception).hasMessageContaining("Unsupported file format: txt");
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = FileFormat.class, names = {"AVRO", "ORC"})
+  void positionDeletesAvroAndOrcRoundTrip(FileFormat format, @TempDir Path temp) throws IOException {
+    String extension = format.name().toLowerCase();
+    String path = temp.resolve("test." + extension).toUri().toString();
+    OutputFile outputFile = table.io().newOutputFile(path);
+    PartitionSpec spec = table.spec();
+    
+    try (PositionDeleteWriter<Record> writer = RewriteTablePathOzoneAction.positionDeletesWriter(
+        outputFile, format, spec, new PartitionData(spec.partitionType()), SCHEMA)) {
+
+      org.apache.iceberg.data.GenericRecord row = org.apache.iceberg.data.GenericRecord.create(SCHEMA);
+      row.setField("c1", 42);
+      row.setField("c2", format.name() + "-test");
+
+      writer.write(PositionDelete.<Record>create().set("data.parquet", 100L, row));
+    }
+    
+    try (CloseableIterable<Record> reader = RewriteTablePathOzoneAction.positionDeletesReader(
+        table.io().newInputFile(path), format, spec)) {
+
+      List<Record> results = new ArrayList<>();
+      reader.forEach(results::add);
+
+      assertThat(results).hasSize(1);
+      Record record = results.get(0);
+      
+      assertThat(record.getField("file_path").toString()).isEqualTo("data.parquet");
+      assertThat(record.getField("pos")).isEqualTo(100L);
+      
+      Record rowResult = (Record) record.getField("row");
+      assertThat(rowResult.getField("c1")).isEqualTo(42);
+      assertThat(rowResult.getField("c2")).isEqualTo(format.name() + "-test");
+    }
+  }
+
+  @Test
+  void manifestsToRewriteRejectsMissingManifestList() {
+    Snapshot snapshot = table.currentSnapshot();
+    String manifestListLocation = snapshot.manifestListLocation();
+    table.io().deleteFile(manifestListLocation);
+
+    RewriteTablePath action = new RewriteTablePathOzoneAction(table)
+        .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+        .stagingLocation(stagingDir + "/");
+    
+    RuntimeException exception = assertThrows(RuntimeException.class, action::execute);
+    assertThat(exception).hasMessageContaining("Failed to collect manifests to rewrite");
+    assertThat(exception.getCause()).hasMessageContaining("Failed to read manifests for snapshot " +
+        snapshot.snapshotId());
+  }
   
   /**
    * For every staged file in the CSV copy plan, asserts that internal paths are rewritten
@@ -387,8 +508,8 @@ class TestRewriteTablePathOzoneAction {
    *       manifest-list references all start with target.</li>
    *   <li><b>snap-*.avro (manifest-list)</b>: target path starts with target, and every
    *       manifest entry path inside the staged file starts with target.</li>
-   *   <li><b>*.avro (manifest)</b>: target path starts with target (content rewrite
-   *       is not yet implemented).</li>
+   *   <li><b>*.avro (manifest)</b>: target path starts with target and the content inside it.</li>
+   *   <li><b>deletes.parquet(position delete file)</b>: target path starts with target and the content inside it.</li>
    * </ul>
    */
   private void assertAllInternalPathsRewritten(Set<Pair<String, String>> csvPairs, String target) throws Exception {
