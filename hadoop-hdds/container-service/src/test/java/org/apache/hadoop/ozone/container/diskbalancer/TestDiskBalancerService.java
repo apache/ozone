@@ -404,9 +404,10 @@ public class TestDiskBalancerService {
         100, 5000);
   }
 
-  @Test
-  public void testDiskBalancerInfoWriteCreatesParentDirectory()
-      throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteCreatesParentDirectory(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     File infoDir = tmpDir.resolve("nested").toFile();
     DiskBalancerServiceTestImpl svc =
         getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
@@ -421,9 +422,10 @@ public class TestDiskBalancerService {
     svc.shutdown();
   }
 
-  @Test
-  public void testDiskBalancerInfoWriteReportsDirectoryCreationFailure()
-      throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteReportsDirectoryCreationFailure(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     File infoDir = tmpDir.resolve("diskBalancer-parent").toFile();
     assertTrue(infoDir.createNewFile());
 
@@ -434,9 +436,10 @@ public class TestDiskBalancerService {
         .hasMessageStartingWith("Unable to create DiskBalancerInfo directories: ");
   }
 
-  @Test
-  public void testDiskBalancerInfoWriteReportsFileWriteFailure()
-      throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteReportsFileWriteFailure(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     File infoDir = tmpDir.resolve("diskBalancer-info-dir").toFile();
     DiskBalancerServiceTestImpl svc =
         getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
