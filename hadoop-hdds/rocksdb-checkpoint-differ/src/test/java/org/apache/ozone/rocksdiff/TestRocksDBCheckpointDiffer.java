@@ -115,7 +115,6 @@ import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DifferSnapshotVersion;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -968,11 +967,16 @@ public class TestRocksDBCheckpointDiffer {
    * Does actual DB write, flush, compaction.
    */
   @Test
-  @Flaky("HDDS-15209")
   void testDifferWithDB() throws Exception {
     writeKeysAndCheckpointing();
     readRocksDBInstance(ACTIVE_DB_DIR_NAME, activeRocksDB, null,
         rocksDBCheckpointDiffer);
+
+    // Wait until compaction listeners have finished updating the DAG; otherwise
+    // diffAllSnapshots can NPE when falling back to snapshot metadata for a file
+    // no longer present in the latest snapshot (HDDS-15209).
+    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000,
+        10000);
 
     if (LOG.isDebugEnabled()) {
       printAllSnapshots();
@@ -996,8 +1000,6 @@ public class TestRocksDBCheckpointDiffer {
       Assertions.assertNotNull(compactionNode.getStartKey());
       Assertions.assertNotNull(compactionNode.getEndKey());
     });
-    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000,
-        10000);
     if (LOG.isDebugEnabled()) {
       rocksDBCheckpointDiffer.dumpCompactionNodeTable();
     }
@@ -1007,6 +1009,33 @@ public class TestRocksDBCheckpointDiffer {
     return Stream.of("fileTable", "directoryTable", "keyTable", "default")
         .map(StringUtils::string2Bytes)
         .map(ColumnFamilyDescriptor::new).collect(Collectors.toList());
+  }
+
+  /**
+   * Resolve SST column family for diff expectations: prefer compaction DAG, then snapshot metadata.
+   * Files compacted away from the latest checkpoint may only appear in an older snapshot (HDDS-15209).
+   */
+  private String columnFamilyForDiffFile(RocksDBCheckpointDiffer differ, String diffFile,
+      DifferSnapshotInfo srcSnap, DifferSnapshotInfo destSnap) {
+    CompactionNode node = differ.getCompactionNodeMap().get(diffFile);
+    if (node != null) {
+      return node.getColumnFamily();
+    }
+    SstFileInfo meta = srcSnap.getSstFile(0, diffFile);
+    if (meta == null) {
+      meta = destSnap.getSstFile(0, diffFile);
+    }
+    if (meta == null) {
+      for (DifferSnapshotInfo s : snapshots) {
+        meta = s.getSstFile(0, diffFile);
+        if (meta != null) {
+          break;
+        }
+      }
+    }
+    Assertions.assertNotNull(meta,
+        "No column family for SST " + diffFile + " (not in compaction DAG or snapshot metadata)");
+    return meta.getColumnFamily();
   }
 
   /**
@@ -1047,12 +1076,7 @@ public class TestRocksDBCheckpointDiffer {
           mask &= mask - 1;
         }
         for (String diffFile : expectedDifferResult.get(index)) {
-          String columnFamily;
-          if (rocksDBCheckpointDiffer.getCompactionNodeMap().containsKey(diffFile)) {
-            columnFamily = rocksDBCheckpointDiffer.getCompactionNodeMap().get(diffFile).getColumnFamily();
-          } else {
-            columnFamily = src.getSstFile(0, diffFile).getColumnFamily();
-          }
+          String columnFamily = columnFamilyForDiffFile(differ, diffFile, src, snap);
           if (columnFamily == null || tableToLookUp.contains(columnFamily)) {
             expectedDiffFiles.add(diffFile);
           }
