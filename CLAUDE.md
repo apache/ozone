@@ -44,7 +44,7 @@ Direct Maven equivalents (for running a single test):
 # Single test class
 mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock
 # Single test method
-mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock#testSomething
+mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock#testLockingOrder
 # Integration tests live in their own modules and require -DskipShade etc.
 mvn -pl :ozone-integration-test test -Dtest=TestOmContainerLocationCache -DskipShade -DskipRecon
 ```
