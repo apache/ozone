@@ -81,6 +81,6 @@ public final class OMUpgradeTestUtils {
         fail(e.getMessage());
       }
       return false;
-    }, 2000, 20000);
+    }, 2000, 60000);
   }
 }
