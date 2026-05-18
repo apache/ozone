@@ -206,7 +206,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.container.sync.task.initial.delay";
 
   public static final String
-      OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT = "2m";
+      OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INITIAL_DELAY_DEFAULT = "1m";
 
   public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY =
       "ozone.recon.scmclient.rpc.timeout";

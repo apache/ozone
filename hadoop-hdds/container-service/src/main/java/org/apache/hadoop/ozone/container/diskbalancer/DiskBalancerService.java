@@ -243,18 +243,16 @@ public class DiskBalancerService extends BackgroundService {
 
   private void applyDiskBalancerInfo(DiskBalancerInfo diskBalancerInfo)
       throws IOException {
-    // verify ContainerStates first
-    DiskBalancerConfiguration validated = new DiskBalancerConfiguration();
-    validated.setContainerStates(diskBalancerInfo.getContainerStates());
+    DiskBalancerConfiguration validated = diskBalancerInfo.toConfiguration();
     // First store in local file, then update in memory variables
     writeDiskBalancerInfoTo(diskBalancerInfo, diskBalancerInfoFile);
 
     updateOperationalStateFromInfo(diskBalancerInfo);
 
-    setThreshold(diskBalancerInfo.getThreshold());
-    setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
-    setParallelThread(diskBalancerInfo.getParallelThread());
-    setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
+    setThreshold(validated.getThreshold());
+    setBandwidthInMB(validated.getDiskBandwidthInMB());
+    setParallelThread(validated.getParallelThread());
+    setStopAfterDiskEven(validated.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
     setContainerStates(validated.getMovableContainerStates());
 
@@ -512,19 +510,19 @@ public class DiskBalancerService extends BackgroundService {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
 
-      // Double check container state before acquiring lock to start move process.
-      // Container state may have changed after selection.
-      State containerState = container.getContainerData().getState();
-      if (!movableContainerStates.contains(containerState)) {
-        LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
-        postCall(false, startTime);
-        return BackgroundTaskResult.EmptyTaskResult.newResult();
-      }
-
       // hold read lock on the container first, to avoid other threads to update the container state,
       // such as block deletion.
       container.readLock();
       try {
+        // Double check container state after acquiring lock to start move process.
+        // Container state may have changed after selection.
+        State containerState = container.getContainerData().getState();
+        if (!movableContainerStates.contains(containerState)) {
+          LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
+          moveSucceeded = false;
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        }
+
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
             .resolve(String.valueOf(containerId));
@@ -580,6 +578,10 @@ public class DiskBalancerService extends BackgroundService {
         // old caller can still hold the old Container object.
         ozoneContainer.getContainerSet().updateContainer(newContainer);
         destVolume.incrementUsedSpace(containerSize);
+
+        // Test injector: ContainerSet now references newContainer while this thread still holds
+        // readLock on the old replica.
+        pauseInjector();
         // Mark old container as DELETED and persist state.
         // markContainerForDelete require writeLock, so release readLock first
         container.readUnlock();
@@ -597,13 +599,7 @@ public class DiskBalancerService extends BackgroundService {
         metrics.incrSuccessBytes(containerSize);
         totalBalancedBytes.addAndGet(containerSize);
       } catch (IOException e) {
-        if (injector != null) {
-          try {
-            injector.pause();
-          } catch (IOException ex) {
-            // do nothing
-          }
-        }
+        pauseInjector();
         moveSucceeded = false;
         LOG.warn("Failed to move container {}", containerId, e);
         if (diskBalancerTmpDir != null) {
@@ -859,6 +855,17 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
+  }
+
+  // call FaultInjector#pause when an injector is registered; ignore IOException.
+  private static void pauseInjector() {
+    if (injector != null) {
+      try {
+        injector.pause();
+      } catch (IOException ex) {
+        // do nothing
+      }
+    }
   }
 
   @VisibleForTesting

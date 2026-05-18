@@ -24,42 +24,29 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 
 /**
- * Admin-only endpoint to manually trigger DB sync operations between Recon
- * and its upstream sources (OM and SCM).
- *
- * <p>Available endpoints:
- * <ul>
- *   <li>{@code GET  /api/v1/triggerdbsync/om}  — triggers full OM DB sync</li>
-   *   <li>{@code POST /api/v1/triggerdbsync/scm} — triggers targeted SCM
-   *       container sync (add missing OPEN/QUASI_CLOSED/CLOSED containers,
-   *       reconcile existing states, retire DELETED containers)</li>
- * </ul>
+ * Endpoint to trigger the OM DB sync between Recon and OM.
  */
 @Path("/triggerdbsync")
 @Produces(MediaType.APPLICATION_JSON)
 @AdminOnly
 public class TriggerDBSyncEndpoint {
 
-  private final OzoneManagerServiceProvider ozoneManagerServiceProvider;
-  private final ReconStorageContainerManagerFacade reconScm;
+  private OzoneManagerServiceProvider ozoneManagerServiceProvider;
+  private ReconStorageContainerManagerFacade reconScm;
 
   @Inject
   public TriggerDBSyncEndpoint(
       OzoneManagerServiceProvider ozoneManagerServiceProvider,
-      ReconStorageContainerManagerFacade reconScm) {
+      OzoneStorageContainerManager reconScm) {
     this.ozoneManagerServiceProvider = ozoneManagerServiceProvider;
-    this.reconScm = reconScm;
+    this.reconScm = (ReconStorageContainerManagerFacade) reconScm;
   }
 
-  /**
-   * Triggers an immediate full OM DB sync between Recon and the Ozone Manager.
-   *
-   * @return {@code true} if the sync was initiated successfully.
-   */
   @GET
   @Path("om")
   public Response triggerOMDBSync() {
@@ -68,33 +55,29 @@ public class TriggerDBSyncEndpoint {
     return Response.ok(isSuccess).build();
   }
 
-  /**
-   * Triggers an immediate targeted SCM container sync.
-   *
-   * <p>Runs the incremental sync unconditionally (bypassing the
-   * periodic drift-based decision):
-   * <ol>
-   *   <li>OPEN: adds missing OPEN containers without moving existing Recon
-   *       containers backwards.</li>
-   *   <li>QUASI_CLOSED/CLOSED: adds missing containers and advances existing
-   *       Recon containers through valid lifecycle transitions.</li>
-   *   <li>DELETED: transitions containers that SCM has marked DELETED forward
-   *       to DELETED in Recon's metadata store.</li>
-   * </ol>
-   *
-   * <p>This endpoint is useful for immediately resolving known discrepancies
-   * without waiting for the next periodic sync cycle (default: every 6h).
-   * For large-scale drift (hundreds of containers), consider triggering a
-   * full SCM DB snapshot sync instead via the Recon admin REST API.
-   *
-   * @return {@code true} if sync completed without fatal errors,
-   *         {@code false} if one or more phases encountered errors (partial
-   *         sync may have occurred; check Recon logs for details).
-   */
   @POST
-  @Path("scm")
-  public Response triggerSCMContainerSync() {
-    boolean isSuccess = reconScm.triggerTargetedSCMContainerSync();
-    return Response.ok(isSuccess).build();
+  @Path("scm/snapshot")
+  public Response triggerSCMDBSnapshotSync() {
+    ReconStorageContainerManagerFacade.ScmDbSnapshotTriggerResponse response =
+        reconScm.triggerScmDbSnapshotSync();
+    return response.isAccepted()
+        ? Response.accepted(response).build()
+        : Response.status(Response.Status.CONFLICT).entity(response).build();
+  }
+
+  @GET
+  @Path("scm/snapshot/status")
+  public Response getSCMDBSnapshotSyncStatus() {
+    return Response.ok(reconScm.getScmDbSnapshotSyncStatus()).build();
+  }
+
+  @POST
+  @Path("scm/snapshot/cancel")
+  public Response cancelSCMDBSnapshotSync() {
+    ReconStorageContainerManagerFacade.ScmDbSnapshotCancelResponse response =
+        reconScm.cancelScmDbSnapshotSync();
+    return response.isCancelled()
+        ? Response.ok(response).build()
+        : Response.status(Response.Status.CONFLICT).entity(response).build();
   }
 }

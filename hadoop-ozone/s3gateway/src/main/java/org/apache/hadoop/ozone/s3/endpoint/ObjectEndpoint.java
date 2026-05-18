@@ -580,6 +580,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     addEntityTagHeader(response, key);
 
     addLastModifiedDate(response, key);
+    addTagCountIfAny(response, key);
     addCustomMetadataHeaders(response, key);
     getMetrics().updateHeadKeySuccessStats(startNanos);
     auditReadSuccess(s3GAction);
