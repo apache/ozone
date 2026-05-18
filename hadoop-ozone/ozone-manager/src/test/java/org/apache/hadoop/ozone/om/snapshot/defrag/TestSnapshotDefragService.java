@@ -551,6 +551,8 @@ public class TestSnapshotDefragService {
     createTableContents(checkpointPath, "_metrics_");
 
     assertNoRocksDBMetrics(checkpointPath);
+    // The generic checkpoint path should keep the existing behavior and
+    // register RocksDB metrics.
     try (OmMetadataManagerImpl defaultCheckpointMetadataManager =
              OmMetadataManagerImpl.createCheckpointMetadataManager(
                  configuration, new RocksDBCheckpoint(checkpointPath), false)) {
@@ -559,6 +561,8 @@ public class TestSnapshotDefragService {
     }
     assertNoRocksDBMetrics(checkpointPath);
 
+    // Defrag checkpoint DBs are transient and must not register generic
+    // RocksDB metrics.
     try (OmMetadataManagerImpl defragCheckpointMetadataManager =
              defragService.createDefragCheckpointMetadataManager(
                  new RocksDBCheckpoint(checkpointPath), false)) {
