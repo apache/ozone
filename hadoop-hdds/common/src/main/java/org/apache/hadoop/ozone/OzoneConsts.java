@@ -243,6 +243,7 @@ public final class OzoneConsts {
   public static final String ORIGIN_NODE_ID = "originNodeId";
   public static final String SCHEMA_VERSION = "schemaVersion";
   public static final String REPLICA_INDEX = "replicaIndex";
+  public static final String CONTAINER_STORAGE_TYPE = "storageType";
 
   // Supported .container datanode schema versions.
   // Since containers in older schema versions are currently not reformatted to

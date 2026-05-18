@@ -70,7 +70,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * Tests processing of containers written with DB schema version 1,
@@ -597,10 +596,10 @@ public class TestSchemaOneBackwardsCompatibility {
 
     // Changing the paths above affects the checksum, so it was also removed
     // from the container file and calculated at run time.
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+    ContainerDataYaml.getYamlForContainerType(
             kvData.getContainerType(),
-        kvData.getReplicaIndex() > 0);
-    kvData.computeAndSetContainerFileChecksum(yaml);
+        kvData.getReplicaIndex() > 0, kvData.getStorageType());
+    kvData.computeAndSetContainerFileChecksum();
 
     KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 

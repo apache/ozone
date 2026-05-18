@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 import java.io.IOException;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -114,12 +115,12 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return storageType;
   }
 
-  private StorageTypeProto getStorageTypeProto() throws IOException {
+  private StorageTypeProto getStorageTypeProto() throws IllegalArgumentException {
     return getStorageTypeProto(getStorageType());
   }
 
   public static StorageTypeProto getStorageTypeProto(StorageType type)
-      throws IOException {
+      throws IllegalArgumentException {
     StorageTypeProto storageTypeProto;
     switch (type) {
     case SSD:
@@ -138,12 +139,12 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
       storageTypeProto = StorageTypeProto.RAM_DISK;
       break;
     default:
-      throw new IOException("Illegal Storage Type specified");
+      throw new IllegalArgumentException("Illegal Storage Type specified");
     }
     return storageTypeProto;
   }
 
-  public long getReserved() { 
+  public long getReserved() {
     return reserved;
   }
 
@@ -155,8 +156,8 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return fsAvailable;
   }
 
-  private static StorageType getStorageType(StorageTypeProto proto) throws
-      IOException {
+  public static StorageType getStorageType(StorageTypeProto proto) throws
+      IllegalArgumentException {
     StorageType storageType;
     switch (proto) {
     case SSD:
@@ -175,7 +176,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
       storageType = StorageType.RAM_DISK;
       break;
     default:
-      throw new IOException("Illegal Storage Type specified");
+      throw new IllegalArgumentException("Illegal Storage Type specified");
     }
     return storageType;
   }
@@ -184,9 +185,14 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
    * Returns the StorageReportProto protoBuf message for the Storage Location
    * report.
    * @return StorageReportProto
-   * @throws IOException In case, the storage type specified is invalid.
+   * @throws IllegalArgumentException In case, the storage type specified is invalid.
    */
-  public StorageReportProto getProtoBufMessage() throws IOException {
+  public StorageReportProto getProtoBufMessage() throws IllegalArgumentException, IOException {
+    return getProtoBufMessage(null);
+  }
+
+  public StorageReportProto getProtoBufMessage(ConfigurationSource conf)
+      throws IOException {
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     return srb.setStorageUuid(getId())
         .setCapacity(getCapacity())
@@ -207,10 +213,10 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
    * Returns the MetadataStorageReportProto protoBuf message for the
    * Storage Location report.
    * @return MetadataStorageReportProto
-   * @throws IOException In case, the storage type specified is invalid.
+   * @throws IllegalArgumentException In case, the storage type specified is invalid.
    */
   public MetadataStorageReportProto getMetadataProtoBufMessage()
-      throws IOException {
+      throws IllegalArgumentException {
     MetadataStorageReportProto.Builder srb =
         MetadataStorageReportProto.newBuilder();
     return srb.setCapacity(getCapacity())
@@ -226,11 +232,11 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
    * Returns the StorageLocationReport from the protoBuf message.
    * @param report SCMStorageReport
    * @return StorageLocationReport
-   * @throws IOException in case of invalid storage type
+   * @throws IllegalArgumentException in case of invalid storage type
    */
 
   public static StorageLocationReport getFromProtobuf(StorageReportProto report)
-      throws IOException {
+      throws IllegalArgumentException {
     StorageLocationReport.Builder builder = StorageLocationReport.newBuilder();
     builder.setId(report.getStorageUuid())
         .setStorageLocation(report.getStorageLocation());
