@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
@@ -37,8 +36,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -71,34 +68,13 @@ public class TestContainerReportHandlingWithHA {
   private static final String BUCKET = "bucket1";
   private static final String KEY = "key1";
 
-  private enum ReplicationInput {
-    RATIS(3, RatisReplicationConfig.getInstance(THREE)),
-    EC(5, new ECReplicationConfig(3, 2));
-
-    private final int numDatanodes;
-    private final ReplicationConfig replicationConfig;
-
-    ReplicationInput(int numDatanodes, ReplicationConfig replicationConfig) {
-      this.numDatanodes = numDatanodes;
-      this.replicationConfig = replicationConfig;
-    }
-
-    int getNumDatanodes() {
-      return numDatanodes;
-    }
-
-    ReplicationConfig getReplicationConfig() {
-      return replicationConfig;
-    }
-  }
-
   private static Stream<Arguments> delStatesAndReplication() {
     return Stream.of(
             HddsProtos.LifeCycleState.DELETING,
             HddsProtos.LifeCycleState.DELETED)
         .flatMap(state -> Stream.of(
-            Arguments.of(state, ReplicationInput.RATIS),
-            Arguments.of(state, ReplicationInput.EC)));
+            Arguments.of(state, TestHelper.ReplicationInput.RATIS),
+            Arguments.of(state, TestHelper.ReplicationInput.EC)));
   }
 
   /**
@@ -113,7 +89,7 @@ public class TestContainerReportHandlingWithHA {
   @MethodSource("delStatesAndReplication")
   void testDeletingOrDeletedContainerWhenNonEmptyReplicaIsReportedWithScmHA(
       HddsProtos.LifeCycleState desiredState,
-      ReplicationInput replicationInput)
+      TestHelper.ReplicationInput replicationInput)
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
@@ -155,7 +131,7 @@ public class TestContainerReportHandlingWithHA {
         }
 
         // Since replica state is CLOSED and container is DELETED/DELETING in SCM
-        // also bcsid of replica and container is same, SCM will trigger delete replica
+        // bcsid of replica and container is same, SCM will trigger delete replica for RATIS, while EC ignores bcsid
         // wait for all replica to be deleted
         GenericTestUtils.waitFor(() -> {
           try {

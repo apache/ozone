@@ -322,8 +322,10 @@ public class TestContainerStateManager {
     assertEquals(HddsProtos.ReplicationType.EC, ecContainer.getReplicationType());
 
     // Verify delete command sent
-    sendReportAndCaptureDeleteCommand(ecContainer, datanode,
+    DeleteContainerCommand deleteCmd = sendReportAndCaptureDeleteCommand(ecContainer, datanode,
         ecContainer.getSequenceId(), false, 1, true);
+    verifyForceDeleteCommand(deleteCmd, ecContainer.containerID(), true, 
+        "Delete command should have force=true for stale EC non-empty replica");
     // Container should be deleted
     verifyContainerState(ecContainer.containerID(), state);
   }
