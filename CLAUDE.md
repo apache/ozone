@@ -74,3 +74,4 @@ OZONE_REPLICATION_FACTOR=3 ./run.sh -d
 - Every change needs an `HDDS-NNNN` Jira; PR titles start with the Jira id (see recent commits like `HDDS-15277. Refactor ...`).
 - Update branches via `git merge --no-edit origin/master`, **not** rebase. Avoid force-push on PRs.
 - The `build-branch` GitHub Actions workflow must be enabled in the contributor's fork before opening a PR.
+- Before wrapping up a change (e.g. before posting a PR), run `./hadoop-ozone/dev-support/checks/checkstyle.sh` locally to catch violations — otherwise the checkstyle CI job will fail immediately on the PR.
