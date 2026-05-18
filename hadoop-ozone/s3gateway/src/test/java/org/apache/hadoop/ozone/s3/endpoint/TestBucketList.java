@@ -461,6 +461,19 @@ public class TestBucketList {
   }
 
   @Test
+  public void testListObjectsWithNonIntegerMaxKeys() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("bucket");
+    BucketEndpoint bucketEndpoint = newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.MAX_KEYS, "blah");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucket"));
+    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e.getCode());
+  }
+
+  @Test
   public void testListObjectsWithNegativeMaxKeys() throws Exception {
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("bucket");
