@@ -98,7 +98,8 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     }
 
     try {
-      if (!ozoneManager.isAdmin(getRemoteUser())) {
+      if (ozoneManager.isAdminAuthorizationEnabled() &&
+          !ozoneManager.isAdmin(getRemoteUser())) {
         throw new OMException("Only administrators are authorized to perform decommission.", PERMISSION_DENIED);
       }
       omRatisServer.removeOMFromRatisRing(decommNode);

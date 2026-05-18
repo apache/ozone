@@ -32,7 +32,7 @@ public class ScmNonShadedByteStringCodec implements ScmCodec<com.google.protobuf
   }
 
   @Override
-  public com.google.protobuf.ByteString deserialize(Class<?> type, ByteString value) {
+  public com.google.protobuf.ByteString deserialize(ByteString value) {
     return com.google.protobuf.UnsafeByteOperations.unsafeWrap(value.asReadOnlyByteBuffer());
   }
 }

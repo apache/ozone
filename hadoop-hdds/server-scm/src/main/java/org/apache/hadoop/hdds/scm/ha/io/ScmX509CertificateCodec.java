@@ -38,20 +38,18 @@ public class ScmX509CertificateCodec implements ScmCodec<X509Certificate> {
       // getBytes returns a new array
       return UnsafeByteOperations.unsafeWrap(certString.getBytes(UTF_8));
     } catch (Exception ex) {
-      throw new InvalidProtocolBufferException(
-          "X509Certificate cannot be decoded: " + ex.getMessage());
+      throw new InvalidProtocolBufferException("Failed to serialize X509Certificate", ex);
     }
   }
 
   @Override
-  public X509Certificate deserialize(Class< ? > type, ByteString value)
+  public X509Certificate deserialize(ByteString value)
       throws InvalidProtocolBufferException {
     try {
       String pemEncodedCert = new String(value.toByteArray(), UTF_8);
       return CertificateCodec.getX509Certificate(pemEncodedCert);
     } catch (Exception ex) {
-      throw new InvalidProtocolBufferException(
-          "X509Certificate cannot be decoded: " + ex.getMessage());
+      throw new InvalidProtocolBufferException("Failed to deserialize X509Certificate", ex);
     }
   }
 }

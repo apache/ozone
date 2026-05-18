@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class SCMRatisRequest {
 
+  static final ScmCodecFactory FACTORY =  ScmCodecFactory.getInstance();
   private final RequestType type;
   private final String operation;
   private final Object[] arguments;
@@ -96,20 +97,18 @@ public final class SCMRatisRequest {
     final Method.Builder methodBuilder = Method.newBuilder();
     methodBuilder.setName(operation);
 
-    final List<MethodArgument> args = new ArrayList<>();
-
-    int paramCounter = 0;
-    for (Object argument : arguments) {
-      final MethodArgument.Builder argBuilder = MethodArgument.newBuilder();
+    for (int i = 0; i < parameterTypes.length; i++) {
       // Set actual method parameter type, not actual argument type.
       // This is done to avoid MethodNotFoundException in case if argument is
       // subclass type, where as method is defined with super class type.
-      argBuilder.setType(parameterTypes[paramCounter++].getName());
-      argBuilder.setValue(ScmCodecFactory.getCodec(argument.getClass())
-          .serialize(argument));
-      args.add(argBuilder.build());
+      final Class<?> parameterType = parameterTypes[i];
+      final Class<?> resolved = FACTORY.resolve(parameterType);
+
+      methodBuilder.addArgs(MethodArgument.newBuilder()
+          .setType(parameterType.getName())
+          .setValue(FACTORY.getCodec(resolved).serialize(arguments[i]))
+          .build());
     }
-    methodBuilder.addAllArgs(args);
     requestProtoBuilder.setMethod(methodBuilder.build());
     final SCMRatisRequestProto requestProto = requestProtoBuilder.build();
     return Message.valueOf(requestProto.toByteString());
@@ -149,15 +148,10 @@ public final class SCMRatisRequest {
       if (!argument.hasValue()) {
         throw new InvalidProtocolBufferException("Missing argument value");
       }
-      try {
-        final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
-        parameterTypes[paramCounter++] = clazz;
-        args.add(ScmCodecFactory.getCodec(clazz)
-            .deserialize(clazz, argument.getValue()));
-      } catch (ClassNotFoundException ex) {
-        throw new InvalidProtocolBufferException(argument.getType() +
-            " cannot be decoded!" + ex.getMessage());
-      }
+      final Class<?> parameterType = FACTORY.getClass(argument.getType());
+      final Class<?> clazz = FACTORY.resolve(parameterType);
+      parameterTypes[paramCounter++] = parameterType;
+      args.add(FACTORY.getCodec(clazz).deserialize(argument.getValue()));
     }
     return new SCMRatisRequest(requestProto.getType(),
         method.getName(), parameterTypes, args.toArray());
@@ -175,8 +169,8 @@ public final class SCMRatisRequest {
           SCMRatisRequestProto.parseFrom(proto.getLogData().asReadOnlyByteBuffer())));
     } catch (Throwable ex) {
       LOG.error("smProtoToString failed", ex);
-      builder.append("smProtoToString failed with");
-      builder.append(ex.getMessage());
+      builder.append("smProtoToString failed with")
+          .append(ex.getMessage());
     }
     return builder.toString();
   }

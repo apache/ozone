@@ -94,12 +94,13 @@ public class TestContainerBalancerOperations {
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
     Optional<String> excludeContainers = Optional.of("");
+    Optional<String> includeContainers = Optional.of("");
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes, excludeContainers);
+        excludeNodes, excludeContainers, includeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -121,7 +122,7 @@ public class TestContainerBalancerOperations {
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes, excludeContainers);
+        excludeNodes, excludeContainers, includeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -149,6 +150,7 @@ public class TestContainerBalancerOperations {
     Optional<Integer> iterations = Optional.empty();
     Optional<Integer> balancingInterval = Optional.empty();
     String excludedContainersList = "1,2,3";
+    String includedContainersList = "4,5";
 
     //CLI options are passed
     Optional<Double> threshold = Optional.of(0.1);
@@ -163,12 +165,13 @@ public class TestContainerBalancerOperations {
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
     Optional<String> excludeContainers = Optional.of(excludedContainersList);
+    Optional<String> includeContainers = Optional.of(includedContainersList);
     containerBalancerClient.startContainerBalancer(threshold, iterations,
             maxDatanodesPercentageToInvolvePerIteration,
             maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
             maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
             moveReplicationTimeout, networkTopologyEnable, includeNodes,
-            excludeNodes, excludeContainers);
+            excludeNodes, excludeContainers, includeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -186,8 +189,9 @@ public class TestContainerBalancerOperations {
     //then it takes the CLI option.
     assertEquals(100, config.getMaxDatanodesPercentageToInvolvePerIteration());
 
-    //Verifies that the 'excludeContainers' passed via CLI overrides the default empty set
+    //Verifies that excluded and included containers passed via CLI overrides the default empty set
     assertEquals(parseContainerIDs(excludedContainersList), config.getExcludeContainers());
+    assertEquals(parseContainerIDs(includedContainersList), config.getIncludeContainers());
 
     containerBalancerClient.stopContainerBalancer();
     running = containerBalancerClient.getContainerBalancerStatus();
@@ -218,12 +222,13 @@ public class TestContainerBalancerOperations {
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
     Optional<String> excludeContainers = Optional.of("");
+    Optional<String> includeContainers = Optional.of("");
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes, excludeContainers);
+        excludeNodes, excludeContainers, includeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 

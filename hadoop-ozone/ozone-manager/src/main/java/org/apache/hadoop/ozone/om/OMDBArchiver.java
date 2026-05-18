@@ -74,6 +74,10 @@ public class OMDBArchiver {
     hardLinkFileMap.put(absolutePath, fileId);
   }
 
+  public void removeHardLinkMapping(String absolutePath) {
+    hardLinkFileMap.remove(absolutePath);
+  }
+
   public boolean isCompleted() {
     return completed;
   }

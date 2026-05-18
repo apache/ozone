@@ -360,4 +360,28 @@ public class TestOmUtils {
       logCapturer.clearOutput();
     }
   }
+
+  /**
+   * Verifies that {@link OmUtils#shouldSendToFollower(OMRequest)} is a subset
+   * of {@link OmUtils#isReadOnly(OMRequest)}: any request eligible for
+   * follower routing must also be classified as read-only.
+   */
+  @Test
+  public void testShouldSendToFollowerImpliesIsReadOnly() {
+    String clientId = UUID.randomUUID().toString();
+
+    for (OzoneManagerProtocolProtos.Type cmdType :
+        OzoneManagerProtocolProtos.Type.values()) {
+      OMRequest request = OMRequest.newBuilder()
+          .setCmdType(cmdType)
+          .setClientId(clientId)
+          .build();
+      if (OmUtils.shouldSendToFollower(request)) {
+        assertTrue(OmUtils.isReadOnly(request),
+            cmdType + " returns true for shouldSendToFollower but false for "
+                + "isReadOnly. Requests eligible for follower read must be "
+                + "read-only.");
+      }
+    }
+  }
 }

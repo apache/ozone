@@ -39,7 +39,6 @@ import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -66,7 +65,7 @@ public class ContainerChecksumTreeManager {
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
   public ContainerChecksumTreeManager(ConfigurationSource conf) {
-    fileLocks = SimpleStriped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
+    fileLocks = Striped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
         () -> new ReentrantLock(true));
     metrics = ContainerMerkleTreeMetrics.create();
   }

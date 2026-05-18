@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
@@ -116,6 +117,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     CertificateClientTestImpl certificateClientTest =

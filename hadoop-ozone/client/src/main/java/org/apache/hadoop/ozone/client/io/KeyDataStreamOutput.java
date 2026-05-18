@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
  * TODO : currently not support multi-thread access.
  */
 public class KeyDataStreamOutput extends AbstractDataStreamOutput
-    implements KeyMetadataAware {
+    implements KeyCommitOutput {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
@@ -87,6 +87,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
 
   private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
 
+  @Override
   public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
     this.preCommits = preCommits;
   }
@@ -306,8 +307,10 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           BlockDataStreamOutput blockDataStreamOutput =
               (BlockDataStreamOutput) currentStreamEntry
                   .getByteBufStreamOutput();
-          blockDataStreamOutput.executePutBlock(false, false);
-          blockDataStreamOutput.watchForCommit(false);
+          if (blockDataStreamOutput != null) {
+            blockDataStreamOutput.executePutBlock(false, false);
+            blockDataStreamOutput.watchForCommit(false);
+          }
         } catch (IOException e) {
           LOG.error(
               "Failed to execute putBlock/watchForCommit. " +
@@ -470,6 +473,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     }
   }
 
+  @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return blockDataStreamOutputEntryPool.getCommitUploadPartInfo();
   }

@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -167,6 +168,7 @@ public class TestStorageContainerManager {
   @Test
   void test(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     configureTopology(conf);
     configureBlockDeletion(conf);
     Path scmPath = tempDir.resolve("scm-meta");
@@ -291,9 +293,9 @@ public class TestStorageContainerManager {
       Map<Long, List<DeletedBlock>> deletedBlocks = new HashMap<>();
       List<DeletedBlock> blocks = new ArrayList<>();
       blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
-          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
       blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
-          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -500,11 +502,12 @@ public class TestStorageContainerManager {
           info.getLatestVersionLocations().getLocationList();
       list.forEach(location -> {
         if (containerBlocks.containsKey(location.getContainerID())) {
-          containerBlocks.get(location.getContainerID())
-              .add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          containerBlocks.get(location.getContainerID()).add(new DeletedBlock(location.getBlockID(),
+              SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
         } else {
           List<DeletedBlock> blks = Lists.newArrayList();
-          blks.add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          blks.add(new DeletedBlock(location.getBlockID(),
+              SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
           containerBlocks.put(location.getContainerID(), blks);
         }
       });

@@ -39,6 +39,7 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.recon.http-address=0.0.0.0:9888
 OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
+OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
 OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
 OZONE-SITE.XML_ozone.scm.container.placement.impl=org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware
 OZONE-SITE.XML_net.topology.node.switch.mapping.impl=org.apache.hadoop.net.TableMapping

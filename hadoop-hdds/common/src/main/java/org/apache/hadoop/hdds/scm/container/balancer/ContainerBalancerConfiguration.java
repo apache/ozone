@@ -91,6 +91,12 @@ public final class ContainerBalancerConfiguration {
       "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String excludeContainers = "";
 
+  @Config(key = "hdds.container.balancer.include.containers", type = ConfigType.STRING, defaultValue =
+      "", tags = {ConfigTag.BALANCER}, description = "List of container IDs " +
+      "to include in balancing. Only these containers will be included in balancing. " +
+      "For example \"1, 4, 5\" or \"1,4,5\".")
+  private String includeContainers = "";
+
   @Config(key = "hdds.container.balancer.move.timeout", type = ConfigType.TIME, defaultValue = "65m",
       tags = {ConfigTag.BALANCER}, description =
       "The amount of time to allow a single container to move " +
@@ -139,6 +145,12 @@ public final class ContainerBalancerConfiguration {
           "consuming , especially when the disk usage rate of a " +
           "data node is very high")
   private boolean triggerDuEnable = false;
+
+  @Config(key = "hdds.container.balancer.include.non.standard.containers", type = ConfigType.BOOLEAN,
+      defaultValue = "false", tags = {ConfigTag.BALANCER},
+      description = "Whether to include containers in non-standard states, such as " +
+          "OVER_REPLICATED CLOSED/QUASI_CLOSED and HEALTHY QUASI_CLOSED containers.")
+  private boolean includeNonStandardContainers = false;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -311,6 +323,17 @@ public final class ContainerBalancerConfiguration {
         }).collect(Collectors.toSet());
   }
 
+  public Set<ContainerID> getIncludeContainers() {
+    if (includeContainers.isEmpty()) {
+      return new HashSet<>();
+    }
+    return Arrays.stream(includeContainers.split(","))
+        .map(s -> {
+          s = s.trim();
+          return ContainerID.valueOf(Long.parseLong(s));
+        }).collect(Collectors.toSet());
+  }
+
   /**
    * Sets containers to exclude from balancing.
    * @param excludeContainers String of {@link ContainerID} to exclude. For
@@ -318,6 +341,16 @@ public final class ContainerBalancerConfiguration {
    */
   public void setExcludeContainers(String excludeContainers) {
     this.excludeContainers = excludeContainers;
+  }
+
+  /**
+   * Sets containers to include in balancing. When non-empty, only these
+   * containers will be considered for balancing.
+   * @param includeContainers String of {@link ContainerID} to include. For
+   *                          example, "1, 4, 5" or "1,4,5".
+   */
+  public void setIncludeContainers(String includeContainers) {
+    this.includeContainers = includeContainers;
   }
 
   public Duration getMoveTimeout() {
@@ -405,6 +438,24 @@ public final class ContainerBalancerConfiguration {
     this.excludeNodes = excludeNodes;
   }
 
+  /**
+   * Get the includeNonStandardContainers value for Container Balancer.
+   *
+   * @return the boolean value of includeNonStandardContainers
+   */
+  public Boolean getIncludeNonStandardContainers() {
+    return includeNonStandardContainers;
+  }
+
+  /**
+   * Set the includeNonStandardContainers value for Container Balancer.
+   *
+   * @param enable the boolean value to be set to includeNonStandardContainers
+   */
+  public void setIncludeNonStandardContainers(boolean enable) {
+    includeNonStandardContainers = enable;
+  }
+
   @Override
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
@@ -418,6 +469,7 @@ public final class ContainerBalancerConfiguration {
             "%-50s %dmin%n" +
             "%-50s %dmin%n" +
             "%-50s %dmin%n" +
+            "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
@@ -443,12 +495,16 @@ public final class ContainerBalancerConfiguration {
         networkTopologyEnable,
         "Whether to Trigger Refresh Datanode Usage Info",
         triggerDuEnable,
+        "Container IDs to Include in Balancing",
+        includeContainers.isEmpty() ? "None" : includeContainers,
         "Container IDs to Exclude from Balancing",
         excludeContainers.equals("") ? "None" : excludeContainers,
         "Datanodes Specified to be Balanced",
         includeNodes.equals("") ? "None" : includeNodes,
         "Datanodes Excluded from Balancing",
-        excludeNodes.equals("") ? "None" : excludeNodes);
+        excludeNodes.equals("") ? "None" : excludeNodes,
+        "Whether to include non-standard containers for balancing",
+        includeNonStandardContainers);
   }
 
   public ContainerBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -463,13 +519,15 @@ public final class ContainerBalancerConfiguration {
         .setSizeLeavingSourceMax(maxSizeLeavingSource)
         .setIterations(iterations)
         .setExcludeContainers(excludeContainers)
+        .setIncludeContainers(includeContainers)
         .setMoveTimeout(moveTimeout)
         .setBalancingIterationInterval(balancingInterval)
         .setIncludeDatanodes(includeNodes)
         .setExcludeDatanodes(excludeNodes)
         .setMoveNetworkTopologyEnable(networkTopologyEnable)
         .setTriggerDuBeforeMoveEnable(triggerDuEnable)
-        .setMoveReplicationTimeout(moveReplicationTimeout);
+        .setMoveReplicationTimeout(moveReplicationTimeout)
+        .setIncludeNonStandardContainers(includeNonStandardContainers);
     return builder;
   }
 
@@ -497,6 +555,9 @@ public final class ContainerBalancerConfiguration {
     if (proto.hasIterations()) {
       config.setIterations(proto.getIterations());
     }
+    if (proto.hasIncludeContainers()) {
+      config.setIncludeContainers(proto.getIncludeContainers());
+    }
     if (proto.hasExcludeContainers()) {
       config.setExcludeContainers(proto.getExcludeContainers());
     }
@@ -520,6 +581,9 @@ public final class ContainerBalancerConfiguration {
     }
     if (proto.hasMoveReplicationTimeout()) {
       config.setMoveReplicationTimeout(proto.getMoveReplicationTimeout());
+    }
+    if (proto.hasIncludeNonStandardContainers()) {
+      config.setIncludeNonStandardContainers(proto.getIncludeNonStandardContainers());
     }
     return config;
   }

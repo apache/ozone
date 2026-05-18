@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.common.primitives.Longs;
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
 import java.util.Objects;
@@ -27,6 +26,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 
 /**
@@ -112,15 +112,15 @@ public final class KeyPrefixContainerCodec
     int secondLastDelimiter = findLastDelimiter(data, lastDelimiter - 1);
     if (secondLastDelimiter == -1) {
       String keyPrefix = new String(data, 0, lastDelimiter, UTF_8);
-      long version = Longs.fromByteArray(ArrayUtils.subarray(data,
+      long version =  LongCodec.get().fromByteArray(ArrayUtils.subarray(data,
           lastDelimiter + 1, lastDelimiter + 1 + Long.BYTES));
       return KeyPrefixContainer.get(keyPrefix, version);
     }
 
     String keyPrefix = new String(data, 0, secondLastDelimiter, UTF_8);
-    long version = Longs.fromByteArray(ArrayUtils.subarray(data,
+    long version = LongCodec.get().fromByteArray(ArrayUtils.subarray(data,
         secondLastDelimiter + 1, secondLastDelimiter + 1 + Long.BYTES));
-    long containerId = Longs.fromByteArray(ArrayUtils.subarray(data,
+    long containerId = LongCodec.get().fromByteArray(ArrayUtils.subarray(data,
         lastDelimiter + 1, lastDelimiter + 1 + Long.BYTES));
 
     return KeyPrefixContainer.get(keyPrefix, version, containerId);
@@ -149,12 +149,12 @@ public final class KeyPrefixContainerCodec
     // expect the version and the containerId to be undefined.
     if (keyPrefixContainer.getKeyVersion() != -1) {
       keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
-      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
-          keyPrefixContainer.getKeyVersion()));
+      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes,
+          LongCodec.get().toByteArray(keyPrefixContainer.getKeyVersion()));
       if (keyPrefixContainer.getContainerId() != -1) {
         keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
-        keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
-            keyPrefixContainer.getContainerId()));
+        keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes,
+            LongCodec.get().toByteArray(keyPrefixContainer.getContainerId()));
       }
     }
 

@@ -146,6 +146,25 @@ public interface ScmClient extends Closeable {
       throws IOException;
 
   /**
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container of this state will be returned.
+   * @param replicationConfig container replication Config.
+   * @param suppressed container to be suppressed/unsuppressed from report
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
+  ContainerListResult listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed)
+      throws IOException;
+
+  /**
    * Read meta data from an existing container.
    * @param containerID - ID of the container.
    * @param pipeline - Pipeline where the container is located.
@@ -376,7 +395,8 @@ public interface ScmClient extends Closeable {
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes,
-      Optional<String> excludeContainers) throws IOException;
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException;
 
   /**
    * Stop ContainerBalancer.
@@ -464,4 +484,14 @@ public interface ScmClient extends Closeable {
    */
   void reconcileContainer(long containerID) throws IOException;
 
+  /**
+   * Suppress or unsuppress containers from reports.
+   * Suppressed containers are excluded from replication manager reports
+   * regardless of their health state.
+   *
+   * @param containerIds container IDs to suppress or unsuppress
+   * @param suppress true to suppress, false to unsuppress
+   * @throws IOException
+   */
+  List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException;
 }

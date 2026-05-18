@@ -280,12 +280,12 @@ public class SCMDatanodeProtocolServer implements
     auditMap.append('[');
     for (SCMCommandProto cmd : cmds) {
       if (cmd.getCommandType().equals(deleteBlocksCommand)) {
-        auditMap.append("commandType: ").append(cmd.getCommandType());
-        auditMap.append(" deleteTransactionsCount: ")
-            .append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsCount());
-        auditMap.append(" cmdID: ").append(cmd.getDeleteBlocksCommandProto().getCmdId());
-        auditMap.append(" encodedToken: \"").append(cmd.getEncodedToken()).append('"');
-        auditMap.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
+        auditMap.append("commandType: ").append(cmd.getCommandType())
+            .append(" deleteTransactionsCount: ")
+            .append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsCount())
+            .append(" cmdID: ").append(cmd.getDeleteBlocksCommandProto().getCmdId())
+            .append(" encodedToken: \"").append(cmd.getEncodedToken()).append('"')
+            .append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
       } else {
         auditMap.append(TextFormat.shortDebugString(cmd));
       }

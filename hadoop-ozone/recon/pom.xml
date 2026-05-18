@@ -23,7 +23,7 @@
   <name>Apache Ozone Recon</name>
   <properties>
     <classpath.skip>false</classpath.skip>
-    <pnpm.version>8.15.7</pnpm.version>
+    <pnpm.version>10.28.2</pnpm.version>
   </properties>
   <dependencies>
     <dependency>
@@ -259,6 +259,18 @@
       <artifactId>sqlite-jdbc</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.fasterxml.jackson.module</groupId>
+      <artifactId>jackson-module-jaxb-annotations</artifactId>
+      <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <!-- using jakarta.xml.bind instead -->
+          <groupId>javax.xml.bind</groupId>
+          <artifactId>jaxb-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-assistedinject</artifactId>
       <scope>runtime</scope>
@@ -281,6 +293,11 @@
     <dependency>
       <groupId>org.glassfish.jersey.media</groupId>
       <artifactId>jersey-media-json-jackson</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
       <scope>runtime</scope>
     </dependency>
 

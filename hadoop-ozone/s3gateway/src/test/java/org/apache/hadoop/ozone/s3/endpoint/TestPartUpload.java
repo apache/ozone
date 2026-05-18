@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.Parameter;
@@ -124,6 +125,42 @@ public class TestPartUpload {
       assertNotNull(newETag);
       assertNotEquals(eTag, newETag);
     }
+  }
+
+  @Test
+  public void testPartUploadWithStandardIA() throws Exception {
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER))
+        .thenReturn(S3StorageType.STANDARD_IA.name(), (String)null);
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+
+    String content = "Multipart Upload";
+    try (Response response = put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, content)) {
+      assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+      assertEquals(200, response.getStatus());
+    }
+    assertContentLength(uploadID, keyName, content.length());
+  }
+
+  @Test
+  public void testPartUploadWithStandardIAAndContentMD5() throws Exception {
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER))
+        .thenReturn(S3StorageType.STANDARD_IA.name(), (String)null);
+    String content = "Multipart Upload Part";
+    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    byte[] md5Bytes = MessageDigest.getInstance("MD5").digest(contentBytes);
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+    when(headers.getHeaderString("Content-MD5")).thenReturn(md5Base64);
+
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+
+    try (Response response = put(rest, OzoneConsts.S3_BUCKET, keyName, 1,
+        uploadID, content)) {
+      assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+      assertEquals(200, response.getStatus());
+    }
+    assertContentLength(uploadID, keyName, content.length());
   }
 
   @Test
@@ -221,14 +258,14 @@ public class TestPartUpload {
     byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
     String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
     return Stream.of(
-        Arguments.arguments(wrongMd5Base64),
-        Arguments.arguments("invalid-base64")
+        Arguments.arguments(wrongMd5Base64, S3ErrorTable.BAD_DIGEST),
+        Arguments.arguments("invalid-base64", S3ErrorTable.INVALID_DIGEST)
     );
   }
 
   @ParameterizedTest
   @MethodSource("wrongContentMD5Provider")
-  public void testPartUploadWithWrongContentMD5(String wrongContentMD5) throws Exception {
+  public void testPartUploadWithWrongContentMD5(String wrongContentMD5, S3ErrorTable s3Error) throws Exception {
     String content = "Multipart Upload Part";
 
     HttpHeaders headersWithWrongMD5 = mock(HttpHeaders.class);
@@ -243,7 +280,7 @@ public class TestPartUpload {
 
     String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
 
-    assertErrorResponse(S3ErrorTable.BAD_DIGEST,
+    assertErrorResponse(s3Error,
         () -> put(endpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
   }
 

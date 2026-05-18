@@ -109,7 +109,7 @@ public final class HttpServletUtils implements Serializable {
       root.setTextContent(errorMessage);
       doc.appendChild(root);
 
-      TransformerFactory transformerFactory = TransformerFactory.newInstance();
+      TransformerFactory transformerFactory = XMLUtils.newSecureTransformerFactory();
       Transformer transformer = transformerFactory.newTransformer();
       transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
       transformer.setOutputProperty(OutputKeys.STANDALONE, "no");

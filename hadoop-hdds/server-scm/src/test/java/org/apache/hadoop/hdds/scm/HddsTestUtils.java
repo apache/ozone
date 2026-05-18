@@ -89,6 +89,7 @@ public final class HddsTestUtils {
 
   public static final long CONTAINER_USED_BYTES_DEFAULT = 100L;
   public static final long CONTAINER_NUM_KEYS_DEFAULT = 2L;
+  public static final long ROLL_INTERVAL_MS_DEFAULT = 5 * 60 * 1000L; //TODO
 
   private HddsTestUtils() {
   }

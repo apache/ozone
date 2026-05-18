@@ -43,8 +43,12 @@ download_and_verify_apache_release "ranger/${RANGER_VERSION}/apache-ranger-${RAN
 tar -C "${DOWNLOAD_DIR}" -x -z -f "${DOWNLOAD_DIR}/apache-ranger-${RANGER_VERSION}.tar.gz"
 export RANGER_SOURCE_DIR="${DOWNLOAD_DIR}/apache-ranger-${RANGER_VERSION}"
 chmod -R a+rX "${RANGER_SOURCE_DIR}"
-chmod a+x "${RANGER_SOURCE_DIR}"/dev-support/ranger-docker/config/*.sh
 
+# Ranger docker support scripts moved between releases (eg: from config/*.sh to scripts/**).
+# Ensure we don't fail if a glob doesn't match, but still make init scripts executable when present.
+if [[ -d "${RANGER_SOURCE_DIR}/dev-support/ranger-docker" ]]; then
+  find "${RANGER_SOURCE_DIR}/dev-support/ranger-docker" -type f -name '*.sh' -exec chmod a+x {} +
+fi
 download_and_verify_apache_release "ranger/${RANGER_VERSION}/plugins/ozone/ranger-${RANGER_VERSION}-ozone-plugin.tar.gz"
 tar -C "${DOWNLOAD_DIR}" -x -z -f "${DOWNLOAD_DIR}/ranger-${RANGER_VERSION}-ozone-plugin.tar.gz"
 export RANGER_OZONE_PLUGIN_DIR="${DOWNLOAD_DIR}/ranger-${RANGER_VERSION}-ozone-plugin"

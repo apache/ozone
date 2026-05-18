@@ -25,6 +25,7 @@ import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -135,6 +136,11 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     return dbMap;
   }
 
+  @VisibleForTesting
+  Set<UUID> getPendingEvictionQueue() {
+    return Collections.unmodifiableSet(pendingEvictionQueue);
+  }
+
   /**
    * @return number of DB instances currently held in cache.
    */
@@ -158,6 +164,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         }
         omMetrics.decNumSnapshotCacheSize();
       }
+      pendingEvictionQueue.remove(k);
       return null;
     });
   }
@@ -323,8 +330,17 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
     AtomicReference<OMLockDetails> lockDetails = new AtomicReference<>(emptyLockFunction.get());
     if (lockDetails.get().isLockAcquired()) {
-      if (!cleanupFunction.get()) {
-        lockDetails.set(emptyUnlockFunction.get());
+      try {
+        if (!cleanupFunction.get()) {
+          throw new IllegalStateException("Failed to acquire lock as cleanup did not drain the cache.");
+        }
+      } catch (Throwable t) {
+        try {
+          lockDetails.set(emptyUnlockFunction.get());
+        } catch (Throwable unlockThrowable) {
+          t.addSuppressed(unlockThrowable);
+        }
+        throw t;
       }
     }
 
@@ -377,26 +393,25 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     }
 
     dbMap.compute(evictionKey, (k, v) -> {
-      pendingEvictionQueue.remove(k);
+      ReferenceCounted<OmSnapshot> result = null;
       if (v == null) {
-        throw new IllegalStateException("SnapshotId '" + k + "' does not exist in cache. The RocksDB " +
-            "instance of the Snapshot may not be closed properly.");
-      }
-
-      if (v.getTotalRefCount() > 0) {
+        LOG.info("SnapshotId '{}' does not exist in cache during cleanup; "
+            + "it may have already been invalidated, closed, and removed.", k);
+      } else if (v.getTotalRefCount() > 0) {
         LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
-        return v;
+        result = v;
       } else {
         LOG.debug("Closing SnapshotId {}. It is not being referenced anymore.", k);
         // Close the instance, which also closes its DB handle.
         try {
           v.get().close();
         } catch (IOException ex) {
-          throw new IllegalStateException("Error while closing snapshot DB.", ex);
+          throw new IllegalStateException("Error while closing snapshot DB for snapshotId " + k, ex);
         }
         omMetrics.decNumSnapshotCacheSize();
-        return null;
       }
+      pendingEvictionQueue.remove(k);
+      return result;
     });
     return null;
   }

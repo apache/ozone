@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
@@ -127,7 +128,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
 
     initialize(om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
+        om.isAdminAuthorizationEnabled(),
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
@@ -142,6 +143,20 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   @Override
   public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    boolean isOmLeader = om.isLeaderReady();
+    if (!isOmLeader) {
+      String msg = "Unable to process metadata snapshot request as "
+          + "this OM is not the leader or not ready to serve requests";
+      LOG.warn(msg);
+      try {
+        response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, msg);
+      } catch (IOException e) {
+        LOG.warn("Failed to send error response, falling back to status only", e);
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      }
+      return;
+    }
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
@@ -304,7 +319,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             }
             collectFilesFromDir(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, false, omdbArchiver);
             try (Stream<Path> backupFiles = sstBackupFiles.stream()) {
-              collectFilesFromDir(sstFilesToExclude, backupFiles, maxTotalSstSize, false, omdbArchiver);
+              // since pruner can delete the files after it has been loaded into sstBackupFiles,
+              // NoSuchFileException needs to be caught
+              collectFilesFromDir(sstFilesToExclude, backupFiles, maxTotalSstSize, false, omdbArchiver, true);
             }
             Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(localDataManager,
                 snapshotInCheckpoint.keySet());
@@ -478,6 +495,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     }
   }
 
+  private boolean collectFilesFromDir(Set<String> sstFilesToExclude, Stream<Path> files,
+      AtomicLong maxTotalSstSize, boolean onlySstFile, OMDBArchiver omdbArchiver) throws IOException {
+    return collectFilesFromDir(sstFilesToExclude, files, maxTotalSstSize,
+        onlySstFile, omdbArchiver, false);
+  }
+
   /**
    * Collects database files to the archive, handling deduplication based on inode IDs.
    * Here the dbDir could either be a snapshot db directory, the active om.db,
@@ -495,8 +518,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @return true if processing should continue, false if size limit reached
    * @throws IOException if an I/O error occurs
    */
-  private boolean collectFilesFromDir(Set<String> sstFilesToExclude, Stream<Path> files, AtomicLong maxTotalSstSize,
-      boolean onlySstFile, OMDBArchiver omdbArchiver) throws IOException {
+  boolean collectFilesFromDir(Set<String> sstFilesToExclude, Stream<Path> files,
+      AtomicLong maxTotalSstSize, boolean onlySstFile, OMDBArchiver omdbArchiver,
+      boolean ignoreNoSuchFileException) throws IOException {
     long bytesRecorded = 0L;
     int filesWritten = 0;
     Iterable<Path> iterable = files::iterator;
@@ -505,7 +529,17 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         if (onlySstFile && !dbFile.toString().endsWith(ROCKSDB_SST_SUFFIX)) {
           continue;
         }
-        String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
+        String fileId;
+        try {
+          fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
+        } catch (NoSuchFileException nsfe) {
+          if (ignoreNoSuchFileException) {
+            LOG.warn("File {} not found.", dbFile);
+            logFileNoLongerExists(dbFile);
+            continue;
+          }
+          throw nsfe;
+        }
         String path = dbFile.toFile().getAbsolutePath();
         // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
         if (path.contains(OM_CHECKPOINT_DIR)) {
@@ -513,20 +547,33 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         }
         omdbArchiver.recordHardLinkMapping(path, fileId);
         if (!sstFilesToExclude.contains(fileId)) {
-          long fileSize = Files.size(dbFile);
-          if (maxTotalSstSize.get() - fileSize <= 0) {
-            return false;
+          try {
+            long fileSize = Files.size(dbFile);
+            if (maxTotalSstSize.get() - fileSize <= 0) {
+              return false;
+            }
+            bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId);
+            filesWritten++;
+            maxTotalSstSize.addAndGet(-fileSize);
+            sstFilesToExclude.add(fileId);
+          } catch (NoSuchFileException e) {
+            if (ignoreNoSuchFileException) {
+              logFileNoLongerExists(dbFile);
+              omdbArchiver.removeHardLinkMapping(path);
+            } else {
+              throw e;
+            }
           }
-          bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId);
-          filesWritten++;
-          maxTotalSstSize.addAndGet(-fileSize);
-          sstFilesToExclude.add(fileId);
         }
       }
     }
     LOG.info("Collected {} KB, #files {} to write to checkpoint tarball stream...",
         bytesRecorded / (1024), filesWritten);
     return true;
+  }
+
+  private void logFileNoLongerExists(Path dbFile) {
+    LOG.warn("Not writing DB file : {} to archive as it no longer exists", dbFile);
   }
 
   /**

@@ -169,7 +169,7 @@ public class TestSnapshotDiffCleanupService {
     // DiffReportEntry codec for Diff Report.
     b.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
-    b.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
+    b.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.codec());
     codecRegistry = b.build();
     emptyReportEntry = codecRegistry.asRawData("{}");
 
@@ -298,7 +298,7 @@ public class TestSnapshotDiffCleanupService {
 
     SnapshotDiffJob job = new SnapshotDiffJob(creationTime, jobId, jobStatus,
         volume, bucket, fromSnapshot, toSnapshot, false, false, noOfEntries,
-        null, 0.0);
+        null, 0.0, jobId + "-" + noOfEntries);
 
     db.get().put(jobTableCfh, codecRegistry.asRawData(jobKey),
         codecRegistry.asRawData(job));

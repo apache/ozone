@@ -74,6 +74,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Type.ForceExitSafeMode));
 
   /**
+   * Read-only commands that can execute on followers without leader check.
+   * These commands respect the --scm parameter and query the specified SCM.
+   */
+  Set<Type> FOLLOWER_READABLE_COMMAND_TYPES = Collections.unmodifiableSet(EnumSet.of(
+      Type.InSafeMode,
+      Type.GetSafeModeRuleStatuses));
+  
+  /**
    * Asks SCM where a container should be allocated. SCM responds with the
    * set of datanodes that should be used creating this container.
    *
@@ -219,6 +227,30 @@ public interface StorageContainerLocationProtocol extends Closeable {
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig) throws IOException;
+
+  /**
+   * Ask SCM for a list of containers with a range of container ID, state
+   * and replication config, and the limit of count.
+   * The containers are returned from startID (exclusive), and
+   * filtered by state and replication config. The returned list is limited to
+   * count entries.
+   *
+   * @param startContainerID start container ID.
+   * @param count count, if count {@literal <} 0, the max size is unlimited.(
+   *              Usually the count will be replace with a very big
+   *              value instead of being unlimited in case the db is very big)
+   * @param state Container with this state will be returned.
+   * @param replicationConfig Replication config for the containers
+   * @param suppressed container to be suppressed/unsuppressed from report
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
+   * @throws IOException
+   */
+  ContainerListResult listContainer(long startContainerID,
+      int count, HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed) throws IOException;
 
   /**
    * Deletes a container in SCM.
@@ -434,7 +466,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes,
-      Optional<String> excludeContainers) throws IOException;
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException;
 
   /**
    * Stop ContainerBalancer.
@@ -496,8 +529,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
   long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException;
 
-  List<ContainerInfo> getListOfContainers(
-      long startContainerID, int count, HddsProtos.LifeCycleState state)
+  List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException;
 
   DecommissionScmResponseProto decommissionScm(
@@ -512,4 +545,13 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException On error
    */
   void reconcileContainer(long containerID) throws IOException;
+
+  /**
+   * Suppress or unsuppress containers from reports.
+   *
+   * @param containerIds container IDs to suppress or unsuppress
+   * @param suppress true to suppress, false to unsuppress
+   * @throws IOException
+   */
+  List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException;
 }
