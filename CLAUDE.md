@@ -6,20 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Apache Ozone — a scalable, distributed object/file store. This is a multi-module Maven project (`org.apache.ozone:ozone-main`, version `2.2.0-SNAPSHOT`). Two top-level Maven aggregators:
 
-- `hadoop-hdds/` — Hadoop Distributed Data Store: the storage layer (SCM, datanode container service, RocksDB integration, common protocols, crypto, framework). Submodules include `server-scm`, `container-service`, `framework`, `managed-rocksdb`, `rocksdb-checkpoint-differ`, `interface-{admin,client,server}`, `common`, `client`, `config`, etc.
-- `hadoop-ozone/` — Ozone services and clients on top of HDDS. Key submodules: `ozone-manager` (OM), `s3gateway`, `recon` (UI/monitoring), `datanode`, `client`, `csi` (CSI driver), `ozonefs*` (Hadoop-compatible FS adapters, including a `ozonefs-shaded` jar), `freon` (load generator), `dist` (assembles the binary distribution and Docker compose configs), `integration-test*` (Java mini-cluster tests), `mini-cluster`, `tools`, `cli-{admin,debug,repair,shell}`.
+- `hadoop-hdds/` — Hadoop Distributed Data Store: the storage layer (SCM, datanode container service, RocksDB integration, common protocols, crypto, framework). Load-bearing submodules: `server-scm`, `container-service`, `framework`, `managed-rocksdb`, `interface-{admin,client,server}`. See `hadoop-hdds/pom.xml` for the full list.
+- `hadoop-ozone/` — Ozone services and clients on top of HDDS. Load-bearing submodules: `ozone-manager` (OM), `s3gateway`, `recon` (UI/monitoring), `datanode`, `dist` (binary tarball + Docker compose configs), `integration-test*` (Java mini-cluster tests), plus `ozonefs*` (Hadoop-compatible FS adapters). See `hadoop-ozone/pom.xml` for the full list.
 
 The big-picture component split: SCM manages containers/pipelines, OM manages namespace/keys, datanodes serve container data via Ratis (RAFT), Recon provides observability, and S3 Gateway / OzoneFS expose S3 and Hadoop FS APIs. Module boundaries follow this split — when changing a feature, expect edits across `hadoop-hdds/interface-*` (proto), an HDDS server module, and one of `ozone-manager` / `s3gateway` / `recon`. Integration tests for these flows live exclusively in `hadoop-ozone/integration-test*`.
 
 ## Build
 
 ```bash
-mvn clean verify -DskipTests       # full build
-mvn clean install -DskipTests      # build + install to local repo (needed when iterating across modules)
+mvn clean install -DskipTests      # build + install to local repo (use this when iterating across modules; required before single-module rebuilds resolve correctly)
+mvn clean verify -DskipTests       # end-to-end compile/verify without installing — useful as a smoke check, not for iterative dev
 ```
 
 Useful flags (composable):
-- `-DskipShade` — skip the shaded Ozone FS jar (saves time; needed for filesystem integration tests if absent)
+- `-DskipShade` — skip building the shaded Ozone FS jar (saves time; omit this flag if you need to run filesystem integration tests, which require the shaded jar)
 - `-DskipRecon` — skip Recon Web UI (~2 min faster)
 - `-DskipDocs` — skip Hugo docs build
 - `-Pdist` — build the binary tarball under `hadoop-ozone/dist/target/`
@@ -42,9 +42,9 @@ mvn -pl :ozone-manager -am install -DskipTests
 Direct Maven equivalents (for running a single test):
 ```bash
 # Single test class
-mvn -pl :ozone-manager test -Dtest=TestOzoneManager
+mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock
 # Single test method
-mvn -pl :ozone-manager test -Dtest=TestOzoneManager#testSomething
+mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock#testSomething
 # Integration tests live in their own modules and require -DskipShade etc.
 mvn -pl :ozone-integration-test test -Dtest=TestOmContainerLocationCache -DskipShade -DskipRecon
 ```
@@ -62,16 +62,12 @@ OZONE_REPLICATION_FACTOR=3 ./run.sh -d
 ```
 `hadoop-ozone/dist/src/main/compose/` has many topologies (`ozone-ha`, `ozonesecure`, `upgrade`, `xcompat`, etc.). For IDE-launched components there are pre-baked IntelliJ run configs in `.run/`; the documented startup order is SCM init → SCM → OM init → OM → Recon → datanodes.
 
-## Code conventions
+## Conventions and PR workflow
 
-- 2-space indentation, 120-char line limit, Apache license header required (enforced by Checkstyle and RAT).
-- No `@author` tags (enforced by `author.sh`).
-- Checkstyle config: `hadoop-hdds/dev-support/checkstyle/checkstyle.xml`.
-- For non-trivial features, follow the OEP (Ozone Enhancement Proposal) process before coding — design docs are required in Markdown.
+The authoritative source is [`CONTRIBUTING.md`](./CONTRIBUTING.md). Highlights worth surfacing here:
 
-## Jira / PR workflow
-
-- Every change needs an `HDDS-NNNN` Jira; PR titles start with the Jira id (see recent commits like `HDDS-15277. Refactor ...`).
-- Update branches via `git merge --no-edit origin/master`, **not** rebase. Avoid force-push on PRs.
-- The `build-branch` GitHub Actions workflow must be enabled in the contributor's fork before opening a PR.
-- Before wrapping up a change (e.g. before posting a PR), run `./hadoop-ozone/dev-support/checks/checkstyle.sh` locally to catch violations — otherwise the checkstyle CI job will fail immediately on the PR.
+- PR titles start with the Jira id (e.g. `HDDS-12345. Short description`); every change needs an `HDDS-NNNN` Jira.
+- Update branches via `git merge --no-edit origin/master`, **not** rebase; avoid force-push.
+- 2-space indent, 120-char lines, Apache license header on most files (enforced by Checkstyle and RAT — Markdown excludes are managed in `dev-support/rat/rat-exclusions.txt`); no `@author` tags. Checkstyle config: `hadoop-hdds/dev-support/checkstyle/checkstyle.xml`.
+- For non-trivial features, follow the OEP (Ozone Enhancement Proposal) process — design docs in Markdown.
+- Before wrapping up a change (e.g. before posting a PR), run `./hadoop-ozone/dev-support/checks/checkstyle.sh` locally to catch violations — otherwise the checkstyle CI job will fail immediately on the PR. `rat.sh` is also worth running if you've added new file types.

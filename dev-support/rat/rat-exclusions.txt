@@ -18,6 +18,7 @@
 **/*.json
 .gitattributes
 .github/*
+CLAUDE.md
 CONTRIBUTING.md
 README.md
 SECURITY.md
