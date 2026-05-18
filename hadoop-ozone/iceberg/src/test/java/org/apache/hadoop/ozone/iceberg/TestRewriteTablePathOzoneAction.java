@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.DataFile;
@@ -48,6 +49,9 @@ import org.apache.iceberg.ManifestContent;
 import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.ManifestFiles;
 import org.apache.iceberg.ManifestReader;
+import org.apache.iceberg.MetadataColumns;
+import org.apache.iceberg.MetricsConfig;
+import org.apache.iceberg.PartitionData;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.RewriteTablePathUtil;
 import org.apache.iceberg.Schema;
@@ -58,8 +62,15 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadata.MetadataLogEntry;
 import org.apache.iceberg.actions.RewriteTablePath;
+import org.apache.iceberg.data.Record;
+import org.apache.iceberg.data.parquet.GenericParquetReaders;
+import org.apache.iceberg.data.parquet.GenericParquetWriter;
+import org.apache.iceberg.deletes.PositionDelete;
+import org.apache.iceberg.deletes.PositionDeleteWriter;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.DeleteSchemaUtil;
+import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.Pair;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,7 +103,7 @@ class TestRewriteTablePathOzoneAction {
   private Path stagingDir;
 
   @BeforeEach
-  public void setupTableLocation() {
+  public void setupTableLocation() throws IOException {
     String tableLocation = tableDir.toUri().toString().replaceFirst("^file:///", "file:/") + TABLE_NAME;
     this.table = createTable(tableLocation + "/");
     this.sourcePrefix = tableLocation;
@@ -305,6 +316,7 @@ class TestRewriteTablePathOzoneAction {
     assertThat(exception).hasMessageContaining("does not exist");
   }
 
+  @Test
   void defaultStagingDirIsUnderTableMetadataLocation() {
     String metadataLocation = RewriteTablePathOzoneUtils.getMetadataLocation(table);
 
@@ -392,6 +404,8 @@ class TestRewriteTablePathOzoneAction {
       } else if (RewriteTablePathUtil.fileName(stagingPath).endsWith(".avro")) {
         assertTrue(targetPath.startsWith(target),
             "Manifest file target path should start with target prefix: " + targetPath);
+      } else if (stagingPath.endsWith("deletes.parquet")) {
+        assertStagedDeleteFileInternalPathsRewritten(table, stagingPath, target);
       }
     }
   }
@@ -538,6 +552,27 @@ class TestRewriteTablePathOzoneAction {
         "Rewritten delete manifest should reference the same delete files (by name) as the original");
   }
 
+  private static void assertStagedDeleteFileInternalPathsRewritten(
+      Table tbl, String stagedPath, String targetPrefix) throws IOException {
+    Schema readSchema = DeleteSchemaUtil.pathPosSchema();
+    String pathColumn = MetadataColumns.DELETE_FILE_PATH.name();
+    int rowCount = 0;
+    try (CloseableIterable<Record> rows =
+             Parquet.read(tbl.io().newInputFile(stagedPath))
+                 .project(readSchema)
+                 .createReaderFunc(fileSchema -> GenericParquetReaders.buildReader(readSchema, fileSchema))
+                 .build()) {
+      for (Record row : rows) {
+        Object path = row.getField(pathColumn);
+        assertTrue(
+            path.toString().startsWith(targetPrefix),
+            stagedPath + " row " + rowCount + ": path '" + path
+                + "' must start with '" + targetPrefix + "'");
+        rowCount++;
+      }
+    }
+  }
+
   private static List<String> metadataLogEntryPaths(Table tbl) {
     TableMetadata meta = ((HasTableOperations) tbl).operations().current();
     List<String> paths = new ArrayList<>();
@@ -569,12 +604,18 @@ class TestRewriteTablePathOzoneAction {
     return pairs;
   }
 
-  private Table createTable(String location) {
+  private Table createTable(String location) throws IOException {
     HadoopTables tables = new HadoopTables(new Configuration());
     Table tbl = tables.create(SCHEMA, PartitionSpec.unpartitioned(), new HashMap<>(), location);
     for (int i = 0; i < COMMITS; i++) {
-      String dataPath = location + "/data/batch-" + i + ".parquet";
+      String dataPath = location + "data/batch-" + i + ".parquet";
       tbl.newAppend().appendFile(dummyDataFile(dataPath)).commit();
+    }
+
+    for (int i = 0; i < 2; i++) {
+      String dataPath = location + "data/batch-" + i + ".parquet";
+      DeleteFile df = writePositionDeleteFile(tbl, dataPath);
+      tbl.newRowDelta().addDeletes(df).commit();
     }
     return tables.load(location);
   }
@@ -586,6 +627,26 @@ class TestRewriteTablePathOzoneAction {
         .withRecordCount(1)
         .withFormat(FileFormat.PARQUET)
         .build();
+  }
+
+  private DeleteFile writePositionDeleteFile(Table tbl, String referencedDataPath)
+      throws IOException {
+    String deleteUri = RewriteTablePathUtil.combinePaths(
+        tbl.location(), "data/" + UUID.randomUUID() + "-deletes.parquet");
+    PositionDeleteWriter<Record> writer =
+        Parquet.writeDeletes(tbl.io().newOutputFile(deleteUri))
+            .createWriterFunc(GenericParquetWriter::create)
+            .withSpec(tbl.spec())
+            .withPartition(new PartitionData(tbl.spec().partitionType()))
+            .metricsConfig(MetricsConfig.forPositionDelete(tbl))
+            .overwrite()
+            .buildPositionWriter();
+    try {
+      writer.write(PositionDelete.<Record>create().set(referencedDataPath, 0L));
+    } finally {
+      writer.close();
+    }
+    return writer.toDeleteFile();
   }
 
   private static StatisticsFile statisticsFile(String path, long fileSizeInBytes) {
