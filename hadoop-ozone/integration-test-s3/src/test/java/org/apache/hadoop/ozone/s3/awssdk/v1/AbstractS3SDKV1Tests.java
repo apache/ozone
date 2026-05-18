@@ -47,6 +47,8 @@ import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingResult;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -1123,6 +1125,27 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     Object tagCountHeader = head.getRawMetadataValue(Headers.S3_TAGGING_COUNT);
     assertNotNull(tagCountHeader);
     assertEquals(tags.size(), Integer.parseInt(tagCountHeader.toString()));
+  }
+
+  @Test
+  public void testGetObjectTaggingReturnsTagsSortedByKey() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "");
+
+    List<Tag> tagsPutOrder = Arrays.asList(new Tag("key2", "val2"), new Tag("key", "val"));
+    s3Client.setObjectTagging(
+        new SetObjectTaggingRequest(bucketName, keyName, new ObjectTagging(tagsPutOrder)));
+
+    GetObjectTaggingResult taggingResult =
+        s3Client.getObjectTagging(new GetObjectTaggingRequest(bucketName, keyName));
+    List<Tag> tagSet = taggingResult.getTagSet();
+    assertEquals(2, tagSet.size());
+    assertEquals("key", tagSet.get(0).getKey());
+    assertEquals("val", tagSet.get(0).getValue());
+    assertEquals("key2", tagSet.get(1).getKey());
+    assertEquals("val2", tagSet.get(1).getValue());
   }
 
   @Test
