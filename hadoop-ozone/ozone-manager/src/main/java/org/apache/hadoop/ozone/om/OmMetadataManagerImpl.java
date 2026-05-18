@@ -242,6 +242,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint, boolean readOnly) throws IOException {
+    return createCheckpointMetadataManager(conf, checkpoint, readOnly, true);
+  }
+
+  public static OmMetadataManagerImpl createCheckpointMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint, boolean readOnly,
+      boolean enableRocksDBMetrics) throws IOException {
     Path path = checkpoint.getCheckpointLocation();
     Path parent = path.getParent();
     if (parent == null) {
@@ -254,7 +260,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throw new IllegalStateException("DB checkpoint dir name should not "
           + "have been null. Checkpoint path is " + path);
     }
-    return new OmMetadataManagerImpl(conf, dir, name.toString(), readOnly);
+    return new OmMetadataManagerImpl(conf, dir, name.toString(), readOnly, enableRocksDBMetrics);
   }
 
   protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name) throws IOException {
@@ -271,6 +277,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name, boolean readOnly)
       throws IOException {
+    this(conf, dir, name, readOnly, true);
+  }
+
+  public OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name, boolean readOnly,
+      boolean enableRocksDBMetrics) throws IOException {
     lock = new OmReadOnlyLock();
     hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
     omEpoch = 0;
@@ -282,7 +293,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setMaxNumberOfOpenFiles(maxOpenFiles)
         .setEnableCompactionDag(false, null)
         .setCreateCheckpointDirs(false)
-        .setEnableRocksDbMetrics(true)
+        .setEnableRocksDbMetrics(enableRocksDBMetrics)
         .build();
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;
