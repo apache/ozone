@@ -25,6 +25,7 @@ import java.util.HashMap;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -95,6 +96,9 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(APPARENT_VERSION_KEY),
           CacheValue.get(context.getIndex(), String.valueOf(apparentVersion)));
+      // Clear the finalization_in_progress key from the cache
+      omMetadataManager.getMetaTable().addCacheEntry(
+          new CacheKey<>(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY), CacheValue.get(System.nanoTime()));
 
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()

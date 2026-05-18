@@ -297,7 +297,7 @@ public class TestOMRatisSnapshots {
     String toMatch = String.format(
         "op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"%s\",\"term\":\"%d\",\"lastAppliedIndex\":\"%d\"}",
         leaderOMNodeId, leaderOMSnapshotTermIndex, followerOMLastAppliedIndex);
-    assertTrue(AuditLogTestUtils.auditLogContains(toMatch));
+    assertTrue(AuditLogTestUtils.systemAuditLogContains(toMatch));
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);

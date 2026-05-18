@@ -33,6 +33,8 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -154,8 +156,15 @@ class TestOMBucketLayoutUpgrade {
   @Order(DURING_UPGRADE)
   void finalizeUpgrade() throws Exception {
     // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
-    cluster.getOzoneManager().getMetadataManager().getMetaTable()
-        .addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
+    cluster.getOzoneManagersList().forEach(om -> {
+      try {
+        om.getMetadataManager().getMetaTable().addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
+        om.getMetadataManager().getMetaTable()
+            .put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore");
+      } catch (RocksDatabaseException | CodecException e) {
+        throw new RuntimeException(e);
+      }
+    });
     waitForFinalization(omClient);
 
     final String expectedVersion =

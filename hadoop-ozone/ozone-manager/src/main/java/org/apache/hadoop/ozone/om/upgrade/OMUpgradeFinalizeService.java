@@ -27,8 +27,6 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -49,7 +47,6 @@ public class OMUpgradeFinalizeService extends BackgroundService {
   private static final TimeUnit INTERVAL_UNIT = TimeUnit.MILLISECONDS;
   private static final long TIMEOUT = 60000;
   private static final AtomicLong RUN_COUNT = new AtomicLong(0);
-  private static final CacheKey<String> FINALIZATION_CACHE_KEY = new CacheKey<>(FINALIZATION_IN_PROGRESS_KEY);
 
   private final OzoneManager ozoneManager;
   private final OMVersionManager versionManager;
@@ -109,9 +106,9 @@ public class OMUpgradeFinalizeService extends BackgroundService {
         try {
           // To finalize OM, first finalization needs to have been started. Then SCM needs to indicate that it has
           // completed its finalization work. Only once both of those things have happened can OM finalize.
-          CacheValue<String> finalizationValue =
-              ozoneManager.getMetadataManager().getMetaTable().getCacheValue(FINALIZATION_CACHE_KEY);
-          if (finalizationValue.getCacheValue() == null) {
+          String finalizationInProgress =
+              ozoneManager.getMetadataManager().getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY);
+          if (finalizationInProgress == null) {
             LOG.debug("OMUpgradeFinalizeService: skipping check — finalization is not in progress.");
             return BackgroundTaskResult.EmptyTaskResult.newResult();
           }

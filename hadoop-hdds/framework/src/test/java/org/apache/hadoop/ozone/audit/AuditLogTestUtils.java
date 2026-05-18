@@ -43,7 +43,6 @@ public final class AuditLogTestUtils {
    */
   public static void enableAuditLog() {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
-    System.setProperty("log4j.configurationFile", "auditlog.properties");
   }
 
   /**
@@ -69,6 +68,10 @@ public final class AuditLogTestUtils {
 
   public static boolean auditLogContains(String... strings) {
     return fileContains(AUDITLOG_FILENAME, strings);
+  }
+
+  public static boolean systemAuditLogContains(String... strings) {
+    return fileContains(SYSTEM_AUDITLOG_FILENAME, strings);
   }
 
   private static boolean fileContains(String filename, String... strings) {
