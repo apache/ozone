@@ -15,18 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.upgrade;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
 /**
- * Annotation to mark a class that belongs to a specific Layout Version.
+ * Provides SCM upgrade interfaces and implementations.
  */
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface BelongsToLayoutVersion {
-  OMLayoutFeature value();
-}
+package org.apache.hadoop.hdds.upgrade;

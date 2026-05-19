@@ -443,10 +443,10 @@ public final class ContainerTestUtils {
         null, null);
   }
 
-  /** Initialize {@link DatanodeLayoutStorage}.  Normally this is done during {@link HddsDatanodeService} start,
+  /** Initialize {@link DatanodeStorage}.  Normally this is done during {@link HddsDatanodeService} start,
    * have to do the same for tests that create {@link OzoneContainer} manually. */
   public static void initializeDatanodeLayout(ConfigurationSource conf, DatanodeDetails dn) throws IOException {
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf, dn.getUuidString());
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf, dn.getUuidString());
     if (layoutStorage.getState() != INITIALIZED) {
       layoutStorage.initialize();
     }

@@ -50,6 +50,7 @@ public class OMVersionManager extends ComponentVersionManager {
     this(storage, upgradeActionArg, new OMUpgradeActionProvider());
   }
 
+  @VisibleForTesting
   public OMVersionManager(OMStorage storage, OzoneManager upgradeActionArg,
       ComponentUpgradeActionProvider<OmUpgradeAction> upgradeActionProvider) throws IOException {
     super(storage, computeApparentVersion(storage.getApparentVersion()), OzoneManagerVersion.SOFTWARE_VERSION);

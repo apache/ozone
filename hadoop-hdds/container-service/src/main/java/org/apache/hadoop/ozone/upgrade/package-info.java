@@ -15,32 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-
 /**
- * Annotation to specify upgrade action run during HDDS (SCM or Datanode) finalization.
+ * Provides Datanode upgrade annotations.
  */
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface UpgradeActionHdds {
-  HDDSLayoutFeature feature();
-
-  Component component();
-
-  /**
-   * Simple enum to denote if an action is for the SCM or the DN.
-   */
-  enum Component {
-    SCM,
-    DATANODE;
-  }
-}
-
-
-
+package org.apache.hadoop.ozone.upgrade;

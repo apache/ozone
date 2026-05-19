@@ -35,25 +35,25 @@ import org.apache.hadoop.ozone.common.Storage;
  * DataNodeStorageConfig is responsible for management of the
  * StorageDirectories used by the DataNode.
  */
-public class DatanodeLayoutStorage extends Storage {
+public class DatanodeStorage extends Storage {
   /**
    * Construct DataNodeStorageConfig.
    * @throws IOException if any directories are inaccessible.
    */
-  public DatanodeLayoutStorage(ConfigurationSource conf, String dataNodeId)
+  public DatanodeStorage(ConfigurationSource conf, String dataNodeId)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
         DATANODE_LAYOUT_VERSION_DIR, dataNodeId, getDefaultLayoutVersion(conf));
   }
 
-  public DatanodeLayoutStorage(OzoneConfiguration conf, String dataNodeId,
-                               int layoutVersion)
+  public DatanodeStorage(OzoneConfiguration conf, String dataNodeId,
+                         int layoutVersion)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
         DATANODE_LAYOUT_VERSION_DIR, dataNodeId, layoutVersion);
   }
 
-  public DatanodeLayoutStorage(ConfigurationSource conf)
+  public DatanodeStorage(ConfigurationSource conf)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
         DATANODE_LAYOUT_VERSION_DIR, getDefaultLayoutVersion(conf));

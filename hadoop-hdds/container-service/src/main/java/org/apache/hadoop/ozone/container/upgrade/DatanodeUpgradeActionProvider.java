@@ -17,28 +17,25 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
-
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeAction;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.upgrade.AbstractUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.UpgradeActionDatanode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Upgrade Action for DataNode for the very first first Upgrade Version.
+ * Loads {@link DatanodeUpgradeAction} implementations annotated with {@link UpgradeActionDatanode}.
  */
-@UpgradeActionDatanode(feature = DATANODE_SCHEMA_V2)
-public class DatanodeSchemaV2FinalizeAction
-    implements DatanodeUpgradeAction {
+public final class DatanodeUpgradeActionProvider extends AbstractUpgradeActionProvider<DatanodeUpgradeAction> {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeSchemaV2FinalizeAction.class);
+  public static final String DATANODE_UPGRADE_CLASS_PACKAGE = "org.apache.hadoop.ozone.container";
+
+  public DatanodeUpgradeActionProvider() {
+    super(UpgradeActionDatanode.class, DatanodeUpgradeAction.class, DATANODE_UPGRADE_CLASS_PACKAGE);
+  }
 
   @Override
-  public void execute(DatanodeStateMachine arg) throws Exception {
-    LOG.info("Executing datanode 'onFinalize' action for the first " +
-        "version with upgrade support. New containers will be " +
-        "created with Schema Version 2 henceforth.");
+  protected ComponentVersion extractVersion(Class<?> clazz) {
+    UpgradeActionDatanode annotation = clazz.getAnnotation(UpgradeActionDatanode.class);
+    return annotation.feature();
   }
 }

@@ -17,22 +17,17 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import java.util.Map;
-import org.apache.hadoop.hdds.ComponentVersion;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 
 /**
- * Supplies upgrade actions keyed by {@link ComponentVersion}. Implementations typically perform classpath scanning or
- * return a fixed map for tests. The component version manager decides when each action is invoked.
- *
- * @param <A> concrete upgrade action type (for example OM-specific or HDDS-specific)
+ * Annotation to specify a Datanode upgrade action.
  */
-@FunctionalInterface
-public interface ComponentUpgradeActionProvider<A extends UpgradeAction<?>> {
-
-  /**
-   * Returns all upgrade actions from this provider, keyed by component version.
-   * <p>
-   * Implementations must return a newly allocated map on each call; the caller may retain and use it directly.
-   */
-  Map<ComponentVersion, A> load();
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface UpgradeActionDatanode {
+  HDDSLayoutFeature feature();
 }

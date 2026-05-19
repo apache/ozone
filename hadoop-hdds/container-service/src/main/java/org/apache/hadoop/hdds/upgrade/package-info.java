@@ -15,27 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.upgrade;
-
-import java.io.IOException;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-
 /**
- * Static utility methods for upgrade commands.
+ * Provides Datanode upgrade actions and providers.
  */
-public final class UpgradeUtil {
-
-  private UpgradeUtil() { }
-
-  /** Utility method to test if the upgrade has completed (finalized) or not.
-   *
-   * @param scmClient
-   * @return True if the cluster has completed the upgrade and is finalized.
-   * @throws IOException
-   */
-  public static boolean isFinalizationComplete(
-      StorageContainerLocationProtocol scmClient) throws IOException {
-    return scmClient.queryUpgradeStatus().getShouldFinalize();
-  }
-
-}
+package org.apache.hadoop.hdds.upgrade;

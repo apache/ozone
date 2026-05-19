@@ -27,6 +27,7 @@ import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
  * List of HDDS Layout Features. All version management has been migrated to {@link HDDSVersion} and no new additions
@@ -64,8 +65,8 @@ public enum HDDSLayoutFeature implements LayoutFeature {
 
   private final int layoutVersion;
   private final String description;
-  private HDDSUpgradeAction scmAction;
-  private HDDSUpgradeAction datanodeAction;
+  private UpgradeAction<?> scmAction;
+  private UpgradeAction<?> datanodeAction;
 
   HDDSLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
@@ -77,7 +78,7 @@ public enum HDDSLayoutFeature implements LayoutFeature {
    *
    * @param action The upgrade action to associate with this feature.
    */
-  public void addScmAction(HDDSUpgradeAction action) {
+  public void addScmAction(UpgradeAction<?> action) {
     // Required by SpotBugs since this setter exists in an enum.
     if (this.scmAction == null) {
       this.scmAction = action;
@@ -89,7 +90,7 @@ public enum HDDSLayoutFeature implements LayoutFeature {
    *
    * @param action The upgrade action to associate with this feature.
    */
-  public void addDatanodeAction(HDDSUpgradeAction action) {
+  public void addDatanodeAction(UpgradeAction<?> action) {
     // Required by SpotBugs since this setter exists in an enum.
     if (this.datanodeAction == null) {
       this.datanodeAction = action;
@@ -135,11 +136,11 @@ public enum HDDSLayoutFeature implements LayoutFeature {
     return name() + " (" + serialize() + ")";
   }
 
-  public Optional<HDDSUpgradeAction> scmAction() {
+  public Optional<UpgradeAction<?>> scmAction() {
     return Optional.ofNullable(scmAction);
   }
 
-  public Optional<HDDSUpgradeAction> datanodeAction() {
+  public Optional<UpgradeAction<?>> datanodeAction() {
     return Optional.ofNullable(datanodeAction);
   }
 }

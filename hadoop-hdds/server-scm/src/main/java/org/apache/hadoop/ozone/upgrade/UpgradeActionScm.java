@@ -15,12 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.upgrade;
+package org.apache.hadoop.ozone.upgrade;
 
-import org.apache.hadoop.ozone.upgrade.UpgradeAction;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 
 /**
- * Upgrade Action for SCM and DataNodes.
+ * Annotation to specify an SCM upgrade action.
  */
-public interface HDDSUpgradeAction<T> extends UpgradeAction<T> {
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface UpgradeActionScm {
+  HDDSLayoutFeature feature();
 }

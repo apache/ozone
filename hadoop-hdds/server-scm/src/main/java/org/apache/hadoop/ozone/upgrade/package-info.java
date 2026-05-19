@@ -15,17 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.upgrade;
-
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
-
-import org.apache.hadoop.ozone.om.OzoneManager;
-
 /**
- * Mock OM Request class for testing annotation.
+ * Provides SCM upgrade actions.
  */
-@BelongsToLayoutVersion(INITIAL_VERSION)
-public class MockOmRequest {
-  public void preExecute(OzoneManager om) {
-  }
-}
+package org.apache.hadoop.ozone.upgrade;

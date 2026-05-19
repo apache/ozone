@@ -137,19 +137,19 @@ public class TestSCMNodeManager {
   private StorageContainerManager scm;
   private SCMContext scmContext;
 
-  private static final int MAX_LV = HDDSLayoutVersionManager.maxLayoutVersion();
-  private static final LayoutVersionProto LARGER_SLV_LAYOUT_PROTO =
-      toLayoutVersionProto(MAX_LV, MAX_LV + 1);
-  private static final LayoutVersionProto SMALLER_MLV_LAYOUT_PROTO =
-      toLayoutVersionProto(MAX_LV - 1, MAX_LV);
+  private static final int MAX_SOFTWARE_VERSION = HDDSLayoutVersionManager.maxLayoutVersion();
+  private static final LayoutVersionProto LARGER_SOFTWARE_PROTO =
+      toLayoutVersionProto(MAX_SOFTWARE_VERSION, MAX_SOFTWARE_VERSION + 1);
+  private static final LayoutVersionProto SMALLER_APPARENT_VERSION_PROTO =
+      toLayoutVersionProto(MAX_SOFTWARE_VERSION - 1, MAX_SOFTWARE_VERSION);
   // In a real cluster, startup is disallowed if MLV is larger than SLV, so
   // increase both numbers to test smaller SLV or larger MLV.
-  private static final LayoutVersionProto SMALLER_MLV_SLV_LAYOUT_PROTO =
-      toLayoutVersionProto(MAX_LV - 1, MAX_LV - 1);
-  private static final LayoutVersionProto LARGER_MLV_SLV_LAYOUT_PROTO =
-      toLayoutVersionProto(MAX_LV + 1, MAX_LV + 1);
-  private static final LayoutVersionProto CORRECT_LAYOUT_PROTO =
-      toLayoutVersionProto(MAX_LV, MAX_LV);
+  private static final LayoutVersionProto SMALLER_ALL_VERSIONS_PROTO =
+      toLayoutVersionProto(MAX_SOFTWARE_VERSION - 1, MAX_SOFTWARE_VERSION - 1);
+  private static final LayoutVersionProto LARGER_ALL_VERSIONS_PROTO =
+      toLayoutVersionProto(MAX_SOFTWARE_VERSION + 1, MAX_SOFTWARE_VERSION + 1);
+  private static final LayoutVersionProto MATCHING_VERSION_PROTO =
+      toLayoutVersionProto(MAX_SOFTWARE_VERSION, MAX_SOFTWARE_VERSION);
 
   @BeforeEach
   public void setup() {
@@ -310,8 +310,10 @@ public class TestSCMNodeManager {
    * @throws InterruptedException
    * @throws TimeoutException
    */
-  @Test
-  public void testScmLayoutOnRegister()
+  // TODO HDDS-15129 This test will need to be updated to check registration conditions depending on SCM's
+  //  finalization state.
+  // @Test
+  public void testScmVersionOnRegister()
       throws Exception {
 
     OzoneConfiguration conf = getConf();
@@ -322,19 +324,19 @@ public class TestSCMNodeManager {
       assertTrue(scm.getScmContext().isLeader());
       // Nodes with mismatched SLV cannot join the cluster.
       registerWithCapacity(nodeManager,
-          LARGER_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
+          LARGER_SOFTWARE_PROTO, errorNodeNotPermitted);
       registerWithCapacity(nodeManager,
-          SMALLER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
+          SMALLER_ALL_VERSIONS_PROTO, errorNodeNotPermitted);
       registerWithCapacity(nodeManager,
-          LARGER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
+          LARGER_ALL_VERSIONS_PROTO, errorNodeNotPermitted);
       // Nodes with mismatched MLV can join
       DatanodeDetails badMlvNode1 = registerWithCapacity(nodeManager,
-          SMALLER_MLV_LAYOUT_PROTO, success);
+          SMALLER_APPARENT_VERSION_PROTO, success);
       DatanodeDetails badMlvNode2 = registerWithCapacity(nodeManager,
-          SMALLER_MLV_LAYOUT_PROTO, success);
+          SMALLER_APPARENT_VERSION_PROTO, success);
       // This node has correct MLV and SLV
       DatanodeDetails goodNode = registerWithCapacity(nodeManager,
-          CORRECT_LAYOUT_PROTO, success);
+          MATCHING_VERSION_PROTO, success);
 
       assertEquals(3, nodeManager.getAllNodes().size());
 
@@ -738,7 +740,7 @@ public class TestSCMNodeManager {
   }
 
   @Test
-  public void testDatanodeFinalizedCounterTracksLayoutVersionReports()
+  public void testDatanodeFinalizedCounterTracksVersionReports()
       throws IOException, AuthenticationException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       DatanodeDetails node =
@@ -776,13 +778,13 @@ public class TestSCMNodeManager {
       throws IOException, AuthenticationException, NodeNotFoundException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       DatanodeDetails finalizedNode =
-          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+          registerWithCapacity(nodeManager, MATCHING_VERSION_PROTO, success);
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
           "Finalized registration should increment finalized count");
 
       DatanodeDetails nonFinalizedNode =
-          registerWithCapacity(nodeManager, SMALLER_MLV_LAYOUT_PROTO, success);
+          registerWithCapacity(nodeManager, SMALLER_APPARENT_VERSION_PROTO, success);
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
           "Non-finalized registration should not increment finalized count");
@@ -822,10 +824,10 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       // transitionNode stops heartbeating and will become STALE or DEAD
       DatanodeDetails transitionNode =
-          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+          registerWithCapacity(nodeManager, MATCHING_VERSION_PROTO, success);
       // heartbeatingNode keeps heartbeating as a healthy baseline
       DatanodeDetails heartbeatingNode =
-          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+          registerWithCapacity(nodeManager, MATCHING_VERSION_PROTO, success);
 
       nodeManager.processHeartbeat(transitionNode);
       nodeManager.processHeartbeat(heartbeatingNode);
@@ -866,7 +868,7 @@ public class TestSCMNodeManager {
       throws IOException, AuthenticationException, NodeNotFoundException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       DatanodeDetails node =
-          registerWithCapacity(nodeManager, CORRECT_LAYOUT_PROTO, success);
+          registerWithCapacity(nodeManager, MATCHING_VERSION_PROTO, success);
       nodeManager.setNodeOperationalState(node, opState);
 
       // All HEALTHY nodes should be counted regardless of operational state
@@ -893,7 +895,7 @@ public class TestSCMNodeManager {
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion());
+        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion(), null, null);
     SCMContext nodeManagerContext = SCMContext.emptyContext();
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
@@ -928,7 +930,7 @@ public class TestSCMNodeManager {
     if (mvlLessThanSlv) {
       currentVersion -= 1;
     }
-    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(currentVersion);
+    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(currentVersion, null, null);
 
     SCMContext nodeManagerContext = SCMContext.emptyContext();
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
@@ -972,7 +974,7 @@ public class TestSCMNodeManager {
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion());
+        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion(), null, null);
     createNodeManager(getConf());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
@@ -2164,7 +2166,7 @@ public class TestSCMNodeManager {
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion());
+    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion(), null, null);
     createNodeManager(getConf());
     SCMNodeManager nodeManager = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),

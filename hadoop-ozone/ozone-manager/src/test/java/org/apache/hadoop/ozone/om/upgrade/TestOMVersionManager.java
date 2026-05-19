@@ -124,6 +124,7 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
     return OzoneManagerVersion.SOFTWARE_VERSION;
   }
 
+  @Override
   @Test
   public void testClasspathScanDiscoversUpgradeActions() throws Exception {
     // Regardless of whether OM is finalized, the same set of upgrade actions should be loaded.
@@ -140,6 +141,7 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
     }
   }
 
+  @Override
   @Test
   public void testFinalizeRunsSuppliedUpgradeAction() throws Exception {
     OmUpgradeAction mockECAction = mock(OmUpgradeAction.class);
@@ -163,6 +165,7 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
     }
   }
 
+  @Override
   @Test
   public void testUpgradeActionFailureAbortsFinalize() throws Exception {
     ComponentUpgradeActionProvider<OmUpgradeAction> provider = () -> {
@@ -183,6 +186,7 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
     }
   }
 
+  @Override
   @Test
   public void testPersistFailureRollsBack() throws Exception {
     // Create a mock storage instance that throws when persisting version updates.

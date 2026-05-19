@@ -27,8 +27,8 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
 /**
  * Component version manager for HDDS (Datanodes and SCM).
  */
-public class HDDSVersionManager extends ComponentVersionManager {
-  public HDDSVersionManager(Storage storage) throws IOException {
+public abstract class HDDSVersionManager extends ComponentVersionManager {
+  protected HDDSVersionManager(Storage storage) throws IOException {
     super(storage, computeApparentVersion(storage.getApparentVersion()), HDDSVersion.SOFTWARE_VERSION);
   }
 
@@ -58,7 +58,5 @@ public class HDDSVersionManager extends ComponentVersionManager {
   }
 
   @Override
-  protected void runUpgradeAction(ComponentVersion componentVersion) throws UpgradeException {
-    // TODO HDDS-15129: Register upgrade actions based on annotations
-  }
+  protected abstract void runUpgradeAction(ComponentVersion version) throws UpgradeException;
 }

@@ -69,7 +69,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -79,8 +78,8 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -441,17 +440,16 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
   }
 
   private LayoutVersionProto createLayoutInfo() throws IOException {
-    Storage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString());
 
-    HDDSLayoutVersionManager layoutVersionManager =
-        new HDDSLayoutVersionManager(layoutStorage.getApparentVersion());
+    DatanodeVersionManager versionManager = new DatanodeVersionManager(layoutStorage, null);
 
     return LayoutVersionProto.newBuilder()
         .setMetadataLayoutVersion(
-            layoutVersionManager.getMetadataLayoutVersion())
+            versionManager.getApparentVersion().serialize())
         .setSoftwareLayoutVersion(
-            layoutVersionManager.getSoftwareLayoutVersion())
+            versionManager.getSoftwareVersion().serialize())
         .build();
   }
 

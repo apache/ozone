@@ -17,17 +17,12 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
- * Annotation to mark a class or a field declaration that belongs to a specific
- * HDDS Layout Version.
+ * Storage Container Manager Upgrade Action interface. An upgrade action is an operation that
+ * needs to be executed during finalization.
  */
-@Target({ElementType.TYPE, ElementType.FIELD})
-@Retention(RetentionPolicy.RUNTIME)
-public @interface BelongsToHDDSLayoutVersion {
-  HDDSLayoutFeature value();
+public interface ScmUpgradeAction extends UpgradeAction<SCMUpgradeFinalizationContext> {
 }
