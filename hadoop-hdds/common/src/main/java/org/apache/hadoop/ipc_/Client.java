@@ -1269,15 +1269,6 @@ public class Client implements AutoCloseable {
     this.clientId = ClientId.getClientId();
   }
 
-  /**
-   * Construct an IPC client with the default SocketFactory.
-   * @param valueClass input valueClass.
-   * @param conf input Configuration.
-   */
-  public Client(Class<? extends Writable> valueClass, Configuration conf) {
-    this(valueClass, conf, NetUtils.getDefaultSocketFactory(conf));
-  }
-
   @Override
   public String toString() {
     return getClass().getSimpleName() + "-"
