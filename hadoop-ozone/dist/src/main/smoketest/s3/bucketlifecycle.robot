@@ -29,12 +29,14 @@ ${BUCKET}             generated
 *** Test Cases ***
 
 Set bucket lifecycle configuration
+    [tags]    no-bucket-type
     ${bucket} =         Create bucket
     ${lifecycle_json} =     Set Variable    {"Rules": [{"ID": "Rule1", "Prefix": "prefix1/", "Status": "Enabled", "Expiration": {"Days": 1}}]}
     ${result} =         Execute AWSS3APICli     put-bucket-lifecycle-configuration --bucket ${bucket} --lifecycle-configuration '${lifecycle_json}'
                         Should Be Empty         ${result}
 
 Get bucket lifecycle configuration
+    [tags]    no-bucket-type
     ${bucket} =         Create bucket
     ${lifecycle_json} =     Set Variable    {"Rules": [{"ID": "Rule1", "Prefix": "prefix1/", "Status": "Enabled", "Expiration": {"Days": 1}}]}
     ${result} =         Execute AWSS3APICli     put-bucket-lifecycle-configuration --bucket ${bucket} --lifecycle-configuration '${lifecycle_json}'
@@ -42,8 +44,10 @@ Get bucket lifecycle configuration
                         Should contain          ${result}           Rule1
                         Should contain          ${result}           prefix1/
                         Should contain          ${result}           Enabled
+                        Should contain          ${result}           "Days": 1
 
 Delete bucket lifecycle configuration
+    [tags]    no-bucket-type
     ${bucket} =         Create bucket
     ${lifecycle_json} =     Set Variable    {"Rules": [{"ID": "Rule1", "Prefix": "prefix1/", "Status": "Enabled", "Expiration": {"Days": 1}}]}
     ${result} =         Execute AWSS3APICli     put-bucket-lifecycle-configuration --bucket ${bucket} --lifecycle-configuration '${lifecycle_json}'
