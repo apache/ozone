@@ -638,8 +638,9 @@ public class TestDiskBalancerSubCommands {
       assertTrue(output.contains("\"volumes\""));
       assertTrue(output.contains("\"storageId\""));
       assertTrue(output.contains("\"storagePath\""));
-      assertTrue(output.contains("\"totalCapacity\""));
-      assertTrue(output.contains("\"usedSpace\""));
+      assertTrue(output.contains("\"ozoneCapacity\""));
+      assertTrue(output.contains("\"ozoneAvailable\""));
+      assertTrue(output.contains("\"ozoneUsed\""));
       assertTrue(output.contains("\"effectiveUsedSpace\""));
       assertTrue(output.contains("\"utilization\""));
       assertTrue(output.contains("\"volumeDensity\""));
@@ -791,6 +792,8 @@ public class TestDiskBalancerSubCommands {
     double util2 = idealUsage - random.nextDouble() * 0.1;
     long used1 = (long) (capacity1 * util1);
     long used2 = (long) (capacity2 * util2);
+    long available1 = capacity1 - used1;
+    long available2 = capacity2 - used2;
     long effective1 = used1 + committed1;
     long effective2 = used2 + committed2;
     String path1 = "/data/hdds-" + hostname + "-1";
@@ -800,8 +803,9 @@ public class TestDiskBalancerSubCommands {
         .setStoragePath(path1)
         .setUtilization(util1)
         .setCommittedBytes(committed1)
-        .setTotalCapacity(capacity1)
-        .setUsedSpace(used1)
+        .setOzoneCapacity(capacity1)
+        .setOzoneAvailable(available1)
+        .setOzoneUsedSpace(used1)
         .setEffectiveUsedSpace(effective1)
         .build();
     VolumeReportProto vol2 = VolumeReportProto.newBuilder()
@@ -809,8 +813,9 @@ public class TestDiskBalancerSubCommands {
         .setStoragePath(path2)
         .setUtilization(util2)
         .setCommittedBytes(committed2)
-        .setTotalCapacity(capacity2)
-        .setUsedSpace(used2)
+        .setOzoneCapacity(capacity2)
+        .setOzoneAvailable(available2)
+        .setOzoneUsedSpace(used2)
         .setEffectiveUsedSpace(effective2)
         .build();
 
