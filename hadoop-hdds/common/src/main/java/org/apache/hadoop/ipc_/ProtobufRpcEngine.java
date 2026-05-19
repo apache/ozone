@@ -30,7 +30,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.concurrent.AsyncGet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,6 @@ import java.lang.reflect.Proxy;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -50,8 +48,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ProtobufRpcEngine implements RpcEngine {
   public static final Logger LOG =
       LoggerFactory.getLogger(ProtobufRpcEngine.class);
-  private static final ThreadLocal<AsyncGet<Message, Exception>>
-      ASYNC_RETURN_MESSAGE = new ThreadLocal<>();
 
   static { // Register the rpcRequest deserializer for ProtobufRpcEngine
     org.apache.hadoop.ipc_.Server.registerProtocolEngine(
@@ -60,10 +56,6 @@ public class ProtobufRpcEngine implements RpcEngine {
   }
 
   private static final ClientCache CLIENTS = new ClientCache();
-
-  public static AsyncGet<Message, Exception> getAsyncReturnMessage() {
-    return ASYNC_RETURN_MESSAGE.get();
-  }
 
   @Override
   @SuppressWarnings("unchecked")
@@ -232,26 +224,7 @@ public class ProtobufRpcEngine implements RpcEngine {
         LOG.debug("Call: " + method.getName() + " took " + callTime + "ms");
       }
       
-      if (Client.isAsynchronousMode()) {
-        final AsyncGet<RpcWritable.Buffer, IOException> arr
-            = Client.getAsyncRpcResponse();
-        final AsyncGet<Message, Exception> asyncGet
-            = new AsyncGet<Message, Exception>() {
-          @Override
-          public Message get(long timeout, TimeUnit unit) throws Exception {
-            return getReturnMessage(method, arr.get(timeout, unit));
-          }
-
-          @Override
-          public boolean isDone() {
-            return arr.isDone();
-          }
-        };
-        ASYNC_RETURN_MESSAGE.set(asyncGet);
-        return null;
-      } else {
-        return getReturnMessage(method, val);
-      }
+      return getReturnMessage(method, val);
     }
 
     protected Writable constructRpcRequest(Method method, Message theRequest) {
@@ -341,9 +314,6 @@ public class ProtobufRpcEngine implements RpcEngine {
   
   public static class Server extends RPC.Server {
 
-    static final ThreadLocal<ProtobufRpcEngineCallback> currentCallback =
-        new ThreadLocal<>();
-
     static final ThreadLocal<CallInfo> currentCallInfo = new ThreadLocal<>();
 
     static class CallInfo {
@@ -354,43 +324,6 @@ public class ProtobufRpcEngine implements RpcEngine {
         this.server = server;
         this.methodName = methodName;
       }
-    }
-
-    static class ProtobufRpcEngineCallbackImpl
-        implements ProtobufRpcEngineCallback {
-
-      private final RPC.Server server;
-      private final Call call;
-      private final String methodName;
-      private final long setupTime;
-
-      public ProtobufRpcEngineCallbackImpl() {
-        this.server = currentCallInfo.get().server;
-        this.call = Server.getCurCall().get();
-        this.methodName = currentCallInfo.get().methodName;
-        this.setupTime = Time.now();
-      }
-
-      @Override
-      public void setResponse(Message message) {
-        long processingTime = Time.now() - setupTime;
-        call.setDeferredResponse(RpcWritable.wrap(message));
-        server.updateDeferredMetrics(methodName, processingTime);
-      }
-
-      @Override
-      public void error(Throwable t) {
-        long processingTime = Time.now() - setupTime;
-        String detailedMetricsName = t.getClass().getSimpleName();
-        server.updateDeferredMetrics(detailedMetricsName, processingTime);
-        call.setDeferredError(t);
-      }
-    }
-
-    public static ProtobufRpcEngineCallback registerForDeferredResponse() {
-      ProtobufRpcEngineCallback callback = new ProtobufRpcEngineCallbackImpl();
-      currentCallback.set(callback);
-      return callback;
     }
 
     /**
@@ -526,13 +459,6 @@ public class ProtobufRpcEngine implements RpcEngine {
           currentCallInfo.set(new CallInfo(server, methodName));
           currentCall.setDetailedMetricsName(methodName);
           result = service.callBlockingMethod(methodDescriptor, null, param);
-          // Check if this needs to be a deferred response,
-          // by checking the ThreadLocal callback being set
-          if (currentCallback.get() != null) {
-            currentCall.deferResponse();
-            currentCallback.set(null);
-            return null;
-          }
         } catch (ServiceException e) {
           Exception exception = (Exception) e.getCause();
           currentCall.setDetailedMetricsName(
