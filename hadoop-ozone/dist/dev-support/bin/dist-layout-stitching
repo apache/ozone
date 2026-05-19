@@ -149,14 +149,14 @@ done
 NATIVE_LIBS_DIR="${ROOT}/target/native-lib"
 
 # Check if the libhadoop files actually exist before attempting to copy
-if ls "${NATIVE_LIBS_DIR}"/libhadoop.* 1> /dev/null 2>&1; then
+if ls "${NATIVE_LIBS_DIR}"/libhadoop* 1> /dev/null 2>&1; then
   echo "Found Hadoop native libraries. Copying to distribution..."
 
   # Create the native directory in the final staging area
   run mkdir -p ./lib/native
 
   # Copy the files and symlinks safely
-  run cp -rP "${NATIVE_LIBS_DIR}/"libhadoop.* ./lib/native
+  run cp -rP "${NATIVE_LIBS_DIR}/"libhadoop* ./lib/native
 else
   echo "Hadoop native libraries not found. Skipping native copy."
 fi

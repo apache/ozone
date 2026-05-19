@@ -2653,17 +2653,16 @@
             <inherited>false</inherited>
             <executions>
               <execution>
-                <id>fetch-hadoop-native-tar</id>
+                <id>fetch-linux-library</id>
                 <goals>
                   <goal>wget</goal>
                 </goals>
                 <phase>generate-resources</phase>
                 <configuration>
-                  <url>https://archive.apache.org/dist/hadoop/common/hadoop-${hadoop.version}/hadoop-${hadoop.version}.tar.gz</url>
-                  <unpack>true</unpack>
-                  <outputDirectory>${project.build.directory}/hadoop-bin</outputDirectory>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
                   <skipCache>false</skipCache>
-                  <overwrite>false</overwrite>
                 </configuration>
               </execution>
             </executions>
@@ -2675,16 +2674,16 @@
             <inherited>false</inherited>
             <executions>
               <execution>
+                <id>extract-linux-library</id>
                 <goals>
                   <goal>run</goal>
                 </goals>
                 <phase>prepare-package</phase>
                 <configuration>
                   <target>
-                    <mkdir dir="${project.build.directory}/native-lib" />
-                    <exec executable="bash" failonerror="true">
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
                       <arg value="-c" />
-                      <arg value="cp -P ${project.build.directory}/hadoop-bin/hadoop-*/lib/native/libhadoop.so* ${project.build.directory}/native-lib/" />
+                      <arg value="ln -sf libhadoop_linux_x86_64.so libhadoop.so" />
                     </exec>
                   </target>
                 </configuration>
@@ -2714,14 +2713,13 @@
             <inherited>false</inherited>
             <executions>
               <execution>
-                <id>fetch-mac-binary</id>
+                <id>fetch-mac-library</id>
                 <goals>
                   <goal>wget</goal>
                 </goals>
                 <phase>generate-resources</phase>
                 <configuration>
-                  <!-- TODO: change ChenSammi to apache after https://github.com/apache/ozone-docker-runner/pull/66 is merged-->
-                  <url>https://raw.githubusercontent.com/ChenSammi/ozone-docker-runner/master/hadoop-native-lib/Mac_OS_X-aarch64/${hadoop.version}/libhadoop.1.0.0.dylib</url>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
                   <unpack>false</unpack>
                   <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
                   <skipCache>false</skipCache>
@@ -2736,6 +2734,7 @@
             <inherited>false</inherited>
             <executions>
               <execution>
+                <id>extract-mac-library</id>
                 <goals>
                   <goal>run</goal>
                 </goals>
@@ -2744,7 +2743,7 @@
                   <target>
                     <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
                       <arg value="-c" />
-                      <arg value="ln -sf libhadoop.1.0.0.dylib libhadoop.dylib" />
+                      <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
                     </exec>
                   </target>
                 </configuration>
