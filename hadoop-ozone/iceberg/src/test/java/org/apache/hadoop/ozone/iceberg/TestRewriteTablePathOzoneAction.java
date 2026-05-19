@@ -64,6 +64,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableMetadata.MetadataLogEntry;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.actions.RewriteTablePath;
+import org.apache.iceberg.data.GenericRecord;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
@@ -326,9 +327,7 @@ class TestRewriteTablePathOzoneAction {
   void usesCurrentMetadataIfEndVersionNotProvided() {
     String currentMetadata = ((HasTableOperations) table).operations().current().metadataFileLocation();
     RewriteTablePathOzoneAction action = new RewriteTablePathOzoneAction(table);
-    action.rewriteLocationPrefix(sourcePrefix, targetPrefix)
-        .stagingLocation(stagingDir + "/");
-
+    action.rewriteLocationPrefix(sourcePrefix, targetPrefix).stagingLocation(stagingDir + "/");
     RewriteTablePath.Result result = action.execute();
     assertThat(result.latestVersion()).isEqualTo(RewriteTablePathUtil.fileName(currentMetadata));
   }
@@ -336,7 +335,6 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void defaultStagingDirIsUnderTableMetadataLocation() {
     String metadataLocation = RewriteTablePathOzoneUtils.getMetadataLocation(table);
-
     RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table)
         .rewriteLocationPrefix(sourcePrefix, targetPrefix)
         .execute();
@@ -459,7 +457,7 @@ class TestRewriteTablePathOzoneAction {
     try (PositionDeleteWriter<Record> writer = RewriteTablePathOzoneAction.positionDeletesWriter(
         outputFile, format, spec, new PartitionData(spec.partitionType()), SCHEMA)) {
 
-      org.apache.iceberg.data.GenericRecord row = org.apache.iceberg.data.GenericRecord.create(SCHEMA);
+      GenericRecord row = GenericRecord.create(SCHEMA);
       row.setField("c1", 42);
       row.setField("c2", format.name() + "-test");
 
