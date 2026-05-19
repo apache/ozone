@@ -606,51 +606,120 @@ public class ChatbotAgent {
   }
 
   /**
-   * Parses the tool call JSON from the LLM response.
+   * Parses the LLM's JSON response into a {@link ToolCall}.
+   *
+   * <p>The LLM always returns a unified JSON envelope with a {@code "type"} field that
+   * identifies one of three response shapes. All three share the same outer structure,
+   * differing only in which additional fields are present:
+   *
+   * <pre>
+   * SINGLE_ENDPOINT  — one Recon API call needed:
+   * {
+   *   "type": "SINGLE_ENDPOINT",
+   *   "endpoint": "/api/v1/datanodes",
+   *   "method": "GET",
+   *   "parameters": { "limit": "10" },
+   *   "reasoning": "..."
+   * }
+   *
+   * MULTI_ENDPOINT   — several Recon API calls needed:
+   * {
+   *   "type": "MULTI_ENDPOINT",
+   *   "reasoning": "why multiple endpoints are needed",
+   *   "tool_calls": [
+   *     { "endpoint": "/api/v1/clusterState", "method": "GET", "parameters": {}, "reasoning": "..." },
+   *     { "endpoint": "/api/v1/datanodes",    "method": "GET", "parameters": {}, "reasoning": "..." }
+   *   ]
+   * }
+   *
+   * DOCUMENTATION_QUERY — general question answered directly from the LLM's knowledge:
+   * {
+   *   "type": "DOCUMENTATION_QUERY",
+   *   "answer": "Apache Ozone is ...",
+   *   "reasoning": "..."
+   * }
+   * </pre>
+   *
+   * <p>The {@code type} field is the single discriminator. Having it present on every response
+   * lets the parser be a simple {@code switch} rather than a chain of field-existence checks.</p>
+   *
+   * <p><b>Unrecognized or missing type:</b> Since all three response shapes always include a
+   * {@code "type"} field, a missing or unrecognized value means the LLM returned something
+   * completely unexpected. In that case this method returns {@code null}. The caller
+   * ({@link #getToolCall}) propagates {@code null} to {@link #processQuery}, which then calls
+   * {@link #handleFallback} to produce a graceful "I cannot answer this" response.</p>
    */
   private ToolCall parseToolCall(JsonNode jsonNode) {
-    ToolCall toolCall = new ToolCall();
+    String type = jsonNode.path("type").asText("");
 
-    // Check if documentation query
-    if (jsonNode.has("type") &&
-        "DOCUMENTATION_QUERY".equals(jsonNode.get("type").asText())) {
-      toolCall.setDocumentationQuery(true);
-      toolCall.setAnswer(jsonNode.path("answer").asText(""));
-      toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
-      return toolCall;
-    }
-
-    // Check if multiple endpoints
-    if (jsonNode.has("requires_multiple_calls") &&
-        jsonNode.get("requires_multiple_calls").asBoolean()) {
-      toolCall.setMultipleEndpoints(true);
-      List<ToolCall> toolCalls = new ArrayList<>();
-      JsonNode toolCallsArray = jsonNode.get("tool_calls");
-      if (toolCallsArray != null && toolCallsArray.isArray()) {
-        int added = 0;
-        for (JsonNode tc : toolCallsArray) {
-          if (added >= maxToolCalls) {
-            LOG.info("Truncating tool_calls from LLM to maxToolCalls={}",
-                maxToolCalls);
-            break;
-          }
-          ToolCall parsed = parseSingleToolCall(tc);
-          if (parsed.getEndpoint() != null && !parsed.getEndpoint().isEmpty()) {
-            toolCalls.add(parsed);
-            added++;
-          }
-        }
+    switch (type) {
+      case "SINGLE_ENDPOINT": {
+        return parseSingleToolCall(jsonNode);
       }
-      toolCall.setToolCalls(toolCalls);
-      return toolCall;
+      case "MULTI_ENDPOINT": {
+        ToolCall toolCall = new ToolCall();
+        toolCall.setMultipleEndpoints(true);
+        toolCall.setToolCalls(parseToolCallList(jsonNode.get("tool_calls")));
+        return toolCall;
+      }
+      case "DOCUMENTATION_QUERY": {
+        ToolCall toolCall = new ToolCall();
+        toolCall.setDocumentationQuery(true);
+        toolCall.setAnswer(jsonNode.path("answer").asText(""));
+        toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
+        return toolCall;
+      }
+      default: {
+        // "type" is missing or unrecognized — the LLM returned something unexpected.
+        // Return null so the caller triggers handleFallback() with a graceful error response.
+        LOG.warn("Unrecognized LLM response type '{}' — cannot parse tool call, using fallback", type);
+        return null;
+      }
     }
-
-    // Single endpoint
-    return parseSingleToolCall(jsonNode);
   }
 
   /**
-   * Parses a single tool call from JSON.
+   * Parses the {@code tool_calls} array from a {@code MULTI_ENDPOINT} response into a list
+   * of individual {@link ToolCall} objects, capped at {@link #maxToolCalls}.
+   *
+   * <p>Each element in the array has the same shape as a {@code SINGLE_ENDPOINT} response
+   * (endpoint, method, parameters, reasoning), so {@link #parseSingleToolCall} is reused.
+   * Entries with a missing or empty endpoint are silently skipped.</p>
+   */
+  private List<ToolCall> parseToolCallList(JsonNode toolCallsArray) {
+    List<ToolCall> result = new ArrayList<>();
+    if (toolCallsArray == null || !toolCallsArray.isArray()) {
+      return result;
+    }
+    for (JsonNode tc : toolCallsArray) {
+      if (result.size() >= maxToolCalls) {
+        LOG.info("Truncating tool_calls from LLM to maxToolCalls={}", maxToolCalls);
+        break;
+      }
+      ToolCall parsed = parseSingleToolCall(tc);
+      if (parsed.getEndpoint() != null && !parsed.getEndpoint().isEmpty()) {
+        result.add(parsed);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Parses a single endpoint entry from JSON.
+   *
+   * <p>Used both for standalone {@code SINGLE_ENDPOINT} responses and for each element
+   * inside the {@code tool_calls} array of a {@code MULTI_ENDPOINT} response. The shape
+   * is identical in both cases:
+   * <pre>
+   * {
+   *   "endpoint":   "/api/v1/datanodes",
+   *   "method":     "GET",
+   *   "parameters": { "key": "value" },
+   *   "reasoning":  "..."
+   * }
+   * </pre>
+   * All fields have safe defaults: {@code endpoint} defaults to {@code ""}, {@code method}
+   * defaults to {@code "GET"}, and missing parameters produce an empty map.</p>
    */
   private ToolCall parseSingleToolCall(JsonNode jsonNode) {
     ToolCall toolCall = new ToolCall();
@@ -660,13 +729,11 @@ public class ChatbotAgent {
     Map<String, String> parameters = new HashMap<>();
     JsonNode paramsNode = jsonNode.get("parameters");
     if (paramsNode != null && paramsNode.isObject()) {
-      paramsNode.fields().forEachRemaining(entry -> {
-        parameters.put(entry.getKey(), entry.getValue().asText());
-      });
+      paramsNode.fields().forEachRemaining(entry ->
+          parameters.put(entry.getKey(), entry.getValue().asText()));
     }
     toolCall.setParameters(parameters);
     toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
-
     return toolCall;
   }
 

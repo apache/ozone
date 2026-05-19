@@ -30,8 +30,11 @@ your assumption in the "reasoning" field.
 
 IMPORTANT: If the user's question requires data from MULTIPLE API endpoints to give a complete answer, return ALL needed endpoints in an array.
 
+All three response types share a common "type" field so the format is always consistent.
+
 For SINGLE endpoint DATA queries, return this JSON format:
 {
+  "type": "SINGLE_ENDPOINT",
   "endpoint": "/api/v1/path",
   "method": "GET",
   "parameters": {},
@@ -40,11 +43,19 @@ For SINGLE endpoint DATA queries, return this JSON format:
 
 For MULTIPLE endpoint DATA queries, return this JSON format:
 {
+  "type": "MULTI_ENDPOINT",
+  "reasoning": "Brief explanation of why multiple endpoints are needed to answer this query",
   "tool_calls": [
     { "endpoint": "/api/v1/path1", "method": "GET", "parameters": {}, "reasoning": "Explain what data this provides" },
     { "endpoint": "/api/v1/path2", "method": "GET", "parameters": {}, "reasoning": "Explain what data this provides" }
-  ],
-  "requires_multiple_calls": true
+  ]
+}
+
+For DOCUMENTATION queries, return this JSON format:
+{
+  "type": "DOCUMENTATION_QUERY",
+  "answer": "Direct answer based on the API guide",
+  "reasoning": "Explanation of what documentation was referenced"
 }
 
 Examples requiring SINGLE endpoint:
@@ -59,13 +70,6 @@ Examples requiring MULTIPLE endpoints:
 - "Cluster state and open keys summary" -> /clusterState + /keys/open/summary
 - "Are there any under-replicated or missing containers?" -> /containers/unhealthy + /containers/missing
 - "Show me the full health picture of the cluster" -> /clusterState + /datanodes + /pipelines + /task/status
-
-For DOCUMENTATION queries, return this JSON format:
-{
-  "type": "DOCUMENTATION_QUERY",
-  "answer": "Direct answer based on the API guide",
-  "reasoning": "Explanation of what documentation was referenced"
-}
 
 If the query cannot be answered by any available API endpoint OR documentation, respond with: NO_SUITABLE_ENDPOINT
 
