@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link LLMClient} implementation that sends chat requests to cloud LLM providers using
@@ -76,7 +77,7 @@ import java.util.Map;
  *         |
  *         +-- Resolve provider (see below)
  *         |
- *         +-- Build a new ChatLanguageModel for that provider + model name (configuration only)
+ *         +-- Resolve or retrieve cached ChatLanguageModel for that provider + model name
  *         |
  *         +-- Translate ChatMessage list to LangChain4j messages (system / user / assistant)
  *         |
@@ -96,11 +97,13 @@ import java.util.Map;
  *       {@code gemini} → {@code gemini}; {@code claude} → {@code anthropic}.</li>
  *   <li>If still unclear, {@link ChatbotConfigKeys#OZONE_RECON_CHATBOT_PROVIDER} is used.</li>
  * </ol>
- * <p>For each call, a fresh {@link ChatLanguageModel} is built with the exact model id the
- * caller passed (for example {@code gemini-2.5-flash}). That object holds provider settings
- * and timeout; the heavy work is the single {@code chat(...)} call. Different users on
- * different threads each follow this flow independently; only read-only configuration is
- * shared on the dispatcher instance.</p>
+ * <p>{@link ChatLanguageModel} instances are built once per {@code (provider, model)} pair and
+ * cached in {@code modelCache} for the lifetime of the process. On the first request for a
+ * given model (e.g. {@code gemini-2.5-flash}), the HTTP client, SSL context, and connection
+ * pool are constructed and stored. All subsequent requests for that model — from any thread —
+ * reuse the same cached instance. The heavy work is the single {@code chat(...)} call.
+ * Different users on different threads each follow this flow independently; the cached model
+ * instance is stateless and holds no per-request data.</p>
  *
  * <h2>Supported models listing</h2>
  * <p>{@link #getSupportedModels()} returns a fixed list per provider for which a non-empty
@@ -122,6 +125,20 @@ public class LangChain4jDispatcher implements LLMClient {
    * A provider only appears here if its API key is configured.
    */
   private final Map<String, List<String>> supportedModels = new HashMap<>();
+
+  /**
+   * Cache of built {@link ChatLanguageModel} instances, keyed by {@code "provider:model"}.
+   *
+   * <p>Building a model involves constructing an HTTP client, SSL context, and connection pool —
+   * expensive operations that should happen once, not on every request. This cache ensures each
+   * (provider, model) pair is built exactly once and then reused for all subsequent calls.</p>
+   *
+   * <p>{@link ConcurrentHashMap} is used because multiple chatbot executor threads may call
+   * {@link #chatCompletion} concurrently. In the unlikely event two threads request the same
+   * model simultaneously on the first call, both may build an instance, but the map will
+   * simply retain one — both instances are functionally identical.</p>
+   */
+  private final Map<String, ChatLanguageModel> modelCache = new ConcurrentHashMap<>();
 
   @Inject
   public LangChain4jDispatcher(OzoneConfiguration configuration,
@@ -286,10 +303,28 @@ public class LangChain4jDispatcher implements LLMClient {
   }
 
   /**
-   * Builds a LangChain4j {@link ChatLanguageModel} for the given provider and model name.
-   * The API key is always resolved from the server configuration via {@link CredentialHelper}.
+   * Returns a {@link ChatLanguageModel} for the given provider and model, building and caching
+   * it on first use. Subsequent calls for the same (provider, model) pair return the cached
+   * instance immediately — no HTTP client or SSL context is re-created.
    */
   private ChatLanguageModel buildModel(String provider, String model) throws LLMException {
+    String cacheKey = provider + ":" + model;
+    ChatLanguageModel cached = modelCache.get(cacheKey);
+    if (cached != null) {
+      return cached;
+    }
+    ChatLanguageModel built = buildModelInternal(provider, model);
+    modelCache.put(cacheKey, built);
+    LOG.info("Built and cached ChatLanguageModel for provider={}, model={}", provider, model);
+    return built;
+  }
+
+  /**
+   * Constructs a new LangChain4j {@link ChatLanguageModel} for the given provider and model name.
+   * The API key is always resolved from the server configuration via {@link CredentialHelper}.
+   * Callers should prefer {@link #buildModel} which caches the result.
+   */
+  private ChatLanguageModel buildModelInternal(String provider, String model) throws LLMException {
     switch (provider) {
       case "openai": {
         String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "openai");
