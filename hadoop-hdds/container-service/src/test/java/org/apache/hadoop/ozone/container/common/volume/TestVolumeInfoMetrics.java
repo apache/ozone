@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +44,7 @@ class TestVolumeInfoMetrics {
     when(volume.getType()).thenReturn(HddsVolume.VolumeType.DATA_VOLUME);
     when(volume.getCommittedBytes()).thenReturn(10L);
     when(volume.getContainers()).thenReturn(3L);
+    when(volume.getReportedFreeSpaceToSpare(anyLong())).thenReturn(20L);
 
     VolumeUsage volumeUsage = mock(VolumeUsage.class);
     when(volume.getVolumeUsage()).thenReturn(volumeUsage);
@@ -56,7 +58,7 @@ class TestVolumeInfoMetrics {
     when(volumeUsage.getReservedInBytes()).thenReturn(50L);
 
     // Raw filesystem stats
-    when(volumeUsage.realUsage()).thenReturn(new SpaceUsageSource.Fixed(2000L, 1500L, 500L));
+    when(volumeUsage.realUsage()).thenReturn(new SpaceUsageSource.Fixed(2000L, 1100L, 500L));
 
     VolumeInfoMetrics metrics = new VolumeInfoMetrics("test-vol-1", volume);
     try {
@@ -72,8 +74,11 @@ class TestVolumeInfoMetrics {
       assertThat(findMetric(all, "OzoneUsed")).isEqualTo(100L);
 
       assertThat(findMetric(all, "FilesystemCapacity")).isEqualTo(2000L);
-      assertThat(findMetric(all, "FilesystemAvailable")).isEqualTo(1500L);
+      assertThat(findMetric(all, "FilesystemAvailable")).isEqualTo(1100L);
       assertThat(findMetric(all, "FilesystemUsed")).isEqualTo(500L);
+
+      assertThat(findMetric(all, "MinFreeSpace")).isEqualTo(20L);
+      assertThat(findMetric(all, "NonOzoneUsed")).isEqualTo(400L);
     } finally {
       metrics.unregister();
     }
