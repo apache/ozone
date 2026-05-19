@@ -137,6 +137,7 @@ This page provides a comprehensive overview of the configuration keys available 
       value = placeholder_pattern.sub(r'`\1{\2}`', value)
       value = value.replace('\n', ' ')
       value = multi_space_pattern.sub(' ', value)
+      value = escape_mdx_markup(value)
     
     markdown += f"| `{prop.name}` | {value} | {prop.tag} | {description} |\n"
   
