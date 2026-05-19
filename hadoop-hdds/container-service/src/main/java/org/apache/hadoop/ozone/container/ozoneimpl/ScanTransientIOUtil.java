@@ -17,7 +17,11 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import java.nio.file.FileSystemException;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Locale;
+import java.util.Set;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 
 /**
@@ -25,6 +29,8 @@ import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
  * that should not be treated as container data corruption.
  */
 public final class ScanTransientIOUtil {
+
+  private static final int MAX_CAUSE_CHAIN_DEPTH = 64;
 
   private static final String TOO_MANY_OPEN_FILES = "too many open files";
 
@@ -44,13 +50,33 @@ public final class ScanTransientIOUtil {
   }
 
   public static boolean isTooManyOpenFiles(Throwable throwable) {
-    for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
-      String message = cause.getMessage();
-      if (message != null && containsTooManyOpenFiles(message)) {
+    if (throwable == null) {
+      return false;
+    }
+    Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    int depth = 0;
+    for (Throwable cause = throwable;
+        cause != null && depth < MAX_CAUSE_CHAIN_DEPTH;
+        cause = cause.getCause(), depth++) {
+      if (!visited.add(cause)) {
+        break;
+      }
+      if (matchesTooManyOpenFiles(cause)) {
         return true;
       }
     }
     return false;
+  }
+
+  private static boolean matchesTooManyOpenFiles(Throwable throwable) {
+    if (throwable instanceof FileSystemException) {
+      String reason = ((FileSystemException) throwable).getReason();
+      if (reason != null && containsTooManyOpenFiles(reason)) {
+        return true;
+      }
+    }
+    String message = throwable.getMessage();
+    return message != null && containsTooManyOpenFiles(message);
   }
 
   private static boolean containsTooManyOpenFiles(String text) {

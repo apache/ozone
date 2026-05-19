@@ -120,10 +120,12 @@ public final class ContainerScanHelper {
    * If every scan error is related to file-descriptor exhaustion, return without marking container unhealthy.
    */
   public void handleUnhealthyScanResult(ContainerData containerData, ScanResult result) throws IOException {
+    long containerID = containerData.getContainerID();
     if (ScanTransientIOUtil.scanErrorsAreOnlyTooManyOpenFiles(result)) {
+      log.warn("Skipped marking container UNHEALTHY [{}]: scan failed due to transient " +
+          "file descriptor exhaustion ('Too many open files'). {}", containerID, result);
       return;
     }
-    long containerID = containerData.getContainerID();
     log.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerID, result);
     if (log.isDebugEnabled()) {
       StringBuilder allErrorString = new StringBuilder();
