@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.StateManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.protocol.Message;
 
-/** Code generated for {@link SequenceIdGenerator.StateManager}.  Do not modify. */
+/** Code generated for {@link StateManager}.  Do not modify. */
 public class SequenceIdGeneratorStateManagerInvoker extends ScmInvoker<StateManager> {
   enum ReplicateMethod implements NameAndParameterTypes {
     allocateBatch(new Class<?>[][] {
