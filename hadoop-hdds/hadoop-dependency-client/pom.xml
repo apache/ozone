@@ -101,10 +101,6 @@
             <artifactId>commons-collections</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>

@@ -85,8 +85,13 @@ public final class ScmInvokerCodeGenerator {
   private ScmInvokerCodeGenerator(Class<?> api) {
     this.api = api;
     this.apiName = api.getSimpleName();
-    this.invokerClassName = apiName + "Invoker";
+    this.invokerClassName = getInvokerClassName(api);
+  }
 
+  static String getInvokerClassName(Class<?> api) {
+    final String name = api.getSimpleName() + "Invoker";
+    final Class<?> enclosing = api.getEnclosingClass();
+    return enclosing == null ? name : enclosing.getSimpleName() + name;
   }
 
   void printf(String format, Object... args) {
@@ -559,12 +564,14 @@ public final class ScmInvokerCodeGenerator {
       final String args = IntStream.range(0, method.getParameterCount())
           .mapToObj(i -> "arg" + i)
           .reduce("", (a, b) -> a.isEmpty() ? b : a + ", " + b);
-      final String returnString = method.getReturnType() == void.class ? "" : "return ";
+      final Class<?> returnType = method.getReturnType();
       if (r != null) {
+        final String returnString = returnType == void.class ? "" : "return (" + returnType.getSimpleName() + ")";
         final String type = r.invocationType() == Replicate.InvocationType.DIRECT ? "Direct" : "Client";
         println("final Object[] args = {%s};", args);
         println("%sinvoker.invokeReplicate%s(ReplicateMethod.%s, args);", returnString, type, method.getName());
       } else {
+        final String returnString = returnType == void.class ? "" : "return ";
         println("%sinvoker.getImpl().%s(%s);", returnString, method.getName(), args);
       }
     }

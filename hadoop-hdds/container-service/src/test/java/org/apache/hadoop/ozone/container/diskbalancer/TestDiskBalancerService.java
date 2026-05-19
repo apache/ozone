@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.TMP_DIR_NAME;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -270,6 +272,29 @@ public class TestDiskBalancerService {
         threadCount);
   }
 
+  private DiskBalancerServiceTestImpl getDiskBalancerService(
+      OzoneConfiguration config) throws IOException {
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(config);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(config, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(config));
+    return getDiskBalancerService(containerSet, config, keyValueHandler, null, 1);
+  }
+
+  private OzoneConfiguration confWithDiskBalancerInfoDir(File infoDir) {
+    OzoneConfiguration testConf = new OzoneConfiguration(conf);
+    testConf.set("hdds.datanode.disk.balancer.info.dir",
+        infoDir.getAbsolutePath());
+    return testConf;
+  }
+
+  private File getDiskBalancerInfoFile(File infoDir) {
+    return new File(infoDir,
+        OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
+  }
+
   public static Stream<Arguments> values() {
     return Stream.of(
         Arguments.arguments(0, 0, 0),
@@ -377,6 +402,60 @@ public class TestDiskBalancerService {
     GenericTestUtils.waitFor(() -> serviceLog.getOutput().contains("No available thread " +
             "for disk balancer service. Current thread count is 3."),
         100, 5000);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteCreatesParentDirectory(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    File infoDir = tmpDir.resolve("nested").toFile();
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
+
+    svc.refresh(info);
+
+    assertEquals(info,
+        DiskBalancerYaml.readDiskBalancerInfoFile(
+            getDiskBalancerInfoFile(infoDir)));
+    svc.shutdown();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteReportsDirectoryCreationFailure(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    File infoDir = tmpDir.resolve("diskBalancer-parent").toFile();
+    assertTrue(infoDir.createNewFile());
+
+    IOException exception = assertThrows(IOException.class,
+        () -> getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir)));
+
+    assertThat(exception)
+        .hasMessageStartingWith("Unable to create DiskBalancerInfo directories: ");
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerInfoWriteReportsFileWriteFailure(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    File infoDir = tmpDir.resolve("diskBalancer-info-dir").toFile();
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(confWithDiskBalancerInfoDir(infoDir));
+    File infoFile = getDiskBalancerInfoFile(infoDir);
+    assertTrue(infoFile.delete());
+    assertTrue(infoFile.mkdirs());
+    assertTrue(new File(infoFile, "existing").createNewFile());
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerRunningStatus.RUNNING, 10.0d, 100L, 5, true);
+
+    IOException exception = assertThrows(IOException.class,
+        () -> svc.refresh(info));
+
+    assertThat(exception)
+        .hasMessageStartingWith("Unable to write DiskBalancerInfo file: ");
+    svc.shutdown();
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,

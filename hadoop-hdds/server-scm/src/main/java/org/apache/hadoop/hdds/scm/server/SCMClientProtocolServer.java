@@ -40,6 +40,7 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -512,7 +513,7 @@ public class SCMClientProtocolServer implements
       
       List<ContainerInfo> containerInfos =
           containerStream.filter(info -> info.containerID().getId() >= startContainerID)
-              .sorted().collect(Collectors.toList());
+              .sorted(Comparator.comparing(ContainerInfo::containerID)).collect(Collectors.toList());
       List<ContainerInfo> limitedContainers =
           containerInfos.stream().limit(count).collect(Collectors.toList());
       long totalCount = (long) containerInfos.size();

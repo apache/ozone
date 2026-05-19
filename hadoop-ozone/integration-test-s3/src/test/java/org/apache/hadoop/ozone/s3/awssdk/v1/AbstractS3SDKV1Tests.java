@@ -47,6 +47,8 @@ import com.amazonaws.services.s3.model.CopyObjectResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
+import com.amazonaws.services.s3.model.GetObjectTaggingResult;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -1103,6 +1105,42 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     }
   }
 
+  static Stream<Arguments> onlyTagKeyCasesV1() {
+    Map<String, String> fooBarEmptyBar = new HashMap<>();
+    fooBarEmptyBar.put("foo", "bar");
+    fooBarEmptyBar.put("bar", "");
+    return Stream.of(
+        Arguments.of(
+            new ObjectTagging(Collections.singletonList(new Tag("tag1", null))),
+            Collections.singletonMap("tag1", "")),
+        Arguments.of(
+            new ObjectTagging(Arrays.asList(new Tag("foo", "bar"), new Tag("bar", null))),
+            fooBarEmptyBar)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("onlyTagKeyCasesV1")
+  public void testPutObjectWithOnlyTagKey(ObjectTagging objectTagging,
+      Map<String, String> expectedTags) throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(bucketName);
+
+    try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
+      PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, keyName, is, new ObjectMetadata())
+          .withTagging(objectTagging);
+      s3Client.putObject(putObjectRequest);
+    }
+
+    GetObjectTaggingResult taggingResult = s3Client.getObjectTagging(
+        new GetObjectTaggingRequest(bucketName, keyName));
+    Map<String, String> actualTags = taggingResult.getTagSet().stream()
+        .collect(Collectors.toMap(Tag::getKey, Tag::getValue));
+    assertEquals(expectedTags, actualTags);
+  }
+
   @Test
   public void testHeadObjectReturnsTaggingCount() {
     final String bucketName = getBucketName();
@@ -1123,6 +1161,27 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     Object tagCountHeader = head.getRawMetadataValue(Headers.S3_TAGGING_COUNT);
     assertNotNull(tagCountHeader);
     assertEquals(tags.size(), Integer.parseInt(tagCountHeader.toString()));
+  }
+
+  @Test
+  public void testGetObjectTaggingReturnsTagsSortedByKey() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName, "");
+
+    List<Tag> tagsPutOrder = Arrays.asList(new Tag("key2", "val2"), new Tag("key", "val"));
+    s3Client.setObjectTagging(
+        new SetObjectTaggingRequest(bucketName, keyName, new ObjectTagging(tagsPutOrder)));
+
+    GetObjectTaggingResult taggingResult =
+        s3Client.getObjectTagging(new GetObjectTaggingRequest(bucketName, keyName));
+    List<Tag> tagSet = taggingResult.getTagSet();
+    assertEquals(2, tagSet.size());
+    assertEquals("key", tagSet.get(0).getKey());
+    assertEquals("val", tagSet.get(0).getValue());
+    assertEquals("key2", tagSet.get(1).getKey());
+    assertEquals("val2", tagSet.get(1).getValue());
   }
 
   @Test
