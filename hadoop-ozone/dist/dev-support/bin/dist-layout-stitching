@@ -148,7 +148,7 @@ done
 # ---------------------------------------------------------
 NATIVE_LIBS_DIR="${ROOT}/target/native-lib"
 
-# Check if the .so files actually exist before attempting to copy
+# Check if the libhadoop files actually exist before attempting to copy
 if ls "${NATIVE_LIBS_DIR}"/libhadoop.* 1> /dev/null 2>&1; then
   echo "Found Hadoop native libraries. Copying to distribution..."
 
