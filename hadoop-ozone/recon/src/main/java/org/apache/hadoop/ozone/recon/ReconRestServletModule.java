@@ -27,8 +27,10 @@ import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.core.UriBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.AdminOnly;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAdminFilter;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAuthFilter;
 import org.glassfish.hk2.api.ServiceLocator;
@@ -67,7 +69,12 @@ public class ReconRestServletModule extends ServletModule {
 
   @Override
   protected void configureServlets() {
-    configureApi(BASE_API_PATH, API_PACKAGE, CHATBOT_API_PACKAGE);
+    if (conf instanceof OzoneConfiguration
+        && ChatbotConfigKeys.isChatbotEnabled((OzoneConfiguration) conf)) {
+      configureApi(BASE_API_PATH, API_PACKAGE, CHATBOT_API_PACKAGE);
+    } else {
+      configureApi(BASE_API_PATH, API_PACKAGE);
+    }
   }
 
   private void configureApi(String baseApiPath, String... packages) {

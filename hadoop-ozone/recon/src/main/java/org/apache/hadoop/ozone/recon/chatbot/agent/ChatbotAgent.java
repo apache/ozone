@@ -675,29 +675,39 @@ public class ChatbotAgent {
   // =========================================================================
 
   /**
-   * Loads the Markdown or Yaml schema file (the "Cheat Sheet").
+   * Loads the API context for the LLM tool-selection prompt.
+   *
+   * <p>Both documents are always loaded and concatenated:
+   * <ul>
+   *   <li>{@code recon-api-guide.md} — human-readable guide written for LLM consumption,
+   *       describing what each endpoint returns and how to use it.</li>
+   *   <li>{@code recon-api.yaml} — full OpenAPI specification with exact paths, parameters,
+   *       and response shapes, giving the LLM precise endpoint details.</li>
+   * </ul>
+   * </p>
    */
   private String loadApiSchema() {
-    String fromMarkdown = loadApiGuideFromClasspath("chatbot/recon-api-guide.md");
-    if (!fromMarkdown.isEmpty()) {
+    String guide = loadApiGuideFromClasspath("chatbot/recon-api-guide.md");
+    String yaml = loadApiGuideFromClasspath("chatbot/recon-api.yaml");
+
+    if (guide.isEmpty() && yaml.isEmpty()) {
+      LOG.warn("Neither recon-api-guide.md nor recon-api.yaml found on classpath — using empty schema");
+      return "";
+    }
+
+    StringBuilder schema = new StringBuilder();
+    if (!guide.isEmpty()) {
       LOG.info("Loaded API guide from classpath: chatbot/recon-api-guide.md");
-      return fromMarkdown;
+      schema.append(guide);
     }
-
-    String fromYaml = loadApiGuideFromClasspath("chatbot/recon-api.yaml");
-    if (!fromYaml.isEmpty()) {
-      LOG.info("Loaded API schema from classpath: chatbot/recon-api.yaml");
-      return fromYaml;
+    if (!yaml.isEmpty()) {
+      LOG.info("Loaded API spec from classpath: chatbot/recon-api.yaml");
+      if (schema.length() > 0) {
+        schema.append("\n\n---\n\n");
+      }
+      schema.append(yaml);
     }
-
-    fromYaml = loadApiGuideFromClasspath("chatbot/recon-api-schema.yaml");
-    if (!fromYaml.isEmpty()) {
-      LOG.info("Loaded API schema from classpath: chatbot/recon-api-schema.yaml");
-      return fromYaml;
-    }
-
-    LOG.warn("No API guide/schema found, using empty schema");
-    return "";
+    return schema.toString();
   }
 
   private String loadApiGuideFromClasspath(String resourcePath) {
