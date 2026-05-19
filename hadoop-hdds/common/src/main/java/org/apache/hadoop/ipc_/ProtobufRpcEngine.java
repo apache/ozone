@@ -68,32 +68,6 @@ public class ProtobufRpcEngine implements RpcEngine {
   @Override
   @SuppressWarnings("unchecked")
   public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
-      ConnectionId connId, Configuration conf, SocketFactory factory)
-      throws IOException {
-    final Invoker invoker = new Invoker(protocol, connId, conf, factory);
-    return new ProtocolProxy<T>(protocol, (T) Proxy.newProxyInstance(
-        protocol.getClassLoader(), new Class[] {protocol}, invoker));
-  }
-
-  public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
-      InetSocketAddress addr, UserGroupInformation ticket, Configuration conf,
-      SocketFactory factory, int rpcTimeout) throws IOException {
-    return getProxy(protocol, clientVersion, addr, ticket, conf, factory,
-        rpcTimeout, null);
-  }
-
-  @Override
-  public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
-      InetSocketAddress addr, UserGroupInformation ticket, Configuration conf,
-      SocketFactory factory, int rpcTimeout, RetryPolicy connectionRetryPolicy
-      ) throws IOException {
-    return getProxy(protocol, clientVersion, addr, ticket, conf, factory,
-      rpcTimeout, connectionRetryPolicy, null, null);
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public <T> ProtocolProxy<T> getProxy(Class<T> protocol, long clientVersion,
       InetSocketAddress addr, UserGroupInformation ticket, Configuration conf,
       SocketFactory factory, int rpcTimeout, RetryPolicy connectionRetryPolicy,
       AtomicBoolean fallbackToSimpleAuth, AlignmentContext alignmentContext)
@@ -309,22 +283,6 @@ public class ProtobufRpcEngine implements RpcEngine {
       return remoteId;
     }
 
-    protected long getClientProtocolVersion() {
-      return clientProtocolVersion;
-    }
-
-    protected String getProtocolName() {
-      return protocolName;
-    }
-  }
-
-  static Client getClient(Configuration conf) {
-    return CLIENTS.getClient(conf, SocketFactory.getDefault(),
-        RpcWritable.Buffer.class);
-  }
-  
-  public static void clearClientCache() {
-    CLIENTS.clearCache();
   }
 
   @Override
@@ -556,6 +514,7 @@ public class ProtobufRpcEngine implements RpcEngine {
     private volatile RequestHeaderProto requestHeader;
     private Message payload;
 
+    @SuppressWarnings("unused") // required for Server#procesRpcRequest
     public RpcProtobufRequest() {
     }
 
