@@ -1,0 +1,77 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Apache Polaris + Spark SQL overlay for ozonesecure-ha STS smoketests.
+# Requires POLARIS_AWS_ACCESS_KEY_ID / POLARIS_AWS_SECRET_ACCESS_KEY at runtime
+# (fetched from ozone s3 getsecret by polaris-smoketest.sh).
+
+services:
+  polaris:
+    image: ${POLARIS_IMAGE}
+    hostname: polaris
+    dns_search: .
+    ports:
+      - 8181:8181
+    environment:
+      AWS_REGION: us-west-2
+      AWS_ACCESS_KEY_ID: ${POLARIS_AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${POLARIS_AWS_SECRET_ACCESS_KEY}
+      POLARIS_BOOTSTRAP_CREDENTIALS: POLARIS,root,s3cr3t
+      polaris.realm-context.realms: POLARIS
+      polaris.features."ALLOW_SETTING_S3_ENDPOINTS": "true"
+      quarkus.otel.sdk.disabled: "true"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8182/q/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.121
+
+  polaris-setup:
+    image: alpine/curl:8.19.0
+    dns_search: .
+    depends_on:
+      polaris:
+        condition: service_healthy
+    environment:
+      CLIENT_ID: root
+      CLIENT_SECRET: s3cr3t
+      POLARIS_REALM: POLARIS
+      POLARIS_CATALOG_NAME: ${POLARIS_CATALOG_NAME:-quickstart_catalog}
+      POLARIS_STORAGE_LOCATION: ${POLARIS_STORAGE_LOCATION:-s3://iceberg-obs/polaris-smoke}
+      POLARIS_S3_ENDPOINT: http://s3g:9878
+      POLARIS_STS_ENDPOINT: http://s3g:9880/sts
+      POLARIS_ROLE_ARN: arn:aws:iam::123456789012:role/iceberg-data-all-access-obs
+      POLARIS_AWS_ACCESS_KEY_ID: ${POLARIS_AWS_ACCESS_KEY_ID}
+      POLARIS_AWS_SECRET_ACCESS_KEY: ${POLARIS_AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./polaris-setup.sh:/polaris-setup.sh:ro
+    entrypoint: ["/bin/sh", "/polaris-setup.sh"]
+    networks:
+      ozone_net: {}
+
+  spark-sql:
+    image: ${SPARK_SQL_IMAGE}
+    user: "0:0"
+    dns_search: .
+    volumes:
+      - ../..:/opt/hadoop
+      - ${RANGER_M2_DIR:-${HOME}/.m2}:/root/.m2
+    networks:
+      ozone_net: {}
