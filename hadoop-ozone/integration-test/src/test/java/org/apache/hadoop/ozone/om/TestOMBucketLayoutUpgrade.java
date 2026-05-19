@@ -56,8 +56,6 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Upgrade testing for Bucket Layout Feature.
@@ -76,9 +74,6 @@ import org.slf4j.LoggerFactory;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class TestOMBucketLayoutUpgrade {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestOMBucketLayoutUpgrade.class);
 
   private static final int PRE_UPGRADE = 100;
   private static final int DURING_UPGRADE = 200;
@@ -166,12 +161,10 @@ class TestOMBucketLayoutUpgrade {
         om.getMetadataManager().getMetaTable().addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
         om.getMetadataManager().getMetaTable()
             .put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore");
-        LOG.info("+++ Written the marker key to an OM");
       } catch (RocksDatabaseException | CodecException e) {
         throw new RuntimeException(e);
       }
     });
-    LOG.info("+++ Waiting for finalization to complete...");
     waitForFinalization(omClient);
 
     final String expectedVersion =
