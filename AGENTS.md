@@ -1,7 +1,5 @@
 # AGENTS.md
 
-> Generated-by: Claude Code (Opus 4.7)
-
 This file provides guidance to AI coding assistants (Claude Code, Codex, etc.) when working with code in this repository. `CLAUDE.md` is a symlink to this file.
 
 ## Repository
@@ -79,3 +77,4 @@ The authoritative source is [`CONTRIBUTING.md`](./CONTRIBUTING.md). Highlights w
 - 2-space indent, 120-char lines, Apache license header on most files (enforced by Checkstyle and RAT — Markdown excludes are managed in `dev-support/rat/rat-exclusions.txt`); no `@author` tags. Checkstyle config: `hadoop-hdds/dev-support/checkstyle/checkstyle.xml`.
 - For non-trivial features, follow the OEP (Ozone Enhancement Proposal) process — design docs in Markdown.
 - Before wrapping up a change (e.g. before posting a PR), run `./hadoop-ozone/dev-support/checks/checkstyle.sh` locally to catch violations — otherwise the checkstyle CI job will fail immediately on the PR. `rat.sh` is also worth running if you've added new file types.
+- When non-trivial content is produced with the help of generative tooling, attribute it in the PR description (and ideally in the file/commit) as `Generated-by: TOOL (MODEL)` — e.g. `Generated-by: Claude Code (Opus 4.7)` or `Generated-by: Codex (GPT-5)`. See the [ASF generative-tooling policy](https://www.apache.org/legal/generative-tooling.html).
