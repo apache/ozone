@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -42,6 +43,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -56,6 +58,9 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import picocli.CommandLine;
@@ -590,23 +595,42 @@ public class TestDiskBalancerSubCommands {
 
   // ========== DiskBalancerReportSubcommand Tests ==========
 
-  @Test
-  public void testReportThresholdRangeLowerBoundNotNegative() throws Exception {
+  static Stream<Arguments> thresholdRangeReportCases() {
+    return Stream.of(
+        Arguments.of(0.08426521, 10.0, false,
+            "ThresholdRange: (0.00000000, 0.18426521)", "ThresholdRange: (-"),
+        Arguments.of(0.95, 10.0, false,
+            "ThresholdRange: (0.85000000, 1.00000000)", "1.05000000"),
+        Arguments.of(0.95, 10.0, true,
+            "\"thresholdRange\" : \"(0.85000000, 1.00000000)\"", "1.05000000"));
+  }
+
+  @ParameterizedTest(name = "idealUsage={0}, threshold={1}%, json={2}")
+  @MethodSource("thresholdRangeReportCases")
+  public void testReportThresholdRangeClamped(double idealUsage,
+      double thresholdPercent, boolean jsonOutput, String expectedRangeSubstring,
+      String mustNotContain) throws Exception {
+    outContent.reset();
+    errContent.reset();
+
     DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
-    double idealUsage = 0.08426521;
-    double thresholdPercent = 10.0;
-    DatanodeDiskBalancerInfoProto reportProto = createReportProto("host-1", idealUsage,
-        thresholdPercent);
+    DatanodeDiskBalancerInfoProto reportProto =
+        createReportProto("host-1", idealUsage, thresholdPercent);
 
     when(mockProtocol.getDiskBalancerInfo()).thenReturn(reportProto);
 
     try (DiskBalancerMocks mocks = setupAllMocks()) {
       CommandLine c = new CommandLine(cmd);
-      c.parseArgs("host-1");
+      if (jsonOutput) {
+        c.parseArgs("--json", "host-1");
+      } else {
+        c.parseArgs("host-1");
+      }
       cmd.call();
 
       String output = outContent.toString(DEFAULT_ENCODING);
-      assertTrue(output.contains("ThresholdRange: (0.00000000, 0.18426521)"));
+      assertThat(output).contains(expectedRangeSubstring);
+      assertThat(output).doesNotContain(mustNotContain);
     }
   }
 
