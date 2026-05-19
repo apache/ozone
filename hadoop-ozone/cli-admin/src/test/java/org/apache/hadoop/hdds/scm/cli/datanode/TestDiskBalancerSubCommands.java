@@ -591,6 +591,26 @@ public class TestDiskBalancerSubCommands {
   // ========== DiskBalancerReportSubcommand Tests ==========
 
   @Test
+  public void testReportThresholdRangeLowerBoundNotNegative() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+    double idealUsage = 0.08426521;
+    double thresholdPercent = 10.0;
+    DatanodeDiskBalancerInfoProto reportProto = createReportProto("host-1", idealUsage,
+        thresholdPercent);
+
+    when(mockProtocol.getDiskBalancerInfo()).thenReturn(reportProto);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertTrue(output.contains("ThresholdRange: (0.00000000, 0.18426521)"));
+    }
+  }
+
+  @Test
   public void testReportDiskBalancerWithInServiceDatanodes() throws Exception {
     DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
     
@@ -821,6 +841,25 @@ public class TestDiskBalancerSubCommands {
         .setDiskBalancerConf(configProto)
         .addVolumeInfo(vol1)
         .addVolumeInfo(vol2)
+        .build();
+  }
+
+  private DatanodeDiskBalancerInfoProto createReportProto(String hostname, double idealUsage,
+      double thresholdPercent) {
+    DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(nodeProto)
+        .setCurrentVolumeDensitySum(0.1408700123786014)
+        .setIdealUsage(idealUsage)
+        .setDiskBalancerConf(createConfigProto(thresholdPercent, 100L, 5, true))
         .build();
   }
 
