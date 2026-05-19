@@ -51,7 +51,7 @@
     <commons-codec.version>1.22.0</commons-codec.version>
     <commons-collections.version>4.5.0</commons-collections.version>
     <commons-compress.version>1.28.0</commons-compress.version>
-    <commons-configuration2.version>2.14.0</commons-configuration2.version>
+    <commons-configuration2.version>2.15.0</commons-configuration2.version>
     <commons-csv.version>1.14.1</commons-csv.version>
     <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-io.version>2.22.0</commons-io.version>
@@ -112,7 +112,7 @@
     <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.9</jline.version>
+    <jline.version>3.30.13</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.22</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
@@ -125,7 +125,7 @@
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
-    <log4j2.version>2.25.4</log4j2.version>
+    <log4j2.version>2.26.0</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
     <maven-assembly-plugin.version>3.8.0</maven-assembly-plugin.version>
@@ -161,7 +161,7 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>20.18.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentelemetry.version>1.61.0</opentelemetry.version>
+    <opentelemetry.version>1.62.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.release>Katmai</ozone.release>
     <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
@@ -2201,13 +2201,6 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pmd-plugin</artifactId>
           <version>${pmd.version}</version>
-          <configuration>
-            <rulesets>
-              <ruleset>dev-support/pmd/pmd-ruleset.xml</ruleset>
-            </rulesets>
-            <printFailingErrors>true</printFailingErrors>
-            <includeTests>true</includeTests>
-          </configuration>
         </plugin>
         <plugin>
           <groupId>org.xolstice.maven.plugins</groupId>
@@ -2340,7 +2333,7 @@
               <goal>prepare-agent</goal>
             </goals>
             <configuration>
-              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*,org.apache.hadoop.ipc_.*,org.apache.hadoop.security_.*</includes>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*,org.apache.ozone.*,org.apache.hadoop.io_.*,org.apache.hadoop.ipc_.*,org.apache.hadoop.security_.*</includes>
             </configuration>
           </execution>
         </executions>
@@ -2406,6 +2399,17 @@
             <version>${checkstyle.version}</version>
           </dependency>
         </dependencies>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <configuration>
+          <rulesets>
+            <ruleset>dev-support/pmd/pmd-ruleset.xml</ruleset>
+          </rulesets>
+          <printFailingErrors>true</printFailingErrors>
+          <includeTests>true</includeTests>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -2666,6 +2670,9 @@
     <profile>
       <id>go-offline</id>
       <properties>
+        <cyclonedx.skip>true</cyclonedx.skip>
+        <enforcer.skip>true</enforcer.skip>
+        <jacoco.skip>true</jacoco.skip>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <mdep.analyze.skip>true</mdep.analyze.skip>
         <skip.installnodepnpm>true</skip.installnodepnpm>

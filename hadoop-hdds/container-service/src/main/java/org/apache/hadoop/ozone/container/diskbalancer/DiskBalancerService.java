@@ -332,17 +332,27 @@ public class DiskBalancerService extends BackgroundService {
   private synchronized void writeDiskBalancerInfoTo(
       DiskBalancerInfo diskBalancerInfo, File path)
       throws IOException {
-    if (path.exists()) {
-      if (!path.delete() || !path.createNewFile()) {
-        throw new IOException("Unable to overwrite the DiskBalancerInfo file.");
-      }
-    } else {
-      if (!path.getParentFile().exists() &&
-          !path.getParentFile().mkdirs()) {
-        throw new IOException("Unable to create DiskBalancerInfo directories.");
-      }
+    Path target = path.toPath().toAbsolutePath();
+    Path parent = target.getParent();
+    if (parent == null) {
+      throw new IOException(
+          "Unable to determine parent directory for DiskBalancerInfo file: "
+              + target);
     }
-    DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo, path);
+    try {
+      Files.createDirectories(parent);
+    } catch (IOException e) {
+      throw new IOException(
+          "Unable to create DiskBalancerInfo directories: " + parent, e);
+    }
+
+    try {
+      DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo,
+          target.toFile());
+    } catch (IOException e) {
+      throw new IOException(
+          "Unable to write DiskBalancerInfo file: " + target, e);
+    }
   }
 
   public void setThreshold(double threshold) {

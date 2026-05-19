@@ -174,13 +174,27 @@ class TestObjectPut {
     assertEquals("value2", tags.get("tag2"));
   }
 
-  @Test
-  public void testPutObjectWithOnlyTagKey() {
-    // Try to send with only the key (no value)
-    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1");
+  static Stream<Arguments> onlyTagKeyCases() {
+    return Stream.of(
+        Arguments.of("tag1", ImmutableMap.of("tag1", "")),
+        Arguments.of("foo=bar&bar", ImmutableMap.of("foo", "bar", "bar", ""))
+    );
+  }
 
-    OS3Exception ex = assertErrorResponse(INVALID_TAG, () -> putObject(CONTENT));
-    assertThat(ex.getErrorMessage()).contains("Some tag values are not specified");
+  /**
+   * Put Object with {@code x-amz-tagging} header where key with a null value is treated as
+   * an empty string value (AWS), e.g. foo=bar&bar, here bar = " ".
+   */
+  @ParameterizedTest
+  @MethodSource("onlyTagKeyCases")
+  void testPutObjectWithOnlyTagKey(String tagHeader,
+      Map<String, String> expectedTags) throws Exception {
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn(tagHeader);
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    assertThat(bucket.getKey(KEY_NAME).getTags())
+        .containsExactlyInAnyOrderEntriesOf(expectedTags);
   }
 
   @Test

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -56,6 +57,30 @@ class TestDiskBalancerVolumeCalculation {
         Collections.singletonList(
             DiskBalancerVolumeCalculation.newVolumeFixedUsage(
                 zeroCapacityVolume, null))));
+  }
+
+  @Test
+  void calculateVolumeDataDensityIgnoresZeroCapacityVolumes()
+      throws IOException {
+    HddsVolume zeroCapacityVolume = createVolume("zero-capacity", 0, 0);
+    HddsVolume lowUsageVolume = createVolume("low-usage", 100, 90);
+    HddsVolume highUsageVolume = createVolume("high-usage", 100, 50);
+
+    DiskBalancerVolumeCalculation.VolumeFixedUsage lowUsage =
+        DiskBalancerVolumeCalculation.newVolumeFixedUsage(lowUsageVolume, null);
+    DiskBalancerVolumeCalculation.VolumeFixedUsage highUsage =
+        DiskBalancerVolumeCalculation.newVolumeFixedUsage(highUsageVolume, null);
+    DiskBalancerVolumeCalculation.VolumeFixedUsage zeroCapacity =
+        DiskBalancerVolumeCalculation.newVolumeFixedUsage(
+            zeroCapacityVolume, null);
+
+    double densityWithoutZeroCapacityVolume =
+        DiskBalancerVolumeCalculation.calculateVolumeDataDensity(
+            Arrays.asList(lowUsage, highUsage));
+
+    assertEquals(densityWithoutZeroCapacityVolume,
+        DiskBalancerVolumeCalculation.calculateVolumeDataDensity(
+            Arrays.asList(zeroCapacity, lowUsage, highUsage)), 0.0);
   }
 
   @Test

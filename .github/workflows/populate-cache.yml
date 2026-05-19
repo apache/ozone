@@ -22,6 +22,8 @@ on:
     branches:
       - master
       - ozone-1.4
+      - ozone-2.0
+      - ozone-2.1
     paths:
       - 'pom.xml'
       - '**/pom.xml'
@@ -30,6 +32,13 @@ on:
   workflow_dispatch:
 
 permissions: { }
+
+env:
+  # variables are duplicated from ci.yml, please keep in sync
+  BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
+  TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
 
 jobs:
   build:
@@ -54,7 +63,7 @@ jobs:
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ env.TEST_JAVA_VERSION }}
 
       - name: Get NodeJS version
         id: nodejs-version
@@ -77,7 +86,7 @@ jobs:
 
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: mvn --batch-mode --no-transfer-progress --show-version -Pgo-offline -Pdist -Drocks_tools_native clean verify
+        run: mvn $BUILD_ARGS $MAVEN_ARGS --no-transfer-progress --show-version -Pgo-offline clean verify
 
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
