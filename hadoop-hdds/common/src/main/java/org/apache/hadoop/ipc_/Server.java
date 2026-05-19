@@ -567,7 +567,7 @@ public abstract class Server {
     long queueTime = details.get(Timing.QUEUE, RpcMetrics.TIMEUNIT);
     rpcMetrics.addRpcQueueTime(queueTime);
 
-    if (connDropped) {
+    if (call.isResponseDeferred() || connDropped) {
       // call was skipped; don't include it in processing metrics
       return;
     }
@@ -586,6 +586,11 @@ public abstract class Server {
     if (isLogSlowRPC()) {
       logSlowRpcCalls(name, call, details);
     }
+  }
+
+  void updateDeferredMetrics(String name, long processingTime) {
+    rpcMetrics.addDeferredRpcProcessingTime(processingTime);
+    rpcDetailedMetrics.addDeferredProcessingTime(name, processingTime);
   }
 
   /**
@@ -758,6 +763,7 @@ public abstract class Server {
     final RPC.RpcKind rpcKind;
     final byte[] clientId;
     private final CallerContext callerContext; // the call context
+    private boolean deferredResponse = false;
     private int priorityLevel;
     // the priority level assigned by scheduler, 0 by default
     private long clientStateId;
@@ -910,6 +916,20 @@ public abstract class Server {
     public boolean isCallCoordinated() {
       return this.isCallCoordinated;
     }
+
+    public void deferResponse() {
+      this.deferredResponse = true;
+    }
+
+    public boolean isResponseDeferred() {
+      return this.deferredResponse;
+    }
+
+    public void setDeferredResponse(Writable response) {
+    }
+
+    public void setDeferredError(Throwable t) {
+    }
   }
 
   /** A RPC extended call queued for handling. */
@@ -990,21 +1010,27 @@ public abstract class Server {
       } catch (Throwable e) {
         populateResponseParamsOnError(e, responseParams);
       }
-      long deltaNanos = Time.monotonicNowNanos() - startNanos;
-      ProcessingDetails details = getProcessingDetails();
+      if (!isResponseDeferred()) {
+        long deltaNanos = Time.monotonicNowNanos() - startNanos;
+        ProcessingDetails details = getProcessingDetails();
 
-      details.set(Timing.PROCESSING, deltaNanos, TimeUnit.NANOSECONDS);
-      deltaNanos -= details.get(Timing.LOCKWAIT, TimeUnit.NANOSECONDS);
-      deltaNanos -= details.get(Timing.LOCKSHARED, TimeUnit.NANOSECONDS);
-      deltaNanos -= details.get(Timing.LOCKEXCLUSIVE, TimeUnit.NANOSECONDS);
-      details.set(Timing.LOCKFREE, deltaNanos, TimeUnit.NANOSECONDS);
-      startNanos = Time.monotonicNowNanos();
+        details.set(Timing.PROCESSING, deltaNanos, TimeUnit.NANOSECONDS);
+        deltaNanos -= details.get(Timing.LOCKWAIT, TimeUnit.NANOSECONDS);
+        deltaNanos -= details.get(Timing.LOCKSHARED, TimeUnit.NANOSECONDS);
+        deltaNanos -= details.get(Timing.LOCKEXCLUSIVE, TimeUnit.NANOSECONDS);
+        details.set(Timing.LOCKFREE, deltaNanos, TimeUnit.NANOSECONDS);
+        startNanos = Time.monotonicNowNanos();
 
-      setResponseFields(value, responseParams);
-      sendResponse();
+        setResponseFields(value, responseParams);
+        sendResponse();
 
-      deltaNanos = Time.monotonicNowNanos() - startNanos;
-      details.set(Timing.RESPONSE, deltaNanos, TimeUnit.NANOSECONDS);
+        deltaNanos = Time.monotonicNowNanos() - startNanos;
+        details.set(Timing.RESPONSE, deltaNanos, TimeUnit.NANOSECONDS);
+      } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Deferring response for callId: " + this.callId);
+        }
+      }
       return null;
     }
 
@@ -1062,6 +1088,69 @@ public abstract class Server {
             call.responseParams.error);
       }
       connection.sendResponse(call);
+    }
+
+    /**
+     * Send a deferred response, ignoring errors.
+     */
+    private void sendDeferedResponse() {
+      try {
+        connection.sendResponse(this);
+      } catch (Exception e) {
+        // For synchronous calls, application code is done once it's returned
+        // from a method. It does not expect to receive an error.
+        // This is equivalent to what happens in synchronous calls when the
+        // Responder is not able to send out the response.
+        LOG.error("Failed to send deferred response. ThreadName=" + Thread
+            .currentThread().getName() + ", CallId="
+            + callId + ", hostname=" + getHostAddress());
+      }
+    }
+
+    @Override
+    public void setDeferredResponse(Writable response) {
+      if (this.connection.getServer().running) {
+        try {
+          setupResponse(this, RpcStatusProto.SUCCESS, null, response,
+              null, null);
+        } catch (IOException e) {
+          // For synchronous calls, application code is done once it has
+          // returned from a method. It does not expect to receive an error.
+          // This is equivalent to what happens in synchronous calls when the
+          // response cannot be sent.
+          LOG.error(
+              "Failed to setup deferred successful response. ThreadName=" +
+                  Thread.currentThread().getName() + ", Call=" + this);
+          return;
+        }
+        sendDeferedResponse();
+      }
+    }
+
+    @Override
+    public void setDeferredError(Throwable t) {
+      if (this.connection.getServer().running) {
+        if (t == null) {
+          t = new IOException(
+              "User code indicated an error without an exception");
+        }
+        try {
+          ResponseParams responseParams = new ResponseParams();
+          populateResponseParamsOnError(t, responseParams);
+          setupResponse(this, responseParams.returnStatus,
+              responseParams.detailedErr,
+              null, responseParams.errorClass, responseParams.error);
+        } catch (IOException e) {
+          // For synchronous calls, application code is done once it has
+          // returned from a method. It does not expect to receive an error.
+          // This is equivalent to what happens in synchronous calls when the
+          // response cannot be sent.
+          LOG.error(
+              "Failed to setup deferred error response. ThreadName=" +
+                  Thread.currentThread().getName() + ", Call=" + this);
+        }
+        sendDeferedResponse();
+      }
     }
 
     /**
@@ -2885,8 +2974,8 @@ public abstract class Server {
           if (call != null) {
             updateMetrics(call, startTimeNanos, connDropped);
             ProcessingDetails.LOG.debug(
-                "Served: [{}] name={} user={} details={}",
-                call,
+                "Served: [{}]{} name={} user={} details={}",
+                call, (call.isResponseDeferred() ? ", deferred" : ""),
                 call.getDetailedMetricsName(), call.getRemoteUser(),
                 call.getProcessingDetails());
           }

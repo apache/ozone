@@ -67,6 +67,8 @@ public class RpcMetrics {
           new MutableQuantiles[intervals.length];
       rpcProcessingTimeQuantiles =
           new MutableQuantiles[intervals.length];
+      deferredRpcProcessingTimeQuantiles =
+          new MutableQuantiles[intervals.length];
       for (int i = 0; i < intervals.length; i++) {
         int interval = intervals[i];
         rpcQueueTimeQuantiles[i] = registry.newQuantiles("rpcQueueTime"
@@ -79,6 +81,10 @@ public class RpcMetrics {
         rpcProcessingTimeQuantiles[i] = registry.newQuantiles(
             "rpcProcessingTime" + interval + "s",
             "rpc processing time in " + TIMEUNIT, "ops",
+            "latency", interval);
+        deferredRpcProcessingTimeQuantiles[i] = registry.newQuantiles(
+            "deferredRpcProcessingTime" + interval + "s",
+            "deferred rpc processing time in " + TIMEUNIT, "ops",
             "latency", interval);
       }
     }
@@ -100,6 +106,8 @@ public class RpcMetrics {
   MutableQuantiles[] rpcLockWaitTimeQuantiles;
   @Metric("Processing time") MutableRate rpcProcessingTime;
   MutableQuantiles[] rpcProcessingTimeQuantiles;
+  @Metric("Deferred Processing time") MutableRate deferredRpcProcessingTime;
+  MutableQuantiles[] deferredRpcProcessingTimeQuantiles;
   @Metric("Number of authentication failures")
   MutableCounterLong rpcAuthenticationFailures;
   @Metric("Number of authentication successes")
@@ -228,6 +236,15 @@ public class RpcMetrics {
     }
   }
 
+  public void addDeferredRpcProcessingTime(long processingTime) {
+    deferredRpcProcessingTime.add(processingTime);
+    if (rpcQuantileEnable) {
+      for (MutableQuantiles q : deferredRpcProcessingTimeQuantiles) {
+        q.add(processingTime);
+      }
+    }
+  }
+
   /**
    * One client backoff event
    */
@@ -280,6 +297,22 @@ public class RpcMetrics {
    */
   public long getRpcSlowCalls() {
     return rpcSlowCalls.value();
+  }
+
+  public MutableRate getDeferredRpcProcessingTime() {
+    return deferredRpcProcessingTime;
+  }
+
+  public long getDeferredRpcProcessingSampleCount() {
+    return deferredRpcProcessingTime.lastStat().numSamples();
+  }
+
+  public double getDeferredRpcProcessingMean() {
+    return deferredRpcProcessingTime.lastStat().mean();
+  }
+
+  public double getDeferredRpcProcessingStdDev() {
+    return deferredRpcProcessingTime.lastStat().stddev();
   }
 
   public MetricsTag getTag(String tagName) {
