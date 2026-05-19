@@ -1215,6 +1215,9 @@ public class SCMClientProtocolServer implements
       int healthyDatanodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
       boolean shouldFinalize = scmFinalized && datanodeFinalizationCounts.allNodesFinalized();
 
+      LOG.info("+++ SCMFinalized {} numDatanodesFinal {} total DNs {} shouldFinal {}",
+          scmFinalized, finalizedDatanodes, healthyDatanodes, shouldFinalize);
+
       HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
           .setScmFinalized(scmFinalized)
           .setNumDatanodesFinalized(finalizedDatanodes)
