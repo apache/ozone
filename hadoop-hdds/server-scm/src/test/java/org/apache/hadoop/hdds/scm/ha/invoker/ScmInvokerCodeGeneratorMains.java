@@ -19,8 +19,13 @@ package org.apache.hadoop.hdds.scm.ha.invoker;
 
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManager;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.scm.security.RootCARotationHandler;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyState;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 
 /** Main methods for running {@link ScmInvokerCodeGenerator}. */
 class ScmInvokerCodeGeneratorMains {
@@ -46,6 +51,36 @@ class ScmInvokerCodeGeneratorMains {
   static class GenerateRootCARotationHandler {
     public static void main(String[] args) {
       ScmInvokerCodeGenerator.generate(RootCARotationHandler.class, true);
+    }
+  }
+
+  static class GenerateFinalizationStateManager {
+    public static void main(String[] args) {
+      ScmInvokerCodeGenerator.generate(FinalizationStateManager.class, true);
+    }
+  }
+
+  static class GenerateSecretKeyState {
+    public static void main(String[] args) {
+      ScmInvokerCodeGenerator.generate(SecretKeyState.class, true);
+    }
+  }
+
+  static class GenerateSequenceIdGeneratorStateManager {
+    public static void main(String[] args) {
+      ScmInvokerCodeGenerator.generate(SequenceIdGenerator.StateManager.class, true);
+    }
+  }
+
+  static class GenerateStatefulServiceStateManager {
+    public static void main(String[] args) {
+      ScmInvokerCodeGenerator.generate(StatefulServiceStateManager.class, true);
+    }
+  }
+
+  static class GenerateCertificateStore {
+    public static void main(String[] args) {
+      ScmInvokerCodeGenerator.generate(CertificateStore.class, true);
     }
   }
 }
