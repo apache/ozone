@@ -87,6 +87,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -988,13 +989,18 @@ public class TestRocksDBCheckpointDiffer {
 
     diffAllSnapshots(rocksDBCheckpointDiffer);
 
-    // Confirm correct links created
+    // SST backup hard-links use whatever file numbers RocksDB assigns for compaction inputs.
     try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
-      List<String> expectedLinks = sstPathStream.map(Path::getFileName)
-              .map(Object::toString).sorted().collect(Collectors.toList());
-      assertEquals(expectedLinks, asList(
-              "000017.sst", "000019.sst", "000021.sst", "000023.sst",
-          "000024.sst", "000026.sst", "000029.sst"));
+      List<String> backupFiles =
+          sstPathStream.map(p -> p.getFileName().toString()).sorted().collect(Collectors.toList());
+      assertEquals(7, backupFiles.size(), "Unexpected compaction SST backup count");
+      ConcurrentMap<String, CompactionNode> compactionNodes =
+          rocksDBCheckpointDiffer.getCompactionNodeMap();
+      for (String name : backupFiles) {
+        assertTrue(name.endsWith(SST_FILE_EXTENSION), () -> "Not an SST: " + name);
+        assertTrue(compactionNodes.containsKey(FilenameUtils.getBaseName(name)),
+            () -> "Backup " + name + " should match a tracked compaction SST");
+      }
     }
     rocksDBCheckpointDiffer.getForwardCompactionDAG().nodes().stream().forEach(compactionNode -> {
       Assertions.assertNotNull(compactionNode.getStartKey());
