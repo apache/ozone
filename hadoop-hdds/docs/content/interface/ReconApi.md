@@ -374,7 +374,7 @@ a `Content-Disposition: attachment` header carrying the export filename.
 
 * `404 Not Found`: `jobId` is unknown or the on-disk file was removed.
 * `409 Conflict`: the job has not reached `COMPLETED` status yet.
-* `429 Too Many Requests`: the per-job download limit has been reached. Body matches `RateLimitedError`.
+* `429 Too Many Requests`: the per-job download limit has been reached. Body: `{ "error": "Download limit reached", "message": "<reason>" }` (schema `DownloadLimitReachedError`).
 
 ### DELETE /api/v1/containers/unhealthy/export/:jobId
 

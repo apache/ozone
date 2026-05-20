@@ -407,7 +407,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RateLimitedError'
+                $ref: '#/components/schemas/DownloadLimitReachedError'
   /containers/mismatch:
     get:
       tags:
@@ -3006,6 +3006,19 @@ components:
         error:
           type: string
           example: Too Many Requests
+        message:
+          type: string
+          example: Export queue is full; please retry later.
+    DownloadLimitReachedError:
+      type: object
+      description: |
+        Returned by `GET /containers/unhealthy/export/{jobId}/download` with HTTP 429 when the
+        per-job download limit has been reached. Same shape as `RateLimitedError` but with a
+        distinct `error` discriminator string so clients can branch on it.
+      properties:
+        error:
+          type: string
+          example: Download limit reached
         message:
           type: string
           example: This export has reached its maximum download limit of 3.
