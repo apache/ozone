@@ -710,10 +710,11 @@ Returns the total count of directories pending deletion.
 
 **Parameters**
 
-* startPrefix (required)
+* startPrefix (optional, but effectively required)
 
-  Bucket-level or deeper prefix (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`). Shallower prefixes
-  return `400 Bad Request`.
+  Bucket-level or deeper prefix (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`). HTTP-level the
+  parameter is optional (defaults to `/`), but the handler rejects anything shallower than
+  bucket level with `400 Bad Request`, so in practice callers must supply one.
 
 * replicationType (optional)
 

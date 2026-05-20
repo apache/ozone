@@ -702,12 +702,15 @@ paths:
       parameters:
         - name: startPrefix
           in: query
-          required: true
+          required: false
           description: |
             Bucket-level or deeper prefix (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`).
-            Shallower prefixes return `400 Bad Request`.
+            HTTP-level the parameter is optional (defaults to `/`), but the handler rejects
+            anything shallower than bucket level with `400 Bad Request`, so in practice
+            callers must supply one.
           schema:
             type: string
+            default: /
         - name: replicationType
           in: query
           required: false
