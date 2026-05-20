@@ -18,12 +18,15 @@
 package org.apache.hadoop.ozone.om.eventlistener;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotificationStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -42,10 +45,16 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
   public static final Logger LOG = LoggerFactory.getLogger(OMEventListenerKafkaPublisher.class);
 
   private static final String KAFKA_CONFIG_PREFIX = "ozone.om.plugin.kafka.";
+  private static final String NOTIFICATION_STRATEGY_CONFIG = KAFKA_CONFIG_PREFIX + "notification.strategy";
+  private static final Class<? extends OMEventListenerNotificationStrategy>
+      DEFAULT_NOTIFICATION_STRATEGY = S3EventNotificationStrategy.class;
+  private static final String KAFKA_SERVICE_INTERVAL_CONFIG = KAFKA_CONFIG_PREFIX + "service.interval";
+  private static final String KAFKA_SERVICE_TIMEOUT_CONFIG = KAFKA_CONFIG_PREFIX + "service.timeout";
   private static final int COMPLETED_REQUEST_CONSUMER_CORE_POOL_SIZE = 1;
 
   private OMEventListenerLedgerPoller ledgerPoller;
   private KafkaClientWrapper kafkaClient;
+  private OMEventListenerNotificationStrategy notificationStrategy;
   private OMEventListenerLedgerPollerSeekPosition seekPosition;
 
   @Override
@@ -56,10 +65,22 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
     this.kafkaClient = new KafkaClientWrapper(kafkaProps);
 
-    // TODO: these constants should be read from config
-    long kafkaServiceInterval = 2 * 1000;
-    long kafkaServiceTimeout = 300 * 1000;
+    long kafkaServiceInterval = conf.getTimeDuration(
+        KAFKA_SERVICE_INTERVAL_CONFIG, "2s", TimeUnit.MILLISECONDS);
+    long kafkaServiceTimeout = conf.getTimeDuration(
+        KAFKA_SERVICE_TIMEOUT_CONFIG, "5m", TimeUnit.MILLISECONDS);
 
+    Class<? extends OMEventListenerNotificationStrategy> strategyClass = conf.getClass(
+        NOTIFICATION_STRATEGY_CONFIG,
+        DEFAULT_NOTIFICATION_STRATEGY,
+        OMEventListenerNotificationStrategy.class);
+    try {
+      this.notificationStrategy = strategyClass.getDeclaredConstructor().newInstance();
+    } catch (Exception ex) {
+      LOG.error("Failed to instantiate notification strategy: {}. " +
+          "Falling back to NoOp strategy.", strategyClass, ex);
+      this.notificationStrategy = new NoOpOMEventListenerNotificationStrategy();
+    }
     this.seekPosition = new OMEventListenerLedgerPollerSeekPosition();
 
     LOG.info("Creating OMEventListenerLedgerPoller with serviceInterval={}," +
@@ -102,24 +123,19 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
   public void handleCompletedRequest(OmCompletedRequestInfo completedRequestInfo) {
     LOG.debug("Processing {}", completedRequestInfo);
 
-    // stub event until we implement a strategy to convert the events to
-    // a user facing schema (e.g. S3)
-    String event = String.format("{\"key\":\"%s/%s/%s\", \"type\":\"%s\"}",
-        completedRequestInfo.getVolumeName(),
-        completedRequestInfo.getBucketName(),
-        completedRequestInfo.getKeyName(),
-        String.valueOf(completedRequestInfo.getCmdType()));
+    List<String> eventsToSend = notificationStrategy.determineEventsForOperation(completedRequestInfo);
 
-    LOG.debug("Sending {}", event);
-
-    try {
-      kafkaClient.send(event);
-    } catch (IOException ex) {
-      LOG.error("Failure to send event {}", event, ex);
-      return;
+    // loop over events and send them to our kafka sink
+    for (String event : eventsToSend) {
+      try {
+        kafkaClient.send(event);
+      } catch (IOException ex) {
+        LOG.error("Failure to send event {}", event, ex);
+        return;
+      }
     }
 
-    // we can update the seek position
+    // no errors so we can update the seek position
     seekPosition.set(String.valueOf(completedRequestInfo.getTrxLogIndex()));
   }
 
@@ -145,7 +161,8 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
     public void shutdown() throws IOException {
       if (producer != null) {
-        producer.close();
+        LOG.info("Closing kafka producer for topic {}", topic);
+        producer.close(Duration.ofSeconds(10));
       }
     }
 
