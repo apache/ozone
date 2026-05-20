@@ -33,8 +33,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -64,7 +67,7 @@ public class TestOMUpgradeFinalizeService {
   private OMUpgradeFinalizeService service;
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws RocksDatabaseException, CodecException {
     ozoneManager = mock(OzoneManager.class);
     OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     metaTable = mock(TypedTable.class);
@@ -73,7 +76,7 @@ public class TestOMUpgradeFinalizeService {
     when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
     when(metadataManager.getMetaTable()).thenReturn(metaTable);
     // For most tests, set the finalization command as having been received
-    when(metaTable.getCacheValue(any())).thenReturn(CacheValue.get(1, "ignored"));
+    when(metaTable.get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY)).thenReturn("ignored");
 
     versionManager = mock(OMVersionManager.class);
     // preExecute() calls ozoneManager.getVersionManager().getApparentVersion().serialize()
@@ -138,14 +141,14 @@ public class TestOMUpgradeFinalizeService {
         .build();
     when(containerClient.queryUpgradeStatus()).thenReturn(scmStatus);
     // Finalization command not given yet
-    when(metaTable.getCacheValue(any())).thenReturn(null);
+    when(metaTable.get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY)).thenReturn(null);
 
     service.runPeriodicalTaskNow();
 
     verifyNoInteractions(containerClient);
     verifyNoInteractions(omRatisServer);
 
-    when(metaTable.getCacheValue(any())).thenReturn(CacheValue.get(1, "ignored"));
+    when(metaTable.get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY)).thenReturn("ignored");
     service.runPeriodicalTaskNow();
 
     verify(containerClient).queryUpgradeStatus();
