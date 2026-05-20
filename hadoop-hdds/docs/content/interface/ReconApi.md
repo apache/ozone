@@ -163,6 +163,58 @@ Returns the MissingContainerMetadata objects for all the missing containers.
     }
 ``` 
   
+### GET /api/v1/containers/quasiClosed
+
+**Parameters**
+
+* limit (optional)
+
+   Maximum number of containers to return. Default is 1000.
+
+* minContainerId (optional)
+
+   Cursor. Returns containers with ID greater than this value, in ascending order. Pass the
+   previous response's `lastKey` to fetch the next page. Default is 0.
+
+**Returns**
+
+Returns containers currently in the `QUASI_CLOSED` lifecycle state. `quasiClosedCount` is the
+cluster-wide total (not just the current page). When the page is empty, both `firstKey` and
+`lastKey` echo back the `minContainerId` cursor.
+
+```json
+{
+  "quasiClosedCount": 42,
+  "firstKey": 100,
+  "lastKey": 199,
+  "containers": [
+    {
+      "containerID": 100,
+      "pipelineID": "88646d32-a1aa-4e1a-a8d5-aa1e7dd3f5cc",
+      "keys": 17,
+      "stateEnterTime": 1718640123456,
+      "expectedReplicaCount": 3,
+      "actualReplicaCount": 2,
+      "replicas": [
+        {
+          "containerID": 100,
+          "datanodeUuid": "841be80f-0454-47df-b676",
+          "datanodeHost": "localhost-1",
+          "firstSeenTime": 1605724047057,
+          "lastSeenTime": 1605731201301,
+          "lastBcsId": 123,
+          "state": "QUASI_CLOSED"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Responses:
+
+* `400 Bad Request`: `limit` or `minContainerId` is negative.
+
 ### GET /api/v1/containers/:id/replicaHistory
 
 **Parameters**
@@ -1638,4 +1690,69 @@ whether the sync request was accepted by the OM service provider.
 
 ```json
 true
+```
+
+### POST /api/v1/triggerdbsync/scm/snapshot
+
+**Returns**
+
+Starts a one-shot SCM DB snapshot sync in the background. Idempotent. The response always carries
+the current `ScmDbSnapshotSyncStatus` so callers can distinguish "accepted and started" from
+"rejected because another sync is already in progress".
+
+* `202 Accepted`: sync accepted and started. Body has `accepted: true`.
+* `409 Conflict`: another SCM DB sync is already running. Body has `accepted: false`.
+
+```json
+{
+  "accepted": true,
+  "status": "IN_PROGRESS",
+  "message": "SCM DB snapshot sync started."
+}
+```
+
+### GET /api/v1/triggerdbsync/scm/snapshot/status
+
+**Returns**
+
+Current status of the triggered SCM DB snapshot sync. Always returns 200, even when no sync has
+ever run (status will be `IDLE`, phase `NONE`, `startedAt`/`finishedAt` zero).
+
+* `status`: one of `IDLE`, `IN_PROGRESS`, `SUCCESS`, `FAILED`, `CANCELLED`.
+* `phase`: one of `NONE`, `DOWNLOADING_CHECKPOINT`, `INITIALIZING_DB`, `SWAPPING_DB`,
+  `COMPLETED`, `FAILED`, `CANCELLED`.
+* `cancelAllowed`: true only while in `DOWNLOADING_CHECKPOINT`. Once the phase advances to
+  `INITIALIZING_DB`, cancellation is no longer honored.
+* `durationMs`: elapsed time in millis; for a running sync, computed against `now()`.
+
+```json
+{
+  "status": "IN_PROGRESS",
+  "phase": "DOWNLOADING_CHECKPOINT",
+  "startedAt": 1718640123456,
+  "finishedAt": 0,
+  "durationMs": 12345,
+  "cancelAllowed": true,
+  "lastError": null
+}
+```
+
+### POST /api/v1/triggerdbsync/scm/snapshot/cancel
+
+**Returns**
+
+Cancels an in-progress SCM DB snapshot sync. Only honored while `status == IN_PROGRESS` and
+`cancelAllowed == true` (see `/triggerdbsync/scm/snapshot/status`).
+
+* `200 OK`: cancellation accepted and the sync has been cancelled. Body has `cancelled: true`.
+* `409 Conflict`: no sync is running, or the sync has passed the cancellable phase. Body has
+  `cancelled: false` and `message` explains which.
+
+```json
+{
+  "cancelled": true,
+  "status": "CANCELLED",
+  "phase": "CANCELLED",
+  "message": "SCM DB snapshot sync cancelled."
+}
 ```

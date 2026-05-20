@@ -151,6 +151,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MissingContainerMetadata'
+  /containers/quasiClosed:
+    get:
+      tags:
+        - Containers
+      summary: List containers in QUASI_CLOSED state, paginated by container ID.
+      operationId: getQuasiClosedContainers
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of containers to return.
+          required: false
+          schema:
+            type: integer
+            default: 1000
+            minimum: 0
+        - name: minContainerId
+          in: query
+          description: Cursor; return containers with ID greater than this value, in ascending order.
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuasiClosedContainersResponse'
+        '400':
+          description: '`limit` or `minContainerId` is negative.'
+          content:
+            text/plain:
+              schema:
+                type: string
   /containers/{id}/replicaHistory:
     get:
       tags:
@@ -1196,6 +1233,66 @@ paths:
               schema:
                 type: boolean
                 example: true
+  /triggerdbsync/scm/snapshot:
+    post:
+      tags:
+        - Admin Utilities
+      summary: Trigger an SCM DB snapshot sync from SCM to Recon.
+      description: |
+        Starts a one-shot SCM DB snapshot sync in the background. Idempotent: if a sync is
+        already in progress the request is rejected with **409 Conflict**. The response body
+        carries the current `ScmDbSnapshotSyncStatus` so the caller can distinguish "accepted
+        and started" from "rejected because another sync is running".
+      operationId: triggerSCMDBSnapshotSync
+      responses:
+        '202':
+          description: Sync accepted and started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotTriggerResponse'
+        '409':
+          description: Another SCM DB sync is already running.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotTriggerResponse'
+  /triggerdbsync/scm/snapshot/status:
+    get:
+      tags:
+        - Admin Utilities
+      summary: Get the current status of an SCM DB snapshot sync.
+      operationId: getSCMDBSnapshotSyncStatus
+      responses:
+        '200':
+          description: Current status (always returned, even when no sync is running).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotStatusResponse'
+  /triggerdbsync/scm/snapshot/cancel:
+    post:
+      tags:
+        - Admin Utilities
+      summary: Cancel an in-progress SCM DB snapshot sync.
+      description: |
+        Cancellation is only honored while the sync is `IN_PROGRESS` and still in a cancellable
+        phase (before `INITIALIZING_DB`). The response body's `cancelled` flag indicates whether
+        the cancel actually took effect.
+      operationId: cancelSCMDBSnapshotSync
+      responses:
+        '200':
+          description: Cancellation accepted; the sync has been cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotCancelResponse'
+        '409':
+          description: No sync is running, or the sync has passed the cancellable phase.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScmDbSnapshotCancelResponse'
   /storageDistribution:
     get:
       tags:
@@ -1639,6 +1736,60 @@ components:
                 type: array
                 items:
                   $ref: "#/components/schemas/ReplicaHistory"
+    QuasiClosedContainerMetadata:
+      type: object
+      properties:
+        containerID:
+          type: integer
+          format: int64
+          example: 42
+        pipelineID:
+          type: string
+          nullable: true
+          example: 88646d32-a1aa-4e1a-a8d5-aa1e7dd3f5cc
+        keys:
+          type: integer
+          format: int64
+          example: 17
+        stateEnterTime:
+          type: integer
+          format: int64
+          description: Epoch millis when the container entered QUASI_CLOSED per SCM.
+          example: 1718640123456
+        expectedReplicaCount:
+          type: integer
+          format: int64
+          example: 3
+        actualReplicaCount:
+          type: integer
+          format: int64
+          example: 2
+        replicas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReplicaHistory'
+    QuasiClosedContainersResponse:
+      type: object
+      properties:
+        quasiClosedCount:
+          type: integer
+          format: int64
+          description: Total number of containers in QUASI_CLOSED state across the cluster.
+          example: 42
+        firstKey:
+          type: integer
+          format: int64
+          description: Container ID of the first item in `containers`; equals `minContainerId` when the page is empty.
+          example: 100
+        lastKey:
+          type: integer
+          format: int64
+          description: Container ID of the last item in `containers`; pass as `minContainerId` to fetch the next page.
+          example: 199
+        containers:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuasiClosedContainerMetadata'
     MismatchedContainers:
       type: object
       properties:
@@ -3077,3 +3228,83 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/EntityReadAccessHeatMap'
+    ScmDbSnapshotSyncStatus:
+      type: string
+      description: Overall state of a triggered SCM DB snapshot sync.
+      enum:
+        - IDLE
+        - IN_PROGRESS
+        - SUCCESS
+        - FAILED
+        - CANCELLED
+    ScmDbSnapshotSyncPhase:
+      type: string
+      description: |
+        Sub-phase of the active sync. Used to decide whether cancellation is still possible
+        (cancellable up to and including `DOWNLOADING_CHECKPOINT`; not cancellable from
+        `INITIALIZING_DB` onwards).
+      enum:
+        - NONE
+        - DOWNLOADING_CHECKPOINT
+        - INITIALIZING_DB
+        - SWAPPING_DB
+        - COMPLETED
+        - FAILED
+        - CANCELLED
+    ScmDbSnapshotTriggerResponse:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+          description: Whether the trigger request actually started a new sync.
+          example: true
+        status:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncStatus'
+        message:
+          type: string
+          example: SCM DB snapshot sync started.
+    ScmDbSnapshotStatusResponse:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncStatus'
+        phase:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncPhase'
+        startedAt:
+          type: integer
+          format: int64
+          description: Epoch millis when the current/last sync started; `0` if never run.
+          example: 1718640123456
+        finishedAt:
+          type: integer
+          format: int64
+          description: Epoch millis when the current/last sync ended; `0` while still running.
+          example: 0
+        durationMs:
+          type: integer
+          format: int64
+          description: Elapsed time in millis; for a running sync, computed against `now()`.
+          example: 12345
+        cancelAllowed:
+          type: boolean
+          description: True only while still in a cancellable phase.
+          example: true
+        lastError:
+          type: string
+          nullable: true
+          description: Failure message from the last sync, if any.
+          example: null
+    ScmDbSnapshotCancelResponse:
+      type: object
+      properties:
+        cancelled:
+          type: boolean
+          description: Whether the cancel actually took effect.
+          example: true
+        status:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncStatus'
+        phase:
+          $ref: '#/components/schemas/ScmDbSnapshotSyncPhase'
+        message:
+          type: string
+          example: SCM DB snapshot sync cancelled.
