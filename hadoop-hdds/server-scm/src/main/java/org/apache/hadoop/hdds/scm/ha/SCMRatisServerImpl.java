@@ -27,6 +27,7 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -222,7 +224,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public void registerStateMachineHandler(final RequestType handlerType,
                                           final Object handler) {
-    stateMachine.registerHandler(handlerType, handler);
+    if (handler instanceof ScmInvoker) {
+      stateMachine.registerInvoker(handlerType, (ScmInvoker) handler);
+    } else {
+      stateMachine.registerHandler(handlerType, handler);
+    }
   }
 
   @Override
@@ -392,7 +398,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   private static RaftGroup buildRaftGroup(SCMNodeDetails details,
       String scmId, String clusterId) {
-    Preconditions.checkNotNull(scmId);
+    Objects.requireNonNull(scmId, "scmId == null");
     final RaftGroupId groupId = buildRaftGroupId(clusterId);
     RaftPeerId selfPeerId = getSelfPeerId(scmId);
 
@@ -414,7 +420,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @VisibleForTesting
   public static RaftGroupId buildRaftGroupId(String clusterId) {
-    Preconditions.checkNotNull(clusterId);
+    Objects.requireNonNull(clusterId, "clusterId == null");
     return RaftGroupId.valueOf(
         UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));
   }

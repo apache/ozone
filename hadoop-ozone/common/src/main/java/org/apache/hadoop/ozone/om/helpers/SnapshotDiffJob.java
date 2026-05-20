@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -33,8 +34,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
  */
 public class SnapshotDiffJob {
 
-  private static final Codec<SnapshotDiffJob> CODEC =
-      new SnapshotDiffJobCodec();
+  private static final Codec<SnapshotDiffJob> CODEC = new SnapshotDiffJobCodec();
 
   private long creationTime;
   private String jobId;
@@ -46,6 +46,7 @@ public class SnapshotDiffJob {
   private boolean forceFullDiff;
   private boolean disableNativeDiff;
   private long totalDiffEntries;
+  private String largestEntryKey;
 
   // Reason tells why the job was FAILED. It should be set only if job status
   // is FAILED.
@@ -75,7 +76,8 @@ public class SnapshotDiffJob {
                          boolean disableNativeDiff,
                          long totalDiffEntries,
                          SubStatus subStatus,
-                         double keysProcessedPct) {
+                         double keysProcessedPct,
+                         String largestEntryKey) {
     this.creationTime = creationTime;
     this.jobId = jobId;
     this.status = jobStatus;
@@ -89,9 +91,10 @@ public class SnapshotDiffJob {
     this.reason = StringUtils.EMPTY;
     this.subStatus = subStatus;
     this.keysProcessedPct = keysProcessedPct;
+    this.largestEntryKey = largestEntryKey;
   }
 
-  public static Codec<SnapshotDiffJob> getCodec() {
+  public static Codec<SnapshotDiffJob> codec() {
     return CODEC;
   }
 
@@ -159,12 +162,16 @@ public class SnapshotDiffJob {
     this.creationTime = creationTime;
   }
 
+  public void setTotalDiffEntries(long totalDiffEntries) {
+    this.totalDiffEntries = totalDiffEntries;
+  }
+
   public long getTotalDiffEntries() {
     return totalDiffEntries;
   }
 
-  public void setTotalDiffEntries(long totalDiffEntries) {
-    this.totalDiffEntries = totalDiffEntries;
+  public void setLargestEntryKey(String largestEntryKey) {
+    this.largestEntryKey = largestEntryKey;
   }
 
   public String getReason() {
@@ -199,6 +206,10 @@ public class SnapshotDiffJob {
     this.keysProcessedPct = keysProcessedPct;
   }
 
+  public String getLargestEntryKey() {
+    return largestEntryKey;
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("creationTime : ").append(creationTime)
@@ -210,16 +221,17 @@ public class SnapshotDiffJob {
         .append(", toSnapshot: ").append(toSnapshot)
         .append(", forceFullDiff: ").append(forceFullDiff)
         .append(", disableNativeDiff: ").append(disableNativeDiff)
-        .append(", totalDiffEntries: ").append(totalDiffEntries);
+        .append(", totalDiffEntries: ").append(totalDiffEntries)
+        .append(", largestEntryKey: ").append(largestEntryKey);
 
     if (StringUtils.isNotEmpty(reason)) {
       sb.append(", reason: ").append(reason);
     }
     if (status.equals(JobStatus.IN_PROGRESS) && subStatus != null) {
-      sb.append(", subStatus: ").append(status);
+      sb.append(", subStatus: ").append(subStatus);
       if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO) ||
           subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS)) {
-        sb.append(String.format(", keysProcessedPercent: %.2f", keysProcessedPct));
+        sb.append(String.format(", keysProcessedPct: %.2f", keysProcessedPct));
       }
     }
     return sb.toString();
@@ -245,7 +257,8 @@ public class SnapshotDiffJob {
           Objects.equals(this.disableNativeDiff, otherJob.disableNativeDiff)
           && Objects.equals(this.reason, otherJob.reason) &&
           Objects.equals(this.subStatus, otherJob.subStatus) &&
-          Objects.equals(this.keysProcessedPct, otherJob.keysProcessedPct);
+          Objects.equals(this.keysProcessedPct, otherJob.keysProcessedPct) &&
+          Objects.equals(this.largestEntryKey, otherJob.largestEntryKey);
     }
     return false;
   }
@@ -254,14 +267,13 @@ public class SnapshotDiffJob {
   public int hashCode() {
     return Objects.hash(creationTime, jobId, status, volume, bucket,
         fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff,
-        totalDiffEntries, reason, subStatus, keysProcessedPct);
+        totalDiffEntries, reason, subStatus, keysProcessedPct, largestEntryKey);
   }
 
   public SnapshotDiffJobProto toProtoBuf() {
-    return SnapshotDiffJobProto.newBuilder()
+    SnapshotDiffJobProto.Builder builder = SnapshotDiffJobProto.newBuilder()
         .setCreationTime(creationTime)
         .setJobId(jobId)
-        .setStatus(status.toProtobuf())
         .setVolume(volume)
         .setBucket(bucket)
         .setFromSnapshot(fromSnapshot)
@@ -269,17 +281,34 @@ public class SnapshotDiffJob {
         .setForceFullDiff(forceFullDiff)
         .setDisableNativeDiff(disableNativeDiff)
         .setTotalDiffEntries(totalDiffEntries)
-        .setSubStatus(subStatus.toProtoBuf())
-        .setKeysProcessedPct(keysProcessedPct)
-        .build();
+        .setKeysProcessedPct(keysProcessedPct);
+    if (status != null) {
+      builder.setStatus(status.toProtobuf());
+    }
+    if (subStatus != null) {
+      builder.setSubStatus(subStatus.toProtoBuf());
+    }
+    if (largestEntryKey != null) {
+      builder.setLargestEntryKey(largestEntryKey);
+    }
+    if (StringUtils.isNotEmpty(reason)) {
+      builder.setMessage(reason);
+    }
+
+    return builder.build();
   }
 
   public static SnapshotDiffJob getFromProtoBuf(
       SnapshotDiffJobProto diffJobProto) {
-    return new SnapshotDiffJob(
+    JobStatus status = (diffJobProto.hasStatus()) ?
+        JobStatus.fromProtobuf(diffJobProto.getStatus()) : null;
+    SubStatus subStatus = (diffJobProto.hasSubStatus()) ?
+        SubStatus.fromProtoBuf(diffJobProto.getSubStatus()) : null;
+    String largestEntryKey = diffJobProto.hasLargestEntryKey() ? diffJobProto.getLargestEntryKey() : null;
+    SnapshotDiffJob job = new SnapshotDiffJob(
         diffJobProto.getCreationTime(),
         diffJobProto.getJobId(),
-        JobStatus.fromProtobuf(diffJobProto.getStatus()),
+        status,
         diffJobProto.getVolume(),
         diffJobProto.getBucket(),
         diffJobProto.getFromSnapshot(),
@@ -287,8 +316,13 @@ public class SnapshotDiffJob {
         diffJobProto.getForceFullDiff(),
         diffJobProto.getDisableNativeDiff(),
         diffJobProto.getTotalDiffEntries(),
-        SubStatus.fromProtoBuf(diffJobProto.getSubStatus()),
-        diffJobProto.getKeysProcessedPct());
+        subStatus,
+        diffJobProto.getKeysProcessedPct(),
+        largestEntryKey);
+    if (diffJobProto.hasMessage()) {
+      job.setReason(diffJobProto.getMessage());
+    }
+    return job;
   }
 
   /**
@@ -307,15 +341,19 @@ public class SnapshotDiffJob {
     }
 
     @Override
-    public byte[] toPersistedFormat(SnapshotDiffJob object)
-        throws IOException {
-      return MAPPER.writeValueAsBytes(object);
+    public byte[] toPersistedFormat(SnapshotDiffJob object) {
+      return object.toProtoBuf().toByteArray();
     }
 
     @Override
-    public SnapshotDiffJob fromPersistedFormat(byte[] rawData)
-        throws IOException {
-      return MAPPER.readValue(rawData, SnapshotDiffJob.class);
+    public SnapshotDiffJob fromPersistedFormatImpl(byte[] rawData) throws IOException {
+      try {
+        SnapshotDiffJobProto proto = SnapshotDiffJobProto.parseFrom(rawData);
+        return SnapshotDiffJob.getFromProtoBuf(proto);
+      } catch (InvalidProtocolBufferException e) {
+        // the rawData was in old format, fallback to the old implementation
+        return MAPPER.readValue(rawData, SnapshotDiffJob.class);
+      }
     }
 
     @Override

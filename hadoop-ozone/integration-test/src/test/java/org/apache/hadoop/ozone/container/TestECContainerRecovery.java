@@ -77,29 +77,21 @@ import org.junit.jupiter.api.Test;
  * Tests the EC recovery and over replication processing.
  */
 public class TestECContainerRecovery {
+  private static final int CHUNK_SIZE = 1024 * 1024;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
   private static ObjectStore objectStore;
-  private static int chunkSize;
-  private static int flushSize;
-  private static int maxFlushSize;
-  private static int blockSize;
   private static String volumeName;
-  private static String bucketName;
   private static int dataBlocks = 3;
-  private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
+  private static byte[][] inputChunks = new byte[dataBlocks][CHUNK_SIZE];
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   @BeforeAll
   public static void init() throws Exception {
-    chunkSize = 1024 * 1024;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
-
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
@@ -139,10 +131,10 @@ public class TestECContainerRecovery {
     conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -152,15 +144,12 @@ public class TestECContainerRecovery {
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = UUID.randomUUID().toString();
-    bucketName = volumeName;
+    String bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
     initInputChunks();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -176,7 +165,7 @@ public class TestECContainerRecovery {
     bucketArgs.setDefaultReplicationConfig(
         new DefaultReplicationConfig(
             new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
-                chunkSize)));
+                CHUNK_SIZE)));
 
     volume.createBucket(myBucket, bucketArgs.build());
     return volume.getBucket(myBucket);
@@ -184,7 +173,7 @@ public class TestECContainerRecovery {
 
   private static void initInputChunks() {
     for (int i = 0; i < dataBlocks; i++) {
-      inputChunks[i] = getBytesWith(i + 1, chunkSize);
+      inputChunks[i] = getBytesWith(i + 1, CHUNK_SIZE);
     }
   }
 
@@ -205,7 +194,7 @@ public class TestECContainerRecovery {
     final Pipeline pipeline;
     ECReplicationConfig repConfig =
         new ECReplicationConfig(3, 2,
-            ECReplicationConfig.EcCodec.RS, chunkSize);
+            ECReplicationConfig.EcCodec.RS, CHUNK_SIZE);
     try (OzoneOutputStream out = bucket
         .createKey(keyName, 1024, repConfig, new HashMap<>())) {
       out.write(inputData);
@@ -273,7 +262,7 @@ public class TestECContainerRecovery {
     final Pipeline pipeline;
     ECReplicationConfig repConfig =
             new ECReplicationConfig(3, 2,
-                    ECReplicationConfig.EcCodec.RS, chunkSize);
+                    ECReplicationConfig.EcCodec.RS, CHUNK_SIZE);
     try (OzoneOutputStream out = bucket
             .createKey(keyName, 1024, repConfig, new HashMap<>())) {
       out.write(inputData);
@@ -407,10 +396,10 @@ public class TestECContainerRecovery {
   }
 
   private byte[] getInputBytes(int numChunks) {
-    byte[] inputData = new byte[numChunks * chunkSize];
+    byte[] inputData = new byte[numChunks * CHUNK_SIZE];
     for (int i = 0; i < numChunks; i++) {
-      int start = (i * chunkSize);
-      Arrays.fill(inputData, start, start + chunkSize - 1,
+      int start = (i * CHUNK_SIZE);
+      Arrays.fill(inputData, start, start + CHUNK_SIZE - 1,
           String.valueOf(i % 9).getBytes(UTF_8)[0]);
     }
     return inputData;

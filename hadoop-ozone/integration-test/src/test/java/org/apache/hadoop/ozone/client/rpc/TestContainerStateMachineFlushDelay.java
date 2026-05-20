@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -62,29 +61,21 @@ import org.junit.jupiter.api.Test;
  * Tests the containerStateMachine failure handling by set flush delay.
  */
 public class TestContainerStateMachineFlushDelay {
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private String keyString;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void setup() throws Exception {
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
     keyString = UUID.randomUUID().toString();
 
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
@@ -104,10 +95,10 @@ public class TestContainerStateMachineFlushDelay {
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster =
@@ -126,9 +117,6 @@ public class TestContainerStateMachineFlushDelay {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

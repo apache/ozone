@@ -70,7 +70,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
       List<OmDirectoryInfo> missingParentInfos,
       OmMultipartKeyInfo multipartKeyInfo) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo,
-        allKeyInfoToRemove, bucketLayout, omBucketInfo);
+        allKeyInfoToRemove, bucketLayout, omBucketInfo, bucketId);
     this.volumeId = volumeId;
     this.bucketId = bucketId;
     this.missingParentInfos = missingParentInfos;

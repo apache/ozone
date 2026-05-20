@@ -75,7 +75,7 @@ public class MinLeaderCountChoosePolicy extends LeaderChoosePolicy {
         try {
           Pipeline pipeline = pipelineStateManager.getPipeline(pipelineID);
           if (!pipeline.isClosed()
-              && dn.getUuid().equals(pipeline.getSuggestedLeaderId())) {
+              && dn.getID().equals(pipeline.getSuggestedLeaderId())) {
             suggestedLeaderCount.put(dn, suggestedLeaderCount.get(dn) + 1);
           }
         } catch (PipelineNotFoundException e) {

@@ -876,9 +876,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
 
     // assert that the response has data in it.
-    Preconditions
-        .checkNotNull(data, "read chunk data is null for chunk: %s",
-            chunkInfo);
+    Objects.requireNonNull(data, () -> "data == null for " + TextFormat.shortDebugString(chunkInfo));
     Preconditions.checkState(data.size() == chunkInfo.getLen(),
         "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
         data.size(), chunkInfo.getLen(), chunkInfo);
@@ -1265,8 +1263,10 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyLogFailed(Throwable t, LogEntryProto failedEntry) {
-    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry),
-        toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry()), t);
+    String stateMachineLogEntry = failedEntry == null
+        ? "null"
+        : toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry());
+    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry), stateMachineLogEntry, t);
     ratisServer.handleNodeLogFailure(getGroupId(), t);
   }
 
@@ -1328,13 +1328,13 @@ public class ContainerStateMachine extends BaseStateMachine {
 
       if (containerController != null) {
         String location = containerController.getContainerLocation(contId);
-        builder.append(", container path=");
-        builder.append(location);
+        builder.append(", container path=")
+            .append(location);
       }
     } catch (Exception t) {
       LOG.info("smProtoToString failed", t);
-      builder.append("smProtoToString failed with ");
-      builder.append(t.getMessage());
+      builder.append("smProtoToString failed with ")
+          .append(t.getMessage());
     }
     return builder.toString();
   }

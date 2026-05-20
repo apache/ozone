@@ -18,7 +18,7 @@
 
 import moment from 'moment';
 import { notification } from 'antd';
-import { CanceledError } from 'axios';
+import axios, { CanceledError, AxiosError } from 'axios';
 
 export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);
 
@@ -34,7 +34,7 @@ const showErrorNotification = (title: string, description: string) => {
   notification.error(args);
 };
 
-const showInfoNotification = (title: string, description: string) => {
+export const showInfoNotification = (title: string, description: string) => {
   const args = {
     message: title,
     description,
@@ -43,16 +43,42 @@ const showInfoNotification = (title: string, description: string) => {
   notification.warn(args);
 };
 
-export const showDataFetchError = (error: string) => {
+export const showDataFetchError = (error: string | AxiosError | unknown) => {
   let title = 'Error while fetching data';
+  let errorMessage = '';
   
-  if (error.includes('CanceledError')) return;
-  if (error.includes('metadata')) {
-    title = 'Metadata Initialization:';
-    showInfoNotification(title, error);
-    return;
+  // Handle AxiosError instances
+  if (axios.isAxiosError(error)) {
+    // Don't show notifications for canceled requests
+    if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
+      return;
+    }
+    
+    if (error.response) {
+      // Server responded with error status
+      errorMessage = `Server Error (${error.response.status}): ${error.response.statusText}`;
+      if (error.response.data && typeof error.response.data === 'string') {
+        errorMessage += ` - ${error.response.data}`;
+      }
+    } else if (error.request) {
+      // Request was made but no response received
+      errorMessage = 'Network Error: No response received from server';
+    } else {
+      // Something else happened
+      errorMessage = error.message || 'Unknown error occurred';
+    }
+  } else {
+    errorMessage = error as string;
+    
+    if (errorMessage.includes('CanceledError')) return;
+    if (errorMessage.includes('metadata')) {
+      title = 'Metadata Initialization:';
+      showInfoNotification(title, errorMessage);
+      return;
+    }
   }
-  showErrorNotification(title, error);
+  
+  showErrorNotification(title, errorMessage);
 };
 
 export const byteToSize = (bytes: number, decimals: number) => {
@@ -106,12 +132,12 @@ export const checkResponseError = (responses: Awaited<Promise<any>>[]) => {
 
   if (responseError.length !== 0) {
     responseError.forEach((err) => {
-      if (err.reason.toString().includes("CanceledError")) {
+      if (err.reason instanceof CanceledError || err.reason.code === 'ERR_CANCELED') {
         throw new CanceledError('canceled', "ERR_CANCELED");
       }
       else {
-        const reqMethod = err.reason.config.method;
-        const reqURL = err.reason.config.url
+        const reqMethod = err.reason.config?.method || 'unknown';
+        const reqURL = err.reason.config?.url || 'unknown URL';
         showDataFetchError(
           `Failed to ${reqMethod} URL ${reqURL}\n${err.reason.toString()}`
         );

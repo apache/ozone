@@ -17,11 +17,6 @@
 
 package org.apache.hadoop.ozone.s3;
 
-import io.opentracing.Scope;
-import io.opentracing.ScopeManager;
-import io.opentracing.Span;
-import io.opentracing.noop.NoopSpan;
-import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
 import java.io.OutputStream;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -31,18 +26,21 @@ import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.ext.Provider;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.client.io.WrappedOutputStream;
 
 /**
- * Filter used to add jaeger tracing span.
+ * Filter used to add tracing span.
  */
 
 @Provider
 public class TracingFilter implements ContainerRequestFilter,
     ContainerResponseFilter {
 
-  public static final String TRACING_SCOPE = "TRACING_SCOPE";
-  public static final String TRACING_SPAN = "TRACING_SPAN";
+  public static final String TRACING_SPAN_CLOSABLE = "TRACING_SPAN_CLOSABLE";
+  private static final String HTTP_GET_METHOD = "GET";
+  private static final String OBJECT_ENDPOINT_CLASS_NAME = "ObjectEndpoint";
+  private static final String OBJECT_GET_METHOD_NAME = "get";
 
   @Context
   private ResourceInfo resourceInfo;
@@ -51,51 +49,64 @@ public class TracingFilter implements ContainerRequestFilter,
   public void filter(ContainerRequestContext requestContext) {
     finishAndCloseActiveSpan();
 
-    Span span = GlobalTracer.get().buildSpan(
-        resourceInfo.getResourceClass().getSimpleName() + "." +
-            resourceInfo.getResourceMethod().getName()).start();
-    Scope scope = GlobalTracer.get().activateSpan(span);
-    requestContext.setProperty(TRACING_SCOPE, scope);
-    requestContext.setProperty(TRACING_SPAN, span);
+    String spanName = resourceInfo.getResourceClass().getSimpleName() + "." +
+        resourceInfo.getResourceMethod().getName();
+
+    TracingUtil.TraceCloseable traceCloseable =
+        TracingUtil.createActivatedSpanFromW3cHttpHeaders(
+            spanName, requestContext::getHeaderString,
+            OzoneConfigurationHolder.configuration());
+    requestContext.setProperty(TRACING_SPAN_CLOSABLE, traceCloseable);
   }
 
   @Override
   public void filter(ContainerRequestContext requestContext,
       ContainerResponseContext responseContext) {
-    final Scope scope = (Scope) requestContext.getProperty(TRACING_SCOPE);
-    final Span span = (Span) requestContext.getProperty(TRACING_SPAN);
+    final TracingUtil.TraceCloseable spanClosable
+        = (TracingUtil.TraceCloseable) requestContext.getProperty(TRACING_SPAN_CLOSABLE);
+    if (spanClosable == null) {
+      return;
+    }
     // HDDS-7064: Operation performed while writing StreamingOutput response
     // should only be closed once the StreamingOutput callback has completely
     // written the data to the destination
-    OutputStream out = responseContext.getEntityStream();
-    if (out != null && !(span instanceof NoopSpan)) {
-      responseContext.setEntityStream(new WrappedOutputStream(out) {
-        @Override
-        public void close() throws IOException {
-          super.close();
-          finishAndClose(scope, span);
-        }
-      });
+    if (isStreamingGetObject(requestContext)) {
+      OutputStream out = responseContext.getEntityStream();
+      if (out != null) {
+        responseContext.setEntityStream(new WrappedOutputStream(out) {
+          @Override
+          public void close() throws IOException {
+            super.close();
+            finishAndClose(spanClosable);
+          }
+        });
+      } else {
+        finishAndClose(spanClosable);
+      }
     } else {
-      finishAndClose(scope, span);
+      finishAndClose(spanClosable);
     }
   }
 
-  private static void finishAndClose(Scope scope, Span span) {
-    if (scope != null) {
-      scope.close();
+  private boolean isStreamingGetObject(ContainerRequestContext req) {
+    if (!HTTP_GET_METHOD.equalsIgnoreCase(req.getMethod())) {
+      return false;
     }
-    if (span != null) {
-      span.finish();
+    String cls = resourceInfo.getResourceClass().getSimpleName();
+    String method = resourceInfo.getResourceMethod().getName();
+    return OBJECT_ENDPOINT_CLASS_NAME.equals(cls) && OBJECT_GET_METHOD_NAME.equals(method);
+  }
+
+  private static void finishAndClose(TracingUtil.TraceCloseable spanClosable) {
+    try {
+      spanClosable.close();
+    } catch (Exception e) {
+      // Do nothing
     }
     finishAndCloseActiveSpan();
   }
 
   private static void finishAndCloseActiveSpan() {
-    ScopeManager scopeManager = GlobalTracer.get().scopeManager();
-    if (scopeManager != null && scopeManager.activeSpan() != null) {
-      scopeManager.activeSpan().finish();
-      scopeManager.activate(null);
-    }
+    TracingUtil.getActiveSpan().end();
   }
 }

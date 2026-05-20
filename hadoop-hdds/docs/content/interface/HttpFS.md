@@ -45,24 +45,102 @@ HttpFS has built-in security supporting Hadoop pseudo authentication and Kerbero
 
 HttpFS service itself is a Jetty based web-application that uses the Hadoop FileSystem API to talk to the cluster, it is a separate service which provides access to Ozone via a REST APIs. It should be started in addition to other regular Ozone components.
 
-To try it out, you can start a Docker Compose dev cluster that has an HttpFS gateway.
+To try it out, follow the instructions from the link below to start the Ozone cluster with Docker Compose. 
 
-Extract the release tarball, go to the `compose/ozone` directory and start the cluster:
+https://ozone.apache.org/docs/edge/start/startfromdockerhub.html
 
 ```bash
-docker-compose up -d --scale datanode=3
+docker compose up -d --scale datanode=3
 ```
 
-You can/should find now the HttpFS gateway in docker with the name `ozone_httpfs`.
-HttpFS HTTP web-service API calls are HTTP REST calls that map to an Ozone file system operation. For example, using the `curl` Unix command.
+You can/should find now the HttpFS gateway in docker with the name like `ozone_httpfs`,
+and it can be accessed through `localhost:14000`.
+HttpFS HTTP web-service API calls are HTTP REST calls that map to an Ozone file system operation.
 
-E.g. in the docker cluster you can execute commands like these:
+Here's some example usage:
 
-* `curl -i -X PUT "http://httpfs:14000/webhdfs/v1/vol1?op=MKDIRS&user.name=hdfs"` creates a volume called `vol1`.
+### Create a volume
 
+```bash
+# creates a volume called `volume1`.
+curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1?op=MKDIRS&user.name=hdfs"
+```
 
-* `$ curl 'http://httpfs-host:14000/webhdfs/v1/user/foo/README.txt?op=OPEN&user.name=foo'` returns the content of the key `/user/foo/README.txt`.
+Example Output:
 
+```bash
+HTTP/1.1 200 OK
+Date: Sat, 18 Oct 2025 07:51:21 GMT
+Cache-Control: no-cache
+Expires: Sat, 18 Oct 2025 07:51:21 GMT
+Pragma: no-cache
+Content-Type: application/json
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+Set-Cookie: hadoop.auth="u=hdfs&p=hdfs&t=simple-dt&e=1760809881100&s=OCdVOi8eyMguFySkmEJxm5EkRfj6NbAM9agi5Gue1Iw="; Path=/; HttpOnly
+Content-Length: 17
+
+{"boolean":true}
+```
+
+### Create a bucket
+
+```bash
+# creates a bucket called `bucket1`.
+curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1/bucket1?op=MKDIRS&user.name=hdfs"
+```
+
+Example Output:
+
+```bash
+HTTP/1.1 200 OK
+Date: Sat, 18 Oct 2025 07:52:06 GMT
+Cache-Control: no-cache
+Expires: Sat, 18 Oct 2025 07:52:06 GMT
+Pragma: no-cache
+Content-Type: application/json
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+Set-Cookie: hadoop.auth="u=hdfs&p=hdfs&t=simple-dt&e=1760809926682&s=yvOaeaRCVJZ+z+nZQ/rM/Y01pzEmS9Pe2mE9f0b+TWw="; Path=/; HttpOnly
+Content-Length: 17
+
+{"boolean":true}
+```
+
+### Upload a file
+
+```bash
+echo "hello" >> ./README.txt
+curl -i -X PUT "http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt?op=CREATE&data=true&user.name=hdfs" -T ./README.txt -H "Content-Type: application/octet-stream" 
+```
+
+Example Output:
+
+```bash
+HTTP/1.1 100 Continue
+
+HTTP/1.1 201 Created
+Date: Sat, 18 Oct 2025 08:33:33 GMT
+Cache-Control: no-cache
+Expires: Sat, 18 Oct 2025 08:33:33 GMT
+Pragma: no-cache
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+Set-Cookie: hadoop.auth="u=hdfs&p=hdfs&t=simple-dt&e=1760812413286&s=09t7xKu/p/fjCJiQNL3bvW/Q7mTw28IbeNqDGlslZ6w="; Path=/; HttpOnly
+Location: http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt
+Content-Type: application/json
+Content-Length: 84
+
+{"Location":"http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt"}
+```
+
+### Read the file content
+
+```bash
+# returns the content of the key `/user/foo/README.txt`.
+curl 'http://localhost:14000/webhdfs/v1/volume1/bucket1/user/foo/README.txt?op=OPEN&user.name=foo'
+hello
+```
 
 ## Supported operations
 
@@ -110,7 +188,66 @@ Set ACL                               | not implemented in Ozone FileSystem API
 Get ACL Status                        | not implemented in Ozone FileSystem API
 Check access                          | not implemented in Ozone FileSystem API
 
+## Proxy User Configuration
 
+HttpFS supports proxy user (user impersonation) functionality, which allows a user to perform operations on behalf of another user. This is useful when HttpFS is used as a gateway and you want to allow certain users to impersonate other users.
+
+To configure proxy users, you need to add the following properties to `httpfs-site.xml`.
+
+### Configuration Properties
+
+For each user that should be allowed to perform impersonation, you need to configure two properties:
+
+1. **`httpfs.proxyuser.#USER#.hosts`**: List of hosts from which the user is allowed to perform impersonation operations.
+2. **`httpfs.proxyuser.#USER#.groups`**: List of groups whose users can be impersonated by the specified user.
+
+Replace `#USER#` with the actual username of the user who should be allowed to perform impersonation.
+
+### Example Configuration
+
+```xml
+<property>
+  <name>httpfs.proxyuser.knoxuser.hosts</name>
+  <value>*</value>
+  <description>
+    List of hosts the 'knoxuser' user is allowed to perform 'doAs'
+    operations.
+    
+    The value can be the '*' wildcard or a comma-separated list of hostnames.
+    
+    For multiple users, copy this property and replace the user name
+    in the property name.
+  </description>
+</property>
+
+<property>
+  <name>httpfs.proxyuser.knoxuser.groups</name>
+  <value>*</value>
+  <description>
+    List of groups the 'knoxuser' user is allowed to impersonate users
+    from to perform 'doAs' operations.
+    
+    The value can be the '*' wildcard or a comma-separated list of group names.
+    
+    For multiple users, copy this property and replace the user name
+    in the property name.
+  </description>
+</property>
+```
+
+In this example, the user `knoxuser` is allowed to impersonate any user from any host. For production environments, it's recommended to restrict these values to specific hosts and groups instead of using the wildcard `*`.
+
+### Troubleshooting
+
+If you encounter an error like:
+```
+User: user/host@REALM is not allowed to impersonate user01
+```
+
+This indicates that the proxy user configuration is missing or incorrect. Ensure that:
+1. The `httpfs.proxyuser.#USER#.hosts` property is set with appropriate host values
+2. The `httpfs.proxyuser.#USER#.groups` property is set with appropriate group values
+3. The HttpFS service has been restarted after configuration changes
 
 ## Hadoop user and developer documentation about HttpFS
 

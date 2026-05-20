@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,12 +33,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
@@ -56,9 +52,9 @@ public class TestDataNodeSafeModeRule {
   private Path tempDir;
   private DataNodeSafeModeRule rule;
   private EventQueue eventQueue;
-  private SCMServiceManager serviceManager;
-  private SCMContext scmContext;
   private NodeManager nodeManager;
+  private SCMSafeModeManager mockSafeModeManager;
+  private SafeModeMetrics metrics;
 
   private void setup(int requiredDns) throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -67,22 +63,16 @@ public class TestDataNodeSafeModeRule {
     ozoneConfiguration.setInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, requiredDns);
 
-    List<ContainerInfo> containers =
-        new ArrayList<>(HddsTestUtils.getContainerInfo(1));
     nodeManager = mock(NodeManager.class);
-    ContainerManager containerManager = mock(ContainerManager.class);
-    when(containerManager.getContainers()).thenReturn(containers);
     eventQueue = new EventQueue();
-    serviceManager = new SCMServiceManager();
-    scmContext = SCMContext.emptyContext();
 
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(ozoneConfiguration, containerManager,
-            null, nodeManager, eventQueue, serviceManager, scmContext);
+    mockSafeModeManager = mock(SCMSafeModeManager.class);
+    metrics = SafeModeMetrics.create();
+    when(mockSafeModeManager.getSafeModeMetrics()).thenReturn(metrics);
 
-    rule = scmSafeModeManager.getDataNodeSafeModeRule();
+    rule = new DataNodeSafeModeRule(eventQueue, ozoneConfiguration, nodeManager, mockSafeModeManager);
     assertNotNull(rule);
-    
+
     rule.setValidateBasedOnReportProcessing(true);
   }
 
@@ -90,6 +80,7 @@ public class TestDataNodeSafeModeRule {
   public void testDataNodeSafeModeRuleWithNoNodes() throws Exception {
     int requiredDns = 1;
     setup(requiredDns);
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(
@@ -107,12 +98,14 @@ public class TestDataNodeSafeModeRule {
         "SCM in safe mode. 1 DataNodes registered, 1 required."), 1000, 5000);
 
     assertTrue(rule.validate());
+    assertEquals(1, metrics.getCurrentRegisteredDatanodesCount().value());
   }
 
   @Test
   public void testDataNodeSafeModeRuleWithMultipleNodes() throws Exception {
     int requiredDns = 3;
     setup(requiredDns);
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(
@@ -132,7 +125,7 @@ public class TestDataNodeSafeModeRule {
         "SCM in safe mode. 2 DataNodes registered, 3 required."), 1000, 5000);
 
     assertFalse(rule.validate());
-
+    assertEquals(2, metrics.getCurrentRegisteredDatanodesCount().value());
     DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
     NodeRegistrationContainerReport nodeReg = 
         new NodeRegistrationContainerReport(dd, null);
@@ -143,12 +136,14 @@ public class TestDataNodeSafeModeRule {
         "SCM in safe mode. 3 DataNodes registered, 3 required."), 1000, 5000);
 
     assertTrue(rule.validate());
+    assertEquals(3, metrics.getCurrentRegisteredDatanodesCount().value());
   }
 
   @Test
   public void testDataNodeSafeModeRuleWithNodeManager() throws Exception {
     int requiredDns = 2;
     setup(requiredDns);
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
     
     rule.setValidateBasedOnReportProcessing(false);
 

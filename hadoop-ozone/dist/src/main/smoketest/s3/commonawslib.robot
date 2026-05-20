@@ -75,6 +75,7 @@ Setup v2 headers
                         Set Environment Variable   AWS_SECRET_ACCESS_KEY   ANYKEY
 
 Setup v4 headers
+    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Setup secure v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3
@@ -133,6 +134,7 @@ Setup s3 tests
     Return From Keyword if    ${OZONE_S3_TESTS_SET_UP}
     Run Keyword        Generate random prefix
     Run Keyword        Install aws cli
+    Run Keyword        Get Security Enabled From Config
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
     Run Keyword if    '${BUCKET}' == 'generated'            Create generated bucket    ${BUCKET_LAYOUT}
     Run Keyword if    '${BUCKET}' == 'link'                 Setup links for S3 tests
@@ -191,3 +193,31 @@ Revoke S3 secrets
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser2
 
+Get bucket owner
+    [arguments]    ${bucket}
+    ${owner} =     Execute    aws s3api --endpoint-url ${ENDPOINT_URL} get-bucket-acl --bucket ${bucket} | jq -r .Owner.DisplayName
+    [return]       ${owner}
+
+Execute AWSS3APICli using bucket ownership verification
+    [arguments]    ${command}    ${expected_bucket_owner}    ${expected_source_bucket_owner}=${EMPTY}
+    ${cmd} =       Set Variable           ${command} --expected-bucket-owner ${expected_bucket_owner}
+    ${cmd} =       Set Variable If        '${expected_source_bucket_owner}' != '${EMPTY}'    ${cmd} --expected-source-bucket-owner ${expected_source_bucket_owner}    ${cmd}
+    ${result} =    Execute AWSS3APICli    ${cmd}
+    Should Not Contain    ${result}    Access Denied
+    [return]              ${result}
+
+Execute AWSS3APICli and failed bucket ownership verification
+    [arguments]    ${command}    ${wrong_bucket_owner}    ${wrong_source_bucket_owner}=${EMPTY}
+    ${cmd} =       Set Variable           ${command} --expected-bucket-owner ${wrong_bucket_owner}
+    ${cmd} =       Set Variable If        '${wrong_source_bucket_owner}' != '${EMPTY}'    ${cmd} --expected-source-bucket-owner ${wrong_source_bucket_owner}    ${cmd}
+    ${result} =    Execute AWSS3APICli and ignore error    ${cmd}
+    Should contain      ${result}         Access Denied
+
+Execute AWSS3APICli with bucket owner check
+    [arguments]    ${command}    ${bucket_owner}    ${source_bucket_owner}=${EMPTY}
+
+    Run Keyword If    '${source_bucket_owner}' != '${EMPTY}'    Execute AWSS3APICli and failed bucket ownership verification    ${command}    wrong-${bucket_owner}    ${source_bucket_owner}
+    Run Keyword If    '${source_bucket_owner}' != '${EMPTY}'    Execute AWSS3APICli and failed bucket ownership verification    ${command}    ${bucket_owner}    wrong-${source_bucket_owner}
+    Run Keyword If    '${source_bucket_owner}' == '${EMPTY}'    Execute AWSS3APICli and failed bucket ownership verification    ${command}    wrong-${bucket_owner}
+    ${result} =    Execute AWSS3APICli using bucket ownership verification    ${command}    ${bucket_owner}    ${source_bucket_owner}
+    [return]              ${result}

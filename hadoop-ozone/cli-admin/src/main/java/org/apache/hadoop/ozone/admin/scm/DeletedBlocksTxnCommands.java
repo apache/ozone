@@ -29,10 +29,8 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        GetFailedDeletedBlocksTxnSubcommand.class,
-        ResetDeletedBlockRetryCountSubcommand.class,
+        GetDeletedBlockSummarySubcommand.class,
     })
 public class DeletedBlocksTxnCommands {
 
 }
-

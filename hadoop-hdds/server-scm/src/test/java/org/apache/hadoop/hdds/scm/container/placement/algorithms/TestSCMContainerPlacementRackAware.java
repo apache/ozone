@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -113,7 +112,8 @@ public class TestSCMContainerPlacementRackAware {
       cluster.add(datanodeDetails);
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(),
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
@@ -456,7 +456,8 @@ public class TestSCMContainerPlacementRackAware {
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultLayoutVersionProto(),
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           dnInfo.getID(), "/data1-" + dnInfo.getID(),
@@ -693,10 +694,9 @@ public class TestSCMContainerPlacementRackAware {
         excludedNodes, null, nodeNum, 0, 5);
     assertEquals(nodeNum, datanodeDetails.size());
 
-    assertTrue(cluster.isSameParent(
-        datanodes.get(0), datanodeDetails.get(0)) &&
-        cluster.isSameParent(datanodes.get(1), datanodeDetails.get(0)) &&
-        excludedNodes.get(0).getUuid() != datanodeDetails.get(0).getUuid());
+    assertTrue(cluster.isSameParent(datanodes.get(0), datanodeDetails.get(0)));
+    assertTrue(cluster.isSameParent(datanodes.get(1), datanodeDetails.get(0)));
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(0));
 
     // Required 2 DN for 2 replica
     nodeNum = 2;
@@ -709,9 +709,8 @@ public class TestSCMContainerPlacementRackAware {
         excludedNodes, null, nodeNum, 0, 5);
     assertEquals(nodeNum, datanodeDetails.size());
 
-    assertTrue(excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(0).getUuid() &&
-        excludedNodes.get(0).getUuid() != datanodeDetails.get(1).getUuid());
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(0));
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(1));
 
     nodeNum = 3;
     // No replica exist
@@ -721,9 +720,8 @@ public class TestSCMContainerPlacementRackAware {
         excludedNodes, null, nodeNum, 0, 5);
     assertEquals(nodeNum, datanodeDetails.size());
 
-    assertTrue(excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(0).getUuid() &&
-        excludedNodes.get(0).getUuid() != datanodeDetails.get(1).getUuid());
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(0));
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(1));
   }
 
   @ParameterizedTest
@@ -747,9 +745,8 @@ public class TestSCMContainerPlacementRackAware {
     assertEquals(nodeNum, datanodeDetails.size());
 
     // Exclude node should not be returned
-    assertTrue(excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(0).getUuid() && excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(1).getUuid());
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(0));
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(1));
 
     usedNodes.clear();
     excludedNodes.clear();
@@ -764,13 +761,11 @@ public class TestSCMContainerPlacementRackAware {
 
     assertEquals(nodeNum, datanodeDetails.size());
 
-    assertTrue(excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(0).getUuid() && excludedNodes.get(1).getUuid() !=
-        datanodeDetails.get(0).getUuid());
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(0));
+    assertNotEquals(excludedNodes.get(1), datanodeDetails.get(0));
 
-    assertTrue(excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(1).getUuid() && excludedNodes.get(1).getUuid() !=
-        datanodeDetails.get(1).getUuid());
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(1));
+    assertNotEquals(excludedNodes.get(1), datanodeDetails.get(1));
   }
 
   @ParameterizedTest
@@ -790,9 +785,8 @@ public class TestSCMContainerPlacementRackAware {
     assertEquals(nodeNum, datanodeDetails.size());
 
     // Exclude node should not be returned
-    assertTrue(excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(0).getUuid() && excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(1).getUuid());
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(0));
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(1));
 
     excludedNodes.clear();
     // Multiple exclude nodes
@@ -805,13 +799,11 @@ public class TestSCMContainerPlacementRackAware {
     assertEquals(nodeNum, datanodeDetails.size());
 
     // Exclude node should not be returned
-    assertTrue(excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(0).getUuid() && excludedNodes.get(0).getUuid() !=
-        datanodeDetails.get(1).getUuid());
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(0));
+    assertNotEquals(excludedNodes.get(0), datanodeDetails.get(1));
 
-    assertTrue(excludedNodes.get(1).getUuid() !=
-        datanodeDetails.get(0).getUuid() && excludedNodes.get(1).getUuid() !=
-        datanodeDetails.get(1).getUuid());
+    assertNotEquals(excludedNodes.get(1), datanodeDetails.get(0));
+    assertNotEquals(excludedNodes.get(1), datanodeDetails.get(1));
   }
 
   @ParameterizedTest
@@ -881,7 +873,19 @@ public class TestSCMContainerPlacementRackAware {
 
     // Favoured node should be returned,
     // as favoured node is in the different rack as used nodes.
-    assertSame(favouredNodes.get(0).getUuid(), datanodeDetails.get(0).getUuid());
+    assertEquals(favouredNodes.get(0), datanodeDetails.get(0));
 
+  }
+
+  @Test
+  public void testSourceDatanodeIsNotChosenAsTarget() {
+    setup(2);
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+    usedNodes.add(datanodes.get(0));
+    dnInfos.get(1).setNodeStatus(NodeStatus.inServiceHealthyReadOnly());
+
+    assertThrows(SCMException.class,
+            () -> policy.chooseDatanodes(usedNodes, null, null, 1, 0, 0),
+            "No target datanode, this call should fail");
   }
 }

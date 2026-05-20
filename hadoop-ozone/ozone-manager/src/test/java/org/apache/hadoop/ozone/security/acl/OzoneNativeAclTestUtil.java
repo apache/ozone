@@ -39,9 +39,10 @@ final class OzoneNativeAclTestUtil {
   ) throws IOException {
     final String volumeKey = metadataManager.getVolumeKey(volume);
     final Table<String, OmVolumeArgs> volumeTable = metadataManager.getVolumeTable();
-    final OmVolumeArgs omVolumeArgs = volumeTable.get(volumeKey);
-
-    omVolumeArgs.addAcl(ozoneAcl);
+    final OmVolumeArgs omVolumeArgs = volumeTable.get(volumeKey)
+        .toBuilder()
+        .addAcl(ozoneAcl)
+        .build();
 
     volumeTable.addCacheEntry(
         new CacheKey<>(volumeKey),
@@ -55,9 +56,10 @@ final class OzoneNativeAclTestUtil {
       OzoneAcl ozoneAcl) throws IOException {
     final String bucketKey = metadataManager.getBucketKey(volume, bucket);
     final Table<String, OmBucketInfo> bucketTable = metadataManager.getBucketTable();
-    final OmBucketInfo omBucketInfo = bucketTable.get(bucketKey);
-
-    omBucketInfo.addAcl(ozoneAcl);
+    final OmBucketInfo omBucketInfo = bucketTable.get(bucketKey)
+        .toBuilder()
+        .addAcl(ozoneAcl)
+        .build();
 
     bucketTable.addCacheEntry(
         new CacheKey<>(bucketKey),
@@ -74,9 +76,10 @@ final class OzoneNativeAclTestUtil {
   ) throws IOException {
     final String objKey = metadataManager.getOzoneKey(volume, bucket, key);
     final Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(bucketLayout);
-    final OmKeyInfo omKeyInfo = keyTable.get(objKey);
-
-    omKeyInfo.addAcl(ozoneAcl);
+    final OmKeyInfo omKeyInfo = keyTable.get(objKey)
+        .toBuilder()
+        .addAcl(ozoneAcl)
+        .build();
 
     keyTable.addCacheEntry(
         new CacheKey<>(objKey),
@@ -89,9 +92,10 @@ final class OzoneNativeAclTestUtil {
       List<OzoneAcl> ozoneAcls) throws IOException {
     final String volumeKey = metadataManager.getVolumeKey(volume);
     final Table<String, OmVolumeArgs> volumeTable = metadataManager.getVolumeTable();
-    final OmVolumeArgs omVolumeArgs = volumeTable.get(volumeKey);
-
-    omVolumeArgs.setAcls(ozoneAcls);
+    final OmVolumeArgs omVolumeArgs = volumeTable.get(volumeKey)
+        .toBuilder()
+        .setAcls(ozoneAcls)
+        .build();
 
     volumeTable.addCacheEntry(
         new CacheKey<>(volumeKey),
@@ -105,9 +109,10 @@ final class OzoneNativeAclTestUtil {
       List<OzoneAcl> ozoneAcls) throws IOException {
     final String bucketKey = metadataManager.getBucketKey(volume, bucket);
     final Table<String, OmBucketInfo> bucketTable = metadataManager.getBucketTable();
-    final OmBucketInfo omBucketInfo = bucketTable.get(bucketKey);
-
-    omBucketInfo.setAcls(ozoneAcls);
+    final OmBucketInfo omBucketInfo = bucketTable.get(bucketKey)
+        .toBuilder()
+        .setAcls(ozoneAcls)
+        .build();
 
     bucketTable.addCacheEntry(
         new CacheKey<>(bucketKey),
@@ -123,9 +128,10 @@ final class OzoneNativeAclTestUtil {
       List<OzoneAcl> ozoneAcls) throws IOException {
     final String objKey = metadataManager.getOzoneKey(volume, bucket, key);
     final Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(bucketLayout);
-    final OmKeyInfo omKeyInfo = keyTable.get(objKey);
-
-    omKeyInfo.setAcls(ozoneAcls);
+    final OmKeyInfo omKeyInfo = keyTable.get(objKey)
+        .toBuilder()
+        .setAcls(ozoneAcls)
+        .build();
 
     keyTable.addCacheEntry(
         new CacheKey<>(objKey),

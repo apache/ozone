@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import java.util.Comparator;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 
@@ -31,6 +32,10 @@ public class DatanodeUsageInfo {
   private SCMNodeStat scmNodeStat;
   private int containerCount;
   private int pipelineCount;
+  private long reserved;
+  private boolean fsUsagePresent;
+  private long fsCapacity;
+  private long fsAvailable;
 
   /**
    * Constructs a DatanodeUsageInfo with DatanodeDetails and SCMNodeStat.
@@ -128,6 +133,10 @@ public class DatanodeUsageInfo {
     return datanodeDetails;
   }
 
+  public DatanodeID getDatanodeID() {
+    return datanodeDetails.getID();
+  }
+
   /**
    * Gets SCMNodeStat of this DatanodeUsageInfo.
    *
@@ -149,8 +158,22 @@ public class DatanodeUsageInfo {
     return pipelineCount;
   }
 
+  public long getReserved() { 
+    return reserved; 
+  }
+
   public void setPipelineCount(int pipelineCount) {
     this.pipelineCount = pipelineCount;
+  }
+
+  public void setReserved(long reserved) { 
+    this.reserved = reserved; 
+  }
+
+  public void setFilesystemUsage(long capacity, long available) {
+    this.fsUsagePresent = true;
+    this.fsCapacity = capacity;
+    this.fsAvailable = available;
   }
 
   /**
@@ -219,6 +242,11 @@ public class DatanodeUsageInfo {
 
     builder.setContainerCount(containerCount);
     builder.setPipelineCount(pipelineCount);
+    builder.setReserved(reserved);
+    if (fsUsagePresent) {
+      builder.setFsCapacity(fsCapacity);
+      builder.setFsAvailable(fsAvailable);
+    }
     return builder;
   }
 }

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.db.CodecTestUtil.gc;
+import static org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes.newBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.slf4j.Logger;
@@ -49,6 +51,7 @@ public final class TestCodec {
 
   static {
     CodecBuffer.enableLeakDetection();
+    ManagedRocksObjectUtils.loadRocksDBLibrary();
   }
 
   @Test
@@ -289,17 +292,15 @@ public final class TestCodec {
   public static <T> void runTest(Codec<T> codec, T original,
       Integer serializedSize) throws Exception {
     CodecTestUtil.runTest(codec, original, serializedSize, null);
-    runTestBytes(original, codec);
+    runTestBytes(original, codec, CodecBuffer.Allocator.HEAP);
+    runTestBytes(original, codec, CodecBuffer.Allocator.DIRECT);
   }
 
-  static <T> void runTestBytes(T object, Codec<T> codec) throws IOException {
+  static <T> void runTestBytes(T object, Codec<T> codec, CodecBuffer.Allocator allocator) throws IOException {
     final byte[] array = codec.toPersistedFormat(object);
     final Bytes fromArray = new Bytes(array);
-
-    try (CodecBuffer buffer = codec.toCodecBuffer(object,
-        CodecBuffer.Allocator.HEAP)) {
-      final Bytes fromBuffer = new Bytes(buffer);
-
+    try (CodecBuffer buffer = codec.toCodecBuffer(object, allocator)) {
+      final Bytes fromBuffer = newBytes(buffer);
       assertEquals(fromArray.hashCode(), fromBuffer.hashCode());
       assertEquals(fromArray, fromBuffer);
       assertEquals(fromBuffer, fromArray);

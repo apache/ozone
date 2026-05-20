@@ -29,7 +29,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,8 +91,7 @@ public class TestBackgroundSCMService {
     assertTrue(backgroundSCMService.shouldRun());
 
     // go into safe mode, RUNNING -> PAUSING
-    scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     backgroundSCMService.notifyStatusChanged();
     assertFalse(backgroundSCMService.shouldRun());
   }

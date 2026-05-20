@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.ErrorCode;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -59,6 +60,7 @@ public class OMInterServiceProtocolServerSideImpl implements
         .setOMNodeId(request.getNodeId())
         .setHostAddress(request.getHostAddress())
         .setRatisPort(request.getRatisPort())
+        .setIsListener(request.getIsListener())
         .build();
 
     try {
@@ -67,7 +69,7 @@ public class OMInterServiceProtocolServerSideImpl implements
       return BootstrapOMResponse.newBuilder()
           .setSuccess(false)
           .setErrorCode(ErrorCode.RATIS_BOOTSTRAP_ERROR)
-          .setErrorMsg(ex.getMessage())
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
 

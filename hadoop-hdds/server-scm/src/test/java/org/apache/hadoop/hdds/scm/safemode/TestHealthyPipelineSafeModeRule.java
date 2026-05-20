@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -30,6 +31,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -73,6 +75,7 @@ public class TestHealthyPipelineSafeModeRule {
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers()).thenReturn(containers);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
     // enable pipeline check
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
@@ -94,12 +97,12 @@ public class TestHealthyPipelineSafeModeRule {
               pipelineManager.getStateManager(), config);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
-      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, nodeManager, eventQueue,
-          serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
 
-      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-          scmSafeModeManager.getHealthyPipelineSafeModeRule();
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // This should be immediately satisfied, as no pipelines are there yet.
       assertTrue(healthyPipelineSafeModeRule.validate());
@@ -172,12 +175,12 @@ public class TestHealthyPipelineSafeModeRule {
       pipeline3 = pipelineManager.getPipeline(pipeline3.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
-      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, nodeManager, eventQueue,
-          serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
 
-      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-          scmSafeModeManager.getHealthyPipelineSafeModeRule();
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // No datanodes have sent pipelinereport from datanode
       assertFalse(healthyPipelineSafeModeRule.validate());
@@ -255,7 +258,7 @@ public class TestHealthyPipelineSafeModeRule {
               ReplicationFactor.THREE));
       pipelineManager.openPipeline(pipeline3.getId());
 
-      // Mark pipeline healthy
+      // Mark pipelines healthy
       pipeline1 = pipelineManager.getPipeline(pipeline1.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline1);
 
@@ -265,26 +268,20 @@ public class TestHealthyPipelineSafeModeRule {
       pipeline3 = pipelineManager.getPipeline(pipeline3.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
 
-      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
-          config, containerManager, pipelineManager, nodeManager, eventQueue,
-          serviceManager, scmContext);
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
 
-      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
-          scmSafeModeManager.getHealthyPipelineSafeModeRule();
-
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // No pipeline event have sent to SCMSafemodeManager
       assertFalse(healthyPipelineSafeModeRule.validate());
-
-      LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.class);
 
       // fire event with pipeline create status with ratis type and factor 1
       // pipeline, validate() should return false
       firePipelineEvent(pipeline1, eventQueue);
 
-      GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-          "reported count is 1"),
-          1000, 5000);
       assertFalse(healthyPipelineSafeModeRule.validate());
 
       firePipelineEvent(pipeline2, eventQueue);
@@ -297,6 +294,190 @@ public class TestHealthyPipelineSafeModeRule {
       scmMetadataStore.getStore().close();
     }
 
+  }
+
+  @Test
+  public void testHealthyPipelineThresholdIncreasesWithMorePipelinesAndReports()
+      throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
+    List<ContainerInfo> containers =
+        new ArrayList<>(HddsTestUtils.getContainerInfo(1));
+
+    OzoneConfiguration config = new OzoneConfiguration();
+    MockNodeManager nodeManager = new MockNodeManager(true, 12);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
+    config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    config.setDouble(HddsConfigKeys.HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
+        0.5);
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 0);
+
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
+    try {
+      PipelineManagerImpl pipelineManager =
+          PipelineManagerImpl.newPipelineManager(
+              config,
+              SCMHAManagerStub.getInstance(true),
+              nodeManager,
+              scmMetadataStore.getPipelineTable(),
+              eventQueue,
+              scmContext,
+              serviceManager,
+              Clock.system(ZoneOffset.UTC));
+
+      PipelineProvider mockRatisProvider =
+          new MockRatisPipelineProvider(nodeManager,
+              pipelineManager.getStateManager(), config);
+      pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+          mockRatisProvider);
+
+      // Create all pipelines before SCM enters safe mode. Pipeline creation is
+      // blocked once safe mode prechecks have not passed.
+      Pipeline pipeline1 =
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
+              ReplicationFactor.THREE));
+      Pipeline pipeline2 =
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
+              ReplicationFactor.THREE));
+      Pipeline pipeline3 =
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
+              ReplicationFactor.THREE));
+
+      // Start with one healthy open pipeline. Threshold is small at this point.
+      pipelineManager.openPipeline(pipeline1.getId());
+      pipeline1 = pipelineManager.getPipeline(pipeline1.getId());
+      MockRatisPipelineProvider.markPipelineHealthy(pipeline1);
+
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager,
+          eventQueue, scmContext);
+      scmSafeModeManager.start();
+
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
+          SafeModeRuleFactory.getInstance()
+              .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+      healthyPipelineSafeModeRule.setValidateBasedOnReportProcessing(false);
+
+      firePipelineEvent(pipeline1, eventQueue);
+      assertTrue(healthyPipelineSafeModeRule.validate());
+      assertEquals(1, healthyPipelineSafeModeRule.getHealthyPipelineThresholdCount());
+
+      // Open more pipelines so threshold increases.
+      pipelineManager.openPipeline(pipeline2.getId());
+      pipeline2 = pipelineManager.getPipeline(pipeline2.getId());
+      MockRatisPipelineProvider.markPipelineHealthy(pipeline2);
+
+      pipelineManager.openPipeline(pipeline3.getId());
+      pipeline3 = pipelineManager.getPipeline(pipeline3.getId());
+      MockRatisPipelineProvider.markPipelineHealthy(pipeline3);
+
+      // Simulate DN reports causing pipelines to be considered unhealthy.
+      for (DatanodeDetails dn : pipeline2.getNodes()) {
+        nodeManager.setNodeState(dn, HddsProtos.NodeState.DEAD);
+      }
+      for (DatanodeDetails dn : pipeline3.getNodes()) {
+        nodeManager.setNodeState(dn, HddsProtos.NodeState.DEAD);
+      }
+      firePipelineEvent(pipeline2, eventQueue);
+      firePipelineEvent(pipeline3, eventQueue);
+
+      assertFalse(healthyPipelineSafeModeRule.validate());
+      assertEquals(2, healthyPipelineSafeModeRule.getHealthyPipelineThresholdCount());
+
+      // Simulate more DN reports and recovery to healthy state, then exit rule.
+      for (DatanodeDetails dn : pipeline1.getNodes()) {
+        nodeManager.setNodeState(dn, HddsProtos.NodeState.HEALTHY);
+      }
+      for (DatanodeDetails dn : pipeline2.getNodes()) {
+        nodeManager.setNodeState(dn, HddsProtos.NodeState.HEALTHY);
+      }
+      for (DatanodeDetails dn : pipeline3.getNodes()) {
+        nodeManager.setNodeState(dn, HddsProtos.NodeState.HEALTHY);
+      }
+      firePipelineEvent(pipeline1, eventQueue);
+      firePipelineEvent(pipeline2, eventQueue);
+      firePipelineEvent(pipeline3, eventQueue);
+
+      assertTrue(healthyPipelineSafeModeRule.validate());
+      assertEquals(2, healthyPipelineSafeModeRule.getHealthyPipelineThresholdCount());
+    } finally {
+      scmMetadataStore.getStore().close();
+    }
+  }
+
+  @Test
+  public void testPipelineIgnoredWhenDnIsUnhealthy() throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    SCMServiceManager serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
+    List<ContainerInfo> containers =
+        new ArrayList<>(HddsTestUtils.getContainerInfo(1));
+
+    OzoneConfiguration config = new OzoneConfiguration();
+    MockNodeManager nodeManager = new MockNodeManager(true, 12);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers()).thenReturn(containers);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
+    config.setBoolean(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
+    try {
+      PipelineManagerImpl pipelineManager =
+          PipelineManagerImpl.newPipelineManager(
+              config,
+              SCMHAManagerStub.getInstance(true),
+              nodeManager,
+              scmMetadataStore.getPipelineTable(),
+              eventQueue,
+              scmContext,
+              serviceManager,
+              Clock.system(ZoneOffset.UTC));
+
+      PipelineProvider mockRatisProvider =
+          new MockRatisPipelineProvider(nodeManager,
+              pipelineManager.getStateManager(), config);
+      pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+          mockRatisProvider);
+
+      // Create a Ratis pipeline with 3 replicas
+      Pipeline pipeline =
+          pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
+              ReplicationFactor.THREE));
+      pipelineManager.openPipeline(pipeline.getId());
+      pipeline = pipelineManager.getPipeline(pipeline.getId());
+      MockRatisPipelineProvider.markPipelineHealthy(pipeline);
+
+      // Mark one DN as DEAD
+      DatanodeDetails dnDead = pipeline.getNodes().get(0);
+      nodeManager.setNodeState(dnDead, HddsProtos.NodeState.DEAD);
+
+      SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(config,
+          nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
+      scmSafeModeManager.start();
+
+      LogCapturer logCapturer = LogCapturer.captureLogs(
+          HealthyPipelineSafeModeRule.class);
+
+      HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
+          .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+
+      // Fire the pipeline report
+      firePipelineEvent(pipeline, eventQueue);
+
+      // Wait for log message indicating the pipeline's DN is in bad health.
+      GenericTestUtils.waitFor(
+          () -> logCapturer.getOutput().contains("are either in bad health or un-registered with SCMs"),
+          100, 5000);
+
+      // Ensure the rule is NOT satisfied due to unhealthy DN
+      assertFalse(healthyPipelineSafeModeRule.validate());
+    } finally {
+      scmMetadataStore.getStore().close();
+    }
   }
 
   private void firePipelineEvent(Pipeline pipeline, EventQueue eventQueue) {

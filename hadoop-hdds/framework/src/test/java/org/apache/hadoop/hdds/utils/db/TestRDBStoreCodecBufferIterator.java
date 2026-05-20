@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -31,7 +32,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -73,12 +73,11 @@ public class TestRDBStoreCodecBufferIterator {
   }
 
   RDBStoreCodecBufferIterator newIterator() {
-    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null);
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
   }
 
   RDBStoreCodecBufferIterator newIterator(CodecBuffer prefix) {
-    return new RDBStoreCodecBufferIterator(
-        managedRocksIterator, rdbTableMock, prefix);
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, rdbTableMock, prefix, KEY_AND_VALUE);
   }
 
   Answer<Integer> newAnswerInt(String name, int b) {
@@ -116,14 +115,8 @@ public class TestRDBStoreCodecBufferIterator {
 
     List<Table.KeyValue<byte[], byte[]>> remaining = new ArrayList<>();
     try (RDBStoreCodecBufferIterator i = newIterator()) {
-      i.forEachRemaining(kv -> {
-        try {
-          remaining.add(RawKeyValue.create(
-              kv.getKey().getArray(), kv.getValue().getArray()));
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      });
+      i.forEachRemaining(kv ->
+          remaining.add(Table.newKeyValue(kv.getKey().getArray(), kv.getValue().getArray())));
 
       System.out.println("remaining: " + remaining);
       assertArrayEquals(new byte[]{0x00}, remaining.get(0).getKey());

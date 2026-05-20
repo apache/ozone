@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -26,7 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
@@ -39,11 +36,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -76,8 +73,6 @@ public class ContainerManagerImpl implements ContainerManager {
   // Metrics related to operations should be moved to ProtocolServer
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
-  private final int numContainerPerVolume;
-
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
@@ -106,10 +101,6 @@ public class ContainerManagerImpl implements ContainerManager {
         .setContainerReplicaPendingOps(containerReplicaPendingOps)
         .build();
 
-    this.numContainerPerVolume = conf
-        .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
-
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
 
@@ -130,15 +121,24 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public ContainerInfo getContainer(final ContainerID id)
       throws ContainerNotFoundException {
-    return Optional.ofNullable(containerStateManager
-        .getContainer(id))
-        .orElseThrow(() -> new ContainerNotFoundException("Container with id " +
-            id + " not found."));
+    final ContainerInfo info = containerStateManager.getContainer(id);
+    if (info == null) {
+      throw new ContainerNotFoundException(id);
+    }
+    return info;
   }
 
   @Override
   public List<ContainerInfo> getContainers(ReplicationType type) {
     return containerStateManager.getContainerInfos(type);
+  }
+
+  @Override
+  public List<ContainerID> getContainerIDs(final ContainerID startID,
+                                           final int count,
+                                           final LifeCycleState state) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    return containerStateManager.getContainerIDs(state, startID, count);
   }
 
   @Override
@@ -194,6 +194,9 @@ public class ContainerManagerImpl implements ContainerManager {
     if (pipelines.isEmpty()) {
       try {
         pipeline = pipelineManager.createPipeline(replicationConfig);
+        if (replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC) {
+          pipelineManager.openPipeline(pipeline.getId());
+        }
         pipelineManager.waitPipelineReady(pipeline.getId(), 0);
       } catch (IOException e) {
         scmContainerManagerMetrics.incNumFailureCreateContainers();
@@ -234,7 +237,12 @@ public class ContainerManagerImpl implements ContainerManager {
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
       throws IOException {
-    final long uniqueId = sequenceIdGen.getNextId(CONTAINER_ID);
+    if (!pipelineManager.hasEnoughSpace(pipeline)) {
+      LOG.debug("Cannot allocate a new container because pipeline {} does not have enough space.", pipeline);
+      return null;
+    }
+
+    final long uniqueId = sequenceIdGen.getNextId(SequenceIdType.containerId);
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
             " generated. %s.", uniqueId);
@@ -272,9 +280,13 @@ public class ContainerManagerImpl implements ContainerManager {
     lock.lock();
     try {
       if (containerExist(cid)) {
-        containerStateManager.updateContainerState(protoId, event);
+        final ContainerInfo info = containerStateManager.getContainer(cid);
+        if (info != null) {
+          // Delegate to @Replicate method with current sequenceId
+          containerStateManager.updateContainerStateWithSequenceId(protoId, event, info.getSequenceId());
+        }
       } else {
-        throwContainerNotFoundException(cid);
+        throw new ContainerNotFoundException(cid);
       }
     } finally {
       lock.unlock();
@@ -282,14 +294,30 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
-  public void transitionDeletingOrDeletedToClosedState(ContainerID containerID) throws IOException {
+  public void updateContainerInfo(final ContainerID cid, ContainerInfoProto containerInfo)
+      throws IOException {
+    lock.lock();
+    try {
+      if (containerExist(cid)) {
+        containerStateManager.updateContainerInfo(containerInfo);
+      } else {
+        throw new ContainerNotFoundException(cid);
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
+  public void transitionDeletingOrDeletedToTargetState(ContainerID containerID, LifeCycleState targetState)
+          throws IOException {
     HddsProtos.ContainerID proto = containerID.getProtobuf();
     lock.lock();
     try {
       if (containerExist(containerID)) {
-        containerStateManager.transitionDeletingOrDeletedToClosedState(proto);
+        containerStateManager.transitionDeletingOrDeletedToTargetState(proto, targetState);
       } else {
-        throwContainerNotFoundException(containerID);
+        throw new ContainerNotFoundException(containerID);
       }
     } finally {
       lock.unlock();
@@ -299,10 +327,11 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id)
       throws ContainerNotFoundException {
-    return Optional.ofNullable(containerStateManager
-        .getContainerReplicas(id))
-        .orElseThrow(() -> new ContainerNotFoundException("Container with id " +
-            id + " not found."));
+    final Set<ContainerReplica> replicas = containerStateManager.getContainerReplicas(id);
+    if (replicas == null) {
+      throw new ContainerNotFoundException(id);
+    }
+    return replicas;
   }
 
   @Override
@@ -312,7 +341,7 @@ public class ContainerManagerImpl implements ContainerManager {
     if (containerExist(cid)) {
       containerStateManager.updateContainerReplica(replica);
     } else {
-      throwContainerNotFoundException(cid);
+      throw new ContainerNotFoundException(cid);
     }
   }
 
@@ -323,7 +352,7 @@ public class ContainerManagerImpl implements ContainerManager {
     if (containerExist(cid)) {
       containerStateManager.removeContainerReplica(replica);
     } else {
-      throwContainerNotFoundException(cid);
+      throw new ContainerNotFoundException(cid);
     }
   }
 
@@ -341,9 +370,12 @@ public class ContainerManagerImpl implements ContainerManager {
     try {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
-        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
-          allocateContainer(pipeline, owner);
-          containerIDs = getContainersForOwner(pipeline, owner);
+        if (containerIDs.size() < pipelineManager.openContainerLimit(pipeline.getNodes())) {
+          ContainerInfo allocated = allocateContainer(pipeline, owner);
+          if (allocated != null) {
+            // New container was created, refresh IDs so it becomes eligible.
+            containerIDs = getContainersForOwner(pipeline, owner);
+          }
         }
         containerIDs.removeAll(excludedContainerIDs);
         containerInfo = containerStateManager.getMatchingContainer(
@@ -357,14 +389,6 @@ public class ContainerManagerImpl implements ContainerManager {
       LOG.warn("Container allocation failed on pipeline={}", pipeline, e);
       return null;
     }
-  }
-
-  private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
-    int minContainerCountPerDn = numContainerPerVolume *
-        pipelineManager.minHealthyVolumeNum(pipeline);
-    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
-    return (int) Math.ceil(
-        ((double) minContainerCountPerDn / minPipelineCountPerDn));
   }
 
   /**
@@ -430,24 +454,13 @@ public class ContainerManagerImpl implements ContainerManager {
       scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
     } else {
       scmContainerManagerMetrics.incNumFailureDeleteContainers();
-      throwContainerNotFoundException(cid);
+      throw new ContainerNotFoundException(cid);
     }
   }
 
   @Override
   public boolean containerExist(final ContainerID id) {
     return containerStateManager.contains(id);
-  }
-
-  private void throwContainerNotFoundException(final ContainerID id)
-      throws ContainerNotFoundException {
-    throw new ContainerNotFoundException("Container with id " +
-        id + " not found.");
-  }
-
-  @Override
-  public void close() throws IOException {
-    containerStateManager.close();
   }
 
   // Remove this after fixing Recon

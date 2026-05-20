@@ -68,14 +68,14 @@ public class ContainerScannerConfiguration {
   public static final long ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT =
       OzoneConsts.MB * 5L;
 
-  @Config(key = "enabled",
+  @Config(key = "hdds.container.scrub.enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "true",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to enable all container scanners.")
   private boolean enabled = true;
 
-  @Config(key = "dev.data.scan.enabled",
+  @Config(key = "hdds.container.scrub.dev.data.scan.enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "true",
       tags = {ConfigTag.STORAGE},
@@ -83,7 +83,7 @@ public class ContainerScannerConfiguration {
           "scanner for developer testing purposes.")
   private boolean dataScanEnabled = true;
 
-  @Config(key = "dev.metadata.scan.enabled",
+  @Config(key = "hdds.container.scrub.dev.metadata.scan.enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "true",
       tags = {ConfigTag.STORAGE},
@@ -91,7 +91,7 @@ public class ContainerScannerConfiguration {
           " scanner for developer testing purposes.")
   private boolean metadataScanEnabled = true;
 
-  @Config(key = "metadata.scan.interval",
+  @Config(key = "hdds.container.scrub.metadata.scan.interval",
       type = ConfigType.TIME,
       defaultValue = "3h",
       tags = {ConfigTag.STORAGE},
@@ -100,7 +100,7 @@ public class ContainerScannerConfiguration {
           " Unit could be defined with postfix (ns,ms,s,m,h,d).")
   private long metadataScanInterval = METADATA_SCAN_INTERVAL_DEFAULT;
 
-  @Config(key = "data.scan.interval",
+  @Config(key = "hdds.container.scrub.data.scan.interval",
       type = ConfigType.TIME,
       defaultValue = "7d",
       tags = {ConfigTag.STORAGE},
@@ -110,7 +110,7 @@ public class ContainerScannerConfiguration {
           " Unit could be defined with postfix (ns,ms,s,m,h,d).")
   private long dataScanInterval = DATA_SCAN_INTERVAL_DEFAULT;
 
-  @Config(key = "volume.bytes.per.second",
+  @Config(key = "hdds.container.scrub.volume.bytes.per.second",
       type = ConfigType.LONG,
       defaultValue = "5242880",
       tags = {ConfigTag.STORAGE},
@@ -118,7 +118,7 @@ public class ContainerScannerConfiguration {
           + " by scanner per volume.")
   private long bandwidthPerVolume = BANDWIDTH_PER_VOLUME_DEFAULT;
 
-  @Config(key = "on.demand.volume.bytes.per.second",
+  @Config(key = "hdds.container.scrub.on.demand.volume.bytes.per.second",
       type = ConfigType.LONG,
       defaultValue = "5242880",
       tags = {ConfigTag.STORAGE},
@@ -127,7 +127,7 @@ public class ContainerScannerConfiguration {
   private long onDemandBandwidthPerVolume
       = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
 
-  @Config(key = "min.gap",
+  @Config(key = "hdds.container.scrub.min.gap",
       defaultValue = "15m",
       type = ConfigType.TIME,
       tags = { DATANODE },
@@ -216,5 +216,9 @@ public class ContainerScannerConfiguration {
 
   public long getContainerScanMinGap() {
     return containerScanMinGap;
+  }
+
+  public void setContainerScanMinGap(long scanGap) {
+    containerScanMinGap = scanGap;
   }
 }

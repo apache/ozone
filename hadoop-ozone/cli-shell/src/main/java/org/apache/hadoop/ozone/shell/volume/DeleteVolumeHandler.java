@@ -60,7 +60,6 @@ public class DeleteVolumeHandler extends VolumeHandler {
   @CommandLine.Option(names = {"-y", "--yes"},
       description = "Continue without interactive user confirmation")
   private boolean yes;
-  private ExecutorService executor;
   private List<String> bucketIdList = new ArrayList<>();
   private AtomicInteger cleanedBucketCounter =
       new AtomicInteger();
@@ -82,10 +81,10 @@ public class DeleteVolumeHandler extends VolumeHandler {
         if (!yes) {
           // Ask for user confirmation
           out().print("This command will delete volume recursively." +
-              "\nThere is no recovery option after using this command, " +
+              "%nThere is no recovery option after using this command, " +
               "and no trash for FSO buckets." +
-              "\nDelay is expected running this command." +
-              "\nEnter 'yes' to proceed': ");
+              "%nDelay is expected running this command." +
+              "%nEnter 'yes' to proceed': ");
           out().flush();
           Scanner scanner = new Scanner(new InputStreamReader(
               System.in, StandardCharsets.UTF_8));
@@ -172,9 +171,10 @@ public class DeleteVolumeHandler extends VolumeHandler {
       final Path path = new Path(ofsPrefix);
       OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
       clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
-      FileSystem fs = FileSystem.get(clientConf);
-      if (!fs.delete(path, true)) {
-        throw new IOException("Failed to delete bucket");
+      try (FileSystem fs = FileSystem.get(clientConf)) {
+        if (!fs.delete(path, true)) {
+          throw new IOException("Failed to delete bucket");
+        }
       }
       numberOfBucketsCleaned.getAndIncrement();
       return true;
@@ -215,7 +215,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
   }
 
   private void doCleanBuckets() throws InterruptedException {
-    executor = Executors.newFixedThreadPool(threadNo);
+    ExecutorService executor = Executors.newFixedThreadPool(threadNo);
     for (int i = 0; i < threadNo; i++) {
       executor.execute(new BucketCleaner());
     }

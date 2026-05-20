@@ -71,7 +71,6 @@ public class TestReconNodeManager {
 
   private OzoneConfiguration conf;
   private DBStore store;
-  private ReconStorageConfig reconStorageConfig;
   private HDDSLayoutVersionManager versionManager;
   private ReconContext reconContext;
 
@@ -81,7 +80,7 @@ public class TestReconNodeManager {
     conf.set(OZONE_METADATA_DIRS, temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
     ReconUtils reconUtils = new ReconUtils();
-    reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
+    ReconStorageConfig reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
     versionManager = new HDDSLayoutVersionManager(
         reconStorageConfig.getLayoutVersion());
     store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
@@ -150,12 +149,12 @@ public class TestReconNodeManager {
     // interface, then they should be filtered out and not returned to the DN
     // when it heartbeats.
     // This command should never be returned by Recon
-    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getID(),
         new SetNodeOperationalStateCommand(1234,
         DECOMMISSIONING, 0));
 
     // This one should be returned
-    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getID(),
         new ReregisterCommand());
 
     // OperationalState sanity check

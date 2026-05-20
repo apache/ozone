@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SHORT_CIRCUIT_FD_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -38,6 +39,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -126,7 +128,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(dispatcherContext);
+    Objects.requireNonNull(dispatcherContext, "dispatcherContext == null");
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
 
     if (info.getLen() <= 0) {
@@ -147,7 +149,7 @@ public class FilePerBlockStrategy implements ChunkManager {
         .getContainerData();
 
     final File chunkFile = getChunkFile(container, blockID);
-    long len = info.getLen();
+    long chunkLength = info.getLen();
     long offset = info.getOffset();
 
     HddsVolume volume = containerData.getVolume();
@@ -172,10 +174,46 @@ public class FilePerBlockStrategy implements ChunkManager {
       ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
     }
 
-    ChunkUtils
-        .writeData(channel, chunkFile.getName(), data, offset, len, volume);
+    long fileLengthBeforeWrite;
+    try {
+      fileLengthBeforeWrite = channel.size();
+    } catch (IOException e) {
+      throw new StorageContainerException("Encountered an error while getting the file size for "
+          + chunkFile.getName(), CHUNK_FILE_INCONSISTENCY);
+    }
 
-    containerData.updateWriteStats(len, overwrite);
+    ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, chunkLength, volume);
+
+    // Handle space accounting for overwrites that extend the file length.
+    // For overwrites, we must distinguish between:
+    // 1. Pure overwrites (no file growth): No space consumed, only I/O metrics updated
+    // 2. Overwrites with growth (file extends): Only the delta consumes new space
+    //
+    // Example: File is 4 bytes. Overwrite 6 bytes at offset 2.
+    // - I/O operation: 6 bytes written (tracked by updateWriteStats below)
+    // - Disk growth: 4 bytes (file grows from 4 -> 8, delta = 4)
+    // - Space consumed: 4 bytes (only the delta, not the full 6 bytes)
+    //
+    // We handle the delta BEFORE calling updateWriteStats to ensure correct accounting:
+    // - incrementBlockBytes(delta): Updates blockBytes for disk space growth
+    // - incrWriteBytes(delta): Updates usedSpace/committedBytes for space consumed
+    // - updateWriteStats(chunkLength, true): Updates I/O metrics (writeBytes, writeCount)
+    //   but skips space updates because overwrite=true
+    if (overwrite) {
+      long fileLengthAfterWrite = offset + chunkLength;
+      if (fileLengthAfterWrite > fileLengthBeforeWrite) {
+        long delta = fileLengthAfterWrite - fileLengthBeforeWrite;
+        // Update disk space accounting for the file growth (delta only)
+        containerData.getStatistics().incrementBlockBytes(delta);
+        // Update volume space accounting for the new space consumed (delta only)
+        containerData.incrWriteBytes(delta);
+      }
+    }
+
+    // Update I/O metrics (writeBytes, writeCount) and space metrics for new writes.
+    // For overwrites (overwrite=true), this only updates I/O metrics.
+    // For new writes (overwrite=false), this updates both I/O and space metrics.
+    containerData.updateWriteStats(chunkLength, overwrite);
   }
 
   @Override
@@ -277,7 +315,7 @@ public class FilePerBlockStrategy implements ChunkManager {
       throws StorageContainerException {
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
+    Objects.requireNonNull(blockID, "blockID == null");
 
     final File file = getChunkFile(container, blockID);
 
@@ -290,8 +328,6 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
 
     if (verifyLength) {
-      Preconditions.checkNotNull(info, "Chunk info cannot be null for single " +
-          "chunk delete");
       checkFullDelete(info, file);
     }
 
@@ -305,6 +341,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static void checkFullDelete(ChunkInfo info, File chunkFile)
       throws StorageContainerException {
+    Objects.requireNonNull(info, "info == null");
     long fileLength = chunkFile.length();
     if ((info.getOffset() > 0) || (info.getLen() != fileLength)) {
       String msg = String.format(

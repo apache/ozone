@@ -17,11 +17,11 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>hdds-crypto-default</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <name>Apache Ozone HDDS Crypto - Default</name>
   <description>Default implementation of Apache Ozone Distributed Data Store's cryptographic functions</description>
 

@@ -127,5 +127,17 @@
     <name>ozone.client.datastream.window.size</name>
     <value>8MB</value>
   </property>
+  <property>
+    <name>ozone.readonly.administrators</name>
+    <value>admin</value>
+  </property>
+  <property>
+    <name>ozone.administrators</name>
+    <value>admin</value>
+  </property>
+  <property>
+  <name>ozone.directory.deleting.service.interval</name>
+  <value>2m</value>
+  </property>
 
 </configuration>

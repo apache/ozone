@@ -23,7 +23,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -174,8 +173,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       Pipeline pipeline = Pipeline.newBuilder()
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE))
-          .setNodes(Arrays.asList(dataLocation))
-          .setId(PipelineID.valueOf(dataLocation.getUuid()))
+          .setNodes(Collections.singletonList(dataLocation))
+          .setId(dataLocation.getID())
           .setReplicaIndexes(ImmutableMap.of(dataLocation, locationIndex + 1))
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
@@ -435,6 +434,12 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Expected to read " + expectedRead + " but got EOF"
           + " from blockGroup " + stream.getBlockID() + " index "
           + currentStreamIndex() + 1);
+    }
+
+    if (actualRead != expectedRead) {
+      throw new IOException(String.format(
+          "Inconsistent read for blockID=%s index=%d expectedRead=%d actualRead=%d",
+          stream.getBlockID(), currentStreamIndex() + 1, expectedRead, actualRead));
     }
     return actualRead;
   }

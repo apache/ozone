@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
-import com.google.common.base.Preconditions;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,8 +40,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneClientUtils;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -129,7 +130,8 @@ public class BasicRootedOzoneClientAdapterImpl
   private boolean securityEnabled;
   private int configuredDnPort;
   private BucketLayout defaultOFSBucketLayout;
-  private OzoneConfiguration config;
+  private final OzoneConfiguration config;
+  private final OzoneClientConfig clientConfig;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -217,6 +219,7 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
 
+      clientConfig = conf.getObject(OzoneClientConfig.class);
       // Fetches the bucket layout to be used by OFS.
       try {
         initDefaultFsBucketLayout(conf);
@@ -244,11 +247,10 @@ public class BasicRootedOzoneClientAdapterImpl
       throws OMException {
     try {
       this.defaultOFSBucketLayout = BucketLayout.fromString(
-          conf.get(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
-              OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT));
+          clientConfig.getFsDefaultBucketLayout());
     } catch (IllegalArgumentException iae) {
       throw new OMException("Unsupported value provided for " +
-          OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+          OzoneClientConfig.Keys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
           ". Supported values are " + BucketLayout.FILE_SYSTEM_OPTIMIZED +
           " and " + BucketLayout.LEGACY + ".",
           OMException.ResultCodes.INVALID_REQUEST);
@@ -259,7 +261,7 @@ public class BasicRootedOzoneClientAdapterImpl
       throw new OMException(
           "Buckets created with OBJECT_STORE layout do not support file " +
               "system semantics. Supported values for config " +
-              OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
+              OzoneClientConfig.Keys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT +
               " include " + BucketLayout.FILE_SYSTEM_OPTIMIZED + " and " +
               BucketLayout.LEGACY, OMException.ResultCodes.INVALID_REQUEST);
     }
@@ -283,8 +285,8 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private OzoneBucket getBucket(String volumeStr, String bucketStr,
       boolean createIfNotExist) throws IOException {
-    Preconditions.checkNotNull(volumeStr);
-    Preconditions.checkNotNull(bucketStr);
+    Objects.requireNonNull(volumeStr, "volumeStr == null");
+    Objects.requireNonNull(bucketStr, "bucketStr == null");
 
     if (bucketStr.isEmpty()) {
       // throw FileNotFoundException in this case to make Hadoop common happy
@@ -683,19 +685,20 @@ public class BasicRootedOzoneClientAdapterImpl
    * valid bucket path or valid snapshot path.
    * Throws exception in case of failure.
    */
-  private FileStatusAdapter getFileStatusForKeyOrSnapshot(OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
+  private FileStatusAdapter getFileStatusForKeyOrSnapshot(
+      OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
       throws IOException {
-    String volumeName = ofsPath.getVolumeName();
-    String bucketName = ofsPath.getBucketName();
     String key = ofsPath.getKeyName();
     try {
+      OzoneBucket bucket = getBucket(ofsPath, false);
       if (ofsPath.isSnapshotPath()) {
-        OzoneVolume volume = objectStore.getVolume(volumeName);
-        OzoneBucket bucket = getBucket(volumeName, bucketName, false);
-        return getFileStatusAdapterWithSnapshotIndicator(volume, bucket, uri);
+        OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+        return getFileStatusAdapterWithSnapshotIndicator(
+            volume, bucket, uri);
       } else {
-        OzoneFileStatus status = proxy.getOzoneFileStatus(volumeName, bucketName, key);
-        return toFileStatusAdapter(status, userName, uri, qualifiedPath, ofsPath.getNonKeyPath());
+        OzoneFileStatus status = bucket.getFileStatus(key);
+        return toFileStatusAdapter(status, userName, uri, qualifiedPath,
+            ofsPath.getNonKeyPath());
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -1072,7 +1075,7 @@ public class BasicRootedOzoneClientAdapterImpl
         owner,
         null,
         getBlockLocations(null),
-        false,
+        keyInfo.isEncrypted(),
         OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }
@@ -1296,7 +1299,7 @@ public class BasicRootedOzoneClientAdapterImpl
   public FileChecksum getFileChecksum(String keyName, long length)
       throws IOException {
     OzoneClientConfig.ChecksumCombineMode combineMode =
-        config.getObject(OzoneClientConfig.class).getChecksumCombineMode();
+        clientConfig.getChecksumCombineMode();
     if (combineMode == null) {
       return null;
     }

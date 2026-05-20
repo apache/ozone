@@ -17,11 +17,11 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import PipelinesTable from '@/v2/components/tables/pipelinesTable';
-import { Pipeline, PipelinesTableProps } from '@/v2/types/pipelines.types';
-import { pipelineLocators } from '@tests/locators/locators';
-import { userEvent } from '@testing-library/user-event';
+import {Pipeline, PipelinesTableProps} from '@/v2/types/pipelines.types';
+import {pipelineLocators} from '@tests/locators/locators';
+import {userEvent} from '@testing-library/user-event';
 
 // Mock to disable scroll behaviour
 // We are running test inside virtual DOM, so scrolling isn't available as a normal browser

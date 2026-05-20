@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.JsonUtils;
 
 /**
  * Class which stores ContainerReplica details on the client.
@@ -34,6 +36,8 @@ public final class ContainerReplicaInfo {
   private long keyCount;
   private long bytesUsed;
   private int replicaIndex = -1;
+  @JsonSerialize(using = JsonUtils.ChecksumSerializer.class)
+  private long dataChecksum;
 
   public static ContainerReplicaInfo fromProto(
       HddsProtos.SCMContainerReplicaProto proto) {
@@ -47,7 +51,8 @@ public final class ContainerReplicaInfo {
         .setKeyCount(proto.getKeyCount())
         .setBytesUsed(proto.getBytesUsed())
         .setReplicaIndex(
-            proto.hasReplicaIndex() ? (int)proto.getReplicaIndex() : -1);
+            proto.hasReplicaIndex() ? (int)proto.getReplicaIndex() : -1)
+        .setDataChecksum(proto.getDataChecksum());
     return builder.build();
   }
 
@@ -84,6 +89,10 @@ public final class ContainerReplicaInfo {
 
   public int getReplicaIndex() {
     return replicaIndex;
+  }
+
+  public long getDataChecksum() {
+    return dataChecksum;
   }
 
   /**
@@ -130,6 +139,11 @@ public final class ContainerReplicaInfo {
 
     public Builder setReplicaIndex(int replicaIndex) {
       subject.replicaIndex = replicaIndex;
+      return this;
+    }
+
+    public Builder setDataChecksum(long dataChecksum) {
+      subject.dataChecksum = dataChecksum;
       return this;
     }
 

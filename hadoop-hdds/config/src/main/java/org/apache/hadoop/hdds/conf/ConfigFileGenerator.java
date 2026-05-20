@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import static org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil.getFullKey;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,13 +29,12 @@ import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.util.SimpleTypeVisitor8;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
@@ -46,18 +43,12 @@ import javax.tools.StandardLocation;
  * Annotation processor to generate config fragments from Config annotations.
  */
 @SupportedAnnotationTypes("org.apache.hadoop.hdds.conf.ConfigGroup")
+@SupportedOptions("artifactId")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class ConfigFileGenerator extends AbstractProcessor {
 
-  public static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";
-
-  private static final SimpleTypeVisitor8<Element, Void> GET_PARENT_ELEMENT =
-      new SimpleTypeVisitor8<Element, Void>() {
-        @Override
-        public Element visitDeclared(DeclaredType t, Void aVoid) {
-          return t.asElement();
-        }
-      };
+  private static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";
+  private static final String OUTPUT_FILE_POSTFIX = "-default.xml";
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
@@ -73,9 +64,16 @@ public class ConfigFileGenerator extends AbstractProcessor {
       //load existing generated config (if exists)
       boolean resourceExists = true;
       ConfigFileAppender appender = new ConfigFileAppender();
+      String currentArtifactId = processingEnv.getOptions().get("artifactId");
+      String outputFileName;
+      if (currentArtifactId == null || currentArtifactId.isEmpty()) {
+        outputFileName = OUTPUT_FILE_NAME;
+      } else {
+        outputFileName = currentArtifactId + OUTPUT_FILE_POSTFIX;
+      }
       try (InputStream input = filer
           .getResource(StandardLocation.CLASS_OUTPUT, "",
-              OUTPUT_FILE_NAME).openInputStream()) {
+              outputFileName).openInputStream()) {
         appender.load(input);
       } catch (FileNotFoundException | NoSuchFileException ex) {
         appender.init();
@@ -90,27 +88,13 @@ public class ConfigFileGenerator extends AbstractProcessor {
         ConfigGroup configGroupAnnotation =
             configurationObject.getAnnotation(ConfigGroup.class);
 
-        TypeElement elementToCheck = configurationObject;
-        while (elementToCheck != null) {
-
-          writeConfigAnnotations(configGroupAnnotation, appender,
-              elementToCheck);
-          if (!elementToCheck.getSuperclass().toString()
-              .equals("java.lang.Object")) {
-            elementToCheck =
-                (TypeElement) elementToCheck.getSuperclass()
-                    .accept(GET_PARENT_ELEMENT, null);
-          } else {
-            elementToCheck = null;
-          }
-        }
-
+        writeConfigAnnotations(configGroupAnnotation, appender, configurationObject);
       }
 
       if (!resourceExists) {
         FileObject resource = filer
             .createResource(StandardLocation.CLASS_OUTPUT, "",
-                OUTPUT_FILE_NAME);
+                outputFileName);
 
         try (Writer writer = new OutputStreamWriter(
             resource.openOutputStream(), StandardCharsets.UTF_8)) {
@@ -133,8 +117,13 @@ public class ConfigFileGenerator extends AbstractProcessor {
         if (element.getAnnotation(Config.class) != null) {
 
           Config configAnnotation = element.getAnnotation(Config.class);
-
-          String key = getFullKey(configGroup, configAnnotation);
+          String prefix = configGroup.prefix() + ".";
+          String key = configAnnotation.key();
+          if (!key.startsWith(prefix)) {
+            processingEnv.getMessager().printMessage(Kind.ERROR,
+                prefix + " is not a prefix of " + key,
+                typeElement);
+          }
 
           appender.addConfig(key,
               configAnnotation.defaultValue(),

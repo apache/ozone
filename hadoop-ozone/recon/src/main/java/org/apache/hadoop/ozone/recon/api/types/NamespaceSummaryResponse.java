@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -147,9 +147,9 @@ public class NamespaceSummaryResponse {
     }
 
     public NamespaceSummaryResponse build() {
-      Preconditions.checkNotNull(this.path);
-      Preconditions.checkNotNull(this.entityType);
-      Preconditions.checkNotNull(this.status);
+      Objects.requireNonNull(path, "path == null");
+      Objects.requireNonNull(entityType, "entityType == null");
+      Objects.requireNonNull(status, "status == null");
 
       return new NamespaceSummaryResponse(this);
     }

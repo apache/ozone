@@ -34,6 +34,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
@@ -59,10 +60,50 @@ public class ContainerReplicaPendingOps {
   private ReplicationManagerMetrics replicationMetrics = null;
   private final List<ContainerReplicaPendingOpsSubscriber> subscribers =
       new ArrayList<>();
+  // tracks how much data is pending to be added to a target Datanode because of pending ADD ops
+  private final ConcurrentHashMap<DatanodeID, SizeAndTime> containerSizeScheduled = new ConcurrentHashMap<>();
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
 
-  public ContainerReplicaPendingOps(Clock clock) {
+  /**
+   * Creates a ContainerReplicaPendingOps with all parameters.
+   * This is the single constructor that should be used for all cases.
+   *
+   * @param clock the clock to use for timing operations
+   * @param rmConf the replication manager configuration (can be null)
+   */
+  public ContainerReplicaPendingOps(Clock clock, ReplicationManager.ReplicationManagerConfiguration rmConf) {
     this.clock = clock;
+    this.rmConf = rmConf;
     resetCounters();
+  }
+
+  /**
+   * Used as the value of {@link ContainerReplicaPendingOps#containerSizeScheduled} map for tracking the size of
+   * containers with pending ADD ops. Immutable.
+   */
+  public static class SizeAndTime {
+    // number of bytes pending ADD on a target DN
+    private final long size;
+    // timestamp (milliseconds since epoch) when the latest op was scheduled for this DN
+    private final long lastUpdatedTime;
+
+    public SizeAndTime(long size, long lastUpdatedTime) {
+      this.size = size;
+      this.lastUpdatedTime = lastUpdatedTime;
+    }
+
+    public long getSize() {
+      return size;
+    }
+
+    public long getLastUpdatedTime() {
+      return lastUpdatedTime;
+    }
+
+    @Override
+    public String toString() {
+      return "Size: " + size + ", lastUpdatedTime: " + lastUpdatedTime;
+    }
   }
 
   private void resetCounters() {
@@ -85,6 +126,7 @@ public class ContainerReplicaPendingOps {
     try {
       pendingOps.clear();
       resetCounters();
+      containerSizeScheduled.clear();
     } finally {
       globalLock.writeLock().unlock();
     }
@@ -123,8 +165,10 @@ public class ContainerReplicaPendingOps {
    *                            be discarded.
    */
   public void scheduleAddReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis) {
-    addReplica(ADD, containerID, target, replicaIndex, command, deadlineEpochMillis);
+      DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis, long containerSize,
+      long scheduledEpochMillis) {
+    addReplica(ADD, containerID, target, replicaIndex, command, deadlineEpochMillis, containerSize,
+        scheduledEpochMillis);
   }
 
   /**
@@ -139,7 +183,7 @@ public class ContainerReplicaPendingOps {
    */
   public void scheduleDeleteReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis) {
-    addReplica(DELETE, containerID, target, replicaIndex, command, deadlineEpochMillis);
+    addReplica(DELETE, containerID, target, replicaIndex, command, deadlineEpochMillis, 0L, clock.millis());
   }
 
   /**
@@ -226,6 +270,9 @@ public class ContainerReplicaPendingOps {
               // For delete ops, we don't remove them from the list as RM must resend them, or they
               // will be removed via a container report when they are confirmed as deleted.
               iterator.remove();
+              if (op.getOpType() == ADD) {
+                releaseScheduledContainerSize(op);
+              }
               decrementCounter(op.getOpType(), op.getReplicaIndex());
             }
             expiredOps.add(op);
@@ -246,6 +293,22 @@ public class ContainerReplicaPendingOps {
     }
   }
 
+  private void releaseScheduledContainerSize(ContainerReplicaOp op) {
+    containerSizeScheduled.computeIfPresent(op.getTarget().getID(), (k, v) -> {
+      long newSize = v.getSize() - op.getContainerSize();
+      boolean isSizeNonPositive = newSize <= 0;
+      boolean hasOpExpired = clock.millis() - v.getLastUpdatedTime() > rmConf.getEventTimeout();
+      if (isSizeNonPositive || hasOpExpired) {
+        /*
+        If the scheduled size is now less than or equal to 0, or if the last op has expired, implying that the ops
+        before it must have completed or expired, then remove this entry from the map
+        */
+        return null;
+      }
+      return new SizeAndTime(newSize, v.getLastUpdatedTime());
+    });
+  }
+
   private void updateTimeoutMetrics(ContainerReplicaOp op) {
     if (op.getOpType() == ADD && isMetricsNotNull()) {
       if (isEC(op.getReplicaIndex())) {
@@ -262,9 +325,10 @@ public class ContainerReplicaPendingOps {
     }
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private void addReplica(ContainerReplicaOp.PendingOpType opType,
       ContainerID containerID, DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
-      long deadlineEpochMillis) {
+      long deadlineEpochMillis, long containerSize, long scheduledEpochMillis) {
     Lock lock = writeLock(containerID);
     lock(lock);
     try {
@@ -274,7 +338,17 @@ public class ContainerReplicaPendingOps {
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
-          target, replicaIndex, command, deadlineEpochMillis));
+          target, replicaIndex, command, deadlineEpochMillis, containerSize));
+      DatanodeID id = target.getID();
+      if (opType == ADD) {
+        containerSizeScheduled.compute(id, (k, v) -> {
+          if (v == null) {
+            return new SizeAndTime(containerSize, scheduledEpochMillis);
+          } else {
+            return new SizeAndTime(v.getSize() + containerSize, scheduledEpochMillis);
+          }
+        });
+      }
       incrementCounter(opType, replicaIndex);
     } finally {
       unlock(lock);
@@ -300,6 +374,15 @@ public class ContainerReplicaPendingOps {
             found = true;
             completedOps.add(op);
             iterator.remove();
+            if (opType == ADD) {
+              containerSizeScheduled.computeIfPresent(target.getID(), (k, v) -> {
+                long newSize = v.getSize() - op.getContainerSize();
+                if (newSize <= 0) {
+                  return null;
+                }
+                return new SizeAndTime(newSize, v.getLastUpdatedTime());
+              });
+            }
             decrementCounter(op.getOpType(), replicaIndex);
           }
         }
@@ -362,6 +445,14 @@ public class ContainerReplicaPendingOps {
   private void unlock(Lock lock) {
     globalLock.readLock().unlock();
     lock.unlock();
+  }
+
+  public ConcurrentHashMap<DatanodeID, SizeAndTime> getContainerSizeScheduled() {
+    return containerSizeScheduled;
+  }
+
+  public Clock getClock() {
+    return clock;
   }
 
   private boolean isMetricsNotNull() {

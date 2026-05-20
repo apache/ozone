@@ -64,6 +64,7 @@ public class TestRunningDatanodeState {
     for (int i = 0; i < threadPoolSize; i++) {
       ecs.submit(() -> futureOne.get());
     }
+    state.setExecutingEndpointCount(threadPoolSize);
 
     long startTime = Time.monotonicNow();
     state.await(500, TimeUnit.MILLISECONDS);

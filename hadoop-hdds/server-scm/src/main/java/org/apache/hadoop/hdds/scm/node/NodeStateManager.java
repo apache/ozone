@@ -124,6 +124,8 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private final long deadNodeIntervalMs;
 
+  private final long containerRollIntervalMs = 5 * 60 * 1000;  //TODO
+
   /**
    * The future is used to pause/unpause the scheduled checks.
    */
@@ -310,7 +312,7 @@ public class NodeStateManager implements Runnable, Closeable {
 
   private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, LayoutVersionProto layout) {
     final NodeStatus status = newNodeStatus(datanode, layout);
-    return new DatanodeInfo(datanode, status, layout);
+    return new DatanodeInfo(datanode, status, layout, containerRollIntervalMs);
   }
 
   /**
@@ -492,15 +494,9 @@ public class NodeStateManager implements Runnable, Closeable {
     return getEnteringMaintenanceNodes().size();
   }
 
-  /**
-   * Returns all the nodes with the specified status.
-   *
-   * @param status NodeStatus
-   *
-   * @return list of nodes
-   */
-  public List<DatanodeInfo> getNodes(NodeStatus status) {
-    return nodeStateMap.getDatanodeInfos(status);
+  /** @return a list of datanodes for the matching nodes matching the given status. */
+  public List<DatanodeDetails> getNodes(NodeStatus status) {
+    return nodeStateMap.getDatanodeDetails(status);
   }
 
   /**
@@ -542,6 +538,10 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public List<DatanodeInfo> getAllNodes() {
     return nodeStateMap.getAllDatanodeInfos();
+  }
+
+  int getAllNodeCount() {
+    return nodeStateMap.getNodeCount();
   }
 
   /**

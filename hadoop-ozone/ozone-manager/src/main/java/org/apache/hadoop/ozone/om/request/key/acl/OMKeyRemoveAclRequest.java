@@ -141,9 +141,9 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
   }
 
   @Override
-  boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
+  boolean apply(OmKeyInfo.Builder builder, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
-    return omKeyInfo.removeAcl(ozoneAcls.get(0));
+    return builder.acls().remove(ozoneAcls.get(0));
   }
 
   @Override

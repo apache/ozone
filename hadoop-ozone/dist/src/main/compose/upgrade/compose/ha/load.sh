@@ -26,6 +26,7 @@ source "$TEST_DIR/testlib.sh"
 export COMPOSE_FILE="$TEST_DIR/compose/ha/docker-compose.yaml"
 export OM_SERVICE_ID=omservice
 export SECURITY_ENABLED="true"
-create_data_dirs "${OZONE_VOLUME}"/{om1,om2,om3,dn1,dn2,dn3,dn4,dn5,kms,recon,s3g,scm1,scm2,scm3}
+
+create_data_dirs dn{1..5} kms om{1..3} recon s3g scm{1..3}
 
 echo "Using docker cluster defined in $COMPOSE_FILE"

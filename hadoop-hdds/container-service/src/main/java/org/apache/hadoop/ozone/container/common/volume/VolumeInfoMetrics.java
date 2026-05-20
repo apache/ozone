@@ -28,6 +28,8 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -42,21 +44,49 @@ public class VolumeInfoMetrics implements MetricsSource {
       VolumeInfoMetrics.class.getSimpleName();
 
   private static final MetricsInfo CAPACITY =
-      Interns.info("Capacity", "Capacity");
+      Interns.info("OzoneCapacity", "Ozone usable capacity (after reserved space adjustment)");
   private static final MetricsInfo AVAILABLE =
-      Interns.info("Available", "Available Space");
+      Interns.info("OzoneAvailable", "Ozone available space (after reserved space adjustment)");
   private static final MetricsInfo USED =
-      Interns.info("Used", "Used Space");
+      Interns.info("OzoneUsed", "Ozone used space");
   private static final MetricsInfo RESERVED =
       Interns.info("Reserved", "Reserved Space");
   private static final MetricsInfo TOTAL_CAPACITY =
-      Interns.info("TotalCapacity", "Total Capacity");
+      Interns.info("TotalCapacity", "Ozone capacity + reserved space");
+  private static final MetricsInfo FS_CAPACITY =
+      Interns.info("FilesystemCapacity", "Filesystem capacity as reported by the local filesystem");
+  private static final MetricsInfo FS_AVAILABLE =
+      Interns.info("FilesystemAvailable", "Filesystem available space as reported by the local filesystem");
+  private static final MetricsInfo FS_USED =
+      Interns.info("FilesystemUsed", "Filesystem used space (FilesystemCapacity - FilesystemAvailable)");
 
   private final MetricsRegistry registry;
   private final String metricsSourceName;
   private final HddsVolume volume;
   @Metric("Returns the RocksDB compact times of the Volume")
   private MutableRate dbCompactLatency;
+  @Metric("Volume reserved space crosses reserved usages limit")
+  private MutableGaugeInt reservedCrossesLimit;
+  @Metric("Volume available space is insufficient")
+  private MutableGaugeInt availableSpaceInsufficient;
+
+  @Metric("Number of times the volume is scanned")
+  private MutableCounterLong numScans;
+
+  @Metric("Number of scans skipped for the volume")
+  private MutableCounterLong numScansSkipped;
+
+  @Metric("Write requests allowed while usable space is between the reported (soft) and hard min-free-space thresholds")
+  private MutableCounterLong numWriteRequestsInSoftBandMinFreeSpace;
+
+  @Metric("Write requests rejected because the hard min-free-space limit would be violated")
+  private MutableCounterLong numWriteRequestsRejectedHardMinFreeSpace;
+  @Metric("Container create allowed while usable space is between the reported (soft) " +
+      "and hard min-free-space thresholds")
+  private MutableCounterLong numContainerCreateRequestsInSoftBandMinFreeSpace;
+
+  @Metric("Container create requests rejected because the hard min-free-space limit would be violated")
+  private MutableCounterLong numContainerCreateRequestsRejectedHardMinFreeSpace;
 
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
@@ -119,6 +149,30 @@ public class VolumeInfoMetrics implements MetricsSource {
     dbCompactLatency.add(time);
   }
 
+  public int getAvailableSpaceInsufficient() {
+    return availableSpaceInsufficient.value();
+  }
+
+  public void setAvailableSpaceInsufficient(boolean isInSufficient) {
+    if (isInSufficient) {
+      availableSpaceInsufficient.set(1);
+    } else {
+      availableSpaceInsufficient.set(0);
+    }
+  }
+
+  public int getReservedCrossesLimit() {
+    return reservedCrossesLimit.value();
+  }
+
+  public void setReservedCrossesLimit(boolean isLimitCrossed) {
+    if (isLimitCrossed) {
+      reservedCrossesLimit.set(1);
+    } else {
+      reservedCrossesLimit.set(0);
+    }
+  }
+
   /**
    * Return the Container Count of the Volume.
    */
@@ -127,19 +181,72 @@ public class VolumeInfoMetrics implements MetricsSource {
     return volume.getContainers();
   }
 
+  public long getNumScans() {
+    return numScans.value();
+  }
+
+  public void incNumScans() {
+    numScans.incr();
+  }
+
+  public long getNumScansSkipped() {
+    return numScansSkipped.value();
+  }
+
+  public void incNumScansSkipped() {
+    numScansSkipped.incr();
+  }
+
+  public long getNumWriteRequestsInSoftBandMinFreeSpace() {
+    return numWriteRequestsInSoftBandMinFreeSpace.value();
+  }
+
+  public void incNumWriteRequestsInSoftBandMinFreeSpace() {
+    numWriteRequestsInSoftBandMinFreeSpace.incr();
+  }
+
+  public long getNumWriteRequestsRejectedHardMinFreeSpace() {
+    return numWriteRequestsRejectedHardMinFreeSpace.value();
+  }
+
+  public void incNumWriteRequestsRejectedHardMinFreeSpace() {
+    numWriteRequestsRejectedHardMinFreeSpace.incr();
+  }
+
+  public long getNumContainerCreateRequestsInSoftBandMinFreeSpace() {
+    return numContainerCreateRequestsInSoftBandMinFreeSpace.value();
+  }
+
+  public void incNumContainerCreateRequestsInSoftBandMinFreeSpace() {
+    numContainerCreateRequestsInSoftBandMinFreeSpace.incr();
+  }
+
+  public long getNumContainerCreateRequestsRejectedHardMinFreeSpace() {
+    return numContainerCreateRequestsRejectedHardMinFreeSpace.value();
+  }
+
+  public void incNumContainerCreateRequestsRejectedHardMinFreeSpace() {
+    numContainerCreateRequestsRejectedHardMinFreeSpace.incr();
+  }
+
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(metricsSourceName);
     registry.snapshot(builder, all);
-    volume.getVolumeUsage().ifPresent(volumeUsage -> {
-      SpaceUsageSource usage = volumeUsage.getCurrentUsage();
+    VolumeUsage volumeUsage = volume.getVolumeUsage();
+    if (volumeUsage != null) {
+      SpaceUsageSource.Fixed fsUsage = volumeUsage.realUsage();
+      SpaceUsageSource usage = volumeUsage.getCurrentUsage(fsUsage);
       long reserved = volumeUsage.getReservedInBytes();
       builder
           .addGauge(CAPACITY, usage.getCapacity())
           .addGauge(AVAILABLE, usage.getAvailable())
           .addGauge(USED, usage.getUsedSpace())
           .addGauge(RESERVED, reserved)
-          .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved);
-    });
+          .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved)
+          .addGauge(FS_CAPACITY, fsUsage.getCapacity())
+          .addGauge(FS_AVAILABLE, fsUsage.getAvailable())
+          .addGauge(FS_USED, fsUsage.getUsedSpace());
+    }
   }
 }

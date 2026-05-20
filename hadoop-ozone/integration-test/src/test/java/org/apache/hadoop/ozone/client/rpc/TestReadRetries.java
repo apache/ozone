@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientWithKeyLatestVersion.assertKeyContent;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.configureFSOptimizedPaths;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

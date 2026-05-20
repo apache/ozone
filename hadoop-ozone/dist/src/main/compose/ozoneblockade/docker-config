@@ -30,6 +30,7 @@ OZONE-SITE.XML_ozone.scm.dead.node.interval=5m
 OZONE-SITE.XML_ozone.server.default.replication=1
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.pipeline.destroy.timeout=15s
 OZONE-SITE.XML_hdds.heartbeat.interval=2s

@@ -83,6 +83,7 @@ export const COLUMNS: ColumnsType<Datanode> = [
     title: 'Hostname',
     dataIndex: 'hostname',
     key: 'hostname',
+    fixed: 'left' as const,
     sorter: (a: Datanode, b: Datanode) => a.hostname.localeCompare(
       b.hostname, undefined, { numeric: true }
     ),
@@ -130,10 +131,7 @@ export const COLUMNS: ColumnsType<Datanode> = [
     render: (_: string, record: Datanode) => (
       <StorageBar
         strokeWidth={6}
-        capacity={record.storageTotal}
-        used={record.storageUsed}
-        remaining={record.storageRemaining}
-        committed={record.storageCommitted} />
+        {...record.storageReport} />
     )
   },
   {

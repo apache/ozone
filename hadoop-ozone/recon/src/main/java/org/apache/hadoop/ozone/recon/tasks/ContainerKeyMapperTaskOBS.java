@@ -18,11 +18,14 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.inject.Inject;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 
 /**
@@ -41,13 +44,29 @@ public class ContainerKeyMapperTaskOBS implements ReconOmTask {
   }
 
   @Override
+  public ReconOmTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    return new ContainerKeyMapperTaskOBS(
+        reconContainerMetadataManager.getStagedReconContainerMetadataManager(stagedReconDbStore), ozoneConfiguration);
+  }
+
+  @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     long containerKeyFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         ReconServerConfigKeys.OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD,
         ReconServerConfigKeys.OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
+    int maxKeysInMemory = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
+    int maxIterators = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
+    int maxWorkers = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
     boolean result = ContainerKeyMapperHelper.reprocess(
         omMetadataManager, reconContainerMetadataManager, BucketLayout.OBJECT_STORE, getTaskName(),
-        containerKeyFlushToDBMaxThreshold);
+        containerKeyFlushToDBMaxThreshold, maxIterators, maxWorkers, maxKeysInMemory);
     return buildTaskResult(result);
   }
 

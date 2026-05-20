@@ -17,16 +17,17 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -80,10 +81,53 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     // First get tenant name
     final String tenantId = omRequest.getDeleteTenantRequest().getTenantId();
-    Preconditions.checkNotNull(tenantId);
+    Objects.requireNonNull(tenantId, "tenantId == null");
+
+    // Check if there are any accessIds in the tenant.
+    // This must be done before we attempt to delete policies from Ranger.
+    if (!multiTenantManager.isTenantEmpty(tenantId)) {
+      LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
+          tenantId);
+      throw new OMException("Tenant '" + tenantId + "' is not empty. " +
+          "All accessIds associated to this tenant must be revoked before " +
+          "the tenant can be deleted. See `ozone tenant user revoke`",
+          TENANT_NOT_EMPTY);
+    }
 
     // Get tenant object by tenant name
     final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
+
+    final OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    final OmDBTenantState dbTenantState =
+        omMetadataManager.getTenantStateTable().get(tenantId);
+    if (dbTenantState == null) {
+      LOG.debug("tenant: '{}' does not exist", tenantId);
+      throw new OMException("Tenant '" + tenantId + "' does not exist",
+          TENANT_NOT_FOUND);
+    }
+    final String volumeName = dbTenantState.getBucketNamespaceName();
+    Objects.requireNonNull(volumeName);
+    if (volumeName.isEmpty()) {
+      throw new OMException("Tenant '" + tenantId + "' has empty volume name",
+          INVALID_REQUEST);
+    }
+
+    // Perform ACL check during preExecute (WRITE_ACL on volume if applicable)
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volumeName, null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new HashMap<>();
+        auditMap.put(OzoneConsts.TENANT, tenantId);
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.DELETE_TENANT, auditMap, ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
 
     // Acquire write lock to authorizer (Ranger)
     multiTenantManager.getAuthorizerLock().tryWriteLockInOMRequest();
@@ -138,7 +182,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       final OmDBTenantState dbTenantState =
           omMetadataManager.getTenantStateTable().get(tenantId);
       volumeName = dbTenantState.getBucketNamespaceName();
-      Preconditions.checkNotNull(volumeName);
+      Objects.requireNonNull(volumeName, "volumeName == null");
 
       LOG.debug("Tenant '{}' has volume '{}'", tenantId, volumeName);
       // decVolumeRefCount is true if volumeName is not empty string
@@ -149,16 +193,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
-      // Check if there are any accessIds in the tenant
-      if (!ozoneManager.getMultiTenantManager().isTenantEmpty(tenantId)) {
-        LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
-            tenantId);
-        throw new OMException("Tenant '" + tenantId + "' is not empty. " +
-            "All accessIds associated to this tenant must be revoked before " +
-            "the tenant can be deleted. See `ozone tenant user revoke`",
-            TENANT_NOT_EMPTY);
-      }
-
       // Invalidate cache entry
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
@@ -166,16 +200,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
       // Decrement volume refCount
       if (decVolumeRefCount) {
-        // Check Acl
-        if (ozoneManager.getAclsEnabled()) {
-          checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-              OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-              volumeName, null, null);
-        }
-
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
-        // Decrement volume ref count
-        omVolumeArgs.decRefCount();
+        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName)
+            .toBuilder()
+            .decRefCount()
+            .build();
 
         // Update omVolumeArgs
         final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);

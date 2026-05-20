@@ -17,26 +17,25 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -85,14 +84,14 @@ public class OMFileCreateRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
         .getCreateFileRequest();
-    Preconditions.checkNotNull(createFileRequest);
+    Objects.requireNonNull(createFileRequest, "createFileRequest == null");
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
-    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
-        .setSnapshotReservedWord(keyArgs.getKeyName())
-        .setKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
-            OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX)).build();
-    validateKey(ozoneManager, validateArgs);
+
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
+    if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
+      OmUtils.validateKeyName(keyArgs.getKeyName());
+    }
 
     UserInfo userInfo = getUserInfo();
     if (keyArgs.getKeyName().isEmpty()) {
@@ -124,7 +123,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     // TODO: Here we are allocating block with out any check for
     //  bucket/key/volume or not and also with out any authorization checks.
-
+    // We also allocate block even if requestedSize is 0 because unlike
+    // CreateKey which is used for S3 use case where the requested dataSize is known in advance
+    // and KeyArgs.dataSize is not going to be set for empty key
+    // File system client does not know the final file size in advance but use 0 as
+    // the placeholder for the data size. Therefore, we should at least allocate a
+    // single block and we cannot simply skip the allocate block call
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
               ozoneManager.getBlockTokenSecretManager(), repConfig,
@@ -244,7 +248,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), omBucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
-          repConfig, ozoneManager.getConfiguration());
+          repConfig, ozoneManager.getConfig());
       validateEncryptionKeyInfo(omBucketInfo, keyArgs);
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();

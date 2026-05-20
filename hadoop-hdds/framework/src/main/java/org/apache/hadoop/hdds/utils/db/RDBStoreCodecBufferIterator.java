@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -33,16 +32,17 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   private final AtomicBoolean closed = new AtomicBoolean();
 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
-      CodecBuffer prefix) {
-    super(iterator, table, prefix);
+      CodecBuffer prefix, IteratorType type) {
+    super(iterator, table, prefix, type);
 
     final String name = table != null ? table.getName() : null;
     this.keyBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-key", 1 << 10),
-        buffer -> getRocksDBIterator().get().key(buffer));
+        // it has to read key for matching prefix.
+        getType().readKey() || prefix != null ? buffer -> getRocksDBIterator().get().key(buffer) : null);
     this.valueBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-value", 4 << 10),
-        buffer -> getRocksDBIterator().get().value(buffer));
+        getType().readValue() ? buffer -> getRocksDBIterator().get().value(buffer) : null);
     seekToFirst();
   }
 
@@ -59,7 +59,8 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   @Override
   Table.KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
     assertOpen();
-    return Table.newKeyValue(key(), valueBuffer.getFromDb());
+    final CodecBuffer key = getType().readKey() ? key() : null;
+    return Table.newKeyValue(key, valueBuffer.getFromDb());
   }
 
   @Override
@@ -69,7 +70,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   }
 
   @Override
-  void delete(CodecBuffer key) throws IOException {
+  void delete(CodecBuffer key) throws RocksDatabaseException {
     assertOpen();
     getRocksDBTable().delete(key.asReadOnlyByteBuffer());
   }
@@ -94,62 +95,6 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
       Optional.ofNullable(getPrefix()).ifPresent(CodecBuffer::release);
       keyBuffer.release();
       valueBuffer.release();
-    }
-  }
-
-  static class Buffer {
-    private final CodecBuffer.Capacity initialCapacity;
-    private final PutToByteBuffer<RuntimeException> source;
-    private CodecBuffer buffer;
-
-    Buffer(CodecBuffer.Capacity initialCapacity,
-           PutToByteBuffer<RuntimeException> source) {
-      this.initialCapacity = initialCapacity;
-      this.source = source;
-    }
-
-    void release() {
-      if (buffer != null) {
-        buffer.release();
-      }
-    }
-
-    private void prepare() {
-      if (buffer == null) {
-        allocate();
-      } else {
-        buffer.clear();
-      }
-    }
-
-    private void allocate() {
-      if (buffer != null) {
-        buffer.release();
-      }
-      buffer = CodecBuffer.allocateDirect(-initialCapacity.get());
-    }
-
-    CodecBuffer getFromDb() {
-      for (prepare(); ; allocate()) {
-        final Integer required = buffer.putFromSource(source);
-        if (required == null) {
-          return null; // the source is unavailable
-        } else if (required == buffer.readableBytes()) {
-          return buffer; // buffer size is big enough
-        }
-        // buffer size too small, try increasing the capacity.
-        if (buffer.setCapacity(required)) {
-          buffer.clear();
-          // retry with the new capacity
-          final int retried = buffer.putFromSource(source);
-          Preconditions.assertSame(required.intValue(), retried, "required");
-          return buffer;
-        }
-
-        // failed to increase the capacity
-        // increase initial capacity and reallocate it
-        initialCapacity.increase(required);
-      }
     }
   }
 }

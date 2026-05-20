@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -81,18 +80,14 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
   private Path temporaryFolder;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
-  private OzoneConfiguration ozoneConfiguration;
   private static final String ROOT_PATH = "/";
   private static final String TEST_USER = "TestUser";
-  private OMMetadataManager omMetadataManager;
-
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   @BeforeEach
   public void setUp() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 100);
-    omMetadataManager = initializeNewOmMetadataManager(
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("OmMetataDir")).toFile());
@@ -108,15 +103,15 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(OMDBInsightEndpoint.class)
-            .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    reconNamespaceSummaryManager = reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
+    ReconNamespaceSummaryManager reconNamespaceSummaryManager =
+        reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     omdbInsightEndpoint = reconTestInjector.getInstance(OMDBInsightEndpoint.class);
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 

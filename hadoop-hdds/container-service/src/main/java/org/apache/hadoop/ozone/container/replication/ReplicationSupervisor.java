@@ -547,11 +547,11 @@ public final class ReplicationSupervisor {
 
   public long getReplicationRequestAvgTime(String metricsName) {
     MutableRate rate = opsLatencyMs.get(metricsName);
-    return rate != null ? (long) rate.lastStat().mean() : 0;
+    return rate != null ? (long) Math.ceil(rate.lastStat().mean()) : 0;
   }
 
   public long getReplicationRequestTotalTime(String metricsName) {
     MutableRate rate = opsLatencyMs.get(metricsName);
-    return rate != null ? (long) rate.lastStat().total() : 0;
+    return rate != null ? (long) Math.ceil(rate.lastStat().total()) : 0;
   }
 }

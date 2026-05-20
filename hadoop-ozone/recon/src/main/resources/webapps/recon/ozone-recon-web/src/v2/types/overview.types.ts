@@ -33,29 +33,15 @@ export type ClusterStateResponse = {
   omServiceId: string;
 }
 
-export type OverviewState = {
-  loading: boolean;
-  datanodes: string;
-  pipelines: number;
-  containers: number;
-  volumes: number;
-  buckets: number;
-  keys: number;
-  missingContainersCount: number;
-  lastRefreshed: number;
-  lastUpdatedOMDBDelta: number;
-  lastUpdatedOMDBFull: number;
-  omStatus: string;
-  openContainers: number;
-  deletedContainers: number;
-  openSummarytotalUnrepSize: number;
-  openSummarytotalRepSize: number;
-  openSummarytotalOpenKeys: number;
-  deletePendingSummarytotalUnrepSize: number;
-  deletePendingSummarytotalRepSize: number;
-  deletePendingSummarytotalDeletedKeys: number;
-  scmServiceId: string;
-  omServiceId: string;
+export type TaskStatus = {
+  taskName: 'OmDeltaRequest' | 'OmSnapshotRequest' | string;
+  lastUpdatedTimestamp: number;
+  lastUpdatedSeqNumber: number;
+}
+
+export type KeysSummary = {
+  totalUnreplicatedDataSize: number;
+  totalReplicatedDataSize: number;
 }
 
 export type StorageReport = {
@@ -63,4 +49,9 @@ export type StorageReport = {
   used: number;
   remaining: number;
   committed: number;
+}
+
+export type OverviewState = {
+  omStatus: string;
+  lastRefreshed: number;
 }

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.util.Arrays;
 import java.util.List;
@@ -89,7 +88,7 @@ public class ReconstructECContainersCommand
 
   public static ReconstructECContainersCommand getFromProtobuf(
       ReconstructECContainersCommandProto protoMessage) {
-    Preconditions.checkNotNull(protoMessage);
+    Objects.requireNonNull(protoMessage, "protoMessage == null");
 
     List<DatanodeDetailsAndReplicaIndex> srcDatanodeDetails =
         protoMessage.getSourcesList().stream()

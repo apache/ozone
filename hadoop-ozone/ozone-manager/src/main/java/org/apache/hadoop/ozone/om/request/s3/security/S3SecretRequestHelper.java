@@ -21,7 +21,7 @@ import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.KERBEROS;
 
 import java.io.IOException;
 import java.util.Optional;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;

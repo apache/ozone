@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.net;
 
-import  org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
+import org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
 import org.apache.hadoop.ozone.util.StringWithByteString;
 
 /**

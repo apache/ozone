@@ -51,41 +51,43 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
 
   private String errorMessage = "Error getting pipeline and container metrics for ";
 
-  @CommandLine.Option(names = { "--id" },
-      description = "Show info by datanode UUID",
-      defaultValue = "")
-  private String uuid;
-
-  @CommandLine.Option(names = { "--ip" },
-      description = "Show info by datanode ipAddress",
-      defaultValue = "")
-  private String ipAddress;
-
   @CommandLine.Option(names = { "--json" },
       description = "Show output in json format",
       defaultValue = "false")
   private boolean json;
 
+  @CommandLine.Mixin
+  private NodeSelectionMixin nodeSelectionMixin;
+
+  @CommandLine.Spec 
+  private CommandLine.Model.CommandSpec spec;
+  
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (!nodeSelectionMixin.getHostname().isEmpty()) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "--hostname option not supported for this command");
+    }
+
     Stream<HddsProtos.Node> allNodes = scmClient.queryNode(DECOMMISSIONING,
         null, HddsProtos.QueryScope.CLUSTER, "").stream();
-    List<HddsProtos.Node> decommissioningNodes =
-        DecommissionUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
-    if (!Strings.isNullOrEmpty(uuid)) {
+    List<HddsProtos.Node> decommissioningNodes = DecommissionUtils.getDecommissioningNodesList(allNodes,
+            nodeSelectionMixin.getNodeId(), nodeSelectionMixin.getIp());
+    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getNodeId())) {
       if (decommissioningNodes.isEmpty()) {
-        System.err.println("Datanode: " + uuid + " is not in DECOMMISSIONING");
+        System.err.println("Datanode: " + nodeSelectionMixin.getNodeId() + " is not in DECOMMISSIONING");
         return;
       }
-    } else if (!Strings.isNullOrEmpty(ipAddress)) {
+    } else if (!Strings.isNullOrEmpty(nodeSelectionMixin.getIp())) {
       if (decommissioningNodes.isEmpty()) {
-        System.err.println("Datanode: " + ipAddress + " is not in " +
+        System.err.println("Datanode: " + nodeSelectionMixin.getIp() + " is not in " +
             "DECOMMISSIONING");
         return;
       }
     } else {
       if (!json) {
-        System.out.println("\nDecommission Status: DECOMMISSIONING - " +
+        System.out.println();
+        System.out.println("Decommission Status: DECOMMISSIONING - " +
             decommissioningNodes.size() + " node(s)");
       }
     }
@@ -133,7 +135,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   }
 
   private void printDetails(DatanodeDetails datanode) {
-    System.out.println("\nDatanode: " + datanode.getUuid().toString() +
+    System.out.println();
+    System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + ")");
   }

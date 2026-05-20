@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,6 +46,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -98,6 +99,11 @@ public class TestOzoneManagerListVolumesSecure {
   private File userKeytab2;
   private UserGroupInformation userUGI1;
   private UserGroupInformation userUGI2;
+
+  @BeforeAll
+  static void setup() {
+    DefaultMetricsSystem.setMiniClusterMode(true);
+  }
 
   @BeforeEach
   public void init() throws Exception {
@@ -182,7 +188,7 @@ public class TestOzoneManagerListVolumesSecure {
     // Use native impl here, default impl doesn't do actual checks
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     conf.setBoolean(OZONE_ACL_ENABLED, aclEnabled);
-    conf.setBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED, volListAllAllowed);
+    conf.setBoolean(OmConfig.Keys.LIST_ALL_VOLUMES_ALLOWED, volListAllAllowed);
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, adminPrincipal);
     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, adminKeytab.getAbsolutePath());
 
@@ -214,8 +220,8 @@ public class TestOzoneManagerListVolumesSecure {
     String aclUser1All = "user:user1:a";
     String aclUser2All = "user:user2:a";
     String aclWorldAll = "world::a";
-    createVolumeWithOwnerAndAcl(omClient, "volume1", USER_1, aclUser1All);
-    createVolumeWithOwnerAndAcl(omClient, "volume2", USER_2, aclUser2All);
+    createVolumeWithOwnerAndAcl(omClient, "volume1", USER_1, null);
+    createVolumeWithOwnerAndAcl(omClient, "volume2", USER_2, null);
     createVolumeWithOwnerAndAcl(omClient, "volume3", USER_1, aclUser2All);
     createVolumeWithOwnerAndAcl(omClient, "volume4", USER_2, aclUser1All);
     createVolumeWithOwnerAndAcl(omClient, "volume5", USER_1, aclWorldAll);

@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -621,7 +621,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                                 DatanodeDetails target, int replicaIndex) {
     replicaCount.addPendingOp(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex, null,
-        Long.MAX_VALUE));
+        Long.MAX_VALUE, 0));
   }
 
   static ByteString integers2ByteString(List<Integer> src) {
@@ -630,7 +630,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     for (int i = 0; i < src.size(); i++) {
       dst[i] = src.get(i).byteValue();
     }
-    return Proto2Utils.unsafeByteString(dst);
+
+    return dst.length > 0 ? UnsafeByteOperations.unsafeWrap(dst)
+        : ByteString.EMPTY;
   }
 
   /**

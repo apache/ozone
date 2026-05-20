@@ -17,10 +17,15 @@
 
 package org.apache.ozone.rocksdb.util;
 
-import com.google.common.collect.Sets;
-import java.io.File;
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
@@ -35,18 +40,26 @@ public final class RdbUtil {
 
   private RdbUtil() { }
 
-  public static List<LiveFileMetaData> getLiveSSTFilesForCFs(
-      final ManagedRocksDB rocksDB, List<String> cfs) {
-    final Set<String> cfSet = Sets.newHashSet(cfs);
+  public static List<LiveFileMetaData> getLiveSSTFilesForCFs(final ManagedRocksDB rocksDB, Set<String> cfs) {
     return rocksDB.get().getLiveFilesMetaData().stream()
-        .filter(lfm -> cfSet.contains(StringUtils.bytes2String(lfm.columnFamilyName())))
+        .filter(lfm -> cfs.contains(StringUtils.bytes2String(lfm.columnFamilyName())))
         .collect(Collectors.toList());
   }
 
-  public static Set<String> getSSTFilesForComparison(
-      final ManagedRocksDB rocksDB, List<String> cfs) {
-    return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
-        .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
+  public static Set<SstFileInfo> getSSTFilesForComparison(final ManagedRocksDB rocksDB, Set<String> cfs) {
+    return getLiveSSTFilesForCFs(rocksDB, cfs).stream().map(SstFileInfo::new)
         .collect(Collectors.toCollection(HashSet::new));
+  }
+
+  public static Map<Object, SstFileInfo> getSSTFilesWithInodesForComparison(
+      final ManagedRocksDB rocksDB, Set<String> cfs) throws IOException {
+    List<LiveFileMetaData> liveSSTFilesForCFs = getLiveSSTFilesForCFs(rocksDB, cfs);
+    Map<Object, SstFileInfo> inodeToSstMap = new HashMap<>();
+    for (LiveFileMetaData lfm : liveSSTFilesForCFs) {
+      Path sstFilePath = Paths.get(lfm.path(), lfm.fileName());
+      Object inode = getINode(sstFilePath);
+      inodeToSstMap.put(inode, new SstFileInfo(lfm));
+    }
+    return inodeToSstMap;
   }
 }

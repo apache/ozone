@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -62,7 +61,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestMultiBlockWritesWithDnFailures {
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private OzoneClient client;
   private ObjectStore objectStore;
   private int chunkSize;
@@ -71,15 +69,8 @@ public class TestMultiBlockWritesWithDnFailures {
   private String bucketName;
   private String keyString;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   private void startCluster(int datanodes) throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
@@ -122,9 +113,6 @@ public class TestMultiBlockWritesWithDnFailures {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);

@@ -78,6 +78,11 @@
         <property name="max" value="120"/>
         <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
     </module>
+    <module name="RegexpMultiline">
+        <property name="format" value="Preconditions\s*\.\s*checkNotNull"/>
+        <property name="matchAcrossLines" value="true"/>
+        <property name="message" value="Use Objects.requireNonNull instead of Preconditions.checkNotNull"/>
+    </module>
     <module name="TreeWalker">
         <module name="SuppressWarningsHolder"/>
         <module name="SuppressionCommentFilter"/>
@@ -112,7 +117,8 @@
             <property name="regexp" value="true"/>
             <property name="illegalPkgs" value="^sun\..*, ^.*\.relocated\..*, ^.*\.shaded\..*"/>
             <property name="illegalClasses"
-                      value="^org.apache.hadoop.test.(GenericTestUtils|LambdaTestUtils|TimedOutTestsListener)"/>
+                      value="^org.apache.hadoop.test.(GenericTestUtils|LambdaTestUtils|TimedOutTestsListener)
+                      |^org.apache.hadoop.fs.CommonConfigurationKeys"/>
         </module>
         <module name="RedundantImport"/>
         <module name="UnusedImports"/>

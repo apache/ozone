@@ -25,7 +25,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterva
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmInitialHeartbeatInterval;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Message;
 import java.io.IOException;
@@ -43,6 +42,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -57,7 +57,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
@@ -70,6 +70,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
@@ -301,9 +303,9 @@ public class StateContext {
       return;
     }
     final Descriptor descriptor = report.getDescriptorForType();
-    Preconditions.checkState(descriptor != null);
+    Objects.requireNonNull(descriptor, "descriptor == null");
     final String reportType = descriptor.getFullName();
-    Preconditions.checkState(reportType != null);
+    Objects.requireNonNull(reportType, "reportType == null");
     // in some case, we want to add a fullReportType message
     // as an incremental message.
     // see XceiverServerRatis#sendPipelineReport
@@ -324,9 +326,9 @@ public class StateContext {
       return;
     }
     final Descriptor descriptor = report.getDescriptorForType();
-    Preconditions.checkState(descriptor != null);
+    Objects.requireNonNull(descriptor, "descriptor == null");
     final String reportType = descriptor.getFullName();
-    Preconditions.checkState(reportType != null);
+    Objects.requireNonNull(reportType, "reportType == null");
     if (!fullReportTypeList.contains(reportType)) {
       throw new IllegalArgumentException(
           "not full report message type: " + reportType);
@@ -355,9 +357,9 @@ public class StateContext {
     // We don't expect too much reports to be put back
     for (Message report : reportsToPutBack) {
       final Descriptor descriptor = report.getDescriptorForType();
-      Preconditions.checkState(descriptor != null);
+      Objects.requireNonNull(descriptor, "descriptor == null");
       final String reportType = descriptor.getFullName();
-      Preconditions.checkState(reportType != null);
+      Objects.requireNonNull(reportType, "reportType == null");
     }
     synchronized (incrementalReportsQueue) {
       if (incrementalReportsQueue.containsKey(endpoint)) {
@@ -519,7 +521,7 @@ public class StateContext {
         int limit = size > maxLimit ? maxLimit : size;
         for (int count = 0; count < limit; count++) {
           ContainerAction action = actions.poll();
-          Preconditions.checkNotNull(action);
+          Objects.requireNonNull(action, "action == null");
           containerActionList.add(action);
         }
       }
@@ -794,17 +796,23 @@ public class StateContext {
     this.addCmdStatus(command);
   }
 
-  public Map<SCMCommandProto.Type, Integer> getCommandQueueSummary() {
-    Map<SCMCommandProto.Type, Integer> summary = new HashMap<>();
+  public EnumCounters<SCMCommandProto.Type> getCommandQueueSummary() {
+    EnumCounters<SCMCommandProto.Type> summary = new EnumCounters<>(SCMCommandProto.Type.class);
     lock.lock();
     try {
       for (SCMCommand<?> cmd : commandQueue) {
-        summary.put(cmd.getType(), summary.getOrDefault(cmd.getType(), 0) + 1);
+        summary.add(cmd.getType(), 1);
       }
     } finally {
       lock.unlock();
     }
     return summary;
+  }
+
+  public boolean isPipelineCloseInProgress(UUID pipelineID) {
+    ClosePipelineCommandHandler handler = parentDatanodeStateMachine.getCommandDispatcher()
+        .getClosePipelineCommandHandler();
+    return handler.isPipelineCloseInProgress(pipelineID);
   }
 
   /**
@@ -900,6 +908,17 @@ public class StateContext {
       if (getQueueMetrics() != null) {
         getQueueMetrics().addEndpoint(endpoint);
       }
+    }
+  }
+
+  public void removeEndpoint(InetSocketAddress endpoint) {
+    this.endpoints.remove(endpoint);
+    this.containerActions.remove(endpoint);
+    this.pipelineActions.remove(endpoint);
+    this.incrementalReportsQueue.remove(endpoint);
+    this.isFullReportReadyToBeSent.remove(endpoint);
+    if (getQueueMetrics() != null) {
+      getQueueMetrics().removeEndpoint(endpoint);
     }
   }
 

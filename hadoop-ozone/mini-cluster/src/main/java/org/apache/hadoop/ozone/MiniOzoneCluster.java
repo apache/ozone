@@ -26,14 +26,15 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -138,13 +139,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
-   * Returns a {@link ReconServer} instance.
-   *
-   * @return {@link ReconServer} instance if it is initialized, otherwise null.
-   */
-  ReconServer getReconServer();
-
-  /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
    * The caller is responsible for closing the client after use.
    *
@@ -170,11 +164,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * Restarts OzoneManager instance.
    */
   void restartOzoneManager() throws IOException;
-
-  /**
-   * Restarts Recon instance.
-   */
-  void restartReconServer() throws Exception;
 
   /**
    * Restart a particular HddsDatanode.
@@ -207,16 +196,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @param dn HddsDatanode in the MiniOzoneCluster
    */
   void shutdownHddsDatanode(DatanodeDetails dn) throws IOException;
-
-  /**
-   * Start Recon.
-   */
-  void startRecon();
-
-  /**
-   * Stop Recon.
-   */
-  void stopRecon();
 
   /**
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
@@ -276,8 +255,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
 
-    protected boolean includeRecon = false;
-
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
@@ -297,6 +274,18 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * between the clusters created. */
     protected void prepareForNextBuild() {
       conf = new OzoneConfiguration(conf);
+
+      // Remove the extra configs set in configureSCM() and configureOM() so that MiniOzoneClusterProvider won't fail
+      conf.unset(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+      conf.unset(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR);
+      conf.unset(ScmConfigKeys.OZONE_SCM_DB_DIRS);
+      conf.unset(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
+
+      conf.unset(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
+      conf.unset(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+      conf.unset(OMConfigKeys.OZONE_OM_DB_DIRS);
+      conf.unset(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR);
+
       setClusterId();
     }
 
@@ -374,11 +363,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setDatanodeFactory(DatanodeFactory factory) {
       this.dnFactory = factory;
-      return this;
-    }
-
-    public Builder includeRecon(boolean include) {
-      this.includeRecon = include;
       return this;
     }
 

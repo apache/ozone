@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import static org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder.forServer;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -35,6 +35,7 @@ import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,7 @@ public class InterSCMGrpcProtocolService {
 
   InterSCMGrpcProtocolService(final ConfigurationSource conf,
       final StorageContainerManager scm) throws IOException {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
     this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
@@ -74,6 +75,10 @@ public class InterSCMGrpcProtocolService {
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslServerContextBuilder, securityConfig.getGrpcSslProvider());
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+        sslContextBuilder.protocols(securityConfig.getGrpcTlsProtocols());
+        sslContextBuilder.ciphers(
+            securityConfig.getGrpcTlsCiphers(),
+            SupportedCipherSuiteFilter.INSTANCE);
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure " +
@@ -82,7 +87,7 @@ public class InterSCMGrpcProtocolService {
             "InterSCMGrpcProtocolService GRPC endpoint.");
       }
     }
-    Preconditions.checkNotNull(b);
+    Objects.requireNonNull(b, "b == null");
     server = nettyServerBuilder.build();
   }
 

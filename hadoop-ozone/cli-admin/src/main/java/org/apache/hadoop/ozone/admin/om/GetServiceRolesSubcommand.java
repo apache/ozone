@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -44,13 +43,8 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class)
 public class GetServiceRolesSubcommand implements Callable<Void> {
 
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
-
-  @CommandLine.Option(names = {"-id", "--service-id"},
-      description = "OM Service ID",
-      required = false)
-  private String omServiceId;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
@@ -62,8 +56,6 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
        description = "Format output as Table")
   private boolean table;
 
-  private OzoneManagerProtocol ozoneManagerClient;
-
   private static final String OM_ROLES_TITLE = "Ozone Manager Roles";
 
   private static final List<String> OM_ROLES_HEADER = Arrays.asList(
@@ -71,8 +63,7 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    try {
-      ozoneManagerClient =  parent.createOmClient(omServiceId);
+    try (OzoneManagerProtocol ozoneManagerClient = omServiceOption.newClient()) {
       if (json) {
         printOmServerRolesAsJson(ozoneManagerClient.getServiceList());
       } else if (table) {
@@ -90,10 +81,6 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
         System.out.println(formattingCLIUtils.render());
       } else {
         printOmServerRoles(ozoneManagerClient.getServiceList());
-      }
-    } finally {
-      if (ozoneManagerClient != null) {
-        ozoneManagerClient.close();
       }
     }
     return null;
@@ -130,15 +117,5 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
     }
     System.out.print(
         JsonUtils.toJsonStringWithDefaultPrettyPrinter(omServiceList));
-  }
-
-  @VisibleForTesting
-  public void setOzoneManagerClient(OzoneManagerProtocol ozoneManagerClient) {
-    this.ozoneManagerClient = ozoneManagerClient;
-  }
-
-  @VisibleForTesting
-  public void setParent(OMAdmin parent) {
-    this.parent = parent;
   }
 }

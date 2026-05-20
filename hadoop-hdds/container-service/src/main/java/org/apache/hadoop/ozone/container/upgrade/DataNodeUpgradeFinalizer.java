@@ -25,7 +25,6 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
@@ -83,7 +82,7 @@ public class DataNodeUpgradeFinalizer extends
       HDDSLayoutFeature hddslayoutFeature =  (HDDSLayoutFeature)layoutFeature;
       super.finalizeLayoutFeature(hddslayoutFeature,
           hddslayoutFeature
-              .datanodeAction(LayoutFeature.UpgradeActionType.ON_FINALIZE),
+              .datanodeAction(),
           dsm.getLayoutStorage());
     } else {
       String msg = String.format("Failed to finalize datanode layout feature " +
@@ -91,13 +90,5 @@ public class DataNodeUpgradeFinalizer extends
       throw new UpgradeException(msg,
           UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
     }
-  }
-
-  @Override
-  public void runPrefinalizeStateActions(Storage storage,
-                                         DatanodeStateMachine dsm)
-      throws IOException {
-    super.runPrefinalizeStateActions(
-        lf -> ((HDDSLayoutFeature) lf)::datanodeAction, storage, dsm);
   }
 }

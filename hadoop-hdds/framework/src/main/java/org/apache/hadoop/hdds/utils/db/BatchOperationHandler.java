@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
-
 /**
  * Create and commit batch operation for one DB.
  */
@@ -37,7 +35,6 @@ public interface BatchOperationHandler {
    * Commit the batch operations.
    *
    * @param operation which contains all the required batch operation.
-   * @throws IOException on Failure.
    */
-  void commitBatchOperation(BatchOperation operation) throws IOException;
+  void commitBatchOperation(BatchOperation operation) throws RocksDatabaseException;
 }

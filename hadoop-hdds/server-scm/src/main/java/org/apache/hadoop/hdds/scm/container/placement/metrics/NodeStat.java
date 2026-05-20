@@ -54,6 +54,12 @@ interface NodeStat {
   LongMetric getFreeSpaceToSpare();
 
   /**
+   * Get the reserved space on the node.
+   * @return the reserved space on the node
+   */
+  LongMetric getReserved();
+
+  /**
    * Set the total/used/remaining space.
    * @param capacity - total space.
    * @param used - used space.
@@ -61,7 +67,7 @@ interface NodeStat {
    */
   @VisibleForTesting
   void set(long capacity, long used, long remain, long committed,
-           long freeSpaceToSpare);
+           long freeSpaceToSpare, long reserved);
 
   /**
    * Adding of the stat.

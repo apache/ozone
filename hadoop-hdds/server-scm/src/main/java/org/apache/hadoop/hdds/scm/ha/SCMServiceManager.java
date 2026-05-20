@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +38,7 @@ public final class SCMServiceManager {
    * Register a SCMService to SCMServiceManager.
    */
   public synchronized void register(SCMService service) {
-    Preconditions.checkNotNull(service);
+    Objects.requireNonNull(service, "service == null");
     LOG.info("Registering service {}.", service.getServiceName());
     services.add(service);
   }

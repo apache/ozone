@@ -203,6 +203,10 @@
               {
                 "name": "GetContainerBalancerStatusInfo",
                 "integer": 44
+              },
+              {
+                "name": "ReconcileContainer",
+                "integer": 45
               }
             ]
           },
@@ -494,7 +498,13 @@
                 "id": 41,
                 "name": "resetDeletedBlockRetryCountRequest",
                 "type": "ResetDeletedBlockRetryCountRequestProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 42,
@@ -506,7 +516,13 @@
                 "id": 43,
                 "name": "getFailedDeletedBlocksTxnRequest",
                 "type": "GetFailedDeletedBlocksTxnRequestProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 44,
@@ -536,6 +552,12 @@
                 "id": 48,
                 "name": "containerBalancerStatusInfoRequest",
                 "type": "ContainerBalancerStatusInfoRequestProto",
+                "optional": true
+              },
+              {
+                "id": 49,
+                "name": "reconcileContainerRequest",
+                "type": "ReconcileContainerRequestProto",
                 "optional": true
               }
             ]
@@ -793,7 +815,13 @@
                 "id": 41,
                 "name": "resetDeletedBlockRetryCountResponse",
                 "type": "ResetDeletedBlockRetryCountResponseProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 42,
@@ -805,7 +833,13 @@
                 "id": 43,
                 "name": "getFailedDeletedBlocksTxnResponse",
                 "type": "GetFailedDeletedBlocksTxnResponseProto",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 44,
@@ -836,6 +870,12 @@
                 "name": "containerBalancerStatusInfoResponse",
                 "type": "ContainerBalancerStatusInfoResponseProto",
                 "optional": true
+              },
+              {
+                "id": 49,
+                "name": "reconcileContainerResponse",
+                "type": "ReconcileContainerResponseProto",
+                "optional": true
               }
             ]
           },
@@ -846,7 +886,7 @@
                 "id": 2,
                 "name": "replicationFactor",
                 "type": "ReplicationFactor",
-                "required": true
+                "optional": true
               },
               {
                 "id": 3,
@@ -864,6 +904,12 @@
                 "id": 5,
                 "name": "traceID",
                 "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "ecReplicationConfig",
+                "type": "ECReplicationConfig",
                 "optional": true
               }
             ]
@@ -2255,6 +2301,20 @@
                 "optional": true
               }
             ]
+          },
+          {
+            "name": "ReconcileContainerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "ReconcileContainerResponseProto"
           }
         ],
         "services": [

@@ -57,15 +57,15 @@ public class LeaseRecoverer implements Callable<Void> {
   public Void call() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
     URI uri = URI.create(this.path);
-    FileSystem fs = FileSystem.get(uri, configuration);
+    try (FileSystem fs = FileSystem.get(uri, configuration)) {
 
-    if (fs instanceof LeaseRecoverable) {
-      ((LeaseRecoverable) fs).recoverLease(new Path(uri));
-    } else {
-      throw new IllegalArgumentException("Unsupported file system: "
-          + fs.getScheme());
+      if (fs instanceof LeaseRecoverable) {
+        ((LeaseRecoverable) fs).recoverLease(new Path(uri));
+      } else {
+        throw new IllegalArgumentException("Unsupported file system: "
+            + fs.getScheme());
+      }
     }
-
     System.out.println("Lease recovery SUCCEEDED on " + uri);
 
     return null;

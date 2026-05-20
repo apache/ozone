@@ -21,12 +21,12 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "${DIR}/../../.." || exit 1
 
-source "${DIR}/_lib.sh"
-source "${DIR}/install/bats.sh"
-
 REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/bats"}
 mkdir -p "${REPORT_DIR}"
 REPORT_FILE="${REPORT_DIR}/summary.txt"
+
+source "${DIR}/_lib.sh"
+source "${DIR}/install/bats.sh"
 
 rm -f "${REPORT_DIR}/output.log"
 

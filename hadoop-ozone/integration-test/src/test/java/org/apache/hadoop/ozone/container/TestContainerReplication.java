@@ -276,7 +276,6 @@ class TestContainerReplication {
     cluster.getHddsDatanode(dn).getDatanodeStateMachine().triggerHeartbeat();
   }
 
-  @Flaky("HDDS-12760")
   @Test
   public void testImportedContainerIsClosed() throws Exception {
     OzoneConfiguration conf = createConfiguration(false);

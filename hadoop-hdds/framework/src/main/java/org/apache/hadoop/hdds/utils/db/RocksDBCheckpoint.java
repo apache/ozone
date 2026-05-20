@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Path;
 import org.apache.commons.io.FileUtils;
@@ -51,6 +52,7 @@ public class RocksDBCheckpoint implements DBCheckpoint {
   }
 
   @Override
+  @Nonnull
   public Path getCheckpointLocation() {
     return this.checkpointLocation;
   }

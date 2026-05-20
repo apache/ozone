@@ -61,6 +61,15 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
     ContainerInfo containerInfo = result.getContainerInfo();
     LOG.debug("Handling under replicated QuasiClosed Stuck Ratis container {}", containerInfo);
 
+    // Check if container is empty before attempting replication
+    // Empty containers will be deleted by EmptyContainerHandler
+    boolean allReplicasEmpty = !replicas.isEmpty() && replicas.stream().allMatch(ContainerReplica::isEmpty);
+    if (allReplicasEmpty) {
+      LOG.info("Skipping replication for empty QUASI_CLOSED stuck container {}. " +
+          "It will be deleted by EmptyContainerHandler.", containerInfo.containerID());
+      return 0;
+    }
+
     int pendingAdd = 0;
     for (ContainerReplicaOp op : pendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
@@ -74,8 +83,10 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
       return 0;
     }
 
+    ReplicationManager.ReplicationManagerConfiguration rmConf = replicationManager.getConfig();
     QuasiClosedStuckReplicaCount replicaCount =
-        new QuasiClosedStuckReplicaCount(replicas, remainingMaintenanceRedundancy);
+        new QuasiClosedStuckReplicaCount(replicas, remainingMaintenanceRedundancy,
+            rmConf.getQuasiClosedStuckBestOriginCopies(), rmConf.getQuasiClosedStuckOtherOriginCopies());
 
     List<QuasiClosedStuckReplicaCount.MisReplicatedOrigin> misReplicatedOrigins
         = replicaCount.getUnderReplicatedReplicas();
@@ -108,9 +119,12 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
           .collect(Collectors.toList());
       for (DatanodeDetails target : targets) {
         try {
-          replicationManager.sendThrottledReplicationCommand(containerInfo, sourceDatanodes, target, 0);
+          replicationManager.sendThrottledReplicationCommand(
+              containerInfo, sourceDatanodes, target, 0);
           // Add the pending op, so we exclude the node for subsequent origins
-          mutablePendingOps.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, target, 0));
+          mutablePendingOps.add(new ContainerReplicaOp(
+              ContainerReplicaOp.PendingOpType.ADD, target, 0,
+              null, System.currentTimeMillis(), 0));
           totalCommandsSent++;
         } catch (CommandTargetOverloadedException e) {
           LOG.warn("Cannot replicate container {} because all sources are overloaded.", containerInfo);

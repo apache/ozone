@@ -408,7 +408,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         loading: false
       });
       decommissionUuids = [];
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     }
     try {
     // Call Datanode API Synchronously after completing Decommission API to render Operation Status Column
@@ -450,7 +450,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         loading: false
       });
       decommissionUuids = [];
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     }
   };
 
@@ -480,7 +480,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     request.then(() => {
       this._loadData();
     }).catch(error => {
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     }).finally(() => {
       this.setState({
         loading: false,

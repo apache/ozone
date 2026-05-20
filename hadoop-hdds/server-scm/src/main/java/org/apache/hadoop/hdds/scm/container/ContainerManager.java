@@ -17,13 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import java.io.Closeable;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -35,8 +36,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
  * ContainerManager is responsible for keeping track of all Containers and
  * managing all containers operations like creating, deleting etc.
  */
-public interface ContainerManager extends Closeable {
-
+public interface ContainerManager {
   /**
    * Reinitialize the containerManager with the updated container store.
    * @param containerStore Container Table
@@ -57,15 +57,32 @@ public interface ContainerManager extends Closeable {
   }
 
   /**
-   * Returns containers under certain conditions.
-   * Search container IDs from start ID(exclusive),
+   * Returns container IDs under certain conditions.
+   * Search container IDs from start ID(inclusive),
    * The max size of the searching range cannot exceed the
    * value of count.
    *
    * @param startID start containerID, &gt;=0,
    * start searching at the head if 0.
    * @param count count must be &gt;= 0
-   *              Usually the count will be replace with a very big
+   *              Usually the count will be replaced with a very big
+   *              value instead of being unlimited in case the db is very big.
+   * @param state container state
+   *
+   * @return a list of container IDs.
+   */
+  List<ContainerID> getContainerIDs(ContainerID startID, int count, LifeCycleState state);
+
+  /**
+   * Returns containers under certain conditions.
+   * Search container IDs from start ID(inclusive),
+   * The max size of the searching range cannot exceed the
+   * value of count.
+   *
+   * @param startID start containerID, &gt;=0,
+   * start searching at the head if 0.
+   * @param count count must be &gt;= 0
+   *              Usually the count will be replaced with a very big
    *              value instead of being unlimited in case the db is very big.
    *
    * @return a list of container.
@@ -80,6 +97,7 @@ public interface ContainerManager extends Closeable {
    * @return List of ContainerInfo
    */
   List<ContainerInfo> getContainers(LifeCycleState state);
+
 
   /**
    * Returns containers under certain conditions.
@@ -134,14 +152,13 @@ public interface ContainerManager extends Closeable {
       throws IOException, InvalidStateTransitionException;
 
   /**
-   * Bypasses the container state machine to change a container's state from DELETING or DELETED to CLOSED. This API was
-   * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
    *
-   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
    * @param containerID id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
    * @throws IOException
    */
-  void transitionDeletingOrDeletedToClosedState(ContainerID containerID) throws IOException;
+  void transitionDeletingOrDeletedToTargetState(ContainerID containerID, LifeCycleState targetState) throws IOException;
 
   /**
    * Returns the latest list of replicas for given containerId.
@@ -191,8 +208,10 @@ public interface ContainerManager extends Closeable {
    * @param owner - the user which requires space in its owned container
    * @param pipeline - pipeline to which the container should belong.
    * @param excludedContainerIDS - containerIds to be excluded.
-   * @return ContainerInfo for the matching container.
+   * @return ContainerInfo for the matching container, or null if a container could not be found and could not be
+   * allocated
    */
+  @Nullable
   ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline,
                                      Set<ContainerID> excludedContainerIDS);
@@ -220,4 +239,14 @@ public interface ContainerManager extends Closeable {
    * @return containerStateManger
    */
   ContainerStateManager getContainerStateManager();
+
+  /**
+   * Update container info in the container manager.
+   * This is used for updating container metadata like ackMissing flag.
+   *
+   * @param containerInfo Updated container info proto
+   * @throws IOException
+   */
+  void updateContainerInfo(ContainerID containerID, ContainerInfoProto containerInfo)
+      throws IOException;
 }

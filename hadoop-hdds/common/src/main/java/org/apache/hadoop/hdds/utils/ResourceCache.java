@@ -34,7 +34,7 @@ public class ResourceCache<K, V> implements Cache<K, V> {
   public ResourceCache(
       Weigher<K, V> weigher, long limits,
       RemovalListener<K, V> listener) {
-    Objects.requireNonNull(weigher);
+    Objects.requireNonNull(weigher, "weigher == null");
     if (listener == null) {
       cache = CacheBuilder.newBuilder()
           .maximumWeight(limits).weigher(weigher).build();
@@ -47,26 +47,26 @@ public class ResourceCache<K, V> implements Cache<K, V> {
 
   @Override
   public V get(K key) {
-    Objects.requireNonNull(key);
+    Objects.requireNonNull(key, "key == null");
     return cache.getIfPresent(key);
   }
 
   @Override
   public void put(K key, V value) throws InterruptedException {
-    Objects.requireNonNull(key);
-    Objects.requireNonNull(value);
+    Objects.requireNonNull(key, "key == null");
+    Objects.requireNonNull(value, "value == null");
     cache.put(key, value);
   }
 
   @Override
   public void remove(K key) {
-    Objects.requireNonNull(key);
+    Objects.requireNonNull(key, "key == null");
     cache.invalidate(key);
   }
 
   @Override
   public void removeIf(Predicate<K> predicate) {
-    Objects.requireNonNull(predicate);
+    Objects.requireNonNull(predicate, "predicate == null");
     for (K key : cache.asMap().keySet()) {
       if (predicate.test(key)) {
         remove(key);

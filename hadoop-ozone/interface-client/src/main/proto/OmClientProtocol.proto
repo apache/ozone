@@ -156,6 +156,7 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
+  SubmitSnapshotDiff = 143;
 }
 
 enum SafeMode {
@@ -178,6 +179,8 @@ message OMRequest {
   optional uint32 version = 5;
 
   optional LayoutVersion layoutVersion = 6;
+
+  optional ReadConsistencyHint readConsistencyHint = 7;
 
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
@@ -303,6 +306,9 @@ message OMRequest {
   optional GetObjectTaggingRequest          getObjectTaggingRequest        = 140;
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
+
+  optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest       = 144;
 }
 
 message OMResponse {
@@ -436,6 +442,8 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
+
+  optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
 }
 
 enum Status {
@@ -565,6 +573,12 @@ enum Status {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
 
     TOO_MANY_SNAPSHOTS = 98;
+
+    ETAG_MISMATCH = 99;
+
+    ETAG_NOT_AVAILABLE = 100;
+
+    ATOMIC_WRITE_CONFLICT = 101;
 }
 
 /**
@@ -771,6 +785,8 @@ message BucketInfo {
     optional BucketLayoutProto bucketLayout = 18;
     optional string owner = 19;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
+    optional uint64 snapshotUsedBytes = 21;
+    optional uint64 snapshotUsedNamespace = 22;
 }
 
 enum BucketLayoutProto {
@@ -877,8 +893,8 @@ message SnapshotInfo {
   optional hadoop.hdds.UUID pathPreviousSnapshotID = 8;
   optional hadoop.hdds.UUID globalPreviousSnapshotID = 9;
   optional string snapshotPath = 10;
-  optional string checkpointDir = 11;
-  optional int64 dbTxSequenceNumber = 12;
+  optional string checkpointDir = 11 [deprecated = true];
+  optional int64 dbTxSequenceNumber = 12 [deprecated = true];
   optional bool deepClean = 13;
   optional bool sstFiltered = 14;
   // snapshot reference size before any key replication or EC
@@ -892,6 +908,10 @@ message SnapshotInfo {
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
   optional bytes lastTransactionInfo = 20;
+  optional uint64 exclusiveSizeDeltaFromDirDeepCleaning = 21;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveReplicatedSizeDeltaFromDirDeepCleaning = 22;
+  optional bytes createTransactionInfo = 23;
 }
 
 message SnapshotDiffJobProto {
@@ -908,6 +928,7 @@ message SnapshotDiffJobProto {
   optional bool disableNativeDiff = 11;
   optional SnapshotDiffResponse.SubStatus subStatus = 12;
   optional double keysProcessedPct = 13;
+  optional string largestEntryKey = 14;
 }
 
 message OzoneObj {
@@ -1075,6 +1096,11 @@ message KeyArgs {
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
     optional uint64 expectedDataGeneration = 23;
+
+    // expectedETag, when set, indicates that the existing key must have
+    // the given ETag for the operation to succeed. This is used for
+    // S3 conditional writes with the If-Match header.
+    optional string expectedETag = 24;
 }
 
 message KeyLocation {
@@ -1168,6 +1194,25 @@ message KeyInfo {
     optional uint64 expectedDataGeneration = 22;
 }
 
+// KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
+// selected fields only, while maintaining the same field indices as KeyInfo
+// for compatibility and consistency.
+message KeyInfoProtoLight {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required string keyName = 3;
+  required uint64 dataSize = 4;
+  required hadoop.hdds.ReplicationType type = 5;
+  optional hadoop.hdds.ReplicationFactor factor = 6;
+  required uint64 creationTime = 8;
+  required uint64 modificationTime = 9;
+  optional uint64 objectID = 14;
+  optional uint64 updateID = 15;
+  optional uint64 parentID = 16;
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
+  optional bool isFile = 19;
+}
+
 message BasicKeyInfo {
     optional string keyName = 1;
     optional uint64 dataSize = 2;
@@ -1178,6 +1223,8 @@ message BasicKeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
     optional string eTag = 8;
     optional string ownerName = 9;
+    optional bool isEncrypted = 10;
+    optional bool isFile = 11;
 }
 
 message DirectoryInfo {
@@ -1194,6 +1241,7 @@ message DirectoryInfo {
 
 message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
+    optional uint64 bucketId = 2;
 }
 
 message OzoneFileStatusProto {
@@ -1376,8 +1424,8 @@ message DeleteKeyResponse {
 }
 
 message DeletedKeys {
-    required string volumeName = 1;
-    required string bucketName = 2;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
     repeated string keys = 3;
 }
 
@@ -1388,6 +1436,14 @@ message PurgeKeysRequest {
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
     // previous snapshotID can also be null & this field would be absent in older requests.
     optional NullableUUID expectedPreviousSnapshotID = 4;
+    repeated string renamedKeys = 5;
+    repeated BucketPurgeKeysSize bucketPurgeKeysSize = 6;
+}
+
+message BucketPurgeKeysSize {
+  optional BucketNameInfo bucketNameInfo = 1;
+  optional uint64 purgedBytes = 2;
+  optional uint64 purgedNamespace = 3;
 }
 
 message PurgeKeysResponse {
@@ -1412,6 +1468,14 @@ message PurgeDirectoriesRequest {
   optional string snapshotTableKey = 2;
   // previous snapshotID can also be null & this field would be absent in older requests.
   optional NullableUUID expectedPreviousSnapshotID = 3;
+  repeated BucketNameInfo bucketNameInfos = 4;
+}
+
+message BucketNameInfo {
+  optional uint64 volumeId = 1;
+  optional uint64 bucketId = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
 }
 
 message NullableUUID {
@@ -1666,17 +1730,36 @@ message MultipartKeyInfo {
     required uint64 creationTime = 2;
     required hadoop.hdds.ReplicationType type = 3;
     optional hadoop.hdds.ReplicationFactor factor = 4;
-    repeated PartKeyInfo partKeyInfoList = 5;
+    repeated PartKeyInfo partKeyInfoList = 5 [deprecated = true];
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
     optional uint64 parentID = 8;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
+    optional uint32 schemaVersion = 10;
+    optional string volumeName = 11;
+    optional string bucketName = 12;
+    optional string keyName = 13;
+    optional string ownerName = 14;
+    repeated OzoneAclInfo acls = 15;
 }
 
 message PartKeyInfo {
     required string partName = 1;
     required uint32 partNumber = 2;
     required KeyInfo partKeyInfo = 3;
+}
+
+message MultipartPartInfo {
+  optional string partName = 1;
+  optional uint32 partNumber = 2;
+  optional string eTag = 3;
+  optional KeyLocationList keyLocationList = 4; 
+  optional uint64 dataSize = 5;
+  optional uint64 modificationTime = 6;
+  optional uint64 objectID = 7;
+  optional uint64 updateID = 8;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 9;
+  optional FileChecksumProto fileChecksum = 10;
 }
 
 message MultipartCommitUploadPartRequest {
@@ -1960,6 +2043,15 @@ message SnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional string token = 5;
   optional uint32 pageSize = 6;
+  optional bool forceFullDiff = 7 [deprecated = true];
+  optional bool disableNativeDiff = 8 [deprecated = true];
+}
+
+message SubmitSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
   optional bool forceFullDiff = 7;
   optional bool disableNativeDiff = 8;
 }
@@ -2016,6 +2108,7 @@ message SnapshotMoveTableKeysRequest {
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
+  optional uint64 bucketId = 3;
 }
 
 message SnapshotPurgeRequest {
@@ -2029,6 +2122,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional SnapshotSize snapshotSizeDeltaFromDirDeepCleaning = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility
@@ -2097,6 +2191,7 @@ message SnapshotDiffResponse {
     REJECTED = 4;
     FAILED = 5;
     CANCELLED = 6;
+    NOT_FOUND = 7;
   }
 
   enum SubStatus {
@@ -2112,6 +2207,10 @@ message SnapshotDiffResponse {
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
   optional SubStatus subStatus = 5;
+}
+
+message SubmitSnapshotDiffResponse {
+  optional string response = 1;
 }
 
 message CancelSnapshotDiffResponse {
@@ -2306,6 +2405,67 @@ message DeleteObjectTaggingRequest {
 }
 
 message DeleteObjectTaggingResponse {
+}
+
+enum ReadConsistencyProto {
+  // Unspecified consistency, the read consistency behavior is decided
+  // by the OM
+  READ_CONSISTENCY_UNSPECIFIED = 0;
+  // Client sends all read requests to OM node that the client believes is the current leader.
+  // If the OM node is not a leader, the OM node throws an exception so the client failover to the OM leader.
+  // OM leader handles the request immediately without doing leadership check to verify
+  // that OM leader is the latest leader. This means here might be a small period of time when there is
+  // a split brain and two OM nodes believe that they are both leaders (i.e. old leader and new leader
+  // where old leader's term < new leader's term).
+  // Without the leadership check, the old OM leader might return stale data
+  // during this small period of time. Therefore, the read consistency is not strictly
+  // linearizable. However, this situation should only happen in rare situations
+  // when the OM Raft group encounters a leader election due to network partition
+  // between the old leader and the other majority quorum (which will elect the new leader).
+  // This consistency is the default consistency for a few reasons
+  // 1. Compatibility: Compatible with the original read behavior
+  // 2. Performance: Fast reads since the leader serves reads immediately
+  // 3. Consistency: It is strongly consistent (linearizable) most of the time, except for rare condition that
+  //                 might cause stale read
+  DEFAULT = 1;
+  // Similar to the Default consistency that all requests can only be handled
+  // by the OM leader, but OM leader will carry out leadership check by sending heartbeats or checking
+  // the leader lease (if leader lease is enabled). This ensures that there are no stale reads.
+  // There might be performance tradeoff due to this leadership check.
+  LINEARIZABLE_LEADER_ONLY = 2;
+  // Client can send read requests to OM followers, but it requires the follower
+  // to carry out ReadIndex protocol to ensure linearizability. Similar to
+  // LinearizableLeaderRead, this consistency guarantee ensures that there are no stale reads.
+  // There might be performance tradeoff due to the ReadIndex protocol.
+  LINEARIZABLE_ALLOW_FOLLOWER = 3;
+  // Client can send read request to OM followers, and the follower only serves
+  // the read requests when these conditions are met
+  // 1. The last RPC elapsed time with the leader is within the time limit
+  // 2. The follower's applied index is within the configurable "lease lag limit"
+  //    compared to the leader's commit index
+  // This creates a form of bounded staleness read based on log index lag.
+  // Note that currently this does not guarantee monotonic reads since it
+  // requires session information of the last seen index. If the client failover
+  // from a leader / fast follower to a slow follower that is still within the bound,
+  // the slow follower can serve data that is more stale than the last seen index.
+  LOCAL_LEASE = 4;
+  // TODO: Support timestamp-based bounded stale reads
+}
+
+// Message to specify the expected read consistency
+// Note that this only acts a hint from the client and the
+// effective read consistency depends whether the OM supports it
+// or whether it is superseded by the OM server-side configuration.
+message ReadConsistencyHint {
+  message LocalLeaseContext {
+    optional uint64 logLimit = 1;
+    optional uint64 leaseTimeMs = 2;
+  }
+
+  optional ReadConsistencyProto readConsistency = 1;
+
+  // Oneof
+  optional LocalLeaseContext localLeaseContext = 2;
 }
 
 /**

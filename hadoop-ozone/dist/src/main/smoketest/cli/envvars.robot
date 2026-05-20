@@ -16,11 +16,30 @@
 *** Settings ***
 Documentation       Test ozone envvars command
 Library             BuiltIn
+Library             OperatingSystem
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Save Environment
+Suite Teardown      Restore Environment
 
 *** Variables ***
 ${OZONE_HOME}    /opt/hadoop
+
+*** Keywords ***
+Save Environment
+    ${saved} =    Get Environment Variables
+    Set Suite Variable    ${SAVED_ENV}    ${saved}
+
+Restore Environment
+    FOR    ${key}    IN
+    ...    HADOOP_HOME    HADOOP_CONF_DIR    HADOOP_LIBEXEC_DIR
+    ...    OZONE_HOME    OZONE_CONF_DIR    OZONE_LIBEXEC_DIR    OZONE_DEPRECATION_WARNING
+        IF    '${key}' in ${SAVED_ENV}
+            Set Environment Variable    ${key}    ${SAVED_ENV}[${key}]
+        ELSE
+            Run Keyword And Ignore Error    Remove Environment Variable    ${key}
+        END
+    END
 
 *** Test Cases ***
 Ignores deprecated vars if new ones are set

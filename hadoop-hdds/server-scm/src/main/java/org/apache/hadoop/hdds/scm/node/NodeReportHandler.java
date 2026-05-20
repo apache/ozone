@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -31,16 +31,16 @@ public class NodeReportHandler implements EventHandler<NodeReportFromDatanode> {
   private final NodeManager nodeManager;
 
   public NodeReportHandler(NodeManager nodeManager) {
-    Preconditions.checkNotNull(nodeManager);
+    Objects.requireNonNull(nodeManager, "nodeManager == null");
     this.nodeManager = nodeManager;
   }
 
   @Override
   public void onMessage(NodeReportFromDatanode nodeReportFromDatanode,
       EventPublisher publisher) {
-    Preconditions.checkNotNull(nodeReportFromDatanode);
+    Objects.requireNonNull(nodeReportFromDatanode, "nodeReportFromDatanode == null");
     DatanodeDetails dn = nodeReportFromDatanode.getDatanodeDetails();
-    Preconditions.checkNotNull(dn, "NodeReport is "
+    Objects.requireNonNull(dn, "NodeReport is "
         + "missing DatanodeDetails.");
     nodeManager
         .processNodeReport(dn, nodeReportFromDatanode.getReport());

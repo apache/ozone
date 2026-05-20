@@ -17,6 +17,7 @@
 Documentation       Test ozone debug ldb CLI
 Library             OperatingSystem
 Resource            ../lib/os.robot
+Resource            ../commonlib.robot
 Test Timeout        5 minute
 Suite Setup         Write keys
 
@@ -29,7 +30,6 @@ ${TESTFILE}         testfile
 
 *** Keywords ***
 Write keys
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
     Execute             ozone sh volume create ${VOLUME}
     Execute             ozone sh bucket create ${VOLUME}/${BUCKET} -l obs
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE}1 bs=100 count=10

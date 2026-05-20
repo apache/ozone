@@ -29,7 +29,7 @@ public class SCMException extends IOException {
    * Constructs an {@code SCMException} with {@code null}
    * as its result code. <p>
    * Required for Unwrapping {@code RemoteException}. Used by
-   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   * {@link org.apache.hadoop.ipc_.RemoteException#unwrapRemoteException()}
    */
   public SCMException(String message) {
     super(message);
@@ -156,6 +156,7 @@ public class SCMException extends IOException {
     CA_ROTATION_IN_PROGRESS,
     CA_ROTATION_IN_POST_PROGRESS,
     CONTAINER_ALREADY_CLOSED,
-    CONTAINER_ALREADY_CLOSING
+    CONTAINER_ALREADY_CLOSING,
+    UNSUPPORTED_OPERATION
   }
 }

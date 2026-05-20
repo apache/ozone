@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  */
 @XmlRootElement(name = "Error")
 @XmlAccessorType(XmlAccessType.NONE)
-public class OS3Exception extends Exception {
+public class OS3Exception extends RuntimeException {
   private static final Logger LOG =
       LoggerFactory.getLogger(OS3Exception.class);
   private static ObjectMapper mapper;
@@ -66,31 +66,16 @@ public class OS3Exception extends Exception {
     //Added for JaxB.
   }
 
-  /**
-   * Create an object OS3Exception.
-   * @param codeVal
-   * @param messageVal
-   * @param requestIdVal
-   * @param resourceVal
-   */
-  public OS3Exception(String codeVal, String messageVal, String requestIdVal,
-                      String resourceVal) {
-    this.code = codeVal;
-    this.errorMessage = messageVal;
-    this.requestId = requestIdVal;
-    this.resource = resourceVal;
-  }
+  OS3Exception(S3ErrorTable error, Exception cause, String resource) {
+    super(error.getErrorMessage(), cause);
 
-  /**
-   * Create an object OS3Exception.
-   * @param codeVal
-   * @param messageVal
-   * @param httpCode
-   */
-  public OS3Exception(String codeVal, String messageVal, int httpCode) {
-    this.code = codeVal;
-    this.errorMessage = messageVal;
-    this.httpCode = httpCode;
+    code = error.getCode();
+    errorMessage = error.getErrorMessage();
+    httpCode = error.getHttpCode();
+    this.resource = resource;
+
+    // logging in S3ErrorTable to respect any existing log level setting
+    S3ErrorTable.log(this);
   }
 
   public String getCode() {
@@ -158,8 +143,8 @@ public class OS3Exception extends Exception {
         this.getRequestId());
   }
 
-  /** Create a copy with specific message. */
   public OS3Exception withMessage(String message) {
-    return new OS3Exception(code, message, httpCode);
+    setErrorMessage(message);
+    return this;
   }
 }

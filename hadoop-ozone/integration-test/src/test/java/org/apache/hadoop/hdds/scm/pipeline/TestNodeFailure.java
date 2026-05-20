@@ -21,7 +21,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
@@ -51,11 +50,6 @@ public class TestNodeFailure {
 
   private static final String FLOOD_TOKEN = "pipeline Action CLOSE";
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
@@ -84,9 +78,6 @@ public class TestNodeFailure {
         .getFollowerSlownessTimeout();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {

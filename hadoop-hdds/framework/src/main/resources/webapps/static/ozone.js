@@ -252,10 +252,14 @@
   angular.module('ozone').component('navmenu', {
     bindings: {
       metrics: '<',
+      /** Optional list of {label, href} for extra top-level nav items (e.g. OM deletion dashboard). */
+      extraNavLinks: '<',
       iostatus: '<',
       ioLinkHref: '@',
       scanner: '<',
       scannerLinkHref: '@',
+      snapshot: '@',
+      snapshotLinkHref: '@'
     },
     templateUrl: 'static/templates/menu.html',
     controller: function($http) {
@@ -296,13 +300,15 @@
         for (var idx in srcObj) {
           //console.log("Adding keys for "+idx)
           for (var key in srcObj[idx]) {
-
+            var propMetadata = srcObj[idx][key];
+            
             if (ctrl.keyTagMap.hasOwnProperty(key)) {
               ctrl.keyTagMap[key]['tag'].push(idx);
             } else {
               var newProp = {};
-              newProp['name'] = key;
-              newProp['value'] = srcObj[idx][key];
+              newProp['name'] = propMetadata.name || key;
+              newProp['value'] = propMetadata.value;
+              newProp['description'] = propMetadata.description || '';
               newProp['tag'] = [];
               newProp['tag'].push(idx);
               ctrl.keyTagMap[key] = newProp;

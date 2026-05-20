@@ -30,7 +30,7 @@ import org.apache.ratis.grpc.GrpcConfigKeys;
 @ConfigGroup(prefix = HDDS_DATANODE_RATIS_PREFIX_KEY + "."
     + GrpcConfigKeys.PREFIX)
 public class DatanodeRatisGrpcConfig {
-  @Config(key = "flow.control.window",
+  @Config(key = "hdds.ratis.raft.grpc.flow.control.window",
       defaultValue = "5MB",
       type = ConfigType.SIZE,
       tags =  {OZONE, CLIENT, PERFORMANCE},

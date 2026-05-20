@@ -16,75 +16,87 @@
  * limitations under the License.
  */
 
-#include "org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator.h"
+#include "org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileIterator.h"
 #include "rocksdb/options.h"
 #include "rocksdb/raw_iterator.h"
 #include <string>
 #include "cplusplus_to_java_convert.h"
 #include <iostream>
 
-jboolean Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_hasNext(JNIEnv *env, jobject obj,
-                                                                                           jlong native_handle) {
+template <class T>
+static jint copyToDirect(JNIEnv* env, T& source, jobject jtarget, jint jtarget_off, jint jtarget_len);
+
+jboolean Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileIterator_hasNext(JNIEnv *env, jobject obj,
+                                                                                jlong native_handle) {
     return static_cast<jboolean>(reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->Valid());
 }
 
-void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_next(JNIEnv *env, jobject obj,
-                                                                                       jlong native_handle) {
+void Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileIterator_next(JNIEnv *env, jobject obj,
+                                                                         jlong native_handle) {
     reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->Next();
 }
 
-jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getKey(JNIEnv *env,
-                                                                                               jobject obj,
-                                                                                               jlong native_handle) {
+jint Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileIterator_getKey(JNIEnv *env,
+                                                                           jobject obj,
+                                                                           jlong native_handle,
+                                                                           jobject jtarget,
+                                                                           jint jtarget_off, jint jtarget_len) {
     ROCKSDB_NAMESPACE::Slice slice = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->key();
-    jbyteArray jkey = env->NewByteArray(static_cast<jsize>(slice.size()));
-    if (jkey == nullptr) {
-        // exception thrown: OutOfMemoryError
-        return nullptr;
-    }
-    env->SetByteArrayRegion(
-            jkey, 0, static_cast<jsize>(slice.size()),
-            const_cast<jbyte*>(reinterpret_cast<const jbyte*>(slice.data())));
-    return jkey;
+    return copyToDirect(env, slice, jtarget, jtarget_off, jtarget_len);
 }
 
 
-jbyteArray Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getValue(JNIEnv *env,
-                                                                                               jobject obj,
-                                                                                               jlong native_handle) {
+jint Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileIterator_getValue(JNIEnv *env,
+                                                                             jobject obj,
+                                                                             jlong native_handle,
+                                                                             jobject jtarget,
+                                                                             jint jtarget_off, jint jtarget_len) {
     ROCKSDB_NAMESPACE::Slice slice = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->value();
-    jbyteArray jkey = env->NewByteArray(static_cast<jsize>(slice.size()));
-    if (jkey == nullptr) {
-        // exception thrown: OutOfMemoryError
-        return nullptr;
-    }
-    env->SetByteArrayRegion(
-            jkey, 0, static_cast<jsize>(slice.size()),
-            const_cast<jbyte*>(reinterpret_cast<const jbyte*>(slice.data())));
-    return jkey;
+    return copyToDirect(env, slice, jtarget, jtarget_off, jtarget_len);
 }
 
-jlong Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getSequenceNumber(JNIEnv *env,
-                                                                                                     jobject obj,
-                                                                                                     jlong native_handle) {
-    uint64_t sequence_number =
-            reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->sequenceNumber();
+jlong Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileIterator_getSequenceNumber(JNIEnv *env,
+                                                                                       jobject obj,
+                                                                                       jlong native_handle) {
+    uint64_t sequence_number = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->sequenceNumber();
     jlong result;
     std::memcpy(&result, &sequence_number, sizeof(jlong));
     return result;
 }
 
 
-jint Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_getType(JNIEnv *env,
-                                                                                          jobject obj,
-                                                                                          jlong native_handle) {
+jint Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileIterator_getType(JNIEnv *env,
+                                                                            jobject obj,
+                                                                            jlong native_handle) {
     uint32_t type = reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle)->type();
     return static_cast<jint>(type);
 }
 
 
-void Java_org_apache_hadoop_hdds_utils_db_managed_ManagedRawSSTFileIterator_closeInternal(JNIEnv *env,
-                                                                                                jobject obj,
-                                                                                                jlong native_handle) {
+void Java_org_apache_hadoop_hdds_utils_db_ManagedRawSSTFileIterator_closeInternal(JNIEnv *env,
+                                                                                  jobject obj,
+                                                                                  jlong native_handle) {
     delete reinterpret_cast<ROCKSDB_NAMESPACE::RawIterator*>(native_handle);
+}
+
+template <class T>
+static jint copyToDirect(JNIEnv* env, T& source, jobject jtarget,
+                         jint jtarget_off, jint jtarget_len) {
+  char* target = reinterpret_cast<char*>(env->GetDirectBufferAddress(jtarget));
+  if (target == nullptr || env->GetDirectBufferCapacity(jtarget) < (jtarget_off + jtarget_len)) {
+    jclass exClass = env->FindClass("java/lang/IllegalArgumentException");
+    if (exClass != nullptr) {
+        env->ThrowNew(exClass, "Invalid buffer address or capacity");
+    }
+    return -1;
+  }
+
+  target += jtarget_off;
+
+  const jint cvalue_len = static_cast<jint>(source.size());
+  const jint length = std::min(jtarget_len, cvalue_len);
+
+  memcpy(target, source.data(), length);
+
+  return cvalue_len;
 }

@@ -37,6 +37,7 @@ on:
         default: 'master'
         required: true
 run-name: Test Ozone ${{ inputs.ref }} with Ratis ${{ inputs.ratis-repo }} @ ${{ inputs.ratis-ref }}
+permissions: { }
 jobs:
   ratis:
     uses: ./.github/workflows/build-ratis.yml
@@ -47,7 +48,11 @@ jobs:
     needs:
       - ratis
     uses: ./.github/workflows/ci.yml
-    secrets: inherit
+    permissions:
+      contents: read
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+      SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
     with:
-      ratis_args: "-Dratis.version=${{ needs.ratis.outputs.ratis-version }} -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }} -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }} -Dnetty.version=${{ needs.ratis.outputs.netty-version }} -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
+      ratis_args: "-Dratis.version=${{ needs.ratis.outputs.ratis-version }} -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }} -Dratis-thirdparty.grpc.version=${{ needs.ratis.outputs.grpc-version }} -Dratis-thirdparty.netty.version=${{ needs.ratis.outputs.netty-version }} -Dratis-thirdparty.protobuf.version=${{ needs.ratis.outputs.protobuf-version }}"
       ref: ${{ github.event.inputs.ref }}

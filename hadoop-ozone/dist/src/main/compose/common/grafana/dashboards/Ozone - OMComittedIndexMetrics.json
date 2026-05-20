@@ -1,7 +1,6 @@
 {
   "__inputs": [
     {
-      "name": "DS_PROMETHEUS",
       "label": "prometheus",
       "description": "",
       "type": "datasource",
@@ -35,8 +34,7 @@
       {
         "builtIn": 1,
         "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
+          "type": "grafana"
         },
         "enable": true,
         "hide": true,
@@ -54,8 +52,7 @@
   "panels": [
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -133,8 +130,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "type": "prometheus"
           },
           "editorMode": "code",
           "exemplar": false,

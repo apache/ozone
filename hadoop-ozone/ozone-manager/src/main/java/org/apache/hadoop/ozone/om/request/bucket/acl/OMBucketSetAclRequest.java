@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -66,14 +66,14 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
   }
 
   public OMBucketSetAclRequest(OMRequest omRequest) {
-    super(omRequest, (acls, omBucketInfo) -> omBucketInfo.setAcls(acls));
+    super(omRequest, (acls, builder) -> builder.set(acls));
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();
     obj = OzoneObjInfo.fromProtobuf(setAclRequest.getObj());
     path = obj.getPath();
-    ozoneAcls = new ArrayList<>();
-    setAclRequest.getAclList().forEach(aclInfo ->
-        ozoneAcls.add(OzoneAcl.fromProtobuf(aclInfo)));
+    ozoneAcls = setAclRequest.getAclList().stream()
+        .map(OzoneAcl::fromProtobuf)
+        .collect(Collectors.toList());
   }
 
   @Override

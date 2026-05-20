@@ -20,14 +20,22 @@ package org.apache.hadoop.hdds.scm.safemode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -49,8 +57,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private static final Logger LOG =
       LoggerFactory.getLogger(HealthyPipelineSafeModeRule.class);
 
-  private static final String NAME = "HealthyPipelineSafeModeRule";
-
   private int healthyPipelineThresholdCount;
   private int currentHealthyPipelineCount = 0;
   private final double healthyPipelinesPercent;
@@ -59,13 +65,15 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final int minHealthyPipelines;
   private final SCMContext scmContext;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
+  private final NodeManager nodeManager;
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
-      ConfigurationSource configuration, SCMContext scmContext) {
-    super(manager, NAME, eventQueue);
+      ConfigurationSource configuration, SCMContext scmContext, NodeManager nodeManager) {
+    super(manager, eventQueue);
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
+    this.nodeManager = nodeManager;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
@@ -115,27 +123,78 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
       LOG.info("All SCM pipelines are closed due to ongoing upgrade " +
           "finalization. Bypassing healthy pipeline safemode rule.");
       return true;
-    } else {
-      return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
     }
+    if (!validateBasedOnReportProcessing()) {
+      return validateHealthyPipelineSafeModeRuleUsingPipelineManager();
+    }
+    return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
   }
 
   @Override
   protected synchronized void process(Pipeline pipeline) {
+    if (!validateBasedOnReportProcessing()) {
+      return;
+    }
+    Objects.requireNonNull(pipeline, "pipeline == null");
 
     // When SCM is in safe mode for long time, already registered
     // datanode can send pipeline report again, or SCMPipelineManager will
     // create new pipelines.
-    Preconditions.checkNotNull(pipeline);
-    if (pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-        ((RatisReplicationConfig) pipeline.getReplicationConfig())
-            .getReplicationFactor() == HddsProtos.ReplicationFactor.THREE &&
-        !processedPipelineIDs.contains(pipeline.getId())) {
-      getSafeModeMetrics().incCurrentHealthyPipelinesCount();
-      currentHealthyPipelineCount++;
-      processedPipelineIDs.add(pipeline.getId());
-      unProcessedPipelineSet.remove(pipeline.getId());
+
+    // Only handle RATIS + 3-replica pipelines.
+    if (pipeline.getType() != HddsProtos.ReplicationType.RATIS ||
+        ((RatisReplicationConfig) pipeline.getReplicationConfig()).getReplicationFactor() !=
+            HddsProtos.ReplicationFactor.THREE) {
+      Logger safeModeManagerLog = SCMSafeModeManager.getLogger();
+      if (safeModeManagerLog.isDebugEnabled()) {
+        safeModeManagerLog.debug("Skipping pipeline safemode report processing as Replication type isn't RATIS " +
+            "or replication factor isn't 3.");
+      }
+      return;
     }
+
+    // Skip already processed ones.
+    if (processedPipelineIDs.contains(pipeline.getId())) {
+      LOG.info("Skipping pipeline safemode report processing check as pipeline: {} is already recorded.",
+          pipeline.getId());
+      return;
+    }
+
+    List<DatanodeDetails> pipelineDns = pipeline.getNodes();
+    if (pipelineDns.size() != 3) {
+      LOG.warn("Only {} DNs reported this pipeline: {}, all 3 DNs should report the pipeline", pipelineDns.size(),
+          pipeline.getId());
+      return;
+    }
+
+    Map<DatanodeDetails, String> badDnsWithReasons = new LinkedHashMap<>();
+
+    for (DatanodeDetails dn : pipelineDns) {
+      try {
+        NodeStatus status = nodeManager.getNodeStatus(dn);
+        if (!status.equals(NodeStatus.inServiceHealthy())) {
+          String reason = String.format("Health: %s, Operational State: %s",
+              status.getHealth(), status.getOperationalState());
+          badDnsWithReasons.put(dn, reason);
+        }
+      } catch (NodeNotFoundException e) {
+        badDnsWithReasons.put(dn, "DN not registered with SCM");
+      }
+    }
+
+    if (!badDnsWithReasons.isEmpty()) {
+      String badDnSummary = badDnsWithReasons.entrySet().stream()
+          .map(entry -> String.format("DN %s: %s", entry.getKey().getID(), entry.getValue()))
+          .collect(Collectors.joining("; "));
+      LOG.warn("Below DNs reported by Pipeline: {} are either in bad health or un-registered with SCMs. Details: {}",
+          pipeline.getId(), badDnSummary);
+      return;
+    }
+
+    getSafeModeMetrics().incCurrentHealthyPipelinesCount();
+    currentHealthyPipelineCount++;
+    processedPipelineIDs.add(pipeline.getId());
+    unProcessedPipelineSet.remove(pipeline.getId());
 
     if (scmInSafeMode()) {
       SCMSafeModeManager.getLogger().info(
@@ -183,6 +242,61 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         healthyPipelineThresholdCount);
   }
 
+  private boolean validateHealthyPipelineSafeModeRuleUsingPipelineManager() {
+    // Query PipelineManager directly for healthy pipeline count
+    List<Pipeline> openPipelines = pipelineManager.getPipelines(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        Pipeline.PipelineState.OPEN);
+    
+    LOG.debug("Found {} open RATIS/THREE pipelines", openPipelines.size());
+
+    int pipelineCount = openPipelines.size();
+    healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
+        (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
+
+    currentHealthyPipelineCount = (int) openPipelines.stream()
+        .filter(this::isPipelineHealthy)
+        .count();
+
+    getSafeModeMetrics().setNumCurrentHealthyPipelines(currentHealthyPipelineCount);
+    boolean isValid = currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+    if (scmInSafeMode()) {
+      LOG.info("SCM in safe mode. Healthy pipelines: {}, threshold: {}, rule satisfied: {}",
+          currentHealthyPipelineCount, healthyPipelineThresholdCount, isValid);
+    } else {
+      LOG.debug("SCM not in safe mode. Healthy pipelines: {}, threshold: {}",
+          currentHealthyPipelineCount, healthyPipelineThresholdCount);
+    }
+    return isValid;
+  }
+
+  boolean isPipelineHealthy(Pipeline pipeline) {
+    // Verify pipeline has all 3 nodes
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    if (nodes.size() != 3) {
+      LOG.debug("Pipeline {} is not healthy: has {} nodes instead of 3",
+          pipeline.getId(), nodes.size());
+      return false;
+    }
+
+    // Verify all nodes are healthy
+    for (DatanodeDetails dn : nodes) {
+      try {
+        NodeStatus status = nodeManager.getNodeStatus(dn);
+        if (!status.equals(NodeStatus.inServiceHealthy())) {
+          LOG.debug("Pipeline {} is not healthy: DN {} has status - Health: {}, Operational State: {}",
+              pipeline.getId(), dn.getUuidString(), status.getHealth(), status.getOperationalState());
+          return false;
+        }
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Pipeline {} is not healthy: DN {} not found in node manager",
+            pipeline.getId(), dn.getUuidString());
+        return false;
+      }
+    }
+    return true;
+  }
+
   @Override
   protected synchronized void cleanup() {
     processedPipelineIDs.clear();
@@ -211,6 +325,24 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   private synchronized String updateStatusTextWithSamplePipelines(
       String status) {
+    if (validateBasedOnReportProcessing()) {
+      List<Pipeline> openPipelines = pipelineManager.getPipelines(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+          Pipeline.PipelineState.OPEN);
+
+      Set<PipelineID> unhealthyPipelines = openPipelines.stream()
+          .filter(p -> !isPipelineHealthy(p))
+          .map(Pipeline::getId)
+          .limit(SAMPLE_PIPELINE_DISPLAY_LIMIT)
+          .collect(Collectors.toSet());
+
+      if (!unhealthyPipelines.isEmpty()) {
+        String samplePipelineText =
+            "Sample pipelines not satisfying the criteria : " + unhealthyPipelines;
+        status = status.concat("\n").concat(samplePipelineText);
+      }
+      return status;
+    }
     Set<PipelineID> samplePipelines =
         unProcessedPipelineSet.stream().limit(SAMPLE_PIPELINE_DISPLAY_LIMIT)
             .collect(Collectors.toSet());

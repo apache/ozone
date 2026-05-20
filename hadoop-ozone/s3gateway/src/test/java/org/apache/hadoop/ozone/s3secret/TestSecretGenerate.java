@@ -79,7 +79,7 @@ class TestSecretGenerate {
     when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(context.getUriInfo()).thenReturn(uriInfo);
 
-    endpoint = new S3SecretManagementEndpoint();
+    endpoint = new S3SecretManagementEndpoint(conf);
     endpoint.setClient(client);
     endpoint.setContext(context);
   }

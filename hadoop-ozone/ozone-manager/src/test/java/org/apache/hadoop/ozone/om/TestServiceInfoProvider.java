@@ -92,7 +92,6 @@ public class TestServiceInfoProvider {
   public class TestSecureEnvironment {
 
     private CertificateClient certClient;
-    private X509Certificate cert1;
     private String pem1;
     private X509Certificate cert2;
     private String pem2;
@@ -102,7 +101,7 @@ public class TestServiceInfoProvider {
     public void setup() throws Exception {
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
       certClient = mock(CertificateClient.class);
-      cert1 = createSelfSignedCert(aKeyPair(conf), "1st", Duration.ofDays(1));
+      X509Certificate cert1 = createSelfSignedCert(aKeyPair(conf), "1st", Duration.ofDays(1));
       pem1 = getPEMEncodedString(cert1);
       cert2 = createSelfSignedCert(aKeyPair(conf), "2nd", Duration.ofDays(2));
       pem2 = getPEMEncodedString(cert2);

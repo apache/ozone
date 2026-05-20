@@ -17,20 +17,20 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An abstract {@link TableIterator} to iterate raw {@link Table.KeyValue}s.
+ * An abstract {@link Table.KeyValueIterator} to iterate raw {@link Table.KeyValue}s.
  *
  * @param <RAW> the raw type.
  */
 abstract class RDBStoreAbstractIterator<RAW>
-    implements TableIterator<RAW, Table.KeyValue<RAW, RAW>> {
+    implements Table.KeyValueIterator<RAW, RAW> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreAbstractIterator.class);
@@ -41,12 +41,23 @@ abstract class RDBStoreAbstractIterator<RAW>
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private final RAW prefix;
+  private final IteratorType type;
+  private final AtomicBoolean isIteratorClosed = new AtomicBoolean(false);
 
-  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table,
-      RAW prefix) {
+  /**
+   * Constructor for RDBStoreAbstractIterator.
+   * Callers must ensure that the iterator is always obtained using try-with-resources
+   * or always closed in a finally block to ensure accurate refcounting.
+   */
+  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
+    this.type = type;
+  }
+
+  IteratorType getType() {
+    return type;
   }
 
   /** @return the key for the current entry. */
@@ -59,7 +70,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   abstract void seek0(RAW key);
 
   /** Delete the given key. */
-  abstract void delete(RAW key) throws IOException;
+  abstract void delete(RAW key) throws RocksDatabaseException;
 
   /** Does the given key start with the prefix? */
   abstract boolean startsWithPrefix(RAW key);
@@ -84,6 +95,10 @@ abstract class RDBStoreAbstractIterator<RAW>
     }
   }
 
+  private boolean isDbClosed() {
+    return rocksDBTable != null && rocksDBTable.isClosed();
+  }
+
   private void setCurrentEntry() {
     if (rocksDBIterator.get().isValid()) {
       currentEntry = getKeyValue();
@@ -94,6 +109,9 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final boolean hasNext() {
+    if (isDbClosed()) {
+      return false;
+    }
     return rocksDBIterator.get().isValid() &&
         (prefix == null || startsWithPrefix(key()));
   }
@@ -136,7 +154,7 @@ abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public final void removeFromDB() throws IOException {
+  public final void removeFromDB() throws RocksDatabaseException, CodecException {
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
@@ -149,6 +167,8 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public void close() {
-    rocksDBIterator.close();
+    if (isIteratorClosed.compareAndSet(false, true)) {
+      rocksDBIterator.close();
+    }
   }
 }

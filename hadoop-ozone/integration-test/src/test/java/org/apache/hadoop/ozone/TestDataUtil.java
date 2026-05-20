@@ -33,12 +33,12 @@ import java.util.Map;
 import java.util.Scanner;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -66,13 +66,31 @@ public final class TestDataUtil {
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
-      String volumeName, String bucketName, BucketLayout bucketLayout)
+      String volumeName, String bucketName, BucketLayout bucketLayout) throws IOException {
+    BucketArgs omBucketArgs;
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    if (bucketLayout != null) {
+      builder.setBucketLayout(bucketLayout);
+    }
+    omBucketArgs = builder.build();
+
+    return createVolumeAndBucket(client, volumeName, bucketName,
+        omBucketArgs);
+  }
+
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
+      String volumeName, String bucketName, BucketLayout bucketLayout, DefaultReplicationConfig replicationConfig)
       throws IOException {
     BucketArgs omBucketArgs;
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setStorageType(StorageType.DISK);
     if (bucketLayout != null) {
       builder.setBucketLayout(bucketLayout);
+    }
+
+    if (replicationConfig != null) {
+      builder.setDefaultReplicationConfig(replicationConfig);
     }
     omBucketArgs = builder.build();
 
@@ -198,18 +216,26 @@ public final class TestDataUtil {
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
                                                   BucketLayout bucketLayout)
       throws IOException {
-    return createVolumeAndBucket(client, bucketLayout, false);
+    return createVolumeAndBucket(client, bucketLayout, null, false);
   }
 
-  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
-      BucketLayout bucketLayout, boolean createLinkedBucket) throws IOException {
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client, BucketLayout bucketLayout,
+                                                  DefaultReplicationConfig replicationConfig)
+      throws IOException {
+    return createVolumeAndBucket(client, bucketLayout, replicationConfig, false);
+  }
+
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client, BucketLayout bucketLayout,
+                                                  DefaultReplicationConfig replicationConfig,
+                                                  boolean createLinkedBucket)
+      throws IOException {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
         String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
         String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
         OzoneBucket ozoneBucket = createVolumeAndBucket(client, volumeName, bucketName,
-            bucketLayout);
+            bucketLayout, replicationConfig);
         if (createLinkedBucket) {
           String targetBucketName = ozoneBucket.getName() + RandomStringUtils.secure().nextNumeric(5);
           ozoneBucket = createLinkedBucket(client, volumeName, bucketName, targetBucketName);
@@ -247,7 +273,7 @@ public final class TestDataUtil {
   public static void cleanupDeletedTable(OzoneManager ozoneManager) throws IOException {
     Table<String, RepeatedOmKeyInfo> deletedTable = ozoneManager.getMetadataManager().getDeletedTable();
     List<String> nameList = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> keyIter = deletedTable.iterator()) {
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> keyIter = deletedTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         nameList.add(kv.getKey());
@@ -265,7 +291,7 @@ public final class TestDataUtil {
   public static void cleanupOpenKeyTable(OzoneManager ozoneManager, BucketLayout bucketLayout) throws IOException {
     Table<String, OmKeyInfo> openKeyTable = ozoneManager.getMetadataManager().getOpenKeyTable(bucketLayout);
     List<String> nameList = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = openKeyTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> keyIter = openKeyTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         nameList.add(kv.getKey());

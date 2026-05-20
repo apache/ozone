@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,16 +46,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.Archiver;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.ozone.test.SpyInputStream;
 import org.apache.ozone.test.SpyOutputStream;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -72,7 +74,7 @@ public class TestTarContainerPacker {
   private static final String TEST_CHUNK_FILE_CONTENT = "This is a chunk";
 
   private static final String TEST_DESCRIPTOR_FILE_CONTENT = "!<KeyValueContainerData>\n" +
-      "checksum: 2215d39f2ae1de89fec837d18dc6387d8cba22fb5943cf4616f80c4b34e2edfe\n" +
+      "checksum: 5e4bea7286f96d88a5b3a745011ff9e4281a5221bfe564413215cd85871dcfd8\n" +
       "chunksPath: target/test-dir/MiniOzoneClusterImpl-23c1bb30-d86a-4f79-88dc-574d8259a5b3/ozone-meta/datanode-4" +
         "/data-0/hdds/23c1bb30-d86a-4f79-88dc-574d8259a5b3/current/containerDir0/1/chunks\n" +
       "containerDBType: RocksDB\n" +
@@ -90,20 +92,21 @@ public class TestTarContainerPacker {
 
   private TarContainerPacker packer;
 
-  private static final Path SOURCE_CONTAINER_ROOT =
-      Paths.get("target/test/data/packer-source-dir");
+  @TempDir
+  private Path sourceContainerRoot;
 
-  private static final Path DEST_CONTAINER_ROOT =
-      Paths.get("target/test/data/packer-dest-dir");
+  @TempDir
+  private Path destContainerRoot;
 
-  private static final Path TEMP_DIR =
-      Paths.get("target/test/data/packer-tmp-dir");
+  @TempDir
+  private Path tempDir;
 
   private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
 
   private ContainerLayoutVersion layout;
   private String schemaVersion;
   private OzoneConfiguration conf;
+  private ContainerChecksumTreeManager checksumTreeManager;
 
   private void initTests(ContainerTestVersionInfo versionInfo,
       CopyContainerCompression compression) {
@@ -112,6 +115,7 @@ public class TestTarContainerPacker {
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     packer = new TarContainerPacker(compression);
+    checksumTreeManager = new ContainerChecksumTreeManager(conf);
   }
 
   public static List<Arguments> getLayoutAndCompression() {
@@ -126,34 +130,16 @@ public class TestTarContainerPacker {
     return parameterList;
   }
 
-  @BeforeAll
-  public static void init() throws IOException {
-    initDir(SOURCE_CONTAINER_ROOT);
-    initDir(DEST_CONTAINER_ROOT);
-    initDir(TEMP_DIR);
-  }
-
-  @AfterAll
-  public static void cleanup() throws IOException {
-    FileUtils.deleteDirectory(SOURCE_CONTAINER_ROOT.toFile());
-    FileUtils.deleteDirectory(DEST_CONTAINER_ROOT.toFile());
-    FileUtils.deleteDirectory(TEMP_DIR.toFile());
-  }
-
-  private static void initDir(Path path) throws IOException {
-    if (path.toFile().exists()) {
-      FileUtils.deleteDirectory(path.toFile());
-    }
-    Files.createDirectories(path);
-  }
-
   private KeyValueContainerData createContainer(Path dir) throws IOException {
-    return createContainer(dir, true);
+    return createContainer(dir, true, true);
   }
 
-  private KeyValueContainerData createContainer(Path dir, boolean createDir)
+  private KeyValueContainerData createContainer(Path dir, boolean createDir, boolean incrementId)
       throws IOException {
-    long id = CONTAINER_ID.getAndIncrement();
+    long id = CONTAINER_ID.get();
+    if (incrementId) {
+      id = CONTAINER_ID.getAndIncrement();
+    }
 
     Path containerDir = dir.resolve(String.valueOf(id));
     Path dataDir = containerDir.resolve("chunks");
@@ -167,7 +153,7 @@ public class TestTarContainerPacker {
 
     KeyValueContainerData containerData = new KeyValueContainerData(
         id, layout,
-        -1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
+        1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
     containerData.setSchemaVersion(schemaVersion);
     containerData.setChunksPath(dataDir.toString());
     containerData.setMetadataPath(metaDir.toString());
@@ -183,7 +169,7 @@ public class TestTarContainerPacker {
     initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
-        createContainer(SOURCE_CONTAINER_ROOT);
+        createContainer(sourceContainerRoot, true, false);
 
     KeyValueContainer sourceContainer =
         new KeyValueContainer(sourceContainerData, conf);
@@ -194,10 +180,15 @@ public class TestTarContainerPacker {
     //sample chunk file in the chunk directory
     writeChunkFile(sourceContainerData, TEST_CHUNK_FILE_NAME);
 
+    //write container checksum file in the metadata directory
+    ContainerMerkleTreeWriter treeWriter = buildTestTree(conf);
+    checksumTreeManager.updateTree(sourceContainerData, treeWriter);
+    assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(sourceContainerData).exists());
+
     //sample container descriptor file
     writeDescriptor(sourceContainer);
 
-    Path targetFile = TEMP_DIR.resolve("container.tar");
+    Path targetFile = tempDir.resolve("container.tar");
 
     //WHEN: pack it
     SpyOutputStream outputForPack =
@@ -239,7 +230,7 @@ public class TestTarContainerPacker {
     inputForUnpackDescriptor.assertClosedExactlyOnce();
 
     KeyValueContainerData destinationContainerData =
-        createContainer(DEST_CONTAINER_ROOT, false);
+        createContainer(destContainerRoot, false, false);
 
     KeyValueContainer destinationContainer =
         new KeyValueContainer(destinationContainerData, conf);
@@ -249,7 +240,7 @@ public class TestTarContainerPacker {
         new SpyInputStream(newInputStream(targetFile));
     String descriptor = new String(
         packer.unpackContainerData(destinationContainer, inputForUnpackData,
-            TEMP_DIR, DEST_CONTAINER_ROOT.resolve(String.valueOf(
+            tempDir, destContainerRoot.resolve(String.valueOf(
                 destinationContainer.getContainerData().getContainerID()))),
         UTF_8);
 
@@ -259,6 +250,11 @@ public class TestTarContainerPacker {
     assertExampleChunkFileIsGood(
         Paths.get(destinationContainerData.getChunksPath()),
         TEST_CHUNK_FILE_NAME);
+
+    assertEquals(sourceContainerData.getContainerID(), destinationContainerData.getContainerID());
+    assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(destinationContainerData).exists());
+    assertTreesSortedAndMatch(checksumTreeManager.read(sourceContainerData).getContainerMerkleTree(),
+        checksumTreeManager.read(destinationContainerData).getContainerMerkleTree());
 
     String containerFileData = new String(Files.readAllBytes(destinationContainer.getContainerFile().toPath()), UTF_8);
     assertTrue(containerFileData.contains("RECOVERING"),
@@ -276,7 +272,7 @@ public class TestTarContainerPacker {
     initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
-        createContainer(SOURCE_CONTAINER_ROOT);
+        createContainer(sourceContainerRoot);
 
     String fileName = "sub/dir/" + TEST_DB_FILE_NAME;
     File file = writeDbFile(sourceContainerData, fileName);
@@ -301,7 +297,7 @@ public class TestTarContainerPacker {
     initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
-        createContainer(SOURCE_CONTAINER_ROOT);
+        createContainer(sourceContainerRoot);
 
     String fileName = "sub/dir/" + TEST_CHUNK_FILE_NAME;
     File file = writeChunkFile(sourceContainerData, fileName);
@@ -325,7 +321,7 @@ public class TestTarContainerPacker {
     initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
-        createContainer(SOURCE_CONTAINER_ROOT);
+        createContainer(sourceContainerRoot);
 
     String fileName = "../db_file";
     File file = writeDbFile(sourceContainerData, fileName);
@@ -346,7 +342,7 @@ public class TestTarContainerPacker {
     initTests(versionInfo, compression);
     //GIVEN
     KeyValueContainerData sourceContainerData =
-        createContainer(SOURCE_CONTAINER_ROOT);
+        createContainer(sourceContainerRoot);
 
     String fileName = "../chunk_file";
     File file = writeChunkFile(sourceContainerData, fileName);
@@ -361,10 +357,10 @@ public class TestTarContainerPacker {
   private KeyValueContainerData unpackContainerData(File containerFile)
       throws IOException {
     try (InputStream input = newInputStream(containerFile.toPath())) {
-      KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT, false);
+      KeyValueContainerData data = createContainer(destContainerRoot, false, true);
       KeyValueContainer container = new KeyValueContainer(data, conf);
-      packer.unpackContainerData(container, input, TEMP_DIR,
-          DEST_CONTAINER_ROOT.resolve(String.valueOf(data.getContainerID())));
+      packer.unpackContainerData(container, input, tempDir,
+          destContainerRoot.resolve(String.valueOf(data.getContainerID())));
       return data;
     }
   }
@@ -406,7 +402,7 @@ public class TestTarContainerPacker {
 
   private File packContainerWithSingleFile(File file, String entryName)
       throws Exception {
-    File targetFile = TEMP_DIR.resolve("container.tar").toFile();
+    File targetFile = tempDir.resolve("container.tar").toFile();
     Path path = targetFile.toPath();
     try (TarArchiveOutputStream archive = new TarArchiveOutputStream(packer.compress(newOutputStream(path)))) {
       archive.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);

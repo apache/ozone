@@ -23,27 +23,12 @@ _upgrade_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # 0 if all passed, 1 if any failed.
 : "${RESULT:=0}"
 : "${OZONE_REPLICATION_FACTOR:=3}"
-: "${OZONE_VOLUME_OWNER:=}"
 : "${ALL_RESULT_DIR:="$_upgrade_dir"/result}"
 
 # export for docker-compose
 export OZONE_REPLICATION_FACTOR
 
 source "${_upgrade_dir}/../testlib.sh"
-
-## @description Create the directory tree required for persisting data between
-##   compose cluster restarts
-create_data_dirs() {
-  local dirs_to_create="$@"
-
-  if [[ -z "${OZONE_VOLUME}" ]]; then
-    return 1
-  fi
-
-  rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
-  mkdir -p $dirs_to_create
-  fix_data_dir_permissions
-}
 
 ## @description Prepares to run an image with `start_docker_env`.
 ## @param the version of Ozone to be run.

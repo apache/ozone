@@ -21,9 +21,7 @@ import java.util.Arrays;
 import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -45,9 +43,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
             S3SecretConfigKeys.class,
-            SCMHTTPServerConfig.class,
-            SCMHTTPServerConfig.ConfigStrings.class,
-            ScmConfig.ConfigStrings.class
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;
@@ -84,6 +79,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY,
+        OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY,
@@ -112,6 +108,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
         ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
+        ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         OMConfigKeys.OZONE_OM_HA_PREFIX,
         OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
@@ -123,6 +120,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
         OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION,
+        OMConfigKeys.OZONE_THREAD_NUMBER_KEY_DELETION,
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         ScmConfigKeys.OZONE_SCM_HA_PREFIX,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,

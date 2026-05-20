@@ -32,14 +32,13 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -73,7 +72,7 @@ public class TestSCMBlockDeletingService {
     nodeManager = mock(NodeManager.class);
     eventPublisher = mock(EventPublisher.class);
     conf = new OzoneConfiguration();
-    metrics = ScmBlockDeletingServiceMetrics.create();
+    metrics = ScmBlockDeletingServiceMetrics.create(mock(BlockManager.class));
     when(nodeManager.getTotalDatanodeCommandCount(any(),
         any())).thenReturn(0);
     SCMServiceManager scmServiceManager = mock(SCMServiceManager.class);
@@ -88,9 +87,9 @@ public class TestSCMBlockDeletingService {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy())).thenReturn(
         datanodeDetails);
     DeletedBlocksTransaction tx1 = createTestDeleteTxn(1, Arrays.asList(1L), 1);
-    ddbt.addTransactionToDN(datanode1.getUuid(), tx1);
-    ddbt.addTransactionToDN(datanode2.getUuid(), tx1);
-    ddbt.addTransactionToDN(datanode3.getUuid(), tx1);
+    ddbt.addTransactionToDN(datanode1.getID(), tx1);
+    ddbt.addTransactionToDN(datanode2.getID(), tx1);
+    ddbt.addTransactionToDN(datanode3.getID(), tx1);
     DeletedBlockLog mockDeletedBlockLog = mock(DeletedBlockLog.class);
     when(mockDeletedBlockLog.getTransactions(
         anyInt(), anySet())).thenReturn(ddbt);
@@ -120,18 +119,18 @@ public class TestSCMBlockDeletingService {
     verify(eventPublisher, times(3)).fireEvent(
         eq(SCMEvents.DATANODE_COMMAND), argumentCaptor.capture());
     List<CommandForDatanode> actualCommands = argumentCaptor.getAllValues();
-    List<UUID> actualDnIds = actualCommands.stream()
+    final Set<DatanodeID> actualDnIds = actualCommands.stream()
         .map(CommandForDatanode::getDatanodeId)
-        .collect(Collectors.toList());
-    Set<UUID> expectedDnIdsSet = datanodeDetails.stream()
-        .map(DatanodeDetails::getUuid).collect(Collectors.toSet());
+        .collect(Collectors.toSet());
+    final Set<DatanodeID> expectedDnIdsSet = datanodeDetails.stream()
+        .map(DatanodeDetails::getID).collect(Collectors.toSet());
 
-    assertEquals(expectedDnIdsSet, new HashSet<>(actualDnIds));
+    assertEquals(expectedDnIdsSet, actualDnIds);
     assertEquals(datanodeDetails.size(),
         metrics.getNumBlockDeletionCommandSent());
     // Echo Command has one Transaction
     assertEquals(datanodeDetails.size() * 1,
-        metrics.getNumBlockDeletionTransactionSent());
+        metrics.getNumBlockDeletionTransactionsOnDatanodes());
   }
 
   private void callDeletedBlockTransactionScanner() throws Exception {

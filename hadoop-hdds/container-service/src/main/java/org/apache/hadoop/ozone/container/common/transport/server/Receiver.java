@@ -22,10 +22,8 @@ import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_VERSION
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
 
-import com.google.common.base.Preconditions;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -38,6 +36,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.SocketTimeoutException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Objects;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -197,7 +196,7 @@ final class Receiver implements Runnable {
       }
       Span span = TracingUtil.importAndCreateSpan("Receiver." + type.name(),
           request.getTraceID());
-      try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+      try (Scope ignore = span.makeCurrent()) {
         ContainerCommandResponseProto responseProto;
         if (isSupportedCmdType(type)) {
           responseProto = dispatcher.dispatch(request, null);
@@ -210,7 +209,7 @@ final class Receiver implements Runnable {
           // get FileDescriptor
           Handler handler = dispatcher.getHandler(ContainerProtos.ContainerType.KeyValueContainer);
           RandomAccessFile file = handler.getBlockFile(request);
-          Preconditions.checkNotNull(file,
+          Objects.requireNonNull(file,
               "Failed to get block file for block " + request.getGetBlock().getBlockID());
           entry.setFile(file);
         }
@@ -219,7 +218,7 @@ final class Receiver implements Runnable {
       } catch (Throwable e) {
         LOG.error("Failed to processRequest {} {} {}", type, request.getClientId(), request.getCallId(), e);
       } finally {
-        span.finish();
+        span.end();
         counter.incrementAndGet();
       }
     }

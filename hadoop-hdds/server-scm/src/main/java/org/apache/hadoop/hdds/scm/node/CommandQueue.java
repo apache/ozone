@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
@@ -38,7 +38,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  * Note this class is not thread safe, and accesses must be protected by a lock.
  */
 public class CommandQueue {
-  private final Map<UUID, Commands> commandMap;
+  private final Map<DatanodeID, Commands> commandMap;
   private long commandsInQueue;
 
   /**
@@ -71,12 +71,11 @@ public class CommandQueue {
    * commands returns a empty list otherwise the current set of
    * commands are returned and command map set to empty list again.
    *
-   * @param datanodeUuid Datanode UUID
    * @return List of SCM Commands.
    */
   @SuppressWarnings("unchecked")
-  List<SCMCommand<?>> getCommand(final UUID datanodeUuid) {
-    Commands cmds = commandMap.remove(datanodeUuid);
+  List<SCMCommand<?>> getCommand(final DatanodeID datanodeID) {
+    Commands cmds = commandMap.remove(datanodeID);
     List<SCMCommand<?>> cmdList = null;
     if (cmds != null) {
       cmdList = cmds.getCommands();
@@ -93,13 +92,13 @@ public class CommandQueue {
    * Command.contributesToQueueSize() method will not be included in the count.
    * At the current time, only low priority ReplicateContainerCommands meet this
    * condition.
-   * @param datanodeUuid Datanode UUID.
+   * @param datanodeID Datanode ID.
    * @param commandType The type of command for which to get the count.
    * @return The currently queued command count, or zero if none are queued.
    */
   public int getDatanodeCommandCount(
-      final UUID datanodeUuid, SCMCommandProto.Type commandType) {
-    Commands commands = commandMap.get(datanodeUuid);
+      final DatanodeID datanodeID, SCMCommandProto.Type commandType) {
+    Commands commands = commandMap.get(datanodeID);
     if (commands == null) {
       return 0;
     }
@@ -112,27 +111,21 @@ public class CommandQueue {
    * Command.contributesToQueueSize() method will not be included in the count.
    * At the current time, only low priority ReplicateContainerCommands meet this
    * condition.
-   * @param datanodeUuid Datanode UUID
    * @return A map containing the command summary. Note the returned map is a
    *         copy of the internal map and can be modified safely by the caller.
    */
   public Map<SCMCommandProto.Type, Integer> getDatanodeCommandSummary(
-      final UUID datanodeUuid) {
-    Commands commands = commandMap.get(datanodeUuid);
+      final DatanodeID datanodeID) {
+    Commands commands = commandMap.get(datanodeID);
     if (commands == null) {
       return Collections.emptyMap();
     }
     return commands.getAllCommandsSummary();
   }
 
-  /**
-   * Adds a Command to the SCM Queue to send the command to container.
-   *
-   * @param datanodeUuid DatanodeDetails.Uuid
-   * @param command    - Command
-   */
-  public void addCommand(final UUID datanodeUuid, final SCMCommand<?> command) {
-    commandMap.computeIfAbsent(datanodeUuid, s -> new Commands()).add(command);
+  /** Adds a Command to the SCM Queue to send the command to container. */
+  public void addCommand(final DatanodeID datanodeID, final SCMCommand<?> command) {
+    commandMap.computeIfAbsent(datanodeID, s -> new Commands()).add(command);
     commandsInQueue++;
   }
 

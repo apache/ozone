@@ -20,9 +20,7 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -36,6 +34,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,15 +128,10 @@ public final class RegisterEndpointTask implements
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
             .register(datanodeDetails.getExtendedProtoBufMessage(),
             nodeReport, containerReport, pipelineReportsProto, layoutInfo);
-        Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
-                .equals(datanodeDetails.getUuid()),
-            "Unexpected datanode ID in the response.");
-        Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
+        Preconditions.assertEquals(datanodeDetails.getUuidString(), response.getDatanodeUUID(), "datanodeID");
+        Preconditions.assertTrue(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");
-        Preconditions.checkState(response.getErrorCode() == success,
-            "DataNode has different Software Layout Version" +
-                " than SCM or RECON. EndPoint address is: " +
-                rpcEndPoint.getAddressString());
+        Preconditions.assertSame(success, response.getErrorCode(), "ErrorCode");
         if (response.hasHostname() && response.hasIpAddress()) {
           datanodeDetails.setHostName(response.getHostname());
           datanodeDetails.setIpAddress(response.getIpAddress());

@@ -39,8 +39,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestPipelineChoosePolicyFactory {
 
-  private OzoneConfiguration conf;
-
   private ScmConfig scmConfig;
 
   private NodeManager nodeManager;
@@ -48,7 +46,7 @@ public class TestPipelineChoosePolicyFactory {
   @BeforeEach
   public void setup() {
     //initialize network topology instance
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     scmConfig = conf.getObject(ScmConfig.class);
     nodeManager = new MockNodeManager(true, 5);
   }

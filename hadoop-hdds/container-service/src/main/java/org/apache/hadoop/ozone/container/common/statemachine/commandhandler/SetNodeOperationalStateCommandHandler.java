@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -50,6 +50,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(SetNodeOperationalStateCommandHandler.class);
   private final ConfigurationSource conf;
   private final Consumer<HddsProtos.NodeOperationalState> replicationSupervisor;
+  private final Consumer<HddsProtos.NodeOperationalState> diskBalancerService;
   private final AtomicInteger invocationCount = new AtomicInteger(0);
   private final MutableRate opsLatencyMs;
 
@@ -59,9 +60,11 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    * @param conf - Configuration for the datanode.
    */
   public SetNodeOperationalStateCommandHandler(ConfigurationSource conf,
-      Consumer<HddsProtos.NodeOperationalState> replicationSupervisor) {
+      Consumer<HddsProtos.NodeOperationalState> replicationSupervisor,
+      Consumer<HddsProtos.NodeOperationalState> diskBalancerService) {
     this.conf = conf;
     this.replicationSupervisor = replicationSupervisor;
+    this.diskBalancerService = diskBalancerService;
     MetricsRegistry registry = new MetricsRegistry(
         SetNodeOperationalStateCommandHandler.class.getSimpleName());
     this.opsLatencyMs = registry.newRate(Type.setNodeOperationalStateCommand + "Ms");
@@ -92,18 +95,32 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
     DatanodeDetails dni = context.getParent().getDatanodeDetails();
     HddsProtos.NodeOperationalState state =
         setNodeCmdProto.getNodeOperationalState();
-    dni.setPersistedOpState(state);
-    dni.setPersistedOpStateExpiryEpochSec(
-        setNodeCmd.getStateExpiryEpochSeconds());
     try {
-      persistDatanodeDetails(dni);
+      persistUpdatedDatanodeDetails(dni, state, setNodeCmd.getStateExpiryEpochSeconds());
     } catch (IOException ioe) {
       LOG.error("Failed to persist the datanode state", ioe);
       // TODO - this should probably be raised, but it will break the command
       //      handler interface.
     }
+
+    // Handle DiskBalancerService state changes
+    if (diskBalancerService != null) {
+      diskBalancerService.accept(state);
+    }
+
     replicationSupervisor.accept(state);
     this.opsLatencyMs.add(Time.monotonicNow() - startTime);
+  }
+
+  private void persistUpdatedDatanodeDetails(
+      DatanodeDetails dnDetails, HddsProtos.NodeOperationalState state, long stateExpiryEpochSeconds)
+      throws IOException {
+    DatanodeDetails persistedDni = new DatanodeDetails(dnDetails);
+    persistedDni.setPersistedOpState(state);
+    persistedDni.setPersistedOpStateExpiryEpochSec(stateExpiryEpochSeconds);
+    persistDatanodeDetails(persistedDni);
+    dnDetails.setPersistedOpState(state);
+    dnDetails.setPersistedOpStateExpiryEpochSec(stateExpiryEpochSeconds);
   }
 
   // TODO - this duplicates code in HddsDatanodeService and InitDatanodeState
@@ -111,7 +128,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath, "idFilePath == null");
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }

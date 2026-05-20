@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -90,32 +89,12 @@ public class TestOmBucketInfo {
         "Expected " + omBucketInfo + " and " + cloneBucketInfo
             + " to be equal");
 
-    /* Reset acl & check not equal. */
-    omBucketInfo.setAcls(Collections.singletonList(OzoneAcl.of(
-        IAccessAuthorizer.ACLIdentityType.USER,
-        "newUser",
-        OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
-    )));
-    assertNotEquals(
-        omBucketInfo.getAcls().get(0),
-        cloneBucketInfo.getAcls().get(0));
-
     /* Clone acl & check equal. */
     cloneBucketInfo = omBucketInfo.copyObject();
     assertEquals(omBucketInfo, cloneBucketInfo);
     assertEquals(
         omBucketInfo.getAcls().get(0),
         cloneBucketInfo.getAcls().get(0));
-
-    /* Remove acl & check. */
-    omBucketInfo.removeAcl(OzoneAcl.of(
-        IAccessAuthorizer.ACLIdentityType.USER,
-        "newUser",
-        OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
-    ));
-    assertEquals(0, omBucketInfo.getAcls().size());
-    assertEquals(1, cloneBucketInfo.getAcls().size());
-
   }
 
   @Test

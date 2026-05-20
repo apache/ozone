@@ -466,7 +466,7 @@ public class TestPipelineStateManagerImpl {
 
     Pipeline pipeline2 = createDummyPipeline(HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE, 3);
-    pipeline2 = Pipeline.newBuilder(pipeline2)
+    pipeline2 = pipeline2.toBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .build();
     HddsProtos.Pipeline pipelineProto2 = pipeline2

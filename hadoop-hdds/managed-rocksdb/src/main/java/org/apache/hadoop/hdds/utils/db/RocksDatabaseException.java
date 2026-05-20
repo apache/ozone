@@ -28,9 +28,13 @@ public class RocksDatabaseException extends IOException {
     return e.getStatus() == null ? "NULL_STATUS" : e.getStatus().getCodeString();
   }
 
-  /** Construct from the given {@link RocksDBException} cause. */
-  public RocksDatabaseException(String message, RocksDBException cause) {
-    super(getStatus(cause) + ": " + message, cause);
+  private static String getMessage(String message, Exception cause) {
+    return cause instanceof RocksDBException ? getStatus((RocksDBException) cause) + ": " + message : message;
+  }
+
+  /** Construct from the given cause. */
+  public RocksDatabaseException(String message, Exception cause) {
+    super(getMessage(message, cause), cause);
   }
 
   public RocksDatabaseException(String message) {

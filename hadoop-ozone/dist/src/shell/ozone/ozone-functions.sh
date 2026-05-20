@@ -1520,17 +1520,15 @@ function ozone_translate_cygwin_path
 ## @replaceable  yes
 function ozone_add_default_gc_opts
 {
-  java_major_version=$(ozone_get_java_major_version)
   if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
-    if [[ ! "$OZONE_OPTS" =~ "-XX" ]] ; then
-      OZONE_OPTS="${OZONE_OPTS} -XX:ParallelGCThreads=8"
-      if [[ "$java_major_version" -lt 15 ]]; then
-        OZONE_OPTS="${OZONE_OPTS} -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the OZONE_OPTS"
-      else
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8' to the OZONE_OPTS"
-      fi
+    local gc_opts
+    local java_major_version
+    java_major_version=$(ozone_get_java_major_version)
+    gc_opts="-XX:ParallelGCThreads=8"
+    if [[ "$java_major_version" -lt 15 ]]; then
+      gc_opts="${gc_opts} -XX:+UseConcMarkSweepGC -XX:NewRatio=3 -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
     fi
+    ozone_add_param OZONE_OPTS XX "${gc_opts}"
   fi
 }
 
@@ -1560,6 +1558,18 @@ function ozone_add_client_opts
      || -z "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" ]]; then
     ozone_debug "Appending OZONE_CLIENT_OPTS onto OZONE_OPTS"
     OZONE_OPTS="${OZONE_OPTS} ${OZONE_CLIENT_OPTS}"
+  fi
+}
+
+## @description  Adds the OZONE_SERVER_OPTS variable to OZONE_OPTS if OZONE_SUBCMD_SUPPORTDAEMONIZATION is true
+## @audience     public
+## @stability    stable
+## @replaceable  yes
+function ozone_add_server_opts
+{
+  if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == "true" ]] && [[ -n "${OZONE_SERVER_OPTS:-}" ]]; then
+    ozone_debug "Appending OZONE_SERVER_OPTS onto OZONE_OPTS"
+    OZONE_OPTS="${OZONE_OPTS} ${OZONE_SERVER_OPTS}"
   fi
 }
 
@@ -2787,6 +2797,33 @@ function ozone_validate_classpath_util
   fi
 }
 
+## @description Add items from .classpath file to the classpath
+## @audience private
+## @stability evolving
+## @replaceable no
+function ozone_add_classpath_from_file() {
+  local classpath_file="$1"
+
+  if [[ ! -e "$classpath_file" ]]; then
+    echo "Skip non-existent classpath file: $classpath_file" >&2
+    return
+  fi
+
+  local classpath
+  # shellcheck disable=SC1090,SC2086
+  source "$classpath_file"
+  local original_ifs=$IFS
+  IFS=':'
+
+  local jar
+  # shellcheck disable=SC2154
+  for jar in $classpath; do
+    ozone_add_classpath "$jar"
+  done
+
+  IFS=$original_ifs
+}
+
 ## @description Add all the required jar files to the classpath
 ## @audience private
 ## @stability evolving
@@ -2806,15 +2843,7 @@ function ozone_assemble_classpath() {
     echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
     exit 255
   fi
-  # shellcheck disable=SC1090,SC2086
-  source "$CLASSPATH_FILE"
-  OIFS=$IFS
-  IFS=':'
-
-  # shellcheck disable=SC2154
-  for jar in $classpath; do
-    ozone_add_classpath "$jar"
-  done
+  ozone_add_classpath_from_file "$CLASSPATH_FILE"
   ozone_add_classpath "${OZONE_HOME}/share/ozone/web"
 
   #Add optional jars to the classpath
@@ -2823,9 +2852,6 @@ function ozone_assemble_classpath() {
   if [[ -d "$OPTIONAL_CLASSPATH_DIR" ]]; then
     ozone_add_classpath "$OPTIONAL_CLASSPATH_DIR/*"
   fi
-
-  # TODO can be moved earlier? (after 'for jar in $classpath' loop)
-  IFS=$OIFS
 }
 
 ## @description  Fallback to value of `oldvar` if `newvar` is undefined
@@ -2911,4 +2937,33 @@ function ozone_set_deprecated_hadoop_vars
   for suffix in "$@"; do
     ozone_set_deprecated_var "HADOOP_${suffix}" "OZONE_${suffix}"
   done
+}
+
+## @description  Check if command is one that was moved from freon to vapor
+function ozone_is_freon_command_moved_to_vapor
+{
+  local opt subcommand
+
+  for opt in "${OZONE_SUBCMD_ARGS[@]}"; do
+    for subcommand in \
+        cgdn \
+        cgom \
+        cgscm \
+        cmdw chunk-manager-disk-write \
+        cr container-replicator \
+        falg follower-append-log-generator \
+        lalg leader-append-log-generator \
+        simulate-datanode \
+        stb scm-throughput-benchmark \
+        strmg streaming-generator
+    do
+      if [[ "$opt" == "$subcommand" ]]; then
+        echo "WARN: 'ozone freon $subcommand' is changed to 'ozone vapor $subcommand'." >&2
+        echo "      Please update your scripts since 'ozone freon $subcommand' may no longer" >&2
+        echo "      work in future releases." >&2
+        return 0
+      fi
+    done
+  done
+  return 1
 }

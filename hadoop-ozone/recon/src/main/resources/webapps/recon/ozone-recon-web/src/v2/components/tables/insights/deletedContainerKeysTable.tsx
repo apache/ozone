@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
-import { AxiosError } from 'axios';
+import React, { useState, useEffect } from 'react';
 import Table, {
   ColumnsType,
   TablePaginationConfig
@@ -26,9 +25,9 @@ import { ValueType } from 'react-select';
 
 import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { showDataFetchError } from '@/utils/common';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import {
@@ -45,6 +44,10 @@ type DeletedContainerKeysTableProps = {
   onRowExpand: (arg0: boolean, arg1: any) => void;
   expandedRowRender: (arg0: any) => JSX.Element;
 }
+
+const DEFAULT_DELETED_CONTAINER_KEYS_RESPONSE: DeletedContainerKeysResponse = {
+  containers: []
+};
 
 //------Constants------
 const COLUMNS: ColumnsType<Container> = [
@@ -84,46 +87,39 @@ const DeletedContainerKeysTable: React.FC<DeletedContainerKeysTableProps> = ({
   onRowExpand,
   expandedRowRender
 }) => {
+  const [data, setData] = useState<Container[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const [loading, setLoading] = React.useState<boolean>(false);
-  const [data, setData] = React.useState<Container[]>();
-  const [searchTerm, setSearchTerm] = React.useState<string>('');
-
-  const cancelSignal = React.useRef<AbortController>();
   const debouncedSearch = useDebounce(searchTerm, 300);
+
+  // Use the modern hooks pattern
+  const deletedContainerKeysData = useApiData<DeletedContainerKeysResponse>(
+    `/api/v1/containers/mismatch/deleted?limit=${limit.value}`,
+    DEFAULT_DELETED_CONTAINER_KEYS_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
+  // Process data when it changes
+  useEffect(() => {
+    if (deletedContainerKeysData.data && deletedContainerKeysData.data.containers) {
+      setData(deletedContainerKeysData.data.containers);
+    }
+  }, [deletedContainerKeysData.data]);
+
+  // Refetch when limit changes
+  useEffect(() => {
+    deletedContainerKeysData.refetch();
+  }, [limit.value]);
 
   function filterData(data: Container[] | undefined) {
     return data?.filter(
       (data: Container) => data.containerId.toString().includes(debouncedSearch)
     );
   }
-
-  function fetchDeletedKeys() {
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/containers/mismatch/deleted?limit=${limit.value}`,
-      cancelSignal.current
-    )
-    cancelSignal.current = controller;
-
-    request.then(response => {
-      setLoading(true);
-      const deletedContainerKeys: DeletedContainerKeysResponse = response?.data;
-      setData(deletedContainerKeys?.containers ?? []);
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    });
-  }
-
-  React.useEffect(() => {
-    fetchDeletedKeys();
-
-    return (() => {
-      cancelSignal.current && cancelSignal.current.abort();
-    })
-  }, [limit.value]);
-
 
   return (
     <>
@@ -151,7 +147,7 @@ const DeletedContainerKeysTable: React.FC<DeletedContainerKeysTableProps> = ({
         }}
         dataSource={filterData(data)}
         columns={COLUMNS}
-        loading={loading}
+        loading={deletedContainerKeysData.loading}
         pagination={paginationConfig}
         rowKey='containerId'
         locale={{ filterTitle: '' }}

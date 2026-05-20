@@ -27,12 +27,6 @@ import org.junit.jupiter.api.BeforeAll;
  */
 public class TestDataValidateWithUnsafeByteOperations extends TestDataValidate {
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -41,9 +35,6 @@ public class TestDataValidateWithUnsafeByteOperations extends TestDataValidate {
     startCluster(conf);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     shutdownCluster();

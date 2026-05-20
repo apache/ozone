@@ -21,17 +21,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.hadoop.fs.StorageType;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
@@ -56,7 +56,7 @@ public class MutableVolumeSet implements VolumeSet {
    * Maintains a map of all active volumes in the DataNode.
    * Each volume has one-to-one mapping with a volumeInfo object.
    */
-  private Map<String, StorageVolume> volumeMap;
+  private final Map<String, StorageVolume> volumeMap = new ConcurrentHashMap<>();
   /**
    * Maintains a map of volumes which have failed. The keys in this map and
    * {@link #volumeMap} are mutually exclusive.
@@ -64,14 +64,8 @@ public class MutableVolumeSet implements VolumeSet {
   private Map<String, StorageVolume> failedVolumeMap;
 
   /**
-   * Maintains a list of active volumes per StorageType.
-   */
-  private EnumMap<StorageType, List<StorageVolume>> volumeStateMap;
-
-  /**
    * A Reentrant Read Write Lock to synchronize volume operations in VolumeSet.
-   * Any update to {@link #volumeMap}, {@link #failedVolumeMap}, or
-   * {@link #volumeStateMap} should be done after acquiring the write lock.
+   * Any update to {@link #volumeMap} or {@link #failedVolumeMap} should be done after acquiring the write lock.
    */
   private final ReentrantReadWriteLock volumeSetRWLock;
 
@@ -83,6 +77,7 @@ public class MutableVolumeSet implements VolumeSet {
   private final StorageVolumeFactory volumeFactory;
   private final StorageVolume.VolumeType volumeType;
   private int maxVolumeFailuresTolerated;
+  private final VolumeHealthMetrics volumeHealthMetrics;
 
   public MutableVolumeSet(String dnUuid, ConfigurationSource conf,
       StateContext context, StorageVolume.VolumeType volumeType,
@@ -122,7 +117,14 @@ public class MutableVolumeSet implements VolumeSet {
       maxVolumeFailuresTolerated = dnConf.getFailedDataVolumesTolerated();
     }
 
-    initializeVolumeSet();
+    // Ensure metrics are unregistered if the volume set initialization fails.
+    this.volumeHealthMetrics = VolumeHealthMetrics.create(volumeType);
+    try {
+      initializeVolumeSet();
+    } catch (Exception e) {
+      volumeHealthMetrics.unregister();
+      throw e;
+    }
   }
 
   public void setFailedVolumeListener(CheckedRunnable<IOException> runnable) {
@@ -138,9 +140,7 @@ public class MutableVolumeSet implements VolumeSet {
    * Add DN volumes configured through ConfigKeys to volumeMap.
    */
   private void initializeVolumeSet() throws IOException {
-    volumeMap = new ConcurrentHashMap<>();
     failedVolumeMap = new ConcurrentHashMap<>();
-    volumeStateMap = new EnumMap<>(StorageType.class);
 
     Collection<String> rawLocations;
     if (volumeType == StorageVolume.VolumeType.META_VOLUME) {
@@ -149,10 +149,6 @@ public class MutableVolumeSet implements VolumeSet {
       rawLocations = HddsServerUtil.getDatanodeDbDirs(conf);
     } else {
       rawLocations = HddsServerUtil.getDatanodeStorageDirs(conf);
-    }
-
-    for (StorageType storageType : StorageType.values()) {
-      volumeStateMap.put(storageType, new ArrayList<>());
     }
 
     for (String locationString : rawLocations) {
@@ -171,9 +167,19 @@ public class MutableVolumeSet implements VolumeSet {
           throw new IOException("Failed to create storage dir " +
               volume.getStorageDir());
         }
+
+        // Ensure permissions are set on the storage directory
+        // (permissions are also set in StorageVolume.initializeImpl(),
+        // but this ensures they're set even if directory already existed
+        // from a previous run with incorrect permissions)
+        if (volumeType == StorageVolume.VolumeType.DATA_VOLUME) {
+          ServerUtils.setDataDirectoryPermissions(volume.getStorageDir(), conf,
+              ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+        }
         volumeMap.put(volume.getStorageDir().getPath(), volume);
-        volumeStateMap.get(volume.getStorageType()).add(volume);
+        volumeHealthMetrics.incrementHealthyVolumes();
       } catch (IOException e) {
+        volumeHealthMetrics.incrementFailedVolumes();
         if (volume != null) {
           volume.shutdown();
         }
@@ -217,8 +223,7 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     if (!failedVolumes.isEmpty()) {
-      LOG.warn("checkAllVolumes got {} failed volumes - {}",
-          failedVolumes.size(), failedVolumes);
+      LOG.error("checkAllVolumes got {} failed volumes - {}", failedVolumes.size(), failedVolumes);
       handleVolumeFailures(failedVolumes);
     } else {
       LOG.debug("checkAllVolumes encountered no failures");
@@ -236,6 +241,7 @@ public class MutableVolumeSet implements VolumeSet {
       for (StorageVolume v : failedVolumes) {
         // Immediately mark the volume as failed so it is unavailable
         // for new containers.
+        LOG.error("Marking volume {} as failed", v.getStorageDir().getPath());
         failVolume(v.getStorageDir().getPath());
       }
 
@@ -273,8 +279,18 @@ public class MutableVolumeSet implements VolumeSet {
         });
   }
 
+  public void startAllVolume() throws IOException {
+    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
+      entry.getValue().start();
+    }
+  }
+
   public void refreshAllVolumeUsage() {
     volumeMap.forEach((k, v) -> v.refreshVolumeUsage());
+  }
+
+  public void setGatherContainerUsages(Function<HddsVolume, Long> gatherContainerUsages) {
+    volumeMap.forEach((k, v) -> v.setGatherContainerUsages(gatherContainerUsages));
   }
 
   /**
@@ -309,43 +325,6 @@ public class MutableVolumeSet implements VolumeSet {
     volumeSetRWLock.writeLock().unlock();
   }
 
-  // Add a volume to VolumeSet
-  boolean addVolume(String dataDir) {
-    return addVolume(dataDir, StorageType.DEFAULT);
-  }
-
-  // Add a volume to VolumeSet
-  private boolean addVolume(String volumeRoot, StorageType storageType) {
-    boolean success;
-
-    this.writeLock();
-    try {
-      if (volumeMap.containsKey(volumeRoot)) {
-        LOG.warn("Volume : {} already exists in VolumeMap", volumeRoot);
-        success = false;
-      } else {
-        if (failedVolumeMap.containsKey(volumeRoot)) {
-          failedVolumeMap.remove(volumeRoot);
-        }
-
-        StorageVolume volume =
-            volumeFactory.createVolume(volumeRoot, storageType);
-        volumeMap.put(volume.getStorageDir().getPath(), volume);
-        volumeStateMap.get(volume.getStorageType()).add(volume);
-
-        LOG.info("Added Volume : {} to VolumeSet",
-            volume.getStorageDir().getPath());
-        success = true;
-      }
-    } catch (IOException ex) {
-      LOG.error("Failed to add volume " + volumeRoot + " to VolumeSet", ex);
-      success = false;
-    } finally {
-      this.writeUnlock();
-    }
-    return success;
-  }
-
   // Mark a volume as failed
   public void failVolume(String volumeRoot) {
     this.writeLock();
@@ -355,37 +334,13 @@ public class MutableVolumeSet implements VolumeSet {
         volume.failVolume();
 
         volumeMap.remove(volumeRoot);
-        volumeStateMap.get(volume.getStorageType()).remove(volume);
         failedVolumeMap.put(volumeRoot, volume);
-
-        LOG.info("Moving Volume : {} to failed Volumes", volumeRoot);
+        volumeHealthMetrics.decrementHealthyVolumes();
+        volumeHealthMetrics.incrementFailedVolumes();
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
-        LOG.info("Volume : {} is not active", volumeRoot);
+        LOG.warn("Unable to fail the volume: {} as it is inactive", volumeRoot);
       } else {
-        LOG.warn("Volume : {} does not exist in VolumeSet", volumeRoot);
-      }
-    } finally {
-      this.writeUnlock();
-    }
-  }
-
-  // Remove a volume from the VolumeSet completely.
-  public void removeVolume(String volumeRoot) throws IOException {
-    this.writeLock();
-    try {
-      if (volumeMap.containsKey(volumeRoot)) {
-        StorageVolume volume = volumeMap.get(volumeRoot);
-        volume.shutdown();
-
-        volumeMap.remove(volumeRoot);
-        volumeStateMap.get(volume.getStorageType()).remove(volume);
-
-        LOG.info("Removed Volume : {} from VolumeSet", volumeRoot);
-      } else if (failedVolumeMap.containsKey(volumeRoot)) {
-        failedVolumeMap.remove(volumeRoot);
-        LOG.info("Removed Volume : {} from failed VolumeSet", volumeRoot);
-      } else {
-        LOG.warn("Volume : {} does not exist in VolumeSet", volumeRoot);
+        LOG.warn("Unable to fail the volume: {} as it does not exist in the VolumeSet", volumeRoot);
       }
     } finally {
       this.writeUnlock();
@@ -404,10 +359,13 @@ public class MutableVolumeSet implements VolumeSet {
       }
     }
     volumeMap.clear();
+
+    if (volumeHealthMetrics != null) {
+      volumeHealthMetrics.unregister();
+    }
   }
 
   @Override
-  @VisibleForTesting
   public List<StorageVolume> getVolumesList() {
     return ImmutableList.copyOf(volumeMap.values());
   }
@@ -423,30 +381,25 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   @VisibleForTesting
-  public void setVolumeMap(Map<String, StorageVolume> map) {
-    this.volumeMap = map;
-  }
-
-  @VisibleForTesting
-  public Map<StorageType, List<StorageVolume>> getVolumeStateMap() {
-    return ImmutableMap.copyOf(volumeStateMap);
+  public void setVolumeMapForTesting(Map<String, StorageVolume> map) {
+    volumeMap.clear();
+    volumeMap.putAll(map);
   }
 
   public boolean hasEnoughVolumes() {
     // Max number of bad volumes allowed, should have at least
     // 1 good volume
     boolean hasEnoughVolumes;
-    if (maxVolumeFailuresTolerated ==
-        StorageVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
-      hasEnoughVolumes = !getVolumesList().isEmpty();
+    if (maxVolumeFailuresTolerated == StorageVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
+      hasEnoughVolumes = !volumeMap.isEmpty();
     } else {
-      hasEnoughVolumes = getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
+      hasEnoughVolumes = failedVolumeMap.size() <= maxVolumeFailuresTolerated;
     }
     if (!hasEnoughVolumes) {
       LOG.error("Not enough volumes in MutableVolumeSet. DatanodeUUID: {}, VolumeType: {}, " +
               "MaxVolumeFailuresTolerated: {}, ActiveVolumes: {}, FailedVolumes: {}",
           datanodeUuid, volumeType, maxVolumeFailuresTolerated,
-          getVolumesList().size(), getFailedVolumesList().size());
+          volumeMap.size(), failedVolumeMap.size());
     }
     return hasEnoughVolumes;
   }
@@ -466,5 +419,14 @@ public class MutableVolumeSet implements VolumeSet {
     } finally {
       this.readUnlock();
     }
+  }
+
+  public StorageVolume.VolumeType getVolumeType() {
+    return volumeType;
+  }
+
+  @VisibleForTesting
+  public VolumeHealthMetrics getVolumeHealthMetrics() {
+    return volumeHealthMetrics;
   }
 }

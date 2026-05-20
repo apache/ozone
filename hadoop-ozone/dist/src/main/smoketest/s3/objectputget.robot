@@ -303,3 +303,39 @@ Create&Download big file by multipart upload and get file not existed part numbe
                                 Execute AWSS3Cli           rm s3://${BUCKET}/big_file
                                 Execute                    rm -rf /tmp/big_file
                                 Execute                    rm -rf /tmp/big_file_1
+
+Check Bucket Ownership Verification
+    Execute             echo "Randomtext" > /tmp/testfile
+    ${correct_owner} =    Get bucket owner    ${BUCKET}
+    # test put
+    Execute AWSS3APICli with bucket owner check         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile  ${correct_owner}
+
+    # test get
+    Execute AWSS3APICli with bucket owner check         get-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 /tmp/testfile  ${correct_owner}
+
+    # create directory
+    Execute                                             touch /tmp/emptyfile
+    Execute AWSS3APICli with bucket owner check         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/dir/ --body /tmp/emptyfile  ${correct_owner}
+
+Put object with Content-MD5 header
+                                Execute                    echo "bar" > /tmp/md5testfile
+    ${md5_hash} =               Execute                    md5sum /tmp/md5testfile | awk '{print $1}'
+    ${md5_base64} =             Execute                    openssl dgst -md5 -binary /tmp/md5testfile | base64
+    ${result} =                 Execute AWSS3APICli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/md5test/key1 --body /tmp/md5testfile --content-md5 ${md5_base64}
+                                Should contain             ${result}    ETag
+    ${etag} =                   Execute and checkrc        echo '${result}' | jq -r '.ETag' | tr -d '"'    0
+                                Should Be Equal            ${etag}      ${md5_hash}
+    ${result} =                 Execute AWSS3APICli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/md5test/key1 /tmp/md5testfile.result
+    ${etag} =                   Execute and checkrc        echo '${result}' | jq -r '.ETag' | tr -d '"'    0
+                                Should Be Equal            ${etag}      ${md5_hash}
+    Compare files               /tmp/md5testfile           /tmp/md5testfile.result
+
+Put object with wrong Content-MD5 header
+                                Execute                    echo "bar" > /tmp/md5testfile2
+    ${wrong_md5_base64} =       Execute                    echo -n "wrong" | openssl dgst -md5 -binary | base64
+    ${result} =                 Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/md5test/key2 --body /tmp/md5testfile2 --content-md5 ${wrong_md5_base64}    255
+                                Should contain             ${result}    BadDigest
+    # Verify the object was not uploaded
+    ${result} =                 Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/md5test/key2    255
+                                Should contain             ${result}    404
+

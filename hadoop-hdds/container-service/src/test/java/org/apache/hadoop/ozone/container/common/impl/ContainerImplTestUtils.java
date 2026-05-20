@@ -17,8 +17,12 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.time.Clock;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 
 /**
  * Helper utility to test container impl.
@@ -33,10 +37,19 @@ public final class ContainerImplTestUtils {
   }
 
   public static ContainerSet newContainerSet(long recoveringTimeout) {
-    return ContainerSet.newRwContainerSet(new InMemoryTestTable<>(), recoveringTimeout);
+    WitnessedContainerMetadataStore mockMetadataStore = mock(WitnessedContainerMetadataStore.class);
+    when(mockMetadataStore.getContainerCreateInfoTable()).thenReturn(new InMemoryTestTable<>());
+    return newContainerSet(recoveringTimeout, mockMetadataStore);
+  }
+
+  public static ContainerSet newContainerSet(
+      long recoveringTimeout, WitnessedContainerMetadataStore mockMetadataStore) {
+    return ContainerSet.newRwContainerSet(mockMetadataStore, recoveringTimeout);
   }
 
   public static ContainerSet newContainerSet(long recoveringTimeout, Clock clock) {
-    return new ContainerSet(new InMemoryTestTable<>(), recoveringTimeout, clock);
+    WitnessedContainerMetadataStore mockMetadataStore = mock(WitnessedContainerMetadataStore.class);
+    when(mockMetadataStore.getContainerCreateInfoTable()).thenReturn(new InMemoryTestTable<>());
+    return new ContainerSet(mockMetadataStore, recoveringTimeout, clock);
   }
 }

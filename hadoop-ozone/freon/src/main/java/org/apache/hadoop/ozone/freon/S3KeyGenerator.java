@@ -73,7 +73,7 @@ public class S3KeyGenerator extends S3EntityGenerator
   private int fileSize;
 
   @Option(names = {"--multi-part-upload"},
-      description = "User multi part upload",
+      description = "Use multi-part upload",
       defaultValue = "false")
   private boolean multiPart;
 

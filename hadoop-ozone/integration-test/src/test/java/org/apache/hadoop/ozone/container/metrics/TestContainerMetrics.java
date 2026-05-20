@@ -49,6 +49,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -145,7 +146,7 @@ public class TestContainerMetrics {
           Handler.getHandlerForContainerType(containerType, CONF,
               context.getParent().getDatanodeDetails().getUuidString(),
               containerSet, volumeSet, volumeChoosingPolicy, metrics,
-              c -> { }));
+              c -> { }, new ContainerChecksumTreeManager(CONF)));
     }
     HddsDispatcher dispatcher = new HddsDispatcher(CONF, containerSet,
         volumeSet, handlers, context, metrics, null);
@@ -206,6 +207,7 @@ public class TestContainerMetrics {
       assertCounter("numReadChunk", 1L, containerMetrics);
       assertCounter("bytesWriteChunk", 1024L, containerMetrics);
       assertCounter("bytesReadChunk", 1024L, containerMetrics);
+      // bytesReadBlock is tested in TestKeyValueHandler.testReadBlockMetrics
 
       String sec = DFS_METRICS_PERCENTILES_INTERVALS + "s";
       Thread.sleep((DFS_METRICS_PERCENTILES_INTERVALS + 1) * 1000);

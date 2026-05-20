@@ -20,6 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${TOKEN_FILE}    ${TEMP_DIR}/ozone.token

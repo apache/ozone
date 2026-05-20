@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
@@ -125,7 +125,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       omKeyInfo.setKeyName(fileName);
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       final long bucketId = omMetadataManager.getBucketId(volumeName,
@@ -156,10 +158,11 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      // TODO: HDDS-4565: consider all the sub-paths if the path is a dir.
       long quotaReleased = sumBlockLengths(omKeyInfo);
-      omBucketInfo.incrUsedBytes(-quotaReleased);
-      omBucketInfo.incrUsedNamespace(-1L);
+      // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
+      boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
+      omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
+      omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty);
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String dbOpenKey = null;
@@ -170,7 +173,8 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
         dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId, parentId, fileName, hsyncClientId);
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyInfo = openKeyInfo.withMetadataMutations(
+              metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
           openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
           deletedOpenKeyInfo = openKeyInfo;
         } else {

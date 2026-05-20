@@ -69,3 +69,21 @@ Delete file with s3api, file doesn't exist, prefix of a real file
 Delete file with s3api, bucket doesn't exist
     ${result} =         Execute AWSS3APICli and checkrc   delete-object --bucket ${BUCKET}-nosuchbucket --key f1      255
                         Should contain                    ${result}         NoSuchBucket
+
+Check Bucket Ownership Verification
+    Execute             echo "Randomtext" > /tmp/testfile
+    ${result} =         Execute AWSS3APICli and checkrc                 put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile   0
+    ${correct_owner} =    Get bucket owner                              ${BUCKET}
+    # delete single object
+    Execute AWSS3APICli with bucket owner check                         delete-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}
+
+    # delete multiple objects
+    Execute                                                             echo "Randomtext" > /tmp/testfile1
+    Execute                                                             echo "Randomtext" > /tmp/testfile2
+    Execute AWSS3APICli and checkrc                                     put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/multi1 --body /tmp/testfile1   0
+    Execute AWSS3APICli and checkrc                                     put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/multi2 --body /tmp/testfile2   0
+
+    ${delete_json} =    Set Variable                                    {"Objects": [{"Key": "${PREFIX}/bucketownercondition/key=value/multi1"}, {"Key": "${PREFIX}/bucketownercondition/key=value/multi2"}]}
+    ${delete_file} =    Set Variable                                    /tmp/delete_objects.json
+    Execute                                                             echo '${delete_json}' > ${delete_file}
+    Execute AWSS3APICli with bucket owner check                         delete-objects --bucket ${BUCKET} --delete file://${delete_file}  ${correct_owner}

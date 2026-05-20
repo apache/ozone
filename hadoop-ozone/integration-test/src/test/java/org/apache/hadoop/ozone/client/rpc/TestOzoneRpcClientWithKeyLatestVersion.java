@@ -19,15 +19,13 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -105,13 +103,6 @@ public abstract class TestOzoneRpcClientWithKeyLatestVersion implements NonHATes
   private static void writeKey(OzoneBucket bucket, String key, byte[] content,
       ReplicationConfig replication) throws IOException {
     TestDataUtil.createKey(bucket, key, replication, content);
-  }
-
-  public static void assertKeyContent(OzoneBucket bucket, String key,
-      byte[] expected) throws Exception {
-    try (InputStream in = bucket.readKey(key)) {
-      assertArrayEquals(expected, IOUtils.readFully(in, expected.length));
-    }
   }
 
   private void assertListStatus(OzoneBucket bucket, String keyName,

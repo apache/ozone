@@ -29,12 +29,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -85,9 +85,9 @@ public class TestLeaderChoosePolicy {
           pipeline.getLeaderId().equals(pipeline.getSuggestedLeaderId()));
     }
 
-    Map<UUID, Integer> leaderCount = new HashMap<>();
+    Map<DatanodeID, Integer> leaderCount = new HashMap<>();
     for (Pipeline pipeline : pipelines) {
-      UUID leader = pipeline.getLeaderId();
+      DatanodeID leader = pipeline.getLeaderId();
       if (!leaderCount.containsKey(leader)) {
         leaderCount.put(leader, 0);
       }
@@ -96,7 +96,7 @@ public class TestLeaderChoosePolicy {
     }
 
     assertEquals(dnNum, leaderCount.size());
-    for (Map.Entry<UUID, Integer> entry: leaderCount.entrySet()) {
+    for (Map.Entry<DatanodeID, Integer> entry: leaderCount.entrySet()) {
       assertEquals(leaderNumOfEachDn, leaderCount.get(entry.getKey()));
     }
   }

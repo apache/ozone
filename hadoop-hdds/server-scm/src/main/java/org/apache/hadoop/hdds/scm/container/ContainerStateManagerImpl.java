@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
@@ -59,12 +58,12 @@ import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
 import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.invoker.ContainerStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
@@ -187,6 +186,7 @@ public final class ContainerStateManagerImpl
     containerLifecycleSM.addTransition(CLOSING, QUASI_CLOSED, QUASI_CLOSE);
     containerLifecycleSM.addTransition(CLOSING, CLOSED, CLOSE);
     containerLifecycleSM.addTransition(QUASI_CLOSED, CLOSED, FORCE_CLOSE);
+    containerLifecycleSM.addTransition(QUASI_CLOSED, DELETING, DELETE);
     containerLifecycleSM.addTransition(CLOSED, DELETING, DELETE);
     containerLifecycleSM.addTransition(DELETING, DELETED, CLEANUP);
 
@@ -234,12 +234,10 @@ public final class ContainerStateManagerImpl
    * @throws IOException in case of error while loading the containers
    */
   private void initialize() throws IOException {
-    try (TableIterator<ContainerID,
-        ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
-             containerStore.iterator()) {
+    try (TableIterator<ContainerID, ContainerInfo> iterator = containerStore.valueIterator()) {
 
       while (iterator.hasNext()) {
-        final ContainerInfo container = iterator.next().getValue();
+        final ContainerInfo container = iterator.next();
         Objects.requireNonNull(container, "container == null");
         containers.addContainer(container);
         if (container.getState() == LifeCycleState.OPEN) {
@@ -266,6 +264,13 @@ public final class ContainerStateManagerImpl
     actions.put(FINALIZE, info -> pipelineManager
         .removeContainerFromPipeline(info.getPipelineID(), info.containerID()));
     return actions;
+  }
+
+  @Override
+  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
+    try (AutoCloseableLock ignored = readLock()) {
+      return containers.getContainerIDs(state, start, count);
+    }
   }
 
   @Override
@@ -356,36 +361,53 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void updateContainerState(final HddsProtos.ContainerID containerID,
-                                   final LifeCycleEvent event)
+  public void updateContainerStateWithSequenceId(final HddsProtos.ContainerID containerID,
+                                                  final LifeCycleEvent event,
+                                                  final Long sequenceId)
       throws IOException, InvalidStateTransitionException {
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
     try (AutoCloseableLock ignored = writeLock(id)) {
       if (containers.contains(id)) {
-        final ContainerInfo oldInfo = containers.getContainerInfo(id);
-        final LifeCycleState oldState = oldInfo.getState();
+        final ContainerInfo containerInfo = containers.getContainerInfo(id);
+        
+        // Synchronize sequenceId first
+        if (containerInfo.getSequenceId() < sequenceId) {
+          containerInfo.updateSequenceId(sequenceId);
+        } else if (containerInfo.getSequenceId() > sequenceId) {
+          LOG.warn("Container sequenceId is {} greater than the leader container sequenceId {}",
+              containerInfo.getSequenceId(), sequenceId);
+        }
+        
+        final LifeCycleState oldState = containerInfo.getState();
         final LifeCycleState newState = stateMachine.getNextState(
-            oldInfo.getState(), event);
+            oldState, event);
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
             transactionBuffer.addToBuffer(containerStore, id,
                 containers.getContainerInfo(id));
           }).onException(() -> {
-            transactionBuffer.addToBuffer(containerStore, id, oldInfo);
             containers.updateState(id, newState, oldState);
+            ContainerInfo currentInfo = containers.getContainerInfo(id);
+            transactionBuffer.addToBuffer(containerStore, id, currentInfo);
+
           }).execute();
           containerStateChangeActions.getOrDefault(event, info -> { })
-              .accept(oldInfo);
+              .accept(containerInfo);
         }
       }
     }
   }
 
   @Override
-  public void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID containerID) throws IOException {
+  public void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID containerID,
+                                                       LifeCycleState targetState) throws IOException {
+    if (targetState != CLOSED && targetState != QUASI_CLOSED) {
+      throw new IllegalArgumentException("Target state must be CLOSED or QUASI_CLOSED, got: " + targetState);
+    }
+
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
     try (AutoCloseableLock ignored = writeLock(id)) {
@@ -394,14 +416,14 @@ public final class ContainerStateManagerImpl
         final LifeCycleState oldState = oldInfo.getState();
         if (oldState != DELETING && oldState != DELETED) {
           throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
-              " back to CLOSED. The container must be in the DELETING or DELETED state.");
+                  " back to " + targetState + ". The container must be in the DELETING or DELETED state.");
         }
         ExecutionUtil.create(() -> {
-          containers.updateState(id, oldState, CLOSED);
+          containers.updateState(id, oldState, targetState);
           transactionBuffer.addToBuffer(containerStore, id, containers.getContainerInfo(id));
         }).onException(() -> {
           transactionBuffer.addToBuffer(containerStore, id, oldInfo);
-          containers.updateState(id, CLOSED, oldState);
+          containers.updateState(id, targetState, oldState);
         }).execute();
       }
     }
@@ -535,7 +557,6 @@ public final class ContainerStateManagerImpl
   public void reinitialize(
       Table<ContainerID, ContainerInfo> store) throws IOException {
     try (AutoCloseableLock ignored = writeLock()) {
-      close();
       this.containerStore = store;
       this.containers = new ContainerStateMap();
       this.lastUsedMap = new ConcurrentHashMap<>();
@@ -544,11 +565,20 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void close() throws IOException {
-    try {
-      containerStore.close();
-    } catch (Exception e) {
-      throw new IOException(e);
+  public void updateContainerInfo(HddsProtos.ContainerInfoProto updatedInfoProto)
+      throws IOException {
+    ContainerInfo updatedInfo = ContainerInfo.fromProtobuf(updatedInfoProto);
+    ContainerID containerID = updatedInfo.containerID();
+    
+    try (AutoCloseableLock ignored = writeLock(containerID)) {
+      final ContainerInfo currentInfo = containers.getContainerInfo(containerID);
+      if (currentInfo == null) {
+        throw new ContainerNotFoundException(containerID);
+      }
+      // Update suppressed flag
+      currentInfo.setSuppressed(updatedInfo.isSuppressed());
+      transactionBuffer.addToBuffer(containerStore, containerID, currentInfo);
+      LOG.debug("Updated container info for container: {}, suppressed={}", containerID, currentInfo.isSuppressed());
     }
   }
 
@@ -624,8 +654,7 @@ public final class ContainerStateManagerImpl
           conf, pipelineMgr, table, transactionBuffer,
           containerReplicaPendingOps);
 
-      return scmRatisServer.getProxyHandler(RequestType.CONTAINER,
-          ContainerStateManager.class, csm);
+      return scmRatisServer.getProxyHandler(new ContainerStateManagerInvoker(csm, scmRatisServer));
     }
 
   }

@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortResponse;
@@ -198,7 +201,6 @@ public class TestS3MultipartResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(fileName)
-            .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
@@ -262,7 +264,6 @@ public class TestS3MultipartResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(fileName)
-            .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
@@ -278,9 +279,19 @@ public class TestS3MultipartResponse {
                     OzoneManagerProtocolProtos.MultipartCommitUploadPartResponse
                             .newBuilder().setETag(volumeName).setPartName(volumeName)).build();
 
+    Map<String, RepeatedOmKeyInfo> keyToDeleteMap = new HashMap<>();
+    if (oldPartKeyInfo != null) {
+      OmKeyInfo partKeyToBeDeleted =
+          OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
+      String delKeyName = omMetadataManager.getOzoneDeletePathKey(
+          partKeyToBeDeleted.getObjectID(), multipartKey);
+
+      keyToDeleteMap.put(delKeyName, new RepeatedOmKeyInfo(partKeyToBeDeleted, omBucketInfo.getObjectID()));
+    }
+
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
-        multipartKey, openKey, multipartKeyInfo, oldPartKeyInfo,
-        openPartKeyInfoToBeDeleted, omBucketInfo,
+        multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
+        openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
         getBucketLayout());
   }
 

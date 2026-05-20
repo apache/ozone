@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -32,8 +32,7 @@ public class TestSCMServiceManager {
     SCMContext scmContext = new SCMContext.Builder()
         .setLeader(false)
         .setTerm(1)
-        .setIsInSafeMode(true)
-        .setIsPreCheckComplete(false)
+        .setSafeModeStatus(SafeModeStatus.INITIAL)
         .buildMaybeInvalid();
 
     // A service runs when it is leader.
@@ -75,8 +74,7 @@ public class TestSCMServiceManager {
     assertFalse(serviceRunWhenLeader.shouldRun());
 
     // PAUSING when out of safe mode.
-    scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(false, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
     serviceManager.notifyStatusChanged();
     assertFalse(serviceRunWhenLeader.shouldRun());
 
@@ -86,8 +84,7 @@ public class TestSCMServiceManager {
     assertTrue(serviceRunWhenLeader.shouldRun());
 
     // RUNNING when in safe mode.
-    scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, false));
+    scmContext.updateSafeModeStatus(SafeModeStatus.INITIAL);
     serviceManager.notifyStatusChanged();
     assertTrue(serviceRunWhenLeader.shouldRun());
 
@@ -102,8 +99,7 @@ public class TestSCMServiceManager {
     SCMContext scmContext = new SCMContext.Builder()
         .setLeader(false)
         .setTerm(1)
-        .setIsInSafeMode(true)
-        .setIsPreCheckComplete(false)
+        .setSafeModeStatus(SafeModeStatus.INITIAL)
         .buildMaybeInvalid();
 
     // A service runs when it is leader and out of safe mode.
@@ -145,8 +141,7 @@ public class TestSCMServiceManager {
     assertFalse(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
 
     // PAUSING when out of safe mode.
-    scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(false, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
     serviceManager.notifyStatusChanged();
     assertFalse(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
 
@@ -156,8 +151,7 @@ public class TestSCMServiceManager {
     assertTrue(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
 
     // PAUSING when in safe mode.
-    scmContext.updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, false));
+    scmContext.updateSafeModeStatus(SafeModeStatus.INITIAL);
     serviceManager.notifyStatusChanged();
     assertFalse(serviceRunWhenLeaderAndOutOfSafeMode.shouldRun());
 

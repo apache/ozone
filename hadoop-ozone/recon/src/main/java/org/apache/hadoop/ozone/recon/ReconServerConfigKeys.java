@@ -108,6 +108,10 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.task.thread.count";
   public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 8;
 
+  public static final String OZONE_RECON_OM_EVENT_BUFFER_CAPACITY =
+      "ozone.recon.om.event.buffer.capacity";
+  public static final int OZONE_RECON_OM_EVENT_BUFFER_CAPACITY_DEFAULT = 20000;
+
   public static final String OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX =
       "ozone.recon.http.auth.";
 
@@ -119,14 +123,14 @@ public final class  ReconServerConfigKeys {
 
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT =
-      "10s";
+      "30s";
 
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT =
       "ozone.recon.metrics.http.connection.request.timeout";
 
   public static final String
-      OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "10s";
+      OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "60s";
 
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
@@ -149,7 +153,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.nssummary.flush.db.max.threshold";
 
   public static final long
-      OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+      OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L * 2;
 
   public static final String
       OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD =
@@ -157,6 +161,28 @@ public final class  ReconServerConfigKeys {
 
   public static final long
       OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+
+  public static final String
+      OZONE_RECON_FILESIZECOUNT_FLUSH_TO_DB_MAX_THRESHOLD =
+      "ozone.recon.filesizecount.flush.db.max.threshold";
+
+  public static final long
+      OZONE_RECON_FILESIZECOUNT_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 200 * 1000L;
+
+  public static final String
+      OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS = "ozone.recon.task.reprocess.max.iterators";
+
+  public static final int OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT = 5;
+
+  public static final String
+      OZONE_RECON_TASK_REPROCESS_MAX_WORKERS = "ozone.recon.task.reprocess.max.workers";
+
+  public static final int OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT = 20;
+
+  public static final String
+      OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY = "ozone.recon.task.reprocess.max.keys.in.memory";
+
+  public static final int OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT = 2000;
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "ozone.recon.scm.snapshot.task.interval.delay";
@@ -186,6 +212,85 @@ public final class  ReconServerConfigKeys {
 
   public static final int
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
+
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY =
+      "ozone.recon.dn.metrics.collection.minimum.api.delay";
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT = "30s";
+
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT =
+      "ozone.recon.dn.metrics.collection.timeout";
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT = "10m";
+
+  /**
+   * Application-level ceiling on the number of ContainerIDs fetched from SCM
+   * per RPC call during container sync. The effective batch size is
+   * {@code min(this value, ipc.maximum.data.length / 12, totalContainerCount)},
+   * so raising this above the default is only meaningful if
+   * {@code ipc.maximum.data.length} has also been raised from its default.
+   *
+   * <p><b>Recon wire cost</b>: each ContainerID is ~12 bytes on the wire, so
+   * the default 1,000,000 produces ~12 MB per RPC.
+   *
+   * <p><b>Recon JVM heap</b>: each deserialized {@code ContainerID} object
+   * occupies ~32 bytes, so the default batch requires ~32 MB of heap on Recon.
+   * Reduce this value on memory-constrained Recon nodes.
+   *
+   * <p><b>SCM-side pressure</b>: on each RPC call SCM holds its container
+   * state read lock (a fair {@link java.util.concurrent.locks.ReentrantReadWriteLock})
+   * for the full duration of streaming N entries from its in-memory
+   * {@link java.util.TreeMap} and collecting them into a response list.
+   * Because the lock is fair, any concurrent write (container allocation,
+   * state transition) queuing for the write lock will be blocked for the
+   * entire batch duration — and new reads queue behind that waiting writer.
+   * Larger batches therefore increase worst-case container-allocation latency
+   * on SCM during sync. On write-heavy SCM nodes, prefer smaller batches with
+   * more calls over fewer large batches.
+   *
+   * <p>Default: 1,000,000 (~12 MB wire, ~32 MB JVM heap per batch on Recon;
+   * 4 calls for a 4 M-container cluster)
+   */
+  public static final String OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE =
+      "ozone.recon.scm.container.id.batch.size";
+  public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
+
+  /**
+   * JDBC fetch size for CSV exports.
+   * Default: 10,000 rows per fetch
+   */
+  public static final String OZONE_RECON_UNHEALTHY_CONTAINER_FETCH_SIZE =
+      "ozone.recon.unhealthy.container.fetch.size";
+  public static final int OZONE_RECON_UNHEALTHY_CONTAINER_FETCH_SIZE_DEFAULT = 10_000;
+
+  /**
+   * Max export jobs that can sit in the queue (waiting + executing) at once.
+   * Submissions beyond this limit are rejected with HTTP 429.
+   * Kept small because export is single-threaded and the unhealthy-container
+   * states it can be invoked for are bounded (~5).
+   * Default: 4
+   */
+  public static final String OZONE_RECON_EXPORT_MAX_JOBS_TOTAL =
+      "ozone.recon.export.max.jobs.total";
+  public static final int OZONE_RECON_EXPORT_MAX_JOBS_TOTAL_DEFAULT = 4;
+
+  /**
+   * Directory to store export CSV files.
+   * Default: /tmp/recon/exports
+   */
+  public static final String OZONE_RECON_EXPORT_DIRECTORY =
+      "ozone.recon.export.directory";
+
+  // Default is resolved at runtime as {ozone.recon.db.dir}/exports.
+  // Empty string signals ExportJobManager to compute the path dynamically.
+  public static final String OZONE_RECON_EXPORT_DIRECTORY_DEFAULT = "";
+
+  /**
+   * Maximum number of times a completed export TAR file can be downloaded.
+   * Prevents repeated downloads from filling up network bandwidth or being misused.
+   * Default: 3
+   */
+  public static final String OZONE_RECON_EXPORT_MAX_DOWNLOADS =
+      "ozone.recon.export.max.downloads";
+  public static final int OZONE_RECON_EXPORT_MAX_DOWNLOADS_DEFAULT = 3;
 
   /**
    * Private constructor for utility class.

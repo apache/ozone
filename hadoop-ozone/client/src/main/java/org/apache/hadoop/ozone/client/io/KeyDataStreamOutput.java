@@ -19,11 +19,14 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -43,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +60,7 @@ import org.slf4j.LoggerFactory;
  * TODO : currently not support multi-thread access.
  */
 public class KeyDataStreamOutput extends AbstractDataStreamOutput
-    implements KeyMetadataAware {
+    implements KeyCommitOutput {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
@@ -81,6 +85,13 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
    */
   private boolean atomicKeyCreation;
 
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+
+  @Override
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
+    this.preCommits = preCommits;
+  }
+
   @VisibleForTesting
   public List<BlockDataStreamOutputEntry> getStreamEntries() {
     return blockDataStreamOutputEntryPool.getStreamEntries();
@@ -99,6 +110,27 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
   @VisibleForTesting
   public long getClientID() {
     return clientID;
+  }
+
+  @VisibleForTesting
+  public KeyDataStreamOutput() {
+    super(null);
+    this.config = new OzoneClientConfig();
+    OmKeyInfo info = new OmKeyInfo.Builder().setKeyName("test").build();
+    blockDataStreamOutputEntryPool =
+        new BlockDataStreamOutputEntryPool(
+            config,
+            null,
+            null,
+            null, 0,
+            false, info,
+            false,
+            null,
+            0L);
+
+    this.writeOffset = 0;
+    this.clientID = 0L;
+    this.atomicKeyCreation = false;
   }
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
@@ -253,7 +285,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
   private void handleException(BlockDataStreamOutputEntry streamEntry,
       IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean retryFailure = checkForRetryFailure(t);
     boolean containerExclusionException = false;
     if (!retryFailure) {
@@ -266,7 +298,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
-    Preconditions.checkNotNull(failedServers);
+    Objects.requireNonNull(failedServers, "failedServers == null");
     if (!containerExclusionException) {
       BlockDataStreamOutputEntry currentStreamEntry =
           blockDataStreamOutputEntryPool.getCurrentStreamEntry();
@@ -275,8 +307,10 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           BlockDataStreamOutput blockDataStreamOutput =
               (BlockDataStreamOutput) currentStreamEntry
                   .getByteBufStreamOutput();
-          blockDataStreamOutput.executePutBlock(false, false);
-          blockDataStreamOutput.watchForCommit(false);
+          if (blockDataStreamOutput != null) {
+            blockDataStreamOutput.executePutBlock(false, false);
+            blockDataStreamOutput.watchForCommit(false);
+          }
         } catch (IOException e) {
           LOG.error(
               "Failed to execute putBlock/watchForCommit. " +
@@ -430,12 +464,16 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
       }
+      for (CheckedRunnable<IOException> preCommit : preCommits) {
+        preCommit.run();
+      }
       blockDataStreamOutputEntryPool.commitKey(offset);
     } finally {
       blockDataStreamOutputEntryPool.cleanup();
     }
   }
 
+  @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return blockDataStreamOutputEntryPool.getCommitUploadPartInfo();
   }

@@ -31,6 +31,7 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.Config;
@@ -85,8 +86,8 @@ public class XceiverClientManager extends XceiverClientCreator {
       ScmClientConfig clientConf,
       ClientTrustManager trustManager) throws IOException {
     super(conf, trustManager);
-    Preconditions.checkNotNull(clientConf);
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(clientConf, "clientConf == null");
+    Objects.requireNonNull(conf, "conf == null");
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
 
     this.clientCache = CacheBuilder.newBuilder()
@@ -147,7 +148,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline,
       boolean topologyAware, boolean allowShortCircuit) throws IOException {
-    Preconditions.checkNotNull(pipeline);
+    Objects.requireNonNull(pipeline, "pipeline == null");
     Preconditions.checkArgument(pipeline.getNodes() != null);
     Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
         NO_REPLICA_FOUND);
@@ -167,7 +168,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public void releaseClient(XceiverClientSpi client, boolean invalidateClient,
       boolean topologyAware) {
-    Preconditions.checkNotNull(client);
+    Objects.requireNonNull(client, "client == null");
     synchronized (clientCache) {
       client.decrementReference();
       if (invalidateClient) {
@@ -194,9 +195,11 @@ public class XceiverClientManager extends XceiverClientCreator {
   }
 
   private String getPipelineCacheKey(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit) {
-    String key = pipeline.getId().getId().toString() + "-" + pipeline.getType();
+    StringBuilder key = new StringBuilder()
+        .append(pipeline.getId().getId()).append('-').append(pipeline.getType());
     boolean isEC = pipeline.getType() == HddsProtos.ReplicationType.EC;
     DatanodeDetails localDN = null;
+    boolean shortCircuitPipeline = false;
 
     if ((!isEC) && allowShortCircuit && isShortCircuitEnabled()) {
       int port = 0;
@@ -214,7 +217,8 @@ public class XceiverClientManager extends XceiverClientCreator {
       }
       if (localAddr != null) {
         // Find a local DN and short circuit read is enabled
-        key += "@" + localAddr.getHostName() + ":" + port + "/" + DomainSocketFactory.FEATURE_FLAG;
+        key.append('@').append(localAddr.getHostName()).append(':').append(port);
+        shortCircuitPipeline = true;
       }
     }
 
@@ -236,7 +240,8 @@ public class XceiverClientManager extends XceiverClientCreator {
         // Standalone port is chosen since all datanodes should have a
         // standalone port regardless of version and this port should not
         // have any collisions.
-        key += closestNode.getHostName() + closestNode.getStandalonePort();
+        key.append('@').append(closestNode.getHostName())
+            .append(':').append(closestNode.getStandalonePort());
       } catch (IOException e) {
         LOG.error("Failed to get closest node to create pipeline cache key:" +
             e.getMessage());
@@ -247,17 +252,22 @@ public class XceiverClientManager extends XceiverClientCreator {
       // Append user short name to key to prevent a different user
       // from using same instance of xceiverClient.
       try {
-        key = UserGroupInformation.getCurrentUser().getShortUserName() + "@" + key;
+        key.append('|').append(UserGroupInformation.getCurrentUser().getShortUserName());
       } catch (IOException e) {
         LOG.error("Failed to get current user to create pipeline cache key:" +
             e.getMessage());
       }
     }
 
-    if (localDN != null) {
-      localDNCache.put(key, localDN);
+    if (shortCircuitPipeline) {
+      key.append('|').append(DomainSocketFactory.FEATURE_FLAG);
     }
-    return key;
+
+    String keyString = key.toString();
+    if (localDN != null) {
+      localDNCache.put(keyString, localDN);
+    }
+    return keyString;
   }
 
   /**
@@ -306,7 +316,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   @ConfigGroup(prefix = "scm.container.client")
   public static class ScmClientConfig {
 
-    @Config(key = "max.size",
+    @Config(key = "scm.container.client.max.size",
         defaultValue = "256",
         tags = {OZONE, PERFORMANCE},
         description =
@@ -317,7 +327,7 @@ public class XceiverClientManager extends XceiverClientCreator {
     )
     private int maxSize;
 
-    @Config(key = "idle.threshold",
+    @Config(key = "scm.container.client.idle.threshold",
         type = ConfigType.TIME, timeUnit = MILLISECONDS,
         defaultValue = "10s",
         tags = {OZONE, PERFORMANCE},

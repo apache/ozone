@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -26,8 +27,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock.Resource;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 
 /**
  * Class to take multiple locks on multiple snapshots.
@@ -35,15 +36,20 @@ import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 public class MultiSnapshotLocks {
   private final List<String[]> objectLocks;
   private final IOzoneManagerLock lock;
-  private final OzoneManagerLock.Resource resource;
+  private final Resource resource;
   private final boolean writeLock;
   private OMLockDetails lockDetails;
 
-  public MultiSnapshotLocks(IOzoneManagerLock lock, OzoneManagerLock.Resource resource, boolean writeLock) {
+  @VisibleForTesting
+  public MultiSnapshotLocks(IOzoneManagerLock lock, Resource resource, boolean writeLock) {
+    this(lock, resource, writeLock, 0);
+  }
+
+  public MultiSnapshotLocks(IOzoneManagerLock lock, Resource resource, boolean writeLock, int maxNumberOfLocks) {
     this.writeLock = writeLock;
     this.resource = resource;
     this.lock = lock;
-    this.objectLocks = new ArrayList<>();
+    this.objectLocks = new ArrayList<>(maxNumberOfLocks);
     this.lockDetails = OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
   }
 
@@ -61,8 +67,10 @@ public class MultiSnapshotLocks {
         lock.acquireReadLocks(resource, keys);
     if (omLockDetails.isLockAcquired()) {
       objectLocks.addAll(keys);
+      this.lockDetails = OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
+    } else {
+      this.lockDetails = OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
     }
-    this.lockDetails = omLockDetails;
     return omLockDetails;
   }
 
@@ -72,6 +80,8 @@ public class MultiSnapshotLocks {
     } else {
       lockDetails = lock.releaseReadLocks(resource, this.objectLocks);
     }
+    this.lockDetails = lockDetails.isLockAcquired() ? OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED :
+        OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
     this.objectLocks.clear();
   }
 

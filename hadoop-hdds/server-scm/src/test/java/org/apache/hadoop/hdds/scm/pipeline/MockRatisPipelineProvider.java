@@ -88,12 +88,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
     for (DatanodeDetails datanodeDetails : pipeline.getNodes()) {
       pipeline.reportDatanode(datanodeDetails);
     }
-    pipeline.setLeaderId(pipeline.getFirstNode().getUuid());
-  }
-
-  @Override
-  public void shutdown() {
-    // Do nothing.
+    pipeline.setLeaderId(pipeline.getFirstNode().getID());
   }
 
   @Override

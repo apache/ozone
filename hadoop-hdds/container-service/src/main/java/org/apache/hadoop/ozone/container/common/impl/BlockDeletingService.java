@@ -17,16 +17,23 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -35,6 +42,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
@@ -65,24 +73,27 @@ public class BlockDeletingService extends BackgroundService {
 
   private final Duration blockDeletingMaxLockHoldingTime;
 
+  private final ContainerChecksumTreeManager checksumTreeManager;
+
   @VisibleForTesting
   public BlockDeletingService(
       OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
-      TimeUnit timeUnit, int workerSize, ConfigurationSource conf
-  ) {
+      TimeUnit timeUnit, int workerSize, ConfigurationSource conf, ContainerChecksumTreeManager checksumTreeManager) {
     this(ozoneContainer, serviceInterval, serviceTimeout, timeUnit, workerSize,
-        conf, "", null);
+        conf, "", checksumTreeManager, null);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
   public BlockDeletingService(
       OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
       TimeUnit timeUnit, int workerSize, ConfigurationSource conf,
-      String threadNamePrefix, ReconfigurationHandler reconfigurationHandler
+      String threadNamePrefix, ContainerChecksumTreeManager checksumTreeManager,
+      ReconfigurationHandler reconfigurationHandler
   ) {
     super("BlockDeletingService", serviceInterval, timeUnit,
         workerSize, serviceTimeout, threadNamePrefix);
     this.ozoneContainer = ozoneContainer;
+    this.checksumTreeManager = checksumTreeManager;
     try {
       containerDeletionPolicy = conf.getClass(
           ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
@@ -95,10 +106,39 @@ public class BlockDeletingService extends BackgroundService {
     dnConf = conf.getObject(DatanodeConfiguration.class);
     if (reconfigurationHandler != null) {
       reconfigurationHandler.register(dnConf);
+      registerReconfigCallbacks(reconfigurationHandler);
     }
     this.blockDeletingMaxLockHoldingTime =
         dnConf.getBlockDeletingMaxLockHoldingTime();
     metrics = BlockDeletingServiceMetrics.create();
+  }
+
+  public void registerReconfigCallbacks(ReconfigurationHandler handler) {
+    handler.registerCompleteCallback((changedKeys, newConf) -> {
+      if (changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_INTERVAL) ||
+          changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT) ||
+          changedKeys.containsKey(OZONE_BLOCK_DELETING_SERVICE_WORKERS)) {
+        updateAndRestart((OzoneConfiguration) newConf);
+      }
+    });
+  }
+
+  public synchronized void updateAndRestart(OzoneConfiguration ozoneConf) {
+    long newInterval = ozoneConf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+        OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
+    int newCorePoolSize = ozoneConf.getInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
+        OZONE_BLOCK_DELETING_SERVICE_WORKERS_DEFAULT);
+    long newTimeout = ozoneConf.getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+        OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT, TimeUnit.NANOSECONDS);
+    LOG.info("Updating and restarting BlockDeletingService with interval {} {}" +
+            ", core pool size {} and timeout {} {}",
+        newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize, newTimeout,
+        TimeUnit.NANOSECONDS.name().toLowerCase());
+    shutdown();
+    setInterval(newInterval, TimeUnit.SECONDS);
+    setPoolSize(newCorePoolSize);
+    setServiceTimeoutInNanos(newTimeout);
+    start();
   }
 
   /**
@@ -144,6 +184,7 @@ public class BlockDeletingService extends BackgroundService {
             new BlockDeletingTaskBuilder();
         builder.setBlockDeletingService(this)
             .setContainerBlockInfo(containerBlockInfo)
+            .setChecksumTreeManager(checksumTreeManager)
             .setPriority(TASK_PRIORITY_DEFAULT);
         containerBlockInfos = builder.build();
         queue.add(containerBlockInfos);
@@ -169,6 +210,7 @@ public class BlockDeletingService extends BackgroundService {
       throws StorageContainerException {
 
     AtomicLong totalPendingBlockCount = new AtomicLong(0L);
+    AtomicLong totalPendingBlockBytes = new AtomicLong(0L);
     Map<Long, ContainerData> containerDataMap =
         ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
             .filter(e -> (checkPendingDeletionBlocks(
@@ -181,10 +223,12 @@ public class BlockDeletingService extends BackgroundService {
               totalPendingBlockCount
                   .addAndGet(
                       ContainerUtils.getPendingDeletionBlocks(containerData));
+              totalPendingBlockBytes.addAndGet(ContainerUtils.getPendingDeletionBytes(containerData));
               return containerData;
             }));
 
     metrics.setTotalPendingBlockCount(totalPendingBlockCount.get());
+    metrics.setTotalPendingBlockBytes(totalPendingBlockBytes.get());
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
@@ -197,8 +241,12 @@ public class BlockDeletingService extends BackgroundService {
       ContainerDeletionChoosingPolicy deletionPolicy) {
     if (!deletionPolicy
         .isValidContainerType(containerData.getContainerType())) {
+      LOG.debug("Container with type {} is not valid for block deletion.",
+          containerData.getContainerType());
       return false;
-    } else if (!containerData.isClosed()) {
+    } else if (!(containerData.isClosed() || containerData.isQuasiClosed())) {
+      LOG.info("Skipping block deletion for container {}. State: {} (only CLOSED or QUASI_CLOSED are allowed).",
+          containerData.getContainerID(), containerData.getState());
       return false;
     } else {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
@@ -210,15 +258,14 @@ public class BlockDeletingService extends BackgroundService {
           // TODO: currently EC container goes through this path.
           return true;
         }
-        UUID pipelineUUID;
+        final PipelineID pipelineID;
         try {
-          pipelineUUID = UUID.fromString(originPipelineId);
+          pipelineID = PipelineID.valueOf(originPipelineId);
         } catch (IllegalArgumentException e) {
           LOG.warn("Invalid pipelineID {} for container {}",
               originPipelineId, containerData.getContainerID());
           return false;
         }
-        PipelineID pipelineID = PipelineID.valueOf(pipelineUUID);
         // in case the ratis group does not exist, just mark it for deletion.
         if (!ratisServer.isExist(pipelineID.getProtobuf())) {
           return true;
@@ -228,11 +275,11 @@ public class BlockDeletingService extends BackgroundService {
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
           if (minReplicatedIndex < containerBCSID) {
-            LOG.warn("Close Container log Index {} is not replicated across all"
-                    + " the servers in the pipeline {} as the min replicated "
-                    + "index is {}. Deletion is not allowed in this container "
-                    + "yet.", containerBCSID,
-                containerData.getOriginPipelineId(), minReplicatedIndex);
+            LOG.warn("Close Container log Index {} is not replicated across all "
+                    + "servers in the pipeline {} (min replicated index {}). "
+                    + "Deletion is not allowed yet.",
+                containerBCSID, containerData.getOriginPipelineId(),
+                minReplicatedIndex);
             return false;
           } else {
             return true;
@@ -243,7 +290,8 @@ public class BlockDeletingService extends BackgroundService {
           if (!ratisServer.isExist(pipelineID.getProtobuf())) {
             return true;
           } else {
-            LOG.info(ioe.getMessage());
+            LOG.info("Skipping deletes for container {} due to exception: {}",
+                containerData.getContainerID(), ioe.getMessage());
             return false;
           }
         }
@@ -276,6 +324,7 @@ public class BlockDeletingService extends BackgroundService {
     private BlockDeletingService blockDeletingService;
     private BlockDeletingService.ContainerBlockInfo containerBlockInfo;
     private int priority;
+    private ContainerChecksumTreeManager checksumTreeManager;
 
     public BlockDeletingTaskBuilder setBlockDeletingService(
         BlockDeletingService blockDeletingService) {
@@ -286,6 +335,11 @@ public class BlockDeletingService extends BackgroundService {
     public BlockDeletingTaskBuilder setContainerBlockInfo(
         ContainerBlockInfo containerBlockInfo) {
       this.containerBlockInfo = containerBlockInfo;
+      return this;
+    }
+
+    public BlockDeletingTaskBuilder setChecksumTreeManager(ContainerChecksumTreeManager treeManager) {
+      this.checksumTreeManager = treeManager;
       return this;
     }
 
@@ -300,8 +354,7 @@ public class BlockDeletingService extends BackgroundService {
       if (containerType
           .equals(ContainerProtos.ContainerType.KeyValueContainer)) {
         return
-            new BlockDeletingTask(blockDeletingService, containerBlockInfo,
-                priority);
+            new BlockDeletingTask(blockDeletingService, containerBlockInfo, checksumTreeManager, priority);
       } else {
         // If another ContainerType is available later, implement it
         throw new IllegalArgumentException(

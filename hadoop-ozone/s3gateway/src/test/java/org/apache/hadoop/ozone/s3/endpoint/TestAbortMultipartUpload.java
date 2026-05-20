@@ -17,19 +17,20 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.abortMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -54,29 +55,12 @@ public class TestAbortMultipartUpload {
         .setClient(client)
         .build();
 
-
-    Response response = rest.initializeMultipartUpload(bucket, key);
-
-    assertEquals(200, response.getStatus());
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-
+    String uploadID = initiateMultipartUpload(rest, bucket, key);
 
     // Abort multipart upload
-    response = rest.delete(bucket, key, uploadID, null);
-
-    assertEquals(204, response.getStatus());
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> abortMultipartUpload(rest, bucket, key, uploadID));
 
     // test with unknown upload Id.
-    try {
-      rest.delete(bucket, key, "random", null);
-    } catch (OS3Exception ex) {
-      assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());
-      assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),
-          ex.getErrorMessage());
-    }
-
+    assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD, () -> abortMultipartUpload(rest, bucket, key, "random"));
   }
 }

@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;

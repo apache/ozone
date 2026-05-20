@@ -19,7 +19,10 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -48,7 +51,6 @@ public class OneReplicaPipelineSafeModeRule extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OneReplicaPipelineSafeModeRule.class);
-  private static final String NAME = "AtleastOneDatanodeReportedRule";
 
   private int thresholdCount;
   private final Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
@@ -59,7 +61,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
   public OneReplicaPipelineSafeModeRule(EventQueue eventQueue, PipelineManager pipelineManager,
       SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
-    super(safeModeManager, NAME, eventQueue);
+    super(safeModeManager, eventQueue);
 
     pipelinePercent =
         configuration.getDouble(
@@ -85,12 +87,18 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   protected synchronized boolean validate() {
+    if (!validateBasedOnReportProcessing()) {
+      updateReportedPipelineSet();
+    }
     return currentReportedPipelineCount >= thresholdCount;
   }
 
   @Override
   protected synchronized void process(PipelineReportFromDatanode report) {
-    Preconditions.checkNotNull(report);
+    if (!validateBasedOnReportProcessing()) {
+      return;
+    }
+    Objects.requireNonNull(report, "report == null");
     for (PipelineReport report1 : report.getReport().getPipelineReportList()) {
       Pipeline pipeline;
       try {
@@ -137,6 +145,10 @@ public class OneReplicaPipelineSafeModeRule extends
     return currentReportedPipelineCount;
   }
 
+  Set<PipelineID> getReportedPipelineIDSet() {
+    return Collections.unmodifiableSet(reportedPipelineIDSet);
+  }
+
   @Override
   public String getStatusText() {
     String status = String.format(
@@ -167,6 +179,22 @@ public class OneReplicaPipelineSafeModeRule extends
     } else {
       if (!validate()) {
         initializeRule(true);
+      }
+    }
+  }
+
+  private void updateReportedPipelineSet() {
+    List<Pipeline> openRatisPipelines =
+        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.OPEN);
+
+    for (Pipeline pipeline : openRatisPipelines) {
+      PipelineID pipelineID = pipeline.getId();
+      if (!pipeline.getNodeSet().isEmpty()
+          && oldPipelineIDSet.contains(pipelineID)
+          && reportedPipelineIDSet.add(pipelineID)) {
+        getSafeModeMetrics().incCurrentHealthyPipelinesWithAtleastOneReplicaReportedCount();
+        currentReportedPipelineCount++;
       }
     }
   }

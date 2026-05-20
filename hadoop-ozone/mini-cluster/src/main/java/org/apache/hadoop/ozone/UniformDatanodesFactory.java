@@ -81,7 +81,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     Path baseDir = Paths.get(Objects.requireNonNull(conf.get(OZONE_METADATA_DIRS)), "datanode-" + i);
 
-    Path metaDir = baseDir.resolve("meta");
+    Path metaDir = baseDir.resolve("ozone-metadata");
     Files.createDirectories(metaDir);
     dnConf.set(OZONE_METADATA_DIRS, metaDir.toString());
 

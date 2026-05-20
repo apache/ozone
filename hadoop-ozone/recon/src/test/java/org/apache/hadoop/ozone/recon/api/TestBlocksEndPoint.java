@@ -65,16 +65,14 @@ public class TestBlocksEndPoint {
   @TempDir
   private Path temporaryFolder;
 
-  private ReconStorageContainerManagerFacade reconStorageContainerManager;
   private ReconContainerManager reconContainerManager;
   private ReconPipelineManager reconPipelineManager;
   private BlocksEndPoint blocksEndPoint;
   private boolean isSetupDone = false;
-  private ReconOMMetadataManager reconOMMetadataManager;
   private  DBStore scmDBStore;
 
   private void initializeInjector() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
@@ -95,7 +93,7 @@ public class TestBlocksEndPoint {
             .addBinding(BlocksEndPoint.class)
             .build();
 
-    reconStorageContainerManager =
+    ReconStorageContainerManagerFacade reconStorageContainerManager =
         reconTestInjector.getInstance(ReconStorageContainerManagerFacade.class);
     reconContainerManager = (ReconContainerManager)
         reconStorageContainerManager.getContainerManager();

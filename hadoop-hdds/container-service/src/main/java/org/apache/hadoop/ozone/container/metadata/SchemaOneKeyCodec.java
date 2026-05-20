@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.container.metadata;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.slf4j.Logger;
@@ -52,7 +52,7 @@ public final class SchemaOneKeyCodec implements Codec<String> {
   }
 
   @Override
-  public byte[] toPersistedFormat(String stringObject) throws IOException {
+  public byte[] toPersistedFormat(String stringObject) throws CodecException {
     try {
       // If the caller's string has no prefix, it should be stored as a long
       // to be encoded as a long to be consistent with the schema one

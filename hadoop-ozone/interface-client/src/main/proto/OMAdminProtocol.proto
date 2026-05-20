@@ -52,6 +52,7 @@ message OMNodeInfo {
     required uint32 rpcPort = 3;
     required uint32 ratisPort = 4;
     optional NodeState nodeState = 5 [default=ACTIVE];
+    optional bool isListener = 6;
 }
 
 enum NodeState {
@@ -78,6 +79,16 @@ message CompactResponse {
     optional string errorMsg = 3;
 }
 
+message TriggerSnapshotDefragRequest {
+    required bool noWait = 1;
+}
+
+message TriggerSnapshotDefragResponse {
+    required bool success = 1;
+    optional string errorMsg = 2;
+    optional bool result = 3;
+}
+
 /**
  The service for OM admin operations.
 */
@@ -94,4 +105,8 @@ service OzoneManagerAdminService {
     // RPC request from admin to compact a column family of the OM's db
     rpc compactDB(CompactRequest)
     returns(CompactResponse);
+
+    // RPC request from admin to trigger snapshot defragmentation
+    rpc triggerSnapshotDefrag(TriggerSnapshotDefragRequest)
+    returns(TriggerSnapshotDefragResponse);
 }

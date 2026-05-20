@@ -23,7 +23,7 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapab
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +34,6 @@ import org.junit.jupiter.api.Test;
  */
 public abstract class AbstractContractConcatTest extends AbstractFSContractTestBase {
 
-  private Path testPath;
   private Path srcFile;
   private Path zeroByteFile;
   private Path target;
@@ -46,7 +45,7 @@ public abstract class AbstractContractConcatTest extends AbstractFSContractTestB
     skipIfUnsupported(SUPPORTS_CONCAT);
 
     //delete the test directory
-    testPath = path("test");
+    Path testPath = path("test");
     srcFile = new Path(testPath, "small.txt");
     zeroByteFile = new Path(testPath, "zero.txt");
     target = new Path(testPath, "target");
@@ -59,14 +58,14 @@ public abstract class AbstractContractConcatTest extends AbstractFSContractTestB
   @Test
   public void testConcatEmptyFiles() throws Throwable {
     touch(getFileSystem(), target);
-    handleExpectedException(intercept(Exception.class,
+    handleExpectedException(assertThrows(Exception.class,
         () -> getFileSystem().concat(target, new Path[0])));
   }
 
   @Test
   public void testConcatMissingTarget() throws Throwable {
     handleExpectedException(
-        intercept(Exception.class,
+        assertThrows(Exception.class,
             () -> getFileSystem().concat(target, new Path[]{zeroByteFile})));
   }
 
@@ -86,7 +85,7 @@ public abstract class AbstractContractConcatTest extends AbstractFSContractTestB
   public void testConcatOnSelf() throws Throwable {
     byte[] block = dataset(TEST_FILE_LEN, 0, 255);
     createFile(getFileSystem(), target, false, block);
-    handleExpectedException(intercept(Exception.class,
+    handleExpectedException(assertThrows(Exception.class,
         () -> getFileSystem().concat(target, new Path[]{target})));
   }
 

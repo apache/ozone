@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
@@ -53,7 +53,7 @@ public class XceiverClientCreator implements XceiverClientFactory {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
     this.trustManager = trustManager;
     if (securityEnabled) {
-      Preconditions.checkNotNull(trustManager);
+      Objects.requireNonNull(trustManager, "trustManager == null");
     }
     shortCircuitEnabled = conf.getObject(OzoneClientConfig.class).isShortCircuitEnabled();
     if (shortCircuitEnabled) {

@@ -18,9 +18,10 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.HashSet;
-import java.util.UUID;
+import java.util.Set;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -35,23 +36,22 @@ import org.apache.hadoop.hdds.server.events.TypedEvent;
 public class DataNodeSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport> {
 
-  private static final String NAME = "DataNodeSafeModeRule";
-
   // Min DataNodes required to exit safe mode.
   private int requiredDns;
   private int registeredDns = 0;
   // Set to track registered DataNodes.
-  private HashSet<UUID> registeredDnSet;
+  private final Set<DatanodeID> registeredDnSet;
   private NodeManager nodeManager;
 
   public DataNodeSafeModeRule(EventQueue eventQueue,
       ConfigurationSource conf,
       NodeManager nodeManager,
       SCMSafeModeManager manager) {
-    super(manager, NAME, eventQueue);
+    super(manager, eventQueue);
     requiredDns = conf.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
+    getSafeModeMetrics().setNumRequiredDatanodesThreshold(requiredDns);
     registeredDnSet = new HashSet<>(requiredDns * 2);
     this.nodeManager = nodeManager;
   }
@@ -72,9 +72,14 @@ public class DataNodeSafeModeRule extends
   @Override
   protected void process(NodeRegistrationContainerReport reportsProto) {
 
-    registeredDnSet.add(reportsProto.getDatanodeDetails().getUuid());
+    DatanodeID dnId = reportsProto.getDatanodeDetails().getID();
+    boolean added = registeredDnSet.add(dnId);
     registeredDns = registeredDnSet.size();
 
+    if (added) {
+      getSafeModeMetrics().incCurrentRegisteredDatanodesCount();
+    }
+    
     if (scmInSafeMode()) {
       SCMSafeModeManager.getLogger().info(
           "SCM in safe mode. {} DataNodes registered, {} required.",

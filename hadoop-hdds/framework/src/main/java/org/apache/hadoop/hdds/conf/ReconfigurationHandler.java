@@ -22,18 +22,24 @@ import static java.util.function.UnaryOperator.identity;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.function.BiConsumer;
 import java.util.function.UnaryOperator;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurableBase;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
+import org.apache.hadoop.conf.ReconfigurationUtil;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.ratis.util.function.CheckedConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Keeps track of reconfigurable properties and the corresponding functions
@@ -42,16 +48,65 @@ import org.apache.ratis.util.function.CheckedConsumer;
 public class ReconfigurationHandler extends ReconfigurableBase
     implements ReconfigureProtocol {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ReconfigurationHandler.class);
   private final String name;
   private final CheckedConsumer<String, IOException> requireAdminPrivilege;
   private final Map<String, UnaryOperator<String>> properties =
       new ConcurrentHashMap<>();
+  private final Set<String> prefixProperties = new ConcurrentSkipListSet<>();
+
+  private final List<ReconfigurationChangeCallback> completeCallbacks = new ArrayList<>();
+  private BiConsumer<ReconfigurationTaskStatus, Configuration> reconfigurationStatusListener;
+
+  public void registerCompleteCallback(ReconfigurationChangeCallback callback) {
+    completeCallbacks.add(callback);
+  }
+
+  public void setReconfigurationCompleteCallback(BiConsumer<ReconfigurationTaskStatus, Configuration>
+      statusListener) {
+    this.reconfigurationStatusListener = statusListener;
+  }
+
+  public BiConsumer<ReconfigurationTaskStatus, Configuration> defaultLoggingCallback() {
+    return (status, conf) -> {
+      if (status.getStatus() != null && !status.getStatus().isEmpty()) {
+        LOG.info("Reconfiguration completed with {} updated properties.",
+            status.getStatus().size());
+      } else {
+        LOG.info("Reconfiguration complete. No properties were changed.");
+      }
+    };
+  }
+
+  private void triggerCompleteCallbacks(ReconfigurationTaskStatus status, Configuration newConf) {
+    if (status.getStatus() != null && !status.getStatus().isEmpty()) {
+      Map<String, Boolean> changedKeys = new HashMap<>();
+      for (ReconfigurationUtil.PropertyChange change : status.getStatus().keySet()) {
+        boolean deleted = change.newVal == null;
+        changedKeys.put(change.prop, !deleted);
+      }
+      for (ReconfigurationChangeCallback callback : completeCallbacks) {
+        callback.onPropertiesChanged(changedKeys, newConf);
+      }
+    }
+
+    if (reconfigurationStatusListener != null) {
+      reconfigurationStatusListener.accept(status, newConf);
+    }
+  }
 
   public ReconfigurationHandler(String name, OzoneConfiguration config,
       CheckedConsumer<String, IOException> requireAdminPrivilege) {
     super(config);
     this.name = name;
     this.requireAdminPrivilege = requireAdminPrivilege;
+
+    // Register callback on reconfiguration complete
+    addReconfigurationCompleteCallback(status -> {
+      Configuration newConf = getNewConf();
+      triggerCompleteCallbacks(status, newConf);
+    });
+
   }
 
   public ReconfigurationHandler register(
@@ -70,6 +125,13 @@ public class ReconfigurationHandler extends ReconfigurableBase
     return this;
   }
 
+  public ReconfigurationHandler registerPrefix(String prefixProperty) {
+    prefixProperties.add(
+        prefixProperty.endsWith(".") ? prefixProperty : prefixProperty.concat(".")
+    );
+    return this;
+  }
+
   @Override
   protected Configuration getNewConf() {
     return new OzoneConfiguration();
@@ -77,7 +139,19 @@ public class ReconfigurationHandler extends ReconfigurableBase
 
   @Override
   public Set<String> getReconfigurableProperties() {
-    return unmodifiableSet(properties.keySet());
+    Set<String> reconfigureProperties = new HashSet<>(properties.keySet());
+    reconfigureProperties.addAll(prefixProperties);
+    return unmodifiableSet(reconfigureProperties);
+  }
+
+  @Override
+  public boolean isPropertyReconfigurable(String property) {
+    for (String prefixProperty : prefixProperties) {
+      if (property.startsWith(prefixProperty)) {
+        return true;
+      }
+    }
+    return properties.containsKey(property);
   }
 
   @Override

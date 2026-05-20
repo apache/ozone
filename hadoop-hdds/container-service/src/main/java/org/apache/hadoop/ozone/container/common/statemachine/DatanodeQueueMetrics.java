@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.text.WordUtils;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -114,20 +116,20 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean b) {
     MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME);
 
-    Map<SCMCommandProto.Type, Integer> tmpMap =
+    EnumCounters<SCMCommandProto.Type> tmpEnum =
         datanodeStateMachine.getContext().getCommandQueueSummary();
     for (Map.Entry<SCMCommandProto.Type, MetricsInfo> entry:
         stateContextCommandQueueMap.entrySet()) {
       builder.addGauge(entry.getValue(),
-          (long) tmpMap.getOrDefault(entry.getKey(), 0));
+          tmpEnum.get(entry.getKey()));
     }
 
-    tmpMap = datanodeStateMachine.getCommandDispatcher()
+    tmpEnum = datanodeStateMachine.getCommandDispatcher()
         .getQueuedCommandCount();
     for (Map.Entry<SCMCommandProto.Type, MetricsInfo> entry:
         commandDispatcherQueueMap.entrySet()) {
       builder.addGauge(entry.getValue(),
-          (long) tmpMap.getOrDefault(entry.getKey(), 0));
+          tmpEnum.get(entry.getKey()));
     }
 
     for (Map.Entry<InetSocketAddress, MetricsInfo> entry:
@@ -168,6 +170,27 @@ public final class DatanodeQueueMetrics implements MetricsSource {
         k -> getMetricsInfo(PIPELINE_ACTION_QUEUE_PREFIX,
             CaseFormat.UPPER_UNDERSCORE
                 .to(CaseFormat.UPPER_CAMEL, k.getHostName())));
+  }
+
+  public void removeEndpoint(InetSocketAddress endpoint) {
+    incrementalReportsQueueMap.remove(endpoint);
+    containerActionQueueMap.remove(endpoint);
+    pipelineActionQueueMap.remove(endpoint);
+  }
+
+  @VisibleForTesting
+  public int getIncrementalReportsQueueMapSize() {
+    return incrementalReportsQueueMap.size();
+  }
+
+  @VisibleForTesting
+  public int getContainerActionQueueMapSize() {
+    return containerActionQueueMap.size();
+  }
+
+  @VisibleForTesting
+  public int getPipelineActionQueueMapSize() {
+    return pipelineActionQueueMap.size();
   }
 
   private MetricsInfo getMetricsInfo(String prefix, String metricName) {

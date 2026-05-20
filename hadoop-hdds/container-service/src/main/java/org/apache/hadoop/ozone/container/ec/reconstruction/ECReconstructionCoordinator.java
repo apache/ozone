@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
-import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
+import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -70,6 +69,7 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.MemoizedSupplier;
@@ -297,15 +297,6 @@ public class ECReconstructionCoordinator implements Closeable {
             int readLen;
             try {
               readLen = sis.recoverChunks(bufs);
-              Set<Integer> failedIndexes = sis.getFailedIndexes();
-              if (!failedIndexes.isEmpty()) {
-                // There was a problem reading some of the block indexes, but we
-                // did not get an exception as there must have been spare indexes
-                // to try and recover from. Therefore we should log out the block
-                // group details in the same way as for the exception case below.
-                logBlockGroupDetails(blockLocationInfo, repConfig,
-                    blockDataGroup);
-              }
             } catch (IOException e) {
               // When we see exceptions here, it could be due to some transient
               // issue that causes the block read to fail when reconstructing it,

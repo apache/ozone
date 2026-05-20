@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_MAGIC_C
 import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_VERSION;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -108,7 +107,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
    */
   public XceiverClientShortCircuit(Pipeline pipeline, ConfigurationSource config, DatanodeDetails dn) {
     super();
-    Preconditions.checkNotNull(config);
+    Objects.requireNonNull(config);
     this.readTimeoutMs = (int) config.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
         OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.writeTimeoutMs = (int) config.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WRITE_TIMEOUT,
@@ -439,9 +438,10 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   @Override
   public String toString() {
     final StringBuilder b =
-        new StringBuilder(getClass().getSimpleName()).append('[');
-    b.append(" DomainSocket: ").append(domainSocket.toString());
-    b.append(" Pipeline: ").append(pipeline.toString());
+        new StringBuilder(getClass().getSimpleName())
+            .append('[').append(" DomainSocket: ").append(domainSocket.toString())
+            .append(" Pipeline: ").append(pipeline.toString())
+            .append(" ]");
     return b.toString();
   }
 

@@ -47,7 +47,6 @@ public final class OmTestManagers {
   private final OzoneManager om;
   private final KeyManager keyManager;
   private final OMMetadataManager metadataManager;
-  private KeyProviderCryptoExtension kmsProvider;
   private final VolumeManager volumeManager;
   private final BucketManager bucketManager;
   private final PrefixManager prefixManager;
@@ -148,12 +147,30 @@ public final class OmTestManagers {
 
   //initializing and returning a mock kmsProvider
   public KeyProviderCryptoExtension kmsProviderInit() {
-    kmsProvider = mock(KeyProviderCryptoExtension.class);
+    KeyProviderCryptoExtension kmsProvider = mock(KeyProviderCryptoExtension.class);
 
     HddsWhiteboxTestUtils.setInternalState(om,
             "kmsProvider", kmsProvider);
 
     return kmsProvider;
+  }
+
+  /**
+   * Stops all managed components and releases resources.
+   */
+  public void stop() {
+    try {
+      if (rpcClient != null) {
+        rpcClient.close();
+      }
+    } catch (IOException e) {
+      // Log but don't fail the stop operation
+      System.err.println("Error closing RPC client: " + e.getMessage());
+    }
+
+    if (om != null) {
+      om.stop();
+    }
   }
 
 }

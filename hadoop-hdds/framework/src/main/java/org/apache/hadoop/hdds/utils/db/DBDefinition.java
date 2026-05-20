@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -54,7 +56,11 @@ public interface DBDefinition {
    */
   default File getDBLocation(ConfigurationSource conf) {
     return ServerUtils.getDirectoryFromConfig(conf,
-            getLocationConfigKey(), getName());
+        getLocationConfigKey(), getName());
+  }
+
+  default Path getOptionsPath(ConfigurationSource conf) {
+    return Paths.get("");
   }
 
   static List<String> getColumnFamilyNames(Iterable<DBColumnFamilyDefinition<?, ?>> columnFamilies) {

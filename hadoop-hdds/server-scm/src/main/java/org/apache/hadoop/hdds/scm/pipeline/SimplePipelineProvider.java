@@ -95,8 +95,4 @@ public class SimplePipelineProvider
 
   }
 
-  @Override
-  public void shutdown() {
-    // Do nothing.
-  }
 }

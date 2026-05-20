@@ -22,7 +22,7 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.HashSet;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -66,8 +66,7 @@ public class SCMDBCheckpointProvider {
       }
 
       Instant start = Instant.now();
-      HddsServerUtil.writeDBCheckpointToStream(checkpoint, stream,
-          new ArrayList<>(), new ArrayList<>());
+      HddsServerUtil.writeDBCheckpointToStream(checkpoint, stream, new HashSet<>());
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();

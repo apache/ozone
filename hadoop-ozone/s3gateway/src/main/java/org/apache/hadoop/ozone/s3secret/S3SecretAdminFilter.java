@@ -27,6 +27,7 @@ import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -46,6 +47,11 @@ public class S3SecretAdminFilter implements ContainerRequestFilter {
 
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
+    // Skip check if authorization is disabled
+    if (!OzoneSecurityUtil.isAuthorizationEnabled(conf)) {
+      return;
+    }
+    
     final Principal userPrincipal = requestContext.getSecurityContext().getUserPrincipal();
     if (null != userPrincipal) {
       UserGroupInformation user = UserGroupInformation.createRemoteUser(userPrincipal.getName());

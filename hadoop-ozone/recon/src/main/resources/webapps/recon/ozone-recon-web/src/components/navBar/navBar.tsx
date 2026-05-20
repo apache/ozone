@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import { Layout, Menu } from 'antd';
+import {Layout, Menu} from 'antd';
 import {
   BarChartOutlined,
   ClusterOutlined,
@@ -31,12 +31,12 @@ import {
   LayoutOutlined,
   PieChartOutlined
 } from '@ant-design/icons';
-import { withRouter, Link } from 'react-router-dom';
-import { RouteComponentProps } from 'react-router';
+import {Link, withRouter} from 'react-router-dom';
+import {RouteComponentProps} from 'react-router';
 
 
 import logo from '../../logo.png';
-import { showDataFetchError } from '@/utils/common';
+import {showDataFetchError} from '@/utils/common';
 import './navBar.less';
 
 const { Sider } = Layout;
@@ -82,7 +82,7 @@ class NavBar extends React.Component<INavBarProps> {
       this.setState({
         isLoading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -141,10 +141,10 @@ class NavBar extends React.Component<INavBarProps> {
         </Menu.Item>
       </Menu.SubMenu>
     ), (
-      <Menu.Item key='/DiskUsage'
+      <Menu.Item key='/NamespaceUsage'
         icon={<PieChartOutlined />}>
-        <span>Disk Usage</span>
-        <Link to='/DiskUsage' />
+        <span>Namespace Usage</span>
+        <Link to='/NamespaceUsage' />
       </Menu.Item>
     ), (
       isHeatmapEnabled

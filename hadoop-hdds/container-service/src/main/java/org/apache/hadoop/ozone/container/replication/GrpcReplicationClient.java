@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -160,15 +160,19 @@ public class GrpcReplicationClient implements AutoCloseable {
         Path outputPath) {
       this.response = response;
       this.containerId = containerId;
-      this.outputPath = outputPath;
+      this.outputPath = Objects.requireNonNull(outputPath, "outputPath == null");
+
+      final Path parentPath = this.outputPath.getParent();
+      if (parentPath == null) {
+        throw new NullPointerException("Output path has no parent: " + this.outputPath);
+      }
+
       try {
-        Preconditions.checkNotNull(outputPath, "Output path cannot be null");
-        Path parentPath = Preconditions.checkNotNull(outputPath.getParent());
         Files.createDirectories(parentPath);
-        stream = Files.newOutputStream(outputPath);
+        stream = Files.newOutputStream(this.outputPath);
       } catch (IOException e) {
         throw new UncheckedIOException(
-            "Output path can't be used: " + outputPath, e);
+            "Output path can't be used: " + this.outputPath, e);
       }
     }
 

@@ -179,6 +179,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.data.dir.permissions</name>
+    <value>700</value>
+    <description>Permissions for the datanode data directories where actual file blocks are stored.
+      The permissions can be either octal or symbolic. If the default permissions are not set
+      then the default value of 700 will be used.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.container.db.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -206,6 +214,15 @@
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>Percentage of volume that should be reserved. This space is left free for other usage.
       The value should be between 0-1. Such as 0.1 which means 10% of volume space will be reserved.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.disk.balancer.enabled</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE, DISKBALANCER</tag>
+    <description>If this property is set to true, then the Disk Balancer
+      feature is enabled on Datanodes, and users can use
+      this service. By default, this is disabled.
     </description>
   </property>
   <property>
@@ -312,8 +329,8 @@
     <name>hdds.container.ratis.segment.size</name>
     <value>64MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the raft segment file used
-      by Apache Ratis on datanodes. (64 MB by default)
+    <description>The size of the raft segment file used by Apache Ratis
+      on datanodes. (64 MB by default)
     </description>
   </property>
   <property>
@@ -371,7 +388,6 @@
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
 
-
   <property>
     <name>hdds.prometheus.endpoint.enabled</name>
     <value>true</value>
@@ -415,7 +431,7 @@
   <property>
     <name>ozone.block.deleting.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>Time interval of the block deleting service.
       The block deleting service runs on each datanode periodically and
       deletes blocks queued for deletion. Unit could be defined with
@@ -425,7 +441,7 @@
   <property>
     <name>ozone.block.deleting.service.timeout</name>
     <value>300000ms</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>A timeout value of block deletion service. If this is set
       greater than 0,
       the service will stop waiting for the block deleting completion after this
@@ -438,7 +454,7 @@
   <property>
     <name>ozone.block.deleting.service.workers</name>
     <value>10</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>Number of workers executed of block deletion service. This
       configuration should be set to greater than 0.
     </description>
@@ -466,9 +482,21 @@
       postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
+    <name>ozone.client.elastic.byte.buffer.pool.max.size</name>
+    <value>16GB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The maximum total size of buffers that can be cached in the client-side
+      ByteBufferPool. This pool is used heavily during EC read and write operations.
+      Setting a limit prevents unbounded memory growth in long-lived rpc clients
+      like the S3 Gateway. Once this limit is reached, used buffers are not
+      put back to the pool and will be garbage collected.
+    </description>
+  </property>
+  <property>
     <name>ozone.key.deleting.limit.per.task</name>
-    <value>20000</value>
-    <tag>OM, PERFORMANCE</tag>
+    <value>50000</value>
+    <tag>OM, PERFORMANCE, DELETION</tag>
     <description>
       A maximum number of keys to be scanned by key deleting service
       per time interval in OM. Those keys are sent to delete metadata and
@@ -479,7 +507,7 @@
   <property>
     <name>ozone.snapshot.key.deleting.limit.per.task</name>
     <value>20000</value>
-    <tag>OM, PERFORMANCE</tag>
+    <tag>OM, PERFORMANCE, DELETION</tag>
     <description>
       The maximum number of deleted keys to be scanned by Snapshot
       Deleting Service per snapshot run.
@@ -554,6 +582,9 @@
     <description>
       The address of the Ozone OM service. This allows clients to discover
       the address of the OM.
+
+      When HA mode is enabled, append the service ID and node ID to each OM property. For example:
+      ozone.om.address.service1.om1
     </description>
   </property>
   <property>
@@ -583,6 +614,9 @@
       If the port is 0, then the server will start on a free port. However, it
       is best to specify a well-known port, so it is easy to connect and see
       the OM management UI.
+
+      When HA mode is enabled, append the service ID and node ID to each OM property. For example:
+      ozone.om.http-address.service1.om1
     </description>
   </property>
   <property>
@@ -593,6 +627,9 @@
       The actual address the OM web server will bind to. If this optional
       the address is set, it overrides only the hostname portion of
       ozone.om.http-address.
+
+      When HA mode is enabled, append the service ID and node ID to each OM property. For example:
+      ozone.om.http-bind-host.service1.om1
     </description>
   </property>
   <property>
@@ -611,6 +648,9 @@
       The address and the base port where the OM web UI will listen
       on using HTTPS.
       If the port is 0 then the server will start on a free port.
+
+      When HA mode is enabled, append the service ID and node ID to each OM property. For example:
+      ozone.om.https-address.service1.om1
     </description>
   </property>
   <property>
@@ -621,20 +661,9 @@
       The actual address the OM web server will bind to using HTTPS.
       If this optional address is set, it overrides only the hostname portion of
       ozone.om.https-address.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.volume.listall.allowed</name>
-    <value>true</value>
-    <tag>OM, MANAGEMENT</tag>
-    <description>
-      Allows everyone to list all volumes when set to true. Defaults to true.
-      When set to false, non-admin users can only list the volumes they have
-      access to. Admins can always list all volumes. Note that this config
-      only applies to OzoneNativeAuthorizer. For other authorizers, admin
-      needs to set policies accordingly to allow all volume listing
-      e.g. for Ranger, a new policy with special volume "/" can be added to
-      allow group public LIST access.
+
+      When HA mode is enabled, append the service ID and node ID to each OM property. For example:
+      ozone.om.https-bind-host.service1.om1
     </description>
   </property>
   <property>
@@ -653,11 +682,11 @@
   </property>
   <property>
     <name>ozone.om.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Ozone Manager. The
       permissions have to be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -675,8 +704,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.path.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
+    <description>A maximum number of paths(dirs/files) to be deleted by
+      directory deleting service per time interval.
+    </description>
+  </property>
+  <property>
     <name>ozone.metadata.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for fallback location for SCM, OM, Recon and DataNodes
       to store their metadata. The permissions have to be octal or symbolic. This is the fallback used in case the
@@ -721,11 +758,11 @@
   </property>
   <property>
     <name>ozone.scm.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Storage Container Manager. The
       permissions can either be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -754,13 +791,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.block.deletion.max.retry</name>
-    <value>4096</value>
-    <tag>OZONE, SCM</tag>
+    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
+    <value>8</value>
+    <tag>OZONE, SCM, DELETION</tag>
     <description>
-      SCM wraps up many blocks in a deletion transaction and sends that to data
-      node for physical deletion periodically. This property determines how many
-      times SCM is going to retry sending a deletion operation to the data node.
+      Factor with which number of delete blocks sent to each datanode in every interval.
+      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
+      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
     </description>
   </property>
   <property>
@@ -873,7 +910,7 @@
   <property>
     <name>ozone.scm.keyvalue.container.deletion-choosing.policy</name>
     <value>org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy</value>
-    <tag>OZONE, MANAGEMENT</tag>
+    <tag>OZONE, MANAGEMENT, DELETION</tag>
     <description>
       The policy used for choosing desired keyvalue containers for block deletion.
       Datanode selects some containers to process block deletion
@@ -901,7 +938,7 @@
       The full name of class which implements
       org.apache.hadoop.hdds.scm.PlacementPolicy.
       The class decides which datanode will be used to host the container replica. If not set,
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware will be used as default
       value.
     </description>
   </property>
@@ -913,7 +950,7 @@
       The full name of class which implements
       org.apache.hadoop.hdds.scm.PlacementPolicy.
       The class decides which datanode will be used to host the container replica in EC mode. If not set,
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter will be used as default
       value.
     </description>
   </property>
@@ -1510,7 +1547,7 @@
   </property>
 
   <property>
-    <name>ozone.compaction.service.enabled</name>
+    <name>ozone.om.compaction.service.enabled</name>
     <value>false</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
@@ -1547,11 +1584,29 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.compact.non.snapshot.diff.tables</name>
+    <value>false</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Enable or disable compaction of tables that are not tracked by snapshot diff when their snapshots are evicted from cache.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.rocksdb.metrics.enabled</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
     <description>
       Skip collecting RocksDBStore metrics for Snapshotted DB.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.db.checkpoint.use.inode.based.transfer</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Denotes if the OM bootstrap inode based transfer implementation is set as default.
     </description>
   </property>
 
@@ -1674,7 +1729,7 @@
 
   <property>
     <name>hdds.scm.safemode.min.datanode</name>
-    <value>1</value>
+    <value>3</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description>Minimum DataNodes which should be registered to get SCM out of
       safe mode.
@@ -1698,6 +1753,16 @@
     <description>
       Percentage of pipelines, where at least one datanode is reported in the
       pipeline.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.scm.safemode.log.interval</name>
+    <value>1m</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description>
+      Interval at which SCM logs safemode status while SCM is in safemode.
+      Default is 1 minute.
     </description>
   </property>
 
@@ -1748,37 +1813,6 @@
   </property>
 
   <property>
-    <name>hdds.scm.kerberos.keytab.file</name>
-    <value>/etc/security/keytabs/SCM.keytab</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description> The keytab file used by SCM daemon to login as its service principal.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.kerberos.principal</name>
-    <value>SCM/_HOST@REALM</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>The SCM service principal. e.g. scm/_HOST@REALM.COM</description>
-  </property>
-  <property>
-    <name>hdds.scm.http.auth.kerberos.principal</name>
-    <value>HTTP/_HOST@REALM</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>
-      SCM http server service principal if SPNEGO is enabled for SCM http server.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.http.auth.kerberos.keytab</name>
-    <value>/etc/security/keytabs/HTTP.keytab</value>
-    <tag>SCM, SECURITY, KERBEROS</tag>
-    <description>
-      The keytab file used by SCM http server to login as its service
-      principal if SPNEGO is enabled for SCM http server.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.s3.administrators</name>
     <value/>
     <tag>OZONE, SECURITY</tag>
@@ -1825,6 +1859,46 @@
     <description>
       Ozone read only admin groups delimited by the comma.
       If set, This is the list of groups are allowed to read operations skip checkAccess.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone blacklisted users delimited by the comma.
+      If set, This is the list of users that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone blacklisted groups delimited by the comma.
+      If set, This is the list of groups that are not allowed to do any operations even
+      if the blacklisted user is also under (readonly) admin / admin group,
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.users</name>
+    <value/>
+    <description>
+      Ozone read blacklist users delimited by the comma.
+      If set, This is the list of users are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.read.blacklist.groups</name>
+    <value/>
+    <description>
+      Ozone read blacklist groups delimited by the comma.
+      If set, This is the list of groups are not allowed to do any read operations even
+      if the blacklisted user is also under (readonly) admin / admin group.
     </description>
   </property>
 
@@ -1963,6 +2037,15 @@
   </property>
 
   <property>
+    <name>ozone.s3g.list.max.keys.limit</name>
+    <value>1000</value>
+    <description>
+      Maximum number of keys returned by S3 ListObjects/ListObjectsV2 API.
+      AWS default is 1000. Can be overridden per deployment in ozone-site.xml.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.secret.http.enabled</name>
     <value>false</value>
     <tag>OZONE, S3GATEWAY</tag>
@@ -2000,6 +2083,15 @@
     <description>Time interval used to store the omMetrics in to a
       file. Background thread periodically stores the OM metrics in to a
       file. Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.directory.metrics.update.interval</name>
+    <value>5m</value>
+    <tag>OZONE, OM</tag>
+    <description>Time interval used to update the space consumption stats of the
+      Ozone Manager snapshot directories. Background thread periodically calculates
+      and updates these stats. Unit could be defined with postfix (ns,ms,s,m,h,d)
     </description>
   </property>
   <property>
@@ -2129,10 +2221,10 @@
 
   <property>
     <name>ozone.om.ratis.segment.size</name>
-    <value>4MB</value>
+    <value>64MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the raft segment used by Apache Ratis on OM.
-      (4 MB by default)
+      (64 MB by default)
     </description>
   </property>
 
@@ -2141,7 +2233,7 @@
     <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on OM.(4 MB by default)
+      used by Apache Ratis on OM. (4 MB by default)
     </description>
   </property>
 
@@ -2157,6 +2249,13 @@
     <value>32MB</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
     <description>Byte limit for Raft's Log Worker queue.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.server.pending.write.element-limit</name>
+    <value>4096</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Maximum number of pending write requests.
     </description>
   </property>
   <property>
@@ -2255,7 +2354,7 @@
   </property>
   <property>
     <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
-    <value>100000000</value>
+    <value>10737418240</value>
     <tag>OZONE, OM, RATIS</tag>
     <description>
       Max size of SST files in OM Ratis Snapshot tarball.
@@ -2291,7 +2390,7 @@
 
   <property>
     <name>ozone.om.fs.snapshot.max.limit</name>
-    <value>1000</value>
+    <value>10000</value>
     <tag>OZONE, OM, MANAGEMENT</tag>
     <description>
       The maximum number of filesystem snapshot allowed in an Ozone Manager.
@@ -2310,6 +2409,20 @@
     <value>false</value>
     <tag>OZONE, SECURITY, ACL</tag>
     <description>Key to enable/disable ozone acls.</description>
+  </property>
+  <property>
+    <name>ozone.authorization.enabled</name>
+    <value>true</value>
+    <tag>OZONE, SECURITY, AUTHORIZATION</tag>
+    <description>
+      Master switch to enable/disable authorization checks in Ozone
+      (admin privilege checks and ACL checks).
+      This property only takes effect when ozone.security.enabled is true.
+      When true: admin privilege checks are always performed, and object
+      ACL checks are controlled by ozone.acl.enabled.
+      When false: no authorization checks are performed.
+      Default is true.
+    </description>
   </property>
   <property>
     <name>ozone.om.kerberos.keytab.file</name>
@@ -2441,6 +2554,24 @@
     <value>false</value>
     <tag>OZONE, HDDS, SECURITY, TLS</tag>
     <description>If HDDS GRPC server TLS is enabled.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.protocols</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS protocol versions for gRPC
+      server endpoints (e.g. "TLSv1.3" or "TLSv1.2,TLSv1.3"). When empty,
+      the TLS provider's defaults are used. Applies to server endpoints
+      only; clients are not restricted.</description>
+  </property>
+  <property>
+    <name>hdds.grpc.tls.ciphers</name>
+    <value></value>
+    <tag>OZONE, HDDS, SECURITY, TLS, CRYPTO_COMPLIANCE</tag>
+    <description>Comma-separated list of TLS cipher suites for gRPC server
+      endpoints (e.g. "TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256").
+      When empty, the TLS provider's defaults are used. Applies to server
+      endpoints only; clients are not restricted.</description>
   </property>
   <property>
     <name>hdds.x509.default.duration</name>
@@ -2713,6 +2844,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.db.config.path</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE</tag>
+    <description>
+      Path to an ini configuration file for RocksDB on datanode component.
+    </description>
+  </property>
+  <property>
     <name>hdds.priv.key.file.name</name>
     <value>private.pem</value>
     <tag>X509, SECURITY</tag>
@@ -2748,8 +2887,14 @@
     <name>ozone.manager.delegation.token.max-lifetime</name>
     <value>7d</value>
     <description>
-      Default max time interval after which ozone delegation token will
-      not be renewed.
+      Default max time interval after which ozone delegation token will not be renewed.
+      Delegation Token is signed and verified using secret key which has a max hdds.secret.key.expiry.duration lifetime.
+      To guarantee that the delegation token can be properly loaded, verified, and renewed during its lifetime,
+      (ozone.manager.delegation.token.max-lifetime + hdds.secret.key.rotate.duration + ozone.manager.delegation.remover.scan.interval)
+      must not be greater than hdds.secret.key.expiry.duration.
+      If any of ozone.manager.delegation.token.max-lifetime, hdds.secret.key.expiry.duration, hdds.secret.key.rotate.duration
+      or ozone.manager.delegation.remover.scan.interval value is changed, The above constrain must be checked and
+      values be adjusted accordingly if necessary.
     </description>
   </property>
 
@@ -2764,7 +2909,7 @@
 
   <property>
     <name>fs.trash.classname</name>
-    <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+    <value>org.apache.hadoop.fs.ozone.OzoneTrashPolicy</value>
     <tag>OZONE, OZONEFS, CLIENT</tag>
     <description>
       Trash Policy to be used.
@@ -2923,7 +3068,14 @@
       Comma separated list of users and groups allowed to access reconfigure protocol.
     </description>
   </property>
-
+  <property>
+    <name>hdds.security.client.datanode.disk.balancer.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access disk balancer protocol.
+    </description>
+  </property>
   <property>
     <name>hdds.datanode.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@REALM</value>
@@ -3040,9 +3192,9 @@
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
       failing over to another OzoneManager, if available. This parameter
-      represents the number of times the client will failover before giving
-      up. This value is kept high so that client does not give up trying to
-      connect to OMs easily.
+      represents the number of times per request the client will failover
+      before giving up. This value is kept high so that client does not
+      give up trying to connect to OMs easily.
     </description>
   </property>
   <property>
@@ -3053,6 +3205,36 @@
       to contact OM. Wait time increases linearly if same OM is retried
       again. If retrying on multiple OMs proxies in round robin fashion, the
       wait time is introduced after all the OM proxies have been attempted once.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.follower.read.enabled</name>
+    <value>false</value>
+    <description>
+      Enable client to read from OM followers. If false, all client
+      requests are sent to the OM leader.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.follower.read.default.consistency</name>
+    <value>LINEARIZABLE_ALLOW_FOLLOWER</value>
+    <description>
+      The default consistency when client enables follower read.
+      Currently, the supported follower read consistency are
+      LINEARIZABLE_ALLOW_FOLLOWER and LOCAL_LEASE
+      The default value is LINEARIZABLE_ALLOW_FOLLOWER to preserve the same strong
+      consistency behavior when switching from leader-only read to follower read.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.leader.read.default.consistency</name>
+    <value>DEFAULT</value>
+    <description>
+      The default consistency when client disables follower read.
+      Currently, the supported leader read consistency are
+      DEFAULT and LINEARIZABLE_LEADER_ONLY.
+      The default value is DEFAULT for backward compatibility reason
+      which is mostly strongly consistent.
     </description>
   </property>
   <property>
@@ -3244,11 +3426,52 @@
   </property>
   <property>
     <name>ozone.recon.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Recon. The
       permissions can either be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.export.directory</name>
+    <value></value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Directory where Recon stores exported TAR files containing unhealthy container
+      CSVs. When empty (default), the path is resolved at runtime as
+      {ozone.recon.db.dir}/exports so exports are co-located with Recon metadata.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.export.max.downloads</name>
+    <value>3</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Maximum number of times a completed export TAR file can be downloaded.
+      Once the limit is reached the download endpoint returns HTTP 429.
+      Prevents repeated downloads from misusing network bandwidth.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.export.max.jobs.total</name>
+    <value>4</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Maximum number of export jobs (waiting + executing) that can exist at once.
+      Submissions beyond this limit are rejected with HTTP 429. Kept small because
+      export is single-threaded and the number of distinct unhealthy-container
+      states is bounded.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.unhealthy.container.fetch.size</name>
+    <value>10000</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Number of rows Derby returns per JDBC round-trip when streaming unhealthy
+      container records during a CSV export. Higher values reduce round-trip
+      overhead at the cost of slightly more memory per fetch batch.
     </description>
   </property>
   <property>
@@ -3427,19 +3650,40 @@
     </description>
   </property>
   <property>
-    <name>hdds.tracing.enabled</name>
-    <value>false</value>
-    <tag>OZONE, HDDS</tag>
-    <description>
-      If enabled, tracing information is sent to tracing server.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.task.thread.count</name>
     <value>1</value>
     <tag>OZONE, RECON</tag>
     <description>
       The number of Recon Tasks that are waiting on updates from OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.om.event.buffer.capacity</name>
+    <value>20000</value>
+    <tag>OZONE, RECON, OM, PERFORMANCE</tag>
+    <description>
+      Maximum capacity of the event buffer used by Recon to queue OM delta updates
+      during task reinitialization. When tasks are being reprocessed on staging DB,
+      this buffer holds incoming delta updates to prevent blocking the OM sync process.
+      If the buffer overflows, task reinitialization will be triggered.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.minimum.api.delay</name>
+    <value>30s</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Minimum delay in API to start a new task for Jmx collection.
+      It behaves like a rate limiter to avoid unnecessary task creation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Maximum time taken for the api to complete.
+      If it exceeds pending tasks will be cancelled.
     </description>
   </property>
   <property>
@@ -3531,6 +3775,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.ssl.enabled.protocols</name>
+    <tag>OZONE,SECURITY,CRYPTO_COMPLIANCE</tag>
+    <value/>
+    <description>
+      The supported SSL protocols used to restrict connections towards the WebUI of different components,
+      and the S3 GateWay.
+    </description>
+  </property>
+  <property>
     <name>ssl.server.keystore.location</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value/>
@@ -3584,16 +3837,6 @@
     <value>500ms</value>
     <description>
       Thresholds for printing slow-operation audit logs.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.keyname.character.check.enabled</name>
-    <tag>OZONE, OM</tag>
-    <value>false</value>
-    <description>If true, then enable to check if the key name
-      contains illegal characters when creating/renaming key.
-      For the definition of illegal characters, follow the
-      rules in Amazon S3's object key naming guide.
     </description>
   </property>
 
@@ -3681,7 +3924,7 @@
   <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>Time interval of the directory deleting service. It runs on OM
       periodically and cleanup orphan directory and its sub-tree. For every
       orphan directory it deletes the sub-path tree structure(dirs/files). It
@@ -3692,7 +3935,7 @@
   <property>
     <name>ozone.snapshot.filtering.limit.per.task</name>
     <value>2</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>A maximum number of snapshots to be filtered by
       sst filtering service per time interval.
     </description>
@@ -3700,16 +3943,31 @@
   <property>
     <name>ozone.snapshot.deleting.limit.per.task</name>
     <value>10</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>The maximum number of snapshots that would be reclaimed by
       Snapshot Deleting Service per run.
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.defrag.limit.per.task</name>
+    <value>1</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>The maximum number of snapshots that would be defragmented in
+      each task run of snapshot defragmentation service.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>Time interval of the SST File filtering service from Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.defrag.service.interval</name>
+    <value>-1</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Task interval of snapshot defragmentation service.
     </description>
   </property>
   <property>
@@ -3724,8 +3982,15 @@
   <property>
     <name>ozone.sst.filtering.service.timeout</name>
     <value>300000ms</value>
-    <tag>OZONE, PERFORMANCE,OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>A timeout value of sst filtering service.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.defrag.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Timeout value of a run of snapshot defragmentation service.
     </description>
   </property>
 
@@ -3740,9 +4005,19 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.rename.allowed</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Allows the Ozone snapshot rename operation if set to true on the OM side.
+      Blocks it otherwise.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.snapshot.deleting.service.timeout</name>
     <value>300s</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       Timeout value for SnapshotDeletingService.
     </description>
@@ -3751,7 +4026,7 @@
   <property>
     <name>ozone.snapshot.deleting.service.interval</name>
     <value>30s</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       The time interval between successive SnapshotDeletingService
       thread run.
@@ -3761,26 +4036,26 @@
   <property>
     <name>ozone.snapshot.directory.service.timeout</name>
     <value>300s</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DEPRECATED</tag>
     <description>
-      Timeout value for SnapshotDirectoryCleaningService.
+      DEPRECATED. Timeout value for SnapshotDirectoryCleaningService.
     </description>
   </property>
 
   <property>
     <name>ozone.snapshot.directory.service.interval</name>
     <value>24h</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DEPRECATED</tag>
     <description>
-      The time interval between successive SnapshotDirectoryCleaningService
+      DEPRECATED. The time interval between successive SnapshotDirectoryCleaningService
       thread run.
     </description>
   </property>
 
   <property>
     <name>ozone.snapshot.deep.cleaning.enabled</name>
-    <value>false</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <value>true</value>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       Flag to enable/disable snapshot deep cleaning.
     </description>
@@ -3821,10 +4096,10 @@
   </property>
   <property>
     <name>ozone.scm.ha.ratis.segment.size</name>
-    <value>4MB</value>
+    <value>64MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the raft segment used by Apache Ratis on
-      SCM. (4 MB by default)
+      SCM. (64 MB by default)
     </description>
   </property>
   <property>
@@ -3832,7 +4107,7 @@
     <value>4MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the buffer which is preallocated for
-      raft segment used by Apache Ratis on SCM.(4 MB by default)
+      raft segment used by Apache Ratis on SCM. (4 MB by default)
     </description>
   </property>
   <property>
@@ -3961,7 +4236,7 @@
   </property>
   <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
-    <value>600s</value>
+    <value>60s</value>
     <tag>SCM, OZONE</tag>
     <description>Wait duration for flush of buffered transaction.</description>
   </property>
@@ -3997,7 +4272,7 @@
     <value>60000</value>
     <tag>OZONE, PERFORMANCE, S3GATEWAY</tag>
     <description>
-      OM/SCM/DN/S3GATEWAY Server connection timeout in milliseconds.
+      Ozone HTTP server connection timeout in milliseconds.
     </description>
   </property>
 
@@ -4058,18 +4333,6 @@
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.client.max.ec.stripe.write.retries</name>
-    <value>10</value>
-    <tag>CLIENT</tag>
-    <description>
-      When EC stripe write failed, client will request to allocate new block group and write the failed stripe into new
-      block group. If the same stripe failure continued in newly acquired block group also, then it will retry by
-      requesting to allocate new block group again. This configuration is used to limit these number of retries. By
-      default the number of retries are 10.
     </description>
   </property>
 
@@ -4153,24 +4416,13 @@
   </property>
 
   <property>
-    <name>ozone.client.fs.default.bucket.layout</name>
-    <value>FILE_SYSTEM_OPTIMIZED</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      Default bucket layout value used when buckets are created using OFS.
-      Supported values are LEGACY and FILE_SYSTEM_OPTIMIZED.
-      FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
-      also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
-      will create intermediate directories.
-    </description>
-  </property>
-    <property>
     <name>ozone.om.namespace.s3.strict</name>
     <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
-      Ozone namespace should follow S3 naming rule by default.
-      However this parameter allows the namespace to support non-S3 compatible characters.
+      When `true` (the default), volume and bucket names follow strict S3 naming rules.
+      When `false`, S3 rules still apply except that underscore (`_`) is additionally
+      allowed in volume and bucket names; no other non-S3 characters are permitted.
     </description>
   </property>
 
@@ -4181,6 +4433,16 @@
     <description>
       The size of the container locations cache in Ozone Manager. This cache allows Ozone Manager to populate
       block locations in key-read responses without calling SCM, thus increases Ozone Manager read performance.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.container.location.datanode.cache.size</name>
+    <value>10000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      The size of the datanode details cache used to reduce duplicate datanode objects
+      retained by the container location cache in Ozone Manager.
     </description>
   </property>
 
@@ -4242,6 +4504,43 @@
     <description>
       Maximum threshold number of entries to hold in memory for Container Key Mapper task in hashmap before flushing to
       recon rocks DB containerKeyTable
+    </description>
+  </property>
+    
+  <property>
+    <name>ozone.recon.filesizecount.flush.db.max.threshold</name>
+    <value>200000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for File Size Count task in hashmap before flushing to
+      recon derby DB
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.iterators</name>
+    <value>5</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of iterator threads to use for parallel table iteration during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.workers</name>
+    <value>20</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of worker threads to use for parallel table processing during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.keys.in.memory</name>
+    <value>2000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of keys to batch in memory before handing to worker threads during parallel reprocess
     </description>
   </property>
     
@@ -4345,8 +4644,18 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.prune.compaction.backup.batch.size</name>
+    <value>2000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Prune SST files in Compaction backup directory in batches every
+      ozone.om.snapshot.compaction.dag.prune.daemon.run.interval.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.compaction.dag.prune.daemon.run.interval</name>
-    <value>3600s</value>
+    <value>10m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which compaction DAG pruning daemon thread is running to remove older snapshots with compaction
@@ -4533,12 +4842,18 @@
   </property>
   <property>
     <name>hdds.secret.key.expiry.duration</name>
-    <value>7d</value>
+    <value>9d</value>
     <tag>SCM, SECURITY</tag>
     <description>
       The duration for which symmetric secret keys issued by SCM are valid.
-      This default value, in combination with hdds.secret.key.rotate.duration=1d, results in 7 secret keys (for the
-      last 7 days) are kept valid at any point of time.
+      Secret key is used to sign delegation tokens signed by OM, so the secret key must be valid for at least
+      (ozone.manager.delegation.token.max-lifetime + hdds.secret.key.rotate.duration + ozone.manager.delegation.remover.scan.interval)
+      time to guarantee that delegation tokens can be verified by OM. Considering the default value of three properties
+      mentioned and rounding up to days, this property's default value, in combination with hdds.secret.key.rotate.duration=1d,
+      results in 9 secret keys (for the last 9 days) are kept valid at any point of time.
+      If any of ozone.manager.delegation.token.max-lifetime, hdds.secret.key.rotate.duration or
+      ozone.manager.delegation.remover.scan.interval value is changed, this property should be checked, and updated
+      accordingly if necessary.
     </description>
   </property>
   <property>
@@ -4680,8 +4995,8 @@
   </property>
   <property>
     <name>hdds.datanode.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, DATANODE</tag>
+    <value>dn/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS, DATANODE</tag>
     <description>
       The Datanode service principal. This is typically set to
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
@@ -4746,5 +5061,32 @@
     <description>When KeyProvider is configured, the max retries allowed to attempt
       warm up edek cache if none of key successful on OM start up.
     </description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.soft.limit</name>
+    <value>1024</value>
+    <description>Soft limit for number of lock objects that could be idle in the pool.</description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.hard.limit</name>
+    <value>10000</value>
+    <description>Maximum number of lock objects that could be present in the pool.</description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.local.data.manager.service.interval</name>
+    <value>5m</value>
+    <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.events.max.limit</name>
+    <value>100</value>
+    <tag>OZONE, RATIS, SCM</tag>
+    <description>The maximum number of events that can be pending in SCM Ratis.</description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.events.max.limit</name>
+    <value>100</value>
+    <tag>OZONE, RATIS, OM</tag>
+    <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
 </configuration>

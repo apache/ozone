@@ -45,6 +45,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final long keyCount;
   private final long bytesUsed;
   private final boolean isEmpty;
+  private final ContainerChecksums checksums;
 
   private ContainerReplica(ContainerReplicaBuilder b) {
     this.containerID = Objects.requireNonNull(b.containerID, "containerID == null");
@@ -56,6 +57,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     this.replicaIndex = b.replicaIndex;
     this.isEmpty = b.isEmpty;
     this.sequenceId = b.sequenceId;
+    this.checksums = Objects.requireNonNull(b.checksums, "checksums == null");
   }
 
   public ContainerID getContainerID() {
@@ -120,6 +122,14 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return isEmpty;
   }
 
+  public ContainerChecksums getChecksums() {
+    return checksums;
+  }
+
+  public long getDataChecksum() {
+    return checksums.getDataChecksum();
+  }
+
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
@@ -174,7 +184,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .setOriginNodeId(originDatanodeId)
         .setReplicaIndex(replicaIndex)
         .setSequenceId(sequenceId)
-        .setEmpty(isEmpty);
+        .setEmpty(isEmpty)
+        .setChecksums(checksums);
   }
 
   @Override
@@ -188,6 +199,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         + ", keyCount=" + keyCount
         + ", bytesUsed=" + bytesUsed
         + ", " + (isEmpty ? "empty" : "non-empty")
+        + ", checksums=" + checksums
         + '}';
   }
 
@@ -205,6 +217,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private long keyCount;
     private int replicaIndex;
     private boolean isEmpty;
+    private ContainerChecksums checksums;
 
     /**
      * Set Container Id.
@@ -279,12 +292,20 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       return this;
     }
 
+    public ContainerReplicaBuilder setChecksums(ContainerChecksums checksums) {
+      this.checksums = checksums;
+      return this;
+    }
+
     /**
      * Constructs new ContainerReplicaBuilder.
      *
      * @return ContainerReplicaBuilder
      */
     public ContainerReplica build() {
+      if (this.checksums == null) {
+        this.checksums = ContainerChecksums.unknown();
+      }
       return new ContainerReplica(this);
     }
   }

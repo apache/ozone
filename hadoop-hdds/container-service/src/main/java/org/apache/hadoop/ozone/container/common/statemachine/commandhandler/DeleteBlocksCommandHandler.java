@@ -45,6 +45,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
@@ -64,6 +66,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
@@ -300,19 +303,31 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           if (keyValueContainer.
               writeLockTryLock(tryLockTimeoutMs, TimeUnit.MILLISECONDS)) {
             try {
-              String schemaVersion = containerData
-                  .getSupportedSchemaVersionOrDefault();
-              if (getSchemaHandlers().containsKey(schemaVersion)) {
-                schemaHandlers.get(schemaVersion).handle(containerData, tx);
+              // Re-fetch the container after acquiring the lock. DiskBalancer may have relocated
+              // this container to a different disk while we waited — in that case, the container
+              // object in ContainerSet has changed and containerData points to the old replica.
+              Container<?> current = containerSet.getContainer(containerId);
+              if (current == null || current.getContainerData() != containerData) {
+                LOG.debug("DeleteBlocks: containerData for container {} is stale "
+                    + ", Will retry on the new replica.",
+                    containerId);
+                lockAcquisitionFailed = true;
+                txResultBuilder.setContainerID(containerId).setSuccess(false);
               } else {
-                throw new UnsupportedOperationException(
-                    "Only schema version 1,2,3 are supported.");
+                String schemaVersion = containerData
+                    .getSupportedSchemaVersionOrDefault();
+                if (getSchemaHandlers().containsKey(schemaVersion)) {
+                  schemaHandlers.get(schemaVersion).handle(containerData, tx);
+                } else {
+                  throw new UnsupportedOperationException(
+                      "Only schema version 1,2,3 are supported.");
+                }
+                txResultBuilder.setContainerID(containerId)
+                    .setSuccess(true);
               }
             } finally {
               keyValueContainer.writeUnlock();
             }
-            txResultBuilder.setContainerID(containerId)
-                .setSuccess(true);
           } else {
             lockAcquisitionFailed = true;
             txResultBuilder.setContainerID(containerId)
@@ -333,6 +348,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
         Thread.currentThread().interrupt();
         txResultBuilder.setContainerID(containerId).setSuccess(false);
+      } catch (Exception e) {
+        LOG.error("Unexpected exception while deleting blocks for " +
+                "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
       }
       return new DeleteBlockTransactionExecutionResult(
           txResultBuilder.build(), lockAcquisitionFailed);
@@ -344,6 +363,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     ContainerBlocksDeletionACKProto blockDeletionACK = null;
     long startTime = Time.monotonicNow();
     boolean cmdExecuted = false;
+    int successCount = 0, failedCount = 0;
     try {
       // move blocks to deleting state.
       // this is a metadata update, the actual deletion happens in another
@@ -375,25 +395,27 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder().addAllResults(results);
-      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails()
-          .getUuid().toString());
+      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails().getUuidString());
       blockDeletionACK = resultBuilder.build();
 
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sending following block deletion ACK to SCM");
-          for (DeleteBlockTransactionResult result : blockDeletionACK
-              .getResultsList()) {
-            boolean success = result.getSuccess();
-            LOG.debug("TxId = {} : ContainerId = {} : {}",
-                result.getTxID(), result.getContainerID(), success);
-            if (success) {
-              blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
-            } else {
-              blockDeleteMetrics.incrProcessedTransactionFailCount(1);
-            }
+
+        for (DeleteBlockTransactionResult result : blockDeletionACK.getResultsList()) {
+          boolean success = result.getSuccess();
+
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("TxId = {} : ContainerId = {} : {}", result.getTxID(),
+                result.getContainerID(), success);
+          }
+
+          if (success) {
+            ++successCount;
+            blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
+          } else {
+            ++failedCount;
+            blockDeleteMetrics.incrProcessedTransactionFailCount(1);
           }
         }
       }
@@ -413,6 +435,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
       long endTime = Time.monotonicNow();
       this.opsLatencyMs.add(endTime - startTime);
+      LOG.info("Sending deletion ACK to SCM, successTransactionCount = {}," +
+          "failedTransactionCount = {}, time elapsed = {}", successCount, failedCount, opsLatencyMs);
       invocationCount++;
     }
   }
@@ -475,8 +499,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try {
         DeleteBlockTransactionExecutionResult result = f.get();
         handler.accept(result);
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (ExecutionException e) {
         LOG.error("task failed.", e);
+      } catch (InterruptedException e) {
+        LOG.error("task interrupted.", e);
         Thread.currentThread().interrupt();
       }
     });
@@ -632,10 +658,20 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               containerData.getPendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
+      // Update pending deletion blocks count, blocks bytes and delete transaction ID in in-memory container status.
+      // Persist pending bytes only if the feature is finalized.
+      if (VersionedDatanodeFeatures.isFinalized(
+          HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) && delTX.hasTotalSizePerReplica()) {
+        long pendingBytes = containerData.getBlockPendingDeletionBytes();
+        pendingBytes += delTX.getTotalSizePerReplica();
+        metadataTable
+            .putWithBatch(batchOperation,
+                containerData.getPendingDeleteBlockBytesKey(),
+                pendingBytes);
+      }
+      containerData.incrPendingDeletionBlocks(newDeletionBlocks,
+          delTX.hasTotalSizePerReplica() ? delTX.getTotalSizePerReplica() : 0);
       containerData.updateDeleteTransactionId(delTX.getTxID());
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
     }
   }
 
@@ -647,7 +683,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (metrics != null) {
         metrics.incOutOfOrderDeleteBlockTransactionCount();
       }
-      LOG.info(String.format("Delete blocks for containerId: %d"
+      LOG.debug(String.format("Delete blocks for containerId: %d"
               + " is received out of order, %d < %d", containerId, delTX.getTxID(),
           containerData.getDeleteTransactionId()));
     } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {
@@ -740,22 +776,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   public void setPoolSize(int size) {
-    if (size <= 0) {
-      throw new IllegalArgumentException("Pool size must be positive.");
-    }
-
-    int currentCorePoolSize = executor.getCorePoolSize();
-
-    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
-    // equal to the corePoolSize. We must make sure this invariant holds when
-    // changing the pool size. Therefore, we take into account whether the
-    // new size is greater or smaller than the current core pool size.
-    if (size > currentCorePoolSize) {
-      executor.setMaximumPoolSize(size);
-      executor.setCorePoolSize(size);
-    } else {
-      executor.setCorePoolSize(size);
-      executor.setMaximumPoolSize(size);
-    }
+    HddsServerUtil.setPoolSize(executor, size, LOG);
   }
 }

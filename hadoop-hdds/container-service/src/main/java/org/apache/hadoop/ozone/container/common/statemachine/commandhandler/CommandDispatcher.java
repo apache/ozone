@@ -23,7 +23,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -80,13 +82,17 @@ public final class CommandDispatcher {
     return handlerMap.get(Type.deleteBlocksCommand);
   }
 
+  public ClosePipelineCommandHandler getClosePipelineCommandHandler() {
+    return (ClosePipelineCommandHandler) handlerMap.get(Type.closePipelineCommand);
+  }
+
   /**
    * Dispatch the command to the correct handler.
    *
    * @param command - SCM Command.
    */
   public void handle(SCMCommand<?> command) {
-    Preconditions.checkNotNull(command);
+    Objects.requireNonNull(command, "command == null");
     CommandHandler handler = handlerMap.get(command.getType());
     if (handler != null) {
       commandHandlerMetrics.increaseCommandCount(command.getType());
@@ -111,15 +117,15 @@ public final class CommandDispatcher {
 
   /**
    * For each registered handler, call its getQueuedCount method to retrieve the
-   * number of queued commands. The returned map will contain an entry for every
+   * number of queued commands. The returned EnumCounters will contain an entry for every
    * registered command in the dispatcher, with a value of zero if there are no
    * queued commands.
-   * @return A Map of CommandType where the value is the queued command count.
+   * @return EnumCounters of CommandType with the queued command count.
    */
-  public Map<Type, Integer> getQueuedCommandCount() {
-    Map<Type, Integer> counts = new HashMap<>();
+  public EnumCounters<Type> getQueuedCommandCount() {
+    EnumCounters<Type> counts = new EnumCounters<>(Type.class);
     for (Map.Entry<Type, CommandHandler> entry : handlerMap.entrySet()) {
-      counts.put(entry.getKey(), entry.getValue().getQueuedCount());
+      counts.set(entry.getKey(), entry.getValue().getQueuedCount());
     }
     return counts;
   }
@@ -148,7 +154,7 @@ public final class CommandDispatcher {
      * @return Builder
      */
     public Builder addHandler(CommandHandler handler) {
-      Preconditions.checkNotNull(handler);
+      Objects.requireNonNull(handler, "handler == null");
       handlerList.add(handler);
       return this;
     }
@@ -160,7 +166,7 @@ public final class CommandDispatcher {
      * @return Builder
      */
     public Builder setContainer(OzoneContainer ozoneContainer) {
-      Preconditions.checkNotNull(ozoneContainer);
+      Objects.requireNonNull(ozoneContainer,  "ozoneContainer == null");
       this.container = ozoneContainer;
       return this;
     }
@@ -173,7 +179,7 @@ public final class CommandDispatcher {
      */
     public Builder setConnectionManager(SCMConnectionManager
         scmConnectionManager) {
-      Preconditions.checkNotNull(scmConnectionManager);
+      Objects.requireNonNull(scmConnectionManager, "scmConnectionManager == null");
       this.connectionManager = scmConnectionManager;
       return this;
     }
@@ -185,7 +191,7 @@ public final class CommandDispatcher {
      * @return this
      */
     public Builder setContext(StateContext stateContext) {
-      Preconditions.checkNotNull(stateContext);
+      Objects.requireNonNull(stateContext, "stateContext == null");
       this.context = stateContext;
       return this;
     }
@@ -195,10 +201,9 @@ public final class CommandDispatcher {
      * @return Command Dispatcher.
      */
     public CommandDispatcher build() {
-      Preconditions.checkNotNull(this.connectionManager,
-          "Missing scm connection manager.");
-      Preconditions.checkNotNull(this.container, "Missing ozone container.");
-      Preconditions.checkNotNull(this.context, "Missing state context.");
+      Objects.requireNonNull(connectionManager, "connectionManager == null");
+      Objects.requireNonNull(container, "container == null");
+      Objects.requireNonNull(context, "context == null");
       Preconditions.checkArgument(!this.handlerList.isEmpty(),
           "The number of command handlers must be greater than 0.");
       return new CommandDispatcher(this.container, this.connectionManager,

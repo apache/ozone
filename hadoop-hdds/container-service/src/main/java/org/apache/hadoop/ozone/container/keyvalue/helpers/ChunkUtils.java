@@ -38,7 +38,6 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
@@ -181,10 +180,7 @@ public final class ChunkUtils {
       FileChannel channel = null;
       try {
         channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
-
-        try (FileLock ignored = channel.lock()) {
-          return writeDataToChannel(channel, data, offset);
-        }
+        return writeDataToChannel(channel, data, offset);
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       } finally {
@@ -237,11 +233,8 @@ public final class ChunkUtils {
     }
 
     // Increment volumeIO stats here.
-    long endTime = Time.monotonicNow();
     if (volume != null) {
-      volume.getVolumeIOStats().incReadTime(endTime - startTime);
-      volume.getVolumeIOStats().incReadOpCount();
-      volume.getVolumeIOStats().incReadBytes(bytesRead);
+      volume.getVolumeIOStats().recordReadOperation(startTime, bytesRead);
     }
 
     LOG.debug("Read {} bytes starting at offset {} from {}",
@@ -496,7 +489,7 @@ public final class ChunkUtils {
     }
   }
 
-  public static void limitReadSize(long len)
+  public static int limitReadSize(long len)
       throws StorageContainerException {
     if (len > OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE) {
       String err = String.format(
@@ -505,6 +498,7 @@ public final class ChunkUtils {
       LOG.error(err);
       throw new StorageContainerException(err, UNSUPPORTED_REQUEST);
     }
+    return (int) len;
   }
 
   public static StorageContainerException wrapInStorageContainerException(

@@ -19,12 +19,15 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Condition;
@@ -48,8 +51,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -73,7 +76,7 @@ import org.slf4j.LoggerFactory;
  * TODO : currently not support multi-thread access.
  */
 public class KeyOutputStream extends OutputStream
-    implements Syncable, KeyMetadataAware {
+    implements Syncable, KeyCommitOutput {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
@@ -109,6 +112,12 @@ public class KeyOutputStream extends OutputStream
 
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+
+  @Override
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
+    this.preCommits = preCommits;
+  }
 
   @VisibleForTesting
   KeyOutputStreamSemaphore getRequestSemaphore() {
@@ -357,7 +366,7 @@ public class KeyOutputStream extends OutputStream
     }
 
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean retryFailure = checkForRetryFailure(t);
     boolean containerExclusionException = false;
     if (!retryFailure) {
@@ -384,7 +393,7 @@ public class KeyOutputStream extends OutputStream
         bufferedDataLen <= streamBufferArgs.getStreamBufferMaxSize());
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
-    Preconditions.checkNotNull(failedServers);
+    Objects.requireNonNull(failedServers, "failedServers == null");
     ExcludeList excludeList = blockOutputStreamEntryPool.getExcludeList();
     if (!failedServers.isEmpty()) {
       excludeList.addDatanodes(failedServers);
@@ -654,13 +663,17 @@ public class KeyOutputStream extends OutputStream
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
       }
+      for (CheckedRunnable<IOException> preCommit : preCommits) {
+        preCommit.run();
+      }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();
     }
   }
 
-  synchronized OmMultipartCommitUploadPartInfo
+  @Override
+  public synchronized OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }

@@ -17,7 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.metadata;
 
-import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -30,14 +31,14 @@ public class SCMDBTransactionBufferImpl implements DBTransactionBuffer {
   }
 
   @Override
-  public <KEY, VALUE> void addToBuffer(
-      Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
+  public <KEY, VALUE> void addToBuffer(Table<KEY, VALUE> table, KEY key, VALUE value)
+      throws RocksDatabaseException, CodecException {
     table.put(key, value);
   }
 
   @Override
   public <KEY, VALUE>void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
-      throws IOException {
+      throws RocksDatabaseException, CodecException {
     table.delete(key);
   }
 

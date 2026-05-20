@@ -34,6 +34,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
@@ -91,7 +92,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -123,6 +123,7 @@ public class TestOmMetadataManager {
       DELETED_TABLE,
       OPEN_KEY_TABLE,
       MULTIPART_INFO_TABLE,
+      MULTIPART_PARTS_TABLE,
       S3_SECRET_TABLE,
       DELEGATION_TOKEN_TABLE,
       PREFIX_TABLE,
@@ -603,6 +604,73 @@ public class TestOmMetadataManager {
 
   }
 
+  @Test
+  public void testListKeysWithEntriesInCacheAndDB() throws Exception {
+    String volumeNameA = "volumeA";
+    String ozoneBucket = "ozoneBucket";
+
+    // Create volumes and bucket.
+    OMRequestTestUtils.addVolumeToDB(volumeNameA, omMetadataManager);
+
+    addBucketsToCache(volumeNameA, ozoneBucket);
+
+    String prefixKeyA = "key-a";
+    TreeMap<String, OmKeyInfo> keyAMap = new TreeMap<>();
+
+    for (int i = 1; i <= 100; i++) {
+      if (i % 2 == 0) {
+        // Add to DB
+        addKeysToOM(volumeNameA, ozoneBucket, prefixKeyA + i, i);
+
+        String key = omMetadataManager.getOzoneKey(volumeNameA,
+            ozoneBucket, prefixKeyA + i);
+        // Key is overwritten in cache (with higher updateID),
+        // but the cache has not been flushed to the DB
+        OmKeyInfo overwriteKey = OMRequestTestUtils.createOmKeyInfo(volumeNameA, ozoneBucket, prefixKeyA + i,
+            RatisReplicationConfig.getInstance(ONE)).setUpdateID(100L).build();
+        omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
+            new CacheKey<>(key),
+            CacheValue.get(100L, overwriteKey));
+        keyAMap.put(prefixKeyA + i, overwriteKey);
+      } else {
+        // Add to cache
+        OmKeyInfo omKeyInfo = addKeysToOM(volumeNameA, ozoneBucket, prefixKeyA + i, i);
+        keyAMap.put(prefixKeyA + i, omKeyInfo);
+      }
+    }
+
+    // Now list keys which match with prefixKeyA.
+    List<OmKeyInfo> omKeyInfoList =
+        omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+            null, prefixKeyA, 1000).getKeys();
+
+    assertEquals(100, omKeyInfoList.size());
+
+    TreeMap<String, OmKeyInfo> currentKeys = new TreeMap<>();
+
+    for (OmKeyInfo omKeyInfo : omKeyInfoList) {
+      currentKeys.put(omKeyInfo.getKeyName(), omKeyInfo);
+      assertTrue(omKeyInfo.getKeyName().startsWith(prefixKeyA));
+    }
+
+    assertEquals(keyAMap, currentKeys);
+
+    omKeyInfoList =
+        omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+            null, prefixKeyA, 100).getKeys();
+    assertEquals(100, omKeyInfoList.size());
+
+    omKeyInfoList =
+        omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+            null, prefixKeyA, 98).getKeys();
+    assertEquals(98, omKeyInfoList.size());
+
+    omKeyInfoList =
+        omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+            null, prefixKeyA, 1).getKeys();
+    assertEquals(1, omKeyInfoList.size());
+  }
+
   /**
    * Tests inner impl of listOpenFiles with different bucket types with and
    * without pagination. NOTE: This UT does NOT test hsync here since the hsync
@@ -629,14 +697,15 @@ public class TestOmMetadataManager {
 
     int numOpenKeys = 3;
     for (int i = 0; i < numOpenKeys; i++) {
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyPrefix + i,
-              RatisReplicationConfig.getInstance(ONE))
-          .build();
+      OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyPrefix + i,
+          RatisReplicationConfig.getInstance(ONE));
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(i);
+      }
+      final OmKeyInfo keyInfo = keyInfoBuilder.build();
 
       final String dbOpenKeyName;
       if (bucketLayout.isFileSystemOptimized()) {
-        keyInfo.setParentObjectID(i);
-        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addFileToKeyTable(true, false,
             keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
         dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
@@ -746,15 +815,16 @@ public class TestOmMetadataManager {
     for (int i = 0; i < numExpiredOpenKeys + numUnexpiredOpenKeys; i++) {
       final long creationTime = i < numExpiredOpenKeys ?
           expiredOpenKeyCreationTime : Time.now();
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+      final OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
               volumeName, bucketName, "expired" + i, RatisReplicationConfig.getInstance(ONE))
-          .setCreationTime(creationTime)
-          .build();
+          .setCreationTime(creationTime);
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(i);
+      }
+      final OmKeyInfo keyInfo = keyInfoBuilder.build();
 
       final String dbOpenKeyName;
       if (bucketLayout.isFileSystemOptimized()) {
-        keyInfo.setParentObjectID(i);
-        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addFileToKeyTable(true, false,
             keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
         dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
@@ -819,10 +889,13 @@ public class TestOmMetadataManager {
     // Ensure that "expired" MPU-related open keys are not fetched.
     // MPU-related open keys, identified by isMultipartKey = false
     for (int i = 0; i < numExpiredMPUOpenKeys; i++) {
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "expired" + i,
+      final OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "expired" + i,
               RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
-          .setCreationTime(expiredOpenKeyCreationTime)
-          .build();
+          .setCreationTime(expiredOpenKeyCreationTime);
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(i);
+      }
+      final OmKeyInfo keyInfo = keyInfoBuilder.build();
       assertThat(keyInfo.getModificationTime()).isPositive();
 
       final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
@@ -832,8 +905,6 @@ public class TestOmMetadataManager {
               HddsProtos.ReplicationFactor.ONE, 0L);
 
       if (bucketLayout.isFileSystemOptimized()) {
-        keyInfo.setParentObjectID(i);
-        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
             keyInfo.getFileName(), keyInfo, uploadId, 0L, omMetadataManager);
       } else {
@@ -853,10 +924,13 @@ public class TestOmMetadataManager {
     // HDDS-9017. Although these open keys are MPU-related,
     // the isMultipartKey flags are set to false
     for (int i = numExpiredMPUOpenKeys; i < 2 * numExpiredMPUOpenKeys; i++) {
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+      final OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
               volumeName, bucketName, "expired" + i, RatisReplicationConfig.getInstance(ONE))
-          .setCreationTime(expiredOpenKeyCreationTime)
-          .build();
+          .setCreationTime(expiredOpenKeyCreationTime);
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(i);
+      }
+      final OmKeyInfo keyInfo = keyInfoBuilder.build();
 
       final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
       final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
@@ -865,8 +939,6 @@ public class TestOmMetadataManager {
               HddsProtos.ReplicationFactor.ONE, 0L);
 
       if (bucketLayout.isFileSystemOptimized()) {
-        keyInfo.setParentObjectID(i);
-        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
         OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
             keyInfo.getFileName(), keyInfo, uploadId, 0L, omMetadataManager);
       } else {
@@ -989,14 +1061,14 @@ public class TestOmMetadataManager {
         .collect(Collectors.toList());
   }
 
-  private void addKeysToOM(String volumeName, String bucketName,
+  private OmKeyInfo addKeysToOM(String volumeName, String bucketName,
       String keyName, int i) throws Exception {
 
     if (i % 2 == 0) {
-      OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+      return OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
           1000L, RatisReplicationConfig.getInstance(ONE), omMetadataManager);
     } else {
-      OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName, keyName,
+      return OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName, keyName,
           RatisReplicationConfig.getInstance(ONE),
           omMetadataManager);
     }

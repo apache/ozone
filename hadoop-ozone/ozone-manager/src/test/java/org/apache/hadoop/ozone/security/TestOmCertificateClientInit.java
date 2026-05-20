@@ -60,9 +60,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestOmCertificateClientInit {
 
   private KeyPair keyPair;
-  private String certSerialId = "3284792342234";
   private OMCertificateClient omCertificateClient;
-  private HDDSKeyGenerator keyGenerator;
   private SecurityConfig securityConfig;
   private KeyStorage omKeyStorage;
   private X509Certificate x509Certificate;
@@ -86,10 +84,10 @@ public class TestOmCertificateClientInit {
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(HDDS_METADATA_DIR_NAME, metaDirPath.toString());
     securityConfig = new SecurityConfig(config);
-    keyGenerator = new HDDSKeyGenerator(securityConfig);
+    HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGenerator.generateKey();
     x509Certificate = getX509Certificate();
-    certSerialId = x509Certificate.getSerialNumber().toString();
+    String certSerialId = x509Certificate.getSerialNumber().toString();
     OMStorage storage = mock(OMStorage.class);
     when(storage.getOmCertSerialId()).thenReturn(certSerialId);
     when(storage.getClusterID()).thenReturn("test");

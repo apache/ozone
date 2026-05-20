@@ -36,6 +36,17 @@ public abstract class ExtendedInputStream extends InputStream
 
   protected static final int EOF = -1;
 
+  /**
+   * Positioned read.
+   *
+   * @param position the starting position of the read.
+   * @param buffer the buffer for storing the data.
+   * @return true iff positioned read is supported in this implementation.
+   */
+  public boolean readFully(long position, ByteBuffer buffer) throws IOException {
+    return false;
+  }
+
   @Override
   public synchronized int read() throws IOException {
     byte[] buf = new byte[1];
@@ -47,19 +58,16 @@ public abstract class ExtendedInputStream extends InputStream
 
   @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
-    ByteReaderStrategy strategy = new ByteArrayReader(b, off, len);
-    int bufferLen = strategy.getTargetLength();
-    if (bufferLen == 0) {
-      return 0;
-    }
-    return readWithStrategy(strategy);
+    return read(new ByteArrayReader(b, off, len));
   }
 
   @Override
   public synchronized int read(ByteBuffer byteBuffer) throws IOException {
-    ByteReaderStrategy strategy = new ByteBufferReader(byteBuffer);
-    int bufferLen = strategy.getTargetLength();
-    if (bufferLen == 0) {
+    return read(new ByteBufferReader(byteBuffer));
+  }
+
+  public synchronized int read(ByteReaderStrategy strategy) throws IOException {
+    if (strategy.getTargetLength() == 0) {
       return 0;
     }
     return readWithStrategy(strategy);

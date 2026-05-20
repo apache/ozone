@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.SNAPSHOT_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 import java.io.IOException;
@@ -92,11 +92,13 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isOwner(ugi, bucketOwner)) {
-      throw new OMException(
-          "Only bucket owners and Ozone admins can delete snapshots",
-          OMException.ResultCodes.PERMISSION_DENIED);
+    if (ozoneManager.isAdminAuthorizationEnabled()) {
+      if (!ozoneManager.isAdmin(ugi) &&
+          !ozoneManager.isOwner(ugi, bucketOwner)) {
+        throw new OMException(
+            "Only bucket owners and Ozone admins can delete snapshots",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
     }
 
     // Set deletion time here so OM leader and follower would have the

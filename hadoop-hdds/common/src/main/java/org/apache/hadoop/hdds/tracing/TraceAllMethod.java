@@ -19,15 +19,13 @@ package org.apache.hadoop.hdds.tracing;
 
 import static java.util.Collections.emptyMap;
 
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * A Java proxy invocation handler to trace all the methods of the delegate
@@ -40,8 +38,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
   /**
    * Cache for all the method objects of the delegate class.
    */
-  private final Map<String, Map<Class<?>[], Method>> methods = new HashMap<>();
-
+  private final Map<String, Map<Class<?>[], Pair<Boolean, Method>>> methods = new HashMap<>();
   private final T delegate;
 
   private final String name;
@@ -53,24 +50,22 @@ public class TraceAllMethod<T> implements InvocationHandler {
       if (method.getDeclaringClass().equals(Object.class)) {
         continue;
       }
+      boolean shouldSkip = method.isAnnotationPresent(SkipTracing.class);
       methods.computeIfAbsent(method.getName(), any -> new HashMap<>())
-          .put(method.getParameterTypes(), method);
+          .put(method.getParameterTypes(), Pair.of(shouldSkip, method));
     }
   }
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args)
       throws Throwable {
-    Method delegateMethod = findDelegatedMethod(method);
-    if (delegateMethod == null) {
-      throw new NoSuchMethodException("Method not found: " +
-        method.getName());
+    Pair<Boolean, Method> methodInfo = findDelegatedMethod(method);
+    if (methodInfo == null) {
+      throw new NoSuchMethodException("Method not found: " + method.getName());
     }
-
-    Span span = GlobalTracer.get().buildSpan(
-        name + "." + method.getName())
-        .start();
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+    boolean shouldSkip = methodInfo.getLeft();
+    Method delegateMethod = methodInfo.getRight();
+    if (shouldSkip) {
       try {
         return delegateMethod.invoke(delegate, args);
       } catch (Exception ex) {
@@ -79,14 +74,24 @@ public class TraceAllMethod<T> implements InvocationHandler {
         } else {
           throw ex;
         }
-      } finally {
-        span.finish();
+      }
+    }
+
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(name + "." + method.getName())) {
+      try {
+        return delegateMethod.invoke(delegate, args);
+      } catch (Exception ex) {
+        if (ex.getCause() != null) {
+          throw ex.getCause();
+        } else {
+          throw ex;
+        }
       }
     }
   }
 
-  private Method findDelegatedMethod(Method method) {
-    for (Entry<Class<?>[], Method> entry : methods.getOrDefault(
+  private Pair<Boolean, Method> findDelegatedMethod(Method method) {
+    for (Entry<Class<?>[], Pair<Boolean, Method>> entry : methods.getOrDefault(
         method.getName(), emptyMap()).entrySet()) {
       if (Arrays.equals(entry.getKey(), method.getParameterTypes())) {
         return entry.getValue();

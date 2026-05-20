@@ -28,7 +28,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 import com.google.common.base.Preconditions;
@@ -40,11 +40,13 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -53,7 +55,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -61,13 +62,13 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -176,80 +177,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         resolvedArgs.getBucketName(), keyArgs.getKeyName(),
         aclType, clientId);
     return resolvedArgs;
-  }
-
-  /**
-   * Define the parameters carried when verifying the Key.
-   */
-  public static class ValidateKeyArgs {
-    private String snapshotReservedWord;
-    private String keyName;
-    private boolean validateSnapshotReserved;
-    private boolean validateKeyName;
-
-    ValidateKeyArgs(String snapshotReservedWord, String keyName,
-        boolean validateSnapshotReserved, boolean validateKeyName) {
-      this.snapshotReservedWord = snapshotReservedWord;
-      this.keyName = keyName;
-      this.validateSnapshotReserved = validateSnapshotReserved;
-      this.validateKeyName = validateKeyName;
-    }
-
-    public String getSnapshotReservedWord() {
-      return snapshotReservedWord;
-    }
-
-    public String getKeyName() {
-      return keyName;
-    }
-
-    public boolean isValidateSnapshotReserved() {
-      return validateSnapshotReserved;
-    }
-
-    public boolean isValidateKeyName() {
-      return validateKeyName;
-    }
-
-    /**
-     * Tools for building {@link ValidateKeyArgs}.
-     */
-    public static class Builder {
-      private String snapshotReservedWord;
-      private String keyName;
-      private boolean validateSnapshotReserved;
-      private boolean validateKeyName;
-
-      public Builder setSnapshotReservedWord(String snapshotReservedWord) {
-        this.snapshotReservedWord = snapshotReservedWord;
-        this.validateSnapshotReserved = true;
-        return this;
-      }
-
-      public Builder setKeyName(String keyName) {
-        this.keyName = keyName;
-        this.validateKeyName = true;
-        return this;
-      }
-
-      public ValidateKeyArgs build() {
-        return new ValidateKeyArgs(snapshotReservedWord, keyName,
-            validateSnapshotReserved, validateKeyName);
-      }
-    }
-  }
-
-  protected void validateKey(OzoneManager ozoneManager, ValidateKeyArgs validateKeyArgs)
-      throws OMException {
-    if (validateKeyArgs.isValidateSnapshotReserved()) {
-      OmUtils.verifyKeyNameWithSnapshotReservedWord(validateKeyArgs.getSnapshotReservedWord());
-    }
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-        .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-            OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (validateKeyArgs.isValidateKeyName() && checkKeyNameEnabled) {
-      OmUtils.validateKeyName(validateKeyArgs.getKeyName());
-    }
   }
 
   /**
@@ -397,17 +324,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
         });
     long generateEDEKTime = monotonicNow() - generateEDEKStartTime;
     LOG.debug("generateEDEK takes {} ms", generateEDEKTime);
-    Preconditions.checkNotNull(edek);
+    Objects.requireNonNull(edek, "edek == null");
     return edek;
   }
 
   protected List<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      PrefixManager prefixManager, OzoneConfiguration config) throws OMException {
+      PrefixManager prefixManager, OmConfig config) throws OMException {
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.addAll(getDefaultAclList(createUGIForApi(), config));
-    if (keyArgs.getAclsList() != null) {
+    if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
 
@@ -463,7 +390,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
    */
   protected List<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
-      OMFileRequest.OMPathInfo omPathInfo, OzoneConfiguration config) throws OMException {
+      OMFileRequest.OMPathInfo omPathInfo, OmConfig config) throws OMException {
     // Acls inherited from parent or bucket will convert to DEFAULT scope
     List<OzoneAcl> acls = new ArrayList<>();
     // add default ACLs
@@ -481,7 +408,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
 
     // add acls from clients
-    acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+    if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
+      acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+    }
     acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
@@ -528,7 +457,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           missingKey);
       OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
           keyArgs, nextObjId, lastKnownParentId, trxnLogIndex,
-          bucketInfo, pathInfo, ozoneManager.getConfiguration());
+          bucketInfo, pathInfo, ozoneManager.getConfig());
       objectCount++;
 
       missingParentInfos.add(dirInfo);
@@ -584,7 +513,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OmKeyInfo parentKeyInfo =
           createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
               bucketInfo, omPathInfo, trxnLogIndex,
-              ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfiguration());
+              ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfig());
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
@@ -609,7 +538,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       String dirName, KeyArgs keyArgs, long objectId,
       long parentObjectId, long transactionIndex,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      OzoneConfiguration config) throws OMException {
+      OmConfig config) throws OMException {
     return OmDirectoryInfo.newBuilder()
         .setName(dirName)
         .setOwner(keyArgs.getOwnerName())
@@ -640,7 +569,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
       KeyArgs keyArgs, long objectId, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, long transactionIndex,
-      ReplicationConfig serverDefaultReplConfig, OzoneConfiguration config) throws OMException {
+      ReplicationConfig serverDefaultReplConfig, OmConfig config) throws OMException {
     return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId,
         serverDefaultReplConfig)
         .setAcls(getAclsForDir(keyArgs, bucketInfo, omPathInfo, config))
@@ -912,7 +841,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OMMetadataManager metadataManager, OmBucketInfo omBucketInfo,
       long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      long usedBytes = omBucketInfo.getUsedBytes();
+      long usedBytes = omBucketInfo.getTotalBucketSpace();
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
       if (quotaInBytes - usedBytes < allocateSize) {
         throw new OMException("The DiskSpace quota of bucket:"
@@ -930,7 +859,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void checkBucketQuotaInNamespace(OmBucketInfo omBucketInfo,
       long allocatedNamespace) throws IOException {
     if (omBucketInfo.getQuotaInNamespace() > OzoneConsts.QUOTA_RESET) {
-      long usedNamespace = omBucketInfo.getUsedNamespace();
+      long usedNamespace = omBucketInfo.getTotalBucketNamespace();
       long quotaInNamespace = omBucketInfo.getQuotaInNamespace();
       long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
       if (quotaInNamespace < toUseNamespaceInTotal) {
@@ -963,9 +892,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
+   * @return the number of bytes (replicated size) used by blocks pointed to by {@code omKeyInfo}.
    */
-  protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
+  public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
       for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
@@ -981,7 +910,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * Return bucket info for the specified bucket.
    */
   @Nullable
-  protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
+  public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
       String volume, String bucket) {
     String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
 
@@ -1006,7 +935,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
-          ReplicationConfig replicationConfig, OzoneConfiguration config)
+          ReplicationConfig replicationConfig, OmConfig config)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
@@ -1030,7 +959,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
           ReplicationConfig replicationConfig,
-          OzoneConfiguration config) throws IOException {
+          OmConfig config) throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
               size, locations, encInfo, prefixManager, omBucketInfo,
@@ -1047,30 +976,25 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (omBucketInfo.getIsVersionEnabled()) {
         newSize += dbKeyInfo.getDataSize();
       }
-      dbKeyInfo.setDataSize(newSize);
       // The modification time is set in preExecute. Use the same
       // modification time.
-      dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      dbKeyInfo.setUpdateID(transactionLogIndex);
-      dbKeyInfo.setReplicationConfig(replicationConfig);
-
-      // Construct a new metadata map from KeyArgs.
-      dbKeyInfo.getMetadata().clear();
-      dbKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
-          keyArgs.getMetadataList()));
-
+      // Construct a new metadata map from KeyArgs by rebuilding via toBuilder.
       // Construct a new tags from KeyArgs
       // Clear the old one when the key is overwritten
-      dbKeyInfo.getTags().clear();
-      dbKeyInfo.getTags().putAll(KeyValueUtil.getFromProtobuf(
-          keyArgs.getTagsList()));
+      final OmKeyInfo.Builder builder = dbKeyInfo.toBuilder()
+          .setDataSize(newSize)
+          .setModificationTime(keyArgs.getModificationTime())
+          .setReplicationConfig(replicationConfig)
+          .setMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
+          .setUpdateID(transactionLogIndex)
+          .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setFileEncryptionInfo(encInfo);
 
       if (keyArgs.hasExpectedDataGeneration()) {
-        dbKeyInfo.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+        builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
 
-      dbKeyInfo.setFileEncryptionInfo(encInfo);
-      return dbKeyInfo;
+      return builder.build();
     }
 
     // the key does not exist, create a new object.
@@ -1095,7 +1019,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfo omPathInfo,
       long transactionLogIndex, long objectID,
-      OzoneConfiguration config) throws OMException {
+      OmConfig config) throws OMException {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
@@ -1116,13 +1040,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setUpdateID(transactionLogIndex)
             .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
+    if (keyArgs.hasExpectedDataGeneration()) {
+      builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+    }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
       OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
           = (OMFileRequest.OMPathInfoWithFSO) omPathInfo;
       objectID = omPathInfoFSO.getLeafNodeObjectId();
       builder.setParentObjectID(omPathInfoFSO.getLastKnownParentId());
-      builder.setFileName(omPathInfoFSO.getLeafNodeName());
     }
     builder.setObjectID(objectID);
     return builder.build();
@@ -1143,7 +1069,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           @Nonnull long transactionLogIndex, long objectID,
-          OzoneConfiguration configuration) throws IOException {
+          OmConfig configuration) throws IOException {
 
     Preconditions.checkArgument(args.getMultipartNumber() > 0,
             "PartNumber Should be greater than zero");
@@ -1152,7 +1078,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // initiate multipart upload. If we have not found any such, we throw
     // error no such multipart upload.
     String uploadID = args.getMultipartUploadID();
-    Preconditions.checkNotNull(uploadID);
+    Objects.requireNonNull(uploadID, "uploadID == null");
     String multipartKey = "";
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
@@ -1208,13 +1134,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * Prepare key for deletion service on overwrite.
    *
    * @param keyToDelete OmKeyInfo of a key to be in deleteTable
+   * @param bucketId
    * @param trxnLogIndex
    * @return Old keys eligible for deletion.
    * @throws IOException
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
-      @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex) throws IOException {
-    return OmUtils.prepareKeyForDelete(keyToDelete, trxnLogIndex);
+      @Nonnull OmKeyInfo keyToDelete, long bucketId, long trxnLogIndex) throws IOException {
+    return OmUtils.prepareKeyForDelete(bucketId, keyToDelete, trxnLogIndex);
   }
 
   protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager) {
@@ -1231,15 +1158,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected OmKeyInfo wrapUncommittedBlocksAsPseudoKey(
       List<OmKeyLocationInfo> uncommitted, OmKeyInfo omKeyInfo) {
-    if (uncommitted.isEmpty()) {
+    if (uncommitted.isEmpty() || omKeyInfo.getDataSize() == 0) {
       return null;
     }
     LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
-    OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder()
+        .setObjectID(OBJECT_ID_RECLAIM_BLOCKS)
+        .build();
     // This is a special marker to indicate that SnapshotDeletingService
     // can reclaim this key's blocks unconditionally.
-    pseudoKeyInfo.setObjectID(OBJECT_ID_RECLAIM_BLOCKS);
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,
@@ -1247,6 +1175,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
     uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
     pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
     return pseudoKeyInfo;
+  }
+
+  protected static Map<String, RepeatedOmKeyInfo> addKeyInfoToDeleteMap(OzoneManager om,
+      long trxnLogIndex, String ozoneKey, long bucketId, OmKeyInfo keyInfo, Map<String, RepeatedOmKeyInfo> deleteMap) {
+    if (keyInfo == null) {
+      return deleteMap;
+    }
+    final long pseudoObjId = om.getObjectIdFromTxId(trxnLogIndex);
+    final String delKeyName = om.getMetadataManager().getOzoneDeletePathKey(pseudoObjId, ozoneKey);
+    if (deleteMap == null) {
+      deleteMap = new HashMap<>();
+    }
+    deleteMap.computeIfAbsent(delKeyName, key -> new RepeatedOmKeyInfo(bucketId))
+        .addOmKeyInfo(keyInfo);
+    return deleteMap;
   }
 
   /**
@@ -1258,20 +1201,20 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param referenceKey OmKeyInfo
    * @param keysToBeFiltered RepeatedOmKeyInfo
    */
-  protected void filterOutBlocksStillInUse(OmKeyInfo referenceKey,
-                                           RepeatedOmKeyInfo keysToBeFiltered) {
+  protected Pair<Map<OmKeyInfo, List<OmKeyLocationInfo>>, Integer> filterOutBlocksStillInUse(OmKeyInfo referenceKey,
+      RepeatedOmKeyInfo keysToBeFiltered) {
 
     LOG.debug("Before block filtering, keysToBeFiltered = {}",
         keysToBeFiltered);
 
     // A HashSet for fast lookup. Gathers all ContainerBlockID entries inside
     // the referenceKey.
-    HashSet<ContainerBlockID> cbIdSet = referenceKey.getKeyLocationVersions()
+    Map<ContainerBlockID, OmKeyLocationInfo> cbIdSet = referenceKey.getKeyLocationVersions()
         .stream()
         .flatMap(e -> e.getLocationList().stream())
-        .map(omKeyLocationInfo ->
-            omKeyLocationInfo.getBlockID().getContainerBlockID())
-        .collect(Collectors.toCollection(HashSet::new));
+        .collect(Collectors.toMap(omKeyLocationInfo -> omKeyLocationInfo.getBlockID().getContainerBlockID(),
+            Function.identity()));
+    Map<OmKeyInfo, List<OmKeyLocationInfo>> filteredOutBlocks = new HashMap<>();
 
     // Pardon the nested loops. ContainerBlockID is 9-layer deep from:
     // keysToBeFiltered               // Layer 0. RepeatedOmKeyInfo
@@ -1290,7 +1233,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Layer 1: List<OmKeyInfo>
     Iterator<OmKeyInfo> iterOmKeyInfo = keysToBeFiltered
         .getOmKeyInfoList().iterator();
-
+    int emptyKeyRemovedCount = 0;
     while (iterOmKeyInfo.hasNext()) {
       // Note with HDDS-8462, each RepeatedOmKeyInfo should have only one entry,
       // so this outer most loop should never be entered twice in each call.
@@ -1324,8 +1267,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
             ContainerBlockID cbId = keyLocationInfo
                 .getBlockID().getContainerBlockID();
 
-            if (cbIdSet.contains(cbId)) {
+            if (cbIdSet.containsKey(cbId)) {
               // Remove this block from oldVerKeyInfo because it is referenced.
+              filteredOutBlocks.computeIfAbsent(oldOmKeyInfo, (k) -> new ArrayList<>()).add(keyLocationInfo);
               iterKeyLocInfo.remove();
               LOG.debug("Filtered out block: {}", cbId);
             }
@@ -1345,6 +1289,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
       // Cleanup when Layer 3 is an empty list
       if (oldOmKeyInfo.getKeyLocationVersions().isEmpty()) {
+        emptyKeyRemovedCount++;
         iterOmKeyInfo.remove();
       }
     }
@@ -1352,6 +1297,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Intentional extra space for alignment
     LOG.debug("After block filtering,  keysToBeFiltered = {}",
         keysToBeFiltered);
+    return Pair.of(filteredOutBlocks, emptyKeyRemovedCount);
   }
 
   protected void validateEncryptionKeyInfo(OmBucketInfo bucketInfo, KeyArgs keyArgs) throws OMException {
@@ -1359,5 +1305,98 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw new OMException("Attempting to create unencrypted file " +
           keyArgs.getKeyName() + " in encrypted bucket " + keyArgs.getBucketName(), INVALID_REQUEST);
     }
+  }
+
+  /**
+   * Validates atomic rewrite conditions for conditional writes.
+   * <p>
+   * For If-None-Match: * (expectedDataGeneration = EXPECTED_GEN_CREATE_IF_NOT_EXISTS),
+   * the key must NOT exist.
+   * <p>
+   * For If-Match with a specific generation, the key must exist with matching updateID.
+   *
+   * @param dbKeyInfo the existing key info from the database (null if key doesn't exist)
+   * @param keyArgs the key arguments containing expected generation
+   * @throws OMException if validation fails
+   */
+  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
+      throws OMException {
+    if (keyArgs.hasExpectedDataGeneration()) {
+      long expectedGen = keyArgs.getExpectedDataGeneration();
+      // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+        if (dbKeyInfo != null) {
+          throw new OMException("Key already exists",
+              OMException.ResultCodes.KEY_ALREADY_EXISTS);
+        }
+      } else {
+        // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
+        if (dbKeyInfo == null) {
+          throw new OMException("Key not found during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+        if (dbKeyInfo.getUpdateID() != expectedGen) {
+          throw new OMException("Generation mismatch during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates If-Match ETag condition.
+   * <p>
+   * This method checks if the existing key's ETag matches the expected ETag.
+   * Use this for single-phase operations (like MPU complete) where no rewrite is needed.
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @throws OMException if validation fails
+   */
+  protected void validateIfMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo)
+      throws OMException {
+    if (!keyArgs.hasExpectedETag()) {
+      return;
+    }
+
+    String expectedETag = keyArgs.getExpectedETag();
+    if (dbKeyInfo == null) {
+      throw new OMException("Key not found for If-Match",
+          OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!dbKeyInfo.hasEtag()) {
+      throw new OMException("Key does not have an ETag",
+          OMException.ResultCodes.ETAG_NOT_AVAILABLE);
+    }
+    if (!dbKeyInfo.isEtagEquals(expectedETag)) {
+      throw new OMException("ETag mismatch",
+          OMException.ResultCodes.ETAG_MISMATCH);
+    }
+  }
+
+  /**
+   * Validates If-Match ETag condition and converts it to expectedDataGeneration.
+   * <p>
+   * This method checks if the existing key's ETag matches the expected ETag.
+   * If it matches, the ETag condition is converted to a generation-based condition
+   * for atomic commit validation in two-phase operations (CreateKey → CommitKey).
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @return updated KeyArgs with expectedDataGeneration set (if ETag matched)
+   * @throws OMException if validation fails
+   */
+  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
+      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    validateIfMatchETag(keyArgs, dbKeyInfo);
+
+    if (!keyArgs.hasExpectedETag() || keyArgs.hasExpectedDataGeneration()) {
+      return keyArgs;
+    }
+
+    return keyArgs.toBuilder()
+        .setExpectedDataGeneration(dbKeyInfo.getUpdateID())
+        .clearExpectedETag()
+        .build();
   }
 }

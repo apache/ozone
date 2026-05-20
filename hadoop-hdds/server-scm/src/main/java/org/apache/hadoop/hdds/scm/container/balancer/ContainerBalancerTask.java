@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -49,6 +48,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -91,7 +91,6 @@ public class ContainerBalancerTask implements Runnable {
   private long sizeScheduledForMoveInLatestIteration;
   // count actual size moved in bytes
   private long sizeActuallyMovedInLatestIteration;
-  private int iterations;
   private final List<DatanodeUsageInfo> overUtilizedNodes;
   private final List<DatanodeUsageInfo> underUtilizedNodes;
   private List<DatanodeUsageInfo> withinThresholdUtilizedNodes;
@@ -99,8 +98,6 @@ public class ContainerBalancerTask implements Runnable {
   private Set<String> includeNodes;
   private ContainerBalancerConfiguration config;
   private ContainerBalancerMetrics metrics;
-  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
-  private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
   private ContainerBalancerSelectionCriteria selectionCriteria;
@@ -147,6 +144,8 @@ public class ContainerBalancerTask implements Runnable {
     this.moveManager.setMoveTimeout(config.getMoveTimeout().toMillis());
     this.moveManager.setReplicationTimeout(
         config.getMoveReplicationTimeout().toMillis());
+    this.moveManager.setIncludeNonStandardContainers(
+        config.getIncludeNonStandardContainers());
     this.delayStart = delayStart;
     this.ozoneConfiguration = scm.getConfiguration();
     this.containerBalancer = containerBalancer;
@@ -156,8 +155,8 @@ public class ContainerBalancerTask implements Runnable {
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
-    this.placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
-    this.networkTopology = scm.getClusterMap();
+    PlacementPolicyValidateProxy placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
+    NetworkTopology networkTopology = scm.getClusterMap();
     this.nextIterationIndex = nextIterationIndex;
     this.containerToSourceMap = new HashMap<>();
     this.containerToTargetMap = new HashMap<>();
@@ -212,10 +211,10 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   private void balance() {
-    this.iterations = config.getIterations();
-    if (this.iterations == -1) {
+    int iterations = config.getIterations();
+    if (iterations == -1) {
       //run balancer infinitely
-      this.iterations = Integer.MAX_VALUE;
+      iterations = Integer.MAX_VALUE;
     }
 
     // nextIterationIndex is the iteration that balancer should start from on
@@ -329,9 +328,9 @@ public class ContainerBalancerTask implements Runnable {
                                                                          IterationResult currentIterationResult,
                                                                          long iterationDuration) {
     String currentIterationResultName = currentIterationResult == null ? null : currentIterationResult.name();
-    Map<UUID, Long> sizeEnteringDataToNodes =
+    Map<DatanodeID, Long> sizeEnteringDataToNodes =
         convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
-    Map<UUID, Long> sizeLeavingDataFromNodes =
+    Map<DatanodeID, Long> sizeLeavingDataFromNodes =
         convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
     IterationInfo iterationInfo = new IterationInfo(
         iterationNumber,
@@ -345,8 +344,8 @@ public class ContainerBalancerTask implements Runnable {
     return new ContainerBalancerTaskIterationStatusInfo(iterationInfo, containerMoveInfo, dataMoveInfo);
   }
 
-  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<UUID, Long> sizeEnteringDataToNodes,
-                                       Map<UUID, Long> sizeLeavingDataFromNodes) {
+  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<DatanodeID, Long> sizeEnteringDataToNodes,
+                                       Map<DatanodeID, Long> sizeLeavingDataFromNodes) {
     if (currentIterationResultName == null) {
       // For unfinished iteration
       return new DataMoveInfo(
@@ -366,7 +365,7 @@ public class ContainerBalancerTask implements Runnable {
     }
   }
 
-  private Map<UUID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
+  private Map<DatanodeID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
     return nodeTrafficMap
         .entrySet()
         .stream()
@@ -374,7 +373,7 @@ public class ContainerBalancerTask implements Runnable {
         .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
         .collect(
             Collectors.toMap(
-                entry -> entry.getKey().getUuid(),
+                entry -> entry.getKey().getID(),
                 Map.Entry::getValue
             )
         );
@@ -556,13 +555,13 @@ public class ContainerBalancerTask implements Runnable {
       overUtilizedNodes.forEach(entry -> {
         LOG.debug("Datanode {} {} is Over-Utilized.",
             entry.getDatanodeDetails().getHostName(),
-            entry.getDatanodeDetails().getUuid());
+            entry.getDatanodeDetails().getID());
       });
 
       underUtilizedNodes.forEach(entry -> {
         LOG.debug("Datanode {} {} is Under-Utilized.",
             entry.getDatanodeDetails().getHostName(),
-            entry.getDatanodeDetails().getUuid());
+            entry.getDatanodeDetails().getID());
       });
     }
 
@@ -999,7 +998,8 @@ public class ContainerBalancerTask implements Runnable {
             result == MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED ||
             result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION ||
-            result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION) {
+            result == MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION ||
+            result == MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE) {
           // add source back to queue as a different container can be selected in next run.
           // the container which caused failure of move is not excluded
           // as it is an intermittent failure or a replica related failure
@@ -1066,7 +1066,7 @@ public class ContainerBalancerTask implements Runnable {
       return 0;
     }
     SCMNodeStat aggregatedStats = new SCMNodeStat(
-        0, 0, 0, 0, 0);
+        0, 0, 0, 0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
       aggregatedStats.add(node.getScmNodeStat());
     }

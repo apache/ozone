@@ -18,13 +18,14 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Objects;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 
 /**
  * Metadata object that represents a Datanode.
@@ -214,11 +215,6 @@ public final class DatanodeMetadata {
       return this;
     }
 
-    public Builder setOperationalState(NodeOperationalState operationalState) {
-      this.opState = operationalState;
-      return this;
-    }
-
     public Builder setLastHeartbeat(long lastHeartbeat) {
       this.lastHeartbeat = lastHeartbeat;
       return this;
@@ -255,28 +251,18 @@ public final class DatanodeMetadata {
       return this;
     }
 
-    public Builder setVersion(String version) {
-      this.version = version;
-      return this;
-    }
+    public Builder setDatanode(DatanodeInfo datanode) {
+      this.uuid = datanode.getUuidString();
+      this.hostname = datanode.getHostName();
+      this.networkLocation = datanode.getNetworkLocation();
 
-    public Builder setSetupTime(long setupTime) {
-      this.setupTime = setupTime;
-      return this;
-    }
+      this.opState = datanode.getPersistedOpState();
 
-    public Builder setRevision(String revision) {
-      this.revision = revision;
-      return this;
-    }
+      this.version = datanode.getVersion();
+      this.revision = datanode.getRevision();
+      this.layoutVersion = datanode.getLastKnownLayoutVersion().getMetadataLayoutVersion();
 
-    public Builder setLayoutVersion(int layoutVersion) {
-      this.layoutVersion = layoutVersion;
-      return this;
-    }
-
-    public Builder setNetworkLocation(String networkLocation) {
-      this.networkLocation = networkLocation;
+      this.setupTime = datanode.getSetupTime();
       return this;
     }
 
@@ -286,8 +272,8 @@ public final class DatanodeMetadata {
      * @return instance of DatanodeMetadata.
      */
     public DatanodeMetadata build() {
-      Preconditions.checkNotNull(hostname);
-      Preconditions.checkNotNull(state);
+      Objects.requireNonNull(hostname, "hostname == null");
+      Objects.requireNonNull(state, "state == null");
 
       return new DatanodeMetadata(this);
     }

@@ -18,13 +18,16 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import java.io.IOException;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
  * Manages the state of finalization in SCM.
  */
-public interface FinalizationStateManager {
+public interface FinalizationStateManager extends SCMHandler {
 
   @Replicate
   void addFinalizingMark() throws IOException;
@@ -52,4 +55,13 @@ public interface FinalizationStateManager {
    */
   void reinitialize(Table<String, String> newFinalizationStore)
       throws IOException;
+
+  @Override
+  default RequestType getType() {
+    return RequestType.FINALIZE;
+  }
+
+  static void main(String[] args) {
+    ScmInvokerCodeGenerator.generate(FinalizationStateManager.class, true);
+  }
 }

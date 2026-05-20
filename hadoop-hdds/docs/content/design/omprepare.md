@@ -42,16 +42,17 @@ author: Aravindan Vijayan
 # Usage
 
 ## How do you prepare an Ozone manager quorum
-    ozone admin om -id=<om-sevice-id> prepare
-    
+
+    ozone admin om prepare -id=<om-service-id>
+
 This leaves the Ozone manager in a state where it cannot accept new writes.
 
 ## How do you cancel a "prepared" Ozone manager quorum
 
 In the case of a cancelled upgrade, the OM can be brought out off the
 prepared state by using the following command.
- 
-    ozone admin om -id=<om-sevice-id> cancelprepare
+
+    ozone admin om cancelprepare -id=<om-service-id>
 
 # Link
 

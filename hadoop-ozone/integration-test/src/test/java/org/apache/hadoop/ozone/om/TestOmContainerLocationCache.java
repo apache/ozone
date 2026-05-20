@@ -49,7 +49,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -62,6 +61,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
@@ -142,21 +142,20 @@ public class TestOmContainerLocationCache {
   private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManager om;
-  private static RpcClient rpcClient;
   private static ObjectStore objectStore;
   private static XceiverClientGrpc mockDn1Protocol;
   private static XceiverClientGrpc mockDn2Protocol;
   private static XceiverClientGrpc mockDnEcProtocol;
   private static final DatanodeDetails DN1 =
-      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN2 =
-      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN3 =
-      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN4 =
-      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
   private static final DatanodeDetails DN5 =
-      MockDatanodeDetails.createDatanodeDetails(UUID.randomUUID());
+      MockDatanodeDetails.createDatanodeDetails(DatanodeID.randomID());
   private static final AtomicLong CONTAINER_ID = new AtomicLong(1);
   private static OzoneClient ozoneClient;
 
@@ -182,7 +181,7 @@ public class TestOmContainerLocationCache {
     ozoneClient = omTestManagers.getRpcClient();
     metadataManager = omTestManagers.getMetadataManager();
 
-    rpcClient = new RpcClient(conf, null) {
+    RpcClient rpcClient = new RpcClient(conf, null) {
       @Nonnull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(

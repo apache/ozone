@@ -31,35 +31,35 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hadoop.hdds.db")
 public class RocksDBConfiguration {
 
-  @Config(key = "rocksdb.logging.enabled",
+  @Config(key = "hadoop.hdds.db.rocksdb.logging.enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = {OM, SCM, DATANODE},
       description = "Enable/Disable RocksDB logging for OM.")
   private boolean rocksdbLogEnabled;
 
-  @Config(key = "rocksdb.logging.level",
+  @Config(key = "hadoop.hdds.db.rocksdb.logging.level",
       type = ConfigType.STRING,
       defaultValue = "INFO",
       tags = {OM, SCM, DATANODE},
       description = "OM RocksDB logging level (INFO/DEBUG/WARN/ERROR/FATAL)")
   private String rocksdbLogLevel;
 
-  @Config(key = "rocksdb.max.log.file.size",
+  @Config(key = "hadoop.hdds.db.rocksdb.max.log.file.size",
       type = ConfigType.SIZE,
       defaultValue = "100MB",
       tags = {OM, SCM, DATANODE},
       description = "Maximum size of RocksDB application log file.")
   private long rocksdbMaxLogFileSize = 100 * 1024 * 1024;
 
-  @Config(key = "rocksdb.keep.log.file.num",
+  @Config(key = "hadoop.hdds.db.rocksdb.keep.log.file.num",
       type = ConfigType.INT,
       defaultValue = "10",
       tags = {OM, SCM, DATANODE},
       description = "Maximum number of RocksDB application log files.")
   private int rocksdbKeepLogFileNum = 10;
 
-  @Config(key = "rocksdb.writeoption.sync",
+  @Config(key = "hadoop.hdds.db.rocksdb.writeoption.sync",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = {OM, SCM, DATANODE},
@@ -68,14 +68,14 @@ public class RocksDBConfiguration {
           " writes are flushed asynchronously.")
   private boolean syncOption;
 
-  @Config(key = "rocksdb.WAL_ttl_seconds",
+  @Config(key = "hadoop.hdds.db.rocksdb.WAL_ttl_seconds",
       type = ConfigType.LONG,
       defaultValue = "1200",
       tags = {OM, SCM, DATANODE},
       description = "The lifetime of WAL log files. Default 1200 seconds.")
   private long walTTL = 1200;
 
-  @Config(key = "rocksdb.WAL_size_limit_MB",
+  @Config(key = "hadoop.hdds.db.rocksdb.WAL_size_limit_MB",
       type = ConfigType.SIZE,
       defaultValue = "0MB",
       tags = {OM, SCM, DATANODE},

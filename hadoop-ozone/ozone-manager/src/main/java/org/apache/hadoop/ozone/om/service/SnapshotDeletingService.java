@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETIN
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
@@ -32,18 +33,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -52,12 +50,11 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveTableKeysRequest;
@@ -65,6 +62,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,33 +77,31 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   // from the same table and can send deletion requests for same snapshot
   // multiple times.
   private static final int SNAPSHOT_DELETING_CORE_POOL_SIZE = 1;
-  private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
   private final ClientId clientId = ClientId.randomId();
 
   private final OzoneManager ozoneManager;
   private final OmSnapshotManager omSnapshotManager;
   private final SnapshotChainManager chainManager;
-  private final AtomicBoolean suspended;
   private final OzoneConfiguration conf;
   private final AtomicLong successRunCount;
   private final int keyLimitPerTask;
   private final int snapshotDeletionPerTask;
   private final int ratisByteLimit;
-  private final long serviceTimeout;
+  private final MultiSnapshotLocks snapshotIdLocks;
+  private final List<UUID> lockIds;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
                                  OzoneManager ozoneManager)
       throws IOException {
     super(SnapshotDeletingService.class.getSimpleName(), interval,
         TimeUnit.MILLISECONDS, SNAPSHOT_DELETING_CORE_POOL_SIZE,
-        serviceTimeout, ozoneManager, null);
+        serviceTimeout, ozoneManager);
     this.ozoneManager = ozoneManager;
     this.omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
     this.chainManager = omMetadataManager.getSnapshotChainManager();
     this.successRunCount = new AtomicLong(0);
-    this.suspended = new AtomicBoolean(false);
     this.conf = ozoneManager.getConfiguration();
     this.snapshotDeletionPerTask = conf.getInt(SNAPSHOT_DELETING_LIMIT_PER_TASK,
         SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT);
@@ -118,35 +114,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.keyLimitPerTask = conf.getInt(
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
-    this.serviceTimeout = serviceTimeout;
+    IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
+    this.snapshotIdLocks = new MultiSnapshotLocks(lock, SNAPSHOT_GC_LOCK, true, 2);
+    this.lockIds = new ArrayList<>(2);
   }
 
-  // Wait for a notification from KeyDeletingService if the key deletion is running. This is to ensure, merging of
-  // entries do not start while the AOS is still processing the deleted keys.
   @VisibleForTesting
-  public void waitForKeyDeletingService() throws InterruptedException {
-    KeyDeletingService keyDeletingService = getOzoneManager().getKeyManager().getDeletingService();
-    synchronized (keyDeletingService) {
-      while (keyDeletingService.isRunningOnAOS()) {
-        keyDeletingService.wait(serviceTimeout);
-      }
-    }
-  }
-
-  // Wait for a notification from DirectoryDeletingService if the directory deletion is running. This is to ensure,
-  // merging of entries do not start while the AOS is still processing the deleted keys.
-  @VisibleForTesting
-  public void waitForDirDeletingService() throws InterruptedException {
-    DirectoryDeletingService directoryDeletingService = getOzoneManager().getKeyManager()
-        .getDirDeletingService();
-    synchronized (directoryDeletingService) {
-      while (directoryDeletingService.isRunningOnAOS()) {
-        directoryDeletingService.wait(serviceTimeout);
-      }
-    }
-  }
-
-  private class SnapshotDeletingTask implements BackgroundTask {
+  final class SnapshotDeletingTask implements BackgroundTask {
 
     @SuppressWarnings("checkstyle:MethodLength")
     @Override
@@ -179,32 +153,39 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 snapInfo.getTableKey());
             continue;
           }
-
           // nextSnapshot = null means entries would be moved to AOS.
           if (nextSnapshot == null) {
             LOG.info("Snapshot: {} entries will be moved to AOS.", snapInfo.getTableKey());
-            waitForKeyDeletingService();
-            waitForDirDeletingService();
           } else {
             LOG.info("Snapshot: {} entries will be moved to next active snapshot: {}",
                 snapInfo.getTableKey(), nextSnapshot.getTableKey());
           }
-          try (ReferenceCounted<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
+          lockIds.clear();
+          lockIds.add(snapInfo.getSnapshotId());
+          if (nextSnapshot != null) {
+            lockIds.add(nextSnapshot.getSnapshotId());
+          }
+          // Acquire write lock on current snapshot and next snapshot in chain.
+          if (!snapshotIdLocks.acquireLock(lockIds).isLockAcquired()) {
+            continue;
+          }
+          try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = omSnapshotManager.getSnapshot(
               snapInfo.getVolumeName(), snapInfo.getBucketName(), snapInfo.getName())) {
             KeyManager snapshotKeyManager = snapshot.get().getKeyManager();
             int moveCount = 0;
             // Get all entries from deletedKeyTable.
             List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries =
                 snapshotKeyManager.getDeletedKeyEntries(snapInfo.getVolumeName(), snapInfo.getBucketName(),
-                    null, remaining);
+                    null, (kv) -> true, remaining);
             moveCount += deletedKeyEntries.size();
             // Get all entries from deletedDirTable.
             List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = snapshotKeyManager.getDeletedDirEntries(
                 snapInfo.getVolumeName(), snapInfo.getBucketName(), remaining - moveCount);
             moveCount += deletedDirEntries.size();
             // Get all entries from snapshotRenamedTable.
-            List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
-                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, remaining - moveCount);
+            List<Table.KeyValue<String, String>> renameEntries =
+                snapshotKeyManager.getRenamesKeyEntries(snapInfo.getVolumeName(), snapInfo.getBucketName(), null,
+                    (kv) -> true, remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
               List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());
@@ -230,11 +211,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 renameKeys.add(HddsProtos.KeyValue.newBuilder().setKey(renameEntry.getKey())
                     .setValue(renameEntry.getValue()).build());
               }
-              submitSnapshotMoveDeletedKeys(snapInfo, deletedKeys, renameKeys, deletedDirs);
-              remaining -= moveCount;
+              int submitted = submitSnapshotMoveDeletedKeysWithBatching(snapInfo, deletedKeys, renameKeys, deletedDirs);
+              remaining -= submitted;
             } else {
               snapshotsToBePurged.add(snapInfo.getTableKey());
             }
+          } finally {
+            snapshotIdLocks.releaseLock();
           }
           successRunCount.incrementAndGet();
           snapshotLimit--;
@@ -248,7 +231,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
-    private void submitSnapshotPurgeRequest(List<String> purgeSnapshotKeys) throws InterruptedException {
+    private void submitSnapshotPurgeRequest(List<String> purgeSnapshotKeys) {
       if (!purgeSnapshotKeys.isEmpty()) {
         SnapshotPurgeRequest snapshotPurgeRequest = SnapshotPurgeRequest
             .newBuilder()
@@ -261,53 +244,189 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             .setClientId(clientId.toString())
             .build();
 
-        try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-          submitRequest(omRequest);
-        }
+        submitOMRequest(omRequest);
       }
     }
 
-    private void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-                                               List<SnapshotMoveKeyInfos> deletedKeys,
-                                               List<HddsProtos.KeyValue> renamedList,
-                                               List<SnapshotMoveKeyInfos> dirsToMove) throws InterruptedException {
-
-      SnapshotMoveTableKeysRequest.Builder moveDeletedKeysBuilder = SnapshotMoveTableKeysRequest.newBuilder()
+    /**
+     * Submits a single batch of snapshot move requests.
+     *
+     * @param snapInfo The snapshot being processed
+     * @param deletedKeys List of deleted keys to move
+     * @param renamedList List of renamed keys
+     * @param dirsToMove List of deleted directories to move
+     * @return true if submission was successful, false otherwise
+     */
+    private boolean submitSingleSnapshotMoveBatch(SnapshotInfo snapInfo,
+                                                   List<SnapshotMoveKeyInfos> deletedKeys,
+                                                   List<HddsProtos.KeyValue> renamedList,
+                                                   List<SnapshotMoveKeyInfos> dirsToMove) {
+      SnapshotMoveTableKeysRequest.Builder moveDeletedKeys = SnapshotMoveTableKeysRequest.newBuilder()
           .setFromSnapshotID(toProtobuf(snapInfo.getSnapshotId()));
 
-      SnapshotMoveTableKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
-          .addAllDeletedKeys(deletedKeys)
-          .addAllRenamedKeys(renamedList)
-          .addAllDeletedDirs(dirsToMove)
-          .build();
-      if (isBufferLimitCrossed(ratisByteLimit, 0, moveDeletedKeys.getSerializedSize())) {
-        int remaining = MIN_ERR_LIMIT_PER_TASK;
-        deletedKeys = deletedKeys.subList(0, Math.min(remaining, deletedKeys.size()));
-        remaining -= deletedKeys.size();
-        renamedList = renamedList.subList(0, Math.min(remaining, renamedList.size()));
-        remaining -= renamedList.size();
-        dirsToMove = dirsToMove.subList(0, Math.min(remaining, dirsToMove.size()));
-        moveDeletedKeys = moveDeletedKeysBuilder
-            .addAllDeletedKeys(deletedKeys)
-            .addAllRenamedKeys(renamedList)
-            .addAllDeletedDirs(dirsToMove)
-            .build();
+      if (!deletedKeys.isEmpty()) {
+        moveDeletedKeys.addAllDeletedKeys(deletedKeys);
+      }
+
+      if (!renamedList.isEmpty()) {
+        moveDeletedKeys.addAllRenamedKeys(renamedList);
+      }
+
+      if (!dirsToMove.isEmpty()) {
+        moveDeletedKeys.addAllDeletedDirs(dirsToMove);
       }
 
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(Type.SnapshotMoveTableKeys)
-          .setSnapshotMoveTableKeysRequest(moveDeletedKeys)
+          .setSnapshotMoveTableKeysRequest(moveDeletedKeys.build())
           .setClientId(clientId.toString())
           .build();
-      try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-        submitRequest(omRequest);
+
+      try {
+        OzoneManagerProtocolProtos.OMResponse response = submitRequest(omRequest);
+        if (response == null || !response.getSuccess()) {
+          LOG.error("SnapshotMoveTableKeys request failed. Will retry in the next run.");
+          return false;
+        }
+        return true;
+      } catch (ServiceException e) {
+        LOG.error("SnapshotMoveTableKeys request failed. Will retry in the next run", e);
+        return false;
       }
     }
 
-    private void submitRequest(OMRequest omRequest) {
+    /**
+     * Submits snapshot move requests with batching to respect the Ratis buffer limit.
+     * This method progressively builds batches while checking size limits before adding entries.
+     *
+     * @param snapInfo The snapshot being processed
+     * @param deletedKeys List of deleted keys to move
+     * @param renamedList List of renamed keys
+     * @param dirsToMove List of deleted directories to move
+     * @return The number of entries successfully submitted
+     */
+    @VisibleForTesting
+    public int submitSnapshotMoveDeletedKeysWithBatching(SnapshotInfo snapInfo,
+                                                           List<SnapshotMoveKeyInfos> deletedKeys,
+                                                           List<HddsProtos.KeyValue> renamedList,
+                                                           List<SnapshotMoveKeyInfos> dirsToMove) {
+      List<SnapshotMoveKeyInfos> currentDeletedKeys = new ArrayList<>();
+      List<HddsProtos.KeyValue> currentRenamedKeys = new ArrayList<>();
+      List<SnapshotMoveKeyInfos> currentDeletedDirs = new ArrayList<>();
+      int totalSubmitted = 0;
+      int batchCount = 0;
+
+      SnapshotMoveTableKeysRequest emptyRequest = SnapshotMoveTableKeysRequest.newBuilder()
+          .setFromSnapshotID(toProtobuf(snapInfo.getSnapshotId()))
+          .build();
+      OMRequest baseRequest = OMRequest.newBuilder()
+          .setCmdType(Type.SnapshotMoveTableKeys)
+          .setSnapshotMoveTableKeysRequest(emptyRequest)
+          .setClientId(clientId.toString())
+          .build();
+      int baseOverhead = baseRequest.getSerializedSize();
+      long batchBytes = baseOverhead;
+
+      for (SnapshotMoveKeyInfos key : deletedKeys) {
+        int keySize = key.getSerializedSize();
+
+        // If adding this key would exceed the limit, flush the current batch first
+        if (batchBytes + keySize > ratisByteLimit && !currentDeletedKeys.isEmpty()) {
+          batchCount++;
+          LOG.debug("Submitting batch {} for snapshot {} with {} deletedKeys, {} renamedKeys, {} deletedDirs, " +
+                  "size: {} bytes", batchCount, snapInfo.getTableKey(), currentDeletedKeys.size(),
+              currentRenamedKeys.size(), currentDeletedDirs.size(), batchBytes);
+
+          if (!submitSingleSnapshotMoveBatch(snapInfo, currentDeletedKeys, currentRenamedKeys, currentDeletedDirs)) {
+            return totalSubmitted;
+          }
+
+          totalSubmitted += currentDeletedKeys.size();
+          currentDeletedKeys.clear();
+          currentRenamedKeys.clear();
+          currentDeletedDirs.clear();
+          batchBytes = baseOverhead;
+        }
+
+        currentDeletedKeys.add(key);
+        batchBytes += keySize;
+      }
+
+      for (HddsProtos.KeyValue renameKey : renamedList) {
+        int keySize = renameKey.getSerializedSize();
+
+        // If adding this key would exceed the limit, flush the current batch first
+        if (batchBytes + keySize > ratisByteLimit && 
+            (!currentDeletedKeys.isEmpty() || !currentRenamedKeys.isEmpty())) {
+          batchCount++;
+          LOG.debug("Submitting batch {} for snapshot {} with {} deletedKeys, {} renamedKeys, {} deletedDirs, " +
+                  "size: {} bytes", batchCount, snapInfo.getTableKey(), currentDeletedKeys.size(),
+              currentRenamedKeys.size(), currentDeletedDirs.size(), batchBytes);
+
+          if (!submitSingleSnapshotMoveBatch(snapInfo, currentDeletedKeys, currentRenamedKeys, currentDeletedDirs)) {
+            return totalSubmitted;
+          }
+
+          totalSubmitted += currentDeletedKeys.size() + currentRenamedKeys.size();
+          currentDeletedKeys.clear();
+          currentRenamedKeys.clear();
+          currentDeletedDirs.clear();
+          batchBytes = baseOverhead;
+        }
+
+        currentRenamedKeys.add(renameKey);
+        batchBytes += keySize;
+      }
+
+      for (SnapshotMoveKeyInfos dir : dirsToMove) {
+        int dirSize = dir.getSerializedSize();
+
+        // If adding this dir would exceed the limit, flush the current batch first
+        if (batchBytes + dirSize > ratisByteLimit && 
+            (!currentDeletedKeys.isEmpty() || !currentRenamedKeys.isEmpty() || !currentDeletedDirs.isEmpty())) {
+          batchCount++;
+          LOG.debug("Submitting batch {} for snapshot {} with {} deletedKeys, {} renamedKeys, {} deletedDirs, " +
+                  "size: {} bytes", batchCount, snapInfo.getTableKey(), currentDeletedKeys.size(),
+              currentRenamedKeys.size(), currentDeletedDirs.size(), batchBytes);
+
+          if (!submitSingleSnapshotMoveBatch(snapInfo, currentDeletedKeys, currentRenamedKeys, currentDeletedDirs)) {
+            return totalSubmitted;
+          }
+
+          totalSubmitted += currentDeletedKeys.size() + currentRenamedKeys.size() + currentDeletedDirs.size();
+          currentDeletedKeys.clear();
+          currentRenamedKeys.clear();
+          currentDeletedDirs.clear();
+          batchBytes = baseOverhead;
+        }
+
+        currentDeletedDirs.add(dir);
+        batchBytes += dirSize;
+      }
+
+      // Submit the final batch if any
+      if (!currentDeletedKeys.isEmpty() || !currentRenamedKeys.isEmpty() || !currentDeletedDirs.isEmpty()) {
+        batchCount++;
+        LOG.debug("Submitting final batch {} for snapshot {} with {} deletedKeys, {} renamedKeys, {} deletedDirs, " +
+                "size: {} bytes", batchCount, snapInfo.getTableKey(), currentDeletedKeys.size(),
+            currentRenamedKeys.size(), currentDeletedDirs.size(), batchBytes);
+
+        if (!submitSingleSnapshotMoveBatch(snapInfo, currentDeletedKeys, currentRenamedKeys, currentDeletedDirs)) {
+          return totalSubmitted;
+        }
+
+        totalSubmitted += currentDeletedKeys.size() + currentRenamedKeys.size() + currentDeletedDirs.size();
+      }
+
+      LOG.debug("Successfully submitted {} total entries in {} batches for snapshot {}", totalSubmitted, batchCount,
+          snapInfo.getTableKey());
+
+      return totalSubmitted;
+    }
+
+    private void submitOMRequest(OMRequest omRequest) {
       try {
-        Status status =
-            OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, getRunCount().get()).getStatus();
+        Status status = submitRequest(omRequest).getStatus();
         if (!Objects.equals(status, Status.OK)) {
           LOG.error("Request: {} failed with an status: {}. Will retry in the next run.", omRequest, status);
         }
@@ -330,93 +449,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         !OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo);
   }
 
-  // TODO: Move this util class.
-  public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
-                                                OmKeyInfo deletedKeyInfo) {
-
-    if (prevKeyInfo == null && deletedKeyInfo == null) {
-      LOG.debug("Both prevKeyInfo and deletedKeyInfo are null.");
-      return true;
-    }
-    if (prevKeyInfo == null || deletedKeyInfo == null) {
-      LOG.debug("prevKeyInfo: '{}' or deletedKeyInfo: '{}' is null.",
-          prevKeyInfo, deletedKeyInfo);
-      return false;
-    }
-    // For hsync, Though the blockLocationInfo of a key may not be same
-    // at the time of snapshot and key deletion as blocks can be appended.
-    // If the objectId is same then the key is same.
-    if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
-      return true;
-    }
-
-    if (prevKeyInfo.getKeyLocationVersions().size() !=
-        deletedKeyInfo.getKeyLocationVersions().size()) {
-      return false;
-    }
-
-    OmKeyLocationInfoGroup deletedOmKeyLocation =
-        deletedKeyInfo.getLatestVersionLocations();
-    OmKeyLocationInfoGroup prevOmKeyLocation =
-        prevKeyInfo.getLatestVersionLocations();
-
-    if (deletedOmKeyLocation == null || prevOmKeyLocation == null) {
-      return false;
-    }
-
-    List<OmKeyLocationInfo> deletedLocationList =
-        deletedOmKeyLocation.getLocationList();
-    List<OmKeyLocationInfo> prevLocationList =
-        prevOmKeyLocation.getLocationList();
-
-    if (deletedLocationList.size() != prevLocationList.size()) {
-      return false;
-    }
-
-    for (int idx = 0; idx < deletedLocationList.size(); idx++) {
-      OmKeyLocationInfo deletedLocationInfo = deletedLocationList.get(idx);
-      OmKeyLocationInfo prevLocationInfo = prevLocationList.get(idx);
-      if (!deletedLocationInfo.hasSameBlockAs(prevLocationInfo)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   @Override
-  public BackgroundTaskQueue getTasks() {
-    BackgroundTaskQueue queue = new BackgroundTaskQueue();
+  public DeletingServiceTaskQueue getTasks() {
+    DeletingServiceTaskQueue queue = new DeletingServiceTaskQueue();
     queue.add(new SnapshotDeletingTask());
     return queue;
   }
 
-  private boolean shouldRun() {
-    return !suspended.get() && ozoneManager.isLeaderReady();
-  }
-
-  /**
-   * Suspend the service.
-   */
-  @VisibleForTesting
-  public void suspend() {
-    suspended.set(true);
-  }
-
-  /**
-   * Resume the service if suspended.
-   */
-  @VisibleForTesting
-  public void resume() {
-    suspended.set(false);
-  }
-
   public long getSuccessfulRunCount() {
     return successRunCount.get();
-  }
-
-  @VisibleForTesting
-  public void setSuccessRunCount(long num) {
-    successRunCount.getAndSet(num);
   }
 }

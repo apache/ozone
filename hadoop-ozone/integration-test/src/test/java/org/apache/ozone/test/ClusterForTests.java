@@ -95,10 +95,16 @@ public abstract class ClusterForTests<C extends MiniOzoneCluster> {
         .setNumDatanodes(5);
   }
 
+  /** Hook method for subclasses. */
+  protected void onClusterReady() throws Exception {
+    // override if needed
+  }
+
   @BeforeAll
   void startCluster() throws Exception {
     cluster = createCluster();
     cluster.waitForClusterToBeReady();
+    onClusterReady();
   }
 
   @AfterAll

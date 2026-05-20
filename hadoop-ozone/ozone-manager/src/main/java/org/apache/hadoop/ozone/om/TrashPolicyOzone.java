@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  *  of TrashPolicy ozone-specific trash optimizations are/will be made such as
  *  having a multithreaded TrashEmptier.
  */
-public class TrashPolicyOzone extends OzoneTrashPolicy {
+class TrashPolicyOzone extends OzoneTrashPolicy {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashPolicyOzone.class);
@@ -60,10 +60,7 @@ public class TrashPolicyOzone extends OzoneTrashPolicy {
       new SimpleDateFormat("yyMMddHHmm");
   private long emptierInterval;
 
-  private OzoneManager om;
-
-  public TrashPolicyOzone() {
-  }
+  private final OzoneManager om;
 
   @Override
   public void initialize(Configuration conf, FileSystem fs) {

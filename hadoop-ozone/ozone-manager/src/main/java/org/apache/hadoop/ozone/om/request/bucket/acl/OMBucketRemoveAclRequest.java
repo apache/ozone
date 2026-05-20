@@ -17,7 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
-import com.google.common.collect.Lists;
+import static java.util.Collections.singletonList;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -66,14 +67,12 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   }
 
   public OMBucketRemoveAclRequest(OMRequest omRequest) {
-    super(omRequest,
-        (acls, omBucketInfo) -> omBucketInfo.removeAcl(acls.get(0)));
+    super(omRequest, (acls, builder) -> builder.remove(acls.get(0)));
     OzoneManagerProtocolProtos.RemoveAclRequest removeAclRequest =
         getOmRequest().getRemoveAclRequest();
     obj = OzoneObjInfo.fromProtobuf(removeAclRequest.getObj());
     path = obj.getPath();
-    ozoneAcls = Lists.newArrayList(
-        OzoneAcl.fromProtobuf(removeAclRequest.getAcl()));
+    ozoneAcls = singletonList(OzoneAcl.fromProtobuf(removeAclRequest.getAcl()));
   }
 
   @Override

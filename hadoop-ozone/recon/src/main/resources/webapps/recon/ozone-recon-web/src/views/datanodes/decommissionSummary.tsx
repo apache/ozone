@@ -67,7 +67,7 @@ class DecommissionSummary extends React.Component<IDecommissionSummaryProps> {
         loading: false,
         summaryData: []
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     }
   };
 

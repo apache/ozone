@@ -21,11 +21,11 @@ x-monitoring-config:
 
 services:
   jaeger:
-    image: jaegertracing/all-in-one:latest
-    environment:
-      COLLECTOR_ZIPKIN_HTTP_PORT: 9411
+    image: jaegertracing/jaeger:latest
     ports:
       - 16686:16686
+      - 4317:4317
+      - 4318:4318
   prometheus:
     image: prom/prometheus
     volumes:
@@ -34,7 +34,7 @@ services:
     ports:
       - 9090:9090
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:13.0.1-security-01
     volumes:
       - "../common/grafana/dashboards:/var/lib/grafana/dashboards"
       - "../common/grafana/provisioning:/etc/grafana/provisioning"

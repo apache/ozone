@@ -502,6 +502,14 @@ public final class SCMContainerPlacementRackAware
             " excludedNodes and affinityNode constrains.", null);
       }
 
+      if (usedNodes != null && usedNodes.contains(node)) {
+        if (excludedNodesForCapacity == null) {
+          excludedNodesForCapacity = new ArrayList<>();
+        }
+        excludedNodesForCapacity.add(node.getNetworkFullPath());
+        continue;
+      }
+
       if (isValidNode(node, metadataSizeRequired, dataSizeRequired)) {
         metrics.incrDatanodeChooseSuccessCount();
         if (isFallbacked) {
@@ -529,8 +537,6 @@ public final class SCMContainerPlacementRackAware
   /**
    * Choose a batch of datanodes on different rack than excludedNodes or
    * chosenNodes.
-   * TODO HDDS-7226: Update Implementation to accomodate for already used
-   * nodes to conform to existing placement policy.
    *
    * @param excludedNodes - list of the datanodes to excluded. Can be null.
    * @param chosenNodes - list of nodes already chosen. These nodes should also

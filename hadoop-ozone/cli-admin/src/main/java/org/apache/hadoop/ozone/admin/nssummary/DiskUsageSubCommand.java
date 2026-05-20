@@ -33,7 +33,8 @@ import java.util.concurrent.Callable;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.server.JsonUtils;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListLimitOptions;
+import org.apache.hadoop.ozone.shell.PrefixFilterOption;
 import picocli.CommandLine;
 
 /**
@@ -67,9 +68,12 @@ public class DiskUsageSubCommand implements Callable {
   private boolean noHeader;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListLimitOptions listOptions;
 
-  private static final String ENDPOINT = "/api/v1/namespace/du";
+  @CommandLine.Mixin
+  private PrefixFilterOption prefixFilter;
+
+  private static final String ENDPOINT = "/api/v1/namespace/usage";
 
   // For text alignment
   private static final String SIZE_HEADER = "Size";
@@ -132,8 +136,8 @@ public class DiskUsageSubCommand implements Callable {
       if (duResponse.path("subPathCount").asInt(-1) == 0) {
         if (totalSize == 0) {
           // the object is empty
-          System.out.println("The object is empty.\n" +
-              "Put more files into it to visualize DU");
+          System.out.println("The object is empty.");
+          System.out.println("Put more files into it to visualize DU");
         } else {
           System.out.println("There's no immediate " +
               "sub-path under this object.");
@@ -147,7 +151,7 @@ public class DiskUsageSubCommand implements Callable {
         printWithUnderline("DU", true);
         printDUHeader();
         int limit = listOptions.getLimit();
-        String seekStr = listOptions.getPrefix();
+        String seekStr = prefixFilter.getPrefix();
         if (seekStr == null) {
           seekStr = "";
         }
@@ -158,11 +162,10 @@ public class DiskUsageSubCommand implements Callable {
           if (cnt >= limit) {
             break;
           }
-          String subPath = subPathDU.path("path").asText("");
+          String pathValue = subPathDU.path("path").asText("");
           // differentiate key from other types
-          if (!subPathDU.path("isKey").asBoolean(false)) {
-            subPath += OM_KEY_PREFIX;
-          }
+          boolean isDir = !subPathDU.path("isKey").asBoolean(false);
+          String subPath = isDir ? (pathValue + OM_KEY_PREFIX) : pathValue;
           long size = subPathDU.path("size").asLong(-1);
           long sizeWithReplica = subPathDU.path("sizeWithReplica").asLong(-1);
           if (subPath.startsWith(seekStr)) {

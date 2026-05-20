@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.proxy;
 
-import com.google.common.base.Preconditions;
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +36,7 @@ public class SCMProxyInfo {
 
   public SCMProxyInfo(String serviceID, String nodeID,
                       InetSocketAddress rpcAddress) {
-    Preconditions.checkNotNull(rpcAddress);
+    Objects.requireNonNull(rpcAddress, "rpcAddress == null");
     this.serviceId = serviceID;
     this.nodeId = nodeID;
     this.rpcAddrStr = rpcAddress.toString();

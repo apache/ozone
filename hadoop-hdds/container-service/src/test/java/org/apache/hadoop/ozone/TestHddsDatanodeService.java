@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,7 +37,10 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -51,6 +55,7 @@ import org.apache.hadoop.util.ServicePlugin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,11 +150,39 @@ public class TestHddsDatanodeService {
     service.stop();
     service.join();
     service.close();
+    DefaultMetricsSystem.shutdown();
 
     deletedContainersAfterShutdown =
         hddsVolume.getDeletedContainerDir().listFiles();
     assertNotNull(deletedContainersAfterShutdown);
     assertEquals(0, deletedContainersAfterShutdown.length);
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testHttpPorts(HttpConfig.Policy policy) {
+    try {
+      conf.setEnum(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy);
+      service.start(conf);
+
+      DatanodeDetails dn = service.getDatanodeDetails();
+      DatanodeDetails.Port httpPort = dn.getPort(DatanodeDetails.Port.Name.HTTP);
+      DatanodeDetails.Port httpsPort = dn.getPort(DatanodeDetails.Port.Name.HTTPS);
+      if (policy.isHttpEnabled()) {
+        assertNotNull(httpPort);
+      }
+      if (policy.isHttpsEnabled()) {
+        assertNotNull(httpsPort);
+      }
+      if (policy.isHttpEnabled() && policy.isHttpsEnabled()) {
+        assertNotEquals(httpPort.getValue(), httpsPort.getValue());
+      }
+    } finally {
+      service.stop();
+      service.join();
+      service.close();
+      DefaultMetricsSystem.shutdown();
+    }
   }
 
   static class MockService implements ServicePlugin {

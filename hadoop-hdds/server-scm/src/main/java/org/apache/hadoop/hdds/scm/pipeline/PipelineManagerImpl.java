@@ -56,6 +56,8 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -383,34 +385,32 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public void addContainerToPipeline(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException, InvalidPipelineStateException {
     // should not lock here, since no ratis operation happens.
     stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
-  public void addContainerToPipelineSCMStart(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException {
     // should not lock here, since no ratis operation happens.
     stateManager.addContainerToPipelineForce(pipelineID, containerID);
   }
 
   @Override
-  public void removeContainerFromPipeline(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) {
     // should not lock here, since no ratis operation happens.
     stateManager.removeContainerFromPipeline(pipelineID, containerID);
   }
 
   @Override
-  public NavigableSet<ContainerID> getContainersInPipeline(
-      PipelineID pipelineID) throws IOException {
+  public NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     return stateManager.getContainers(pipelineID);
   }
 
   @Override
-  public int getNumberOfContainers(PipelineID pipelineID) throws IOException {
+  public int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException {
     return stateManager.getNumberOfContainers(pipelineID);
   }
 
@@ -551,16 +551,15 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @VisibleForTesting
   List<Pipeline> getStalePipelines(DatanodeDetails datanodeDetails) {
-    List<Pipeline> pipelines = getPipelines();
-    return pipelines.stream()
-            .filter(p -> p.getNodes().stream()
-                    .anyMatch(n -> n.getUuid()
-                            .equals(datanodeDetails.getUuid())
-                            && (!n.getIpAddress()
-                            .equals(datanodeDetails.getIpAddress())
-                            || !n.getHostName()
-                            .equals(datanodeDetails.getHostName()))))
-            .collect(Collectors.toList());
+    return getPipelines().stream()
+        .filter(p -> p.getNodes().stream().anyMatch(n -> sameIdDifferentHostOrAddress(n, datanodeDetails)))
+        .collect(Collectors.toList());
+  }
+
+  static boolean sameIdDifferentHostOrAddress(DatanodeDetails left, DatanodeDetails right) {
+    return left.getID().equals(right.getID())
+        && (!left.getIpAddress().equals(right.getIpAddress())
+        ||  !left.getHostName().equals(right.getHostName()));
   }
 
   /**
@@ -634,6 +633,23 @@ public class PipelineManagerImpl implements PipelineManager {
     return false;
   }
 
+  @Override
+  public boolean hasEnoughSpace(Pipeline pipeline) {
+    for (DatanodeDetails node : pipeline.getNodes()) {
+      if (!nodeManager.hasSpaceForNewContainerAllocation(node.getID())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
+    }
+  }
+
   /**
    * Schedules a fixed interval job to create pipelines.
    */
@@ -656,13 +672,8 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(Pipeline pipeline) {
-    return nodeManager.minHealthyVolumeNum(pipeline.getNodes());
-  }
-
-  @Override
-  public int minPipelineLimit(Pipeline pipeline) {
-    return nodeManager.minPipelineLimit(pipeline.getNodes());
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    return nodeManager.openContainerLimit(datanodes);
   }
 
   /**
@@ -789,7 +800,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
-      throws IOException {
+      throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException {
     stateManager.reinitialize(pipelineStore);
   }
 
@@ -827,8 +838,6 @@ public class PipelineManagerImpl implements PipelineManager {
 
     SCMPipelineMetrics.unRegister();
 
-    // shutdown pipeline provider.
-    pipelineFactory.shutdown();
     try {
       stateManager.close();
     } catch (Exception ex) {
@@ -904,12 +913,8 @@ public class PipelineManagerImpl implements PipelineManager {
         metrics.incNumPipelineContainSameDatanodes();
         //TODO remove until pipeline allocation is proved equally distributed.
         for (Pipeline overlapPipeline : overlapPipelines) {
-          LOG.info("Pipeline: " + pipeline.getId().toString() +
-              " contains same datanodes as previous pipelines: " +
-              overlapPipeline.getId().toString() + " nodeIds: " +
-              pipeline.getNodes().get(0).getUuid().toString() +
-              ", " + pipeline.getNodes().get(1).getUuid().toString() +
-              ", " + pipeline.getNodes().get(2).getUuid().toString());
+          LOG.info("{} and {} have exactly the same set of datanodes: {}",
+              pipeline.getId(), overlapPipeline.getId(), pipeline.getNodeSet());
         }
       }
       return;
@@ -939,5 +944,10 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void releaseWriteLock() {
     lock.writeLock().unlock();
+  }
+
+  @Override
+  public SCMPipelineMetrics getMetrics() {
+    return metrics;
   }
 }

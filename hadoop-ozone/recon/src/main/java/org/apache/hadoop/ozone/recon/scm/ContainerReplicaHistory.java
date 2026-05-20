@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryProto;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 
 /**
  * A ContainerReplica timestamp class that tracks first and last seen time.
@@ -39,14 +40,16 @@ public class ContainerReplicaHistory {
 
   private long bcsId;
   private String state;
+  private ContainerChecksums checksums;
 
   public ContainerReplicaHistory(UUID id, Long firstSeenTime,
-      Long lastSeenTime, long bcsId, String state) {
+      Long lastSeenTime, long bcsId, String state, ContainerChecksums checksums) {
     this.uuid = id;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
     this.bcsId = bcsId;
     this.state = state;
+    setChecksums(checksums);
   }
 
   public long getBcsId() {
@@ -81,16 +84,30 @@ public class ContainerReplicaHistory {
     this.state = state;
   }
 
+  public long getDataChecksum() {
+    return getChecksums().getDataChecksum();
+  }
+
+  public ContainerChecksums getChecksums() {
+    return checksums;
+  }
+
+  public void setChecksums(ContainerChecksums checksums) {
+    this.checksums = checksums != null ? checksums : ContainerChecksums.unknown();
+  }
+
   public static ContainerReplicaHistory fromProto(
       ContainerReplicaHistoryProto proto) {
     return new ContainerReplicaHistory(UUID.fromString(proto.getUuid()),
         proto.getFirstSeenTime(), proto.getLastSeenTime(), proto.getBcsId(),
-        proto.getState());
+        proto.getState(), ContainerChecksums.of(proto.getDataChecksum()));
   }
 
   public ContainerReplicaHistoryProto toProto() {
     return ContainerReplicaHistoryProto.newBuilder().setUuid(uuid.toString())
         .setFirstSeenTime(firstSeenTime).setLastSeenTime(lastSeenTime)
-        .setBcsId(bcsId).setState(state).build();
+        .setBcsId(bcsId).setState(state)
+        .setDataChecksum(checksums.getDataChecksum())
+        .build();
   }
 }

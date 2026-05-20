@@ -55,7 +55,8 @@ scrape_configs:
 ## 分布式跟踪
 分布式跟踪可以通过可视化端到端的性能来帮助了解性能瓶颈。
 
-Ozone 使用 [jaeger](https://jaegertracing.io) 跟踪库收集跟踪，可以将跟踪数据发送到任何兼容的后端(Zipkin，…)。
+Ozone 使用 [OpenTelemetry](https://opentelemetry.io/) API 进行跟踪，并使用 Grpc 格式的 otlp 发送跟踪信息。
+jaeger 跟踪库作为收集器可以通过默认端口 4317（默认）从 Ozone 收集跟踪信息。
 
 默认情况下，跟踪功能是关闭的，可以通过 `ozon-site.xml` 的 `hdds.tracing.enabled` 配置变量打开。
 
@@ -66,17 +67,14 @@ Ozone 使用 [jaeger](https://jaegertracing.io) 跟踪库收集跟踪，可以�
 </property>
 ```
 
-Jaeger 客户端可以用环境变量进行配置，如[这份](https://github.com/jaegertracing/jaeger-client-java/blob/master/jaeger-core/README.md)文档所述。
+以下是提供收集器端点和采样策略所需的配置。这些是需要为每个 Ozone 组件（OM、SCM、DataNode）和 Ozone 客户端设置的环境变量，以启用 Shell 等跟踪功能。
 
-例如：
-
-```shell
-JAEGER_SAMPLER_PARAM=0.01
-JAEGER_SAMPLER_TYPE=probabilistic
-JAEGER_AGENT_HOST=jaeger
+```
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_TRACES_SAMPLER_ARG=0.01
 ```
 
-此配置将记录1%的请求，以限制性能开销。有关 Jaeger 抽样的更多信息，请查看[文档](https://www.jaegertracing.io/docs/1.18/sampling/#client-sampling-configuration)。
+此配置将记录1%的请求，以限制性能开销。
 
 ## Ozone Insight
 Ozone Insight 是一个用于检查 Ozone 集群当前状态的工具，它可以显示特定组件的日志记录、指标和配置。

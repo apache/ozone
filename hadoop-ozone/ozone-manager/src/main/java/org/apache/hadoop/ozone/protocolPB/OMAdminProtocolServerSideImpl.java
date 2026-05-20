@@ -38,6 +38,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.De
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragResponse;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -95,14 +98,15 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     }
 
     try {
-      if (!ozoneManager.isAdmin(getRemoteUser())) {
+      if (ozoneManager.isAdminAuthorizationEnabled() &&
+          !ozoneManager.isAdmin(getRemoteUser())) {
         throw new OMException("Only administrators are authorized to perform decommission.", PERMISSION_DENIED);
       }
       omRatisServer.removeOMFromRatisRing(decommNode);
     } catch (IOException ex) {
       return DecommissionOMResponse.newBuilder()
           .setSuccess(false)
-          .setErrorMsg(ex.getMessage())
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
 
@@ -118,14 +122,32 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
       // check if table exists. IOException is thrown if table is not found.
       ozoneManager.getMetadataManager().getStore().getTable(compactRequest.getColumnFamily());
       ozoneManager.compactOMDB(compactRequest.getColumnFamily());
-    } catch (Exception ex) {
+    } catch (IOException ex) {
       return CompactResponse.newBuilder()
           .setSuccess(false)
-          .setErrorMsg(ex.getMessage())
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
 
     return CompactResponse.newBuilder()
         .setSuccess(true).build();
+  }
+
+  @Override
+  public TriggerSnapshotDefragResponse triggerSnapshotDefrag(
+      RpcController controller, TriggerSnapshotDefragRequest request)
+      throws ServiceException {
+    try {
+      boolean result = ozoneManager.triggerSnapshotDefrag(request.getNoWait());
+      return TriggerSnapshotDefragResponse.newBuilder()
+          .setSuccess(true)
+          .setResult(result)
+          .build();
+    } catch (IOException ex) {
+      return TriggerSnapshotDefragResponse.newBuilder()
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
+          .build();
+    }
   }
 }

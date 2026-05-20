@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -750,7 +751,7 @@ public class TestXceiverServerDomainSocket {
           Handler.getHandlerForContainerType(containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
               containerSet, volumeSet, volumeChoosingPolicy, metrics,
-              c -> { }, ozoneContainer));
+              c -> { }, new ContainerChecksumTreeManager(conf), ozoneContainer));
     }
     HddsDispatcher dispatcher =
         new HddsDispatcher(conf, containerSet, volumeSet, handlers, context, containerMetrics, null);

@@ -22,7 +22,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
-import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -30,7 +29,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
@@ -73,7 +74,7 @@ public class PipelineEndpoint {
     List<Pipeline> pipelines = pipelineManager.getPipelines();
 
     pipelines.forEach(pipeline -> {
-      UUID pipelineId = pipeline.getId().getId();
+      final PipelineID pipelineId = pipeline.getId();
       List<DatanodeDetails> datanodes = new ArrayList<>();
       PipelineMetadata.Builder builder = PipelineMetadata.newBuilder();
       pipeline.getNodes().forEach(node -> datanodes.add(node));
@@ -98,7 +99,7 @@ public class PipelineEndpoint {
       }
 
       PipelineMetadata.Builder pipelineBuilder =
-          builder.setPipelineId(pipelineId)
+          builder.setPipelineId(pipelineId.getId())
               .setDatanodes(datanodes)
               .setDuration(duration)
               .setStatus(pipeline.getPipelineState())
@@ -110,7 +111,7 @@ public class PipelineEndpoint {
         // Extract last part of pipelineId to get its group Id.
         // ex. group id of 48981bf7-8bea-4fbd-9857-79df51ee872d
         // is group-79DF51EE872D
-        String[] splits = pipelineId.toString().split("-");
+        String[] splits = pipelineId.getId().toString().split("-");
         String groupId = "group-" + splits[splits.length - 1].toUpperCase();
         Long leaderElectionCount = getElectionCountMetricValue(groupId);
         pipelineBuilder.setLeaderElections(leaderElectionCount);
@@ -154,11 +155,10 @@ public class PipelineEndpoint {
   }
 
   private Long getLastLeaderElectionElapsedTimeMetricValue(String groupId,
-                                                           UUID uuid) {
+                                                           DatanodeID dnId) {
     String metricsQuery = String.format(
             "query=ratis_leader_election_lastLeaderElectionElapsedTime{group=" +
-                    "\"%s\",exported_instance=\"%s\"}", groupId,
-            uuid.toString());
+                    "\"%s\",exported_instance=\"%s\"}", groupId, dnId);
     try {
       List<Metric> metrics = metricsServiceProvider.getMetricsInstant(
               metricsQuery);

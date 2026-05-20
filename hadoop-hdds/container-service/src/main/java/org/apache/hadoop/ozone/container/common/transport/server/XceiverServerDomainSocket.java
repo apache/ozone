@@ -18,12 +18,12 @@
 package org.apache.hadoop.ozone.container.common.transport.server;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.nio.channels.AsynchronousCloseException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -82,7 +82,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   public XceiverServerDomainSocket(DatanodeDetails datanodeDetails, ConfigurationSource conf,
       ContainerDispatcher dispatcher, ThreadPoolExecutor executor,
       ContainerMetrics metrics, DomainSocketFactory domainSocketFactory) {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf);
     this.port = conf.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     if (conf.getBoolean(OzoneConfigKeys.HDDS_CONTAINER_IPC_RANDOM_PORT,

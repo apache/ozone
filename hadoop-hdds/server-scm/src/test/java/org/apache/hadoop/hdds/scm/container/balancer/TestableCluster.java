@@ -80,7 +80,7 @@ public final class TestableCluster {
 
       SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
           datanodeCapacity - datanodeUsedSpace, 0,
-          datanodeCapacity - datanodeUsedSpace - 1);
+          datanodeCapacity - datanodeUsedSpace - 1, 0);
       nodesInCluster[i].setScmNodeStat(stat);
       clusterUsedSpace += datanodeUsedSpace;
       clusterCapacity += datanodeCapacity;

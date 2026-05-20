@@ -221,6 +221,8 @@ public final class ScmConfigKeys {
   public static final int OZONE_SCM_HTTP_BIND_PORT_DEFAULT = 9876;
   public static final int OZONE_SCM_HTTPS_BIND_PORT_DEFAULT = 9877;
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
+  public static final String HDDS_DATANODE_DATA_DIR_PERMISSIONS =
+      "hdds.datanode.data.dir.permissions";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED =
       "hdds.datanode.dir.du.reserved";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED_PERCENT =
@@ -452,9 +454,10 @@ public final class ScmConfigKeys {
   public static final boolean
       OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT = true;
 
-  public static final String OZONE_SCM_BLOCK_DELETION_MAX_RETRY =
-      "ozone.scm.block.deletion.max.retry";
-  public static final int OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT = 4096;
+  public static final String OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR =
+      "ozone.scm.block.deletion.per.dn.distribution.factor";
+
+  public static final int OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT = 8;
 
   public static final String OZONE_SCM_SEQUENCE_ID_BATCH_SIZE =
       "ozone.scm.sequence.id.batch.size";
@@ -465,9 +468,6 @@ public final class ScmConfigKeys {
       "ozone.scm.network.topology.schema.file";
   public static final String OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT =
       "network-topology-default.xml";
-
-  public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
-  public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
@@ -521,7 +521,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE =
           "ozone.scm.ha.ratis.segment.size";
-  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "4MB";
+  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "64MB";
 
   public static final String OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE =
           "ozone.scm.ha.ratis.segment.preallocated.size";
@@ -617,7 +617,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL =
       "ozone.scm.ha.dbtransactionbuffer.flush.interval";
   public static final long
-      OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 60 * 1000L;
 
   public static final String NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
       "net.topology.node.switch.mapping.impl";
@@ -627,6 +627,11 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT
       = "ozone.scm.ha.raft.server.rpc.first-election.timeout";
+  public static final String HDDS_SCM_HTTP_AUTH_TYPE = "hdds.scm.http.auth.type";
+
+  public static final String OZONE_SCM_RATIS_EVENTS_MAX_LIMIT =
+      "ozone.scm.ratis.events.max.limit";
+  public static final int OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
 
   /**
    * Never constructed.

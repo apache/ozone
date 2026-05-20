@@ -33,14 +33,8 @@ import picocli.CommandLine;
 )
 public class TransferOmLeaderSubCommand implements Callable<Void> {
 
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
-
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID."
-  )
-  private String omServiceId;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @CommandLine.ArgGroup(multiplicity = "1")
   private TransferOption configGroup;
@@ -59,14 +53,14 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    OzoneManagerProtocol client =
-        parent.createOmClient(omServiceId, null, true);
     if (configGroup.isRandom) {
       configGroup.omNodeId = "";
     }
-    client.transferLeadership(configGroup.omNodeId);
-    System.out.println("Transfer leadership successfully to " +
-        (configGroup.isRandom ? "random node" : configGroup.omNodeId) + ".");
+    try (OzoneManagerProtocol client = omServiceOption.newClient()) {
+      client.transferLeadership(configGroup.omNodeId);
+      System.out.println("Transfer leadership successfully to " +
+          (configGroup.isRandom ? "random node" : configGroup.omNodeId) + ".");
+    }
     return null;
   }
 }

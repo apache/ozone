@@ -96,15 +96,12 @@ public class TestDBStoreBuilder {
         .build();
     // Building should succeed without error.
 
-    try (Table<byte[], byte[]> firstTable = dbStore.getTable("FIRST")) {
-      byte[] key =
-          RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
-      byte[] value =
-          RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
-      firstTable.put(key, value);
-      byte[] temp = firstTable.get(key);
-      assertArrayEquals(value, temp);
-    }
+    final Table<byte[], byte[]> firstTable = dbStore.getTable("FIRST");
+    byte[] key = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+    byte[] value = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+    firstTable.put(key, value);
+    byte[] temp = firstTable.get(key);
+    assertArrayEquals(value, temp);
 
     dbStore.close();
   }
@@ -118,19 +115,16 @@ public class TestDBStoreBuilder {
         .addTable("First")
         .addTable("Second")
         .build()) {
-      try (Table<byte[], byte[]> firstTable = dbStore.getTable("First")) {
-        byte[] key =
-            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-        byte[] temp = firstTable.get(key);
-        assertArrayEquals(value, temp);
-      }
+      final Table<byte[], byte[]> firstTable = dbStore.getTable("First");
+      byte[] key = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
+      byte[] temp = firstTable.get(key);
+      assertArrayEquals(value, temp);
 
-      try (Table secondTable = dbStore.getTable("Second")) {
-        assertTrue(secondTable.isEmpty());
-      }
+
+      final Table<byte[], byte[]> secondTable = dbStore.getTable("Second");
+      assertTrue(secondTable.isEmpty());
     }
   }
 
@@ -145,19 +139,15 @@ public class TestDBStoreBuilder {
         .addTable("Second")
         .setProfile(DBProfile.DISK)
         .build()) {
-      try (Table<byte[], byte[]> firstTable = dbStore.getTable("First")) {
-        byte[] key =
-            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-        byte[] temp = firstTable.get(key);
-        assertArrayEquals(value, temp);
-      }
+      Table<byte[], byte[]> firstTable = dbStore.getTable("First");
+      byte[] key = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
+      byte[] temp = firstTable.get(key);
+      assertArrayEquals(value, temp);
 
-      try (Table secondTable = dbStore.getTable("Second")) {
-        assertTrue(secondTable.isEmpty());
-      }
+      Table<byte[], byte[]> secondTable = dbStore.getTable("Second");
+      assertTrue(secondTable.isEmpty());
     }
   }
 

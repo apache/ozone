@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.security.acl;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -236,5 +237,23 @@ public final class OzoneObjInfo extends OzoneObj {
       return new OzoneObjInfo(resType, storeType, volumeName, bucketName,
           name, ozonePrefixPath);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    } else if (!super.equals(o)) {
+      return false;
+    }
+
+    final OzoneObjInfo that = (OzoneObjInfo) o;
+    return Objects.equals(volumeName, that.volumeName) && Objects.equals(bucketName, that.bucketName) &&
+        Objects.equals(name, that.name) && Objects.equals(ozonePrefixPath, that.ozonePrefixPath);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), volumeName, bucketName, name, ozonePrefixPath);
   }
 }

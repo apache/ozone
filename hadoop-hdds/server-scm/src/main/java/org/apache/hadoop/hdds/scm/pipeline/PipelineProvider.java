@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -81,18 +80,14 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
 
   protected abstract void close(Pipeline pipeline) throws IOException;
 
-  protected abstract void shutdown();
-
   List<DatanodeDetails> pickNodesNotUsed(REPLICATION_CONFIG replicationConfig,
                                          long metadataSizeRequired,
-                                         long dataSizeRequired,
-                                         ConfigurationSource conf)
+                                         long dataSizeRequired)
       throws SCMException {
     int nodesRequired = replicationConfig.getRequiredNodes();
     List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
-        .filter(dn -> SCMCommonPlacementPolicy
-            .hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired, conf))
+        .filter(dn -> SCMCommonPlacementPolicy.hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired))
         .limit(nodesRequired)
         .collect(Collectors.toList());
 

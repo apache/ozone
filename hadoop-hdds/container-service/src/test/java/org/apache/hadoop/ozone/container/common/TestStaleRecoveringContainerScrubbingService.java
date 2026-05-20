@@ -71,10 +71,8 @@ public class TestStaleRecoveringContainerScrubbingService {
   private Path tempDir;
   private String datanodeUuid;
   private OzoneConfiguration conf;
-  private HddsVolume hddsVolume;
 
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
   private String clusterID;
   private int containerIdNum = 0;
   private MutableVolumeSet volumeSet;
@@ -85,7 +83,7 @@ public class TestStaleRecoveringContainerScrubbingService {
   private void initVersionInfo(ContainerTestVersionInfo versionInfo)
       throws IOException {
     this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     init();
@@ -98,8 +96,8 @@ public class TestStaleRecoveringContainerScrubbingService {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, volumeDir.getAbsolutePath());
     datanodeUuid = UUID.randomUUID().toString();
     clusterID = UUID.randomUUID().toString();
-    hddsVolume = new HddsVolume.Builder(volumeDir.getAbsolutePath())
-        .conf(conf).datanodeUuid(datanodeUuid).clusterID(clusterID).build();
+    HddsVolume hddsVolume = new HddsVolume.Builder(volumeDir.getAbsolutePath())
+                                .conf(conf).datanodeUuid(datanodeUuid).clusterID(clusterID).build();
     hddsVolume.format(clusterID);
     hddsVolume.createWorkingDir(clusterID, null);
     volumeSet = mock(MutableVolumeSet.class);

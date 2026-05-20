@@ -26,13 +26,14 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import com.google.protobuf.UnsafeByteOperations;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -81,7 +82,7 @@ public final class OzoneAcl {
     return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
-  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
+  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, Set<ACLType> acls) {
     return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
@@ -180,10 +181,10 @@ public final class OzoneAcl {
 
     // Check if acl string contains scope info.
     if (parts[2].matches(ACL_SCOPE_REGEX)) {
-      int indexOfOpenBracket = parts[2].indexOf("[");
+      int indexOfOpenBracket = parts[2].indexOf('[');
       bits = parts[2].substring(0, indexOfOpenBracket);
       aclScope = AclScope.valueOf(parts[2].substring(indexOfOpenBracket + 1,
-          parts[2].indexOf("]")));
+          parts[2].indexOf(']')));
     }
 
     EnumSet<ACLType> acls = EnumSet.noneOf(ACLType.class);
@@ -309,7 +310,7 @@ public final class OzoneAcl {
     final byte first = (byte) aclBits;
     final byte second = (byte) (aclBits >>> 8);
     final byte[] bytes = second != 0 ? new byte[]{first, second} : new byte[]{first};
-    return Proto2Utils.unsafeByteString(bytes);
+    return UnsafeByteOperations.unsafeWrap(bytes);
   }
 
   @JsonIgnore
@@ -319,6 +320,10 @@ public final class OzoneAcl {
 
   public List<ACLType> getAclList() {
     return getAclList(aclBits, Function.identity());
+  }
+
+  public Set<ACLType> getAclSet() {
+    return Collections.unmodifiableSet(EnumSet.copyOf(getAclList()));
   }
 
   private static <T> List<T> getAclList(int aclBits, Function<ACLType, T> converter) {

@@ -17,18 +17,13 @@
  */
 
 import React from 'react';
-import { vi } from 'vitest';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor
-} from '@testing-library/react';
+import {vi} from 'vitest';
+import {fireEvent, render, screen} from '@testing-library/react';
 
-import { DatanodeTableProps } from '@/v2/types/datanode.types';
+import {DatanodeTableProps} from '@/v2/types/datanode.types';
 import DatanodesTable from '@/v2/components/tables/datanodesTable';
-import { datanodeServer } from '@tests/mocks/datanodeMocks/datanodeServer';
-import { waitForDNTable } from '@tests/utils/datanodes.utils';
+import {datanodeServer} from '@tests/mocks/datanodeMocks/datanodeServer';
+import {waitForDNTable} from '@tests/utils/datanodes.utils';
 
 const defaultProps: DatanodeTableProps = {
   loading: false,
@@ -51,6 +46,15 @@ function getDataWith(name: string, state: "HEALTHY" | "STALE" | "DEAD", uuid: nu
     state: state,
     opState: 'IN_SERVICE',
     lastHeartbeat: 1728280581608,
+    storageReport: {
+      capacity: 125645656770,
+      used: 4096,
+      remaining: 114225606656,
+      committed: 0,
+      filesystemCapacity: 150000000000,
+      filesystemUsed: 30000000000,
+      filesystemAvailable: 120000000000
+    },
     storageUsed: 4096,
     storageTotal: 125645656770,
     storageCommitted: 0,
@@ -147,5 +151,24 @@ describe('DatanodesTable Component', () => {
     const checkboxes = document.querySelectorAll('input.ant-checkbox-input');
     expect(checkboxes[1]).toBeDisabled(); // HEALTHY node
     expect(checkboxes[2]).not.toBeDisabled(); // DEAD node
+  });
+
+  test('shows filesystem rows in storage tooltip when provided', async () => {
+    render(
+      <DatanodesTable
+        {...defaultProps}
+        data={[
+          getDataWith('ozone-datanode-1', 'HEALTHY', 1)
+        ]}
+      />
+    );
+
+    const storageBar = document.querySelector('.capacity-bar-v2');
+    expect(storageBar).not.toBeNull();
+    fireEvent.mouseOver(storageBar as HTMLElement);
+
+    expect(await screen.findByText('Filesystem Capacity')).toBeInTheDocument();
+    expect(screen.getByText('Filesystem Used')).toBeInTheDocument();
+    expect(screen.getByText('Filesystem Available')).toBeInTheDocument();
   });
 });

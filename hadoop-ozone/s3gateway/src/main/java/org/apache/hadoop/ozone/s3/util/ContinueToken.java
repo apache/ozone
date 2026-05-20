@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
-import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
@@ -39,7 +38,7 @@ public class ContinueToken {
   private static final String CONTINUE_TOKEN_SEPARATOR = "-";
 
   public ContinueToken(String lastKey, String lastDir) {
-    Preconditions.checkNotNull(lastKey,
+    Objects.requireNonNull(lastKey,
         "The last key can't be null in the continue token.");
     this.lastKey = lastKey;
     if (lastDir != null && !lastDir.isEmpty()) {

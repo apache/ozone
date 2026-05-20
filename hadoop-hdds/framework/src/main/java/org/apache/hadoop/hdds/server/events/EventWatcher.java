@@ -18,11 +18,11 @@
 package org.apache.hadoop.hdds.server.events;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
@@ -77,7 +77,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     this.completionEvent = completionEvent;
     this.leaseManager = leaseManager;
     this.metrics = new EventWatcherMetrics();
-    Preconditions.checkNotNull(name);
+    Objects.requireNonNull(name, "name == null");
     if (name.equals("")) {
       name = getClass().getSimpleName();
     }

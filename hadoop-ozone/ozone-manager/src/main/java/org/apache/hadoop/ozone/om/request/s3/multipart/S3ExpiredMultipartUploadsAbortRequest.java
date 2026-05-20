@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
-import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -198,11 +197,10 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OmBucketInfo omBucketInfo = null;
     BucketLayout bucketLayout = null;
-    OMLockDetails omLockDetails = null;
     try {
-      omLockDetails = omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
-      acquiredLock = omLockDetails.isLockAcquired();
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
@@ -236,7 +234,9 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           }
 
           // Set the UpdateID to current transactionLogIndex
-          omMultipartKeyInfo.setUpdateID(trxnLogIndex);
+          omMultipartKeyInfo = omMultipartKeyInfo.toBuilder()
+              .setUpdateID(trxnLogIndex)
+              .build();
 
           // Parse the multipart upload components (e.g. volume, bucket, key)
           // from the multipartInfoTable db key

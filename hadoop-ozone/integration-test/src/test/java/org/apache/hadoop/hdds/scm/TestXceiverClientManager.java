@@ -163,7 +163,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       Throwable t = assertThrows(IOException.class,
           () -> ContainerProtocolCalls.createContainer(client1,
               container1.getContainerInfo().getContainerID(), null));
-      assertThat(t.getMessage()).contains("This channel is not connected");
+      assertThat(t.getMessage()).contains("Client is closed");
 
       clientManager.releaseClient(client2, false);
     }
@@ -212,7 +212,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       Throwable t = assertThrows(IOException.class,
           () -> ContainerProtocolCalls.createContainer(client1,
               container1.getContainerInfo().getContainerID(), null));
-      assertThat(t.getMessage()).contains("This channel is not connected");
+      assertThat(t.getMessage()).contains("Client is closed");
 
       clientManager.releaseClient(client2, false);
     }

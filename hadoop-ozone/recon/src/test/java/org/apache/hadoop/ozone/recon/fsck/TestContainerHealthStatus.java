@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -173,6 +174,40 @@ public class TestContainerHealthStatus {
     assertEquals(-1, status.replicaDelta());
     assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
+  }
+
+  @Test
+  public void testSameDataChecksumContainer() {
+    Set<ContainerReplica> replicas = generateReplicas(container,
+            ContainerReplicaProto.State.CLOSED,
+            ContainerReplicaProto.State.CLOSED,
+            ContainerReplicaProto.State.CLOSED);
+    ContainerHealthStatus status =
+            new ContainerHealthStatus(container, replicas, placementPolicy,
+                    reconContainerMetadataManager, CONF);
+    assertTrue(status.isHealthilyReplicated());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isOverReplicated());
+    assertFalse(status.isMisReplicated());
+    assertFalse(status.areChecksumsMismatched());
+  }
+
+  @Test
+  public void testDataChecksumMismatchContainer() {
+    Set<ContainerReplica> replicas = generateMismatchedReplicas(container,
+            ContainerReplicaProto.State.CLOSED,
+            ContainerReplicaProto.State.CLOSED,
+            ContainerReplicaProto.State.CLOSED);
+    ContainerHealthStatus status =
+            new ContainerHealthStatus(container, replicas, placementPolicy,
+                    reconContainerMetadataManager, CONF);
+    assertTrue(status.isHealthilyReplicated());
+    assertFalse(status.isMissing());
+    assertFalse(status.isUnderReplicated());
+    assertFalse(status.isOverReplicated());
+    assertFalse(status.isMisReplicated());
+    assertTrue(status.areChecksumsMismatched());
   }
 
   /**
@@ -382,8 +417,25 @@ public class TestContainerHealthStatus {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setChecksums(ContainerChecksums.of(1234L, 0L))
           .setContainerState(s)
           .build());
+    }
+    return replicas;
+  }
+
+  private Set<ContainerReplica> generateMismatchedReplicas(ContainerInfo cont,
+                                                           ContainerReplicaProto.State...states) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    long checksum = 1234L;
+    for (ContainerReplicaProto.State s : states) {
+      replicas.add(new ContainerReplica.ContainerReplicaBuilder()
+          .setContainerID(cont.containerID())
+          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setContainerState(s)
+          .setChecksums(ContainerChecksums.of(checksum, 0L))
+          .build());
+      checksum++;
     }
     return replicas;
   }

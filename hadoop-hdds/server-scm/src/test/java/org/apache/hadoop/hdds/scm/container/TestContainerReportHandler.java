@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainerReports;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
@@ -42,6 +43,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -81,7 +83,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test the behaviour of the ContainerReportHandler.
@@ -95,7 +96,6 @@ public class TestContainerReportHandler {
   @TempDir
   private File testDir;
   private DBStore dbStore;
-  private SCMHAManager scmhaManager;
   private PipelineManager pipelineManager;
 
   @BeforeEach
@@ -104,7 +104,7 @@ public class TestContainerReportHandler {
     nodeManager = new MockNodeManager(true, 10);
     containerManager = mock(ContainerManager.class);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
@@ -114,7 +114,7 @@ public class TestContainerReportHandler {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault()), null))
         .build();
     publisher = mock(EventPublisher.class);
 
@@ -131,9 +131,9 @@ public class TestContainerReportHandler {
 
     doAnswer(invocation -> {
       containerStateManager
-          .updateContainerState(((ContainerID)invocation
+          .updateContainerStateWithSequenceId(((ContainerID)invocation
                   .getArguments()[0]).getProtobuf(),
-              (HddsProtos.LifeCycleEvent)invocation.getArguments()[1]);
+              (HddsProtos.LifeCycleEvent)invocation.getArguments()[1], 0L);
       return null;
     }).when(containerManager).updateContainerState(
         any(ContainerID.class),
@@ -154,15 +154,15 @@ public class TestContainerReportHandler {
         any(ContainerID.class), any(ContainerReplica.class));
 
     doAnswer(invocation -> {
-      containerStateManager.transitionDeletingOrDeletedToClosedState(
-          ((ContainerID) invocation.getArgument(0)).getProtobuf());
+      containerStateManager.transitionDeletingOrDeletedToTargetState(
+          ((ContainerID) invocation.getArgument(0)).getProtobuf(), invocation.getArgument(1));
       return null;
-    }).when(containerManager).transitionDeletingOrDeletedToClosedState(any(ContainerID.class));
+    }).when(containerManager).transitionDeletingOrDeletedToTargetState(
+        any(ContainerID.class), any(LifeCycleState.class));
   }
 
   @AfterEach
   public void tearDown() throws Exception {
-    containerStateManager.close();
     if (dbStore != null) {
       dbStore.close();
     }
@@ -202,6 +202,17 @@ public class TestContainerReportHandler {
         for (ContainerReplicaProto.State replicaState : replicaStates) {
           if (replicationType == HddsProtos.ReplicationType.EC &&
               replicaState.equals(ContainerReplicaProto.State.QUASI_CLOSED)) {
+            continue;
+          }
+          if (replicationType == HddsProtos.ReplicationType.RATIS &&
+              (replicaState.equals(ContainerReplicaProto.State.CLOSED) ||
+              replicaState.equals(ContainerReplicaProto.State.QUASI_CLOSED)) &&
+              (containerState.equals(HddsProtos.LifeCycleState.DELETED) ||
+              containerState.equals(HddsProtos.LifeCycleState.DELETING))) {
+            continue;
+          }
+          if (replicationType == HddsProtos.ReplicationType.EC &&
+              containerState.equals(HddsProtos.LifeCycleState.DELETED)) {
             continue;
           }
           for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {
@@ -558,7 +569,14 @@ public class TestContainerReportHandler {
     ContainerReportsProto closedContainerReport = getContainerReports(validReplica);
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithValidReplica, closedContainerReport), publisher);
-    assertEquals(LifeCycleState.CLOSED, containerStateManager.getContainer(container.containerID()).getState());
+    // Determine expected state based on replica state
+    LifeCycleState expectedState;
+    if (replicaState == ContainerReplicaProto.State.CLOSED) {
+      expectedState = LifeCycleState.CLOSED;
+    } else {
+      expectedState = LifeCycleState.QUASI_CLOSED;
+    }
+    assertEquals(expectedState, containerStateManager.getContainer(container.containerID()).getState());
 
     // verify that no delete command is issued for non-empty replica, regardless of container state
     verify(publisher, times(0))
@@ -1142,9 +1160,8 @@ public class TestContainerReportHandler {
         .getNumberOfKeys());
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  public void testStaleReplicaOfDeletedContainer(boolean isEmpty) throws NodeNotFoundException, IOException {
+  @Test
+  public void testStaleReplicaOfDeletedContainer() throws NodeNotFoundException, IOException {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
 
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
@@ -1161,19 +1178,243 @@ public class TestContainerReportHandler {
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString(), 0, isEmpty);
+        datanodeOne.getUuidString(), 0, true);
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    if (isEmpty) {
-      // Expect the replica to be deleted when it is empty
-      verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
-    } else {
-      // Expect the replica to stay when it is NOT empty
-      verify(publisher, times(0)).fireEvent(any(), any(CommandForDatanode.class));
-    }
+    // Expect the replica to be deleted when it is empty
+    verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
     assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
+  }
+
+  /**
+   * Test resurrection of DELETED container to QUASI_CLOSED state when a non-empty
+   * QUASI_CLOSED replica with matching bcsId is reported.
+   */
+  @Test
+  public void testDeletedContainerWithStaleQuasiClosedReplicaDoesNotResurrect()
+          throws NodeNotFoundException, IOException {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    final DatanodeDetails datanodeOne = nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator().next();
+    // Create container in DELETED state with bcsId=100
+    final ContainerInfo containerOne = getContainer(LifeCycleState.DELETED);
+    assertEquals(10000L, containerOne.getSequenceId());
+
+    final Set<ContainerID> containerIDSet = Stream.of(containerOne.containerID()).collect(Collectors.toSet());
+    nodeManager.setContainers(datanodeOne, containerIDSet);
+    containerStateManager.addContainer(containerOne.getProtobuf());
+
+    // Report non-empty QUASI_CLOSED replica with matching bcsId
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        containerOne.containerID(), 
+        ContainerReplicaProto.State.QUASI_CLOSED,
+        datanodeOne.getUuidString(), 
+        200L,    // usedBytes
+        10L,     // keyCount (non-empty)
+        10000L,  // bcsId (matches container)
+        0,       // replicaIndex
+        false);  // isEmpty=false
+
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        new ContainerReportFromDatanode(datanodeOne, containerReport);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
+
+    // Container should NOT resurrect
+    final ContainerInfo container = containerManager.getContainer(containerOne.containerID());
+    assertEquals(LifeCycleState.DELETED, container.getState(),
+        "Container should not resurrect when a stale QUASI_CLOSED replica is reported");
+    
+    // A delete command should be sent for the stale replica
+    verify(publisher, times(1)).fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
+  }
+
+  /**
+   * Test resurrection of DELETING container to QUASI_CLOSED state when a non-empty OPEN replica is reported.
+   * OPEN replicas should trigger resurrection to QUASI_CLOSED state.
+   */
+  @Test
+  public void testDeletingContainerResurrectionToQuasiClosedWithOpenReplica() 
+      throws NodeNotFoundException, IOException {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    final DatanodeDetails datanodeOne = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator().next();
+    // Create container in DELETING state
+    final ContainerInfo containerOne = getContainer(LifeCycleState.DELETING);
+
+    final Set<ContainerID> containerIDSet = Stream.of(containerOne.containerID()).collect(Collectors.toSet());
+    nodeManager.setContainers(datanodeOne, containerIDSet);
+    containerStateManager.addContainer(containerOne.getProtobuf());
+
+    // Report non-empty OPEN replica (e.g., stale DN that came back online)
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        containerOne.containerID(), 
+        ContainerReplicaProto.State.OPEN,
+        datanodeOne.getUuidString(),
+        200L,    // usedBytes
+        10L,     // keyCount (non-empty)
+        10000L,  // bcsId
+        0,       // replicaIndex
+        false);  // isEmpty=false
+
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        new ContainerReportFromDatanode(datanodeOne, containerReport);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
+
+    // Container should resurrect to QUASI_CLOSED for OPEN replica
+    final ContainerInfo resurrectedContainer = containerManager.getContainer(containerOne.containerID());
+    assertEquals(LifeCycleState.QUASI_CLOSED, resurrectedContainer.getState(),
+        "Container should resurrect to QUASI_CLOSED when OPEN replica is reported");
+    
+    // Replica should be updated in SCM
+    assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
+  }
+
+  @Test
+  public void testWithNoContainerDataChecksum() throws Exception {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+
+    final int numNodes = 3;
+    List<DatanodeDetails> datanodes = nodeManager.getNodes(NodeStatus.inServiceHealthy()).stream()
+        .limit(numNodes)
+        .collect(Collectors.toList());
+
+    // Create a container and put one replica on each datanode.
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    ContainerID contID = container.containerID();
+    final Set<ContainerID> containerIDSet = Stream.of(contID).collect(Collectors.toSet());
+
+    for (DatanodeDetails dn: datanodes) {
+      nodeManager.setContainers(dn, containerIDSet);
+    }
+
+    containerStateManager.addContainer(container.getProtobuf());
+
+    getReplicas(contID, ContainerReplicaProto.State.CLOSED, 0, datanodes)
+        .forEach(containerStateManager::updateContainerReplica);
+
+    // Container manager should now be aware of 3 replicas of each container.
+    assertEquals(numNodes, containerManager.getContainerReplicas(contID).size());
+
+    // All replicas should start with an empty data checksum in SCM.
+    boolean contOneDataChecksumsEmpty = containerManager.getContainerReplicas(contID).stream()
+        .allMatch(r -> r.getDataChecksum() == 0);
+    assertTrue(contOneDataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
+
+    // Send a report to SCM from one datanode that still does not have a data checksum.
+    int numReportsSent = 0;
+    for (DatanodeDetails dn: datanodes) {
+      final ContainerReportsProto dnReportProto = getContainerReportsProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      final ContainerReportFromDatanode dnReport = new ContainerReportFromDatanode(dn, dnReportProto);
+      reportHandler.onMessage(dnReport, publisher);
+      numReportsSent++;
+    }
+    assertEquals(numNodes, numReportsSent);
+
+    // Regardless of which datanode sent the report, none of them have checksums, so all replica's data checksums
+    // should remain empty.
+    boolean containerDataChecksumEmpty = containerManager.getContainerReplicas(contID).stream()
+        .allMatch(r -> r.getDataChecksum() == 0);
+    assertTrue(containerDataChecksumEmpty, "Replicas of the container should not have any data checksums.");
+  }
+
+  @Test
+  public void testWithContainerDataChecksum() throws Exception {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+
+    final int numNodes = 3;
+    List<DatanodeDetails> datanodes = nodeManager.getNodes(NodeStatus.inServiceHealthy()).stream()
+        .limit(numNodes)
+        .collect(Collectors.toList());
+
+    // Create a container and put one replica on each datanode.
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    ContainerID contID = container.containerID();
+    final Set<ContainerID> containerIDSet = Stream.of(contID).collect(Collectors.toSet());
+
+    for (DatanodeDetails dn: datanodes) {
+      nodeManager.setContainers(dn, containerIDSet);
+    }
+
+    containerStateManager.addContainer(container.getProtobuf());
+
+    getReplicas(contID, ContainerReplicaProto.State.CLOSED, 0, datanodes)
+        .forEach(containerStateManager::updateContainerReplica);
+
+    // Container manager should now be aware of 3 replicas of each container.
+    assertEquals(numNodes, containerManager.getContainerReplicas(contID).size());
+
+    // All replicas should start with an empty data checksum in SCM.
+    boolean dataChecksumsEmpty = containerManager.getContainerReplicas(contID).stream()
+        .allMatch(r -> r.getDataChecksum() == 0);
+    assertTrue(dataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
+
+    // For each datanode, send a container report with a mismatched checksum.
+    for (DatanodeDetails dn: datanodes) {
+      ContainerReportsProto dnReportProto = getContainerReportsProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      ContainerReplicaProto replicaWithChecksum = dnReportProto.getReports(0).toBuilder()
+          .setDataChecksum(createUniqueDataChecksumForReplica(contID, dn.getUuidString()))
+          .build();
+      ContainerReportsProto reportWithChecksum = dnReportProto.toBuilder()
+          .clearReports()
+          .addReports(replicaWithChecksum)
+          .build();
+      final ContainerReportFromDatanode dnReport = new ContainerReportFromDatanode(dn, reportWithChecksum);
+      reportHandler.onMessage(dnReport, publisher);
+    }
+
+    // All the replicas should have different checksums.
+    // Since the containers don't have any data in this test, different checksums are based on container ID and
+    // datanode ID.
+    int numReplicasChecked = 0;
+    for (ContainerReplica replica: containerManager.getContainerReplicas(contID)) {
+      long expectedChecksum = createUniqueDataChecksumForReplica(contID, replica.getDatanodeDetails().getUuidString());
+      assertEquals(expectedChecksum, replica.getDataChecksum());
+      numReplicasChecked++;
+    }
+    assertEquals(numNodes, numReplicasChecked);
+
+    // For each datanode, send a container report with a matching checksum.
+    // This simulates reconciliation running.
+    for (DatanodeDetails dn: datanodes) {
+      ContainerReportsProto dnReportProto = getContainerReportsProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      ContainerReplicaProto replicaWithChecksum = dnReportProto.getReports(0).toBuilder()
+          .setDataChecksum(createMatchingDataChecksumForReplica(contID))
+          .build();
+      ContainerReportsProto reportWithChecksum = dnReportProto.toBuilder()
+          .clearReports()
+          .addReports(replicaWithChecksum)
+          .build();
+      final ContainerReportFromDatanode dnReport = new ContainerReportFromDatanode(dn, reportWithChecksum);
+      reportHandler.onMessage(dnReport, publisher);
+    }
+
+    // All the replicas should now have matching checksums.
+    // Since the containers don't have any data in this test, the matching checksums are based on container ID only.
+    numReplicasChecked = 0;
+    for (ContainerReplica replica: containerManager.getContainerReplicas(contID)) {
+      long expectedChecksum = createMatchingDataChecksumForReplica(contID);
+      assertEquals(expectedChecksum, replica.getDataChecksum());
+      numReplicasChecked++;
+    }
+    assertEquals(numNodes, numReplicasChecked);
+  }
+
+  /**
+   * Generates a placeholder data checksum for testing that is specific to a container replica.
+   */
+  protected static long createUniqueDataChecksumForReplica(ContainerID containerID, String datanodeID) {
+    return (datanodeID + containerID).hashCode();
+  }
+
+  /**
+   * Generates a placeholder data checksum for testing that is the same for all container replicas.
+   */
+  protected static long createMatchingDataChecksumForReplica(ContainerID containerID) {
+    return Objects.hashCode(containerID);
   }
 
   private ContainerReportFromDatanode getContainerReportFromDatanode(
@@ -1248,7 +1489,6 @@ public class TestContainerReportHandler {
             .setContainerID(containerId.getId())
             .setState(state)
             .setOriginNodeId(originNodeId)
-            .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")
             .setSize(5368709120L)
             .setUsed(usedBytes)
             .setKeyCount(keyCount)
@@ -1263,5 +1503,4 @@ public class TestContainerReportHandler {
             .build();
     return crBuilder.addReports(replicaProto).build();
   }
-
 }

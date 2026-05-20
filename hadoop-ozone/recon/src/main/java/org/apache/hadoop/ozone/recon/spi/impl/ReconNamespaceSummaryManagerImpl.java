@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
@@ -44,9 +43,25 @@ public class ReconNamespaceSummaryManagerImpl
   @Inject
   public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider, NSSummaryTask nsSummaryTask)
           throws IOException {
-    namespaceDbStore = reconDBProvider.getDbStore();
+    this(reconDBProvider.getDbStore(), nsSummaryTask);
+  }
+
+  private ReconNamespaceSummaryManagerImpl(DBStore dbStore, NSSummaryTask nsSummaryTask)
+      throws IOException {
+    namespaceDbStore = dbStore;
     this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
     this.nsSummaryTask = nsSummaryTask;
+  }
+
+  @Override
+  public ReconNamespaceSummaryManager getStagedNsSummaryManager(DBStore dbStore) throws IOException {
+    return new ReconNamespaceSummaryManagerImpl(dbStore, nsSummaryTask);
+  }
+
+  @Override
+  public void reinitialize(ReconDBProvider reconDBProvider) throws IOException {
+    namespaceDbStore = reconDBProvider.getDbStore();
+    this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
   }
 
   @Override
@@ -68,6 +83,12 @@ public class ReconNamespaceSummaryManagerImpl
   }
 
   @Override
+  public void batchDeleteNSSummaries(BatchOperation batch, long objectId)
+      throws IOException {
+    nsSummaryTable.deleteWithBatch(batch, objectId);
+  }
+
+  @Override
   public void deleteNSSummary(long objectId) throws IOException {
     nsSummaryTable.delete(objectId);
   }
@@ -81,11 +102,6 @@ public class ReconNamespaceSummaryManagerImpl
   public void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException {
     this.namespaceDbStore.commitBatchOperation(rdbBatchOperation);
-  }
-
-  @Override
-  public void rebuildNSSummaryTree(OMMetadataManager omMetadataManager) {
-    nsSummaryTask.reprocess(omMetadataManager);
   }
 
   public Table getNSSummaryTable() {
