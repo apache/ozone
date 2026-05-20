@@ -234,15 +234,13 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         String bucketName = updatedKeyInfo.getBucketName();
         String bucketDBKey =
             getReconOMMetadataManager().getBucketKey(volumeName, bucketName);
-        // Get bucket info from bucket table
-        OmBucketInfo omBucketInfo = getReconOMMetadataManager().getBucketTable()
-            .getSkipCache(bucketDBKey);
+        OmBucketInfo omBucketInfo = lookupBucketCached(bucketDBKey);
 
         if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
           continue;
         }
 
-        long parentObjectID = getKeyParentID(updatedKeyInfo);
+        long parentObjectID = omBucketInfo.getObjectID();
 
         switch (action) {
         case PUT:
@@ -253,9 +251,10 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           break;
         case UPDATE:
           if (oldKeyInfo != null) {
-            // delete first, then put
-            long oldKeyParentObjectID = getKeyParentID(oldKeyInfo);
-            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, oldKeyParentObjectID);
+            // For OBS, parent is always the bucket, so same parentObjectID
+            // applies to old and new (a key cannot move between buckets via
+            // an UPDATE event — that would be a delete+put).
+            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, parentObjectID);
           } else {
             LOG.warn("Update event does not have the old keyInfo for {}.",
                 updatedKey);

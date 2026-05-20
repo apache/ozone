@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -136,11 +137,15 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
 
     private NSSummary nsSummaryForBucket1;
     private NSSummary nsSummaryForBucket2;
+    private NSSummary nsSummaryForBucket3;
+    private ReconOmTask.TaskResult processResult;
 
     @BeforeEach
     public void setUp() throws IOException {
       nSSummaryTask.reprocess(getReconOMMetadataManager());
-      nSSummaryTask.process(processEventBatch(), Collections.emptyMap());
+      // Exercise process() across all three bucket layouts in a single batch
+      // so the parallel sub-task dispatch is covered end-to-end.
+      processResult = nSSummaryTask.process(processEventBatch(), Collections.emptyMap());
 
       nsSummaryForBucket1 =
           getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
@@ -148,12 +153,13 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
       nsSummaryForBucket2 =
           getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
       assertNotNull(nsSummaryForBucket2);
-      NSSummary nsSummaryForBucket3 = getReconNamespaceSummaryManager().getNSSummary(BUCKET_THREE_OBJECT_ID);
+      nsSummaryForBucket3 =
+          getReconNamespaceSummaryManager().getNSSummary(BUCKET_THREE_OBJECT_ID);
       assertNotNull(nsSummaryForBucket3);
     }
 
     private OMUpdateEventBatch processEventBatch() throws IOException {
-      // put file5 under bucket 2
+      // PUT file5 under bucket 2 (Legacy)
       String omPutKey =
           OM_KEY_PREFIX + VOL +
               OM_KEY_PREFIX + BUCKET_TWO +
@@ -169,7 +175,7 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
                                       .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
                                       .build();
 
-      // delete file 1 under bucket 1
+      // DELETE file1 under bucket 1 (FSO)
       String omDeleteKey = BUCKET_ONE_OBJECT_ID + OM_KEY_PREFIX + FILE_ONE;
       OmKeyInfo omDeleteInfo = buildOmKeyInfo(
           VOL, BUCKET_ONE, KEY_ONE, FILE_ONE,
@@ -183,7 +189,24 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
                                       .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
                                       .build();
 
-      return new OMUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2), 0L);
+      // PUT file4 under bucket 3 (OBS) — exercises the OBS sub-task path so a
+      // regression in the OBS branch (e.g. missed events) is caught.
+      String omObsPutKey =
+          OM_KEY_PREFIX + VOL +
+              OM_KEY_PREFIX + BUCKET_THREE +
+              OM_KEY_PREFIX + KEY_FOUR;
+      OmKeyInfo omObsPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_THREE, KEY_FOUR,
+          KEY_FOUR, KEY_FOUR_OBJECT_ID, BUCKET_THREE_OBJECT_ID, KEY_FOUR_SIZE);
+      OMDBUpdateEvent keyEvent3 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omObsPutKey)
+                                      .setValue(omObsPutKeyInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getOBSBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+                                      .build();
+
+      return new OMUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2, keyEvent3), 0L);
     }
 
     @Test
@@ -215,6 +238,25 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
       for (int i = 2; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         assertEquals(0, fileSizeDist[i]);
       }
+    }
+
+    @Test
+    public void testProcessObsBucket() {
+      // bucket 3 (OBS) had file3 from reprocess; the batch added file4.
+      assertEquals(2, nsSummaryForBucket3.getNumOfFiles());
+      assertEquals(KEY_THREE_SIZE + KEY_FOUR_SIZE,
+          nsSummaryForBucket3.getSizeOfFiles());
+    }
+
+    @Test
+    public void testProcessTaskResult() {
+      // Sub-task seek positions must be reported for all three layouts so the
+      // dispatcher can resume each sub-task independently on retry.
+      assertNotNull(processResult);
+      assertTrue(processResult.isTaskSuccess());
+      assertNotNull(processResult.getSubTaskSeekPositions().get(NSSummaryTask.BucketType.FSO.name()));
+      assertNotNull(processResult.getSubTaskSeekPositions().get(NSSummaryTask.BucketType.LEGACY.name()));
+      assertNotNull(processResult.getSubTaskSeekPositions().get(NSSummaryTask.BucketType.OBS.name()));
     }
   }
 }

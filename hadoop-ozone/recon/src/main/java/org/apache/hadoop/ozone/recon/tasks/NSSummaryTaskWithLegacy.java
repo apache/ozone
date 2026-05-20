@@ -363,8 +363,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       throws IOException {
     String bucketKey = getReconOMMetadataManager()
         .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
-    OmBucketInfo parentBucketInfo =
-        getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
+    OmBucketInfo parentBucketInfo = lookupBucketCached(bucketKey);
 
     if (parentBucketInfo != null) {
       return parentBucketInfo.getObjectID();
@@ -388,8 +387,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     String volumeName = keyInfo.getVolumeName();
     String bucketName = keyInfo.getBucketName();
     String bucketDBKey = metadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        metadataManager.getBucketTable().getSkipCache(bucketDBKey);
+    OmBucketInfo omBucketInfo = lookupBucketCached(bucketDBKey);
 
     if (omBucketInfo.getBucketLayout() != LEGACY_BUCKET_LAYOUT) {
       LOG.debug(

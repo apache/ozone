@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -43,12 +45,36 @@ public class NSSummaryTaskDbEventHandler {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
 
+  // Bucket layout never changes for an existing bucket, so cache OmBucketInfo
+  // lookups across process() calls. Each delta loop hits at most a few buckets;
+  // without this cache, every event pays a RocksDB point read in the Legacy and
+  // OBS sub-tasks.
+  //
+  // Single-thread access only (one dispatcher thread per task). HashMap is fine.
+  private final Map<String, OmBucketInfo> bucketInfoCache = new HashMap<>();
+
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
                                      reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+  }
+
+  /** Look up an {@link OmBucketInfo} via {@link Table#getSkipCache} and cache
+   *  the result. Bucket layout/object-id are immutable for an existing bucket,
+   *  so an unbounded field-level cache is safe and avoids one RocksDB point
+   *  read per event in the per-event sub-task loops. */
+  protected OmBucketInfo lookupBucketCached(String bucketDBKey) throws IOException {
+    OmBucketInfo cached = bucketInfoCache.get(bucketDBKey);
+    if (cached != null) {
+      return cached;
+    }
+    OmBucketInfo info = reconOMMetadataManager.getBucketTable().getSkipCache(bucketDBKey);
+    if (info != null) {
+      bucketInfoCache.put(bucketDBKey, info);
+    }
+    return info;
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
