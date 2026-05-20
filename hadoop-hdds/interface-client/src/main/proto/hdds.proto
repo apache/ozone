@@ -587,11 +587,11 @@ message VolumeReportProto {
     optional string storageId = 1;
     optional string storagePath = 2;
     optional uint64 ozoneCapacity = 3;
-    optional uint64 ozoneAvailable = 4;
-    optional uint64 ozoneUsedSpace = 5;
-    optional uint64 committedBytes = 6;
-    optional uint64 effectiveUsedSpace = 7;
-    optional double utilization = 8;
+    optional uint64 ozoneUsedSpace = 4;
+    optional uint64 committedBytes = 5;
+    optional uint64 effectiveUsedSpace = 6;
+    optional double utilization = 7;
+    optional uint64 ozoneAvailable = 8;
 }
 
 message DatanodeDiskBalancerInfoProto {

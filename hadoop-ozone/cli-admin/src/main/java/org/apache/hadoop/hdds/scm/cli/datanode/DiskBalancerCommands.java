@@ -157,7 +157,7 @@ import picocli.CommandLine.Command;
 
 @Command(
     name = "diskbalancer",
-    description = "DiskBalancer specific operations to ensure even disk utilisation." +
+    description = "DiskBalancer specific operations to ensure even disk utilization." +
         " It is disabled by default. To enable it, set " + HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY + " as true.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,

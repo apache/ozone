@@ -115,7 +115,8 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         double lt = idealUsage - threshold / 100.0;
         double ut = idealUsage + threshold / 100.0;
         header.append("IdealUsage: ").append(formatPercent(idealUsage))
-            .append(" | Threshold: ").append(threshold).append('%')
+            .append(" | Threshold: ")
+            .append(String.format(Locale.ROOT, PERCENT_FORMAT, threshold))
             .append(" | ThresholdRange: (").append(formatPercent(lt))
             .append(", ").append(formatPercent(ut)).append(')')
             .append(System.lineSeparator())
@@ -126,20 +127,20 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       contentList.add(header.toString());
 
       if (p.getVolumeInfoCount() > 0 && p.hasIdealUsage()) {
-        formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %20s %5s %5s%n");
+        formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
         contentList.add("StorageID");
         contentList.add("StoragePath");
         contentList.add("OzoneCapacity");
         contentList.add("OzoneAvailable");
         contentList.add("OzoneUsed");
-        contentList.add("Container Pre-AllocatedSpace");
+        contentList.add("ContainerPreAllocatedSpace");
         contentList.add("EffectiveUsedSpace");
         contentList.add("Utilization");
         contentList.add("VolumeDensity");
 
         double ideal = p.getIdealUsage();
         for (VolumeReportProto v : p.getVolumeInfoList()) {
-          formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %15s %6s %6s%n");
+          formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
           contentList.add(v.hasStorageId() ? v.getStorageId() : "-");
           contentList.add(v.hasStoragePath() ? v.getStoragePath() : "-");
           contentList.add(v.hasOzoneCapacity() ? StringUtils.byteDesc(v.getOzoneCapacity()) : "-");
@@ -161,15 +162,16 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     formatBuilder.append("%nNote:%n")
         .append("  - Aggregate VolumeDataDensity: Sum of per-volume density (deviation from ideal);")
         .append(" higher means more imbalance.%n")
-        .append("  - IdealUsage: Target utilization ratio (0-1) when volumes are evenly balanced.%n")
+        .append("  - IdealUsage: Target utilization (0-100%%) when volumes are evenly balanced.%n")
         .append("  - ThresholdRange: Acceptable deviation (percent); volumes within")
         .append(" IdealUsage +/- Threshold are considered balanced.%n")
         .append("  - VolumeDensity: Deviation of a particular volume's utilization from IdealUsage.%n")
-        .append("  - Utilization: Ratio of actual used space to capacity (0-1) for a particular volume.%n")
+        .append("  - Utilization: how much a particular volume is utilized ")
+        .append("effectiveUsedSpace / ozoneCapacity) in %%.%n")
         .append("  - OzoneCapacity: Ozone volume capacity.%n")
         .append("  - OzoneAvailable: Ozone available space.%n")
         .append("  - OzoneUsed: Ozone used space.%n")
-        .append("  - Container Pre-AllocatedSpace: Space reserved for containers not yet written to disk.%n")
+        .append("  - ContainerPreAllocatedSpace: Space reserved for containers not yet written to disk.%n")
         .append("  - EffectiveUsedSpace: This is the actual used space of volume which is visible")
         .append(" to the diskBalancer : (ozoneCapacity minus ozoneAvailable) + containerPreAllocatedSpace + ")
         .append("move delta.%n")
@@ -208,7 +210,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       double lt = idealUsage - threshold / 100.0;
       double ut = idealUsage + threshold / 100.0;
       result.put("idealUsage", formatPercent(idealUsage));
-      result.put("threshold %", report.getDiskBalancerConf().getThreshold());
+      result.put("threshold %", String.format(Locale.ROOT, PERCENT_FORMAT, threshold));
       result.put("thresholdRange", String.format("(%s, %s)",
           formatPercent(lt), formatPercent(ut)));
     }
