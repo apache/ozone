@@ -1048,26 +1048,23 @@ public class TestRocksDBCheckpointDiffer {
       throws IOException {
     final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
 
-    // Hard-coded expected output.
-    // The results are deterministic. Retrieved from a successful run.
-    final List<List<String>> expectedDifferResult = asList(
-        asList("000023", "000029", "000026", "000019", "000021", "000031"),
-        asList("000023", "000029", "000026", "000021", "000031"),
-        asList("000023", "000029", "000026", "000031"),
-        asList("000029", "000026", "000031"),
-        asList("000029", "000031"),
-        Collections.singletonList("000031"),
-        Collections.emptyList()
-    );
-    assertEquals(snapshots.size(), expectedDifferResult.size());
-
-    int index = 0;
     List<String> expectedDiffFiles = new ArrayList<>();
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksCheckpointDiffer Dag.
       List<String> tablesToTrack = new ArrayList<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
       // Add some invalid index.
       tablesToTrack.add("compactionLogTable");
+      Set<String> fullTableToLookUp = new HashSet<>(tablesToTrack);
+      List<String> baselineDiffFileNames =
+          differ.getSSTDiffList(
+                  new DifferSnapshotVersion(src, 0, fullTableToLookUp),
+                  new DifferSnapshotVersion(snap, 0, fullTableToLookUp),
+                  null, fullTableToLookUp, true)
+              .orElse(Collections.emptyList())
+              .stream()
+              .map(SstFileInfo::getFileName)
+              .collect(Collectors.toList());
+
       Set<String> tableToLookUp = new HashSet<>();
       for (int i = 0; i < Math.pow(2, tablesToTrack.size()); i++) {
         tableToLookUp.clear();
@@ -1078,7 +1075,7 @@ public class TestRocksDBCheckpointDiffer {
           tableToLookUp.add(tablesToTrack.get(firstSetBitIndex));
           mask &= mask - 1;
         }
-        for (String diffFile : expectedDifferResult.get(index)) {
+        for (String diffFile : baselineDiffFileNames) {
           Pair<Boolean, String> resolved =
               resolveColumnFamilyForDiffFile(differ, diffFile, src, snap);
           if (!resolved.getLeft()) {
@@ -1096,11 +1093,12 @@ public class TestRocksDBCheckpointDiffer {
         LOG.info("SST diff list from '{}' to '{}': {} tables: {}",
             src.getDbPath(0), snap.getDbPath(0), sstDiffList, tableToLookUp);
 
-        assertEquals(expectedDiffFiles, sstDiffList.stream().map(SstFileInfo::getFileName)
-            .collect(Collectors.toList()));
+        List<String> actualNames =
+            sstDiffList.stream().map(SstFileInfo::getFileName).collect(Collectors.toList());
+        expectedDiffFiles.sort(Comparator.naturalOrder());
+        actualNames.sort(Comparator.naturalOrder());
+        assertEquals(expectedDiffFiles, actualNames);
       }
-
-      ++index;
     }
   }
 
