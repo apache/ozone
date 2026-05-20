@@ -51,6 +51,7 @@ public class S3EntityGenerator extends BaseFreonGenerator {
       amazonS3ClientBuilder.withRegion(Regions.DEFAULT_REGION);
     }
 
+    amazonS3ClientBuilder.withRequestHandlers(new FreonS3TraceContextRequestHandler());
     s3 = amazonS3ClientBuilder.build();
   }
 

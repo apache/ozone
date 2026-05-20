@@ -431,7 +431,7 @@
   <property>
     <name>ozone.block.deleting.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>Time interval of the block deleting service.
       The block deleting service runs on each datanode periodically and
       deletes blocks queued for deletion. Unit could be defined with
@@ -441,7 +441,7 @@
   <property>
     <name>ozone.block.deleting.service.timeout</name>
     <value>300000ms</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>A timeout value of block deletion service. If this is set
       greater than 0,
       the service will stop waiting for the block deleting completion after this
@@ -454,7 +454,7 @@
   <property>
     <name>ozone.block.deleting.service.workers</name>
     <value>10</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
+    <tag>OZONE, PERFORMANCE, SCM, DELETION</tag>
     <description>Number of workers executed of block deletion service. This
       configuration should be set to greater than 0.
     </description>
@@ -496,7 +496,7 @@
   <property>
     <name>ozone.key.deleting.limit.per.task</name>
     <value>50000</value>
-    <tag>OM, PERFORMANCE</tag>
+    <tag>OM, PERFORMANCE, DELETION</tag>
     <description>
       A maximum number of keys to be scanned by key deleting service
       per time interval in OM. Those keys are sent to delete metadata and
@@ -507,7 +507,7 @@
   <property>
     <name>ozone.snapshot.key.deleting.limit.per.task</name>
     <value>20000</value>
-    <tag>OM, PERFORMANCE</tag>
+    <tag>OM, PERFORMANCE, DELETION</tag>
     <description>
       The maximum number of deleted keys to be scanned by Snapshot
       Deleting Service per snapshot run.
@@ -706,7 +706,7 @@
   <property>
     <name>ozone.path.deleting.limit.per.task</name>
     <value>20000</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>A maximum number of paths(dirs/files) to be deleted by
       directory deleting service per time interval.
     </description>
@@ -793,7 +793,7 @@
   <property>
     <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
     <value>8</value>
-    <tag>OZONE, SCM</tag>
+    <tag>OZONE, SCM, DELETION</tag>
     <description>
       Factor with which number of delete blocks sent to each datanode in every interval.
       If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
@@ -910,7 +910,7 @@
   <property>
     <name>ozone.scm.keyvalue.container.deletion-choosing.policy</name>
     <value>org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy</value>
-    <tag>OZONE, MANAGEMENT</tag>
+    <tag>OZONE, MANAGEMENT, DELETION</tag>
     <description>
       The policy used for choosing desired keyvalue containers for block deletion.
       Datanode selects some containers to process block deletion
@@ -3915,7 +3915,7 @@
   <property>
     <name>ozone.directory.deleting.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>Time interval of the directory deleting service. It runs on OM
       periodically and cleanup orphan directory and its sub-tree. For every
       orphan directory it deletes the sub-path tree structure(dirs/files). It
@@ -3926,7 +3926,7 @@
   <property>
     <name>ozone.snapshot.filtering.limit.per.task</name>
     <value>2</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>A maximum number of snapshots to be filtered by
       sst filtering service per time interval.
     </description>
@@ -3934,7 +3934,7 @@
   <property>
     <name>ozone.snapshot.deleting.limit.per.task</name>
     <value>10</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>The maximum number of snapshots that would be reclaimed by
       Snapshot Deleting Service per run.
     </description>
@@ -3950,7 +3950,7 @@
   <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>Time interval of the SST File filtering service from Snapshot.
     </description>
   </property>
@@ -3973,14 +3973,14 @@
   <property>
     <name>ozone.sst.filtering.service.timeout</name>
     <value>300000ms</value>
-    <tag>OZONE, PERFORMANCE,OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>A timeout value of sst filtering service.
     </description>
   </property>
   <property>
     <name>ozone.snapshot.defrag.service.timeout</name>
     <value>300s</value>
-    <tag>OZONE, PERFORMANCE,OM</tag>
+    <tag>OZONE, PERFORMANCE, OM</tag>
     <description>Timeout value of a run of snapshot defragmentation service.
     </description>
   </property>
@@ -4008,7 +4008,7 @@
   <property>
     <name>ozone.snapshot.deleting.service.timeout</name>
     <value>300s</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       Timeout value for SnapshotDeletingService.
     </description>
@@ -4017,7 +4017,7 @@
   <property>
     <name>ozone.snapshot.deleting.service.interval</name>
     <value>30s</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       The time interval between successive SnapshotDeletingService
       thread run.
@@ -4045,8 +4045,8 @@
 
   <property>
     <name>ozone.snapshot.deep.cleaning.enabled</name>
-    <value>false</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <value>true</value>
+    <tag>OZONE, PERFORMANCE, OM, DELETION</tag>
     <description>
       Flag to enable/disable snapshot deep cleaning.
     </description>

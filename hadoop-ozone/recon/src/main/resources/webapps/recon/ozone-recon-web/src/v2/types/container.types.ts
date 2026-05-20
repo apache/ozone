@@ -74,6 +74,23 @@ export type ContainersPaginationResponse = {
   replicaMismatchCount: number;
 }
 
+export type QuasiClosedContainer = {
+  containerID: number;
+  pipelineID: string;
+  keys: number;
+  stateEnterTime: number;
+  expectedReplicaCount: number;
+  actualReplicaCount: number;
+  replicas: ContainerReplica[];
+}
+
+export type QuasiClosedContainersResponse = {
+  quasiClosedCount: number;
+  firstKey: number;
+  lastKey: number;
+  containers: QuasiClosedContainer[];
+}
+
 export type TabPaginationState = {
   data: Container[];
   loading: boolean;
@@ -98,6 +115,7 @@ export type ContainerTableProps = {
   hasPrevPage: boolean;
   pageSize: number;
   onPageSizeChange: (newSize: number) => void;
+  sinceColumnTitle?: string;
 }
 
 
@@ -121,7 +139,9 @@ export type ContainerState = {
   overReplicatedCount: number;
   misReplicatedCount: number;
   replicaMismatchCount: number;
+  quasiClosedCount: number;
 }
+
 
 export type ExportJobStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
 

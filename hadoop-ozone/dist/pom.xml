@@ -44,6 +44,13 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.jacoco</groupId>
+      <artifactId>org.jacoco.cli</artifactId>
+      <version>${jacoco.version}</version>
+      <classifier>nodeps</classifier>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-container-service</artifactId>
       <scope>runtime</scope>
