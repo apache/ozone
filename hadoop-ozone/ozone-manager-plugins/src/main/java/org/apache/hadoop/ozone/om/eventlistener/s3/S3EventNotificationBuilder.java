@@ -31,8 +31,10 @@ import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotification.UserIdent
  * com.amazonaws.services.s3.event.S3EventNotification which is part of
  * AWS SDK 1.x
  *
- * NOTE: the above class is designed for deserialization which is why it
- * requires this builder wrapper.
+ * NOTE: the original SDK class is designed primarily for consumer-side
+ * deserialization (parsing incoming JSON). Because it lacks standard public
+ * setters or a fluent API for creation, this builder was added to provide
+ * a clean interface for the serialization path (producing events from Ozone).
  *
  * XXX: we may need to fork these classes so that we can customize it to
  * our needs.

@@ -46,6 +46,34 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
   public List<String> determineEventsForOperation(OmCompletedRequestInfo requestInfo) {
 
     switch (requestInfo.getCmdType()) {
+    case CreateVolume:
+      return Collections.singletonList(createS3Event("OzoneVolumeCreated:Put",
+              requestInfo.getVolumeName(),
+              null,
+              null,
+              Collections.emptyMap())
+      );
+    case DeleteVolume:
+      return Collections.singletonList(createS3Event("OzoneVolumeRemoved:Delete",
+              requestInfo.getVolumeName(),
+              null,
+              null,
+              Collections.emptyMap())
+      );
+    case CreateBucket:
+      return Collections.singletonList(createS3Event("OzoneBucketCreated:Put",
+              requestInfo.getVolumeName(),
+              requestInfo.getBucketName(),
+              null,
+              Collections.emptyMap())
+      );
+    case DeleteBucket:
+      return Collections.singletonList(createS3Event("OzoneBucketRemoved:Delete",
+              requestInfo.getVolumeName(),
+              requestInfo.getBucketName(),
+              null,
+              Collections.emptyMap())
+      );
     case CreateKey:
     case CommitKey:
       return Collections.singletonList(createS3Event("ObjectCreated:Put",
@@ -62,16 +90,16 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
       // schema makes sense but the general S3 schema is somewhat
       // freeform.  These arguments are more informational than
       // required so it is unclear as to their necessity.
-      Map<String, Object> renameEventData = new HashMap<>();
-      renameEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), false);
-      renameEventData.put(OzoneEventDataKey.IS_RECURSIVE.toString(), createFileArgs.isRecursive());
-      renameEventData.put(OzoneEventDataKey.IS_OVERWRITE.toString(), createFileArgs.isOverwrite());
+      Map<String, Object> createFileEventData = new HashMap<>();
+      createFileEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), false);
+      createFileEventData.put(OzoneEventDataKey.IS_RECURSIVE.toString(), createFileArgs.isRecursive());
+      createFileEventData.put(OzoneEventDataKey.IS_OVERWRITE.toString(), createFileArgs.isOverwrite());
 
       return Collections.singletonList(createS3Event("ObjectCreated:Put",
               requestInfo.getVolumeName(),
               requestInfo.getBucketName(),
               requestInfo.getKeyName(),
-              renameEventData)
+              createFileEventData)
       );
     case CreateDirectory:
       // XXX: ozoneEventData is an Ozone extension. Its is unclear if this
@@ -116,7 +144,7 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
               ozoneEventData)
       );
     default:
-      LOG.info("No events for operation {} on {}",
+      LOG.debug("No events for operation {} on {}",
            requestInfo.getCmdType(),
            requestInfo.getKeyName());
       return Collections.emptyList();
@@ -130,7 +158,9 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
                               Map<String, Object> ozoneEventData) {
     try {
       String objectKey = S3OzoneEventKeyFormatter.getOzoneKey(volumeName, bucketName, keyName);
-      String bucketArn = "arn:aws:s3:::" + volumeName + "." + bucketName;
+      String bucketArn = (bucketName == null)
+          ? "arn:aws:s3:::" + volumeName
+          : "arn:aws:s3:::" + volumeName + "." + bucketName;
       Instant eventTime = Instant.now();
       String etag = UUID.randomUUID().toString();
 
@@ -156,12 +186,13 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
     public static String getOzoneKey(String volume, String bucket, String key) {
       StringBuilder builder = new StringBuilder();
       builder.append(volume);
-      // TODO : Throw if the Bucket is null?
-      builder.append(OM_KEY_PREFIX).append(bucket);
-      if (StringUtils.isNotBlank(key)) {
-        builder.append(OM_KEY_PREFIX);
-        if (!key.equals(OM_KEY_PREFIX)) {
-          builder.append(key);
+      if (StringUtils.isNotBlank(bucket)) {
+        builder.append(OM_KEY_PREFIX).append(bucket);
+        if (StringUtils.isNotBlank(key)) {
+          builder.append(OM_KEY_PREFIX);
+          if (!key.equals(OM_KEY_PREFIX)) {
+            builder.append(key);
+          }
         }
       }
       return builder.toString();

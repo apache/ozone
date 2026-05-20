@@ -171,6 +171,49 @@ public class TestOMEventListenerKafkaPublisher {
   }
 
   @Test
+  public void testCreateVolumeRequestProducesOzoneVolumeCreatedEvent() throws IOException {
+    OmCompletedRequestInfo createRequest = buildCompletedRequestInfo(6L, Type.CreateVolume, null,
+        new OperationArgs.NoArgs());
+    // override volume/bucket to simulate volume-only op
+    createRequest = new OmCompletedRequestInfo.Builder()
+        .setTrxLogIndex(6L)
+        .setCmdType(Type.CreateVolume)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(null)
+        .setKeyName(null)
+        .setCreationTime(Time.now())
+        .setOpArgs(new OperationArgs.NoArgs())
+        .build();
+
+    List<String> events = captureEventsProducedByOperation(createRequest, 1);
+    S3EventNotificationRecord record = getFirstRecord(events);
+
+    assertThat(record.getEventName()).isEqualTo("OzoneVolumeCreated:Put");
+    assertThat(record.getS3().getBucket().getName()).isNull();
+    assertThat(record.getS3().getObject().getKey()).isEqualTo(VOLUME_NAME);
+  }
+
+  @Test
+  public void testCreateBucketRequestProducesOzoneBucketCreatedEvent() throws IOException {
+    OmCompletedRequestInfo createRequest = new OmCompletedRequestInfo.Builder()
+        .setTrxLogIndex(7L)
+        .setCmdType(Type.CreateBucket)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName(null)
+        .setCreationTime(Time.now())
+        .setOpArgs(new OperationArgs.NoArgs())
+        .build();
+
+    List<String> events = captureEventsProducedByOperation(createRequest, 1);
+    S3EventNotificationRecord record = getFirstRecord(events);
+
+    assertThat(record.getEventName()).isEqualTo("OzoneBucketCreated:Put");
+    assertThat(record.getS3().getBucket().getName()).isEqualTo(BUCKET_NAME);
+    assertThat(record.getS3().getObject().getKey()).isEqualTo(VOLUME_NAME + "/" + BUCKET_NAME);
+  }
+
+  @Test
   public void testEventDateFormatIsIso8601() throws IOException {
     OmCompletedRequestInfo createRequest = buildCompletedRequestInfo(5L, Type.CreateKey, "date/test",
         new OperationArgs.NoArgs());

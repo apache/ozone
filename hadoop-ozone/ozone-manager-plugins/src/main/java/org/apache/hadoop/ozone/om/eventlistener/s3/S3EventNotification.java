@@ -347,21 +347,6 @@ public class S3EventNotification {
         }
     }
 
-    public static class GlacierEventDataEntity {
-        private final RestoreEventDataEntity restoreEventData;
-
-        @JsonCreator
-        public GlacierEventDataEntity(
-                @JsonProperty(value = "restoreEventData") RestoreEventDataEntity restoreEventData)
-        {
-            this.restoreEventData = restoreEventData;
-        }
-
-        public RestoreEventDataEntity getRestoreEventData() {
-            return restoreEventData;
-        }
-    }
-
     public static class LifecycleEventDataEntity {
 
         private final TransitionEventDataEntity transitionEventData;
@@ -379,82 +364,6 @@ public class S3EventNotification {
         }
     }
 
-    public static class IntelligentTieringEventDataEntity {
-
-        private final String destinationAccessTier;
-
-        @JsonCreator
-        public IntelligentTieringEventDataEntity(
-                @JsonProperty(value = "destinationAccessTier") String destinationAccessTier)
-        {
-            this.destinationAccessTier = destinationAccessTier;
-        }
-
-        @JsonProperty("destinationAccessTier")
-        public String getDestinationAccessTier() {
-            return destinationAccessTier;
-        }
-    }
-
-    public static class ReplicationEventDataEntity {
-
-        private final String replicationRuleId;
-        private final String destinationBucket;
-        private final String s3Operation;
-        private final String requestTime;
-        private final String failureReason;
-        private final String threshold;
-        private final String replicationTime;
-
-        @JsonCreator
-        public ReplicationEventDataEntity(
-                @JsonProperty(value = "replicationRuleId") String replicationRuleId,
-                @JsonProperty(value = "destinationBucket") String destinationBucket,
-                @JsonProperty(value = "s3Operation") String s3Operation,
-                @JsonProperty(value = "requestTime") String requestTime,
-                @JsonProperty(value = "failureReason") String failureReason,
-                @JsonProperty(value = "threshold") String threshold,
-                @JsonProperty(value = "replicationTime") String replicationTime)
-        {
-            this.replicationRuleId = replicationRuleId;
-            this.destinationBucket = destinationBucket;
-            this.s3Operation = s3Operation;
-            this.requestTime = requestTime;
-            this.failureReason = failureReason;
-            this.threshold = threshold;
-            this.replicationTime = replicationTime;
-        }
-
-        @JsonProperty("replicationRuleId")
-        public String getReplicationRuleId() {
-            return replicationRuleId;
-        }
-        @JsonProperty("destinationBucket")
-        public String getDestinationBucket() {
-            return destinationBucket;
-        }
-        @JsonProperty("s3Operation")
-        public String getS3Operation() {
-            return s3Operation;
-        }
-        @JsonProperty("requestTime")
-        public String getRequestTime() {
-            return requestTime;
-        }
-        @JsonProperty("failureReason")
-        public String getFailureReason() {
-            return failureReason;
-        }
-        @JsonProperty("threshold")
-        public String getThreshold() {
-            return threshold;
-        }
-        @JsonProperty("replicationTime")
-        public String getReplicationTime() {
-            return replicationTime;
-        }
-    }
-
     public static class TransitionEventDataEntity {
         private final String destinationStorageClass;
 
@@ -467,31 +376,6 @@ public class S3EventNotification {
 
         public String getDestinationStorageClass() {
             return destinationStorageClass;
-        }
-    }
-
-    public static class RestoreEventDataEntity {
-        private OffsetDateTime lifecycleRestorationExpiryTime;
-        private final String lifecycleRestoreStorageClass;
-
-        @JsonCreator
-        public RestoreEventDataEntity(
-                @JsonProperty("lifecycleRestorationExpiryTime") String lifecycleRestorationExpiryTime,
-                @JsonProperty("lifecycleRestoreStorageClass") String lifecycleRestoreStorageClass)
-        {
-            if (lifecycleRestorationExpiryTime != null) {
-                this.lifecycleRestorationExpiryTime = OffsetDateTime.parse(lifecycleRestorationExpiryTime);
-            }
-            this.lifecycleRestoreStorageClass = lifecycleRestoreStorageClass;
-        }
-
-        @JsonSerialize(using=DateTimeJsonSerializer.class)
-        public OffsetDateTime getLifecycleRestorationExpiryTime() {
-            return lifecycleRestorationExpiryTime;
-        }
-
-        public String getLifecycleRestoreStorageClass() {
-            return lifecycleRestoreStorageClass;
         }
     }
 
