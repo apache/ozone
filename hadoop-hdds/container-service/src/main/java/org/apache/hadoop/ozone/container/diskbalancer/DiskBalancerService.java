@@ -634,15 +634,14 @@ public class DiskBalancerService extends BackgroundService {
         if (!readLockReleased) {
           container.readUnlock();
         }
-        if (moveSucceeded) {
+        boolean moveCompleted = moveSucceeded && newContainer != null;
+        if (moveCompleted) {
           // Add current old container to pendingDeletionContainers.
           pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelay, container);
-          if (newContainer != null) {
-            ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
-                destVolume, containerSize, Time.monotonicNow() - startTime);
-          }
+          ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
+              destVolume, containerSize, Time.monotonicNow() - startTime);
         }
-        postCall(moveSucceeded, startTime);
+        postCall(moveCompleted, startTime);
 
         // pick one expired container from pendingDeletionContainers to delete
         tryCleanupOnePendingDeletionContainer();
