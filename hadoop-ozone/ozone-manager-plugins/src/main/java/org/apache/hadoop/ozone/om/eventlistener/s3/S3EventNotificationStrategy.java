@@ -86,7 +86,7 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
       OmCompletedRequestInfo.OperationArgs.CreateFileArgs createFileArgs
           = (OmCompletedRequestInfo.OperationArgs.CreateFileArgs) requestInfo.getOpArgs();
 
-      // XXX: ozoneEventData is an Ozone extension. Its is unclear if this
+      // XXX: ozoneEventData is an Ozone extension. It is unclear if this
       // schema makes sense but the general S3 schema is somewhat
       // freeform.  These arguments are more informational than
       // required so it is unclear as to their necessity.
@@ -102,7 +102,7 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
               createFileEventData)
       );
     case CreateDirectory:
-      // XXX: ozoneEventData is an Ozone extension. Its is unclear if this
+      // XXX: ozoneEventData is an Ozone extension. It is unclear if this
       // schema makes sense but the general S3 schema is somewhat
       // freeform.  These arguments are more informational than
       // required so it is unclear as to their necessity.
@@ -171,7 +171,7 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
 
       return MAPPER.writer().writeValueAsString(event);
     } catch (Exception ex) {
-      LOG.info("------------> {}", "failed");
+      LOG.error("Failed to create S3 event for {} on {}/{}", eventName, volumeName, bucketName, ex);
       return null;
     }
   }

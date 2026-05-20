@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.om.eventlistener.s3;
 
 /* copy of
- * software.amazon.awssdk.eventnotifications.s3.model.S3EventNotification
+ * com.amazonaws.services.s3.event.S3EventNotification
  * class taken from AWS SDK (1.x) with minor changes for build issues
- * and removed usage of unnecessary AWS specific extension entiies:
+ * and removed usage of unnecessary AWS specific extension entities:
  *
  * - GlacierEventDataEntity
  * - LifecycleEventDataEntity

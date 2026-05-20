@@ -127,6 +127,10 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
 
     // loop over events and send them to our kafka sink
     for (String event : eventsToSend) {
+      if (event == null) {
+        LOG.warn("Skipping null event for transaction {}", completedRequestInfo.getTrxLogIndex());
+        continue;
+      }
       try {
         kafkaClient.send(event);
       } catch (IOException ex) {

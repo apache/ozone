@@ -124,7 +124,7 @@ public class S3EventNotificationBuilder {
         new S3EventNotification.RequestParametersEntity(""),
         new S3EventNotification.ResponseElementsEntity("", ""),
         s3Entity,
-        new S3EventNotification.UserIdentityEntity("tester"),
+        new S3EventNotification.UserIdentityEntity(USER_IDENTITY),
         ozoneEventData);
 
     return new S3EventNotification(Collections.singletonList(eventRecord));
