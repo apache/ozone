@@ -56,15 +56,12 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 /**
  * Generate code for {@link ScmInvoker} implementations.
  * Step 1. Create the target java file in {@link #DIR}.  It will be used as an input for license header and imports.
- * Step 2. Add main method to the API interface.
+ * Step 2. Call {@link #generate(Class, boolean)} from a test or a temporary main method in any test class.
  * Step 3. Manually fix imports.
  * <p>
  * Below is an example for generating the API interface FinalizationStateManager:
  * Step 1. Copy FinalizationStateManager.java to DIR/FinalizationStateManagerInvoker.java
- * Step 2. //FinalizationStateManager
- *         static void main(String[] args) {
- *           ScmInvokerCodeGenerator.generate(FinalizationStateManager.class, true);
- *         }
+ * Step 2. ScmInvokerCodeGenerator.generate(FinalizationStateManager.class, true);
  * Step 3. Manually fix imports.
  */
 public final class ScmInvokerCodeGenerator {

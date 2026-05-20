@@ -103,8 +103,7 @@ public class SequenceIdGeneratorStateManagerInvoker extends ScmInvoker<StateMana
       return Message.EMPTY;
 
     default:
-      throw new IllegalArgumentException("Method not found: " + methodName
-          + " in SequenceIdGenerator.StateManager");
+      throw new IllegalArgumentException("Method not found: " + methodName + " in StateManager");
     }
 
     return SCMRatisResponse.encode(returnValue, returnType);
