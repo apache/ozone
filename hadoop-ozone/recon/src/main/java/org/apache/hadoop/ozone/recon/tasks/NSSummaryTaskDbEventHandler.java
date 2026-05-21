@@ -61,10 +61,10 @@ public class NSSummaryTaskDbEventHandler {
     this.reconOMMetadataManager = reconOMMetadataManager;
   }
 
-  /** Look up an {@link OmBucketInfo} via {@link Table#getSkipCache} and cache
-   *  the result. Bucket layout/object-id are immutable for an existing bucket,
-   *  so an unbounded field-level cache is safe and avoids one RocksDB point
-   *  read per event in the per-event sub-task loops. */
+  /** Look up an {@link OmBucketInfo} via {@code getBucketTable().getSkipCache}
+   *  and cache the result. Bucket layout/object-id are immutable for an existing
+   *  bucket, so an unbounded field-level cache is safe and avoids one RocksDB
+   *  point read per event in the per-event sub-task loops. */
   protected OmBucketInfo lookupBucketCached(String bucketDBKey) throws IOException {
     OmBucketInfo cached = bucketInfoCache.get(bucketDBKey);
     if (cached != null) {
