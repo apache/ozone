@@ -530,7 +530,6 @@ public class DiskBalancerService extends BackgroundService {
         State containerState = container.getContainerData().getState();
         if (!movableContainerStates.contains(containerState)) {
           LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
-          moveSucceeded = false;
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
 
