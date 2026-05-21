@@ -42,9 +42,12 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
@@ -369,6 +372,60 @@ public class TestOMClientRequestWithUserInfo {
     } finally {
       OzoneManager.setS3Auth(null);
       OzoneManager.setStsTokenIdentifier(null);
+    }
+  }
+
+  @Test
+  public void testPreExecuteRejectsSessionTokenWithoutStsTokenIdentifierWhenSecurityEnabled() {
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+
+    final String accessId = "ASIA12345";
+    final String signature = "Signature";
+    final String stringToSign = "StringToSign";
+    final String sessionToken = "SessionToken";
+
+    final S3Authentication s3Authentication = S3Authentication.newBuilder()
+        .setAccessId(accessId)
+        .setSignature(signature)
+        .setStringToSign(stringToSign)
+        .setSessionToken(sessionToken)
+        .build();
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setS3Authentication(s3Authentication)
+        .build();
+
+    try {
+      OzoneManager.setStsTokenIdentifier(null);
+      final OMClientRequest omClientRequest = new DummyOMClientRequest(omRequest);
+
+      final OMException ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
+      assertTrue(ex.getMessage().contains("session token"));
+    } finally {
+      OzoneManager.setStsTokenIdentifier(null);
+    }
+  }
+
+  private static final class DummyOMClientRequest extends OMClientRequest {
+    private DummyOMClientRequest(OMRequest omRequest) {
+      super(omRequest);
+    }
+
+    @Override
+    public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(OzoneManager ozoneManager) {
+      return OzoneManagerProtocolProtos.UserInfo.newBuilder()
+          .setUserName("test-user")
+          .setHostName("localhost")
+          .setRemoteAddress("127.0.0.1")
+          .build();
+    }
+
+    @Override
+    public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+      return null;
     }
   }
 

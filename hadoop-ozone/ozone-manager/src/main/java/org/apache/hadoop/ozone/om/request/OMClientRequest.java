@@ -123,8 +123,19 @@ public abstract class OMClientRequest implements RequestAuditor {
         .setLayoutVersion(layoutVersion);
 
     if (requestBuilder.hasS3Authentication()) {
-      requestBuilder.setS3Authentication(
-          resolveS3Authentication(requestBuilder.getS3Authentication(), OzoneManager.getStsTokenIdentifier()));
+      final OzoneManagerProtocolProtos.S3Authentication s3Auth = requestBuilder.getS3Authentication();
+      final boolean hasSessionToken = s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty();
+      final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
+
+      // This should not happen, so explicitly throw an error.  An existing sessionToken
+      // implies prior STS validation must have populated the ThreadLocal.
+      if (ozoneManager.isSecurityEnabled() && hasSessionToken && stsTokenIdentifier == null) {
+        throw new OMException(
+            "S3Authentication has session token but no STS token identifier in OzoneManager ThreadLocal",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+
+      requestBuilder.setS3Authentication(resolveS3Authentication(s3Auth, stsTokenIdentifier));
     }
 
     omRequest = requestBuilder.build();
