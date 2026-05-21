@@ -92,29 +92,6 @@ class ReconStorageContainerSyncHelper {
   private static final long CONTAINER_ID_PROTO_SIZE_BYTES = 12;
 
   /**
-   * Conservative wire-size upper bound for one {@code ContainerInfo} proto
-   * response entry (used by {@code getListOfContainerInfos}).
-   *
-   * <p>ContainerInfo carries only container metadata — no pipeline, no
-   * DatanodeDetails. Measured estimate: containerID(8) + state(2) +
-   * usedBytes(8) + numberOfKeys(8) + owner(~20) + replicationType(2) +
-   * replicationFactor(2) + stateEnterTime(8) + sequenceId(8) +
-   * pipelineID(~20) ≈ 86 bytes. This constant uses <b>128 bytes</b>
-   * (~1.5× measured) as a safety margin.
-   *
-   * <p>Safe max batch for {@code getListOfContainerInfos} at 128 MB IPC limit:
-   * <pre>
-   *   128 MB / 128 bytes = 1,048,576 containers per call
-   *   (actual bytes: 1,048,576 × 86 ≈ 86 MB — well within limit)
-   * </pre>
-   *
-   * <p>This is ~8× larger than {@link #CONTAINER_WITH_PIPELINE_PROTO_SIZE_BYTES}
-   * because ContainerInfo does not include the Pipeline and DatanodeDetails
-   * entries that dominate the ContainerWithPipeline size.
-   */
-  private static final long CONTAINER_INFO_PROTO_SIZE_BYTES = 128;
-
-  /**
    * Conservative wire-size upper bound for one {@code ContainerWithPipeline}
    * proto response entry.
    *
@@ -699,26 +676,6 @@ class ReconStorageContainerSyncHelper {
 
     long batchSize = Math.min(countByRpcLimit, countByBatchLimit);
     return Math.min(upperBound, batchSize);
-  }
-
-  /**
-   * Returns the maximum number of containers for one {@code getListOfContainerInfos}
-   * call without exceeding the Hadoop IPC message size limit.
-   *
-   * <p>Uses {@link #CONTAINER_INFO_PROTO_SIZE_BYTES} (128 bytes) — ContainerInfo
-   * carries only container metadata with no Pipeline or DatanodeDetails, making it
-   * ~8× smaller than a full {@code ContainerWithPipeline}. The safe maximum at
-   * 128 MB IPC limit is ~1M containers; the configured batch size is typically far
-   * below this, so the IPC bound rarely restricts in practice.
-   *
-   * @param requested caller-requested batch size
-   * @return safe maximum containers for one ContainerInfo response
-   */
-  private int safeContainerInfoBatchSize(int requested) {
-    long hadoopRPCSize = ozoneConfiguration.getInt(
-        IPC_MAXIMUM_DATA_LENGTH, IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
-    long responseLimit = hadoopRPCSize / CONTAINER_INFO_PROTO_SIZE_BYTES;
-    return (int) Math.min(requested, responseLimit);
   }
 
   /**
