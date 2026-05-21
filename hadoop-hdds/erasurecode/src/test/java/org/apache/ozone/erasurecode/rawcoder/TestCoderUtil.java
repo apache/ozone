@@ -17,7 +17,7 @@
 
 package org.apache.ozone.erasurecode.rawcoder;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.lang.reflect.Field;
@@ -67,14 +67,16 @@ public class TestCoderUtil {
         smallChunk = executor.submit(() -> CoderUtil.getEmptyChunk(
             SMALL_LENGTH));
         waitUntilBlocked(workerThread);
-        assertTrue(CoderUtil.getEmptyChunk(LARGE_LENGTH).length >=
-            LARGE_LENGTH);
+        assertThat(CoderUtil.getEmptyChunk(LARGE_LENGTH).length)
+            .isGreaterThanOrEqualTo(LARGE_LENGTH);
       }
 
-      assertTrue(smallChunk.get(10, TimeUnit.SECONDS).length >= LARGE_LENGTH,
-          "concurrent caller should return the larger chunk already cached");
-      assertTrue(CoderUtil.getEmptyChunk(LARGE_LENGTH).length >= LARGE_LENGTH,
-          "empty chunk cache should not shrink");
+      assertThat(smallChunk.get(10, TimeUnit.SECONDS).length)
+          .as("concurrent caller should return the larger chunk already cached")
+          .isGreaterThanOrEqualTo(LARGE_LENGTH);
+      assertThat(CoderUtil.getEmptyChunk(LARGE_LENGTH).length)
+          .as("empty chunk cache should not shrink")
+          .isGreaterThanOrEqualTo(LARGE_LENGTH);
     } finally {
       executor.shutdownNow();
     }
