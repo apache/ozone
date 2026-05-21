@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
 import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ServiceException;
@@ -31,8 +32,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -52,16 +57,22 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainInfo;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,8 +84,11 @@ public class QuotaRepairTask {
       QuotaRepairTask.class);
   private static final int BATCH_SIZE = 5000;
   private static final int TASK_THREAD_CNT = 3;
-  /** Parallel full-table scans (OBS keys, FSO files, dirs, deleted keys, deleted dirs). */
-  private static final int QUOTA_REPAIR_SCAN_TASKS = 5;
+  /**
+   * Parallel full-table scans: OBS keys, FSO files, dirs, active deleted keys/dirs,
+   * snapshot DB deleted keys/dirs.
+   */
+  private static final int QUOTA_REPAIR_SCAN_TASKS = 6;
   private static final AtomicBoolean IN_PROGRESS = new AtomicBoolean(false);
   private static final RepairStatus REPAIR_STATUS = new RepairStatus();
   private static final AtomicLong RUN_CNT = new AtomicLong(0);
@@ -105,7 +119,7 @@ public class QuotaRepairTask {
 
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
-    // thread pool with 3 Table type * (1 task each + 3 thread for each task)
+    // thread pool: scan task types * (1 coordinator + worker threads per task)
     executor = Executors.newFixedThreadPool(QUOTA_REPAIR_SCAN_TASKS * (1 + TASK_THREAD_CNT));
     try (OMMetadataManager activeMetaManager =
         createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration())) {
@@ -335,9 +349,19 @@ public class QuotaRepairTask {
       Map<Long, OmBucketInfo> bucketById = buildBucketByObjectId(idBucketInfoMap);
 
       tasks.add(executor.submit(() -> recalculateSnapshotDeletedKeyUsages(
-          metadataManager.getDeletedTable(), bucketById, snapshotDeletedKeyMap)));
+          metadataManager.getDeletedTable(), bucketById, snapshotDeletedKeyMap,
+          "active DB checkpoint")));
       tasks.add(executor.submit(() -> recalculateSnapshotDeletedDirNamespace(
-          metadataManager.getDeletedDirTable(), snapshotDeletedDirMap)));
+          metadataManager.getDeletedDirTable(), snapshotDeletedDirMap,
+          "active DB checkpoint")));
+      tasks.add(executor.submit(() -> {
+        try {
+          recalculateSnapshotDbPendingDeleteQuota(nameBucketInfoMap, bucketById, metadataManager,
+              snapshotDeletedKeyMap, snapshotDeletedDirMap);
+        } catch (IOException ex) {
+          throw new UncheckedIOException(ex);
+        }
+      }));
 
       for (Future<?> f : tasks) {
         f.get();
@@ -368,12 +392,106 @@ public class QuotaRepairTask {
     return bucketById;
   }
 
+  /**
+   * Recompute pending-delete quota from each ACTIVE snapshot DB on repaired buckets' path chains.
+   * Runs as an executor task in parallel with active-table scans.
+   */
+  private void recalculateSnapshotDbPendingDeleteQuota(
+      Map<String, OmBucketInfo> nameBucketInfoMap,
+      Map<Long, OmBucketInfo> bucketById,
+      OMMetadataManager activeMetaManager,
+      Map<String, CountPair> snapshotDeletedKeyMap,
+      Map<String, CountPair> snapshotDeletedDirMap) throws IOException {
+    LOG.info("Starting recalculate snapshot pending-delete from snapshot DBs");
+    SnapshotChainManager chain =
+        ((OmMetadataManagerImpl) activeMetaManager).getSnapshotChainManager();
+    OmSnapshotManager snapshotManager = om.getOmSnapshotManager();
+    OMMetadataManager liveMetaManager = om.getMetadataManager();
+    Set<UUID> scannedSnapshotIds = new HashSet<>();
+
+    for (OmBucketInfo bucket : nameBucketInfoMap.values()) {
+      String snapshotPath = buildSnapshotPath(bucket.getVolumeName(), bucket.getBucketName());
+      LinkedHashMap<UUID, SnapshotChainInfo> pathChain;
+      try {
+        pathChain = chain.getSnapshotChainPath(snapshotPath);
+      } catch (IOException ex) {
+        throw new IOException("Failed to read snapshot chain for path " + snapshotPath, ex);
+      }
+      if (pathChain == null || pathChain.isEmpty()) {
+        continue;
+      }
+      for (UUID snapshotId : pathChain.keySet()) {
+        if (!scannedSnapshotIds.add(snapshotId)) {
+          continue;
+        }
+        SnapshotInfo snapshotInfo = loadActiveSnapshot(activeMetaManager, chain, snapshotId);
+        if (snapshotInfo == null) {
+          continue;
+        }
+        if (!snapshotInfo.getVolumeName().equals(bucket.getVolumeName())
+            || !snapshotInfo.getBucketName().equals(bucket.getBucketName())) {
+          continue;
+        }
+        if (!OmSnapshotManager.isSnapshotFlushedToDB(liveMetaManager, snapshotInfo)) {
+          LOG.warn("Skipping snapshot {} for quota repair: create txn not flushed to active DB",
+              snapshotInfo.getTableKey());
+          continue;
+        }
+        String sourceLabel = "snapshot DB " + snapshotInfo.getTableKey();
+        try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshotRef =
+                 snapshotManager.getSnapshot(snapshotId)) {
+          scanDeletedTables(snapshotRef.get().getMetadataManager(), bucketById,
+              snapshotDeletedKeyMap, snapshotDeletedDirMap, sourceLabel);
+        }
+      }
+    }
+    LOG.info("Recalculate snapshot pending-delete from snapshot DBs completed, snapshots scanned: {}",
+        scannedSnapshotIds.size());
+  }
+
+  private static String buildSnapshotPath(String volumeName, String bucketName) {
+    return volumeName + OM_KEY_PREFIX + bucketName;
+  }
+
+  private static SnapshotInfo loadActiveSnapshot(
+      OMMetadataManager metadataManager,
+      SnapshotChainManager chain,
+      UUID snapshotId) throws IOException {
+    String tableKey = chain.getTableKey(snapshotId);
+    if (tableKey == null) {
+      LOG.warn("Snapshot id {} is not present in snapshot chain table-key map", snapshotId);
+      return null;
+    }
+    SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(tableKey);
+    if (snapshotInfo == null) {
+      LOG.warn("Snapshot {} not found in snapshotInfoTable during quota repair", tableKey);
+      return null;
+    }
+    if (snapshotInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE) {
+      return null;
+    }
+    return snapshotInfo;
+  }
+
+  private void scanDeletedTables(
+      OMMetadataManager metadataManager,
+      Map<Long, OmBucketInfo> bucketById,
+      Map<String, CountPair> snapshotDeletedKeyMap,
+      Map<String, CountPair> snapshotDeletedDirMap,
+      String sourceLabel) throws UncheckedIOException {
+    recalculateSnapshotDeletedKeyUsages(metadataManager.getDeletedTable(), bucketById,
+        snapshotDeletedKeyMap, sourceLabel);
+    recalculateSnapshotDeletedDirNamespace(metadataManager.getDeletedDirTable(),
+        snapshotDeletedDirMap, sourceLabel);
+  }
+
   private void recalculateSnapshotDeletedKeyUsages(
       Table<String, RepeatedOmKeyInfo> deletedTable,
       Map<Long, OmBucketInfo> bucketById,
-      Map<String, CountPair> snapshotCountByBucketNameKey)
+      Map<String, CountPair> snapshotCountByBucketNameKey,
+      String sourceLabel)
       throws UncheckedIOException {
-    LOG.info("Starting recalculate snapshot usages from deletedTable");
+    LOG.info("Starting recalculate snapshot usages from deletedTable ({})", sourceLabel);
 
     int count = 0;
     long startTime = Time.monotonicNow();
@@ -395,8 +513,8 @@ public class QuotaRepairTask {
         usage.incrSpace(val.getTotalSize().getRight());
         usage.incrNamespace(val.getOmKeyInfoList().size());
       }
-      LOG.info("Recalculate snapshot usages from deletedTable completed, count {} time {}ms",
-          count, (Time.monotonicNow() - startTime));
+      LOG.info("Recalculate snapshot usages from deletedTable ({}) completed, count {} time {}ms",
+          sourceLabel, count, (Time.monotonicNow() - startTime));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
@@ -404,9 +522,11 @@ public class QuotaRepairTask {
 
   private void recalculateSnapshotDeletedDirNamespace(
       Table<String, OmKeyInfo> deletedDirTable,
-      Map<String, CountPair> snapshotDirNsByIdPrefix)
+      Map<String, CountPair> snapshotDirNsByIdPrefix,
+      String sourceLabel)
       throws UncheckedIOException {
-    LOG.info("Starting recalculate snapshot namespace from deletedDirectoryTable");
+    LOG.info("Starting recalculate snapshot namespace from deletedDirectoryTable ({})",
+        sourceLabel);
 
     int count = 0;
     long startTime = Time.monotonicNow();
@@ -422,8 +542,8 @@ public class QuotaRepairTask {
         }
       }
       LOG.info(
-          "Recalculate snapshot namespace from deletedDirectoryTable completed, count {} time {}ms",
-          count, (Time.monotonicNow() - startTime));
+          "Recalculate snapshot namespace from deletedDirectoryTable ({}) completed, count {} time {}ms",
+          sourceLabel, count, (Time.monotonicNow() - startTime));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
