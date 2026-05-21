@@ -43,8 +43,7 @@ github:
       branches:
         includes:
           - "~DEFAULT_BRANCH"
-          - "release/*"
-          - "rel/*"
+          - "ozone-*"
         excludes: []
       bypass_teams:
         - root
