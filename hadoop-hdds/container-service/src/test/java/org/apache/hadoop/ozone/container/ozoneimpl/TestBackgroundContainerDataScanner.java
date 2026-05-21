@@ -419,10 +419,14 @@ public class TestBackgroundContainerDataScanner extends
             new ContainerMerkleTreeWriter());
     when(container.scanData(any(DataTransferThrottler.class), any(Canceler.class))).thenReturn(scanResult);
 
-    setContainers(container, healthy);
+    setContainers(container);
     scanner.runIteration();
 
     verify(controller, never()).markContainerUnhealthy(anyLong(), any(ScanResult.class));
+    verify(controller, never()).updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
+    verify(controller, never()).updateDataScanTimestamp(eq(container.getContainerData().getContainerID()), any());
+    assertEquals(1, scanner.getMetrics().getNumScanIterations());
+    assertEquals(0, scanner.getMetrics().getNumContainersScanned());
     assertEquals(0, scanner.getMetrics().getNumUnHealthyContainers());
   }
 }

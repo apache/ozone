@@ -272,10 +272,12 @@ public class TestBackgroundContainerMetadataScanner extends
             new ContainerScanError(FailureType.CORRUPT_CONTAINER_FILE, new File("."), emf)));
     when(container.scanMetaData()).thenReturn(scanResult);
 
-    setContainers(container, healthy);
+    setContainers(container);
     scanner.runIteration();
 
     verify(controller, never()).markContainerUnhealthy(anyLong(), any(ScanResult.class));
+    assertEquals(1, scanner.getMetrics().getNumScanIterations());
+    assertEquals(0, scanner.getMetrics().getNumContainersScanned());
     assertEquals(0, scanner.getMetrics().getNumUnHealthyContainers());
   }
 }
