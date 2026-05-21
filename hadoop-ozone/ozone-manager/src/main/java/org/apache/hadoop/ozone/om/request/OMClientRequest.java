@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.s3.security.S3AssumeRoleRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -114,13 +115,18 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    final LayoutVersion layoutVersion = LayoutVersion.newBuilder()
-        .setVersion(ozoneManager.getVersionManager().getMetadataLayoutVersion())
-        .build();
-
     final OMRequest.Builder requestBuilder = getOmRequest().toBuilder()
-        .setUserInfo(getUserIfNotExists(ozoneManager))
-        .setLayoutVersion(layoutVersion);
+        .setUserInfo(getUserIfNotExists(ozoneManager));
+
+    // VersionManager is always expected in production OzoneManager instances.
+    // Some unit tests use a minimal mocked OzoneManager, so perform null check here.
+    final OMLayoutVersionManager versionManager = ozoneManager.getVersionManager();
+    if (versionManager != null) {
+      final LayoutVersion layoutVersion = LayoutVersion.newBuilder()
+          .setVersion(versionManager.getMetadataLayoutVersion())
+          .build();
+      requestBuilder.setLayoutVersion(layoutVersion);
+    }
 
     if (requestBuilder.hasS3Authentication()) {
       final OzoneManagerProtocolProtos.S3Authentication s3Auth = requestBuilder.getS3Authentication();
