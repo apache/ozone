@@ -134,7 +134,7 @@ public class SequenceIdGenerator {
         }
 
         // reload lastId from RocksDB.
-        batch.lastId = stateManager.getLastId(idType.name());
+        batch.lastId = stateManager.getLastId(idType);
       }
 
       Preconditions.checkArgument(batch.nextId <= batch.lastId);
@@ -198,10 +198,10 @@ public class SequenceIdGenerator {
         throws SCMException;
 
     /**
-     * @param sequenceIdName : name of the sequence id.
+     * @param idType : supported sequence ID type.
      * @return lastId saved in db
      */
-    Long getLastId(String sequenceIdName);
+    Long getLastId(SequenceIdType idType);
 
     /**
      * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
@@ -264,8 +264,8 @@ public class SequenceIdGenerator {
     }
 
     @Override
-    public Long getLastId(String sequenceIdName) {
-      return sequenceIdToLastIdMap.get(SequenceIdType.valueOf(sequenceIdName));
+    public Long getLastId(SequenceIdType idType) {
+      return sequenceIdToLastIdMap.get(idType);
     }
 
     @Override

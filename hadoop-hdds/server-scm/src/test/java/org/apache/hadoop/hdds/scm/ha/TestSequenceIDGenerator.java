@@ -199,24 +199,23 @@ public class TestSequenceIDGenerator {
             .setSequenceIdTable(scmMetadataStore.getSequenceIdTable())
             .build();
 
-    String localIdKey = SequenceIdType.localId.name();
-
+    SequenceIdType idType = SequenceIdType.localId;
     // Verify initial state from empty DB
-    Assertions.assertNull(stateManager.getLastId(localIdKey));
+    Assertions.assertNull(stateManager.getLastId(idType));
 
     // Allocate a new batch, which puts 100L into the sequenceIdToLastIdMap map
-    assertTrue(stateManager.allocateBatch(localIdKey, 0L, 100L));
+    assertTrue(stateManager.allocateBatch(idType.name(), 0L, 100L));
     // Verify the map was updated
-    assertEquals(100L, stateManager.getLastId(localIdKey));
+    assertEquals(100L, stateManager.getLastId(idType));
 
     // Allocate a new batch, which puts 100L into the sequenceIdToLastIdMap map
-    assertTrue(stateManager.allocateBatch(localIdKey, 100L, 200L));
+    assertTrue(stateManager.allocateBatch(idType.name(), 100L, 200L));
     // Verify the map was updated
-    assertEquals(200L, stateManager.getLastId(localIdKey));
+    assertEquals(200L, stateManager.getLastId(idType));
 
     // This call should fail because expectedLastId in db should be (200L)
     // But we are passing 0L
-    assertFalse(stateManager.allocateBatch(localIdKey, 0L, 100L));
+    assertFalse(stateManager.allocateBatch(idType.name(), 0L, 100L));
   }
 
   @Test
@@ -226,9 +225,9 @@ public class TestSequenceIDGenerator {
     scmMetadataStore.start(conf);
     SCMHAManager scmHAManager = SCMHAManagerStub.getInstance(true);
 
-    String containerId = SequenceIdType.containerId.name();
+    SequenceIdType idType = SequenceIdType.containerId;
     // Simulate an SCM restart by writing a raw String directly to the database.
-    scmMetadataStore.getSequenceIdTable().put(containerId, 100L);
+    scmMetadataStore.getSequenceIdTable().put(idType.name(), 100L);
 
     // Create the StateManager directly using its Builder
     SequenceIdGenerator.StateManager stateManager =
@@ -242,9 +241,9 @@ public class TestSequenceIDGenerator {
     // for the sequenceIdToLastIdMap used.
     stateManager.reinitialize(scmMetadataStore.getSequenceIdTable());
 
-    assertEquals(100L, stateManager.getLastId(containerId));
-    assertTrue(stateManager.allocateBatch(containerId, 100L, 1100L));
-    assertEquals(1100L, stateManager.getLastId(containerId));
+    assertEquals(100L, stateManager.getLastId(idType));
+    assertTrue(stateManager.allocateBatch(idType.name(), 100L, 1100L));
+    assertEquals(1100L, stateManager.getLastId(idType));
   }
 
   @Test
