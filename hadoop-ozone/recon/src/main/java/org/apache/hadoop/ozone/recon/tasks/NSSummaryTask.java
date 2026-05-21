@@ -83,6 +83,13 @@ public class NSSummaryTask implements ReconOmTask {
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
 
+  // Shared executor for the three FSO/Legacy/OBS sub-tasks during process().
+  // The sub-tasks operate on disjoint slices of the event stream (filtered by
+  // table and bucket layout) and write to disjoint NSSummary entries, so they
+  // are safe to run in parallel.
+  private final ExecutorService subTaskExecutor = Executors.newFixedThreadPool(
+      3, new ThreadFactoryBuilder().setNameFormat("NSSummarySubTask-%d").setDaemon(true).build());
+
   /**
    * Rebuild state enum to track NSSummary tree rebuild status.
    */
@@ -168,13 +175,6 @@ public class NSSummaryTask implements ReconOmTask {
       return description;
     }
   }
-
-  // Shared executor for the three FSO/Legacy/OBS sub-tasks during process().
-  // The sub-tasks operate on disjoint slices of the event stream (filtered by
-  // table and bucket layout) and write to disjoint NSSummary entries, so they
-  // are safe to run in parallel.
-  private final ExecutorService subTaskExecutor = Executors.newFixedThreadPool(
-      3, new ThreadFactoryBuilder().setNameFormat("NSSummarySubTask-%d").setDaemon(true).build());
 
   @Override
   public TaskResult process(
