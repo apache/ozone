@@ -508,7 +508,7 @@ public class DiskBalancerService extends BackgroundService {
     @Override
     public BackgroundTaskResult call() {
       long startTime = Time.monotonicNow();
-      boolean moveSucceeded = true;
+      boolean moveSucceeded = false;
       Container newContainer = null;
       long containerId = containerData.getContainerID();
       Container container = ozoneContainer.getContainerSet().getContainer(containerId);
@@ -595,6 +595,7 @@ public class DiskBalancerService extends BackgroundService {
         pauseInjector();
         // Mark old container as DELETED and persist state.
         // markContainerForDelete require writeLock, so release readLock first
+        moveSucceeded = true;
         container.readUnlock();
         readLockReleased = true;
         try {
@@ -609,9 +610,8 @@ public class DiskBalancerService extends BackgroundService {
         balancedBytesInLastWindow.addAndGet(containerSize);
         metrics.incrSuccessBytes(containerSize);
         totalBalancedBytes.addAndGet(containerSize);
-      } catch (IOException e) {
+      } catch (Throwable e) {
         pauseInjector();
-        moveSucceeded = false;
         LOG.warn("Failed to move container {}", containerId, e);
         if (diskBalancerTmpDir != null) {
           try {
