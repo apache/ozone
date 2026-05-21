@@ -598,11 +598,11 @@ public class TestDiskBalancerSubCommands {
   static Stream<Arguments> thresholdRangeReportCases() {
     return Stream.of(
         Arguments.of(0.08426521, 10.0, false,
-            "ThresholdRange: (0.00000000, 0.18426521)", "ThresholdRange: (-"),
+            "ThresholdRange: (0.00%, 18.43%)", "ThresholdRange: (-"),
         Arguments.of(0.95, 10.0, false,
-            "ThresholdRange: (0.85000000, 1.00000000)", "1.05000000"),
+            "ThresholdRange: (85.00%, 100.00%)", "105.00%"),
         Arguments.of(0.95, 10.0, true,
-            "\"thresholdRange\" : \"(0.85000000, 1.00000000)\"", "1.05000000"));
+            "\"thresholdRange\" : \"(85.00%, 100.00%)\"", "105.00%"));
   }
 
   @ParameterizedTest(name = "idealUsage={0}, threshold={1}%, json={2}")
