@@ -34,7 +34,7 @@ public abstract class AbstractReplicationTask {
 
   private final long containerId;
 
-  private final Instant queued;
+  private Instant queued;
 
   private final long deadlineMsSinceEpoch;
 
@@ -76,6 +76,10 @@ public abstract class AbstractReplicationTask {
 
   public Instant getQueued() {
     return queued;
+  }
+
+  public void updateQueuedTime() {
+    this.queued = Instant.now();
   }
 
   public long getTerm() {
