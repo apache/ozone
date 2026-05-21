@@ -147,6 +147,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
+  @Deprecated
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
       volumeChoosingPolicy, String clusterId) throws StorageContainerException {
     create(volumeSet, volumeChoosingPolicy, clusterId, null);
@@ -171,6 +172,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         HddsVolume containerVolume;
         String hddsVolumeDir;
         try {
+          // TODO Use the interface that supports `storageType` and `chooseVolume`
           containerVolume = storageType == null
               ? volumeChoosingPolicy.chooseVolume(volumes, maxSize)
               : volumeChoosingPolicy.chooseVolume(

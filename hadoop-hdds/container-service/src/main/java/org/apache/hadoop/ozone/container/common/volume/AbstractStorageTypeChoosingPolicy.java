@@ -30,6 +30,7 @@ public abstract class AbstractStorageTypeChoosingPolicy
     implements VolumeChoosingPolicy {
 
   @Override
+  @Deprecated
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
     return chooseVolume(volumes, maxContainerSize, null);

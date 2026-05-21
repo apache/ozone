@@ -41,6 +41,7 @@ public interface VolumeChoosingPolicy {
    * @return the chosen volume.
    * @throws IOException when disks are unavailable or are full.
    */
+  @Deprecated
   HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize)
       throws IOException;
 
