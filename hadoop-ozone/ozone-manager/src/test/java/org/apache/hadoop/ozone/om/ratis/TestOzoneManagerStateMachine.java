@@ -125,6 +125,7 @@ public class TestOzoneManagerStateMachine {
   @AfterEach
   public void tearDown() {
     sm.stop();
+    OzoneManager.setStsTokenIdentifier(null);
   }
 
   // --- startTransaction tests ---
@@ -403,6 +404,79 @@ public class TestOzoneManagerStateMachine {
     // calls ExitUtils.terminate which throws ExitException.
     assertThrows(ExitUtils.ExitException.class,
         () -> sm.runCommand(request, ti));
+  }
+
+  @Test
+  public void testRunCommandSetsAndClearsStsThreadLocal() throws Exception {
+    when(om.isSecurityEnabled()).thenReturn(true);
+
+    final OzoneManagerProtocolProtos.S3Authentication s3Auth =
+        OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+            .setAccessId("accessId")
+            .setSessionToken("sessionToken")
+            .setResolvedStsSessionPolicy("sessionPolicy")
+            .setResolvedStsRoleArn("roleArn")
+            .setResolvedStsOriginalAccessKeyId("originalAccessKeyId")
+            .setResolvedStsTempAccessKeyId("tempAccessKeyId")
+            .setResolvedStsSecretKeyId("secretKeyId")
+            .build();
+
+    final OMRequest request = sampleWriteRequest().toBuilder()
+        .setS3Authentication(s3Auth)
+        .build();
+    final TermIndex ti = TermIndex.valueOf(1, 5);
+
+    final OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    final OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+    doAnswer(invocation -> {
+      assertNotNull(OzoneManager.getStsTokenIdentifier(),
+          "Expected STS ThreadLocal to be set during handler.handleWriteRequest");
+      assertEquals("tempAccessKeyId", OzoneManager.getStsTokenIdentifier().getTempAccessKeyId());
+      assertEquals("originalAccessKeyId", OzoneManager.getStsTokenIdentifier().getOriginalAccessKeyId());
+      assertEquals("roleArn", OzoneManager.getStsTokenIdentifier().getRoleArn());
+      assertEquals("sessionPolicy", OzoneManager.getStsTokenIdentifier().getSessionPolicy());
+      return clientResponse;
+    }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
+
+    assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be clear before runCommand");
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertTrue(result.getSuccess());
+    assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be cleared after runCommand");
+  }
+
+  @Test
+  public void testRunCommandMissingResolvedStsFieldsReturnsErrorResponse() throws Exception {
+    when(om.isSecurityEnabled()).thenReturn(true);
+
+    final OzoneManagerProtocolProtos.S3Authentication s3Auth =
+        OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+            .setAccessId("accessId")
+            .setSessionToken("sessionToken")
+            .build();
+
+    final OMRequest request = sampleWriteRequest().toBuilder()
+        .setS3Authentication(s3Auth)
+        .build();
+    final TermIndex ti = TermIndex.valueOf(1, 5);
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertFalse(result.getSuccess());
+    assertEquals(Status.INVALID_TOKEN, result.getStatus());
+    assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be cleared after runCommand");
+    verify(handler, never()).handleWriteRequest(any(), any(), any());
   }
 
   // --- processResponse tests ---
