@@ -60,8 +60,9 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeReq =
-        getOmRequest().getRevokeSTSTokenRequest();
+        omRequest.getRevokeSTSTokenRequest();
 
     // Get the original (long-lived) access key id from the session token
     // and enforce the same permission model that is used for S3 secret
@@ -73,21 +74,10 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
         sessionToken, ozoneManager.getSecretKeyClient(), CLOCK);
     final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
 
-    final OzoneManagerProtocolProtos.UserInfo userInfo = getUserInfo();
     final UserGroupInformation ugi = S3SecretRequestHelper.getOrCreateUgi(originalAccessKeyId);
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(ozoneManager, ugi, originalAccessKeyId);
 
-    final OMRequest.Builder omRequest = OMRequest.newBuilder()
-        .setRevokeSTSTokenRequest(revokeReq)
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId())
-        .setUserInfo(userInfo);
-
-    if (getOmRequest().hasTraceID()) {
-      omRequest.setTraceID(getOmRequest().getTraceID());
-    }
-
-    return omRequest.build();
+    return omRequest;
   }
 
   @Override

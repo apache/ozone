@@ -87,7 +87,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CreateKeyRequest createKeyRequest = super.preExecute(ozoneManager)
+    final CreateKeyRequest createKeyRequest = super.preExecute(ozoneManager)
         .getCreateKeyRequest();
     Objects.requireNonNull(createKeyRequest, "createKeyRequest == null");
 
