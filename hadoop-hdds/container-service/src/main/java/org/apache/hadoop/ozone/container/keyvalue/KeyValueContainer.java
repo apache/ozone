@@ -172,7 +172,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         HddsVolume containerVolume;
         String hddsVolumeDir;
         try {
-          // TODO Use the interface that supports `storageType` and `chooseVolume`
+          // TODO Use the `chooseVolume` that supports `storageType`
           containerVolume = storageType == null
               ? volumeChoosingPolicy.chooseVolume(volumes, maxSize)
               : volumeChoosingPolicy.chooseVolume(
