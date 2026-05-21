@@ -74,14 +74,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
       this.retryInvocationHandler = retryInvocationHandler;
     }
 
-    int getCallId() {
-      return callId;
-    }
-
-    Counters getCounters() {
-      return counters;
-    }
-
     synchronized Long getWaitTime(final long now) {
       return retryInfo == null? null: retryInfo.retryTime - now;
     }
@@ -120,12 +112,9 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     /**
      * It first processes the wait time, if there is any,
      * and then invokes {@link #processRetryInfo()}.
+     * If the wait time is positive, it sleeps.
      *
-     * If the wait time is positive, it either sleeps for synchronous calls
-     * or immediately returns for asynchronous calls.
-     *
-     * @return {@link CallReturn#RETRY} if the retryInfo is processed;
-     *         otherwise, return {@link CallReturn#WAIT_RETRY}.
+     * @return {@link CallReturn#RETRY}
      */
     CallReturn processWaitTimeAndRetryInfo() throws InterruptedIOException {
       final Long waitTime = getWaitTime(Time.monotonicNow());
@@ -133,7 +122,7 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
           callId, retryInfo, waitTime);
       if (waitTime != null && waitTime > 0) {
         try {
-          Thread.sleep(retryInfo.delay);
+          Thread.sleep(waitTime);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           if (LOG.isDebugEnabled()) {
@@ -184,10 +173,6 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     private int retries;
     /** Counter for method invocation has been failed over. */
     private int failovers;
-
-    boolean isZeros() {
-      return retries == 0 && failovers == 0;
-    }
   }
 
   private static class ProxyDescriptor<T> {
