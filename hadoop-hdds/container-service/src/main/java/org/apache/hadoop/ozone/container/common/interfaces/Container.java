@@ -41,22 +41,12 @@ import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 public interface Container<CONTAINERDATA extends ContainerData> {
 
   /**
-   * Creates a container.
-   *
-   * @throws StorageContainerException
-   */
-  void create(VolumeSet volumeSet, VolumeChoosingPolicy volumeChoosingPolicy,
-              String scmId) throws StorageContainerException;
-
-  /**
    * Creates a container and optionally constrains the destination volume to a
    * specific storage type.
    */
-  default void create(VolumeSet volumeSet,
+  void create(VolumeSet volumeSet,
       VolumeChoosingPolicy volumeChoosingPolicy, String scmId,
-      StorageType storageType) throws StorageContainerException {
-    create(volumeSet, volumeChoosingPolicy, scmId);
-  }
+      StorageType storageType) throws StorageContainerException;
 
   /**
    * Deletes the container.

@@ -58,6 +58,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -189,7 +190,7 @@ public class TestBlockDeletingService {
     data.setSchemaVersion(schemaVersion);
     KeyValueContainer container = new KeyValueContainer(data, conf);
     container.create(volumeSet,
-        new RoundRobinVolumeChoosingPolicy(), scmId);
+        new RoundRobinVolumeChoosingPolicy(), scmId, StorageType.DISK);
     containerSet.addContainer(container);
     data = (KeyValueContainerData) containerSet.getContainer(
         containerID).getContainerData();

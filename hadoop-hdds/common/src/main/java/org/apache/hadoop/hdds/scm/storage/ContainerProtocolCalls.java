@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
@@ -62,6 +63,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
@@ -430,23 +432,23 @@ public final class ContainerProtocolCalls  {
    * @param blockID ID of the block
    * @param data the data of the chunk to write
    * @param tokenString serialized block token
+   * @param storageType - the type of storage that is required, if the storageType
+   *                      is null, any storageType will be considered.
    * @throws IOException if there is an I/O error while performing the call
    */
   @SuppressWarnings("parameternumber")
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
       ByteString data, String tokenString,
-      int replicationIndex, BlockData blockData, boolean close)
+      int replicationIndex, BlockData blockData, boolean close,
+      HddsProtos.StorageTypeProto storageType)
       throws IOException, ExecutionException, InterruptedException {
 
+    DatanodeBlockID datanodeBlockID = getDatanodeBlockID(
+        blockID, replicationIndex, storageType);
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
-            .setBlockID(DatanodeBlockID.newBuilder()
-                .setContainerID(blockID.getContainerID())
-                .setLocalID(blockID.getLocalID())
-                .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
-                .setReplicaIndex(replicationIndex)
-                .build())
+            .setBlockID(datanodeBlockID)
             .setChunkData(chunk)
             .setData(data);
     if (blockData != null) {
@@ -477,18 +479,23 @@ public final class ContainerProtocolCalls  {
    * using a single RPC. This API is designed to be used for files which are
    * smaller than 1 MB.
    *
-   * @param client - client that communicates with the container.
-   * @param blockID - ID of the block
-   * @param data - Data to be written into the container.
-   * @param token a token for this block (may be null)
+   * @param client      - client that communicates with the container.
+   * @param blockID     - ID of the block
+   * @param data        - Data to be written into the container.
+   * @param token       a token for this block (may be null)
+   * @param storageType - the type of storage that is required, if the storageType
+   *                    is null, any storageType will be considered.
    * @return container protocol writeSmallFile response
    */
   public static PutSmallFileResponseProto writeSmallFile(
       XceiverClientSpi client, BlockID blockID, byte[] data,
-      Token<OzoneBlockTokenIdentifier> token) throws IOException {
+      Token<OzoneBlockTokenIdentifier> token,
+      HddsProtos.StorageTypeProto storageType) throws IOException {
 
+    DatanodeBlockID datanodeBlockID = getDatanodeBlockID(
+        blockID, null, storageType);
     BlockData containerBlockData =
-        BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
+        BlockData.newBuilder().setBlockID(datanodeBlockID)
             .build();
     PutBlockRequestProto.Builder createBlockRequest =
         PutBlockRequestProto.newBuilder()
@@ -509,10 +516,10 @@ public final class ContainerProtocolCalls  {
             .setChecksumData(checksumData.getProtoBufMessage())
             .build();
 
-    PutSmallFileRequestProto putSmallFileRequest =
+    PutSmallFileRequestProto.Builder putSmallFileBuilder =
         PutSmallFileRequestProto.newBuilder().setChunkInfo(chunk)
-            .setBlock(createBlockRequest).setData(ByteString.copyFrom(data))
-            .build();
+            .setBlock(createBlockRequest)
+            .setData(ByteString.copyFrom(data));
 
     String id = client.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
@@ -520,7 +527,7 @@ public final class ContainerProtocolCalls  {
             .setCmdType(Type.PutSmallFile)
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id)
-            .setPutSmallFile(putSmallFileRequest);
+            .setPutSmallFile(putSmallFileBuilder);
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }
@@ -573,6 +580,7 @@ public final class ContainerProtocolCalls  {
       throws IOException {
     ContainerProtos.CreateContainerRequestProto.Builder createRequest =
         ContainerProtos.CreateContainerRequestProto.newBuilder();
+    // TODO StoragePolicy Support createContainer Command
     createRequest
         .setContainerType(ContainerProtos.ContainerType.KeyValueContainer);
     if (state != null) {
@@ -936,5 +944,21 @@ public final class ContainerProtocolCalls  {
       b.setReplicaIndex(replicaIndex);
     }
     return b.build();
+  }
+
+  private static DatanodeBlockID getDatanodeBlockID(BlockID blockID,
+      Integer replicationIndex, HddsProtos.StorageTypeProto storageType) {
+    DatanodeBlockID.Builder blockIDBuilder = DatanodeBlockID.newBuilder()
+        .setContainerID(blockID.getContainerID())
+        .setLocalID(blockID.getLocalID())
+        .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
+    if (replicationIndex != null) {
+      blockIDBuilder.setReplicaIndex(replicationIndex);
+    }
+    if (storageType != null) {
+      blockIDBuilder.setStorageTypeID(
+          StorageTypeUtils.getIDFromProtobuf(storageType));
+    }
+    return blockIDBuilder.build();
   }
 }

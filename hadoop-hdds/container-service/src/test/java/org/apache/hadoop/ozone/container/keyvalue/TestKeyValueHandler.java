@@ -72,6 +72,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -876,7 +877,7 @@ public class TestKeyValueHandler {
       // markContainerForClose - OPEN -> CLOSING (should send immediate ICR)
       containerData.setState(ContainerProtos.ContainerDataProto.State.OPEN);
       KeyValueContainer container = new KeyValueContainer(containerData, conf);
-      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID, StorageType.DISK);
       containerSet.addContainer(container);
 
       kvHandler.markContainerForClose(container);
@@ -1023,7 +1024,7 @@ public class TestKeyValueHandler {
           (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
           DATANODE_UUID);
       KeyValueContainer container = new KeyValueContainer(containerData, conf);
-      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID, StorageType.DISK);
       containerSet.addContainer(container);
 
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);

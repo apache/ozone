@@ -81,7 +81,7 @@ public abstract class TestContainerSmallFile implements NonHATests.TestCase {
     BlockID blockID = ContainerTestHelper.getTestBlockID(
         container.getContainerInfo().getContainerID());
     ContainerProtocolCalls.writeSmallFile(client, blockID,
-        "data123".getBytes(UTF_8), null);
+        "data123".getBytes(UTF_8), null, null);
     ContainerProtos.GetSmallFileResponseProto response =
         ContainerProtocolCalls.readSmallFile(client, blockID, null);
     String readData = response.getData().getDataBuffers().getBuffersList()
@@ -124,7 +124,7 @@ public abstract class TestContainerSmallFile implements NonHATests.TestCase {
     BlockID blockID = ContainerTestHelper.getTestBlockID(
         container.getContainerInfo().getContainerID());
     ContainerProtocolCalls.writeSmallFile(client, blockID,
-        "data123".getBytes(UTF_8), null);
+        "data123".getBytes(UTF_8), null, null);
 
     assertThrowsExactly(StorageContainerException.class,
         () -> ContainerProtocolCalls.readSmallFile(client,
@@ -149,7 +149,8 @@ public abstract class TestContainerSmallFile implements NonHATests.TestCase {
         container.getContainerInfo().getContainerID());
     ContainerProtos.PutSmallFileResponseProto responseProto =
         ContainerProtocolCalls
-            .writeSmallFile(client, blockID1, "data123".getBytes(UTF_8), null);
+            .writeSmallFile(client, blockID1, "data123".getBytes(UTF_8), null,
+                null);
     long bcsId = responseProto.getCommittedBlockLength().getBlockID()
         .getBlockCommitSequenceId();
 
@@ -164,7 +165,7 @@ public abstract class TestContainerSmallFile implements NonHATests.TestCase {
     BlockID blockID2 = ContainerTestHelper
         .getTestBlockID(container.getContainerInfo().getContainerID());
     ContainerProtocolCalls
-        .writeSmallFile(client, blockID2, "data123".getBytes(UTF_8), null);
+        .writeSmallFile(client, blockID2, "data123".getBytes(UTF_8), null, null);
 
     blockID1.setBlockCommitSequenceId(bcsId + 1);
     //read a file with higher bcsId than the committed bcsId for the block

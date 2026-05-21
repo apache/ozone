@@ -94,8 +94,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -469,6 +471,18 @@ public class KeyValueHandler extends Handler {
     }
     newContainerData.setReplicaIndex(request.getCreateContainer()
         .getReplicaIndex());
+    StorageType storageType = null;
+    if (request.getCreateContainer().hasStorageTypeID()) {
+      try {
+        storageType = StorageTypeUtils.getStorageTypeFromID(
+            request.getCreateContainer().getStorageTypeID());
+      } catch (IllegalArgumentException ex) {
+        return ContainerUtils.logAndReturnError(LOG,
+            new StorageContainerException(ex.getMessage(), ex,
+                INVALID_ARGUMENT), request);
+      }
+    }
+    newContainerData.setStorageType(storageType);
 
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
@@ -480,7 +494,7 @@ public class KeyValueHandler extends Handler {
     containerIdLock.lock();
     try {
       if (containerSet.getContainer(containerID) == null) {
-        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
+        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId, storageType);
         if (RECOVERING == newContainer.getContainerState()) {
           created = containerSet.addContainerByOverwriteMissingContainer(newContainer);
         } else {
@@ -515,6 +529,7 @@ public class KeyValueHandler extends Handler {
       HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
     try {
+      // TODO StoragePolicy Check whether need to adapt storageType
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
           hddsVolume, clusterId);
       container.populatePathFields(idDir, hddsVolume);
@@ -540,7 +555,6 @@ public class KeyValueHandler extends Handler {
     return getReadContainerResponse(
         request, containerData.getProtoBufMessage());
   }
-
 
   /**
    * Handles Update Container Request. If successful, the container metadata

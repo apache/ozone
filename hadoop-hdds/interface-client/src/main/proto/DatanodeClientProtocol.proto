@@ -150,6 +150,8 @@ message DatanodeBlockID {
   optional uint64 blockCommitSequenceId = 3 [default = 0];
   optional int32 replicaIndex = 4;
 
+  optional int32 storageTypeID = 5;
+
 }
 
 message KeyValue {
@@ -271,6 +273,10 @@ message CreateContainerRequestProto {
   optional ContainerType containerType = 3 [default = KeyValueContainer];
   optional int32 replicaIndex = 4;
   optional ContainerDataProto.State state = 5;
+
+  // If we do not set storageTypeID, it means that we allow Containers to be
+  // created on Volumes of any StorageType.
+  optional int32 storageTypeID = 6;
 }
 
 message CreateContainerResponseProto {

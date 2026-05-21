@@ -49,6 +49,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -686,9 +687,9 @@ public class TestDiskBalancerTask {
 
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     VolumeChoosingPolicy policy = mock(VolumeChoosingPolicy.class);
-    when(policy.chooseVolume(any(List.class), any(Long.class)))
+    when(policy.chooseVolume(any(List.class), any(Long.class), any(StorageType.class)))
         .thenReturn(vol);
-    container.create((VolumeSet) volumeSet, policy, scmId);
+    container.create((VolumeSet) volumeSet, policy, scmId, StorageType.DISK);
     containerSet.addContainer(container);
 
     // Manually update volume usage for test purposes

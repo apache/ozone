@@ -41,6 +41,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -168,7 +169,7 @@ public class TestOzoneContainer {
       containerDatas.add(keyValueContainerData);
       keyValueContainer = new KeyValueContainer(
           keyValueContainerData, conf);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId, StorageType.DISK);
       myVolume = keyValueContainer.getContainerData().getVolume();
       
       // Track container in mock volume
@@ -286,7 +287,7 @@ public class TestOzoneContainer {
     StorageContainerException e = assertThrows(
         StorageContainerException.class,
         () -> keyValueContainer.
-            create(volumeSet, volumeChoosingPolicy, clusterId)
+            create(volumeSet, volumeChoosingPolicy, clusterId, StorageType.DISK)
     );
     assertEquals(DISK_OUT_OF_SPACE, e.getResult());
   }

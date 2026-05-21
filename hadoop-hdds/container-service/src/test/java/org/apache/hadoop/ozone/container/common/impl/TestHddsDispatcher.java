@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
@@ -40,10 +41,13 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,6 +55,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -64,7 +69,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -167,9 +174,9 @@ public class TestHddsDispatcher {
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-          scmId.toString());
+          scmId.toString(), StorageType.DISK);
       container2.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-          scmId.toString());
+          scmId.toString(), StorageType.DISK);
       containerSet.addContainer(container);
       containerSet.addContainer(container2);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -185,7 +192,7 @@ public class TestHddsDispatcher {
           conf, containerSet, volumeSet, handlers, context, metrics, null);
       hddsDispatcher.setClusterId(scmId.toString());
       ContainerCommandResponseProto responseOne = hddsDispatcher
-          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null), null);
       assertEquals(ContainerProtos.Result.SUCCESS,
           responseOne.getResult());
       verify(context, times(0))
@@ -196,9 +203,9 @@ public class TestHddsDispatcher {
       containerData2.getStatistics().setBlockBytesForTesting(Double.valueOf(
           StorageUnit.MB.toBytes(950)).longValue());
       ContainerCommandResponseProto responseTwo = hddsDispatcher
-          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L, null), null);
       ContainerCommandResponseProto responseThree = hddsDispatcher
-          .dispatch(getWriteChunkRequest(dd.getUuidString(), 2L, 1L), null);
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 2L, 1L, null), null);
       assertEquals(ContainerProtos.Result.SUCCESS,
           responseTwo.getResult());
       assertEquals(ContainerProtos.Result.SUCCESS, responseThree.getResult());
@@ -211,7 +218,7 @@ public class TestHddsDispatcher {
 
       // if we write again to container 1, the container action should get added but heartbeat should not get triggered
       // again because of throttling
-      hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 3L), null);
+      hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 3L, null), null);
       verify(context, times(3)).addContainerActionIfAbsent(any(ContainerAction.class));
       verify(stateMachine, times(2)).triggerHeartbeat(); // was called twice before
     } finally {
@@ -326,7 +333,7 @@ public class TestHddsDispatcher {
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempDir.toFile()));
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-          scmId.toString());
+          scmId.toString(), StorageType.DISK);
       containerSet.addContainer(container);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
@@ -343,15 +350,15 @@ public class TestHddsDispatcher {
       containerData.getVolume().incrementUsedSpace(60);
       usedSpace.addAndGet(60);
       ContainerCommandResponseProto response = hddsDispatcher
-          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
-      assertEquals(ContainerProtos.Result.DISK_OUT_OF_SPACE, response.getResult());
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null), null);
+      assertEquals(DISK_OUT_OF_SPACE, response.getResult());
       verify(context, times(1))
           .addContainerActionIfAbsent(any(ContainerAction.class));
       // verify that immediate heartbeat is triggered
       verify(stateMachine, times(1)).triggerHeartbeat();
       // the volume has reached the min free space boundary but this time the heartbeat should not be triggered because
       // of throttling
-      hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L), null);
+      hddsDispatcher.dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 2L, null), null);
       verify(context, times(2)).addContainerActionIfAbsent(any(ContainerAction.class));
       verify(stateMachine, times(1)).triggerHeartbeat(); // was called once before
 
@@ -366,8 +373,8 @@ public class TestHddsDispatcher {
       StorageContainerException scException =
           assertThrows(StorageContainerException.class,
               () -> container2.create(volumeSet,
-                  new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
-      assertEquals("Container creation failed, due to disk out of space",
+                  new RoundRobinVolumeChoosingPolicy(), scmId.toString(), StorageType.DISK));
+      assertEquals("Container creation failed, due to disk out of space on StorageType: DISK",
           scException.getMessage());
     } finally {
       volumeSet.shutdown();
@@ -386,7 +393,7 @@ public class TestHddsDispatcher {
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest =
-          getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+          getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null);
       // send read chunk request and make sure container does not exist
       ContainerCommandResponseProto response =
           hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
@@ -429,6 +436,120 @@ public class TestHddsDispatcher {
   }
 
   @Test
+  public void testCreateContainerWithWriteChunkWithStorageType() throws IOException {
+    int volumeNum = 2;
+    // Create two volume one is SSD volume another is DISK volume
+    StringBuilder hddsDirs = new StringBuilder();
+    File ssdVolume = Files.createTempDirectory(tempDir, "ssd").toFile();
+    File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
+    hddsDirs.append("[SSD]").append(ssdVolume).append(',').append("[DISK]").append(diskVolume);
+    UUID scmId = UUID.randomUUID();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, scmId, conf);
+    long containerID = 1L;
+    long localId = 1L;
+
+    ContainerCommandRequestProto writeSSDChunkReq1 =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, HddsProtos.StorageTypeProto.SSD);
+    ContainerCommandRequestProto writeSSDChunkReq2 =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, HddsProtos.StorageTypeProto.SSD);
+    ContainerCommandRequestProto writeDISKChunkReq1 =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, HddsProtos.StorageTypeProto.DISK);
+    ContainerCommandRequestProto writeDISKChunkReq2 =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, HddsProtos.StorageTypeProto.DISK);
+
+    assertContainerDoNotExist(dispatcher, writeSSDChunkReq1);
+    assertContainerDoNotExist(dispatcher, writeSSDChunkReq2);
+    assertContainerDoNotExist(dispatcher, writeDISKChunkReq1);
+    assertContainerDoNotExist(dispatcher, writeDISKChunkReq2);
+
+    assertContainerCreateAtSpecificVolume(dispatcher, writeSSDChunkReq1, Collections.singletonList(ssdVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeSSDChunkReq2, Collections.singletonList(ssdVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeDISKChunkReq1, Collections.singletonList(diskVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeDISKChunkReq2, Collections.singletonList(diskVolume));
+
+    // Except the DISK and SSD volume, cannot create Container on other StorageType Volume,
+    // because there is no other StorageType Volume
+    ContainerCommandRequestProto writeToRAMDISKChunkRequest =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, HddsProtos.StorageTypeProto.RAM_DISK);
+    assertContainerDoNotExist(dispatcher, writeToRAMDISKChunkRequest);
+    ContainerCommandResponseProto response = dispatcher.dispatch(writeToRAMDISKChunkRequest, null);
+    assertEquals(DISK_OUT_OF_SPACE, response.getResult());
+
+    // If set the StorageType to null, then the Container can be created on any StorageType Volume
+    ContainerCommandRequestProto writeAnyStorageTypeChunkRequest1 =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, null);
+    ContainerCommandRequestProto writeAnyStorageTypeChunkRequest2 =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, null);
+    ContainerCommandRequestProto writeAnyStorageTypeChunkRequest3 =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, null);
+    ContainerCommandRequestProto writeAnyStorageTypeChunkRequest4 =
+        getWriteChunkRequest(dd.getUuidString(), containerID++, localId++, null);
+
+    assertContainerCreateAtSpecificVolume(dispatcher, writeAnyStorageTypeChunkRequest1,
+        Arrays.asList(ssdVolume, diskVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeAnyStorageTypeChunkRequest2,
+        Arrays.asList(ssdVolume, diskVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeAnyStorageTypeChunkRequest3,
+        Arrays.asList(ssdVolume, diskVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, writeAnyStorageTypeChunkRequest4,
+        Arrays.asList(ssdVolume, diskVolume));
+  }
+
+  @Test
+  public void testCreateContainerRejectsInvalidStorageType() throws IOException {
+    File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, diskVolume.getAbsolutePath());
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+
+    ContainerCommandRequestProto writeChunkRequest =
+        getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null);
+    WriteChunkRequestProto writeChunk = writeChunkRequest.getWriteChunk();
+    ContainerCommandRequestProto requestWithInvalidStorageType =
+        writeChunkRequest.toBuilder()
+            .setWriteChunk(writeChunk.toBuilder()
+                .setBlockID(writeChunk.getBlockID().toBuilder()
+                    .setStorageTypeID(999)))
+            .build();
+
+    ContainerCommandResponseProto response =
+        dispatcher.dispatch(requestWithInvalidStorageType, null);
+    assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, response.getResult());
+  }
+
+  private void assertContainerDoNotExist(HddsDispatcher hddsDispatcher,
+      ContainerCommandRequestProto writeChunkRequest) {
+    ContainerCommandResponseProto response =
+        hddsDispatcher.dispatch(getReadContainerRequest(writeChunkRequest), null);
+    assertEquals(response.getResult(),
+        ContainerProtos.Result.CONTAINER_NOT_FOUND);
+  }
+
+  private void assertContainerCreateAtSpecificVolume(HddsDispatcher hddsDispatcher,
+      ContainerCommandRequestProto writeChunkRequest, List<File> exceptionVolumePaths) {
+
+    // Send write chunk request without sending create container
+    ContainerCommandResponseProto response = hddsDispatcher.dispatch(writeChunkRequest, null);
+    // Container should be created as part of write chunk request
+    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+    // Send read chunk request to read the chunk written above
+    response = hddsDispatcher.dispatch(getReadContainerRequest(writeChunkRequest), null);
+    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+    // Check if any of the exceptionVolumePaths match
+    String containerPath = response.getReadContainer().getContainerData().getContainerPath();
+    boolean isMatched = exceptionVolumePaths.stream()
+        .anyMatch(path -> containerPath.startsWith(path.getAbsolutePath()));
+
+    assertTrue(isMatched);
+  }
+
+  @Test
   public void testContainerNotFoundWithCommitChunk() throws IOException {
     String testDirPath = testDir.getPath();
     try {
@@ -439,7 +560,7 @@ public class TestHddsDispatcher {
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest =
-          getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+          getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null);
 
       // send read chunk request and make sure container does not exist
       ContainerCommandResponseProto response =
@@ -473,12 +594,12 @@ public class TestHddsDispatcher {
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-          dd.getUuidString(), 1L, 1L);
+          dd.getUuidString(), 1L, 1L, null);
 
       HddsDispatcher mockDispatcher = spy(hddsDispatcher);
       ContainerCommandResponseProto.Builder builder =
           getContainerCommandResponse(writeChunkRequest,
-              ContainerProtos.Result.DISK_OUT_OF_SPACE, "");
+              DISK_OUT_OF_SPACE, "");
       // Return DISK_OUT_OF_SPACE response when writing chunk
       // with container creation.
       doReturn(builder.build()).when(mockDispatcher)
@@ -509,7 +630,7 @@ public class TestHddsDispatcher {
 
       // Create container via WriteChunk
       ContainerCommandRequestProto writeChunkRequest =
-          getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+          getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null);
       ContainerCommandResponseProto initialResponse =
           hddsDispatcher.dispatch(writeChunkRequest, null);
       assertEquals(ContainerProtos.Result.SUCCESS, initialResponse.getResult());
@@ -549,7 +670,7 @@ public class TestHddsDispatcher {
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
-          dd.getUuidString(), 1L, 1L);
+          dd.getUuidString(), 1L, 1L, null);
       //Send same WriteChunkRequest
       ContainerCommandResponseProto response;
       hddsDispatcher.dispatch(writeChunkRequest, null);
@@ -657,7 +778,7 @@ public class TestHddsDispatcher {
   }
 
   private ContainerCommandRequestProto getWriteChunkRequest(
-      String datanodeId, Long containerId, Long localId) {
+      String datanodeId, Long containerId, Long localId, HddsProtos.StorageTypeProto storageType) {
 
     ByteString data = ByteString.copyFrom(
         UUID.randomUUID().toString().getBytes(UTF_8));
@@ -671,10 +792,16 @@ public class TestHddsDispatcher {
         .setChecksumData(Checksum.getNoChecksumDataProto())
         .build();
 
+    ContainerProtos.DatanodeBlockID.Builder blockID =
+        new BlockID(containerId, localId).getDatanodeBlockIDProtobufBuilder();
+    // TODO: Pass the real storage type from the write path once that BlockID support StorageType
+    if (storageType != null) {
+      blockID.setStorageTypeID(storageType.getNumber());
+    }
+
     WriteChunkRequestProto.Builder writeChunkRequest = WriteChunkRequestProto
         .newBuilder()
-        .setBlockID(new BlockID(containerId, localId)
-            .getDatanodeBlockIDProtobuf())
+        .setBlockID(blockID)
         .setChunkData(chunk)
         .setData(data);
 
@@ -789,6 +916,25 @@ public class TestHddsDispatcher {
         .build();
   }
 
+  /**
+   * Creates container read chunk request using input container write chunk
+   * request.
+   *
+   * @param writeChunkRequest - Input container write chunk request
+   * @return container read chunk request
+   */
+  private ContainerCommandRequestProto getReadContainerRequest(
+      ContainerCommandRequestProto writeChunkRequest) {
+    WriteChunkRequestProto writeChunk = writeChunkRequest.getWriteChunk();
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.ReadContainer)
+        .setContainerID(writeChunk.getBlockID().getContainerID())
+        .setTraceID(writeChunkRequest.getTraceID())
+        .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
+        .setReadContainer(ContainerProtos.ReadContainerRequestProto.newBuilder())
+        .build();
+  }
+
   @Test
   public void testValidateToken() throws Exception {
     try {
@@ -819,7 +965,7 @@ public class TestHddsDispatcher {
       };
 
       final ContainerCommandRequestProto request = getWriteChunkRequest(
-          dd.getUuidString(), 1L, 1L);
+          dd.getUuidString(), 1L, 1L, HddsProtos.StorageTypeProto.DISK);
       final HddsDispatcher dispatcher = createDispatcher(
           dd, scmId, conf, tokenVerifier);
 
