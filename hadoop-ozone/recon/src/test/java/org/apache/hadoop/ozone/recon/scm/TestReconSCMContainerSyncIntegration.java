@@ -29,6 +29,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -550,7 +551,7 @@ public class TestReconSCMContainerSyncIntegration
   }
 
   // ===========================================================================
-  // Pass 4: DELETED retirement (uses getListOfContainerInfos for SCM DELETED list)
+  // Pass 4: DELETED retirement (uses ID scan; fetches ContainerInfo only for misses)
   // ===========================================================================
 
   @Nested
@@ -566,15 +567,23 @@ public class TestReconSCMContainerSyncIntegration
     /** Stubs SCM's DELETED list to contain exactly the given containers. */
     private void stubDeletedList(ContainerInfo... infos) throws IOException {
       List<ContainerInfo> page = Arrays.asList(infos);
+      List<ContainerID> ids = page.stream()
+          .map(ContainerInfo::containerID)
+          .collect(Collectors.toList());
       // First page returns the list; cursor beyond the last ID returns empty.
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
-          .thenReturn(page);
+          .thenReturn(ids);
       long nextCursor = page.isEmpty() ? 1L
           : page.get(page.size() - 1).getContainerID() + 1;
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(nextCursor)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
+      for (ContainerInfo info : page) {
+        when(mockScm.getListOfContainerInfos(
+            eq(info.containerID()), eq(1), eq(DELETED)))
+            .thenReturn(Collections.singletonList(info));
+      }
     }
 
     @Test
@@ -586,6 +595,8 @@ public class TestReconSCMContainerSyncIntegration
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(DELETED, getContainerManager().getContainer(cid).getState());
+      verify(mockScm, times(0)).getListOfContainerInfos(
+          eq(cid), eq(1), eq(DELETED));
     }
 
     @Test
@@ -621,7 +632,7 @@ public class TestReconSCMContainerSyncIntegration
       seedRecon(103, 1, CLOSED);
       ContainerID cid = ContainerID.valueOf(103L);
 
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
 
@@ -635,13 +646,11 @@ public class TestReconSCMContainerSyncIntegration
       // in the DELETED list. Pass 4 drives them all the way to DELETED.
       seedRecon(200, 5, OPEN);
 
-      List<ContainerInfo> deleted = idRange(200, 205).stream()
-          .map(c -> containerInfo(c.getId(), DELETED))
-          .collect(Collectors.toList());
-      when(mockScm.getListOfContainerInfos(
+      List<ContainerID> deleted = idRange(200, 205);
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(deleted);
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(205L)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
 
@@ -656,7 +665,7 @@ public class TestReconSCMContainerSyncIntegration
       seedRecon(300, 3, CLOSED);
 
       // DELETED list is empty for these containers
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
 
@@ -675,13 +684,11 @@ public class TestReconSCMContainerSyncIntegration
           mockScm, getConf(), getContainerManager());
 
       // SCM's DELETED list page 1 (IDs 400-402), then empty.
-      List<ContainerInfo> firstPage = idRange(400, 403).stream()
-          .map(c -> containerInfo(c.getId(), DELETED))
-          .collect(Collectors.toList());
-      when(mockScm.getListOfContainerInfos(
+      List<ContainerID> firstPage = idRange(400, 403);
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), eq(3), eq(DELETED)))
           .thenReturn(firstPage);
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(403L)), eq(3), eq(DELETED)))
           .thenReturn(Collections.emptyList());
 
@@ -699,16 +706,20 @@ public class TestReconSCMContainerSyncIntegration
       // 503: NOT in Recon, appears in SCM's DELETED list → added as DELETED.
       seedRecon(500, 3, CLOSED); // seeds 500, 501, 502
 
-      List<ContainerInfo> deletedList = Arrays.asList(
-          containerInfo(500L, DELETED),
-          containerInfo(502L, DELETED),
-          containerInfo(503L, DELETED));  // 503 absent from Recon
-      when(mockScm.getListOfContainerInfos(
+      ContainerInfo missingDeleted = containerInfo(503L, DELETED);
+      List<ContainerID> deletedList = Arrays.asList(
+          ContainerID.valueOf(500L),
+          ContainerID.valueOf(502L),
+          missingDeleted.containerID());  // 503 absent from Recon
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(deletedList);
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(504L)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(503L)), eq(1), eq(DELETED)))
+          .thenReturn(Collections.singletonList(missingDeleted));
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(DELETED, getContainerManager().getContainer(
@@ -750,7 +761,7 @@ public class TestReconSCMContainerSyncIntegration
           });
       // Default Pass 4 mock: SCM's DELETED list is empty → no retirements.
       // Tests that need Pass 4 retirement override this inline.
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
     }
@@ -824,13 +835,11 @@ public class TestReconSCMContainerSyncIntegration
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
       // Override Pass 4: SCM's DELETED list contains all 100k containers.
-      List<ContainerInfo> deletedPage = idRange(1, LARGE_COUNT + 1).stream()
-          .map(c -> containerInfo(c.getId(), DELETED))
-          .collect(Collectors.toList());
-      when(mockScm.getListOfContainerInfos(
+      List<ContainerID> deletedPage = idRange(1, LARGE_COUNT + 1);
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(deletedPage);
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf((long) LARGE_COUNT + 1)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
 
@@ -848,13 +857,11 @@ public class TestReconSCMContainerSyncIntegration
       when(mockScm.getContainerCount(OPEN)).thenReturn(0L);
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(0L);
       // Override Pass 4: SCM's DELETED list contains all 100k containers.
-      List<ContainerInfo> deletedPage = idRange(1, LARGE_COUNT + 1).stream()
-          .map(c -> containerInfo(c.getId(), DELETED))
-          .collect(Collectors.toList());
-      when(mockScm.getListOfContainerInfos(
+      List<ContainerID> deletedPage = idRange(1, LARGE_COUNT + 1);
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(deletedPage);
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf((long) LARGE_COUNT + 1)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
 
@@ -938,15 +945,16 @@ public class TestReconSCMContainerSyncIntegration
       });
 
       // Pass 4 mock: SCM's DELETED list contains containers 80001-100000.
-      List<ContainerInfo> deletedPage = idRange(80_001, 100_001).stream()
-          .map(c -> containerInfo(c.getId(), DELETED))
-          .collect(Collectors.toList());
-      when(mockScm.getListOfContainerInfos(
+      List<ContainerID> deletedPage = idRange(80_001, 100_001);
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(deletedPage);
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(100_001L)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
+      when(mockScm.getListOfContainerInfos(
+          eq(ContainerID.valueOf(100_000L)), eq(1), eq(DELETED)))
+          .thenReturn(Collections.singletonList(containerInfo(100_000L, DELETED)));
 
       // ---- Run sync ----
       assertTrue(syncHelper.syncWithSCMContainerInfo());
@@ -1075,16 +1083,22 @@ public class TestReconSCMContainerSyncIntegration
       });
 
       // Pass 4 — SCM DELETED list: groups F + G + H (F and G exist in Recon; H is absent).
-      List<ContainerInfo> deletedPage = new ArrayList<>();
-      idRange(eEnd, fEnd).forEach(c -> deletedPage.add(containerInfo(c.getId(), DELETED))); // F
-      idRange(fEnd, gEnd).forEach(c -> deletedPage.add(containerInfo(c.getId(), DELETED))); // G
-      idRange(gEnd, hEnd).forEach(c -> deletedPage.add(containerInfo(c.getId(), DELETED))); // H
-      when(mockScm.getListOfContainerInfos(
+      List<ContainerID> deletedPage = new ArrayList<>();
+      deletedPage.addAll(idRange(eEnd, fEnd)); // F
+      deletedPage.addAll(idRange(fEnd, gEnd)); // G
+      deletedPage.addAll(idRange(gEnd, hEnd)); // H
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(1L)), anyInt(), eq(DELETED)))
           .thenReturn(deletedPage);
-      when(mockScm.getListOfContainerInfos(
+      when(mockScm.getListOfContainerIDs(
           eq(ContainerID.valueOf(hEnd)), anyInt(), eq(DELETED)))
           .thenReturn(Collections.emptyList());
+      when(mockScm.getListOfContainerInfos(
+          any(ContainerID.class), eq(1), eq(DELETED)))
+          .thenAnswer(inv -> {
+            ContainerID id = inv.getArgument(0);
+            return Collections.singletonList(containerInfo(id.getId(), DELETED));
+          });
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
 

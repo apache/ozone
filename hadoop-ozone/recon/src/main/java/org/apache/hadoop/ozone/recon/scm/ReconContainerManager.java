@@ -18,11 +18,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static java.util.Comparator.comparingLong;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLEANUP;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -189,10 +185,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
    * open-container count in {@link #pipelineToOpenContainer} accurate.
    *
    * <p>Must be called whenever an OPEN container is moved to CLOSING so that
-   * the pipeline's open-container count stays consistent.  Both the DN-report
-   * driven path ({@link #checkContainerStateAndUpdate}) and the periodic sync
-   * passes ({@code processSyncedClosedContainer}, {@code syncQuasiClosedContainers})
-   * use this method to avoid divergence in the count exposed to the Recon Node API.
+   * the pipeline's open-container count stays consistent. Both the DN-report
+   * driven path ({@link #checkContainerStateAndUpdate}) and the periodic
+   * targeted sync path use this method to avoid divergence in the count exposed
+   * to the Recon Node API.
    *
    * <p>If the container was recorded without a pipeline (null pipeline at
    * {@code addNewContainer} time) the count decrement is safely skipped.
@@ -218,26 +214,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   /**
-   * Check if container state needs to advance based on a DN replica report and
-   * SCM's authoritative lifecycle state.
-   *
-   * <p>Two scenarios handled:
-   * <ol>
-   *   <li>OPEN in Recon + non-OPEN healthy replica → FINALIZE (OPEN→CLOSING),
-   *       then query SCM to advance further if possible.</li>
-   *   <li>CLOSING in Recon + any report → query SCM to advance to
-   *       QUASI_CLOSED or CLOSED if SCM has already moved there.</li>
-   *   <li>DELETED in Recon + live replica report → rehydrate the container from
-   *       SCM if SCM still records it in a live state such as QUASI_CLOSED or
-   *       CLOSED.</li>
-   * </ol>
-   *
-   * <p>Querying SCM for the authoritative state prevents containers from getting
-   * permanently stuck at CLOSING when the DN report that would normally
-   * trigger the next transition was missed (e.g., Recon downtime).
-   *
-   * @param containerID containerID to check
-   * @param replicaState replica state reported by DataNode
+   * Check if an OPEN container should move to CLOSING based on a healthy
+   * non-OPEN DN replica report.
    */
   private void checkContainerStateAndUpdate(ContainerID containerID,
                                             ContainerReplicaProto.State replicaState)
@@ -245,98 +223,15 @@ public class ReconContainerManager extends ContainerManagerImpl {
     ContainerInfo containerInfo = getContainer(containerID);
     HddsProtos.LifeCycleState reconState = containerInfo.getState();
 
-    if (reconState == HddsProtos.LifeCycleState.DELETED) {
-      recoverDeletedContainerFromScm(containerID, replicaState);
-      return;
-    }
-
-    // Only act on transient pre-closed states where a DN report signals change
-    boolean isTransient = reconState == HddsProtos.LifeCycleState.OPEN
-        || reconState == HddsProtos.LifeCycleState.CLOSING;
-    if (!isTransient
+    if (reconState != HddsProtos.LifeCycleState.OPEN
         || replicaState == ContainerReplicaProto.State.OPEN
         || !isHealthy(replicaState)) {
       return;
     }
 
-    if (reconState == HddsProtos.LifeCycleState.OPEN) {
-      LOG.info("Container {} is OPEN in Recon but DN reports replica state {}. "
-          + "Moving to CLOSING.", containerID, replicaState);
-      transitionOpenToClosing(containerID, containerInfo);  // OPEN → CLOSING + counter update
-      // Fall through: now CLOSING — query SCM to advance further if possible
-    }
-
-    // Container is now CLOSING in Recon. Query SCM for the authoritative
-    // state so we do not permanently stick at CLOSING when the next DN
-    // transition report was missed.
-    try {
-      ContainerWithPipeline scmContainer =
-          scmClient.getContainerWithPipeline(containerID.getId());
-      HddsProtos.LifeCycleState scmState =
-          scmContainer.getContainerInfo().getState();
-
-      // Idempotent transitions are safe even if already past the target state.
-      if (scmState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
-        updateContainerState(containerID, QUASI_CLOSE);  // CLOSING → QUASI_CLOSED
-        LOG.info("Container {} advanced to QUASI_CLOSED in Recon (SCM state: {}).",
-            containerID, scmState);
-      } else if (scmState == HddsProtos.LifeCycleState.CLOSED) {
-        updateContainerState(containerID, CLOSE);        // CLOSING → CLOSED
-        LOG.info("Container {} advanced to CLOSED in Recon (SCM state: {}).",
-            containerID, scmState);
-      } else if (scmState == HddsProtos.LifeCycleState.DELETING
-          || scmState == HddsProtos.LifeCycleState.DELETED) {
-        // Unusual but possible: SCM already deleted this container.
-        // Drive through CLOSE first (idempotent), then DELETE, then CLEANUP.
-        updateContainerState(containerID, CLOSE);
-        updateContainerState(containerID, DELETE);
-        if (scmState == HddsProtos.LifeCycleState.DELETED) {
-          updateContainerState(containerID, CLEANUP);
-        }
-        LOG.info("Container {} advanced to {} in Recon (SCM state: {}).",
-            containerID, scmState, scmState);
-      }
-      // If scmState is still CLOSING: nothing more to do now; wait for next report.
-    } catch (IOException e) {
-      LOG.warn("Failed to fetch authoritative state for container {} from SCM. "
-          + "Container may remain in CLOSING until next periodic sync.", containerID, e);
-    }
-  }
-
-  private void recoverDeletedContainerFromScm(
-      ContainerID containerID, ContainerReplicaProto.State replicaState)
-      throws IOException {
-    if (replicaState != ContainerReplicaProto.State.CLOSED
-        && replicaState != ContainerReplicaProto.State.QUASI_CLOSED) {
-      return;
-    }
-
-    try {
-      ContainerWithPipeline scmContainer =
-          scmClient.getContainerWithPipeline(containerID.getId());
-      HddsProtos.LifeCycleState scmState =
-          scmContainer.getContainerInfo().getState();
-      if (scmState != HddsProtos.LifeCycleState.CLOSED
-          && scmState != HddsProtos.LifeCycleState.QUASI_CLOSED) {
-        LOG.info("Container {} is DELETED in Recon and DN reported {}, but SCM "
-                + "still reports {}. Skipping recovery.", containerID, replicaState, scmState);
-        return;
-      }
-
-      // Reverse transitions are not supported by the lifecycle state machine,
-      // so rebuild the container record from SCM's authoritative metadata.
-      deleteContainer(containerID);
-      addNewContainer(scmContainer);
-      LOG.info("Recovered container {} from DELETED in Recon to {} based on "
-              + "DN report {} and SCM state {}.", containerID, scmState, replicaState, scmState);
-    } catch (ContainerNotFoundException e) {
-      LOG.warn("Container {} disappeared from Recon while recovering DELETED "
-          + "state; retry on next report.", containerID, e);
-    } catch (IOException e) {
-      LOG.warn("Failed to recover container {} from DELETED state using SCM "
-          + "metadata.", containerID, e);
-      throw e;
-    }
+    LOG.info("Container {} is OPEN in Recon but DN reports replica state {}. "
+        + "Moving to CLOSING.", containerID, replicaState);
+    transitionOpenToClosing(containerID, containerInfo);
   }
 
   private boolean isHealthy(ContainerReplicaProto.State replicaState) {

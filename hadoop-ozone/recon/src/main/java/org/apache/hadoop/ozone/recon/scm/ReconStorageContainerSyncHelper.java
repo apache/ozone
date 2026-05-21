@@ -61,9 +61,9 @@ import org.slf4j.LoggerFactory;
  *       containers and advance existing Recon containers through valid local
  *       state-machine transitions. If Recon has DELETED but SCM reports one of
  *       these states, Recon rebuilds the container record from SCM metadata.</li>
- *   <li><b>DELETED:</b> paginates SCM's DELETED list using
- *       {@code getListOfContainerInfos}. For each container SCM reports as
- *       DELETED, Recon drives the container to DELETED in a single call. The
+ *   <li><b>DELETED:</b> paginates SCM's DELETED ID list. For IDs already in
+ *       Recon, Recon drives the container to DELETED in a single call. Full
+ *       {@code ContainerInfo} is fetched only for IDs missing from Recon. The
  *       DELETING list is intentionally skipped to avoid leaving Recon in an
  *       intermediate DELETING state across cycles.</li>
  * </ol>
@@ -75,9 +75,8 @@ import org.slf4j.LoggerFactory;
  *       absent containers — not one per absent container.
  *       Sub-batch size is bounded by {@link #safeContainerWithPipelineBatchSize}
  *       to keep the CWP response within the 128 MB IPC limit.</li>
- *   <li>DELETED sync uses {@code getListOfContainerInfos} against SCM's
- *       DELETED list only, bounded by {@link #safeContainerInfoBatchSize(int)}.
- *       </li>
+ *   <li>DELETED sync uses ID-only pagination for the common path and fetches
+ *       {@code ContainerInfo} only for missing Recon entries.</li>
  * </ul>
  */
 class ReconStorageContainerSyncHelper {
@@ -376,48 +375,37 @@ class ReconStorageContainerSyncHelper {
    * CLOSED/QUASI_CLOSED → DELETING → DELETED in a single call with no
    * cross-cycle intermediate state.
    *
-   * <p>Uses {@code getListOfContainerInfos} rather than
-   * {@code getExistContainerWithPipelinesInBatch} because DELETED sync needs the
-   * DELETED container metadata but does not need pipeline resolution.
+   * <p>Uses ID-only pagination for the common path. Full {@code ContainerInfo}
+   * is fetched only for IDs absent from Recon, where adding the missing terminal
+   * entry needs SCM's authoritative metadata.
    *
    * @return {@code true} if all RPC calls completed without error
    */
   private boolean syncDeletedContainers() {
     try {
-      // getListOfContainerInfos returns ContainerInfo objects (~86 bytes each
-      // on wire). Use safeContainerInfoBatchSize (not safeContainerWithPipelineBatchSize)
-      // because ContainerInfo does NOT include Pipeline or DatanodeDetails.
-      // At batchSize=50K: 50K × 86 bytes ≈ 4 MB per page — well within 128 MB IPC limit.
       int configuredBatch = ozoneConfiguration.getInt(
           OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE,
           OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT);
-      int batchSize = safeContainerInfoBatchSize(configuredBatch);
+      int batchSize = (int) getContainerCountPerCall(configuredBatch);
       int retiredCount = 0;
 
-      // Paginate SCM's DELETED list using getListOfContainerInfos (not IDs-only).
-      // We need full ContainerInfo to handle two cases correctly:
-      //   1. Containers absent from Recon: added via addNewContainer with their
-      //      actual replication config (RATIS or EC) — using IDs only would
-      //      require a placeholder config that could be wrong for EC containers.
-      //   2. Containers present in Recon: retired using retireContainerToDeleted.
-      //
-      // Memory: one page (batchSize ContainerInfo objects) in memory at a time.
-      // Each page is processed and GC'd before the next page is fetched — never
-      // millions of objects simultaneously.
+      // Existing Recon containers need only the ID to retire to DELETED. Fetch
+      // full ContainerInfo only for IDs absent from Recon, where we must add a
+      // missing terminal record with SCM's actual replication metadata.
       //
       // We do NOT scan the DELETING list: processing DELETING would drive Recon
       // to an intermediate DELETING state across cycles (stuck). We wait for SCM
       // to confirm full deletion (DELETED) and then retire atomically.
       ContainerID start = ContainerID.valueOf(1);
       while (true) {
-        List<ContainerInfo> page = scmServiceProvider.getListOfContainerInfos(
+        List<ContainerID> page = scmServiceProvider.getListOfContainerIDs(
             start, batchSize, HddsProtos.LifeCycleState.DELETED);
         if (page == null || page.isEmpty()) {
           break;
         }
         retiredCount += processDeletedPage(page);
         start = ContainerID.valueOf(
-            page.get(page.size() - 1).containerID().getId() + 1);
+            page.get(page.size() - 1).getId() + 1);
       }
 
       LOG.info("DELETED sync complete, retired={}.", retiredCount);
@@ -429,31 +417,22 @@ class ReconStorageContainerSyncHelper {
   }
 
   /**
-   * Processes one page of DELETED containers from SCM.
+   * Processes one page of DELETED container IDs from SCM.
    * For each container:
    * <ul>
-   *   <li>If absent from Recon: adds it using the full {@link ContainerInfo}
-   *       from SCM (preserving the actual replication config — RATIS or EC).</li>
+   *   <li>If absent from Recon: fetches full {@link ContainerInfo} from SCM and
+   *       adds it (preserving the actual replication config — RATIS or EC).</li>
    *   <li>If present in Recon in a non-terminal state: drives it to DELETED.</li>
    *   <li>If already DELETED in Recon: no-op.</li>
    * </ul>
    */
-  private int processDeletedPage(List<ContainerInfo> page) {
+  private int processDeletedPage(List<ContainerID> page) {
     int retiredCount = 0;
-    for (ContainerInfo scmInfo : page) {
-      ContainerID containerID = scmInfo.containerID();
+    for (ContainerID containerID : page) {
       if (!containerManager.containerExist(containerID)) {
-        // Container entirely absent from Recon — add it with the correct
-        // replication config from SCM (handles both RATIS and EC correctly).
-        try {
-          containerManager.addNewContainer(
-              new ContainerWithPipeline(scmInfo, null));
+        if (addContainerInfoFallback(containerID,
+            HddsProtos.LifeCycleState.DELETED, "DELETED sync")) {
           retiredCount++;
-          LOG.info("DELETED sync: added missing DELETED container {} "
-              + "(full lifecycle occurred while Recon was down).", containerID);
-        } catch (IOException e) {
-          LOG.warn("DELETED sync: failed to add missing DELETED "
-              + "container {}.", containerID, e);
         }
         continue;
       }
@@ -647,10 +626,10 @@ class ReconStorageContainerSyncHelper {
    * <p><b>Safety:</b> {@link ReconContainerManager#addNewContainer} accepts a
    * {@code null} pipeline for non-OPEN containers and stores the container
    * in the state manager without pipeline tracking, which is correct for
-   * CLOSED and QUASI_CLOSED containers.
+   * CLOSED, QUASI_CLOSED, and DELETED containers.
    *
    * @param containerID the container to add
-   * @param state       the expected SCM lifecycle state (CLOSED or QUASI_CLOSED)
+   * @param state       the expected SCM lifecycle state
    * @param passLabel   logging label
    * @return {@code true} if the container was successfully added
    */
@@ -678,8 +657,7 @@ class ReconStorageContainerSyncHelper {
       }
       containerManager.addNewContainer(
           new ContainerWithPipeline(infos.get(0), null));
-      LOG.info("{} ({}): added container {} via pipeline-failed fallback "
-              + "(pipeline unresolvable — container has no viable replicas).",
+      LOG.info("{} ({}): added container {} using ContainerInfo fallback.",
           passLabel, state, containerID);
       return true;
     } catch (IOException e) {

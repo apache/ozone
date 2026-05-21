@@ -44,6 +44,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -969,24 +970,34 @@ public class ReconStorageContainerManagerFacade
     final DBStore oldStore = dbStore;
     final File oldDbLocation = oldStore != null ? oldStore.getDbLocation() :
         null;
+    Map<DatanodeID, DatanodeDetails> preservedNodes = new HashMap<>();
     DBStore newStore = null;
     try {
-      newStore = DBStoreBuilder.newBuilder(ozoneConfiguration,
-          ReconSCMDBDefinition.get(), dbFile).build();
       if (oldStore != null) {
         final Table<DatanodeID, DatanodeDetails> nodeTable =
             ReconSCMDBDefinition.NODES.getTable(oldStore);
-        final Table<DatanodeID, DatanodeDetails> newNodeTable =
-            ReconSCMDBDefinition.NODES.getTable(newStore);
         try (TableIterator<DatanodeID, ? extends KeyValue<DatanodeID,
             DatanodeDetails>> iterator = nodeTable.iterator()) {
           while (iterator.hasNext()) {
             final KeyValue<DatanodeID, DatanodeDetails> keyValue =
                 iterator.next();
-            newNodeTable.put(keyValue.getKey(), keyValue.getValue());
+            preservedNodes.put(keyValue.getKey(), keyValue.getValue());
           }
         }
       }
+
+      IOUtils.close(LOG, oldStore);
+      File activeDbLocation = renameSnapshotToReconScmDb(dbFile);
+
+      newStore = DBStoreBuilder.newBuilder(ozoneConfiguration,
+          ReconSCMDBDefinition.get(), activeDbLocation).build();
+      final Table<DatanodeID, DatanodeDetails> newNodeTable =
+          ReconSCMDBDefinition.NODES.getTable(newStore);
+      for (Map.Entry<DatanodeID, DatanodeDetails> entry :
+          preservedNodes.entrySet()) {
+        newNodeTable.put(entry.getKey(), entry.getValue());
+      }
+
       sequenceIdGen.reinitialize(
           ReconSCMDBDefinition.SEQUENCE_ID.getTable(newStore));
       pipelineManager.reinitialize(
@@ -996,9 +1007,7 @@ public class ReconStorageContainerManagerFacade
       nodeManager.reinitialize(
           ReconSCMDBDefinition.NODES.getTable(newStore));
       dbStore = newStore;
-      IOUtils.close(LOG, oldStore);
-      cleanupOldSCMDB(oldDbLocation, dbFile);
-      File activeDbLocation = renameSnapshotToReconScmDb(dbFile);
+      cleanupOldSCMDB(oldDbLocation, activeDbLocation);
       LOG.info("Created SCM DB handle from snapshot at {}.",
           activeDbLocation.getAbsolutePath());
     } catch (IOException | RuntimeException ex) {
