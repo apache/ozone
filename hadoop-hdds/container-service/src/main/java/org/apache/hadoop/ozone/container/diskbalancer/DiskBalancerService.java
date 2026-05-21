@@ -509,6 +509,7 @@ public class DiskBalancerService extends BackgroundService {
     public BackgroundTaskResult call() {
       long startTime = Time.monotonicNow();
       boolean moveSucceeded = true;
+      Container newContainer = null;
       long containerId = containerData.getContainerID();
       Container container = ozoneContainer.getContainerSet().getContainer(containerId);
       boolean readLockReleased = false;
@@ -580,7 +581,7 @@ public class DiskBalancerService extends BackgroundService {
         }
 
         // Import the container. importContainer will reset container back to original state
-        Container newContainer = ozoneContainer.getController().importContainer(tempContainerData);
+        newContainer = ozoneContainer.getController().importContainer(tempContainerData);
 
         // Step 4: Update container for containerID and mark old container for deletion
         // first, update the in-memory set to point to the new replica.
@@ -633,13 +634,13 @@ public class DiskBalancerService extends BackgroundService {
         if (!readLockReleased) {
           container.readUnlock();
         }
-        if (moveSucceeded) {
+        if (moveSucceeded && newContainer != null) {
           // Add current old container to pendingDeletionContainers.
           pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelay, container);
-          ContainerLogger.logMoveSuccess(containerId, sourceVolume,
+          ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
-        postCall(moveSucceeded, startTime);
+        postCall(moveSucceeded && newContainer != null, startTime);
 
         // pick one expired container from pendingDeletionContainers to delete
         tryCleanupOnePendingDeletionContainer();

@@ -112,8 +112,8 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
           && p.getDiskBalancerConf().hasThreshold()) {
         double idealUsage = p.getIdealUsage();
         double threshold = p.getDiskBalancerConf().getThreshold();
-        double lt = idealUsage - threshold / 100.0;
-        double ut = idealUsage + threshold / 100.0;
+        double lt = Math.max(0.0, idealUsage - threshold / 100.0);
+        double ut = Math.min(1.0, idealUsage + threshold / 100.0);
         header.append("IdealUsage: ").append(formatPercent(idealUsage))
             .append(" | Threshold: ")
             .append(String.format(Locale.ROOT, PERCENT_FORMAT, threshold))
@@ -207,8 +207,8 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         && report.getDiskBalancerConf().hasThreshold()) {
       double idealUsage = report.getIdealUsage();
       double threshold = report.getDiskBalancerConf().getThreshold();
-      double lt = idealUsage - threshold / 100.0;
-      double ut = idealUsage + threshold / 100.0;
+      double lt = Math.max(0.0, idealUsage - threshold / 100.0);
+      double ut = Math.min(1.0, idealUsage + threshold / 100.0);
       result.put("idealUsage", formatPercent(idealUsage));
       result.put("threshold %", String.format(Locale.ROOT, PERCENT_FORMAT, threshold));
       result.put("thresholdRange", String.format("(%s, %s)",
