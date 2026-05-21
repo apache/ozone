@@ -118,17 +118,21 @@ public final class DiskBalancerVolumeCalculation {
     }
     
     try {
-      // If there is only one volume, return 0.0 as there's no imbalance to measure
-      if (volumeSet.size() <= 1) {
+      final List<VolumeFixedUsage> usableVolumes = volumeSet.stream()
+          .filter(v -> v.getUsage().getCapacity() > 0)
+          .collect(Collectors.toList());
+
+      // If there is only one usable volume, return 0.0 as there's no imbalance to measure
+      if (usableVolumes.size() <= 1) {
         return 0.0;
       }
 
       // Calculate ideal usage using the same immutable volume snapshot
-      final double idealUsage = getIdealUsage(volumeSet);
+      final double idealUsage = getIdealUsage(usableVolumes);
       double volumeDensitySum = 0.0;
 
       // Calculate density for each volume using the same snapshot
-      for (VolumeFixedUsage volumeUsage : volumeSet) {
+      for (VolumeFixedUsage volumeUsage : usableVolumes) {
         final double currentUsage = volumeUsage.getUtilization();
 
         // Calculate density as absolute difference from ideal usage

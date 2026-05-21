@@ -285,7 +285,8 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
       }
     });
     assertThat(deleteThreadPastSchedule.await(10, TimeUnit.SECONDS)).isTrue();
-    Thread.sleep(200);
+    GenericTestUtils.waitFor(
+        () -> containerSet.getContainer(CONTAINER_ID) == null, 100, 10_000);
 
     raceInjector.continueBalancer();
 
@@ -367,7 +368,9 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
       }
     });
     assertThat(blockThreadStarted.await(10, TimeUnit.SECONDS)).isTrue();
-    Thread.sleep(200);
+    GenericTestUtils.waitFor(
+        () -> readPendingDeleteBlockCountUnchecked(newData) < pendingBefore,
+        100, 10_000);
 
     raceInjector.continueBalancer();
     CompletableFuture.allOf(balancerDone, blockDone).get(60, TimeUnit.SECONDS);
@@ -433,7 +436,8 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
       }
     });
     assertThat(unhealthyThreadStarted.await(10, TimeUnit.SECONDS)).isTrue();
-    Thread.sleep(200);
+    GenericTestUtils.waitFor(
+        () -> liveReplica.getContainerState() == State.UNHEALTHY, 100, 10_000);
 
     raceInjector.continueBalancer();
     CompletableFuture.allOf(balancerDone, unhealthyDone).get(60, TimeUnit.SECONDS);
@@ -497,7 +501,8 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
       }
     });
     assertThat(closeThreadStarted.await(10, TimeUnit.SECONDS)).isTrue();
-    Thread.sleep(200);
+    GenericTestUtils.waitFor(
+        () -> liveReplica.getContainerState() == State.CLOSED, 100, 10_000);
 
     raceInjector.continueBalancer();
     CompletableFuture.allOf(balancerDone, closeDone).get(60, TimeUnit.SECONDS);
@@ -532,6 +537,14 @@ class TestDiskBalancerWithConcurrentBackgroundTasks {
       Table<String, Long> meta = db.getStore().getMetadataTable();
       Long v = meta.get(data.getPendingDeleteBlockCountKey());
       return v == null ? 0L : v;
+    }
+  }
+
+  private long readPendingDeleteBlockCountUnchecked(KeyValueContainerData data) {
+    try {
+      return readPendingDeleteBlockCount(data);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 

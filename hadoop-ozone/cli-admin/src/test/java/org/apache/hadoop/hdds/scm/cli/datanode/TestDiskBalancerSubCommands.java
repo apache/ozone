@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -42,6 +43,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -56,6 +58,9 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import picocli.CommandLine;
@@ -590,6 +595,45 @@ public class TestDiskBalancerSubCommands {
 
   // ========== DiskBalancerReportSubcommand Tests ==========
 
+  static Stream<Arguments> thresholdRangeReportCases() {
+    return Stream.of(
+        Arguments.of(0.08426521, 10.0, false,
+            "ThresholdRange: (0.00000000, 0.18426521)", "ThresholdRange: (-"),
+        Arguments.of(0.95, 10.0, false,
+            "ThresholdRange: (0.85000000, 1.00000000)", "1.05000000"),
+        Arguments.of(0.95, 10.0, true,
+            "\"thresholdRange\" : \"(0.85000000, 1.00000000)\"", "1.05000000"));
+  }
+
+  @ParameterizedTest(name = "idealUsage={0}, threshold={1}%, json={2}")
+  @MethodSource("thresholdRangeReportCases")
+  public void testReportThresholdRangeClamped(double idealUsage,
+      double thresholdPercent, boolean jsonOutput, String expectedRangeSubstring,
+      String mustNotContain) throws Exception {
+    outContent.reset();
+    errContent.reset();
+
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+    DatanodeDiskBalancerInfoProto reportProto =
+        createReportProto("host-1", idealUsage, thresholdPercent);
+
+    when(mockProtocol.getDiskBalancerInfo()).thenReturn(reportProto);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      if (jsonOutput) {
+        c.parseArgs("--json", "host-1");
+      } else {
+        c.parseArgs("host-1");
+      }
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertThat(output).contains(expectedRangeSubstring);
+      assertThat(output).doesNotContain(mustNotContain);
+    }
+  }
+
   @Test
   public void testReportDiskBalancerWithInServiceDatanodes() throws Exception {
     DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
@@ -821,6 +865,25 @@ public class TestDiskBalancerSubCommands {
         .setDiskBalancerConf(configProto)
         .addVolumeInfo(vol1)
         .addVolumeInfo(vol2)
+        .build();
+  }
+
+  private DatanodeDiskBalancerInfoProto createReportProto(String hostname, double idealUsage,
+      double thresholdPercent) {
+    DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(nodeProto)
+        .setCurrentVolumeDensitySum(0.1408700123786014)
+        .setIdealUsage(idealUsage)
+        .setDiskBalancerConf(createConfigProto(thresholdPercent, 100L, 5, true))
         .build();
   }
 

@@ -51,8 +51,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -76,7 +76,7 @@ import org.slf4j.LoggerFactory;
  * TODO : currently not support multi-thread access.
  */
 public class KeyOutputStream extends OutputStream
-    implements Syncable, KeyMetadataAware {
+    implements Syncable, KeyCommitOutput {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
@@ -114,6 +114,7 @@ public class KeyOutputStream extends OutputStream
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
   private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
 
+  @Override
   public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
     this.preCommits = preCommits;
   }
@@ -671,7 +672,8 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  synchronized OmMultipartCommitUploadPartInfo
+  @Override
+  public synchronized OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
   }
