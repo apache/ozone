@@ -22,11 +22,13 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -42,6 +44,7 @@ import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
@@ -54,6 +57,46 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
                                 BucketLayout bucketLayout) {
     super(omReq);
     setBucketLayout(bucketLayout);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest omRequest = super.preExecute(ozoneManager);
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        ObjectParser objectParser = new ObjectParser(getPath(),
+            OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
+        ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+            Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+        String volume = resolvedBucket.realVolume();
+        String bucket = resolvedBucket.realBucket();
+        String key = objectParser.getKey();
+
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volume, bucket, key);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        OzoneObj obj = getObject();
+        auditMap.putAll(obj.toAuditMap());
+        // Determine which action based on request type
+        OMAction action = OMAction.SET_ACL;
+        if (omRequest.hasAddAclRequest()) {
+          action = OMAction.ADD_ACL;
+        } else if (omRequest.hasRemoveAclRequest()) {
+          action = OMAction.REMOVE_ACL;
+        }
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(action, auditMap, ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
+
+    return omRequest;
   }
 
   @Override
@@ -81,12 +124,6 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       bucket = resolvedBucket.realBucket();
       key = objectParser.getKey();
 
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, bucket, key);
-      }
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volume, bucket));
       lockAcquired = getOmLockDetails().isLockAcquired();

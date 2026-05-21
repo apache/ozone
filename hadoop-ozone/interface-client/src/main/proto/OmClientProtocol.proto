@@ -1367,6 +1367,7 @@ message RenameKeysArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated RenameKeysMap renameKeysMap = 3;
+    repeated RenameKeysMap aclDeniedRenameKeys = 4;
 }
 
 message RenameKeysMap {
@@ -1400,6 +1401,7 @@ message DeleteKeyArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
+    repeated string aclDeniedKeys = 4;
 }
 
 message DeleteKeyError {

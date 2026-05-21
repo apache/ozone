@@ -88,6 +88,65 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     super(omRequest, bucketLayout);
   }
 
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    super.preExecute(ozoneManager);
+
+    DeleteKeysRequest deleteKeysRequest = getOmRequest().getDeleteKeysRequest();
+    DeleteKeyArgs deleteKeyArgs = deleteKeysRequest.getDeleteKeys();
+
+    String volumeName = deleteKeyArgs.getVolumeName();
+    String bucketName = deleteKeyArgs.getBucketName();
+    List<String> keys = deleteKeyArgs.getKeysList();
+
+    ResolvedBucket resolvedBucketObj = ozoneManager.resolveBucketLink(
+        Pair.of(volumeName, bucketName));
+    String resolvedVolume = resolvedBucketObj.realVolume();
+    String resolvedBucket = resolvedBucketObj.realBucket();
+
+    String volumeOwner = getVolumeOwner(ozoneManager.getMetadataManager(), resolvedVolume);
+
+    List<String> keysPassingAcl = new ArrayList<>();
+    List<String> aclDeniedKeys = new ArrayList<>();
+    if (ozoneManager.getAclsEnabled()) {
+      for (String keyName : keys) {
+        try {
+          checkKeyAcls(ozoneManager, resolvedVolume, resolvedBucket, keyName,
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
+              volumeOwner);
+          keysPassingAcl.add(keyName);
+        } catch (IOException ex) {
+          LOG.warn("ACL check failed for key {} during preExecute: {}",
+              keyName, ex.getMessage());
+          aclDeniedKeys.add(keyName);
+          Map<String, String> auditMap = new LinkedHashMap<>();
+          auditMap.put(VOLUME, resolvedVolume);
+          auditMap.put(BUCKET, resolvedBucket);
+          auditMap.put(KEY, keyName);
+          markForAudit(ozoneManager.getAuditLogger(),
+              buildAuditMessage(DELETE_KEYS, auditMap, ex,
+                  getOmRequest().getUserInfo()));
+        }
+      }
+    } else {
+      keysPassingAcl.addAll(keys);
+    }
+
+    DeleteKeyArgs.Builder modifiedArgs = deleteKeyArgs.toBuilder()
+        .clearKeys()
+        .addAllKeys(keysPassingAcl)
+        .clearAclDeniedKeys()
+        .addAllAclDeniedKeys(aclDeniedKeys);
+
+    DeleteKeysRequest.Builder modifiedRequest = deleteKeysRequest.toBuilder()
+        .setDeleteKeys(modifiedArgs);
+
+    return getOmRequest().toBuilder()
+        .setDeleteKeysRequest(modifiedRequest)
+        .setUserInfo(getUserIfNotExists(ozoneManager))
+        .build();
+  }
+
   @Override @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
@@ -147,7 +206,13 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
+
+      for (String deniedKey : deleteKeyArgs.getAclDeniedKeysList()) {
+        deleteStatus = false;
+        unDeletedKeys.addKeys(deniedKey);
+        keyToError.put(deniedKey,
+            new ErrorInfo(OMException.ResultCodes.ACCESS_DENIED.name(), "ACL check failed"));
+      }
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
@@ -166,25 +231,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           continue;
         }
 
-        try {
-          // check Acl
-          long startNanosDeleteKeysAclCheckLatency = Time.monotonicNowNanos();
-          checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
-              volumeOwner);
-          perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNanosDeleteKeysAclCheckLatency);
-          OzoneFileStatus fileStatus = getOzoneKeyStatus(
-              ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
-          addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
-              fileStatus);
-          deleteKeysInfo.add(omKeyInfo);
-        } catch (Exception ex) {
-          deleteStatus = false;
-          LOG.error("Acl check failed for Key: {}", objectKey, ex);
-          deleteKeys.remove(keyName);
-          unDeletedKeys.addKeys(keyName);
-          keyToError.put(keyName, new ErrorInfo(OMException.ResultCodes.ACCESS_DENIED.name(), "ACL check failed"));
-        }
+        OzoneFileStatus fileStatus = getOzoneKeyStatus(
+            ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
+        addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
+            fileStatus);
+        deleteKeysInfo.add(omKeyInfo);
       }
 
       OmBucketInfo omBucketInfo =
