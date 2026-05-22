@@ -443,8 +443,7 @@ public class DiskBalancerService extends BackgroundService {
               destVolume);
           queue.add(task);
           inProgressContainers.add(ContainerID.valueOf(toBalanceContainer.getContainerID()));
-          deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
-              - toBalanceContainer.getBytesUsed());
+          reserveDeltaSize(sourceVolume, toBalanceContainer.getBytesUsed());
         }
       }
     }
@@ -490,6 +489,30 @@ public class DiskBalancerService extends BackgroundService {
           bytesBalanced / megaByte, delayInMillisec, delayInMillisec / 1000);
     }
     return false;
+  }
+
+  private void reserveDeltaSize(HddsVolume sourceVolume, long bytes) {
+    // deltaSizes can be updated by multiple DiskBalancer tasks for the same
+    // source volume. Use compute to avoid lost updates from a non-atomic
+    // get/put sequence.
+    deltaSizes.compute(sourceVolume, (volume, current) -> {
+      long updated = (current == null ? 0L : current) - bytes;
+      return updated == 0L ? null : updated;
+    });
+  }
+
+  private void releaseDeltaSize(HddsVolume sourceVolume, long bytes) {
+    // Match reserveDeltaSize and release the previously reserved bytes
+    // atomically when a DiskBalancer task completes.
+    deltaSizes.compute(sourceVolume, (volume, current) -> {
+      if (current == null) {
+        LOG.warn("No reserved delta size found for source volume {} when "
+            + "releasing {} bytes.", sourceVolume, bytes);
+        return null;
+      }
+      long updated = current + bytes;
+      return updated == 0L ? null : updated;
+    });
   }
 
   protected class DiskBalancerTask implements BackgroundTask {
@@ -654,8 +677,7 @@ public class DiskBalancerService extends BackgroundService {
 
     private void postCall(boolean success, long startTime) {
       inProgressContainers.remove(ContainerID.valueOf(containerData.getContainerID()));
-      deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
-          containerData.getBytesUsed());
+      releaseDeltaSize(sourceVolume, containerData.getBytesUsed());
       destVolume.incCommittedBytes(0 - containerData.getBytesUsed());
       long endTime = Time.monotonicNow();
       if (success) {

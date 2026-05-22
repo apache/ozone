@@ -36,19 +36,24 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiFunction;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -87,6 +92,7 @@ import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -312,6 +318,37 @@ public class TestDiskBalancerTask {
     containerIterator = destVolume.getContainerIterator();
     assertTrue(containerIterator.hasNext());
     assertEquals(CONTAINER_ID, containerIterator.next());
+  }
+
+  @Test
+  public void concurrentPostCallRestoresDeltaSizeAtomically()
+      throws Exception {
+    Method postCall = DiskBalancerService.DiskBalancerTask.class
+        .getDeclaredMethod("postCall", boolean.class, long.class);
+    postCall.setAccessible(true);
+
+    RacingDeltaMap deltaSizes = new RacingDeltaMap(sourceVolume);
+    setDeltaSizes(deltaSizes);
+    deltaSizes.put(sourceVolume, -2 * CONTAINER_SIZE);
+    destVolume.incCommittedBytes(2 * CONTAINER_SIZE);
+
+    DiskBalancerService.DiskBalancerTask task1 =
+        newTask(CONTAINER_ID + 1);
+    DiskBalancerService.DiskBalancerTask task2 =
+        newTask(CONTAINER_ID + 2);
+
+    deltaSizes.enableRacingGets();
+    CompletableFuture<Void> first = CompletableFuture.runAsync(
+        () -> invokePostCall(postCall, task1));
+    CompletableFuture<Void> second = CompletableFuture.runAsync(
+        () -> invokePostCall(postCall, task2));
+
+    first.get(5, TimeUnit.SECONDS);
+    second.get(5, TimeUnit.SECONDS);
+
+    deltaSizes.disableRacingGets();
+    assertEquals(0L, deltaSizes.getOrDefault(sourceVolume, 0L));
+    assertEquals(0L, destVolume.getCommittedBytes());
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -677,6 +714,99 @@ public class TestDiskBalancerTask {
 
     // Verify delta sizes are restored
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+  }
+
+  private DiskBalancerService.DiskBalancerTask newTask(long containerId) {
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        containerId, ContainerLayoutVersion.FILE_PER_BLOCK, CONTAINER_SIZE,
+        UUID.randomUUID().toString(), datanodeUuid);
+    containerData.getStatistics().setBlockBytesForTesting(CONTAINER_SIZE);
+    return diskBalancerService.new DiskBalancerTask(containerData,
+        sourceVolume, destVolume);
+  }
+
+  private void invokePostCall(Method postCall,
+      DiskBalancerService.DiskBalancerTask task) {
+    try {
+      postCall.invoke(task, false, TimeUnit.MILLISECONDS.toMillis(1));
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  private void setDeltaSizes(Map<HddsVolume, Long> deltaSizes)
+      throws ReflectiveOperationException {
+    Field field = DiskBalancerService.class.getDeclaredField("deltaSizes");
+    field.setAccessible(true);
+    field.set(diskBalancerService, deltaSizes);
+  }
+
+  private static final class RacingDeltaMap
+      extends AbstractMap<HddsVolume, Long> {
+    private final Map<HddsVolume, Long> entries = new HashMap<>();
+    private final HddsVolume racedVolume;
+    private final CountDownLatch concurrentGets = new CountDownLatch(2);
+    private volatile boolean raceGets;
+
+    private RacingDeltaMap(HddsVolume racedVolume) {
+      this.racedVolume = racedVolume;
+    }
+
+    private void enableRacingGets() {
+      raceGets = true;
+    }
+
+    private void disableRacingGets() {
+      raceGets = false;
+    }
+
+    @Override
+    public Long get(Object key) {
+      Long value;
+      synchronized (this) {
+        value = entries.get(key);
+      }
+      if (raceGets && key == racedVolume) {
+        concurrentGets.countDown();
+        try {
+          if (!concurrentGets.await(5, TimeUnit.SECONDS)) {
+            throw new AssertionError("Timed out waiting for concurrent gets");
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new AssertionError(e);
+        }
+      }
+      return value;
+    }
+
+    @Override
+    public synchronized Long put(HddsVolume key, Long value) {
+      return entries.put(key, value);
+    }
+
+    @Override
+    public synchronized Long remove(Object key) {
+      return entries.remove(key);
+    }
+
+    @Override
+    public synchronized Long compute(HddsVolume key,
+        BiFunction<? super HddsVolume, ? super Long, ? extends Long>
+            remappingFunction) {
+      Long newValue = remappingFunction.apply(key, entries.get(key));
+      if (newValue == null) {
+        entries.remove(key);
+      } else {
+        entries.put(key, newValue);
+      }
+      return newValue;
+    }
+
+    @Override
+    public synchronized Set<Entry<HddsVolume, Long>> entrySet() {
+      return entries.entrySet();
+    }
   }
 
   private KeyValueContainer createContainer(long containerId, HddsVolume vol, State state)
