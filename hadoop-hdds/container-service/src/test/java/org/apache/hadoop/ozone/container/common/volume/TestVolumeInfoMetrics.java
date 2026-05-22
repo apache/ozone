@@ -75,7 +75,7 @@ class TestVolumeInfoMetrics {
 
       assertThat(findMetric(all, "FilesystemCapacity")).isEqualTo(2000L);
       assertThat(findMetric(all, "FilesystemAvailable")).isEqualTo(1100L);
-      assertThat(findMetric(all, "FilesystemUsed")).isEqualTo(500L);
+      assertThat(findMetric(all, "FilesystemUsed")).isEqualTo(900L); // FilesystemCapacity - FilesystemAvailable
 
       assertThat(findMetric(all, "MinFreeSpace")).isEqualTo(20L);
       assertThat(findMetric(all, "NonOzoneUsed")).isEqualTo(400L);

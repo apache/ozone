@@ -252,7 +252,7 @@ public class VolumeInfoMetrics implements MetricsSource {
           .addGauge(RESERVED, reserved)
           .addGauge(FS_CAPACITY, fsUsage.getCapacity())
           .addGauge(FS_AVAILABLE, fsUsage.getAvailable())
-          .addGauge(FS_USED, fsUsage.getUsedSpace())
+          .addGauge(FS_USED, fsUsage.getCapacity() - fsUsage.getAvailable())
           .addGauge(MIN_FREE_SPACE, volume.getReportedFreeSpaceToSpare(ozoneCapacity))
           .addGauge(NON_OZONE_USED, VolumeUsage.getOtherUsed(fsUsage));
     }
