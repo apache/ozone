@@ -43,6 +43,7 @@ import java.nio.file.Paths;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,9 +54,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -284,7 +287,7 @@ public class TestIncrementalContainerReportHandler {
                                   int replicaIndex) {
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(containerID, state,
-            datanodeDetails.getUuidString(), true, replicaIndex);
+            datanodeDetails.getUuidString(), true, replicaIndex, null);
     final IncrementalContainerReportFromDatanode icrFromDatanode =
         new IncrementalContainerReportFromDatanode(datanodeDetails,
             containerReport);
@@ -439,7 +442,7 @@ public class TestIncrementalContainerReportHandler {
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
             CLOSED, datanodeThree.getUuidString(), false, 0,
-            2000L);
+            2000L, StorageType.DISK);
     final IncrementalContainerReportFromDatanode icr =
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
@@ -571,7 +574,7 @@ public class TestIncrementalContainerReportHandler {
             datanode, containerReport);
 
     final ContainerReportsProto fullReport = getContainerReportsProto(
-            containerTwo.containerID(), CLOSED, datanode.getUuidString());
+            containerTwo.containerID(), CLOSED, datanode.getUuidString(), null);
     final ContainerReportFromDatanode fcr = new ContainerReportFromDatanode(
         datanode, fullReport);
 
@@ -752,6 +755,59 @@ public class TestIncrementalContainerReportHandler {
     assertEquals(numNodes, numReplicasChecked);
   }
 
+  @Test
+  public void testReplicaStorageTypeValidation() throws IOException {
+    // Prepare env
+    Map<StorageType, DatanodeDetails> storageTypeToDn = new HashMap<>();
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(
+            nodeManager, containerManager, scmContext);
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+    final DatanodeDetails datanodeOne = randomDatanodeDetails();
+    final DatanodeDetails datanodeTwo = randomDatanodeDetails();
+    final DatanodeDetails datanodeThree = randomDatanodeDetails();
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
+    final Set<ContainerReplica> containerReplicas = getReplicas(
+        container.containerID(),
+        ContainerReplicaProto.State.CLOSING,
+        datanodeOne, datanodeTwo, datanodeThree);
+    containerStateManager.addContainer(container.getProtobuf());
+    containerReplicas.forEach(replica -> {
+      containerStateManager.updateContainerReplica(replica);
+    });
+
+    // Add Container Report
+    addIncrContainerReport(container, datanodeOne, reportHandler, StorageType.DISK);
+    storageTypeToDn.put(StorageType.DISK, datanodeOne);
+    addIncrContainerReport(container, datanodeTwo, reportHandler, StorageType.SSD);
+    storageTypeToDn.put(StorageType.SSD, datanodeTwo);
+    addIncrContainerReport(container, datanodeThree, reportHandler, StorageType.RAM_DISK);
+    storageTypeToDn.put(StorageType.RAM_DISK, datanodeThree);
+
+    // Assert the StorageType is valid
+    assertEquals(3, containerStateManager
+        .getContainerReplicas(container.containerID()).size());
+    for (ContainerReplica containerReplica : containerStateManager
+        .getContainerReplicas(container.containerID())) {
+      assertEquals(storageTypeToDn.get(containerReplica.getStorageType()),
+          containerReplica.getDatanodeDetails());
+    }
+  }
+
+  private void addIncrContainerReport(ContainerInfo container, DatanodeDetails datanode,
+      IncrementalContainerReportHandler reportHandler, StorageType storageType) {
+    final IncrementalContainerReportProto containerReport1 =
+        getIncrementalContainerReportProto(container.containerID(),
+            ContainerReplicaProto.State.CLOSED,
+            datanode.getUuidString(),  true, 0, storageType);
+    final IncrementalContainerReportFromDatanode icrFromDatanode1 =
+        new IncrementalContainerReportFromDatanode(
+            datanode, containerReport1);
+    reportHandler.onMessage(icrFromDatanode1, publisher);
+  }
+
   private static IncrementalContainerReportProto
       getIncrementalContainerReportProto(ContainerReplicaProto replicaProto) {
     final IncrementalContainerReportProto.Builder crBuilder =
@@ -765,9 +821,10 @@ public class TestIncrementalContainerReportHandler {
           final ContainerReplicaProto.State state,
           final String originNodeId,
           final boolean hasReplicaIndex,
-          final int replicaIndex) {
+          final int replicaIndex,
+            final StorageType storageType) {
     return getIncrementalContainerReportProto(containerId, state, originNodeId,
-        hasReplicaIndex, replicaIndex, 10000L);
+        hasReplicaIndex, replicaIndex, 10000L, storageType);
   }
 
   private static IncrementalContainerReportProto
@@ -777,7 +834,8 @@ public class TestIncrementalContainerReportHandler {
           final String originNodeId,
           final boolean hasReplicaIndex,
           final int replicaIndex,
-          final long bcsId) {
+          final long bcsId,
+          final StorageType storageType) {
     final ContainerReplicaProto.Builder replicaProto =
             ContainerReplicaProto.newBuilder()
                     .setContainerID(containerId.getId())
@@ -795,6 +853,9 @@ public class TestIncrementalContainerReportHandler {
     if (hasReplicaIndex) {
       replicaProto.setReplicaIndex(replicaIndex);
     }
+    if (storageType != null) {
+      replicaProto.setStorageType(StorageTypeUtils.getStorageTypeProto(storageType));
+    }
     return getIncrementalContainerReportProto(replicaProto.build());
   }
 
@@ -804,16 +865,16 @@ public class TestIncrementalContainerReportHandler {
           final ContainerReplicaProto.State state,
           final String originNodeId) {
     return getIncrementalContainerReportProto(containerId, state, originNodeId,
-            false, 0);
+            false, 0, null);
   }
 
   private void testReplicaIndexUpdate(ContainerInfo container,
          DatanodeDetails dn, int replicaIndex,
-         Map<DatanodeDetails, Integer> expectedReplicaMap) {
+         Map<DatanodeDetails, Integer> expectedReplicaMap, StorageType storageType) {
     final IncrementalContainerReportProto containerReport =
             getIncrementalContainerReportProto(container.containerID(),
                     ContainerReplicaProto.State.CLOSED, dn.getUuidString(),
-                    true, replicaIndex);
+                    true, replicaIndex, storageType);
     final IncrementalContainerReportFromDatanode containerReportFromDatanode =
             new IncrementalContainerReportFromDatanode(dn, containerReport);
     final IncrementalContainerReportHandler reportHandler =
@@ -852,9 +913,9 @@ public class TestIncrementalContainerReportHandler {
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex));
     replicas.forEach(containerStateManager::updateContainerReplica);
-    testReplicaIndexUpdate(container, dns.get(0), 0, replicaMap);
-    testReplicaIndexUpdate(container, dns.get(0), 6, replicaMap);
+    testReplicaIndexUpdate(container, dns.get(0), 0, replicaMap, null);
+    testReplicaIndexUpdate(container, dns.get(0), 6, replicaMap, null);
     replicaMap.put(dns.get(0), 2);
-    testReplicaIndexUpdate(container, dns.get(0), 2, replicaMap);
+    testReplicaIndexUpdate(container, dns.get(0), 2, replicaMap, null);
   }
 }

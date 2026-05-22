@@ -235,6 +235,7 @@ message ContainerReplicaProto {
   optional int32 replicaIndex = 14;
   optional bool isEmpty = 15 [default = false];
   optional int64 dataChecksum = 16;
+  optional StorageTypeProto storageType = 17;
 }
 
 message CommandStatusReportsProto {
