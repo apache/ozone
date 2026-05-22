@@ -2703,7 +2703,10 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
+                <include>org.apache.hadoop.io_.**</include>
+                <include>org.apache.hadoop.ipc_.**</include>
                 <include>org.apache.hadoop.ozone.client.**</include>
+                <include>org.apache.hadoop.security_.**</include>
               </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
