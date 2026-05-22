@@ -122,7 +122,9 @@ public final class RegisterEndpointTask implements
         boolean supportsFCRLease =
             rpcEndPoint.supportsFullContainerReportLease();
         ContainerReportsProto containerReport = supportsFCRLease
-            ? ContainerReportsProto.getDefaultInstance()
+            ? ContainerReportsProto.newBuilder()
+                .setFullContainerReportDeferred(true)
+                .build()
             : datanodeContainerManager.getController().getContainerReport();
         NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
         PipelineReportsProto pipelineReportsProto =

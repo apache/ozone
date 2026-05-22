@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeleteBlocksCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -58,6 +60,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -82,13 +85,16 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests the endpoints.
@@ -466,6 +472,61 @@ public class TestEndPoint {
       // Successful register should move us to Heartbeat state.
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
     }
+  }
+
+  @Test
+  public void testRegisterTaskDefersFCRWhenSCMSupportsFCRLease()
+      throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    ArgumentCaptor<ContainerReportsProto> containerReport =
+        ArgumentCaptor.forClass(ContainerReportsProto.class);
+    when(scm.register(any(), any(), containerReport.capture(), any(), any()))
+        .thenReturn(SCMRegisteredResponseProto.newBuilder()
+            .setClusterID(UUID.randomUUID().toString())
+            .setDatanodeUUID(datanodeDetails.getUuidString())
+            .setErrorCode(SCMRegisteredResponseProto.ErrorCode.success)
+            .build());
+
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    DatanodeID datanodeID = DatanodeID.randomID();
+    when(ozoneContainer.getNodeReport()).thenReturn(HddsTestUtils
+        .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
+            Arrays.asList(getMetadataStorageReports(datanodeID))));
+    ContainerController controller = mock(ContainerController.class);
+    when(controller.getContainerReport()).thenReturn(
+        HddsTestUtils.getRandomContainerReports(10));
+    when(ozoneContainer.getController()).thenReturn(controller);
+    when(ozoneContainer.getPipelineReport()).thenReturn(
+        HddsTestUtils.getRandomPipelineReports());
+    HDDSLayoutVersionManager versionManager =
+        mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+
+    try (EndpointStateMachine rpcEndpoint = new EndpointStateMachine(
+        new HostAndPort(serverAddress.getHostName(), serverAddress.getPort()),
+        scm, conf, "")) {
+      rpcEndpoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
+      rpcEndpoint.setVersion(VersionResponse.newBuilder()
+          .setVersion(1)
+          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED,
+              Boolean.TRUE.toString())
+          .build());
+      RegisterEndpointTask endpointTask = new RegisterEndpointTask(
+          rpcEndpoint, ozoneContainer, mock(StateContext.class),
+          versionManager);
+      endpointTask.setDatanodeDetails(datanodeDetails);
+
+      endpointTask.call();
+    }
+
+    assertTrue(containerReport.getValue().getFullContainerReportDeferred());
+    assertEquals(0, containerReport.getValue().getReportsCount());
   }
 
   @Test

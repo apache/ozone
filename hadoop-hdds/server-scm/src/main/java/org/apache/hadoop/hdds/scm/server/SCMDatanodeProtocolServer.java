@@ -251,7 +251,7 @@ public class SCMDatanodeProtocolServer implements
             layoutInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
-      if (containerReportsProto.getReportsCount() > 0) {
+      if (!containerReportsProto.getFullContainerReportDeferred()) {
         eventPublisher.fireEvent(CONTAINER_REPORT,
             new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
                 datanodeDetails, containerReportsProto, true));
