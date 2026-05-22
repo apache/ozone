@@ -31,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -55,6 +56,8 @@ public class EndpointStateMachine
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
+  private long fullContainerReportLeaseId;
+  private long fullContainerReportLeaseTerm;
   private final ExecutorService executorService;
 
   private static final String RECON_TYPE = "Recon";
@@ -111,6 +114,40 @@ public class EndpointStateMachine
    */
   public void setVersion(VersionResponse version) {
     this.version = version;
+  }
+
+  public boolean supportsFullContainerReportLease() {
+    return !isPassive && version != null
+        && Boolean.parseBoolean(version.getValue(
+            OzoneConsts.SCM_FCR_LEASE_SUPPORTED));
+  }
+
+  public boolean hasFullContainerReportLease() {
+    return fullContainerReportLeaseId != 0;
+  }
+
+  public long getFullContainerReportLeaseId() {
+    return fullContainerReportLeaseId;
+  }
+
+  public long getFullContainerReportLeaseTerm() {
+    return fullContainerReportLeaseTerm;
+  }
+
+  public void setFullContainerReportLease(long leaseId, long leaseTerm) {
+    this.fullContainerReportLeaseId = leaseId;
+    this.fullContainerReportLeaseTerm = leaseTerm;
+  }
+
+  public void clearFullContainerReportLease() {
+    fullContainerReportLeaseId = 0;
+    fullContainerReportLeaseTerm = 0;
+  }
+
+  public void clearFullContainerReportLeaseIfStale(long term) {
+    if (hasFullContainerReportLease() && term > fullContainerReportLeaseTerm) {
+      clearFullContainerReportLease();
+    }
   }
 
   /**

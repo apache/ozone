@@ -130,6 +130,17 @@ public final class ScmConfigKeys {
 
   public static final int OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT = 4096;
 
+  public static final String OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES =
+      "ozone.scm.max.full.container.report.leases";
+  public static final int
+      OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES_DEFAULT = 6;
+
+  public static final String OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION =
+      "ozone.scm.full.container.report.lease.duration";
+  public static final TimeDuration
+      OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT =
+      TimeDuration.valueOf(5, TimeUnit.MINUTES);
+
   // TODO : this is copied from OzoneConsts, may need to move to a better place
   public static final String OZONE_SCM_CHUNK_SIZE_KEY = "ozone.scm.chunk.size";
   // 4 MB by default

@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
@@ -217,8 +218,20 @@ public class HeartbeatEndpointTask
    * @param requestBuilder builder to which the report has to be added.
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
+    boolean fcrReady = context.isFullContainerReportReady(
+        rpcEndpoint.getAddress());
+    boolean waitForFCRLease = fcrReady
+        && rpcEndpoint.supportsFullContainerReportLease()
+        && !rpcEndpoint.hasFullContainerReportLease();
+    if (waitForFCRLease) {
+      requestBuilder.setRequestFullContainerReportLease(true);
+    }
+
     for (Message report :
-        context.getAllAvailableReports(rpcEndpoint.getAddress())) {
+        context.getAllAvailableReports(rpcEndpoint.getAddress(),
+            waitForFCRLease ? StateContext.CONTAINER_REPORTS_PROTO_NAME
+                : null)) {
+      report = attachFullContainerReportLease(report);
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
           SCMHeartbeatRequestProto.getDescriptor().getFields()) {
@@ -233,6 +246,22 @@ public class HeartbeatEndpointTask
         }
       }
     }
+  }
+
+  private Message attachFullContainerReportLease(Message report) {
+    if (report instanceof ContainerReportsProto
+        && rpcEndpoint.hasFullContainerReportLease()) {
+      ContainerReportsProto leasedReport = ((ContainerReportsProto) report)
+          .toBuilder()
+          .setFullContainerReportLeaseId(
+              rpcEndpoint.getFullContainerReportLeaseId())
+          .setFullContainerReportLeaseTerm(
+              rpcEndpoint.getFullContainerReportLeaseTerm())
+          .build();
+      rpcEndpoint.clearFullContainerReportLease();
+      return leasedReport;
+    }
+    return report;
   }
 
   /**
@@ -308,7 +337,14 @@ public class HeartbeatEndpointTask
             .equalsIgnoreCase(datanodeDetails.getUuid()),
         "Unexpected datanode ID in the response.");
     if (response.hasTerm()) {
+      rpcEndpoint.clearFullContainerReportLeaseIfStale(response.getTerm());
       context.updateTermOfLeaderSCM(response.getTerm());
+    }
+    if (response.hasFullContainerReportLeaseId()
+        && response.getFullContainerReportLeaseId() != 0) {
+      rpcEndpoint.setFullContainerReportLease(
+          response.getFullContainerReportLeaseId(),
+          response.getFullContainerReportLeaseTerm());
     }
     // Verify the response is indeed for this datanode.
     for (SCMCommandProto commandResponseProto : response.getCommandsList()) {
@@ -457,6 +493,7 @@ public class HeartbeatEndpointTask
         LOG.debug("Received SCM notification to register."
             + " Interrupt HEARTBEAT and transit to GETVERSION state.");
       }
+      rpcEndpoint.clearFullContainerReportLease();
       rpcEndpoint.setState(EndPointStates.GETVERSION);
       // trigger immediate GETVERSION
       context.getParent().setNextHB(Time.monotonicNow());

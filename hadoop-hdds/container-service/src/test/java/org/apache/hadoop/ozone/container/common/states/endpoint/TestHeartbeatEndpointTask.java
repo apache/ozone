@@ -52,10 +52,12 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -259,6 +261,75 @@ public class TestHeartbeatEndpointTask {
     assertTrue(heartbeat.hasContainerReport());
     assertEquals(0, heartbeat.getCommandStatusReportsCount());
     assertFalse(heartbeat.hasContainerActions());
+  }
+
+  @Test
+  public void leasedFCRRequestsLeaseBeforeSendingReport() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
+        .forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto)invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .setTerm(7L)
+                .setFullContainerReportLeaseId(99L)
+                .setFullContainerReportLeaseTerm(7L)
+                .build());
+
+    DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
+        .setUuid(UUID.randomUUID())
+        .setHostName("localhost")
+        .setIpAddress("127.0.0.1")
+        .build();
+    EndpointStateMachine endpointStateMachine = new EndpointStateMachine(
+        TEST_SCM_ENDPOINT, scm, conf, "");
+    endpointStateMachine.setVersion(VersionResponse.newBuilder()
+        .setVersion(1)
+        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
+        .build());
+    HDDSLayoutVersionManager layoutVersionManager =
+        mock(HDDSLayoutVersionManager.class);
+    when(layoutVersionManager.getSoftwareLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+    when(layoutVersionManager.getMetadataLayoutVersion())
+        .thenReturn(maxLayoutVersion());
+
+    HeartbeatEndpointTask endpointTask = HeartbeatEndpointTask.newBuilder()
+        .setConfig(conf)
+        .setDatanodeDetails(datanodeDetails)
+        .setContext(context)
+        .setLayoutVersionManager(layoutVersionManager)
+        .setEndpointStateMachine(endpointStateMachine)
+        .build();
+
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+
+    endpointTask.call();
+    SCMHeartbeatRequestProto firstHeartbeat = argument.getValue();
+    assertFalse(firstHeartbeat.hasContainerReport());
+    assertTrue(firstHeartbeat.getRequestFullContainerReportLease());
+
+    endpointTask.call();
+    SCMHeartbeatRequestProto secondHeartbeat = argument.getValue();
+    assertTrue(secondHeartbeat.hasContainerReport());
+    assertEquals(99L, secondHeartbeat.getContainerReport()
+        .getFullContainerReportLeaseId());
+    assertEquals(7L, secondHeartbeat.getContainerReport()
+        .getFullContainerReportLeaseTerm());
+    assertFalse(secondHeartbeat.getRequestFullContainerReportLease());
   }
 
   @Test

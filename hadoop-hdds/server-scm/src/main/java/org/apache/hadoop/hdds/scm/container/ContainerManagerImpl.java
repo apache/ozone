@@ -427,6 +427,11 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
+  public SCMContainerManagerMetrics getMetrics() {
+    return scmContainerManagerMetrics;
+  }
+
+  @Override
   public void deleteContainer(final ContainerID cid)
       throws IOException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();

@@ -119,8 +119,11 @@ public final class RegisterEndpointTask implements
             .setSoftwareLayoutVersion(
                 layoutVersionManager.getSoftwareLayoutVersion())
             .build();
-        ContainerReportsProto containerReport =
-            datanodeContainerManager.getController().getContainerReport();
+        boolean supportsFCRLease =
+            rpcEndPoint.supportsFullContainerReportLease();
+        ContainerReportsProto containerReport = supportsFCRLease
+            ? ContainerReportsProto.getDefaultInstance()
+            : datanodeContainerManager.getController().getContainerReport();
         NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
         PipelineReportsProto pipelineReportsProto =
             datanodeContainerManager.getPipelineReport();
@@ -148,6 +151,10 @@ public final class RegisterEndpointTask implements
           this.stateContext.configureReconHeartbeatFrequency();
         } else {
           this.stateContext.configureHeartbeatFrequency();
+        }
+        if (supportsFCRLease) {
+          this.stateContext.refreshFullReport(
+              datanodeContainerManager.getController().getContainerReport());
         }
       }
     } catch (IOException ex) {

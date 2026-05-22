@@ -387,6 +387,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
         .addValue(OzoneConsts.SCM_ID,
             this.scmStorageConfig.getScmId())
         .addValue(OzoneConsts.CLUSTER_ID, this.scmStorageConfig.getClusterID())
+        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
         .build();
   }
 
