@@ -4777,7 +4777,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.cleanup.service.run.interval</name>
-    <value>1m</value>
+    <value>60m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which snapshot diff clean up service will run.
