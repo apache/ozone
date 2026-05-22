@@ -168,6 +168,20 @@
       response of ListContainer request.</description>
   </property>
   <property>
+    <name>ozone.scm.max.full.container.report.leases</name>
+    <value>6</value>
+    <tag>OZONE, SCM, CONTAINER</tag>
+    <description>The max number of outstanding full container report leases
+      SCM can grant to datanodes.</description>
+  </property>
+  <property>
+    <name>ozone.scm.full.container.report.lease.duration</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, CONTAINER</tag>
+    <description>The time SCM waits for a datanode to send a full container
+      report after granting a full container report lease.</description>
+  </property>
+  <property>
     <name>hdds.datanode.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>

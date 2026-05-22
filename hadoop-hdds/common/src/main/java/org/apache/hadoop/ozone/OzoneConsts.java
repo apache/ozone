@@ -31,6 +31,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 public final class OzoneConsts {
   public static final String STORAGE_DIR = "scm";
   public static final String SCM_ID = "scmUuid";
+  public static final String SCM_FCR_LEASE_SUPPORTED =
+      "scm.fcr.lease.supported";
   public static final String SCM_HA = "scmHA";
   public static final String CLUSTER_ID_PREFIX = "CID-";
   public static final String SCM_CERT_SERIAL_ID = "scmCertSerialId";
