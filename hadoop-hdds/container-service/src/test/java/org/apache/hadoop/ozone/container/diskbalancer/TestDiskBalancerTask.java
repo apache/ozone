@@ -47,6 +47,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -579,7 +580,7 @@ public class TestDiskBalancerTask {
 
   @ContainerTestVersionInfo.ContainerTest
   public void testOldReplicaDelayedDeletion(ContainerTestVersionInfo versionInfo)
-      throws IOException, InterruptedException {
+      throws IOException, InterruptedException, TimeoutException {
     setLayoutAndSchemaForTest(versionInfo);
     long delay = 2000L; // 2 second delay
     diskBalancerService.setReplicaDeletionDelay(delay);
@@ -598,8 +599,10 @@ public class TestDiskBalancerTask {
     // create another container to trigger the deletion of old replicas
     createContainer(CONTAINER_ID + 1, sourceVolume, State.CLOSED);
     task = getTask();
-    // Wait for the delay to pass
-    Thread.sleep(delay);
+    // Wait until the delayed deletion is eligible, then trigger cleanup.
+    long deletionEligibleAt = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(delay);
+    GenericTestUtils.waitFor(
+        () -> System.nanoTime() >= deletionEligibleAt, 50, 12_000);
     task.call();
     // Verify that the old container is deleted
     assertFalse(oldContainerDir.exists());

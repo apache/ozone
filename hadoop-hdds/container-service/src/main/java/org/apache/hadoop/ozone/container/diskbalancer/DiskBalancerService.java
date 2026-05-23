@@ -243,18 +243,16 @@ public class DiskBalancerService extends BackgroundService {
 
   private void applyDiskBalancerInfo(DiskBalancerInfo diskBalancerInfo)
       throws IOException {
-    // verify ContainerStates first
-    DiskBalancerConfiguration validated = new DiskBalancerConfiguration();
-    validated.setContainerStates(diskBalancerInfo.getContainerStates());
+    DiskBalancerConfiguration validated = diskBalancerInfo.toConfiguration();
     // First store in local file, then update in memory variables
     writeDiskBalancerInfoTo(diskBalancerInfo, diskBalancerInfoFile);
 
     updateOperationalStateFromInfo(diskBalancerInfo);
 
-    setThreshold(diskBalancerInfo.getThreshold());
-    setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
-    setParallelThread(diskBalancerInfo.getParallelThread());
-    setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
+    setThreshold(validated.getThreshold());
+    setBandwidthInMB(validated.getDiskBandwidthInMB());
+    setParallelThread(validated.getParallelThread());
+    setStopAfterDiskEven(validated.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
     setContainerStates(validated.getMovableContainerStates());
 
@@ -334,17 +332,27 @@ public class DiskBalancerService extends BackgroundService {
   private synchronized void writeDiskBalancerInfoTo(
       DiskBalancerInfo diskBalancerInfo, File path)
       throws IOException {
-    if (path.exists()) {
-      if (!path.delete() || !path.createNewFile()) {
-        throw new IOException("Unable to overwrite the DiskBalancerInfo file.");
-      }
-    } else {
-      if (!path.getParentFile().exists() &&
-          !path.getParentFile().mkdirs()) {
-        throw new IOException("Unable to create DiskBalancerInfo directories.");
-      }
+    Path target = path.toPath().toAbsolutePath();
+    Path parent = target.getParent();
+    if (parent == null) {
+      throw new IOException(
+          "Unable to determine parent directory for DiskBalancerInfo file: "
+              + target);
     }
-    DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo, path);
+    try {
+      Files.createDirectories(parent);
+    } catch (IOException e) {
+      throw new IOException(
+          "Unable to create DiskBalancerInfo directories: " + parent, e);
+    }
+
+    try {
+      DiskBalancerYaml.createDiskBalancerInfoFile(diskBalancerInfo,
+          target.toFile());
+    } catch (IOException e) {
+      throw new IOException(
+          "Unable to write DiskBalancerInfo file: " + target, e);
+    }
   }
 
   public void setThreshold(double threshold) {
@@ -500,7 +508,8 @@ public class DiskBalancerService extends BackgroundService {
     @Override
     public BackgroundTaskResult call() {
       long startTime = Time.monotonicNow();
-      boolean moveSucceeded = true;
+      boolean moveSucceeded = false;
+      Container newContainer = null;
       long containerId = containerData.getContainerID();
       Container container = ozoneContainer.getContainerSet().getContainer(containerId);
       boolean readLockReleased = false;
@@ -512,19 +521,18 @@ public class DiskBalancerService extends BackgroundService {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
 
-      // Double check container state before acquiring lock to start move process.
-      // Container state may have changed after selection.
-      State containerState = container.getContainerData().getState();
-      if (!movableContainerStates.contains(containerState)) {
-        LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
-        postCall(false, startTime);
-        return BackgroundTaskResult.EmptyTaskResult.newResult();
-      }
-
       // hold read lock on the container first, to avoid other threads to update the container state,
       // such as block deletion.
       container.readLock();
       try {
+        // Double check container state after acquiring lock to start move process.
+        // Container state may have changed after selection.
+        State containerState = container.getContainerData().getState();
+        if (!movableContainerStates.contains(containerState)) {
+          LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        }
+
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
             .resolve(String.valueOf(containerId));
@@ -572,7 +580,7 @@ public class DiskBalancerService extends BackgroundService {
         }
 
         // Import the container. importContainer will reset container back to original state
-        Container newContainer = ozoneContainer.getController().importContainer(tempContainerData);
+        newContainer = ozoneContainer.getController().importContainer(tempContainerData);
 
         // Step 4: Update container for containerID and mark old container for deletion
         // first, update the in-memory set to point to the new replica.
@@ -580,8 +588,13 @@ public class DiskBalancerService extends BackgroundService {
         // old caller can still hold the old Container object.
         ozoneContainer.getContainerSet().updateContainer(newContainer);
         destVolume.incrementUsedSpace(containerSize);
+
+        // Test injector: ContainerSet now references newContainer while this thread still holds
+        // readLock on the old replica.
+        pauseInjector();
         // Mark old container as DELETED and persist state.
         // markContainerForDelete require writeLock, so release readLock first
+        moveSucceeded = true;
         container.readUnlock();
         readLockReleased = true;
         try {
@@ -596,15 +609,8 @@ public class DiskBalancerService extends BackgroundService {
         balancedBytesInLastWindow.addAndGet(containerSize);
         metrics.incrSuccessBytes(containerSize);
         totalBalancedBytes.addAndGet(containerSize);
-      } catch (IOException e) {
-        if (injector != null) {
-          try {
-            injector.pause();
-          } catch (IOException ex) {
-            // do nothing
-          }
-        }
-        moveSucceeded = false;
+      } catch (Throwable e) {
+        pauseInjector();
         LOG.warn("Failed to move container {}", containerId, e);
         if (diskBalancerTmpDir != null) {
           try {
@@ -627,13 +633,13 @@ public class DiskBalancerService extends BackgroundService {
         if (!readLockReleased) {
           container.readUnlock();
         }
-        if (moveSucceeded) {
+        if (moveSucceeded && newContainer != null) {
           // Add current old container to pendingDeletionContainers.
           pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelay, container);
-          ContainerLogger.logMoveSuccess(containerId, sourceVolume,
+          ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
-        postCall(moveSucceeded, startTime);
+        postCall(moveSucceeded && newContainer != null, startTime);
 
         // pick one expired container from pendingDeletionContainers to delete
         tryCleanupOnePendingDeletionContainer();
@@ -859,6 +865,17 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
+  }
+
+  // call FaultInjector#pause when an injector is registered; ignore IOException.
+  private static void pauseInjector() {
+    if (injector != null) {
+      try {
+        injector.pause();
+      } catch (IOException ex) {
+        // do nothing
+      }
+    }
   }
 
   @VisibleForTesting

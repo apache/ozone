@@ -49,7 +49,7 @@ public class RotateKeySubCommand extends ScmSubcommand {
       try {
         status = client.rotateSecretKeys(force);
       } catch (IOException e) {
-        System.err.println("Secret key rotation failed: " + e.getMessage());
+        rootCommand().printError(e);
         return;
       }
       if (status) {

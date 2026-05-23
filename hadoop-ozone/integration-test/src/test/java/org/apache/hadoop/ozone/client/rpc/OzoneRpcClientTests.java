@@ -36,7 +36,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
-import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS;
+import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -1450,7 +1450,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         () -> {
         bucket.rewriteKey("key2",
             1024,
-            EXPECTED_GEN_CREATE_IF_NOT_EXISTS,
+            EXPECTED_GEN_CREATE_IF_ABSENT,
             RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
             singletonMap("key", "value"));
         });
@@ -3957,7 +3957,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // Complete with If-None-Match semantics (key doesn't exist, should succeed)
     OmMultipartUploadCompleteInfo result = bucket.completeMultipartUpload(
         keyName, uploadID, partsMap,
-        EXPECTED_GEN_CREATE_IF_NOT_EXISTS, null);
+        EXPECTED_GEN_CREATE_IF_ABSENT, null);
 
     assertNotNull(result);
     assertEquals(keyName, result.getKey());
@@ -3993,7 +3993,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // Complete with If-None-Match semantics (key exists, should fail)
     OMException omEx = assertThrows(OMException.class,
         () -> bucket.completeMultipartUpload(keyName, uploadID, partsMap,
-            EXPECTED_GEN_CREATE_IF_NOT_EXISTS, null));
+            EXPECTED_GEN_CREATE_IF_ABSENT, null));
 
     assertEquals(KEY_ALREADY_EXISTS, omEx.getResult());
   }

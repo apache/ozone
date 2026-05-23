@@ -63,7 +63,7 @@ These parameters, defined in `ozone-site.xml`, control how Ozone manages snapsho
     *   `ozone.snapshot.filtering.service.interval`: Interval for the snapshot filtering service (Default: 60s).
     *   `ozone.snapshot.deleting.service.timeout`: Timeout for the snapshot deleting service (Default: 300s).
     *   `ozone.snapshot.deleting.service.interval`: Interval for the snapshot deleting service (Default: 30s).
-    *   `ozone.snapshot.deep.cleaning.enabled`: Enable deep cleaning of snapshots (Default: false).
+    *   `ozone.snapshot.deep.cleaning.enabled`: Enable deep cleaning of snapshots (Default: true).
 
 *   **Performance and Resource Management**
     *   `ozone.om.snapshot.rocksdb.metrics.enabled`: Enable detailed RocksDB metrics for snapshots (Default: false). Use for debugging/monitoring.

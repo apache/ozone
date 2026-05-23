@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.scm.pipeline.MockPipeline.createPipeline;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.createContainer;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -53,8 +54,11 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -65,6 +69,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.event.Level;
 
 /**
@@ -153,6 +158,54 @@ class TestContainerReplication {
 
     queueAndWaitForCompletion(cmd, target,
         ReplicationSupervisor::getReplicationFailureCount);
+  }
+
+  /**
+   * Replication must succeed even when the source container's persisted
+   * {@code CONTAINER_BYTES_USED} RocksDB counter has drifted negative.
+   */
+  @ParameterizedTest
+  @ValueSource(longs = {0L, 1L, -1_234_567_890L})
+  void pushSucceedsWhenSourceBytesUsedIsNegative(long containerSize) throws Exception {
+    DatanodeDetails source = cluster.getHddsDatanodes().get(0)
+        .getDatanodeDetails();
+    DatanodeDetails target = selectOtherNode(source);
+
+    long containerID = createOverAllocatedContainer(source, 2L * 1024L * 1024L);
+
+    poisonBytesUsed(source, containerID, containerSize);
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(containerID, target);
+
+    queueAndWaitForCompletion(cmd, source,
+        ReplicationSupervisor::getReplicationSuccessCount);
+
+    // Target must end up hosting the container.
+    Container<?> imported = cluster.getHddsDatanode(target)
+        .getDatanodeStateMachine()
+        .getContainer()
+        .getContainerSet()
+        .getContainer(containerID);
+    assertNotNull(imported, "target should import the container despite a negative bytesUsed on source");
+  }
+
+  private void poisonBytesUsed(DatanodeDetails dn, long containerID, long poisonValue) throws IOException {
+    HddsDatanodeService dnService = cluster.getHddsDatanode(dn);
+    Container<?> container = dnService.getDatanodeStateMachine().getContainer()
+        .getContainerSet().getContainer(containerID);
+    KeyValueContainerData data =
+        (KeyValueContainerData) container.getContainerData();
+
+    try (DBHandle db = BlockUtils.getDB(data, dnService.getConf())) {
+      db.getStore().getMetadataTable()
+          .put(data.getBytesUsedKey(), poisonValue);
+    }
+    // Keep the in-memory Statistics counter consistent with the on-disk
+    // poisoned value. The import failure is driven by the on-disk value (what
+    // the target reads), but this prevents any subsequent close/flush path on
+    // the source from silently correcting the poison before packing.
+    data.getStatistics().setBlockBytesForTesting(poisonValue);
   }
 
   /**

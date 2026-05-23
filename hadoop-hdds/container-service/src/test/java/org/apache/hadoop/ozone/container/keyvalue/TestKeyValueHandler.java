@@ -370,18 +370,20 @@ public class TestKeyValueHandler {
   @ContainerLayoutTestInfo.ContainerTest
   public void testCloseInvalidContainer(ContainerLayoutVersion layoutVersion)
       throws IOException {
-    KeyValueHandler keyValueHandler = createKeyValueHandler(tempDir);
     conf = new OzoneConfiguration();
-    KeyValueContainerData kvData = new KeyValueContainerData(DUMMY_CONTAINER_ID,
-        layoutVersion,
-        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
-        UUID.randomUUID().toString());
-    kvData.setMetadataPath(tempDir.toString());
-    kvData.setDbFile(dbFile.toFile());
-    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, layoutVersion.name());
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir);
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+
+    long containerId = DUMMY_CONTAINER_ID + layoutVersion.getVersion();
     ContainerCommandRequestProto createContainerRequest =
-        createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID);
-    keyValueHandler.handleCreateContainer(createContainerRequest, container);
+        createContainerRequest(DATANODE_UUID, containerId);
+    keyValueHandler.handleCreateContainer(createContainerRequest, null);
+
+    KeyValueContainer container =
+        (KeyValueContainer) containerSet.getContainer(containerId);
+    KeyValueContainerData kvData = container.getContainerData();
 
     // Make the container state as invalid.
     kvData.setState(ContainerProtos.ContainerDataProto.State.INVALID);
@@ -390,12 +392,11 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto closeContainerRequest =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.CloseContainer)
-            .setContainerID(DUMMY_CONTAINER_ID)
+            .setContainerID(containerId)
             .setDatanodeUuid(DATANODE_UUID)
             .setCloseContainer(ContainerProtos.CloseContainerRequestProto
                 .getDefaultInstance())
             .build();
-    dispatcher.dispatch(closeContainerRequest, null);
 
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
@@ -923,7 +924,7 @@ public class TestKeyValueHandler {
         .build();
   }
 
-  private KeyValueHandler createKeyValueHandler(Path path) throws IOException {
+  private HandlerWithVolumeSet createKeyValueHandler(Path path) throws IOException {
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
@@ -950,7 +951,7 @@ public class TestKeyValueHandler {
         conf.getObject(ContainerScannerConfiguration.class), controller);
     containerSet.registerOnDemandScanner(onDemandScanner);
 
-    return kvHandler;
+    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet);
   }
 
   private static class HandlerWithVolumeSet {

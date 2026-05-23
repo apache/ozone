@@ -299,7 +299,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig,
         new OmKeyLocationInfoGroup(version, new ArrayList<>()));
-    omKeyInfoBuilder.setExpectedDataGeneration(OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS);
+    omKeyInfoBuilder.setExpectedDataGeneration(OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
 
     String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfoBuilder);
     assertNotNull(openKeyTable.get(openKey));
@@ -333,7 +333,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig,
         new OmKeyLocationInfoGroup(version, new ArrayList<>()));
-    omKeyInfoBuilder.setExpectedDataGeneration(OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS);
+    omKeyInfoBuilder.setExpectedDataGeneration(OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
 
     String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfoBuilder);
     assertNotNull(openKeyTable.get(openKey));
