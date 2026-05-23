@@ -29,7 +29,6 @@ import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
@@ -154,7 +153,7 @@ final class ObjectEndpointStreaming {
         preCommits.add(checkSha256Hook);
       }
 
-      streamOutput.getKeyDataStreamOutput().setPreCommits(preCommits);
+      streamOutput.setPreCommits(preCommits);
     }
     return Pair.of(md5Hash, writeLen);
   }
@@ -186,11 +185,13 @@ final class ObjectEndpointStreaming {
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
       DigestInputStream body, PerformanceStringBuilder perf, long startNanos,
-      Map<String, String> tags)
+      Map<String, String> tags,
+      S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
     long writeLen;
-    try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
-        length, replicationConfig, keyMetadata, tags)) {
+    try (OzoneDataStreamOutput streamOutput = openStreamKeyForPut(bucket,
+        keyPath, length, replicationConfig, keyMetadata, tags,
+        writeConditions)) {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
@@ -235,13 +236,15 @@ final class ObjectEndpointStreaming {
             writeToStreamOutput(streamOutput, body, chunkSize, length);
         eTag = DatatypeConverter.printHexBinary(
             body.getMessageDigest(OzoneConsts.MD5_HASH).digest()).toLowerCase();
+        List<CheckedRunnable<IOException>> preCommits = new ArrayList<>();
         String clientContentMD5 = headers.getHeaderString(S3Consts.CHECKSUM_HEADER);
         if (clientContentMD5 != null) {
           CheckedRunnable<IOException> checkContentMD5Hook = () -> {
             S3Utils.validateContentMD5(clientContentMD5, eTag, key);
           };
-          streamOutput.getKeyDataStreamOutput().setPreCommits(Collections.singletonList(checkContentMD5Hook));
+          preCommits.add(checkContentMD5Hook);
         }
+        streamOutput.setPreCommits(preCommits);
         ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
         METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);

@@ -22,92 +22,114 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import org.apache.hadoop.ozone.local.LocalOzoneClusterConfig.FormatMode;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Unit tests for {@link LocalOzoneClusterConfig}.
+ * Tests for {@link LocalOzoneClusterConfig}.
  */
 class TestLocalOzoneClusterConfig {
 
-  @TempDir
-  private Path tempDir;
-
   @Test
-  void builderSetsDefaults() {
-    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(tempDir)
-        .build();
+  void builderProvidesLocalClusterDefaults() {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder().build();
 
-    assertEquals(tempDir.toAbsolutePath().normalize(), config.getDataDir());
-    assertEquals(FormatMode.IF_NEEDED, config.getFormatMode());
-    assertEquals(LocalOzoneClusterConfig.DEFAULT_DATANODES,
-        config.getDatanodes());
-    assertEquals(LocalOzoneClusterConfig.DEFAULT_HOST, config.getHost());
-    assertEquals(LocalOzoneClusterConfig.DEFAULT_BIND_HOST,
-        config.getBindHost());
-    assertEquals(LocalOzoneClusterConfig.DEFAULT_STARTUP_TIMEOUT,
-        config.getStartupTimeout());
+    assertEquals(LocalOzoneClusterConfig.DEFAULT_DATA_DIR,
+        config.getDataDir());
+    assertEquals(LocalOzoneClusterConfig.FormatMode.IF_NEEDED,
+        config.getFormatMode());
+    assertEquals(1, config.getDatanodes());
+    assertEquals("127.0.0.1", config.getHost());
+    assertEquals("0.0.0.0", config.getBindHost());
+    assertEquals(0, config.getScmPort());
+    assertEquals(0, config.getOmPort());
+    assertEquals(0, config.getS3gPort());
+    assertTrue(config.isS3gEnabled());
     assertFalse(config.isEphemeral());
+    assertEquals(Duration.ofMinutes(2), config.getStartupTimeout());
+    assertEquals("admin", config.getS3AccessKey());
+    assertEquals("admin123", config.getS3SecretKey());
+    assertEquals("us-east-1", config.getS3Region());
   }
 
   @Test
-  void builderAcceptsCustomValues() {
-    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(tempDir)
-        .setFormatMode(FormatMode.ALWAYS)
+  void typedDefaultsMatchSharedFallbackValues() {
+    assertEquals(LocalOzoneClusterConfig.FormatMode.fromString(
+        LocalOzoneClusterConfig.DEFAULT_FORMAT_MODE_VALUE),
+        LocalOzoneClusterConfig.DEFAULT_FORMAT_MODE);
+    assertEquals(Integer.parseInt(
+        LocalOzoneClusterConfig.DEFAULT_DATANODES_VALUE),
+        LocalOzoneClusterConfig.DEFAULT_DATANODES);
+    assertEquals(Integer.parseInt(LocalOzoneClusterConfig.DEFAULT_PORT_VALUE),
+        LocalOzoneClusterConfig.DEFAULT_PORT);
+    assertEquals(Boolean.parseBoolean(
+        LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED_VALUE),
+        LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED);
+    assertEquals(Boolean.parseBoolean(
+        LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE),
+        LocalOzoneClusterConfig.DEFAULT_EPHEMERAL);
+    assertEquals(Duration.parse(
+        LocalOzoneClusterConfig.DEFAULT_STARTUP_TIMEOUT_VALUE),
+        LocalOzoneClusterConfig.DEFAULT_STARTUP_TIMEOUT);
+  }
+
+  @Test
+  void builderAcceptsExplicitOverrides() {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            Paths.get("target", "custom-local-ozone"))
+        .setFormatMode(LocalOzoneClusterConfig.FormatMode.ALWAYS)
         .setDatanodes(3)
-        .setHost("192.168.1.100")
-        .setBindHost("192.168.1.100")
-        .setStartupTimeout(Duration.ofMinutes(5))
+        .setHost("localhost")
+        .setBindHost("127.0.0.1")
+        .setScmPort(9860)
+        .setOmPort(9862)
+        .setS3gPort(9878)
+        .setS3gEnabled(false)
         .setEphemeral(true)
+        .setStartupTimeout(Duration.ofSeconds(45))
+        .setS3AccessKey("dev")
+        .setS3SecretKey("secret")
+        .setS3Region("ap-south-1")
         .build();
 
-    assertEquals(FormatMode.ALWAYS, config.getFormatMode());
+    assertEquals(Paths.get("target", "custom-local-ozone")
+        .toAbsolutePath().normalize(), config.getDataDir());
+    assertEquals(LocalOzoneClusterConfig.FormatMode.ALWAYS,
+        config.getFormatMode());
     assertEquals(3, config.getDatanodes());
-    assertEquals("192.168.1.100", config.getHost());
-    assertEquals("192.168.1.100", config.getBindHost());
-    assertEquals(Duration.ofMinutes(5), config.getStartupTimeout());
+    assertEquals("localhost", config.getHost());
+    assertEquals("127.0.0.1", config.getBindHost());
+    assertEquals(9860, config.getScmPort());
+    assertEquals(9862, config.getOmPort());
+    assertEquals(9878, config.getS3gPort());
+    assertFalse(config.isS3gEnabled());
     assertTrue(config.isEphemeral());
+    assertEquals(Duration.ofSeconds(45), config.getStartupTimeout());
+    assertEquals("dev", config.getS3AccessKey());
+    assertEquals("secret", config.getS3SecretKey());
+    assertEquals("ap-south-1", config.getS3Region());
   }
 
   @Test
-  void builderRejectsInvalidDatanodeCount() {
-    LocalOzoneClusterConfig.Builder builder =
-        LocalOzoneClusterConfig.builder(tempDir);
-
-    assertThrows(IllegalArgumentException.class,
-        () -> builder.setDatanodes(0));
-    assertThrows(IllegalArgumentException.class,
-        () -> builder.setDatanodes(-1));
+  void formatModeParsesUserFacingValues() {
+    assertEquals(LocalOzoneClusterConfig.FormatMode.IF_NEEDED,
+        LocalOzoneClusterConfig.FormatMode.fromString("if-needed"));
+    assertEquals(LocalOzoneClusterConfig.FormatMode.ALWAYS,
+        LocalOzoneClusterConfig.FormatMode.fromString(" always "));
+    assertEquals(LocalOzoneClusterConfig.FormatMode.NEVER,
+        LocalOzoneClusterConfig.FormatMode.fromString("NEVER"));
   }
 
   @Test
-  void dataDirIsNormalized() {
-    Path unnormalized = Paths.get(tempDir.toString(), "subdir", "..", "data");
-    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(unnormalized)
-        .build();
-
-    Path expected = tempDir.resolve("data").toAbsolutePath().normalize();
-    assertEquals(expected, config.getDataDir());
+  void formatModeRejectsUnknownValues() {
+    assertThrows(IllegalArgumentException.class,
+        () -> LocalOzoneClusterConfig.FormatMode.fromString("sometimes"));
   }
 
   @Test
-  void formatModeFromStringParsesValidValues() {
-    assertEquals(FormatMode.IF_NEEDED, FormatMode.fromString("if-needed"));
-    assertEquals(FormatMode.IF_NEEDED, FormatMode.fromString("IF_NEEDED"));
-    assertEquals(FormatMode.IF_NEEDED, FormatMode.fromString("If-Needed"));
-    assertEquals(FormatMode.ALWAYS, FormatMode.fromString("always"));
-    assertEquals(FormatMode.NEVER, FormatMode.fromString("never"));
-  }
-
-  @Test
-  void formatModeFromStringRejectsInvalidValues() {
+  void formatModeRejectsNullValues() {
     assertThrows(IllegalArgumentException.class,
-        () -> FormatMode.fromString("invalid"));
-    assertThrows(IllegalArgumentException.class,
-        () -> FormatMode.fromString(""));
+        () -> LocalOzoneClusterConfig.FormatMode.fromString(null));
   }
 }

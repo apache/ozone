@@ -27,8 +27,10 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.RewriteTablePathUtil;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StatisticsFile;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.OutputFile;
@@ -111,6 +113,14 @@ final class RewriteTablePathOzoneUtils {
     } catch (IOException e) {
       LOG.error("Failed to write CSV to {}", outputFile.location(), e);
       throw new RuntimeIOException(e);
+    }
+  }
+
+  static Set<Snapshot> snapshotSet(TableMetadata metadata) {
+    if (metadata == null) {
+      return new HashSet<>();
+    } else {
+      return new HashSet<>(metadata.snapshots());
     }
   }
 }

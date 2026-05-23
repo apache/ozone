@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
@@ -325,6 +326,12 @@ public final class OzoneBucketStub extends OzoneBucket {
     if (multipartInfo == null || !multipartInfo.getUploadId().equals(uploadID)) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
+      if (isECMultipartUpload(multipartInfo)) {
+        OzoneOutputStream outputStream =
+            createMultipartKey(key, size, partNumber, uploadID);
+        return new OzoneDataStreamOutputStub(outputStream, key + size);
+      }
+
       ByteBufferStreamOutput byteBufferStreamOutput =
           new KeyMetadataAwareByteBufferStreamOutput(new HashMap<>()) {
             private final ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
@@ -361,6 +368,12 @@ public final class OzoneBucketStub extends OzoneBucket {
 
       return new OzoneDataStreamOutputStub(byteBufferStreamOutput, key + size);
     }
+  }
+
+  private boolean isECMultipartUpload(MultipartInfoStub multipartInfo) {
+    ReplicationConfig config = multipartInfo.getReplicationConfig();
+    return config != null &&
+        config.getReplicationType() == HddsProtos.ReplicationType.EC;
   }
 
   @Override
@@ -501,7 +514,8 @@ public final class OzoneBucketStub extends OzoneBucket {
        ReplicationConfig config, Map<String, String> metadata, Map<String, String> tags)
       throws IOException {
     String uploadID = UUID.randomUUID().toString();
-    keyToMultipartUpload.put(keyName, new MultipartInfoStub(uploadID, metadata, tags));
+    keyToMultipartUpload.put(keyName,
+        new MultipartInfoStub(uploadID, config, metadata, tags));
     return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
   }
 
@@ -580,6 +594,30 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     return new OmMultipartUploadCompleteInfo(getVolumeName(), getName(), key,
         DigestUtils.sha256Hex(key));
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
+      String uploadID, Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    // Handle If-None-Match: * (expectedDataGeneration == 0 means create-if-absent)
+    if (expectedDataGeneration != null &&
+        expectedDataGeneration == EXPECTED_GEN_CREATE_IF_ABSENT) {
+      if (keyContents.containsKey(key)) {
+        throw new OMException("Key already exists", ResultCodes.KEY_ALREADY_EXISTS);
+      }
+    }
+
+    // Handle If-Match: <etag>
+    if (expectedETag != null) {
+      OzoneKeyDetails existingKey = keyDetails.get(key);
+      if (existingKey == null) {
+        throw new OMException("Key not found", ResultCodes.KEY_NOT_FOUND);
+      }
+      // Stub doesn't track ETag, so we just delegate
+    }
+
+    return completeMultipartUpload(key, uploadID, partsMap);
   }
 
   @Override
@@ -886,18 +924,24 @@ public final class OzoneBucketStub extends OzoneBucket {
   private static class MultipartInfoStub {
 
     private final String uploadId;
+    private final ReplicationConfig replicationConfig;
     private final Map<String, String> metadata;
     private final Map<String, String> tags;
 
-    MultipartInfoStub(String uploadId, Map<String, String> metadata,
-                      Map<String, String> tags) {
+    MultipartInfoStub(String uploadId, ReplicationConfig replicationConfig,
+                      Map<String, String> metadata, Map<String, String> tags) {
       this.uploadId = uploadId;
+      this.replicationConfig = replicationConfig;
       this.metadata = metadata;
       this.tags = tags;
     }
 
     public String getUploadId() {
       return uploadId;
+    }
+
+    public ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
     }
 
     public Map<String, String> getMetadata() {

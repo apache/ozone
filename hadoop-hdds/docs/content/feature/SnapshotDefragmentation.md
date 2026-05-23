@@ -40,7 +40,7 @@ Currently, snapshot RocksDBs has automatic RocksDB compaction disabled intention
 
 Note: Snapshot Defragmentation was previously called Snapshot Compaction earlier during the design phase. It is not RocksDB compaction. Thus the rename to avoid such confusion. We are also not going to enable RocksDB auto compaction on snapshot RocksDBs.
 
-1. ### Introducing last defragmentation time
+1. ### Snapshot local YAML metadata
 
    The implemented metadata is stored in local `OmSnapshotLocalData` YAML files,
    not in Ratis-replicated `SnapshotInfo`. The YAML is created on every snapshot
@@ -49,7 +49,8 @@ Note: Snapshot Defragmentation was previously called Snapshot Compaction earlier
    The important YAML fields are `snapshotId`, `previousSnapshotId`, `version`,
    `needsDefrag`, `versionSstFileInfos`, `dbTxSequenceNumber`,
    `transactionInfo`, `lastDefragTime`, `checksum`, and `isSSTFiltered`.
-   `lastDefragTime` is serialized, but current defrag decisions are based on
+   `lastDefragTime` records the local wall-clock time when a new defragged
+   snapshot version is committed. Current defrag decisions are still based on
    `version`, `needsDefrag`, and `versionSstFileInfos`.
 
    The earlier proposal's `notDefraggedSstFileList` and `defraggedSstFileList`

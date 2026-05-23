@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 public class RpcDetailedMetrics {
 
   @Metric MutableRatesWithAggregation rates;
-  @Metric MutableRatesWithAggregation deferredRpcRates;
 
   static final Logger LOG = LoggerFactory.getLogger(RpcDetailedMetrics.class);
   final MetricsRegistry registry;
@@ -59,7 +58,6 @@ public class RpcDetailedMetrics {
    */
   public void init(Class<?> protocol) {
     rates.init(protocol);
-    deferredRpcRates.init(protocol);
   }
 
   /**
@@ -70,10 +68,6 @@ public class RpcDetailedMetrics {
   //@Override // some instrumentation interface
   public void addProcessingTime(String rpcCallName, long processingTime) {
     rates.add(rpcCallName, processingTime);
-  }
-
-  public void addDeferredProcessingTime(String name, long processingTime) {
-    deferredRpcRates.add(name, processingTime);
   }
 
   /**

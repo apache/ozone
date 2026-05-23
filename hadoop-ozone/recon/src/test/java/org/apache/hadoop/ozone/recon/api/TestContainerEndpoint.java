@@ -95,6 +95,8 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
@@ -1953,5 +1955,206 @@ public class TestContainerEndpoint {
         throw new AssertionError("Unexpected complete path: " + completePath);
       }
     }
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersEmpty() throws Exception {
+    // No QUASI_CLOSED containers exist — endpoint must return an empty list with zero counts.
+    Response response = containerEndpoint.getQuasiClosedContainers(1000, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertTrue(result.getContainers() == null || result.getContainers().isEmpty());
+    assertEquals(0L, result.getQuasiClosedCount());
+    assertEquals(0L, result.getFirstKey());
+    assertEquals(0L, result.getLastKey());
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersBasic() throws Exception {
+    // Add 3 containers and transition them to QUASI_CLOSED.
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 200L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 201L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 202L));
+
+    for (long id = 200L; id <= 202L; id++) {
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 3);
+
+    Response response = containerEndpoint.getQuasiClosedContainers(1000, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertEquals(3L, result.getQuasiClosedCount());
+    assertEquals(200L, result.getFirstKey());
+    assertEquals(202L, result.getLastKey());
+
+    List<QuasiClosedContainerMetadata> containers =
+        new ArrayList<>(result.getContainers());
+    assertEquals(3, containers.size());
+    containers.forEach(c -> {
+      // StandaloneReplicationConfig.ONE → requiredNodes = 1
+      assertEquals(1L, c.getExpectedReplicaCount());
+    });
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersWithReplicas() throws Exception {
+    // Use RATIS/THREE so requiredNodes=3, which is > number of replicas we add.
+    // getLatestContainerHistory uses requiredNodes as its limit, so if we used
+    // StandaloneReplicationConfig.ONE (requiredNodes=1) only 1 replica would come back.
+    Pipeline localPipeline = getRandomPipeline();
+    reconPipelineManager.addPipeline(localPipeline);
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(210L)
+        .setNumberOfKeys(10)
+        .setPipelineID(localPipeline.getId())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setOwner("test")
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .build();
+    reconContainerManager.addNewContainer(
+        new ContainerWithPipeline(containerInfo, localPipeline));
+    reconContainerManager.updateContainerState(
+        ContainerID.valueOf(210L), HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(
+        ContainerID.valueOf(210L), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+
+    // Register 2 datanodes and upsert replica history for container 210.
+    UUID dn1 = newDatanode("qc-host1", "10.0.0.1");
+    UUID dn2 = newDatanode("qc-host2", "10.0.0.2");
+    reconContainerManager.upsertContainerHistory(
+        210L, dn1, 1L, 2L, "QUASI_CLOSED", ContainerChecksums.of(1111L, 0L));
+    reconContainerManager.upsertContainerHistory(
+        210L, dn2, 3L, 4L, "QUASI_CLOSED", ContainerChecksums.of(1111L, 0L));
+
+    Response response = containerEndpoint.getQuasiClosedContainers(1000, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertEquals(1, result.getContainers().size());
+
+    QuasiClosedContainerMetadata meta = result.getContainers().get(0);
+    assertEquals(210L, meta.getContainerID());
+    assertEquals(2L, meta.getActualReplicaCount());
+    assertEquals(2, meta.getReplicas().size());
+
+    Set<String> returnedHosts = meta.getReplicas().stream()
+        .map(ContainerHistory::getDatanodeHost)
+        .collect(Collectors.toSet());
+    assertThat(returnedHosts).contains("qc-host1", "qc-host2");
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersPagination() throws Exception {
+    // Add 6 containers (IDs 300–305) in QUASI_CLOSED state.
+    for (long id = 300L; id <= 305L; id++) {
+      reconContainerManager.addNewContainer(
+          getTestContainer(HddsProtos.LifeCycleState.OPEN, id));
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 6);
+
+    // Page 1: fetch first 3.
+    Response page1Response = containerEndpoint.getQuasiClosedContainers(3, 0L);
+    QuasiClosedContainersResponse page1 =
+        (QuasiClosedContainersResponse) page1Response.getEntity();
+
+    assertEquals(3, page1.getContainers().size());
+    assertEquals(6L, page1.getQuasiClosedCount());
+    assertEquals(300L, page1.getFirstKey());
+    assertEquals(302L, page1.getLastKey());
+
+    // Page 2: use lastKey from page 1 as prevKey cursor.
+    Response page2Response =
+        containerEndpoint.getQuasiClosedContainers(3, page1.getLastKey());
+    QuasiClosedContainersResponse page2 =
+        (QuasiClosedContainersResponse) page2Response.getEntity();
+
+    assertEquals(3, page2.getContainers().size());
+    assertEquals(6L, page2.getQuasiClosedCount());
+    assertEquals(303L, page2.getFirstKey());
+    assertEquals(305L, page2.getLastKey());
+
+    // IDs must not overlap between pages.
+    Set<Long> page1Ids = page1.getContainers().stream()
+        .map(QuasiClosedContainerMetadata::getContainerID)
+        .collect(Collectors.toSet());
+    Set<Long> page2Ids = page2.getContainers().stream()
+        .map(QuasiClosedContainerMetadata::getContainerID)
+        .collect(Collectors.toSet());
+    assertTrue(Collections.disjoint(page1Ids, page2Ids));
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersLimitZeroReturnsCountOnly() throws Exception {
+    // Add 3 containers in QUASI_CLOSED state.
+    for (long id = 500L; id <= 502L; id++) {
+      reconContainerManager.addNewContainer(
+          getTestContainer(HddsProtos.LifeCycleState.OPEN, id));
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 3);
+
+    // limit=0 must return an empty container list but still populate quasiClosedCount.
+    Response response = containerEndpoint.getQuasiClosedContainers(0, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertTrue(result.getContainers() == null || result.getContainers().isEmpty());
+    assertEquals(3, result.getQuasiClosedCount());
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersInvalidInputsReturnBadRequest() {
+    // Negative minContainerId must return 400.
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
+        containerEndpoint.getQuasiClosedContainers(10, -1L).getStatus());
+
+    // Negative limit must return 400.
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
+        containerEndpoint.getQuasiClosedContainers(-1, 0L).getStatus());
+  }
+
+  @Test
+  public void testGetQuasiClosedCountViaDedicatedEndpoint() throws Exception {
+    // Add 2 containers and move them to QUASI_CLOSED.
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 400L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 401L));
+
+    for (long id = 400L; id <= 401L; id++) {
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 2);
+
+    // The quasi-closed count is fetched independently via the dedicated endpoint.
+    // The unhealthy endpoint no longer carries this count.
+    Response response = containerEndpoint.getQuasiClosedContainers(1, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertEquals(2L, result.getQuasiClosedCount());
   }
 }

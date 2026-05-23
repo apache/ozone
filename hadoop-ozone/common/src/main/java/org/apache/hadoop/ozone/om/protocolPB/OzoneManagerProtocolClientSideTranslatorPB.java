@@ -1805,6 +1805,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     }
 
+    if (omKeyArgs.getExpectedDataGeneration() != null) {
+      keyArgs.setExpectedDataGeneration(omKeyArgs.getExpectedDataGeneration());
+    }
+    if (omKeyArgs.getExpectedETag() != null) {
+      keyArgs.setExpectedETag(omKeyArgs.getExpectedETag());
+    }
+
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());
     multipartUploadCompleteRequest.addAllPartsList(multipartUploadList
         .getPartsList());
@@ -2157,12 +2164,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  @SkipTracing
   public void setThreadLocalS3Auth(
       S3Auth s3Auth) {
     this.threadLocalS3Auth.set(s3Auth);
   }
 
   @Override
+  @SkipTracing
   public void clearThreadLocalS3Auth() {
     this.threadLocalS3Auth.remove();
   }
@@ -2667,8 +2676,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void startQuotaRepair(List<String> buckets) throws IOException {
+    Objects.requireNonNull(buckets, "buckets == null");
     OzoneManagerProtocolProtos.StartQuotaRepairRequest startQuotaRepairRequest =
         OzoneManagerProtocolProtos.StartQuotaRepairRequest.newBuilder()
+            .addAllBuckets(buckets)
             .build();
     OMRequest omRequest = createOMRequest(Type.StartQuotaRepair)
         .setStartQuotaRepairRequest(startQuotaRepairRequest).build();
