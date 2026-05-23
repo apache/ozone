@@ -1236,6 +1236,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-cli-interactive</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-cli-repair</artifactId>
         <version>${ozone.version}</version>
       </dependency>
