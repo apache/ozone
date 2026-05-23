@@ -566,6 +566,46 @@ public class TestSCMCommonPlacementPolicy {
     assertTrue(placementStatus.isPolicySatisfied());
   }
 
+  /**
+   * HDDS-15350: when the network topology transiently reports zero racks
+   * (observed during a DN decommission), validateContainerPlacement must
+   * not crash with ArithmeticException ("/ by zero") in
+   * getMaxReplicasPerRack. Without the fix this test throws and SCM's
+   * ReplicationMonitor thread dies along with it.
+   */
+  @Test
+  public void testValidateContainerPlacementWithZeroRackTopology() {
+    List<DatanodeDetails> nodes = ImmutableList.of(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.getAllNodes()).thenAnswer(inv -> nodes);
+
+    // Topology that reports zero racks at the rack level - the empty
+    // -topology window observed during DN decommission.
+    NetworkTopology topology = mock(NetworkTopology.class);
+    when(topology.getMaxLevel()).thenReturn(3);
+    when(topology.getNumOfNodes(anyInt())).thenReturn(0);
+    when(mockNodeManager.getClusterNetworkTopologyMap()).thenReturn(topology);
+
+    // rackCnt=2 makes DummyPlacementPolicy.getRequiredRackCount return
+    // min(replicas, 2) > 1, so the original early-return guard does NOT
+    // fire and execution proceeds to the divide site.
+    Map<Integer, Integer> rackMap = new HashMap<>();
+    rackMap.put(0, 0);
+    rackMap.put(1, 0);
+    rackMap.put(2, 0);
+    DummyPlacementPolicy policy = new DummyPlacementPolicy(
+        mockNodeManager, conf, rackMap, 2);
+
+    ContainerPlacementStatus status =
+        policy.validateContainerPlacement(nodes, 3);
+    assertTrue(status.isPolicySatisfied(),
+        "placement should not crash and should be considered satisfied "
+            + "when the topology reports no racks");
+  }
+
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
     private Map<DatanodeDetails, Node> rackMap;
     private List<Node> racks;
