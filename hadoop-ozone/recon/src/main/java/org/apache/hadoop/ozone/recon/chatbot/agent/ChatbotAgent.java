@@ -42,8 +42,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Main chatbot agent that orchestrates the conversation flow.
@@ -56,7 +54,6 @@ public class ChatbotAgent {
   private static final Logger LOG = LoggerFactory.getLogger(ChatbotAgent.class);
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Pattern JSON_PATTERN = Pattern.compile("\\{.*\\}", Pattern.DOTALL);
 
   // A specific Recon API endpoint we want to handle carefully because it can return millions of rows.
   private static final String LIST_KEYS_ENDPOINT_SUFFIX = "/keys/listKeys";
@@ -276,8 +273,7 @@ public class ChatbotAgent {
         // Save the raw JSON data the API returned
         apiResponses = new HashMap<>();
         apiResponses.put(toolCall.getEndpoint(), outcome.getResponseBody());
-        executionMetadata.put(toolCall.getEndpoint(),
-            createExecutionMetadataMap(outcome));
+        executionMetadata.put(toolCall.getEndpoint(), createExecutionMetadataMap(outcome));
       }
 
       // STEP 3: Send the raw JSON data BACK to the LLM to format a nice answer
@@ -326,15 +322,14 @@ public class ChatbotAgent {
       return null;
     }
 
-    // Extract JSON from response
-    Matcher matcher = JSON_PATTERN.matcher(content);
-    if (!matcher.find()) {
+    // Extract the first complete JSON object from the response.
+    // LLMs sometimes wrap their JSON in prose text despite being instructed not to.
+    String jsonStr = extractFirstJsonObject(content);
+    if (jsonStr == null) {
       LOG.warn("No JSON found in LLM response");
       return null;
     }
 
-    // Convert the JSON string into our Java "ToolCall" object
-    String jsonStr = matcher.group();
     JsonNode jsonNode = MAPPER.readTree(jsonStr);
     return parseToolCall(jsonNode);
   }
@@ -735,6 +730,60 @@ public class ChatbotAgent {
     toolCall.setParameters(parameters);
     toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
     return toolCall;
+  }
+
+  // =========================================================================
+  // JSON Extraction
+  // =========================================================================
+
+  /**
+   * <p>LLMs sometimes wrap their JSON response in prose text (e.g. "Here is the result: {...}")
+   * despite being instructed to return JSON only. A simple greedy regex like {@code \{.*\}}
+   * fails for nested objects because it can match from the first {@code {} to the last {@code }}
+   * in the entire string, returning multiple concatenated objects or truncating nested ones.
+   *
+   * <p>This method uses brace-counting with string-awareness to reliably extract the first
+   * outermost JSON object regardless of surrounding text, nesting depth, or number of
+   * objects in the response:
+   *
+   * @param text the raw LLM response string, which may contain prose before/after JSON
+   * @return the first complete JSON object string, or {@code null} if none is found
+   */
+  static String extractFirstJsonObject(String text) {
+    int depth = 0;
+    int start = -1;
+    boolean inString = false;
+    boolean escape = false;
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (c == '\\' && inString) {
+        escape = true;
+        continue;
+      }
+      if (c == '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) {
+        continue;
+      }
+      if (c == '{') {
+        if (depth == 0) {
+          start = i;
+        }
+        depth++;
+      } else if (c == '}') {
+        depth--;
+        if (depth == 0 && start != -1) {
+          return text.substring(start, i + 1);
+        }
+      }
+    }
+    return null;
   }
 
   // =========================================================================

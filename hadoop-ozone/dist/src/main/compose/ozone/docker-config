@@ -67,13 +67,18 @@ no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 
-# Recon Chatbot — DISABLED by default.
-# To enable locally for testing, uncomment the lines below and set a real API key.
+# Recon AI Chatbot — DISABLED by default.
 #
-# WARNING: Never commit a real API key to git. Set the key value only in your local
-# copy of this file (or export it in your shell before running docker compose).
-# If you accidentally add a real key, rotate it immediately at your provider's console.
+# WARNING: The plaintext API key approach shown below is for LOCAL DOCKER
+# TESTING ONLY. It must NOT be used on production clusters because plaintext
+# keys are exposed via 'hadoop conf | grep api.key' and via Recon's /conf HTTP
+# endpoint. For production clusters, store the key in a Hadoop JCEKS credential
+# store instead (see ozone-site.xml.template for full setup instructions).
 #
+# To enable the chatbot locally for testing:
+#   1. Uncomment the lines below.
+#   2. Replace YOUR_GEMINI_API_KEY_HERE with a real key.
+#   3. Never commit a real key to git — rotate it immediately if you do.
 # OZONE-SITE.XML_ozone.recon.chatbot.enabled=true
 # OZONE-SITE.XML_ozone.recon.chatbot.provider=gemini
 # OZONE-SITE.XML_ozone.recon.chatbot.gemini.api.key=YOUR_GEMINI_API_KEY_HERE
