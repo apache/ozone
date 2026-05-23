@@ -215,7 +215,6 @@ abstract class StringCodecBase implements Codec<String> {
       return decodeWithFallback(buffer.asReadOnlyByteBuffer());
     }
 
-
     @Override
     public String fromPersistedFormat(byte[] bytes) {
       return decodeWithFallback(ByteBuffer.wrap(bytes));

@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets;
  */
 public final class StringCodec extends StringCodecBase.WithFallback {
   private static final StringCodec CODEC_WITH_FALLBACK = new StringCodec();
-  private static final Codec<String> CODEC_NO_FALLBACK = new StringCodecBase(StandardCharsets.UTF_8) {};
+  private static final Codec<String> CODEC_NO_FALLBACK = new StringCodecBase(StandardCharsets.UTF_8) { };
 
   public static StringCodec get() {
     return CODEC_WITH_FALLBACK;
