@@ -191,10 +191,11 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   private void startDatanodes(OzoneConfiguration baseConf) throws IOException {
     PersistedPorts persistedPorts = PersistedPorts.load(
         config.getDataDir().resolve(PORTS_STATE_FILE));
+    PortAllocator ports = new PortAllocator();
 
     for (int index = 0; index < config.getDatanodes(); index++) {
       OzoneConfiguration dnConf = createDatanodeConfiguration(
-          baseConf, index, persistedPorts);
+          baseConf, index, ports, persistedPorts);
       HddsDatanodeService datanode = startDatanode(dnConf);
       datanodes.add(datanode);
       LOG.info("Started datanode {} of {}", index + 1, config.getDatanodes());
@@ -207,11 +208,10 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
    * Creates isolated configuration for a single datanode.
    */
   private OzoneConfiguration createDatanodeConfiguration(
-      OzoneConfiguration baseConf, int index, PersistedPorts persistedPorts)
-      throws IOException {
+      OzoneConfiguration baseConf, int index, PortAllocator ports,
+      PersistedPorts persistedPorts) throws IOException {
 
     OzoneConfiguration dnConf = new OzoneConfiguration(baseConf);
-    PortAllocator ports = new PortAllocator();
 
     // Create isolated directories for this datanode
     Path datanodeDir = Files.createDirectories(
