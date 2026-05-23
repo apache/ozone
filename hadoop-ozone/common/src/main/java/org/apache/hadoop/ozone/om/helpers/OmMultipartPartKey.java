@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.helpers;
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 
 /**
  * Typed key for multipart parts table.
@@ -184,7 +186,14 @@ public final class OmMultipartPartKey {
       final ByteBuffer uploadIdBuffer = input.duplicate();
       uploadIdBuffer.limit(separatorIndex);
       uploadIdBuffer.position(start);
-      String uploadId = StandardCharsets.UTF_8.decode(uploadIdBuffer).toString();
+      byte[] uploadIdBytes = new byte[uploadIdBuffer.remaining()];
+      uploadIdBuffer.get(uploadIdBytes);
+      String uploadId = StringCodec.get().fromPersistedFormat(uploadIdBytes);
+      if (!Arrays.equals(uploadIdBytes,
+          uploadId.getBytes(StandardCharsets.UTF_8))) {
+        throw new IllegalArgumentException(
+            "Invalid multipart part key: malformed UTF-8 uploadId");
+      }
       if (suffixLength == 0) {
         return prefix(uploadId);
       }

@@ -132,6 +132,13 @@ public class TestOmMultipartPartKey {
   }
 
   @Test
+  public void testDecodeRejectsMalformedUtf8UploadId() {
+    byte[] malformed = new byte[] {(byte) 0xC3, (byte) '/', 0, 0, 0, 1};
+    assertThrows(IllegalArgumentException.class,
+        () -> codec.fromPersistedFormat(malformed));
+  }
+
+  @Test
   public void testDecodeRejectsEmptyKey() {
     assertThrows(IllegalArgumentException.class,
         () -> codec.fromPersistedFormat(new byte[0]));
