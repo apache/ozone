@@ -69,6 +69,18 @@ public final class BufferUtils {
   }
 
   /**
+   * Return a non-copying {@link ByteBuffer#duplicate()} of {@code src} that
+   * covers exactly {@code [position, position + length)}. Read-only-ness
+   * and direct/heap kind are inherited from {@code src}.
+   */
+  public static ByteBuffer slice(ByteBuffer src, int position, int length) {
+    final ByteBuffer slice = src.duplicate();
+    slice.position(position);
+    slice.limit(position + length);
+    return slice;
+  }
+
+  /**
    * Return a read only ByteBuffer list for the input ByteStrings list.
    */
   public static List<ByteBuffer> getReadOnlyByteBuffers(

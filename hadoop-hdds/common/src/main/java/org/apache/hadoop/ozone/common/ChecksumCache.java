@@ -20,7 +20,8 @@ package org.apache.hadoop.ozone.common;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
+import org.apache.hadoop.ozone.common.Checksum.StreamingChecksum;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,58 +66,102 @@ public class ChecksumCache {
     return checksums;
   }
 
-  public List<ByteString> computeChecksum(ChunkBuffer data, Function<ByteBuffer, ByteString> function) {
-    // Indicates how much data the current chunk buffer holds
+  /**
+   * Recompute checksums for the windows that have changed since the last
+   * call: bytes {@code [ciStart * bytesPerChecksum, currChunkLength)} where
+   * {@code ciStart = prevChunkLength / bytesPerChecksum} (the index of the
+   * first window whose result may have changed - either the previously-
+   * partial last window now has more bytes, or new full windows have been
+   * appended).
+   *
+   * <p>Walks {@code data}'s underlying buffer list directly (no
+   * {@code iterate()} byte[] linearization) and feeds slices to {@code algo}
+   * incrementally; the cached prefix is skipped via index arithmetic so
+   * those bytes are never re-fed.
+   */
+  public List<ByteString> computeChecksum(ChunkBuffer data,
+      StreamingChecksum algo, int chksumSize) {
+    if (chksumSize != bytesPerChecksum) {
+      throw new IllegalArgumentException("bytesPerChecksum mismatch: cache="
+          + bytesPerChecksum + " call=" + chksumSize);
+    }
     final int currChunkLength = data.limit();
 
     if (currChunkLength == prevChunkLength) {
       LOG.debug("ChunkBuffer data limit same as last time ({}). No new checksums need to be computed", prevChunkLength);
       return checksums;
     }
-
-    // Sanity check
     if (currChunkLength < prevChunkLength) {
-      // If currChunkLength <= lastChunkLength, it indicates a bug that needs to be addressed.
-      // It means BOS has not properly clear()ed the cache when a new chunk is started in that code path.
-      throw new IllegalArgumentException("ChunkBuffer data limit (" + currChunkLength + ")" +
-          " must not be smaller than last time (" + prevChunkLength + ")");
+      // Indicates a bug: BOS did not clear() the cache before starting a new chunk.
+      throw new IllegalArgumentException("ChunkBuffer data limit (" + currChunkLength + ")"
+          + " must not be smaller than last time (" + prevChunkLength + ")");
     }
 
-    // One or more checksums need to be computed
-
-    // Start of the checksum index that need to be (re)computed
+    // Index of the first window that needs (re)computing.
     final int ciStart = prevChunkLength / bytesPerChecksum;
-    final int ciEnd = currChunkLength / bytesPerChecksum + (currChunkLength % bytesPerChecksum == 0 ? 0 : 1);
-    int i = 0;
-    for (ByteBuffer b : data.iterate(bytesPerChecksum)) {
-      if (i < ciStart) {
-        i++;
+    final int ciEnd = currChunkLength / bytesPerChecksum
+        + (currChunkLength % bytesPerChecksum == 0 ? 0 : 1);
+    // Bytes to skip (the cached full windows preceding ciStart).
+    long bytesToSkip = (long) ciStart * bytesPerChecksum;
+
+    int i = ciStart;
+    int windowRemaining = bytesPerChecksum;
+    algo.reset();
+    long position = 0;
+
+    for (ByteBuffer src : data.asByteBufferList()) {
+      int srcPos = src.position();
+      final int srcLim = src.limit();
+      final int srcLen = srcLim - srcPos;
+
+      // Fast-forward through buffers that lie entirely within the cached
+      // prefix.
+      if (position + srcLen <= bytesToSkip) {
+        position += srcLen;
         continue;
       }
-
-      // variable i can either point to:
-      // 1. the last element in the list -- in which case the checksum needs to be updated
-      // 2. one after the last element   -- in which case a new checksum needs to be added
-      assert i == checksums.size() - 1 || i == checksums.size();
-
-      // TODO: Furthermore for CRC32/CRC32C, it can be even more efficient by updating the last checksum byte-by-byte.
-      final ByteString checksum = Checksum.computeChecksum(b, function, bytesPerChecksum);
-      if (i == checksums.size()) {
-        checksums.add(checksum);
-      } else {
-        checksums.set(i, checksum);
+      // First buffer that crosses into the not-yet-cached region: advance
+      // srcPos to the boundary.
+      if (position < bytesToSkip) {
+        srcPos += (int) (bytesToSkip - position);
+        position = bytesToSkip;
       }
 
-      i++;
+      while (srcPos < srcLim) {
+        final int n = Math.min(srcLim - srcPos, windowRemaining);
+        algo.update(BufferUtils.slice(src, srcPos, n));
+        srcPos += n;
+        position += n;
+        windowRemaining -= n;
+        if (windowRemaining == 0) {
+          storeChecksum(i++, algo.finish());
+          algo.reset();
+          windowRemaining = bytesPerChecksum;
+        }
+      }
+    }
+    if (windowRemaining < bytesPerChecksum) {
+      // Unaligned trailing window.
+      storeChecksum(i++, algo.finish());
     }
 
-    // Sanity check
     if (i != ciEnd) {
       throw new IllegalStateException("ChecksumCache: Checksum index end does not match expectation");
     }
 
-    // Update last written index
     prevChunkLength = currChunkLength;
     return checksums;
+  }
+
+  private void storeChecksum(int i, ByteString cs) {
+    // i can either point to the last cached element (recompute - the
+    // previously-partial trailing window) or one past it (append a new
+    // checksum for newly-arrived bytes).
+    assert i == checksums.size() - 1 || i == checksums.size();
+    if (i == checksums.size()) {
+      checksums.add(cs);
+    } else {
+      checksums.set(i, cs);
+    }
   }
 }
