@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +40,8 @@ import org.slf4j.LoggerFactory;
  * <p>
  * Same algorithm as the SCMContainerPlacementCapacity.
  */
-public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
+public class CapacityVolumeChoosingPolicy
+    extends AbstractStorageTypeChoosingPolicy {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       CapacityVolumeChoosingPolicy.class);
@@ -58,7 +58,7 @@ public class CapacityVolumeChoosingPolicy implements VolumeChoosingPolicy {
   }
 
   @Override
-  public HddsVolume chooseVolume(List<HddsVolume> volumes,
+  protected HddsVolume chooseVolumeInternal(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from

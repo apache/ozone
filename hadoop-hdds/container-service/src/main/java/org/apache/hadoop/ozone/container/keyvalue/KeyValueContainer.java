@@ -56,6 +56,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -146,8 +147,16 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
+  @Deprecated
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
       volumeChoosingPolicy, String clusterId) throws StorageContainerException {
+    create(volumeSet, volumeChoosingPolicy, clusterId, null);
+  }
+
+  @Override
+  public void create(VolumeSet volumeSet, VolumeChoosingPolicy
+      volumeChoosingPolicy, String clusterId, StorageType storageType)
+      throws StorageContainerException {
     Objects.requireNonNull(volumeChoosingPolicy, "VolumeChoosingPolicy == null");
     Objects.requireNonNull(volumeSet, "volumeSet == null");
     Objects.requireNonNull(clusterId, "clusterId == null");
@@ -163,11 +172,16 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         HddsVolume containerVolume;
         String hddsVolumeDir;
         try {
-          containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize);
+          // TODO Use the `chooseVolume` that supports `storageType`
+          containerVolume = storageType == null
+              ? volumeChoosingPolicy.chooseVolume(volumes, maxSize)
+              : volumeChoosingPolicy.chooseVolume(
+                  volumes, maxSize, storageType);
           hddsVolumeDir = containerVolume.getHddsRootDir().toString();
           // Set volume before getContainerDBFile(), because we may need the
           // volume to deduce the db file.
           containerData.setVolume(containerVolume);
+          containerData.setStorageType(containerVolume.getStorageType());
           // commit bytes have been reserved in volumeChoosingPolicy#chooseVolume
           containerData.setCommittedSpace(true);
         } catch (DiskOutOfSpaceException ex) {

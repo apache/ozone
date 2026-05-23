@@ -24,7 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +32,8 @@ import org.slf4j.LoggerFactory;
  * Choose volumes in round-robin order.
  * The caller should synchronize access to the list of volumes.
  */
-public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
+public class RoundRobinVolumeChoosingPolicy
+    extends AbstractStorageTypeChoosingPolicy {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       RoundRobinVolumeChoosingPolicy.class);
@@ -53,7 +53,7 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
   }
 
   @Override
-  public HddsVolume chooseVolume(List<HddsVolume> volumes,
+  protected HddsVolume chooseVolumeInternal(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
