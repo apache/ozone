@@ -415,7 +415,12 @@ public abstract class SCMCommonPlacementPolicy implements
       // No rack information means there is no per-rack constraint to
       // enforce. Callers are expected to short-circuit before reaching
       // here, but guard the divide site against transient empty-topology
-      // windows (HDDS-15350).
+      // windows (HDDS-15350). The WARN makes the silent path observable;
+      // configure log4j appender-side filtering if it floods.
+      LOG.warn("Empty rack topology in placement validation: numReplicas={} "
+          + "numberOfRacks={}; returning numReplicas to avoid divide-by-zero "
+          + "(HDDS-15350).",
+          numReplicas, numberOfRacks);
       return numReplicas;
     }
     return numReplicas / numberOfRacks
