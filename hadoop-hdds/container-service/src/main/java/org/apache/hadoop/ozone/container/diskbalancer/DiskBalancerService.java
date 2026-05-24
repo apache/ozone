@@ -491,19 +491,33 @@ public class DiskBalancerService extends BackgroundService {
     return false;
   }
 
+  /**
+   * Atomically reserves bytes to be moved from a source volume.
+   *
+   * <p>Multiple DiskBalancer tasks can update the delta size of the same
+   * source volume concurrently.  When the resulting delta becomes zero, the
+   * volume is removed from the delta size map.</p>
+   *
+   * @param sourceVolume the volume from which bytes will be moved
+   * @param bytes the number of bytes to reserve
+   */
   private void reserveDeltaSize(HddsVolume sourceVolume, long bytes) {
-    // deltaSizes can be updated by multiple DiskBalancer tasks for the same
-    // source volume. Use compute to avoid lost updates from a non-atomic
-    // get/put sequence.
     deltaSizes.compute(sourceVolume, (volume, current) -> {
       long updated = (current == null ? 0L : current) - bytes;
       return updated == 0L ? null : updated;
     });
   }
 
+  /**
+   * Atomically releases bytes previously reserved for a source volume.
+   *
+   * <p>When the resulting delta becomes zero, the volume is removed from the
+   * delta size map.</p>
+   *
+   * @param sourceVolume the volume from which bytes were moved
+   * @param bytes the number of bytes to release
+   */
   private void releaseDeltaSize(HddsVolume sourceVolume, long bytes) {
-    // Match reserveDeltaSize and release the previously reserved bytes
-    // atomically when a DiskBalancer task completes.
     deltaSizes.compute(sourceVolume, (volume, current) -> {
       if (current == null) {
         LOG.warn("No reserved delta size found for source volume {} when "
