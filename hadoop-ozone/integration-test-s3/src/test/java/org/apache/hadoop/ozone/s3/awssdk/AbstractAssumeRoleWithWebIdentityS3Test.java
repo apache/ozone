@@ -22,17 +22,16 @@ import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZ
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_AUDIENCE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ISSUER_URI;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_JWKS_URI;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_REQUIRE_HTTPS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.security.oidc.OidcConfig.OZONE_STS_WEB_IDENTITY_AUDIENCE;
+import static org.apache.hadoop.ozone.security.oidc.OidcConfig.OZONE_STS_WEB_IDENTITY_ISSUER_URI;
+import static org.apache.hadoop.ozone.security.oidc.OidcConfig.OZONE_STS_WEB_IDENTITY_JWKS_URI;
+import static org.apache.hadoop.ozone.security.oidc.OidcConfig.OZONE_STS_WEB_IDENTITY_REQUIRE_HTTPS;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -117,8 +116,6 @@ abstract class AbstractAssumeRoleWithWebIdentityS3Test
     conf.set(OZONE_STS_WEB_IDENTITY_AUDIENCE, AUDIENCE);
     conf.set(OZONE_STS_WEB_IDENTITY_JWKS_URI, jwksUri());
     conf.setBoolean(OZONE_STS_WEB_IDENTITY_REQUIRE_HTTPS, false);
-    conf.setBoolean(OZONE_STS_WEB_IDENTITY_ALLOW_INSECURE_HTTP_FOR_TESTS,
-        true);
     conf.set(OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY, "RATIS");
     conf.set(OZONE_SERVER_DEFAULT_REPLICATION_KEY, "ONE");
     conf.set(OZONE_S3G_STS_HTTP_ADDRESS_KEY, localhostWithFreePort());

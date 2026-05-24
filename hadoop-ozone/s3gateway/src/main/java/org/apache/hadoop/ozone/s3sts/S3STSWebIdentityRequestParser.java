@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.s3sts;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -26,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.container.ContainerRequestContext;
+import org.apache.commons.io.IOUtils;
 
 /**
  * Parses the STS action without logging request parameters.
@@ -65,7 +65,7 @@ final class S3STSWebIdentityRequestParser {
       return null;
     }
 
-    byte[] body = readFully(stream);
+    byte[] body = IOUtils.toByteArray(stream);
     context.setEntityStream(new ByteArrayInputStream(body));
     String form = new String(body, StandardCharsets.UTF_8);
     String action = null;
@@ -83,16 +83,6 @@ final class S3STSWebIdentityRequestParser {
       }
     }
     return action;
-  }
-
-  private static byte[] readFully(InputStream stream) throws IOException {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    byte[] buffer = new byte[4096];
-    int read;
-    while ((read = stream.read(buffer)) != -1) {
-      out.write(buffer, 0, read);
-    }
-    return out.toByteArray();
   }
 
   private static String decode(String value) throws IOException {

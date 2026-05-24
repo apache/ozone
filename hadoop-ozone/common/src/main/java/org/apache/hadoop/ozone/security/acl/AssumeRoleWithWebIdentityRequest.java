@@ -34,7 +34,7 @@ import org.apache.commons.lang3.StringUtils;
  * attributes to the authorizer.
  */
 @Immutable
-public class AssumeRoleWithWebIdentityRequest {
+public final class AssumeRoleWithWebIdentityRequest {
 
   public static final String ACTION = "AssumeRoleWithWebIdentity";
 
@@ -51,24 +51,24 @@ public class AssumeRoleWithWebIdentityRequest {
   private final String providerId;
   private final Set<AssumeRoleRequest.OzoneGrant> grants;
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  public AssumeRoleWithWebIdentityRequest(String host, InetAddress ip,
-      String user, Set<String> groups, Set<String> roles, String roleArn,
-      String roleSessionName, String issuer, String subject, String audience,
-      String providerId, Set<AssumeRoleRequest.OzoneGrant> grants) {
-    this.host = host;
-    this.ip = ip;
-    this.user = requireNonBlank(user, "user");
-    this.groups = immutableSet(groups);
-    this.roles = immutableSet(roles);
-    this.roleArn = requireNonBlank(roleArn, "roleArn");
+  private AssumeRoleWithWebIdentityRequest(Builder builder) {
+    this.host = builder.host;
+    this.ip = builder.ip;
+    this.user = requireNonBlank(builder.user, "user");
+    this.groups = immutableSet(builder.groups);
+    this.roles = immutableSet(builder.roles);
+    this.roleArn = requireNonBlank(builder.roleArn, "roleArn");
     this.roleSessionName =
-        requireNonBlank(roleSessionName, "roleSessionName");
-    this.issuer = requireNonBlank(issuer, "issuer");
-    this.subject = requireNonBlank(subject, "subject");
-    this.audience = requireNonBlank(audience, "audience");
-    this.providerId = providerId;
-    this.grants = grants;
+        requireNonBlank(builder.roleSessionName, "roleSessionName");
+    this.issuer = requireNonBlank(builder.issuer, "issuer");
+    this.subject = requireNonBlank(builder.subject, "subject");
+    this.audience = requireNonBlank(builder.audience, "audience");
+    this.providerId = builder.providerId;
+    this.grants = builder.grants;
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   public String getAction() {
@@ -183,5 +183,90 @@ public class AssumeRoleWithWebIdentityRequest {
       throw new IllegalArgumentException(name + " must not be empty");
     }
     return value;
+  }
+
+  /**
+   * Builder for {@link AssumeRoleWithWebIdentityRequest}.
+   */
+  public static final class Builder {
+    private String host;
+    private InetAddress ip;
+    private String user;
+    private Set<String> groups;
+    private Set<String> roles;
+    private String roleArn;
+    private String roleSessionName;
+    private String issuer;
+    private String subject;
+    private String audience;
+    private String providerId;
+    private Set<AssumeRoleRequest.OzoneGrant> grants;
+
+    private Builder() {
+    }
+
+    public Builder setHost(String value) {
+      this.host = value;
+      return this;
+    }
+
+    public Builder setIp(InetAddress value) {
+      this.ip = value;
+      return this;
+    }
+
+    public Builder setUser(String value) {
+      this.user = value;
+      return this;
+    }
+
+    public Builder setGroups(Set<String> value) {
+      this.groups = value;
+      return this;
+    }
+
+    public Builder setRoles(Set<String> value) {
+      this.roles = value;
+      return this;
+    }
+
+    public Builder setRoleArn(String value) {
+      this.roleArn = value;
+      return this;
+    }
+
+    public Builder setRoleSessionName(String value) {
+      this.roleSessionName = value;
+      return this;
+    }
+
+    public Builder setIssuer(String value) {
+      this.issuer = value;
+      return this;
+    }
+
+    public Builder setSubject(String value) {
+      this.subject = value;
+      return this;
+    }
+
+    public Builder setAudience(String value) {
+      this.audience = value;
+      return this;
+    }
+
+    public Builder setProviderId(String value) {
+      this.providerId = value;
+      return this;
+    }
+
+    public Builder setGrants(Set<AssumeRoleRequest.OzoneGrant> value) {
+      this.grants = value;
+      return this;
+    }
+
+    public AssumeRoleWithWebIdentityRequest build() {
+      return new AssumeRoleWithWebIdentityRequest(this);
+    }
   }
 }

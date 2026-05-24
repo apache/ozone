@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_JWKS_URI;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
+import static org.apache.hadoop.ozone.security.oidc.OidcConfig.OZONE_STS_WEB_IDENTITY_JWKS_URI;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -105,10 +105,12 @@ public class S3AssumeRoleWithWebIdentityRequest extends OMClientRequest {
           FEATURE_NOT_ENABLED);
     }
 
+    validateExternalRequest(request);
     final int requestedDuration =
         S3STSUtils.validateDuration(request.getDurationSeconds());
     S3STSUtils.validateRoleSessionName(request.getRoleSessionName());
-    AwsRoleArnValidator.validateAndExtractRoleNameFromArn(request.getRoleArn());
+    AwsRoleArnValidator.validateAndExtractRoleNameFromArn(
+        request.getRoleArn());
 
     final OzoneIdentity identity = authenticate(oidcConfig,
         request.getWebIdentityToken());
@@ -132,7 +134,8 @@ public class S3AssumeRoleWithWebIdentityRequest extends OMClientRequest {
             .setRoleArn(request.getRoleArn())
             .setRoleSessionName(request.getRoleSessionName())
             .setDurationSeconds(effectiveDuration)
-            .setProviderId(request.hasProviderId() ? request.getProviderId() : "")
+            .setProviderId(request.hasProviderId()
+                ? request.getProviderId() : "")
             .setRequestId(request.getRequestId())
             .setTempAccessKeyId(S3AssumeRoleRequest.generateTempAccessKeyId())
             .setSecretAccessKey(S3AssumeRoleRequest.generateSecretAccessKey())
@@ -143,7 +146,8 @@ public class S3AssumeRoleWithWebIdentityRequest extends OMClientRequest {
             .setAudience(oidcConfig.getAudience())
             .addAllGroups(identity.getGroups())
             .addAllRoles(identity.getRoles())
-            .setWebIdentityTokenExpiresAt(identity.getExpiresAt().toEpochMilli())
+            .setWebIdentityTokenExpiresAt(
+                identity.getExpiresAt().toEpochMilli())
             .setAuthenticatedAt(identity.getAuthenticatedAt().toEpochMilli())
             .setTokenFingerprint(tokenFingerprint)
             .setSessionPolicy(sessionPolicy)
@@ -179,14 +183,11 @@ public class S3AssumeRoleWithWebIdentityRequest extends OMClientRequest {
     Exception exception = null;
     OMClientResponse omClientResponse;
     try {
+      validateUpdateRequest(updateRequest);
       S3STSUtils.validateDuration(updateRequest.getDurationSeconds());
       S3STSUtils.validateRoleSessionName(updateRequest.getRoleSessionName());
       AwsRoleArnValidator.validateAndExtractRoleNameFromArn(
           updateRequest.getRoleArn());
-      if (Strings.isNullOrEmpty(updateRequest.getSessionPolicy())) {
-        throw new OMException("Missing WebIdentity session policy",
-            ACCESS_DENIED);
-      }
 
       final String sessionToken = ozoneManager.getSTSTokenSecretManager()
           .createWebIdentitySTSTokenString(
@@ -206,8 +207,8 @@ public class S3AssumeRoleWithWebIdentityRequest extends OMClientRequest {
               updateRequest.getProviderId(),
               updateRequest.getTokenFingerprint());
 
-      final String assumedRoleId =
-          updateRequest.getRoleId() + ":" + updateRequest.getRoleSessionName();
+      final String assumedRoleId = updateRequest.getRoleId()
+          + ":" + updateRequest.getRoleSessionName();
       final long expirationEpochSeconds =
           updateRequest.getCredentialExpirationEpochSeconds();
 
@@ -306,20 +307,82 @@ public class S3AssumeRoleWithWebIdentityRequest extends OMClientRequest {
 
     return ozoneManager.getAccessAuthorizer()
         .generateAssumeRoleWithWebIdentitySessionPolicy(
-            new org.apache.hadoop.ozone.security.acl
-                .AssumeRoleWithWebIdentityRequest(
-                    hostName,
-                    remoteIp,
-                    identity.getUsername(),
-                    identity.getGroups(),
-                    identity.getRoles(),
-                    request.getRoleArn(),
-                    request.getRoleSessionName(),
-                    identity.getIssuer(),
-                    identity.getSubject(),
-                    audience,
-                    request.hasProviderId() ? request.getProviderId() : null,
-                    null));
+            org.apache.hadoop.ozone.security.acl
+                .AssumeRoleWithWebIdentityRequest.newBuilder()
+                .setHost(hostName)
+                .setIp(remoteIp)
+                .setUser(identity.getUsername())
+                .setGroups(identity.getGroups())
+                .setRoles(identity.getRoles())
+                .setRoleArn(request.getRoleArn())
+                .setRoleSessionName(request.getRoleSessionName())
+                .setIssuer(identity.getIssuer())
+                .setSubject(identity.getSubject())
+                .setAudience(audience)
+                .setProviderId(request.hasProviderId()
+                    ? request.getProviderId() : null)
+                .build());
+  }
+
+  private static void validateExternalRequest(
+      AssumeRoleWithWebIdentityRequest request) throws OMException {
+    requirePresentNonBlank(request.hasRoleArn(), request.getRoleArn(),
+        "roleArn");
+    requirePresentNonBlank(request.hasRoleSessionName(),
+        request.getRoleSessionName(), "roleSessionName");
+    requirePresentNonBlank(request.hasWebIdentityToken(),
+        request.getWebIdentityToken(), "webIdentityToken");
+    requirePresentNonBlank(request.hasRequestId(), request.getRequestId(),
+        "requestId");
+  }
+
+  private static void validateUpdateRequest(
+      UpdateAssumeRoleWithWebIdentityRequest request) throws OMException {
+    requirePresentNonBlank(request.hasRoleArn(), request.getRoleArn(),
+        "roleArn");
+    requirePresentNonBlank(request.hasRoleSessionName(),
+        request.getRoleSessionName(), "roleSessionName");
+    requirePresent(request.hasDurationSeconds(), "durationSeconds");
+    requirePresentNonBlank(request.hasRequestId(), request.getRequestId(),
+        "requestId");
+    requirePresentNonBlank(request.hasTempAccessKeyId(),
+        request.getTempAccessKeyId(), "tempAccessKeyId");
+    requirePresentNonBlank(request.hasSecretAccessKey(),
+        request.getSecretAccessKey(), "secretAccessKey");
+    requirePresentNonBlank(request.hasRoleId(), request.getRoleId(),
+        "roleId");
+    requirePresentNonBlank(request.hasEffectiveUser(),
+        request.getEffectiveUser(), "effectiveUser");
+    requirePresentNonBlank(request.hasSubject(), request.getSubject(),
+        "subject");
+    requirePresentNonBlank(request.hasIssuer(), request.getIssuer(),
+        "issuer");
+    requirePresentNonBlank(request.hasAudience(), request.getAudience(),
+        "audience");
+    requirePresent(request.hasWebIdentityTokenExpiresAt(),
+        "webIdentityTokenExpiresAt");
+    requirePresent(request.hasAuthenticatedAt(), "authenticatedAt");
+    requirePresentNonBlank(request.hasTokenFingerprint(),
+        request.getTokenFingerprint(), "tokenFingerprint");
+    requirePresentNonBlank(request.hasSessionPolicy(),
+        request.getSessionPolicy(), "sessionPolicy");
+    requirePresent(request.hasCredentialExpirationEpochSeconds(),
+        "credentialExpirationEpochSeconds");
+  }
+
+  private static void requirePresent(boolean present, String field)
+      throws OMException {
+    if (!present) {
+      throw new OMException("Missing WebIdentity " + field, INVALID_REQUEST);
+    }
+  }
+
+  private static void requirePresentNonBlank(boolean present, String value,
+      String field) throws OMException {
+    requirePresent(present, field);
+    if (value.trim().isEmpty()) {
+      throw new OMException("Missing WebIdentity " + field, INVALID_REQUEST);
+    }
   }
 
   private static void addAuditParams(Map<String, String> auditMap,

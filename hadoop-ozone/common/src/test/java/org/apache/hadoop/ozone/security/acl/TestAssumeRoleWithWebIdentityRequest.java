@@ -45,10 +45,19 @@ public class TestAssumeRoleWithWebIdentityRequest {
     final InetAddress ip = InetAddress.getByName("127.0.0.1");
 
     final AssumeRoleWithWebIdentityRequest request =
-        new AssumeRoleWithWebIdentityRequest(
-            "s3g.example.com", ip, "tomato-user", groups, roles, ROLE_ARN,
-            "tomato-session", "https://keycloak.example.com/realms/ozone",
-            "subject-1", "ozone", "keycloak", null);
+        AssumeRoleWithWebIdentityRequest.newBuilder()
+            .setHost("s3g.example.com")
+            .setIp(ip)
+            .setUser("tomato-user")
+            .setGroups(groups)
+            .setRoles(roles)
+            .setRoleArn(ROLE_ARN)
+            .setRoleSessionName("tomato-session")
+            .setIssuer("https://keycloak.example.com/realms/ozone")
+            .setSubject("subject-1")
+            .setAudience("ozone")
+            .setProviderId("keycloak")
+            .build();
 
     groups.add("mutated-group");
     roles.add("mutated-role");
@@ -75,10 +84,16 @@ public class TestAssumeRoleWithWebIdentityRequest {
     assertThrows(IllegalArgumentException.class,
         () -> requestWithUser(" "));
     assertThrows(IllegalArgumentException.class,
-        () -> new AssumeRoleWithWebIdentityRequest(
-            null, null, "tomato-user", set("ozone-tomato"), set(),
-            " ", "tomato-session", "issuer", "subject", "audience",
-            null, null));
+        () -> AssumeRoleWithWebIdentityRequest.newBuilder()
+            .setUser("tomato-user")
+            .setGroups(set("ozone-tomato"))
+            .setRoles(set())
+            .setRoleArn(" ")
+            .setRoleSessionName("tomato-session")
+            .setIssuer("issuer")
+            .setSubject("subject")
+            .setAudience("audience")
+            .build());
   }
 
   @Test
@@ -142,10 +157,18 @@ public class TestAssumeRoleWithWebIdentityRequest {
 
   private static AssumeRoleWithWebIdentityRequest requestWithUser(
       String user) {
-    return new AssumeRoleWithWebIdentityRequest(
-        "host", null, user, set("ozone-tomato"), set("role:writer"),
-        ROLE_ARN, "session", "issuer", "subject", "audience",
-        "provider", null);
+    return AssumeRoleWithWebIdentityRequest.newBuilder()
+        .setHost("host")
+        .setUser(user)
+        .setGroups(set("ozone-tomato"))
+        .setRoles(set("role:writer"))
+        .setRoleArn(ROLE_ARN)
+        .setRoleSessionName("session")
+        .setIssuer("issuer")
+        .setSubject("subject")
+        .setAudience("audience")
+        .setProviderId("provider")
+        .build();
   }
 
   private static Set<String> set(String... values) {

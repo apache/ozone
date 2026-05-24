@@ -17,12 +17,13 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_AUDIENCE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ISSUER_URI;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_JWKS_URI;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
+import static org.apache.hadoop.ozone.security.oidc.OidcConfig.OZONE_STS_WEB_IDENTITY_AUDIENCE;
+import static org.apache.hadoop.ozone.security.oidc.OidcConfig.OZONE_STS_WEB_IDENTITY_ISSUER_URI;
+import static org.apache.hadoop.ozone.security.oidc.OidcConfig.OZONE_STS_WEB_IDENTITY_JWKS_URI;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -280,6 +281,47 @@ public class TestS3AssumeRoleWithWebIdentityRequest {
   }
 
   @Test
+  public void testMissingExternalRequiredFieldFailsClosed() {
+    final CapturingIdentityProvider identityProvider =
+        new CapturingIdentityProvider(identity(3600));
+    final S3AssumeRoleWithWebIdentityRequest request =
+        new S3AssumeRoleWithWebIdentityRequest(
+            externalRequest(requestBuilder(3600, RAW_JWT)
+                .clearWebIdentityToken()
+                .build()), CLOCK, identityProvider);
+
+    assertThatThrownBy(() -> request.preExecute(ozoneManager))
+        .isInstanceOf(OMException.class)
+        .satisfies(e -> assertThat(((OMException) e).getResult())
+            .isEqualTo(INVALID_REQUEST))
+        .hasMessageContaining("webIdentityToken");
+    assertThat(identityProvider.getCapturedToken()).isNull();
+  }
+
+  @Test
+  public void testMissingSanitizedRequiredFieldFailsClosed()
+      throws Exception {
+    final S3AssumeRoleWithWebIdentityRequest request =
+        new S3AssumeRoleWithWebIdentityRequest(externalRequest(3600), CLOCK,
+            new CapturingIdentityProvider(identity(3600)));
+    final OMRequest preExecuted = request.preExecute(ozoneManager);
+    final UpdateAssumeRoleWithWebIdentityRequest malformed =
+        preExecuted.getUpdateAssumeRoleWithWebIdentityRequest().toBuilder()
+            .clearSessionPolicy()
+            .build();
+    final OMRequest malformedOmRequest = preExecuted.toBuilder()
+        .setUpdateAssumeRoleWithWebIdentityRequest(malformed)
+        .build();
+
+    final OMClientResponse clientResponse =
+        new S3AssumeRoleWithWebIdentityRequest(malformedOmRequest, CLOCK)
+            .validateAndUpdateCache(ozoneManager, context);
+
+    assertThat(clientResponse.getOMResponse().getStatus())
+        .isEqualTo(Status.INVALID_REQUEST);
+  }
+
+  @Test
   public void testExceptionCauseChainDoesNotExposeTokenMaterial() {
     final String sensitiveToken = "raw.jwt.SecretAccessKey.SessionToken."
         + "AuthorizationHeader";
@@ -302,20 +344,31 @@ public class TestS3AssumeRoleWithWebIdentityRequest {
 
   private static OMRequest externalRequest(int durationSeconds,
       String webIdentityToken) {
+    return externalRequest(requestBuilder(durationSeconds, webIdentityToken)
+        .build());
+  }
+
+  private static OMRequest externalRequest(
+      org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+          .AssumeRoleWithWebIdentityRequest request) {
     return OMRequest.newBuilder()
         .setCmdType(Type.AssumeRoleWithWebIdentity)
         .setClientId("client-1")
-        .setAssumeRoleWithWebIdentityRequest(
-            org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-                .AssumeRoleWithWebIdentityRequest.newBuilder()
-                .setRoleArn(ROLE_ARN)
-                .setRoleSessionName(ROLE_SESSION_NAME)
-                .setDurationSeconds(durationSeconds)
-                .setProviderId(PROVIDER_ID)
-                .setRequestId(REQUEST_ID)
-                .setWebIdentityToken(webIdentityToken)
-                .build())
+        .setAssumeRoleWithWebIdentityRequest(request)
         .build();
+  }
+
+  private static org.apache.hadoop.ozone.protocol.proto
+      .OzoneManagerProtocolProtos.AssumeRoleWithWebIdentityRequest.Builder
+      requestBuilder(int durationSeconds, String webIdentityToken) {
+    return org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+        .AssumeRoleWithWebIdentityRequest.newBuilder()
+        .setRoleArn(ROLE_ARN)
+        .setRoleSessionName(ROLE_SESSION_NAME)
+        .setDurationSeconds(durationSeconds)
+        .setProviderId(PROVIDER_ID)
+        .setRequestId(REQUEST_ID)
+        .setWebIdentityToken(webIdentityToken);
   }
 
   private static void assertThrowableChainDoesNotContain(Throwable throwable,

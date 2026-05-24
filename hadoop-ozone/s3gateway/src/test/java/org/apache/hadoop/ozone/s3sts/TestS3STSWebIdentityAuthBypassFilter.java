@@ -27,7 +27,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -35,6 +34,7 @@ import javax.ws.rs.HttpMethod;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.UriInfo;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.s3.AuthorizationFilter;
 import org.junit.jupiter.api.Test;
@@ -124,10 +124,7 @@ public class TestS3STSWebIdentityAuthBypassFilter {
   private static S3STSWebIdentityAuthBypassFilter filter(boolean enabled) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_STS_WEB_IDENTITY_ENABLED, enabled);
-    S3STSWebIdentityAuthBypassFilter filter =
-        new S3STSWebIdentityAuthBypassFilter();
-    filter.setOzoneConfiguration(conf);
-    return filter;
+    return new S3STSWebIdentityAuthBypassFilter(conf);
   }
 
   private static void assertDoesNotSkipPost(String body) throws Exception {
@@ -172,12 +169,6 @@ public class TestS3STSWebIdentityAuthBypassFilter {
   }
 
   private static String read(InputStream stream) throws Exception {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    byte[] buffer = new byte[256];
-    int read;
-    while ((read = stream.read(buffer)) != -1) {
-      out.write(buffer, 0, read);
-    }
-    return new String(out.toByteArray(), StandardCharsets.UTF_8);
+    return new String(IOUtils.toByteArray(stream), StandardCharsets.UTF_8);
   }
 }

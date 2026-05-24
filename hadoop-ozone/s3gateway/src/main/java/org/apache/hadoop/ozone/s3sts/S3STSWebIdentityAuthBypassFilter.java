@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.s3sts;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import javax.annotation.Priority;
 import javax.inject.Inject;
@@ -45,8 +44,16 @@ import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 public class S3STSWebIdentityAuthBypassFilter
     implements ContainerRequestFilter {
 
+  private final OzoneConfiguration ozoneConfiguration;
+
+  public S3STSWebIdentityAuthBypassFilter() {
+    this(null);
+  }
+
   @Inject
-  private OzoneConfiguration ozoneConfiguration;
+  public S3STSWebIdentityAuthBypassFilter(OzoneConfiguration conf) {
+    this.ozoneConfiguration = conf;
+  }
 
   @Override
   public void filter(ContainerRequestContext context) throws IOException {
@@ -67,8 +74,4 @@ public class S3STSWebIdentityAuthBypassFilter
         OZONE_STS_WEB_IDENTITY_ENABLED_DEFAULT);
   }
 
-  @VisibleForTesting
-  void setOzoneConfiguration(OzoneConfiguration conf) {
-    this.ozoneConfiguration = conf;
-  }
 }

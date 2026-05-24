@@ -137,16 +137,13 @@ subsequent S3 access.
 </property>
 ```
 
-For local tests only, HTTP issuer and JWKS URLs can be enabled explicitly:
+For local tests only, HTTP issuer and JWKS URLs can be enabled explicitly by
+turning off the HTTPS requirement:
 
 ```xml
 <property>
   <name>ozone.sts.web.identity.require.https</name>
   <value>false</value>
-</property>
-<property>
-  <name>ozone.sts.web.identity.allow.insecure.http.for.tests</name>
-  <value>true</value>
 </property>
 ```
 
