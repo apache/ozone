@@ -152,7 +152,6 @@
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven.compiler.createMissingPackageInfoClass>false</maven.compiler.createMissingPackageInfoClass>
     <maven.compiler.release>8</maven.compiler.release>
-    <maven.core.version>3.9.15</maven.core.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
@@ -2439,13 +2438,6 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>properties-maven-plugin</artifactId>
         <version>${properties.maven.plugin.version}</version>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.maven</groupId>
-            <artifactId>maven-core</artifactId>
-            <version>${maven.core.version}</version>
-          </dependency>
-        </dependencies>
       </plugin>
       <plugin>
         <groupId>org.apache.rat</groupId>
