@@ -277,6 +277,57 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # export OZONE_SCM_OPTS=""
 
 ###
+# S3 Gateway specific parameters
+###
+# Specify the JVM options to be used when starting the S3 Gateway.
+# These options will be appended to the options specified as OZONE_OPTS
+# and therefore may override any similar flags set in OZONE_OPTS
+#
+# export OZONE_S3G_OPTS=""
+
+###
+# Recon specific parameters
+###
+# Specify the JVM options to be used when starting Recon.
+# These options will be appended to the options specified as OZONE_OPTS
+# and therefore may override any similar flags set in OZONE_OPTS
+#
+# export OZONE_RECON_OPTS=""
+
+###
+# HttpFS Gateway specific parameters
+###
+# Specify the JVM options to be used when starting the HttpFS Gateway.
+# These options will be appended to the options specified as OZONE_OPTS
+# and therefore may override any similar flags set in OZONE_OPTS
+#
+# export OZONE_HTTPFS_OPTS=""
+
+###
+# CSI server specific parameters
+###
+# Specify the JVM options to be used when starting the CSI server.
+# These options will be appended to the options specified as OZONE_OPTS
+# and therefore may override any similar flags set in OZONE_OPTS
+#
+# export OZONE_CSI_OPTS=""
+
+###
+# Client and tool command specific parameters
+###
+# Specify the JVM options to be used when running the corresponding command
+# (ozone sh, fs, admin, debug, freon, vapor).  These options will be appended
+# to the options specified as OZONE_OPTS and therefore may override any
+# similar flags set in OZONE_OPTS
+#
+# export OZONE_SH_OPTS=""
+# export OZONE_FS_OPTS=""
+# export OZONE_ADMIN_OPTS=""
+# export OZONE_DEBUG_OPTS=""
+# export OZONE_FREON_OPTS=""
+# export OZONE_VAPOR_OPTS=""
+
+###
 # Advanced Users Only!
 ###
 
