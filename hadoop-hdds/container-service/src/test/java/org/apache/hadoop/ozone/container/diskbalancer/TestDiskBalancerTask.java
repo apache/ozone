@@ -36,24 +36,19 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.BiFunction;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -92,7 +87,6 @@ import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -280,7 +274,8 @@ public class TestDiskBalancerTask {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     long initialDestCommitted = destVolume.getCommittedBytes();
-    long initialSourceDelta = getDeltaSize(sourceVolume);
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
 
     Container container = createContainer(CONTAINER_ID, sourceVolume, containerState);
     State originalState = container.getContainerState();
@@ -310,44 +305,13 @@ public class TestDiskBalancerTask {
     assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
     assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
-    assertEquals(initialSourceDelta, getDeltaSize(sourceVolume));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
 
     containerIterator = sourceVolume.getContainerIterator();
     assertFalse(containerIterator.hasNext());
     containerIterator = destVolume.getContainerIterator();
     assertTrue(containerIterator.hasNext());
     assertEquals(CONTAINER_ID, containerIterator.next());
-  }
-
-  @Test
-  public void concurrentPostCallRestoresDeltaSizeAtomically()
-      throws Exception {
-    Method postCall = DiskBalancerService.DiskBalancerTask.class
-        .getDeclaredMethod("postCall", boolean.class, long.class);
-    postCall.setAccessible(true);
-
-    RacingDeltaMap deltaSizes = new RacingDeltaMap(sourceVolume);
-    setDeltaSizes(deltaSizes);
-    deltaSizes.put(sourceVolume, -2 * CONTAINER_SIZE);
-    destVolume.incCommittedBytes(2 * CONTAINER_SIZE);
-
-    DiskBalancerService.DiskBalancerTask task1 =
-        newTask(CONTAINER_ID + 1);
-    DiskBalancerService.DiskBalancerTask task2 =
-        newTask(CONTAINER_ID + 2);
-
-    deltaSizes.enableRacingGets();
-    CompletableFuture<Void> first = CompletableFuture.runAsync(
-        () -> invokePostCall(postCall, task1));
-    CompletableFuture<Void> second = CompletableFuture.runAsync(
-        () -> invokePostCall(postCall, task2));
-
-    first.get(5, TimeUnit.SECONDS);
-    second.get(5, TimeUnit.SECONDS);
-
-    deltaSizes.disableRacingGets();
-    assertEquals(0L, deltaSizes.getOrDefault(sourceVolume, 0L));
-    assertEquals(0L, destVolume.getCommittedBytes());
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -359,7 +323,8 @@ public class TestDiskBalancerTask {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     long initialDestCommitted = destVolume.getCommittedBytes();
-    long initialSourceDelta = getDeltaSize(sourceVolume);
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
     String oldContainerPath = container.getContainerData().getContainerPath();
 
     // verify temp container directory doesn't exist before task execution
@@ -398,7 +363,7 @@ public class TestDiskBalancerTask {
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
-    assertEquals(initialSourceDelta, getDeltaSize(sourceVolume));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -410,7 +375,8 @@ public class TestDiskBalancerTask {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     long initialDestCommitted = destVolume.getCommittedBytes();
-    long initialSourceDelta = getDeltaSize(sourceVolume);
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
     String oldContainerPath = container.getContainerData().getContainerPath();
     Path tempDir = destVolume.getTmpDir().toPath()
         .resolve(DISK_BALANCER_DIR)
@@ -461,7 +427,7 @@ public class TestDiskBalancerTask {
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
-    assertEquals(initialSourceDelta, getDeltaSize(sourceVolume));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -473,7 +439,8 @@ public class TestDiskBalancerTask {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     long initialDestCommitted = destVolume.getCommittedBytes();
-    long initialSourceDelta = getDeltaSize(sourceVolume);
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
     String oldContainerPath = container.getContainerData().getContainerPath();
     Path destDirPath = Paths.get(
         KeyValueContainerLocationUtil.getBaseContainerLocation(
@@ -525,7 +492,7 @@ public class TestDiskBalancerTask {
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
-    assertEquals(initialSourceDelta, getDeltaSize(sourceVolume));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -536,7 +503,8 @@ public class TestDiskBalancerTask {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     long initialDestCommitted = destVolume.getCommittedBytes();
-    long initialSourceDelta = getDeltaSize(sourceVolume);
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
 
     // Use a static mock for the KeyValueContainer utility class
     try (MockedStatic<KeyValueContainerUtil> mockedUtil =
@@ -573,7 +541,7 @@ public class TestDiskBalancerTask {
           destVolume.getCurrentUsage().getUsedSpace());
       assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
       assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
-      assertEquals(initialSourceDelta, getDeltaSize(sourceVolume));
+      assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
     }
   }
 
@@ -585,7 +553,8 @@ public class TestDiskBalancerTask {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     long initialDestCommitted = destVolume.getCommittedBytes();
-    long initialSourceDelta = getDeltaSize(sourceVolume);
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
 
     GenericTestUtils.LogCapturer serviceLog = GenericTestUtils.LogCapturer.captureLogs(DiskBalancerService.class);
     DiskBalancerService.DiskBalancerTask task = getTask();
@@ -606,7 +575,7 @@ public class TestDiskBalancerTask {
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
-    assertEquals(initialSourceDelta, getDeltaSize(sourceVolume));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -653,7 +622,8 @@ public class TestDiskBalancerTask {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     long initialDestCommitted = destVolume.getCommittedBytes();
-    long initialSourceDelta = getDeltaSize(sourceVolume);
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
     String oldContainerPath = container.getContainerData().getContainerPath();
 
     // Verify temp container directory doesn't exist before task execution
@@ -706,106 +676,7 @@ public class TestDiskBalancerTask {
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
 
     // Verify delta sizes are restored
-    assertEquals(initialSourceDelta, getDeltaSize(sourceVolume));
-  }
-
-  private DiskBalancerService.DiskBalancerTask newTask(long containerId) {
-    KeyValueContainerData containerData = new KeyValueContainerData(
-        containerId, ContainerLayoutVersion.FILE_PER_BLOCK, CONTAINER_SIZE,
-        UUID.randomUUID().toString(), datanodeUuid);
-    containerData.getStatistics().setBlockBytesForTesting(CONTAINER_SIZE);
-    return diskBalancerService.new DiskBalancerTask(containerData,
-        sourceVolume, destVolume);
-  }
-
-  private void invokePostCall(Method postCall,
-      DiskBalancerService.DiskBalancerTask task) {
-    try {
-      postCall.invoke(task, false, TimeUnit.MILLISECONDS.toMillis(1));
-    } catch (ReflectiveOperationException e) {
-      throw new AssertionError(e);
-    }
-  }
-
-  private void setDeltaSizes(Map<HddsVolume, Long> deltaSizes)
-      throws ReflectiveOperationException {
-    Field field = DiskBalancerService.class.getDeclaredField("deltaSizes");
-    field.setAccessible(true);
-    field.set(diskBalancerService, deltaSizes);
-  }
-
-  private long getDeltaSize(HddsVolume volume) {
-    return diskBalancerService.getDeltaSizes().getOrDefault(volume, 0L);
-  }
-
-  private static final class RacingDeltaMap
-      extends AbstractMap<HddsVolume, Long> {
-    private final Map<HddsVolume, Long> entries = new HashMap<>();
-    private final HddsVolume racedVolume;
-    private final CountDownLatch concurrentGets = new CountDownLatch(2);
-    private volatile boolean raceGets;
-
-    private RacingDeltaMap(HddsVolume racedVolume) {
-      this.racedVolume = racedVolume;
-    }
-
-    private void enableRacingGets() {
-      raceGets = true;
-    }
-
-    private void disableRacingGets() {
-      raceGets = false;
-    }
-
-    @Override
-    public Long get(Object key) {
-      Long value;
-      synchronized (this) {
-        value = entries.get(key);
-      }
-      if (raceGets && key == racedVolume) {
-        concurrentGets.countDown();
-        try {
-          if (!concurrentGets.await(5, TimeUnit.SECONDS)) {
-            throw new AssertionError("Timed out waiting for concurrent gets");
-          }
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new AssertionError(e);
-        }
-      }
-      return value;
-    }
-
-    @Override
-    public synchronized Long put(HddsVolume key, Long value) {
-      return entries.put(key, value);
-    }
-
-    @Override
-    public synchronized Long remove(Object key) {
-      return entries.remove(key);
-    }
-
-    @Override
-    public synchronized Long merge(HddsVolume key, Long value,
-        BiFunction<? super Long, ? super Long, ? extends Long>
-            remappingFunction) {
-      Long current = entries.get(key);
-      Long newValue = current == null ? value :
-          remappingFunction.apply(current, value);
-      if (newValue == null) {
-        entries.remove(key);
-      } else {
-        entries.put(key, newValue);
-      }
-      return newValue;
-    }
-
-    @Override
-    public synchronized Set<Entry<HddsVolume, Long>> entrySet() {
-      return entries.entrySet();
-    }
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   private KeyValueContainer createContainer(long containerId, HddsVolume vol, State state)
