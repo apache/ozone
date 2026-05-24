@@ -582,8 +582,8 @@ public class TestSCMCommonPlacementPolicy {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getAllNodes()).thenAnswer(inv -> nodes);
 
-    // Topology that reports zero racks at the rack level - the empty
-    // -topology window observed during DN decommission.
+    // Topology that reports zero racks at the rack level during the
+    // empty-topology window observed during DN decommission.
     NetworkTopology topology = mock(NetworkTopology.class);
     when(topology.getMaxLevel()).thenReturn(3);
     when(topology.getNumOfNodes(anyInt())).thenReturn(0);
