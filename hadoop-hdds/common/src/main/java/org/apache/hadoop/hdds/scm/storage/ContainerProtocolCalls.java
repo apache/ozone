@@ -344,17 +344,24 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
-   * Calls the container protocol to read a chunk.
+   * Calls the container protocol to read a chunk and returns the outer
+   * {@link ContainerCommandResponseProto}. The caller is responsible for
+   * invoking
+   * {@link XceiverClientSpi#releaseReceivedResponse(ContainerCommandResponseProto)}
+   * on the returned response once the chunk bytes are no longer needed.
+   * The outer wrapper is returned (rather than just the inner
+   * {@link ReadChunkResponseProto}) so that the caller has a stable reference
+   * for the zero-copy release.
    *
    * @param xceiverClient client to perform call
    * @param chunk information about chunk to read
    * @param blockID ID of the block
    * @param validators functions to validate the response
    * @param token a token for this block (may be null)
-   * @return container protocol read chunk response
+   * @return outer container command response containing the read chunk reply
    * @throws IOException if there is an I/O error while performing the call
    */
-  public static ContainerProtos.ReadChunkResponseProto readChunk(
+  public static ContainerCommandResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
       List<Validator> validators,
       Token<? extends TokenIdentifier> token) throws IOException {
@@ -383,7 +390,7 @@ public final class ContainerProtocolCalls  {
     }
   }
 
-  private static ContainerProtos.ReadChunkResponseProto readChunk(
+  private static ContainerCommandResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
       List<Validator> validators,
       ContainerCommandRequestProto.Builder builder,
@@ -399,10 +406,12 @@ public final class ContainerProtocolCalls  {
     final ReadChunkResponseProto response = reply.getReadChunk();
     final long readLen = getLen(response);
     if (readLen != chunk.getLen()) {
+      // Release the zero-copy-tracked buffer before propagating the error.
+      xceiverClient.releaseReceivedResponse(reply);
       throw new IOException(toErrorMessage(chunk, blockID, d)
           + ": readLen=" + readLen);
     }
-    return response;
+    return reply;
   }
 
   static String toErrorMessage(ChunkInfo chunk, DatanodeBlockID blockId,

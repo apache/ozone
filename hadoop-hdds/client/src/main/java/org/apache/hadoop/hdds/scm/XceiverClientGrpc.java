@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -63,8 +64,15 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.thirdparty.io.grpc.CallOptions;
+import org.apache.ratis.thirdparty.io.grpc.Channel;
+import org.apache.ratis.thirdparty.io.grpc.ClientCall;
+import org.apache.ratis.thirdparty.io.grpc.ClientInterceptor;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
@@ -91,6 +99,82 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
   private static final int SHUTDOWN_WAIT_INTERVAL_MILLIS = 100;
   private static final int SHUTDOWN_WAIT_MAX_SECONDS = 5;
+
+  /**
+   * Zero-copy marshaller for inbound {@link ContainerCommandResponseProto}.
+   * For {@code ReadChunk} responses, the parsed proto's bytes fields alias
+   * the inbound Netty buffer (avoiding a chunk-sized memcpy); the buffer is
+   * held until {@link ChunkInputStream} releases it via
+   * {@link #releaseReceivedResponse}. Other response types are deep-copied
+   * inside the wrapping marshaller and released immediately, so callers
+   * never observe a buffer-aliased non-{@code ReadChunk} response.
+   */
+  private static final ZeroCopyMessageMarshaller<ContainerCommandResponseProto>
+      ZERO_COPY_RESPONSE_MARSHALLER = new ZeroCopyMessageMarshaller<>(
+          ContainerCommandResponseProto.getDefaultInstance());
+
+  /**
+   * Marshaller used as the response marshaller of the {@code send} method.
+   * Delegates outbound {@code stream()} to the default, and inbound
+   * {@code parse()} to the zero-copy marshaller. After a successful
+   * zero-copy parse, non-{@code ReadChunk} responses are deep-copied and
+   * the original buffer-aliased response is released, so only
+   * {@code ReadChunk} responses retain the Netty buffer until the caller
+   * is done with the chunk bytes.
+   */
+  private static final MethodDescriptor.Marshaller<ContainerCommandResponseProto>
+      RESPONSE_MARSHALLER =
+      new MethodDescriptor.Marshaller<ContainerCommandResponseProto>() {
+        @Override
+        public InputStream stream(ContainerCommandResponseProto value) {
+          return ZERO_COPY_RESPONSE_MARSHALLER.stream(value);
+        }
+
+        @Override
+        public ContainerCommandResponseProto parse(InputStream stream) {
+          ContainerCommandResponseProto resp =
+              ZERO_COPY_RESPONSE_MARSHALLER.parse(stream);
+          if (resp == null
+              || resp.getCmdType() == ContainerProtos.Type.ReadChunk) {
+            return resp;
+          }
+          // Materialize all bytes fields into byte[]-backed ByteStrings so
+          // the response is independent of the Netty inbound buffer, then
+          // release the underlying buffer back to the pool.
+          try {
+            return ContainerCommandResponseProto.parseFrom(resp.toByteArray());
+          } catch (InvalidProtocolBufferException e) {
+            throw Status.INTERNAL.withDescription("Failed to materialize response")
+                .withCause(e).asRuntimeException();
+          } finally {
+            ZERO_COPY_RESPONSE_MARSHALLER.release(resp);
+          }
+        }
+      };
+
+  /**
+   * gRPC interceptor that installs {@link #RESPONSE_MARSHALLER} as the
+   * response marshaller for the {@code send} bidi-streaming method.
+   */
+  private static final ClientInterceptor ZERO_COPY_INTERCEPTOR =
+      new ClientInterceptor() {
+        @Override
+        public <ReqT, RespT> ClientCall<ReqT, RespT> interceptCall(
+            MethodDescriptor<ReqT, RespT> method,
+            CallOptions callOptions, Channel next) {
+          if (XceiverClientProtocolServiceGrpc.getSendMethod()
+              .getFullMethodName().equals(method.getFullMethodName())) {
+            @SuppressWarnings("unchecked")
+            final MethodDescriptor.Marshaller<RespT> respMarshaller =
+                (MethodDescriptor.Marshaller<RespT>) RESPONSE_MARSHALLER;
+            method = method.toBuilder()
+                .setResponseMarshaller(respMarshaller)
+                .build();
+          }
+          return next.newCall(method, callOptions);
+        }
+      };
+
   private final Pipeline pipeline;
   private final ConfigurationSource config;
   private final XceiverClientMetrics metrics;
@@ -210,7 +294,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(dnHost, port)
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
             .proxyDetector(uri -> null)
-            .intercept(new GrpcClientInterceptor());
+            // Order matters. The zero-copy interceptor swaps the response
+            // marshaller for `send`; the tracing interceptor wraps that.
+            .intercept(new GrpcClientInterceptor())
+            .intercept(ZERO_COPY_INTERCEPTOR);
     if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (trustManager != null) {
@@ -764,6 +851,15 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   public void setTimeout(long timeout) {
     this.timeout = timeout;
+  }
+
+  @Override
+  public void releaseReceivedResponse(ContainerCommandResponseProto response) {
+    if (response != null) {
+      // Idempotent: the marshaller no-ops if `response` was never tracked
+      // (i.e., parsed via the standard fallback path).
+      ZERO_COPY_RESPONSE_MARSHALLER.release(response);
+    }
   }
 
   /**

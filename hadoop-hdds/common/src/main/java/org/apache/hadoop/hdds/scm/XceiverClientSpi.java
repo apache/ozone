@@ -129,12 +129,15 @@ public abstract class XceiverClientSpi implements Closeable {
       ContainerCommandRequestProto request,
       List<Validator> validators)
       throws IOException {
+    ContainerCommandResponseProto responseProto = null;
+    boolean validatorsPassed = false;
     try {
       XceiverClientReply reply = sendCommandAsync(request);
-      ContainerCommandResponseProto responseProto = reply.getResponse().get();
+      responseProto = reply.getResponse().get();
       for (Validator function : validators) {
         function.accept(request, responseProto);
       }
+      validatorsPassed = true;
       return responseProto;
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
@@ -142,6 +145,13 @@ public abstract class XceiverClientSpi implements Closeable {
       throw getIOExceptionForSendCommand(request, e);
     } catch (ExecutionException e) {
       throw getIOExceptionForSendCommand(request, e);
+    } finally {
+      // If a validator threw, the caller never receives the response, so
+      // release any zero-copy-tracked buffer here. Successful responses are
+      // returned to the caller, who is responsible for releasing them.
+      if (responseProto != null && !validatorsPassed) {
+        releaseReceivedResponse(responseProto);
+      }
     }
   }
 
@@ -204,4 +214,22 @@ public abstract class XceiverClientSpi implements Closeable {
   public abstract Map<DatanodeDetails, ContainerCommandResponseProto>
       sendCommandOnAllNodes(ContainerCommandRequestProto request)
       throws IOException, InterruptedException;
+
+  /**
+   * Release the resources held on behalf of a previously-received response.
+   * <p>
+   * When the underlying transport parses a response with a zero-copy
+   * marshaller, the parsed proto's {@code bytes} fields reference the
+   * Netty-managed pooled buffer of the inbound message. Those buffers must
+   * be released back to Netty when the caller is done with the proto;
+   * otherwise direct memory accumulates. Callers of {@code sendCommand}
+   * that retain the response past the call (e.g. {@code ReadChunk} via
+   * {@code ChunkInputStream}) must invoke this method once they are done.
+   * <p>
+   * This method is idempotent and safe to call on responses that were
+   * never tracked by a zero-copy marshaller.
+   */
+  public void releaseReceivedResponse(ContainerCommandResponseProto response) {
+    // Default: transport without zero-copy support -> no-op.
+  }
 }
