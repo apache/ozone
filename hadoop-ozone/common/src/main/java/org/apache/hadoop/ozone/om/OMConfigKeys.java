@@ -621,7 +621,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.cache.cleanup.service.run.interval";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.MINUTES.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(60);
   public static final long
       OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);

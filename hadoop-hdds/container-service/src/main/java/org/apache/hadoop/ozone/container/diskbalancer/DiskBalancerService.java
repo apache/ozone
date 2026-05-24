@@ -443,8 +443,7 @@ public class DiskBalancerService extends BackgroundService {
               destVolume);
           queue.add(task);
           inProgressContainers.add(ContainerID.valueOf(toBalanceContainer.getContainerID()));
-          deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
-              - toBalanceContainer.getBytesUsed());
+          deltaSizes.merge(sourceVolume, -toBalanceContainer.getBytesUsed(), Long::sum);
         }
       }
     }
@@ -654,8 +653,7 @@ public class DiskBalancerService extends BackgroundService {
 
     private void postCall(boolean success, long startTime) {
       inProgressContainers.remove(ContainerID.valueOf(containerData.getContainerID()));
-      deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
-          containerData.getBytesUsed());
+      deltaSizes.merge(sourceVolume, containerData.getBytesUsed(), Long::sum);
       destVolume.incCommittedBytes(0 - containerData.getBytesUsed());
       long endTime = Time.monotonicNow();
       if (success) {

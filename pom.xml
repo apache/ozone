@@ -32,7 +32,7 @@
     <annotation-api.version>1.3.2</annotation-api.version>
     <aopalliance.version>1.0</aopalliance.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
-    <asm.version>9.9.1</asm.version>
+    <asm.version>9.10</asm.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
     <aspectj.java11.version>1.9.20</aspectj.java11.version>
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
@@ -134,7 +134,7 @@
     <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
     <maven-dependency-plugin.version>3.10.0</maven-dependency-plugin.version>
     <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
-    <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
     <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
     <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
     <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
@@ -207,7 +207,7 @@
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.53.0.0</sqlite.version>
+    <sqlite.version>3.53.1.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
