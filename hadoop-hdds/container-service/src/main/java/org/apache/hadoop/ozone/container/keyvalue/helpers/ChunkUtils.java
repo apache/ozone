@@ -202,18 +202,25 @@ public final class ChunkUtils {
   @SuppressWarnings("checkstyle:parameternumber")
   public static ChunkBuffer readData(long len, int bufferCapacity,
       File file, long off, HddsVolume volume, int readMappedBufferThreshold, boolean mmapEnabled,
-      MappedBufferManager mappedBufferManager) throws StorageContainerException {
+      MappedBufferManager mappedBufferManager, DispatcherContext dispatcherContext)
+      throws StorageContainerException {
     if (mmapEnabled && len > readMappedBufferThreshold && bufferCapacity > readMappedBufferThreshold) {
-      return readData(file, bufferCapacity, off, len, volume, mappedBufferManager);
+      return readData(file, bufferCapacity, off, len, volume, mappedBufferManager, dispatcherContext);
     } else if (len == 0) {
       return ChunkBuffer.wrap(Collections.emptyList());
+    } else {
+      final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(len, bufferCapacity);
+      readData(file, off, len, c -> c.position(off).read(buffers), volume);
+      Arrays.stream(buffers).forEach(ByteBuffer::flip);
+      if (dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
+        dispatcherContext.setReleaseMethod(() -> {
+          for (ByteBuffer buf : buffers) {
+            BufferUtils.BUFFER_POOL.returnBuffer(buf);
+          }
+        });
+      }
+      return ChunkBuffer.wrap(Arrays.asList(buffers));
     }
-
-    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(len,
-        bufferCapacity);
-    readData(file, off, len, c -> c.position(off).read(buffers), volume);
-    Arrays.stream(buffers).forEach(ByteBuffer::flip);
-    return ChunkBuffer.wrap(Arrays.asList(buffers));
   }
 
   private static void readData(File file, long offset, long len,
@@ -253,16 +260,23 @@ public final class ChunkUtils {
    * @return a list of {@link MappedByteBuffer} containing the data.
    */
   private static ChunkBuffer readData(File file, int chunkSize,
-      long offset, long length, HddsVolume volume, MappedBufferManager mappedBufferManager)
+      long offset, long length, HddsVolume volume, MappedBufferManager mappedBufferManager,
+      DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
     final int bufferNum = Math.toIntExact((length - 1) / chunkSize) + 1;
     if (!mappedBufferManager.getQuota(bufferNum)) {
       // proceed with normal buffer
-      final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(length,
-          chunkSize);
+      final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(length, chunkSize);
       readData(file, offset, length, c -> c.position(offset).read(buffers), volume);
       Arrays.stream(buffers).forEach(ByteBuffer::flip);
+      if (dispatcherContext != null && dispatcherContext.isReleaseSupported()) {
+        dispatcherContext.setReleaseMethod(() -> {
+          for (ByteBuffer buf : buffers) {
+            BufferUtils.BUFFER_POOL.returnBuffer(buf);
+          }
+        });
+      }
       return ChunkBuffer.wrap(Arrays.asList(buffers));
     } else {
       try {
