@@ -154,6 +154,10 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # helper scripts # such as workers.sh, start-ozone.sh, etc.
 # export OZONE_WORKERS="${OZONE_CONF_DIR}/workers"
 
+# A space-separated list of worker host names, used as an alternative to the
+# OZONE_WORKERS file.  Only one of OZONE_WORKERS or OZONE_WORKER_NAMES may be set.
+# export OZONE_WORKER_NAMES=""
+
 ###
 # Options for all daemons
 ###
@@ -167,6 +171,15 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # or set differently in certain contexts (e.g., secure vs
 # non-secure)
 #
+
+# Extra Java runtime options for all Ozone server daemons (OM, SCM, DataNode,
+# S3 Gateway, Recon, HttpFS, CSI).  These get appended to OZONE_OPTS for such
+# daemons and are a convenient way to apply common options to all of them.
+# export OZONE_SERVER_OPTS=""
+
+# Simple override of the default log level used to build OZONE_ROOT_LOGGER and
+# OZONE_DAEMON_ROOT_LOGGER.  Defaults to INFO.
+# export OZONE_LOGLEVEL=INFO
 
 # Where (primarily) daemon log files are stored.
 # ${OZONE_HOME}/logs by default.
@@ -232,6 +245,9 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # protocol.  Jsvc is not required if SASL is configured for authentication of
 # data transfer protocol using non-privileged ports.
 # export JSVC_HOME=/usr/bin
+
+# Extra arguments to pass to jsvc when launching secure/privileged daemons.
+# export OZONE_DAEMON_JSVC_EXTRA_OPTS=""
 
 #
 # This directory contains pids for secure and privileged processes.
