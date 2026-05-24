@@ -220,16 +220,6 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # Java property: hadoop.policy.file
 # export OZONE_POLICYFILE="hadoop-policy.xml"
 
-#
-# NOTE: this is not used by default!  <-----
-# You can define variables right here and then re-use them later on.
-# For example, it is common to use the same garbage collection settings
-# for all the daemons.  So one could define:
-#
-# export OZONE_GC_SETTINGS="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps"
-#
-# .. and then use it when setting OZONE_OM_OPTS, etc. below
-
 ###
 # Secure/privileged execution
 ###
@@ -257,13 +247,6 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # This directory contains the logs for secure and privileged processes.
 # Java property: hadoop.log.dir
 # export OZONE_SECURE_LOG_DIR=${OZONE_LOG_DIR}
-
-#
-# When running a secure daemon, the default value of OZONE_IDENT_STRING
-# ends up being a bit bogus.  Therefore, by default, the code will
-# replace OZONE_IDENT_STRING with OZONE_xx_SECURE_USER.  If one wants
-# to keep OZONE_IDENT_STRING untouched, then uncomment this line.
-# export OZONE_SECURE_IDENT_PRESERVE="true"
 
 ###
 # Ozone Manager specific parameters
