@@ -46,6 +46,11 @@ public class S3STSWebIdentityAuthBypassFilter
 
   private final OzoneConfiguration ozoneConfiguration;
 
+  /**
+   * No-arg constructor for Jersey provider instantiation without injection.
+   * Falls back to OzoneConfigurationHolder and fails closed when no
+   * configuration is available.
+   */
   public S3STSWebIdentityAuthBypassFilter() {
     this(null);
   }

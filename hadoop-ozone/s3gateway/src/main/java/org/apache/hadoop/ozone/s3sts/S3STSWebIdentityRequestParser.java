@@ -18,14 +18,16 @@
 package org.apache.hadoop.ozone.s3sts;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.ws.rs.HttpMethod;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
-import org.apache.commons.io.IOUtils;
+import javax.ws.rs.core.Response;
 
 /**
  * Parses the STS action without logging request parameters.
@@ -35,6 +37,10 @@ final class S3STSWebIdentityRequestParser {
   static final String ACTION = "Action";
   static final String ASSUME_ROLE_WITH_WEB_IDENTITY =
       "AssumeRoleWithWebIdentity";
+  static final int MAX_FORM_BODY_BYTES = 64 * 1024;
+
+  private static final int BUFFER_SIZE = 8192;
+  private static final int HTTP_PAYLOAD_TOO_LARGE = 413;
 
   private S3STSWebIdentityRequestParser() {
   }
@@ -65,7 +71,7 @@ final class S3STSWebIdentityRequestParser {
       return null;
     }
 
-    byte[] body = IOUtils.toByteArray(stream);
+    byte[] body = readBoundedFormBody(stream);
     context.setEntityStream(new ByteArrayInputStream(body));
     String form = new String(body, StandardCharsets.UTF_8);
     String action = null;
@@ -87,6 +93,28 @@ final class S3STSWebIdentityRequestParser {
 
   private static String decode(String value) throws IOException {
     return URLDecoder.decode(value, StandardCharsets.UTF_8.name());
+  }
+
+  private static byte[] readBoundedFormBody(InputStream stream)
+      throws IOException {
+    ByteArrayOutputStream body =
+        new ByteArrayOutputStream(Math.min(MAX_FORM_BODY_BYTES, BUFFER_SIZE));
+    byte[] buffer = new byte[BUFFER_SIZE];
+    int remaining = MAX_FORM_BODY_BYTES;
+    while (remaining > 0) {
+      int read = stream.read(buffer, 0, Math.min(buffer.length, remaining));
+      if (read == -1) {
+        return body.toByteArray();
+      }
+      body.write(buffer, 0, read);
+      remaining -= read;
+    }
+    if (stream.read() != -1) {
+      throw new WebApplicationException(
+          "STS WebIdentity request body is too large",
+          Response.status(HTTP_PAYLOAD_TOO_LARGE).build());
+    }
+    return body.toByteArray();
   }
 
   private static String singleAction(List<String> values) {

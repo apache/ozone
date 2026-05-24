@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3sts;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_STS_WEB_IDENTITY_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -31,6 +32,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import javax.ws.rs.HttpMethod;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.UriInfo;
@@ -96,6 +98,39 @@ public class TestS3STSWebIdentityAuthBypassFilter {
         ArgumentCaptor.forClass(InputStream.class);
     verify(context).setEntityStream(streamCaptor.capture());
     assertEquals(body, read(streamCaptor.getValue()));
+  }
+
+  @Test
+  public void postWebIdentityRequestAtBodyLimitSkipsAwsAuthAndRestoresBody()
+      throws Exception {
+    S3STSWebIdentityAuthBypassFilter filter = filter(true);
+    String body = formBody(S3STSWebIdentityRequestParser.MAX_FORM_BODY_BYTES);
+    ContainerRequestContext context = context(HttpMethod.POST, null, body);
+
+    filter.filter(context);
+
+    verify(context).setProperty(AuthorizationFilter.SKIP_AWS_AUTH_PROPERTY,
+        Boolean.TRUE);
+    ArgumentCaptor<InputStream> streamCaptor =
+        ArgumentCaptor.forClass(InputStream.class);
+    verify(context).setEntityStream(streamCaptor.capture());
+    assertEquals(body, read(streamCaptor.getValue()));
+  }
+
+  @Test
+  public void oversizedPostWebIdentityRequestFailsBeforeBypass()
+      throws Exception {
+    S3STSWebIdentityAuthBypassFilter filter = filter(true);
+    String body = formBody(
+        S3STSWebIdentityRequestParser.MAX_FORM_BODY_BYTES + 1);
+    ContainerRequestContext context = context(HttpMethod.POST, null, body);
+
+    WebApplicationException ex = assertThrows(WebApplicationException.class,
+        () -> filter.filter(context));
+
+    assertEquals(413, ex.getResponse().getStatus());
+    verify(context, never()).setProperty(anyString(), any());
+    verify(context, never()).setEntityStream(any());
   }
 
   @Test
@@ -170,5 +205,16 @@ public class TestS3STSWebIdentityAuthBypassFilter {
 
   private static String read(InputStream stream) throws Exception {
     return new String(IOUtils.toByteArray(stream), StandardCharsets.UTF_8);
+  }
+
+  private static String formBody(int size) {
+    String prefix = "Action=AssumeRoleWithWebIdentity&WebIdentityToken=";
+    return prefix + repeat('a', size - prefix.length());
+  }
+
+  private static String repeat(char ch, int count) {
+    char[] chars = new char[count];
+    Arrays.fill(chars, ch);
+    return new String(chars);
   }
 }
