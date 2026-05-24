@@ -1521,11 +1521,6 @@
         <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>properties-maven-plugin</artifactId>
-        <version>${properties.maven.plugin.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.glassfish.hk2</groupId>
         <artifactId>guice-bridge</artifactId>
         <version>${hk2.version}</version>
