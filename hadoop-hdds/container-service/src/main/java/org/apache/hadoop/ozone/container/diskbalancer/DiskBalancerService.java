@@ -443,7 +443,7 @@ public class DiskBalancerService extends BackgroundService {
               destVolume);
           queue.add(task);
           inProgressContainers.add(ContainerID.valueOf(toBalanceContainer.getContainerID()));
-          reserveDeltaSize(sourceVolume, toBalanceContainer.getBytesUsed());
+          deltaSizes.merge(sourceVolume, -toBalanceContainer.getBytesUsed(), Long::sum);
         }
       }
     }
