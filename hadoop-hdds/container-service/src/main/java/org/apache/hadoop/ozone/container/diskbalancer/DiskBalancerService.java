@@ -691,7 +691,7 @@ public class DiskBalancerService extends BackgroundService {
 
     private void postCall(boolean success, long startTime) {
       inProgressContainers.remove(ContainerID.valueOf(containerData.getContainerID()));
-      releaseDeltaSize(sourceVolume, containerData.getBytesUsed());
+      deltaSizes.merge(sourceVolume, containerData.getBytesUsed(), Long::sum);
       destVolume.incCommittedBytes(0 - containerData.getBytesUsed());
       long endTime = Time.monotonicNow();
       if (success) {
