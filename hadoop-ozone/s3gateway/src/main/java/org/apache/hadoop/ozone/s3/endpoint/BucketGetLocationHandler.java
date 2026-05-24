@@ -41,7 +41,7 @@ class BucketGetLocationHandler extends BucketOperationHandler {
       return null;
     }
 
-    context.setAction(S3GAction.GET_BUCKET);
+    context.setAction(S3GAction.GET_BUCKET_LOCATION);
     throw newError(NOT_IMPLEMENTED, "GetBucketLocation");
   }
 }

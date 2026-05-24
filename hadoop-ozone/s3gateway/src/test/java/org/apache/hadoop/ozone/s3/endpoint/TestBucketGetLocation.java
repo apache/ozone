@@ -17,14 +17,12 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 
 import java.io.IOException;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,8 +47,6 @@ public class TestBucketGetLocation {
   public void getBucketLocationIsNotImplemented() {
     bucketEndpoint.queryParamsForTest().set(QueryParams.LOCATION, "");
 
-    final OS3Exception ex = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(BUCKET_NAME));
-    assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());
-    assertEquals("NotImplemented", ex.getCode());
+    assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> bucketEndpoint.get(BUCKET_NAME));
   }
 }
