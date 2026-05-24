@@ -788,10 +788,12 @@ public class TestDiskBalancerTask {
     }
 
     @Override
-    public synchronized Long compute(HddsVolume key,
-        BiFunction<? super HddsVolume, ? super Long, ? extends Long>
+    public synchronized Long merge(HddsVolume key, Long value,
+        BiFunction<? super Long, ? super Long, ? extends Long>
             remappingFunction) {
-      Long newValue = remappingFunction.apply(key, entries.get(key));
+      Long current = entries.get(key);
+      Long newValue = current == null ? value :
+          remappingFunction.apply(current, value);
       if (newValue == null) {
         entries.remove(key);
       } else {
