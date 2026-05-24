@@ -84,6 +84,17 @@ class TestDiskBalancerVolumeCalculation {
   }
 
   @Test
+  void buildVolumeReportProtoReportsZeroUtilizationForZeroCapacityVolume()
+      throws IOException {
+    HddsVolume volume = createVolume("zero-capacity-report", 0, 0);
+
+    assertEquals(0.0, DiskBalancerService.buildVolumeReportProto(
+        Collections.singletonList(
+            DiskBalancerVolumeCalculation.newVolumeFixedUsage(volume, null)))
+        .get(0).getUtilization());
+  }
+
+  @Test
   void getIdealUsageRejectsNegativeCapacity() throws IOException {
     HddsVolume negativeCapacityVolume = createVolume(
         "negative-capacity", -1, 0);
