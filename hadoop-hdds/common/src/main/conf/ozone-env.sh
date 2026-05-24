@@ -256,7 +256,7 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 #
 # This directory contains the logs for secure and privileged processes.
 # Java property: hadoop.log.dir
-# export OZONE_SECURE_LOG=${OZONE_LOG_DIR}
+# export OZONE_SECURE_LOG_DIR=${OZONE_LOG_DIR}
 
 #
 # When running a secure daemon, the default value of OZONE_IDENT_STRING
