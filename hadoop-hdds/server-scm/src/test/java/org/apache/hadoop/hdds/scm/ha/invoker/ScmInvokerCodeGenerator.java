@@ -618,7 +618,7 @@ public final class ScmInvokerCodeGenerator {
     }
     final File tmp = new File(dir, invokerClassName + "_tmp.java");
     if (tmp.exists()) {
-      throw new IOException("Already exist: " + java.getAbsolutePath());
+      throw new IOException("Already exist: " + tmp.getAbsolutePath());
     }
     tmp.deleteOnExit();
 
