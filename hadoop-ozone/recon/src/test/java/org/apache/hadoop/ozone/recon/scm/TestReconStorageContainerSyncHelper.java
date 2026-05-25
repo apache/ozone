@@ -189,12 +189,12 @@ class TestReconStorageContainerSyncHelper {
     boolean result = syncHelper.syncWithSCMContainerInfo();
 
     assertTrue(result);
-    // Pass 4 calls getContainers() (returns empty list, no action taken) so we assert
-    // on the meaningful mutations: no containers added, no state transitions applied.
+    // Other state passes may still run, so assert that the CLOSED pass was
+    // skipped and no meaningful mutations happened.
     verify(mockContainerManager, never()).addNewContainer(any());
     verify(mockContainerManager, never()).updateContainerState(any(), any());
     verify(mockScmServiceProvider, never())
-        .getListOfContainerIDs(any(), any(Integer.class), any());
+        .getListOfContainerIDs(any(), any(Integer.class), eq(CLOSED));
   }
 
   @Test
