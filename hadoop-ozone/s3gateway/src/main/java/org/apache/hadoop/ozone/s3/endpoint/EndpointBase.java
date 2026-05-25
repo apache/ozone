@@ -364,7 +364,16 @@ public abstract class EndpointBase {
 
     List<NameValuePair> tagPairs = URLEncodedUtils.parse(tagString, UTF_8);
 
-    return validateAndGetTagging(tagPairs, NameValuePair::getName, NameValuePair::getValue);
+    // Put Object with x-amz-tagging header. A segment with no '=' (e.g."foo=bar&bar") is
+    // typically represented as (key=bar, value=null). AWS S3 treats that as an empty value for "bar".
+    // We map null → "" here only for this header path.
+    // PutObjectTagging is different: the XML/JSON API requires each Tag to
+    // include a Value element; so a missing Value stays null and fails validation.
+    return validateAndGetTagging(tagPairs, NameValuePair::getName,
+        pair -> {
+          String v = pair.getValue();
+          return v != null ? v : "";
+        });
   }
 
   protected static <KV> Map<String, String> validateAndGetTagging(
@@ -390,7 +399,8 @@ public abstract class EndpointBase {
       }
 
       if (tagValue == null) {
-        // For example for query parameter with only value (e.g. "tag1")
+        // Missing tag value is invalid for PutObjectTagging XML/JSON; x-amz-tagging must
+        // normalize null to "" in getTaggingFromHeaders before calling this method.
         OS3Exception ex = S3ErrorTable.newError(INVALID_TAG, tagKey);
         ex.setErrorMessage("Some tag values are not specified, please specify the tag values");
         throw ex;
