@@ -2255,7 +2255,7 @@
             <goals>
               <goal>build-classpath</goal>
             </goals>
-            <phase>prepare-package</phase>
+            <phase>generate-resources</phase>
             <configuration>
               <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
               <prefix>$HDDS_LIB_JARS_DIR</prefix>
