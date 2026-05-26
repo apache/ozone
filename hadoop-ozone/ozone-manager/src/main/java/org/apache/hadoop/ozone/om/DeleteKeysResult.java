@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
@@ -27,11 +28,14 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 public class DeleteKeysResult {
 
   private List<OmKeyInfo> keysToDelete;
-
   private boolean processedKeys;
+  private List<ExclusiveRange> keyRanges;
 
-  public DeleteKeysResult(List<OmKeyInfo> keysToDelete, boolean processedKeys) {
-    this.keysToDelete = keysToDelete;
+  DeleteKeysResult(List<OmKeyInfo> keysToDelete, List<ExclusiveRange> keyRanges, boolean processedKeys) {
+    this.keysToDelete =
+        Collections.unmodifiableList(java.util.Objects.requireNonNull(keysToDelete, "keysToDelete must not be null"));
+    this.keyRanges =
+        Collections.unmodifiableList(java.util.Objects.requireNonNull(keyRanges, "keyRanges must not be null"));
     this.processedKeys = processedKeys;
   }
 
@@ -41,6 +45,32 @@ public class DeleteKeysResult {
 
   public boolean isProcessedKeys() {
     return processedKeys;
+  }
+
+  public List<ExclusiveRange> getKeyRanges() {
+    return keyRanges;
+  }
+
+  /**
+   * Represents a half-open key range {@code [startKey, exclusiveEndKey)} used
+   * for RocksDB deleteRange operations.
+   */
+  public static class ExclusiveRange {
+    private final String startKey;
+    private final String exclusiveEndKey;
+
+    public ExclusiveRange(String startKey, String exclusiveEndKey) {
+      this.startKey = java.util.Objects.requireNonNull(startKey, "startKey must not be null");
+      this.exclusiveEndKey = java.util.Objects.requireNonNull(exclusiveEndKey, "exclusiveEndKey must not be null");
+    }
+
+    public String getExclusiveEndKey() {
+      return exclusiveEndKey;
+    }
+
+    public String getStartKey() {
+      return startKey;
+    }
   }
 
 }

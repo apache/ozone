@@ -21,6 +21,7 @@ import static java.lang.String.format;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -2298,15 +2299,30 @@ public class KeyManagerImpl implements KeyManager {
     List<OmKeyInfo> keyInfos = new ArrayList<>();
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId, parentInfo.getObjectID(), "");
     try (TableIterator<String, ? extends KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
+      String startKey = null;
+      List<DeleteKeysResult.ExclusiveRange> keyRanges = new ArrayList<>();
       while (iterator.hasNext() && remainingNum > 0) {
         KeyValue<String, T> entry = iterator.next();
         KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
         if (deleteKeyFilter.apply(keyInfo)) {
           keyInfos.add(keyInfo.getValue());
           remainingNum--;
+          if (startKey == null) {
+            startKey = entry.getKey();
+          }
+        } else {
+          if (startKey != null) {
+            keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey, entry.getKey()));
+          }
+          startKey = null;
         }
       }
-      return new DeleteKeysResult(keyInfos, !iterator.hasNext());
+      boolean processedAllKeys = !iterator.hasNext();
+      if (startKey != null) {
+        keyRanges.add(new DeleteKeysResult.ExclusiveRange(startKey,
+            processedAllKeys ? getLexicographicallyHigherString(seekFileInDB) : iterator.next().getKey()));
+      }
+      return new DeleteKeysResult(keyInfos, keyRanges, processedAllKeys);
     }
   }
 

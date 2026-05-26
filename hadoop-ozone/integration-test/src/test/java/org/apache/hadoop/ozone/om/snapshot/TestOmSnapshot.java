@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
@@ -102,12 +103,15 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
@@ -141,6 +145,7 @@ import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -235,6 +240,7 @@ public abstract class TestOmSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
     conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, -1);
     conf.setTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL, 100, TimeUnit.MILLISECONDS);
     if (!disableNativeDiff) {
@@ -1080,6 +1086,73 @@ public abstract class TestOmSnapshot {
         SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReport.DiffType.DELETE, key1));
     assertEquals(diff.getDiffList(), diffEntries);
+  }
+
+  /**
+   * Testing scenario:
+   * 1) Dir dir1/dir2 is created.
+   * 2) Snapshot snap1 created.
+   * 3) Delete dir1.
+   * 4) Wait for DDS to run and pick the sub-dirs and purge.
+   * 6) Snapshot snap2 created.
+   * 5) Snap-diff b/w snapshot snap1 and snap2 should have 1 entry
+   * in case of native lib (dir1) and 2 entries (dir1, dir1/dir2)
+   * in case of non-native env.
+   * This is because native lib impl will read the single entry from
+   * range delete tombstone.
+   */
+  @Test
+  public void testSnapDiffWithDirectoryDeleteAfterDDSProcessing() throws Exception {
+    startKeyManager();
+    assumeTrue(bucketLayout.isFileSystemOptimized());
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+    String snap1 = "snap1";
+    String dir1 = "dir1";
+    String dir2 = "dir1/dir2";
+    bucket.createDirectory(dir2);
+    createSnapshot(testVolumeName, testBucketName, snap1);
+    bucket.deleteDirectory(dir1, true);
+    // assert that dir2 exists
+    assertTrue(dirExists("dir2"));
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return !dirExists("dir2");
+      } catch (RocksDatabaseException | CodecException e) {
+        fail("Exception occurred while waiting for deletion" + e.getMessage());
+        return false;
+      }
+    }, 100, 20000);
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+    List<SnapshotDiffReport.DiffReportEntry> diffEntries =
+        Lists.newArrayList(SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, dir1));
+    if (disableNativeDiff) {
+      diffEntries.add(SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, dir2));
+    }
+    assertEquals(diff.getDiffList(), diffEntries);
+    stopKeyManager();
+  }
+
+  private boolean dirExists(String dirName) throws RocksDatabaseException,
+      CodecException {
+    Table<String, OmDirectoryInfo> directoryTable = ozoneManager
+        .getMetadataManager().getDirectoryTable();
+    try (Table.KeyValueIterator<String, OmDirectoryInfo> it = directoryTable
+        .iterator()) {
+      while (it.hasNext()) {
+        String name = it.next().getValue().getName();
+        if (name.equals(dirName)) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   private OzoneObj buildKeyObj(OzoneBucket bucket, String key) {
