@@ -750,6 +750,9 @@ public class ChatbotAgent {
    * @return the first complete JSON object string, or {@code null} if none is found
    */
   static String extractFirstJsonObject(String text) {
+    if (text == null) {
+      return null;
+    }
     int depth = 0;
     int start = -1;
     boolean inString = false;
