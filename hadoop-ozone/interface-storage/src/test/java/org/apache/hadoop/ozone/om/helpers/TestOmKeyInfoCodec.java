@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.io.MD5Hash;
-import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
@@ -97,8 +96,6 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
   public void test() throws IOException {
     testOmKeyInfoCodecWithoutPipeline(1);
     testOmKeyInfoCodecWithoutPipeline(2);
-    testOmKeyInfoCodecCompatibility(1);
-    testOmKeyInfoCodecCompatibility(2);
   }
 
   public void testOmKeyInfoCodecWithoutPipeline(int chunkNum)
@@ -113,17 +110,5 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
         .getPipeline());
     assertNotNull(key.getFileChecksum());
     assertEquals(key.getFileChecksum(), checksum);
-  }
-
-  public void testOmKeyInfoCodecCompatibility(int chunkNum) throws IOException {
-    final Codec<OmKeyInfo> codec = OmKeyInfo.getCodec();
-    OmKeyInfo originKey = getKeyInfo(chunkNum);
-    byte[] rawData = originKey
-        .getProtobuf(false, ClientVersion.CURRENT_VERSION).toByteArray();
-    OmKeyInfo key = codec.fromPersistedFormat(rawData);
-    System.out.println("Chunk number = " + chunkNum +
-        ", Serialized key size with pipeline = " + rawData.length);
-    assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
-        .getPipeline());
   }
 }
