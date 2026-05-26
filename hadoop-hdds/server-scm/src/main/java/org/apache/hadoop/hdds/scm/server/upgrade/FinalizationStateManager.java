@@ -33,17 +33,6 @@ public interface FinalizationStateManager extends SCMHandler {
   void finalizeUpgrade() throws IOException;
 
   /**
-   * Legacy layout-feature finalization API. Retained until obsolete finalizer classes are removed.
-   */
-  @Replicate
-  void finalizeLayoutFeatures(Integer toLayoutVersion) throws IOException;
-
-  /**
-   * Legacy finalization context. Retained until obsolete finalizer classes are removed.
-   */
-  void setUpgradeContext(SCMUpgradeFinalizationContext context);
-
-  /**
    * Called on snapshot installation.
    */
   void reinitialize(Table<String, String> newFinalizationStore)
