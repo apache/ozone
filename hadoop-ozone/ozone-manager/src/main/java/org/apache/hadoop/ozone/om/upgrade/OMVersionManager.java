@@ -17,28 +17,21 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
+import org.apache.hadoop.ozone.upgrade.RatisBasedVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Component version manager for Ozone Manager.
  */
-public class OMVersionManager extends ComponentVersionManager {
-
-  private static final Logger LOG = LoggerFactory.getLogger(OMVersionManager.class);
+public class OMVersionManager extends RatisBasedVersionManager {
 
   private final Map<ComponentVersion, OmUpgradeAction> upgradeActions;
 
@@ -53,31 +46,9 @@ public class OMVersionManager extends ComponentVersionManager {
   @VisibleForTesting
   public OMVersionManager(OMStorage storage, OzoneManager upgradeActionArg,
       ComponentUpgradeActionProvider<OmUpgradeAction> upgradeActionProvider) throws IOException {
-    super(storage, computeApparentVersion(storage.getApparentVersion()), OzoneManagerVersion.SOFTWARE_VERSION);
+    super(storage, computeApparentVersionInternal(storage.getApparentVersion()), OzoneManagerVersion.SOFTWARE_VERSION);
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();
-  }
-
-  public void validateDBVersion(OMMetadataManager metadataManager) throws IOException {
-    ComponentVersion dbVersion = getApparentVersionInDB(metadataManager);
-    ComponentVersion apparentVersion = getApparentVersion();
-
-    if (!apparentVersion.equals(dbVersion)) {
-      LOG.info("Version file has different apparent version ({}) than OM DB ({}). That is expected if this "
-          + "OM has never been finalized to a newer version.", apparentVersion, dbVersion);
-    }
-  }
-
-  public void finalizeFromSnapshotIfRequired(OMMetadataManager metadataManager) throws IOException {
-    ComponentVersion apparentVersionInDB = getApparentVersionInDB(metadataManager);
-    if (apparentVersionInDB != null && !isAllowed(apparentVersionInDB)) {
-      LOG.info("New OM snapshot received with higher apparent version {}. "
-          + "Attempting to finalize current OM to that version.", apparentVersionInDB);
-      finalizeUpgrade();
-      // Update the apparent version in the DB to match the VERSION file.
-      // When finalization is not done with a snapshot, this DB value is updated by OMFinalizeUpgradeRequest.
-      metadataManager.getMetaTable().put(APPARENT_VERSION_KEY, String.valueOf(getApparentVersion().serialize()));
-    }
   }
 
   @VisibleForTesting
@@ -99,9 +70,9 @@ public class OMVersionManager extends ComponentVersionManager {
     }
   }
 
-  private static ComponentVersion getApparentVersionInDB(OMMetadataManager metadataManager) throws IOException {
-    String apparentVersion = metadataManager.getMetaTable().get(APPARENT_VERSION_KEY);
-    return (apparentVersion == null) ? null : computeApparentVersion(Integer.parseInt(apparentVersion));
+  @Override
+  protected ComponentVersion computeApparentVersion(int serializedApparentVersion) throws IOException {
+    return computeApparentVersionInternal(serializedApparentVersion);
   }
 
   /**
@@ -113,7 +84,7 @@ public class OMVersionManager extends ComponentVersionManager {
    * the gap between the largest {@link OMLayoutFeature} and ZDU are not valid legacy layout values; startup fails with
    * the persisted integer in the exception message.
    */
-  private static ComponentVersion computeApparentVersion(int serializedApparentVersion) throws IOException {
+  private static ComponentVersion computeApparentVersionInternal(int serializedApparentVersion) throws IOException {
     if (serializedApparentVersion >= OzoneManagerVersion.ZDU.serialize()) {
       OzoneManagerVersion fromOm = OzoneManagerVersion.deserialize(serializedApparentVersion);
       if (fromOm != OzoneManagerVersion.UNKNOWN_VERSION) {
