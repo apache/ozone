@@ -109,7 +109,10 @@ class TestReconAndAdminContainerCLI {
   private static final int RM_RECON_COMPARE_POLL_INTERVAL_MS = 1000;
   /** Max wait (Recon can trail SCM briefly). */
   private static final int RM_RECON_COMPARE_WAIT_MS = 90_000;
-  /** Matching reports must hold this many polls in a row. */
+  /**
+   * Two matches in a row on purpose. A single agreeing poll can be luck while RM and Recon counts
+   * are still drifting past each other (HDDS-15223).
+   */
   private static final int RM_RECON_COMPARE_STABLE_POLLS = 2;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
