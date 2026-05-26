@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocat
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.assertj.core.api.Fail;
@@ -600,9 +601,9 @@ public class TestDiskBalancerTask {
     createContainer(CONTAINER_ID + 1, sourceVolume, State.CLOSED);
     task = getTask();
     // Wait until the delayed deletion is eligible, then trigger cleanup.
-    long deletionEligibleAt = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(delay);
+    long deletionEligibleAt = Time.monotonicNow() + delay;
     GenericTestUtils.waitFor(
-        () -> System.nanoTime() >= deletionEligibleAt, 50, 12_000);
+        () -> Time.monotonicNow() >= deletionEligibleAt, 50, 12_000);
     task.call();
     // Verify that the old container is deleted
     assertFalse(oldContainerDir.exists());

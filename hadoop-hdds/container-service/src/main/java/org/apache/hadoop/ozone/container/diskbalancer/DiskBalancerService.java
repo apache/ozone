@@ -634,7 +634,7 @@ public class DiskBalancerService extends BackgroundService {
         }
         if (moveSucceeded && newContainer != null) {
           // Add current old container to pendingDeletionContainers.
-          pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelay, container);
+          pendingDeletionContainers.put(Time.monotonicNow() + replicaDeletionDelay, container);
           ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
@@ -691,7 +691,7 @@ public class DiskBalancerService extends BackgroundService {
   private boolean tryCleanupOnePendingDeletionContainer() {
     Map.Entry<Long, Container> entry = pendingDeletionContainers.pollFirstEntry();
     if (entry != null) {
-      if (entry.getKey() <= System.currentTimeMillis()) {
+      if (entry.getKey() <= Time.monotonicNow()) {
         // entry container is expired
         deleteContainer(entry.getValue());
         return true;
