@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * appears in the exception message thrown when no API key is configured — this is the
  * cheapest way to prove the routing decision without mocking the LangChain4j internals.</p>
  */
-public class TestLLMDispatcher {
+public class TestLangChain4jDispatcher {
 
     private OzoneConfiguration conf;
     private CredentialHelper credentialHelper;

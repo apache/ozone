@@ -418,10 +418,13 @@ public class ChatbotAgent {
    * "Sorry, I only know about Hadoop."
    * The prompt template is loaded from {@code chatbot/recon-fallback-prompt-template.txt}.
    * The single {@code %s} placeholder is substituted with the user's original query.
+   * Plain string replacement is used instead of {@code String.format} to avoid
+   * {@link java.util.MissingFormatArgumentException} when the user query contains
+   * a {@code %} character (e.g. "What is 50% of cluster capacity?").
    */
   private String handleFallback(String userQuery, String model,
                                 String provider) throws LLMClient.LLMException {
-    String prompt = String.format(fallbackPromptTemplate, userQuery);
+    String prompt = fallbackPromptTemplate.replace("%s", userQuery);
 
     List<ChatMessage> messages = new ArrayList<>();
     messages.add(new ChatMessage("user", prompt));
