@@ -799,7 +799,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
           createNodeReport(datanodeDetails.getUuid()),
           createContainerReport(),
           createPipelineReport(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultVersionProto());
 
       if (response.hasHostname() && response.hasIpAddress()) {
         datanodeDetails.setHostName(response.getHostname());
@@ -816,7 +816,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
           .newBuilder()
           .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
           .setContainerReport(containerReport)
-          .setDataNodeLayoutVersion(UpgradeUtils.defaultLayoutVersionProto())
+          .setDataNodeLayoutVersion(UpgradeUtils.defaultVersionProto())
           .build();
       datanodeScmClient.sendHeartbeat(heartbeatRequest);
       // scm commands are ignored

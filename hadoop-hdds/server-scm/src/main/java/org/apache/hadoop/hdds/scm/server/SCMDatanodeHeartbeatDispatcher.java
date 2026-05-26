@@ -25,7 +25,7 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 
 import com.google.protobuf.Message;
 import java.util.List;
@@ -97,18 +97,17 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     } else {
 
-      LayoutVersionProto layoutVersion = null;
+      LayoutVersionProto versionInfo = null;
       if (!heartbeat.hasDataNodeLayoutVersion()) {
         // Backward compatibility to make sure old Datanodes can still talk to
         // SCM.
-        layoutVersion = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
-            INITIAL_VERSION.layoutVersion());
+        versionInfo = toVersionProto(INITIAL_VERSION, INITIAL_VERSION);
       } else {
-        layoutVersion = heartbeat.getDataNodeLayoutVersion();
+        versionInfo = heartbeat.getDataNodeLayoutVersion();
       }
 
       LOG.debug("Processing DataNode Layout Report.");
-      nodeManager.processLayoutVersionReport(datanodeDetails, layoutVersion);
+      nodeManager.processVersionReport(datanodeDetails, versionInfo);
 
       CommandQueueReportProto commandQueueReport = null;
       if (heartbeat.hasCommandQueueReport()) {

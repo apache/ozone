@@ -101,7 +101,7 @@ public class TestHDDSLayoutFeature {
   public void testAllLayoutFeaturesAreSupportedByFutureVersions() {
     for (HDDSLayoutFeature feature : HDDSLayoutFeature.values()) {
       assertSupportedBy(feature, HDDSVersion.ZDU);
-      assertSupportedBy(feature, HDDSVersion.FUTURE_VERSION);
+      assertSupportedBy(feature, HDDSVersion.UNKNOWN_VERSION);
       // No ComponentVersion instance represents an arbitrary future version.
       assertTrue(feature.isSupportedBy(Integer.MAX_VALUE));
     }

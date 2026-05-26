@@ -234,7 +234,7 @@ public class NodeStateManager implements Runnable, Closeable {
       LayoutVersionProto layoutInfo) throws NodeAlreadyExistsException {
     nodeStateMap.addNode(newDatanodeInfo(datanodeDetails, layoutInfo));
     try {
-      updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
+      updateLastKnownVersionInfo(datanodeDetails, layoutInfo);
     } catch (NodeNotFoundException ex) {
       throw new IllegalStateException("Inconsistent NodeStateMap! Datanode "
           + datanodeDetails.getID() + " was added but not found in map: " + nodeStateMap);
@@ -318,11 +318,10 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * @throws NodeNotFoundException if the node is not present
    */
-  public void updateLastKnownLayoutVersion(DatanodeDetails datanodeDetails,
-                                      LayoutVersionProto layoutInfo)
-      throws NodeNotFoundException {
+  public void updateLastKnownVersionInfo(DatanodeDetails datanodeDetails,
+      LayoutVersionProto layoutInfo) throws NodeNotFoundException {
     nodeStateMap.getNodeInfo(datanodeDetails.getID())
-        .updateLastKnownLayoutVersion(layoutInfo);
+        .updateLastKnownVersions(layoutInfo);
   }
 
   /**
@@ -339,7 +338,7 @@ public class NodeStateManager implements Runnable, Closeable {
     final DatanodeInfo oldInfo = nodeStateMap.updateNode(newInfo);
     LOG.info("Updated datanode {} {} to {} {}",
         oldInfo, oldInfo.getNodeStatus(), newInfo, newInfo.getNodeStatus());
-    updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
+    updateLastKnownVersionInfo(datanodeDetails, layoutInfo);
   }
 
   /**

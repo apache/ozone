@@ -83,7 +83,7 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
     ALL_VERSIONS = new ArrayList<>(Arrays.asList(OMLayoutFeature.values()));
     for (OzoneManagerVersion version : OzoneManagerVersion.values()) {
       // Add all defined versions after and including ZDU to get the complete version list.
-      if (ZDU.isSupportedBy(version) && version != OzoneManagerVersion.FUTURE_VERSION) {
+      if (ZDU.isSupportedBy(version) && version != OzoneManagerVersion.UNKNOWN_VERSION) {
         ALL_VERSIONS.add(version);
       }
     }
