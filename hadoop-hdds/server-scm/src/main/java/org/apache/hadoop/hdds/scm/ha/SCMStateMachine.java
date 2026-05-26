@@ -150,6 +150,7 @@ public class SCMStateMachine extends BaseStateMachine {
       final TransactionContext trx) {
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
+    transactionBuffer.beginApplyingTransaction();
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
@@ -182,6 +183,8 @@ public class SCMStateMachine extends BaseStateMachine {
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
     return applyTransactionFuture;
   }

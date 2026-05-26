@@ -42,13 +42,10 @@ public class SCMHATransactionBufferMonitorTask implements Runnable {
 
   @Override
   public void run() {
-    if (transactionBuffer.shouldFlush(flushInterval)) {
-      LOG.debug("Running TransactionFlushTask");
-      try {
-        transactionBuffer.flush();
-      } catch (IOException e) {
-        LOG.error("TransactionFlushTask is failed", e);
-      }
+    try {
+      transactionBuffer.flushIfNeeded(flushInterval);
+    } catch (IOException e) {
+      LOG.error("TransactionFlushTask is failed", e);
     }
   }
 }
