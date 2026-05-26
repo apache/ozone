@@ -38,6 +38,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND_COUNT_UPDATED;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
+import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,6 +69,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -97,9 +100,10 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -137,19 +141,21 @@ public class TestSCMNodeManager {
   private StorageContainerManager scm;
   private SCMContext scmContext;
 
-  private static final int MAX_SOFTWARE_VERSION = HDDSLayoutVersionManager.maxLayoutVersion();
-  private static final LayoutVersionProto LARGER_SOFTWARE_PROTO =
-      toVersionProto(MAX_SOFTWARE_VERSION, MAX_SOFTWARE_VERSION + 1);
+  private static final LayoutVersionProto LARGER_SOFTWARE_PROTO = LayoutVersionProto.newBuilder()
+      .setMetadataLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+      .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1)
+      .build();
   private static final LayoutVersionProto SMALLER_APPARENT_VERSION_PROTO =
-      toVersionProto(MAX_SOFTWARE_VERSION - 1, MAX_SOFTWARE_VERSION);
-  // In a real cluster, startup is disallowed if MLV is larger than SLV, so
-  // increase both numbers to test smaller SLV or larger MLV.
+      toVersionProto(HDDSLayoutFeature.SCM_HA, HDDSVersion.SOFTWARE_VERSION);
+  // In a real cluster, startup is disallowed if apparent version is larger than software version, so
+  // increase both numbers to test smaller software version or larger apparent version.
   private static final LayoutVersionProto SMALLER_ALL_VERSIONS_PROTO =
-      toVersionProto(MAX_SOFTWARE_VERSION - 1, MAX_SOFTWARE_VERSION - 1);
-  private static final LayoutVersionProto LARGER_ALL_VERSIONS_PROTO =
-      toVersionProto(MAX_SOFTWARE_VERSION + 1, MAX_SOFTWARE_VERSION + 1);
-  private static final LayoutVersionProto MATCHING_VERSION_PROTO =
-      toVersionProto(MAX_SOFTWARE_VERSION, MAX_SOFTWARE_VERSION);
+      toVersionProto(HDDSLayoutFeature.SCM_HA, HDDSLayoutFeature.SCM_HA);
+  private static final LayoutVersionProto LARGER_ALL_VERSIONS_PROTO = LayoutVersionProto.newBuilder()
+          .setMetadataLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1)
+          .setSoftwareLayoutVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + 1)
+          .build();
+  private static final LayoutVersionProto MATCHING_VERSION_PROTO = defaultVersionProto();
 
   @BeforeEach
   public void setup() {
@@ -733,10 +739,10 @@ public class TestSCMNodeManager {
   }
 
   @Test
-  public void testProcessLayoutVersion() throws IOException {
-    testProcessLayoutVersionLowerMlv(true);
-    testProcessLayoutVersionLowerMlv(false);
-    testProcessLayoutVersionReportHigherMlv();
+  public void testProcessVersionReports() throws IOException {
+    testProcessVersionReportLowerApparentVersion(true);
+    testProcessVersionReportLowerApparentVersion(false);
+    testProcessVersionReportHigherApparentVersion();
   }
 
   @Test
@@ -749,27 +755,26 @@ public class TestSCMNodeManager {
               .getNumFinalizedDatanodes(),
           "Initial datanode should be counted as finalized");
 
-      int softwareVersion =
-          nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
-      int metadataVersion =
-          nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
+      // Report a pre-finalized datanode.
+      int softwareVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
       nodeManager.processVersionReport(node,
           LayoutVersionProto.newBuilder()
-              .setMetadataLayoutVersion(metadataVersion - 1)
+              .setMetadataLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
               .setSoftwareLayoutVersion(softwareVersion)
               .build());
       assertEquals(0, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
-          "Lower metadata layout version should decrement finalized count");
+          "Lower apparent version should decrement finalized count");
 
+      // Report a finalized datanode.
       nodeManager.processVersionReport(node,
           LayoutVersionProto.newBuilder()
-              .setMetadataLayoutVersion(metadataVersion)
+              .setMetadataLayoutVersion(softwareVersion)
               .setSoftwareLayoutVersion(softwareVersion)
               .build());
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
-          "Restored metadata layout version should restore finalized count");
+          "Restored apparent version should restore finalized count");
     }
   }
 
@@ -880,7 +885,7 @@ public class TestSCMNodeManager {
   }
 
   // Currently invoked by testProcessLayoutVersion.
-  public void testProcessLayoutVersionReportHigherMlv()
+  public void testProcessVersionReportHigherApparentVersion()
       throws IOException {
     final int healthCheckInterval = 200; // milliseconds
     final int heartbeatInterval = 1; // seconds
@@ -894,73 +899,61 @@ public class TestSCMNodeManager {
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion(), null, null);
+    ScmVersionManager versionManager = mockVersionManager();
+
     SCMContext nodeManagerContext = SCMContext.emptyContext();
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        nodeManagerContext, lvm);
+        nodeManagerContext, versionManager);
 
-    // Regardless of SCM's finalization checkpoint, datanodes with higher MLV
-    // than SCM should not be found in the cluster.
+    // Datanodes should never have higher apparent version than SCM.
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
     LogCapturer logCapturer = LogCapturer.captureLogs(SCMNodeManager.class);
-    int scmMlv =
-        nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
-    int scmSlv =
-        nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
-    nodeManager.processVersionReport(node1,
-        LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(scmMlv + 1)
-            .setSoftwareLayoutVersion(scmSlv + 1)
-            .build());
-    assertThat(logCapturer.getOutput())
-        .contains("Invalid data node in the cluster");
+    nodeManager.processVersionReport(node1, LARGER_ALL_VERSIONS_PROTO);
+    assertThat(logCapturer.getOutput()).contains("will not be allowed to join the cluster");
     nodeManager.close();
   }
 
   // Currently invoked by testProcessLayoutVersion.
-  public void testProcessLayoutVersionLowerMlv(boolean mvlLessThanSlv) throws IOException {
+  public void testProcessVersionReportLowerApparentVersion(boolean withScmFinalized) {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    int currentVersion = HDDSLayoutVersionManager.maxLayoutVersion();
-    if (mvlLessThanSlv) {
-      currentVersion -= 1;
+
+    ScmVersionManager versionManager;
+    if (withScmFinalized) {
+      versionManager = mockVersionManager();
+    } else {
+      // Use an apparent version for SCM that is in between SCM's software version and the datanode's apparent version.
+      versionManager = mockVersionManager(HDDSLayoutFeature.SCM_HA);
     }
-    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(currentVersion, null, null);
 
     SCMContext nodeManagerContext = SCMContext.emptyContext();
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        nodeManagerContext, lvm);
+        nodeManagerContext, versionManager);
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
     verify(eventPublisher,
         times(1)).fireEvent(NEW_NODE, node1);
-    int scmMlv =
-        nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
     nodeManager.processVersionReport(node1,
         LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(scmMlv - 1)
-            .setSoftwareLayoutVersion(scmMlv)
+            .setMetadataLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
+            .setSoftwareLayoutVersion(versionManager.getSoftwareVersion().serialize())
             .build());
     ArgumentCaptor<CommandForDatanode> captor =
         ArgumentCaptor.forClass(CommandForDatanode.class);
 
-    if (!lvm.needsFinalization()) {
-      // If the mlv equals slv checkpoint passed, datanodes with older mlvs
-      // should be instructed to finalize.
+    // SCM will only tell datanodes to finalize after it has finalized.
+    if (withScmFinalized) {
       verify(eventPublisher, times(1))
           .fireEvent(eq(DATANODE_COMMAND), captor.capture());
       assertEquals(captor.getValue().getDatanodeId(), node1.getID());
-      assertEquals(captor.getValue().getCommand().getType(),
-          finalizeNewLayoutVersionCommand);
+      assertEquals(finalizeNewLayoutVersionCommand,
+          captor.getValue().getCommand().getType());
     } else {
-      // SCM has not finished finalizing its mlv, so datanodes with older
-      // mlvs should not be instructed to finalize yet.
       verify(eventPublisher, times(0))
           .fireEvent(eq(DATANODE_COMMAND), captor.capture());
     }
@@ -973,12 +966,10 @@ public class TestSCMNodeManager {
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion(), null, null);
     createNodeManager(getConf());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        scmContext, lvm);
+        scmContext, mockVersionManager());
 
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
@@ -2166,11 +2157,10 @@ public class TestSCMNodeManager {
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion(), null, null);
     createNodeManager(getConf());
     SCMNodeManager nodeManager = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        scmContext, lvm);
+        scmContext, mockVersionManager());
 
     DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
     datanode.setPersistedOpState(oldState);

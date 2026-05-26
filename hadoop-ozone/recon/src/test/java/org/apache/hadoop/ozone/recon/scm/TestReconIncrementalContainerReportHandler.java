@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -51,9 +51,9 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.recon.TestReconUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -93,11 +93,7 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+    ScmVersionManager versionManager = mockVersionManager();
 
     NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
         eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);

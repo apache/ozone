@@ -84,9 +84,9 @@ public final class DatanodeMetadata {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private String revision;
 
-  @XmlElement(name = "layoutVersion")
+  @XmlElement(name = "apparentVersion")
   @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-  private int layoutVersion;
+  private int apparentVersion;
 
   @XmlElement(name = "networkLocation")
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -106,7 +106,7 @@ public final class DatanodeMetadata {
     this.version = builder.version;
     this.setupTime = builder.setupTime;
     this.revision = builder.revision;
-    this.layoutVersion = builder.layoutVersion;
+    this.apparentVersion = builder.apparentVersion;
     this.networkLocation = builder.networkLocation;
   }
 
@@ -162,8 +162,8 @@ public final class DatanodeMetadata {
     return revision;
   }
 
-  public int getLayoutVersion() {
-    return layoutVersion;
+  public int getApparentVersion() {
+    return apparentVersion;
   }
 
   public String getNetworkLocation() {
@@ -196,7 +196,7 @@ public final class DatanodeMetadata {
     private String version;
     private long setupTime;
     private String revision;
-    private int layoutVersion;
+    private int apparentVersion;
     private String networkLocation;
 
     public Builder() {
@@ -260,7 +260,7 @@ public final class DatanodeMetadata {
 
       this.version = datanode.getVersion();
       this.revision = datanode.getRevision();
-      this.layoutVersion = datanode.getLastKnownLayoutVersion().getMetadataLayoutVersion();
+      this.apparentVersion = datanode.getLastKnownApparentVersion().serialize();
 
       this.setupTime = datanode.getSetupTime();
       return this;

@@ -28,21 +28,20 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Properties;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Ensures SCM does not start when the VERSION file records an apparent version (still persisted as the layout-version
- * integer) that is not supported by the layout version manager for this build
- * ({@link HDDSLayoutVersionManager} / {@link HDDSLayoutFeature}).
+ * Ensures SCM does not start when the VERSION file records an apparent version
+ * that is larger than the software version.
  */
 public class TestScmStartupInvalidApparentVersion {
 
@@ -74,18 +73,16 @@ public class TestScmStartupInvalidApparentVersion {
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, folder.toAbsolutePath().toString());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toAbsolutePath().toString());
 
-    int softwareLayoutVersion = HDDSLayoutVersionManager.maxLayoutVersion();
-
     Properties properties = new Properties();
     properties.setProperty(SCM_ID, "scm");
     properties.setProperty(SCM_HA, "true");
 
     UpgradeTestUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, serializedApparentVersion, properties);
 
-    // TODO update this message when SCM migrated to using HDDSVersionManager.
-    String expectedMessage = String.format(
-        "Cannot initialize VersionManager. Metadata layout version (%s) > software layout version (%s)",
-        serializedApparentVersion, softwareLayoutVersion);
+    String expectedMessage =
+        "Initialization failed. Disk contains unknown apparent version " + serializedApparentVersion
+            + " for software version " + HDDSVersion.SOFTWARE_VERSION + ". Make sure this component was not" +
+            " downgraded after finalization";
 
     IOException ioException =
         assertThrows(IOException.class, () -> new StorageContainerManager(conf));

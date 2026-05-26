@@ -47,12 +47,13 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -89,9 +90,9 @@ public class ReconNodeManager extends SCMNodeManager {
                           EventPublisher eventPublisher,
                           NetworkTopology networkTopology,
                           Table<DatanodeID, DatanodeDetails> nodeDB,
-                          HDDSLayoutVersionManager scmLayoutVersionManager) {
+                          ScmVersionManager versionManager) {
     super(conf, scmStorageConfig, eventPublisher, networkTopology,
-        SCMContext.emptyContext(), scmLayoutVersionManager);
+        SCMContext.emptyContext(), versionManager);
     final int reconStaleDatanodeMultiplier = 3;
     this.reconDatanodeOutdatedTime = reconStaleDatanodeMultiplier *
         HddsServerUtil.getReconHeartbeatInterval(conf);
@@ -100,8 +101,8 @@ public class ReconNodeManager extends SCMNodeManager {
 
   public ReconNodeManager(OzoneConfiguration conf, SCMStorageConfig scmStorageConfig, EventQueue eventQueue,
                           NetworkTopology clusterMap, Table<DatanodeID, DatanodeDetails> table,
-                          HDDSLayoutVersionManager scmLayoutVersionManager, ReconContext reconContext) {
-    this(conf, scmStorageConfig, eventQueue, clusterMap, table, scmLayoutVersionManager);
+                          ScmVersionManager versionManager, ReconContext reconContext) {
+    this(conf, scmStorageConfig, eventQueue, clusterMap, table, versionManager);
     this.reconContext = reconContext;
     loadExistingNodes();
   }
@@ -112,13 +113,7 @@ public class ReconNodeManager extends SCMNodeManager {
       int nodeCount = 0;
       while (iterator.hasNext()) {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
-        register(datanodeDetails, null, null,
-            LayoutVersionProto.newBuilder()
-                .setMetadataLayoutVersion(
-                    HDDSLayoutVersionManager.maxLayoutVersion())
-                .setSoftwareLayoutVersion(
-                    HDDSLayoutVersionManager.maxLayoutVersion())
-                .build());
+        register(datanodeDetails, null, null, UpgradeUtils.defaultVersionProto());
         nodeCount++;
       }
       LOG.info("Loaded {} nodes from node DB.", nodeCount);
@@ -212,7 +207,7 @@ public class ReconNodeManager extends SCMNodeManager {
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto layoutInfo) {
+      LayoutVersionProto dnVersionInfo) {
     if (isNodeRegistered(datanodeDetails)) {
       try {
         nodeDB.put(datanodeDetails.getID(), datanodeDetails);
@@ -223,7 +218,7 @@ public class ReconNodeManager extends SCMNodeManager {
     }
     try {
       RegisteredCommand registeredCommand = super.register(datanodeDetails, nodeReport, pipelineReportsProto,
-          layoutInfo);
+          dnVersionInfo);
       reconContext.updateHealthStatus(new AtomicBoolean(true));
       reconContext.getErrors().remove(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY);
       return registeredCommand;
@@ -298,31 +293,9 @@ public class ReconNodeManager extends SCMNodeManager {
 
   @Override
   protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutVersionReport) {
-    // Recon should do nothing here.
-    int scmSlv = getLayoutVersionManager().getSoftwareLayoutVersion();
-    int scmMlv = getLayoutVersionManager().getMetadataLayoutVersion();
-    int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
-    int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
-
-    if (dnSlv > scmSlv) {
-      LOG.error("Invalid data node reporting to Recon : {}. " +
-              "DataNode SoftwareLayoutVersion = {}, Recon/SCM " +
-              "SoftwareLayoutVersion = {}",
-          datanodeDetails.getHostName(), dnSlv, scmSlv);
-    }
-
-    if (scmMlv == scmSlv) {
-      // Recon metadata is finalised.
-      if (dnMlv < scmMlv) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Data node {} reports a lower MLV than Recon "
-                  + "DataNode MetadataLayoutVersion = {}, Recon/SCM "
-                  + "MetadataLayoutVersion = {}. SCM needs to finalize this DN",
-              datanodeDetails.getHostName(), dnMlv, scmMlv);
-        }
-      }
-    }
-
+      LayoutVersionProto versionReport) {
+    // Recon will not send commands to datanodes, but it should still log if a datanode with an invalid version is
+    // heartbeating.
+    shouldFenceDatanode(datanodeDetails, versionReport);
   }
 }

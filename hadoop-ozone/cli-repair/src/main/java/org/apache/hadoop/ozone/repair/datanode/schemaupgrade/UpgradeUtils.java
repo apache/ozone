@@ -29,13 +29,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -91,28 +87,6 @@ final class UpgradeUtils {
       writer.write(date.toString());
     }
     return file.exists();
-  }
-
-  public static Pair<HDDSLayoutFeature, HDDSLayoutFeature> getLayoutFeature(
-      DatanodeDetails dnDetail, OzoneConfiguration conf) throws IOException {
-    DatanodeStorage layoutStorage =
-        new DatanodeStorage(conf, dnDetail.getUuidString());
-    HDDSLayoutVersionManager layoutVersionManager =
-        new HDDSLayoutVersionManager(layoutStorage.getApparentVersion(), null, null);
-
-    final int metadataLayoutVersion =
-        layoutVersionManager.getMetadataLayoutVersion();
-    final HDDSLayoutFeature metadataLayoutFeature =
-        (HDDSLayoutFeature) layoutVersionManager.getFeature(
-            metadataLayoutVersion);
-
-    final int softwareLayoutVersion =
-        layoutVersionManager.getSoftwareLayoutVersion();
-    final HDDSLayoutFeature softwareLayoutFeature =
-        (HDDSLayoutFeature) layoutVersionManager.getFeature(
-            softwareLayoutVersion);
-
-    return Pair.of(softwareLayoutFeature, metadataLayoutFeature);
   }
 
   public static List<HddsVolume> getAllVolume(DatanodeDetails detail,
