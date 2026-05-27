@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -59,6 +60,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -94,6 +96,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
+  private final Clock clock;
 
   private double threshold;
   private long bandwidthInMB;
@@ -135,10 +138,19 @@ public class DiskBalancerService extends BackgroundService {
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
       int workerSize, ConfigurationSource conf) throws IOException {
+    this(ozoneContainer, serviceCheckInterval, serviceCheckTimeout, timeUnit,
+        workerSize, conf, new SlidingWindow.MonotonicClock());
+  }
+
+  DiskBalancerService(OzoneContainer ozoneContainer,
+      long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
+      int workerSize, ConfigurationSource conf, Clock clock)
+      throws IOException {
     super("DiskBalancerService", serviceCheckInterval, timeUnit, workerSize,
         serviceCheckTimeout);
     this.ozoneContainer = ozoneContainer;
     this.conf = conf;
+    this.clock = Objects.requireNonNull(clock, "clock");
 
     String diskBalancerInfoPath = getDiskBalancerInfoPath();
     Objects.requireNonNull(diskBalancerInfoPath);
@@ -634,7 +646,8 @@ public class DiskBalancerService extends BackgroundService {
         }
         if (moveSucceeded && newContainer != null) {
           // Add current old container to pendingDeletionContainers.
-          pendingDeletionContainers.put(Time.monotonicNow() + replicaDeletionDelay, container);
+          pendingDeletionContainers.put(clock.millis() + replicaDeletionDelay,
+              container);
           ContainerLogger.logMoveSuccess(newContainer.getContainerData(), sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
@@ -691,7 +704,7 @@ public class DiskBalancerService extends BackgroundService {
   private boolean tryCleanupOnePendingDeletionContainer() {
     Map.Entry<Long, Container> entry = pendingDeletionContainers.pollFirstEntry();
     if (entry != null) {
-      if (entry.getKey() <= Time.monotonicNow()) {
+      if (entry.getKey() <= clock.millis()) {
         // entry container is expired
         deleteContainer(entry.getValue());
         return true;
