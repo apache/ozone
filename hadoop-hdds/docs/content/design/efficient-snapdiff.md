@@ -1,4 +1,22 @@
-# Snapshot Diff Improvement POC - Technical Design Document
+---
+title: Snapshot Diff Optimization
+summary: Describe proposal for an optimized snapshot diff that uses mostly sequential reads and batch puts
+date: 2025-05-22
+jira: HDDS-9154
+status: draft
+author: Saketa Chalamchala
+---
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+   http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
 
 ## 1. Introduction
 This document outlines the technical design, architectural choices, and algorithmic improvements to optimize Ozone's Snapshot Diff feature. The design addresses performance bottlenecks in both the **Full Diff** and **DAG-based Diff** paths. The primary goals are to reduce random I/O, minimize CPU overhead from deserialization, and streamline the classification of differences.
