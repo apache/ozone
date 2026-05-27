@@ -99,6 +99,33 @@ public class TestReplicationConfig {
   }
 
   @Test
+  public void acceptsOutOfServiceFactorBoundaryValues() {
+    // GIVEN
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        OUTOFSERVICE_FACTOR_MIN);
+
+    // WHEN
+    ReplicationConfig subject = conf.getObject(ReplicationConfig.class);
+
+    // THEN
+    assertEquals(OUTOFSERVICE_FACTOR_MIN,
+        subject.getOutOfServiceFactor(), 0.001);
+
+    // GIVEN
+    conf = new OzoneConfiguration();
+    conf.setDouble(REPLICATION_OUTOFSERVICE_FACTOR_KEY,
+        OUTOFSERVICE_FACTOR_MAX);
+
+    // WHEN
+    subject = conf.getObject(ReplicationConfig.class);
+
+    // THEN
+    assertEquals(OUTOFSERVICE_FACTOR_MAX,
+        subject.getOutOfServiceFactor(), 0.001);
+  }
+
+  @Test
   public void isCreatedWitDefaultValues() {
     // GIVEN
     OzoneConfiguration conf = new OzoneConfiguration();
