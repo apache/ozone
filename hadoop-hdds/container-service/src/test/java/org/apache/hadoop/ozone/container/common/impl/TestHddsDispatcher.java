@@ -503,11 +503,7 @@ public class TestHddsDispatcher {
     StringBuilder hddsDirs = new StringBuilder();
     File ssdVolume = Files.createTempDirectory(tempDir, "ssd").toFile();
     File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
-    hddsDirs.append("[SSD]");
-    hddsDirs.append(ssdVolume);
-    hddsDirs.append(',');
-    hddsDirs.append("[DISK]");
-    hddsDirs.append(diskVolume);
+    hddsDirs.append("[SSD]").append(ssdVolume).append(',').append("[DISK]").append(diskVolume);
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
     HddsDispatcher dispatcher = createDispatcher(randomDatanodeDetails(), UUID.randomUUID(), conf);
