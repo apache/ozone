@@ -4,7 +4,8 @@
       {
         "builtIn": 1,
         "datasource": {
-          "type": "prometheus"
+          "type": "grafana",
+          "uid": "-- Grafana --"
         },
         "enable": true,
         "hide": true,
@@ -921,19 +922,19 @@
       "targets": [
         {
           "expr": "replication_supervisor_metrics_num_in_flight_replications",
-          "legendFormat": "Inflight Replications",
+          "legendFormat": "Inflight Replications ({{hostname}})",
           "range": true,
           "refId": "A"
         },
         {
           "expr": "replication_supervisor_metrics_num_queued_replications",
-          "legendFormat": "Queued Replications",
+          "legendFormat": "Queued Replications ({{hostname}})",
           "range": true,
           "refId": "B"
         },
         {
           "expr": "replication_supervisor_metrics_num_requested_replications",
-          "legendFormat": "Requested Replications",
+          "legendFormat": "Requested Replications ({{hostname}})",
           "range": true,
           "refId": "C"
         }
@@ -979,25 +980,25 @@
       "targets": [
         {
           "expr": "rate(replication_supervisor_metrics_num_success_replications[$__rate_interval])",
-          "legendFormat": "Success Repl/sec",
+          "legendFormat": "Success Repl/sec ({{hostname}})",
           "range": true,
           "refId": "A"
         },
         {
           "expr": "rate(replication_supervisor_metrics_num_failure_replications[$__rate_interval])",
-          "legendFormat": "Failure Repl/sec",
+          "legendFormat": "Failure Repl/sec ({{hostname}})",
           "range": true,
           "refId": "B"
         },
         {
           "expr": "rate(replication_supervisor_metrics_num_timeout_replications[$__rate_interval])",
-          "legendFormat": "Timeout Repl/sec",
+          "legendFormat": "Timeout Repl/sec ({{hostname}})",
           "range": true,
           "refId": "C"
         },
         {
           "expr": "rate(replication_supervisor_metrics_num_skipped_replications[$__rate_interval])",
-          "legendFormat": "Skipped Repl/sec",
+          "legendFormat": "Skipped Repl/sec ({{hostname}})",
           "range": true,
           "refId": "D"
         }
@@ -1096,135 +1097,19 @@
       },
       "targets": [
         {
-          "expr": "rate(container_replicator_pull_success[$__rate_interval])",
-          "legendFormat": "Pull Success/sec",
+          "expr": "rate(measured_replicator_success[$__rate_interval])",
+          "legendFormat": "Success/sec ({{hostname}})",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "rate(container_replicator_pull_failure[$__rate_interval])",
-          "legendFormat": "Pull Failure/sec",
+          "expr": "rate(measured_replicator_failure[$__rate_interval])",
+          "legendFormat": "Failure/sec ({{hostname}})",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Pull Replicator Operations Rate",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          },
-          "decimals": 0,
-          "mappings": [],
-          "unit": "ops"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 63 },
-      "id": 52,
-      "options": {
-        "legend": {
-          "calcs": [ "sum", "max" ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "expr": "rate(container_replicator_push_success[$__rate_interval])",
-          "legendFormat": "Push Success/sec",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "expr": "rate(container_replicator_push_failure[$__rate_interval])",
-          "legendFormat": "Push Failure/sec",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Push Replicator Operations Rate",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "lineInterpolation": "smooth",
-            "lineWidth": 2
-          },
-          "decimals": 1,
-          "mappings": [],
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 71 },
-      "id": 53,
-      "options": {
-        "legend": {
-          "calcs": [ "mean", "max" ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "expr": "rate(container_replicator_pull_queue_time[$__rate_interval]) / rate(container_replicator_pull_success[$__rate_interval])",
-          "legendFormat": "Pull Avg Queue Delay (ms)",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "expr": "rate(container_replicator_pull_success_time[$__rate_interval]) / rate(container_replicator_pull_success[$__rate_interval])",
-          "legendFormat": "Pull Avg Success Exec Time (ms)",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "expr": "rate(container_replicator_push_queue_time[$__rate_interval]) / rate(container_replicator_push_success[$__rate_interval])",
-          "legendFormat": "Push Avg Queue Delay (ms)",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "expr": "rate(container_replicator_push_success_time[$__rate_interval]) / rate(container_replicator_push_success[$__rate_interval])",
-          "legendFormat": "Push Avg Success Exec Time (ms)",
-          "range": true,
-          "refId": "D"
-        }
-      ],
-      "title": "Avg Queue Delay and Execution Latency",
+      "title": "Replicator Operations Rate",
       "type": "timeseries"
     },
     {
@@ -1248,8 +1133,8 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 71 },
-      "id": 54,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 63 },
+      "id": 52,
       "options": {
         "legend": {
           "calcs": [ "sum", "max" ],
@@ -1264,31 +1149,77 @@
       },
       "targets": [
         {
-          "expr": "rate(container_replicator_pull_transferred_bytes[$__rate_interval])",
-          "legendFormat": "Pull Transferred/sec",
+          "expr": "rate(measured_replicator_transferred_bytes[$__rate_interval])",
+          "legendFormat": "Transferred Bytes/sec ({{hostname}})",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "rate(container_replicator_pull_failure_bytes[$__rate_interval])",
-          "legendFormat": "Pull Failure Bytes/sec",
+          "expr": "rate(measured_replicator_failure_bytes[$__rate_interval])",
+          "legendFormat": "Failure Bytes/sec ({{hostname}})",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Replicator Byte Transfer Rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2
+          },
+          "decimals": 1,
+          "mappings": [],
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 71 },
+      "id": 53,
+      "options": {
+        "legend": {
+          "calcs": [ "mean", "max" ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(measured_replicator_queue_time[$__rate_interval]) / rate(measured_replicator_success[$__rate_interval])",
+          "legendFormat": "Avg Queue Delay (ms) ({{hostname}})",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "expr": "rate(measured_replicator_success_time[$__rate_interval]) / rate(measured_replicator_success[$__rate_interval])",
+          "legendFormat": "Avg Success Exec Time (ms) ({{hostname}})",
           "range": true,
           "refId": "B"
         },
         {
-          "expr": "rate(container_replicator_push_transferred_bytes[$__rate_interval])",
-          "legendFormat": "Push Transferred/sec",
+          "expr": "rate(measured_replicator_failure_time[$__rate_interval]) / rate(measured_replicator_failure[$__rate_interval])",
+          "legendFormat": "Avg Failure Exec Time (ms) ({{hostname}})",
           "range": true,
           "refId": "C"
-        },
-        {
-          "expr": "rate(container_replicator_push_failure_bytes[$__rate_interval])",
-          "legendFormat": "Push Failure Bytes/sec",
-          "range": true,
-          "refId": "D"
         }
       ],
-      "title": "Replicator Byte Transfer Rates",
+      "title": "Avg Queue Delay and Execution Latency",
       "type": "timeseries"
     }
   ],
