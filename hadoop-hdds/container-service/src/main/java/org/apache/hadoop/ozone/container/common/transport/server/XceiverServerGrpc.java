@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
