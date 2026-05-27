@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.StateManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.protocol.Message;
 
@@ -66,7 +67,7 @@ public class SequenceIdGeneratorStateManagerInvoker extends ScmInvoker<StateMana
       }
 
       @Override
-      public Long getLastId(String arg0) {
+      public Long getLastId(SequenceIdType arg0) {
         return invoker.getImpl().getLastId(arg0);
       }
 
@@ -92,7 +93,7 @@ public class SequenceIdGeneratorStateManagerInvoker extends ScmInvoker<StateMana
       break;
 
     case "getLastId":
-      final String arg3 = p.length > 0 ? (String) p[0] : null;
+      final SequenceIdType arg3 = p.length > 0 ? (SequenceIdType) p[0] : null;
       returnType = Long.class;
       returnValue = getImpl().getLastId(arg3);
       break;

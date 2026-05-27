@@ -135,7 +135,7 @@ public class SequenceIdGenerator {
         }
 
         // reload lastId from RocksDB.
-        batch.lastId = stateManager.getLastId(idType.name());
+        batch.lastId = stateManager.getLastId(idType);
       }
 
       Preconditions.checkArgument(batch.nextId <= batch.lastId);
@@ -199,10 +199,10 @@ public class SequenceIdGenerator {
         throws SCMException;
 
     /**
-     * @param sequenceIdName : name of the sequence id.
+     * @param idType : supported sequence ID type.
      * @return lastId saved in db
      */
-    Long getLastId(String sequenceIdName);
+    Long getLastId(SequenceIdType idType);
 
     /**
      * Reinitialize the SequenceIdGenerator with the latest sequenceIdTable
@@ -223,7 +223,7 @@ public class SequenceIdGenerator {
   static final class StateManagerImpl implements StateManager {
     private Table<String, Long> sequenceIdTable;
     private final DBTransactionBuffer transactionBuffer;
-    private final Map<String, Long> sequenceIdToLastIdMap;
+    private final Map<SequenceIdType, Long> sequenceIdToLastIdMap;
 
     private StateManagerImpl(Table<String, Long> sequenceIdTable,
                                DBTransactionBuffer trxBuffer) {
@@ -236,10 +236,11 @@ public class SequenceIdGenerator {
     @Override
     public Boolean allocateBatch(String sequenceIdName,
                                  Long expectedLastId, Long newLastId) {
-      Long lastId = sequenceIdToLastIdMap.computeIfAbsent(sequenceIdName,
+      SequenceIdType idType = SequenceIdType.valueOf(sequenceIdName);
+      Long lastId = sequenceIdToLastIdMap.computeIfAbsent(idType,
           key -> {
             try {
-              Long idInDb = this.sequenceIdTable.get(key);
+              Long idInDb = this.sequenceIdTable.get(key.name());
               return idInDb != null ? idInDb : INVALID_SEQUENCE_ID;
             } catch (IOException ioe) {
               throw new RuntimeException("Failed to get lastId from db", ioe);
@@ -254,18 +255,18 @@ public class SequenceIdGenerator {
 
       try {
         transactionBuffer
-            .addToBuffer(sequenceIdTable, sequenceIdName, newLastId);
+            .addToBuffer(sequenceIdTable, idType.name(), newLastId);
       } catch (IOException ioe) {
         throw new RuntimeException("Failed to put lastId to Batch", ioe);
       }
 
-      sequenceIdToLastIdMap.put(sequenceIdName, newLastId);
+      sequenceIdToLastIdMap.put(idType, newLastId);
       return true;
     }
 
     @Override
-    public Long getLastId(String sequenceIdName) {
-      return sequenceIdToLastIdMap.get(sequenceIdName);
+    public Long getLastId(SequenceIdType idType) {
+      return sequenceIdToLastIdMap.get(idType);
     }
 
     @Override
@@ -287,7 +288,7 @@ public class SequenceIdGenerator {
               "sequenceIdName should not be null");
           Objects.requireNonNull(lastId,
               "lastId should not be null");
-          sequenceIdToLastIdMap.put(sequenceIdName, lastId);
+          sequenceIdToLastIdMap.put(SequenceIdType.valueOf(sequenceIdName), lastId);
         }
       }
     }

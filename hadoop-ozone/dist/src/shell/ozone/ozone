@@ -104,7 +104,7 @@ function ozonecmd_case
     ;;
     completion)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.utils.AutoCompletion;
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-dist"
     ;;
     datanode)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -287,6 +287,7 @@ function check_running_ozone_services
 function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-dist" ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
     if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
