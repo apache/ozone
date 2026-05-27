@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.shell;
 
+import java.util.List;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.shell.s3.S3Shell;
@@ -53,9 +54,14 @@ public final class OzoneInteractiveShell {
       public String prompt() {
         return "ozone";
       }
+
+      @Override
+      protected List<String> interactiveWelcomeLines() {
+        return OzoneInteractiveWelcome.lines();
+      }
     };
 
-    new REPL(dummyShell, topCmd, factory, null);
+    new REPL(dummyShell, topCmd, factory, null, dummyShell.interactiveWelcomeLines());
   }
 
   @Command(name = "ozone", description = "Interactive Shell for all Ozone commands",
