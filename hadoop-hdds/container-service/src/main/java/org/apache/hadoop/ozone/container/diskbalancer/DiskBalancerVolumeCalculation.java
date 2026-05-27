@@ -174,7 +174,7 @@ public final class DiskBalancerVolumeCalculation {
       this.effectiveUsed = computeEffectiveUsage(usage, volume.getCommittedBytes(), delta);
       this.utilization = usage.getCapacity() > 0
           ? computeUtilization(usage, volume.getCommittedBytes(), delta)
-          : 1.0;
+          : 0.0;
     }
 
     public HddsVolume getVolume() {

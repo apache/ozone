@@ -84,20 +84,20 @@ class TestDiskBalancerVolumeCalculation {
   }
 
   @Test
-  void getUtilizationReturnsFullUtilizationForZeroCapacityVolume()
+  void getUtilizationReturnsZeroForZeroCapacityVolume()
       throws IOException {
     HddsVolume volume = createVolume("zero-capacity-utilization", 0, 0);
 
-    assertEquals(1.0, DiskBalancerVolumeCalculation.newVolumeFixedUsage(
+    assertEquals(0.0, DiskBalancerVolumeCalculation.newVolumeFixedUsage(
         volume, null).getUtilization());
   }
 
   @Test
-  void buildVolumeReportProtoReportsFullUtilizationForZeroCapacityVolume()
+  void buildVolumeReportProtoReportsZeroUtilizationForZeroCapacityVolume()
       throws IOException {
     HddsVolume volume = createVolume("zero-capacity-report", 0, 0);
 
-    assertEquals(1.0, DiskBalancerService.buildVolumeReportProto(
+    assertEquals(0.0, DiskBalancerService.buildVolumeReportProto(
         Collections.singletonList(
             DiskBalancerVolumeCalculation.newVolumeFixedUsage(volume, null)))
         .get(0).getUtilization());
