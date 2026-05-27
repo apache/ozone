@@ -515,7 +515,7 @@ public class TestContainerCommandsEC {
         assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
             readContainerResponseProto.getContainerData().getState());
         ContainerProtos.ContainerCommandResponseProto readChunkReply =
-            ContainerProtocolCalls.readChunk(dnClient,
+            ContainerProtocolCalls.readChunkForZeroCopy(dnClient,
                 writeChunkRequest.getWriteChunk().getChunkData(),
                 blockID.getDatanodeBlockIDProtobufBuilder().setReplicaIndex(replicaIndex).build(), null,
                 blockToken);

@@ -450,8 +450,8 @@ public class ChunkInputStream extends InputStream
       throws IOException {
 
     ContainerCommandResponseProto reply =
-        ContainerProtocolCalls.readChunk(xceiverClient, readChunkInfo, datanodeBlockID, validators,
-            tokenSupplier.get());
+        ContainerProtocolCalls.readChunkForZeroCopy(xceiverClient, readChunkInfo,
+            datanodeBlockID, validators, tokenSupplier.get());
     // The zero-copy-tracked buffer for the chunk data lives inside `reply`.
     // Stash the outer reference so releaseBuffers() can return it once the
     // chunk bytes have been fully consumed.

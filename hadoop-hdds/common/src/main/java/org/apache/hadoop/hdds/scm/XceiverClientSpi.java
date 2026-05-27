@@ -224,6 +224,7 @@ public abstract class XceiverClientSpi implements Closeable {
    * be released back to Netty when the caller is done with the proto;
    * otherwise direct memory accumulates. Callers of {@code sendCommand}
    * that retain the response past the call (e.g. {@code ReadChunk} via
+   * {@code ContainerProtocolCalls.readChunkForZeroCopy(...)} in
    * {@code ChunkInputStream}) must invoke this method once they are done.
    * <p>
    * This method is idempotent and safe to call on responses that were

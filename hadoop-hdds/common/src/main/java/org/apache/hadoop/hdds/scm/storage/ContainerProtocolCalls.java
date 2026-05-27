@@ -344,6 +344,37 @@ public final class ContainerProtocolCalls  {
   }
 
   /**
+   * Calls the container protocol to read a chunk and returns a detached
+   * {@link ReadChunkResponseProto}.
+   * <p>
+   * Callers that need access to the zero-copy-backed outer response should use
+   * {@link #readChunkForZeroCopy(XceiverClientSpi, ChunkInfo, DatanodeBlockID,
+   * List, Token)}.
+   *
+   * @param xceiverClient client to perform call
+   * @param chunk information about chunk to read
+   * @param blockID ID of the block
+   * @param validators functions to validate the response
+   * @param token a token for this block (may be null)
+   * @return detached read chunk response
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static ReadChunkResponseProto readChunk(
+      XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
+      List<Validator> validators,
+      Token<? extends TokenIdentifier> token) throws IOException {
+    ContainerCommandResponseProto reply =
+        readChunkForZeroCopy(xceiverClient, chunk, blockID, validators, token);
+    try {
+      // Detach the inner proto from any zero-copy-backed buffers before the
+      // outer response is released.
+      return ReadChunkResponseProto.parseFrom(reply.getReadChunk().toByteArray());
+    } finally {
+      xceiverClient.releaseReceivedResponse(reply);
+    }
+  }
+
+  /**
    * Calls the container protocol to read a chunk and returns the outer
    * {@link ContainerCommandResponseProto}. The caller is responsible for
    * invoking
@@ -361,7 +392,7 @@ public final class ContainerProtocolCalls  {
    * @return outer container command response containing the read chunk reply
    * @throws IOException if there is an I/O error while performing the call
    */
-  public static ContainerCommandResponseProto readChunk(
+  public static ContainerCommandResponseProto readChunkForZeroCopy(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
       List<Validator> validators,
       Token<? extends TokenIdentifier> token) throws IOException {
