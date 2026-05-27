@@ -17,9 +17,10 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.admin.OzoneAdmin;
+import org.apache.hadoop.ozone.debug.OzoneDebug;
+import org.apache.hadoop.ozone.shell.s3.S3Shell;
+import org.apache.hadoop.ozone.shell.tenant.TenantShell;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
@@ -29,8 +30,6 @@ import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
  */
 public final class OzoneInteractiveShell {
 
-  private static final Logger LOG = LoggerFactory.getLogger(OzoneInteractiveShell.class);
-
   private OzoneInteractiveShell() {
   }
 
@@ -38,15 +37,11 @@ public final class OzoneInteractiveShell {
     PicocliCommandsFactory factory = new PicocliCommandsFactory();
     CommandLine topCmd = new CommandLine(new TopCommand(), factory);
 
-    // Add known subcommands statically if they are in the same module.
     topCmd.addSubcommand("sh", new OzoneShell().getCmd());
-    topCmd.addSubcommand("tenant", new org.apache.hadoop.ozone.shell.tenant.TenantShell().getCmd());
-    topCmd.addSubcommand("s3", new org.apache.hadoop.ozone.shell.s3.S3Shell().getCmd());
-
-    // Dynamically add subcommands from other modules to avoid circular dependencies.
-    addDynamicSubcommand(topCmd, "admin", "org.apache.hadoop.ozone.admin.OzoneAdmin");
-    addDynamicSubcommand(topCmd, "debug", "org.apache.hadoop.ozone.debug.OzoneDebug");
-    addDynamicSubcommand(topCmd, "repair", "org.apache.hadoop.ozone.repair.OzoneRepair");
+    topCmd.addSubcommand("tenant", new TenantShell().getCmd());
+    topCmd.addSubcommand("s3", new S3Shell().getCmd());
+    topCmd.addSubcommand("admin", new OzoneAdmin().getCmd());
+    topCmd.addSubcommand("debug", new OzoneDebug().getCmd());
 
     Shell dummyShell = new Shell() {
       @Override
@@ -63,18 +58,8 @@ public final class OzoneInteractiveShell {
     new REPL(dummyShell, topCmd, factory, null);
   }
 
-  private static void addDynamicSubcommand(CommandLine topCmd, String name, String className) {
-    try {
-      Class<?> clazz = Class.forName(className);
-      GenericCli instance = (GenericCli) clazz.getDeclaredConstructor().newInstance();
-      topCmd.addSubcommand(name, instance.getCmd());
-    } catch (Exception e) {
-      LOG.debug("Subcommand {} not loaded: class {} not found or could not be instantiated", 
-          name, className, e);
-    }
-  }
-
-  @Command(name = "ozone", description = "Interactive Shell for all Ozone commands", mixinStandardHelpOptions = true)
+  @Command(name = "ozone", description = "Interactive Shell for all Ozone commands",
+      mixinStandardHelpOptions = true)
   private static class TopCommand implements Runnable {
     @Override
     public void run() {
