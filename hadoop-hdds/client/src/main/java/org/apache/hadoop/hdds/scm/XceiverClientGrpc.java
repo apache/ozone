@@ -608,8 +608,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
         break;
       } catch (IOException e) {
+        if (responseProto != null) {
+          releaseReceivedResponse(responseProto);
+          responseProto = null;
+        }
         ioException = e;
-        responseProto = null;
         if (LOG.isDebugEnabled()) {
           LOG.debug("Failed to execute command {} on datanode {}",
               processForDebug(request), dn, e);

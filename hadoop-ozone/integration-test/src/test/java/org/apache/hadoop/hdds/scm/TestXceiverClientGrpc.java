@@ -25,10 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -43,6 +45,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -148,6 +151,58 @@ public class TestXceiverClientGrpc {
       e.printStackTrace();
     }
     assertEquals(0, allDNs.size());
+  }
+
+  @Test
+  public void testReadChunkValidatorFailureReleasesResponseBeforeRetry()
+      throws IOException {
+    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+    final AtomicInteger releaseCount = new AtomicInteger();
+    final BlockID blockID = new BlockID(1, 1);
+    final ContainerProtos.ChunkInfo chunkInfo = ContainerProtos.ChunkInfo
+        .newBuilder()
+        .setChunkName("Anything")
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setBytesPerChecksum(1)
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .build())
+        .setLen(1)
+        .setOffset(0)
+        .build();
+    final ContainerProtos.ContainerCommandRequestProto request =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.ReadChunk)
+            .setContainerID(blockID.getContainerID())
+            .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
+            .setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
+                .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+                .setChunkData(chunkInfo))
+            .build();
+
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) {
+        allDNs.remove(dn);
+        return buildValidReadChunkResponse();
+      }
+
+      @Override
+      public void releaseReceivedResponse(
+          ContainerProtos.ContainerCommandResponseProto response) {
+        releaseCount.incrementAndGet();
+      }
+    }) {
+      IOException ex = assertThrows(IOException.class,
+          () -> client.sendCommand(request, Collections.singletonList((req, resp) -> {
+            throw new IOException("validator failed");
+          })));
+      assertThat(ex).hasMessageContaining("validator failed");
+    }
+
+    assertEquals(0, allDNs.size());
+    assertEquals(dns.size(), releaseCount.get());
   }
 
   @Test
@@ -299,6 +354,34 @@ public class TestXceiverClientGrpc {
         ContainerProtos.ContainerCommandResponseProto.newBuilder()
             .setCmdType(ContainerProtos.Type.GetBlock)
             .setResult(ContainerProtos.Result.SUCCESS).build();
+    final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
+        replyFuture = new CompletableFuture<>();
+    replyFuture.complete(resp);
+    return new XceiverClientReply(replyFuture);
+  }
+
+  private XceiverClientReply buildValidReadChunkResponse() {
+    ContainerProtos.ContainerCommandResponseProto resp =
+        ContainerProtos.ContainerCommandResponseProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.ReadChunk)
+            .setResult(ContainerProtos.Result.SUCCESS)
+            .setReadChunk(ContainerProtos.ReadChunkResponseProto.newBuilder()
+                .setBlockID(ContainerProtos.DatanodeBlockID.newBuilder()
+                    .setContainerID(1)
+                    .setLocalID(1)
+                    .build())
+                .setChunkData(ContainerProtos.ChunkInfo.newBuilder()
+                    .setChunkName("Anything")
+                    .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+                        .setBytesPerChecksum(1)
+                        .setType(ContainerProtos.ChecksumType.CRC32)
+                        .build())
+                    .setLen(1)
+                    .setOffset(0)
+                    .build())
+                .setData(ByteString.copyFrom(new byte[] {1}))
+                .build())
+            .build();
     final CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
         replyFuture = new CompletableFuture<>();
     replyFuture.complete(resp);
