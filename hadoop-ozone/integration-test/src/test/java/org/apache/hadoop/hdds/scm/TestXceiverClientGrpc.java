@@ -209,11 +209,12 @@ public class TestXceiverClientGrpc {
             ContainerProtocolCalls.readChunk(client, chunkInfo,
                 bid.getDatanodeBlockIDProtobuf(), null, null)
                 .getData().toByteArray());
-        assertEquals(1, releaseCount.get());
+        assertEquals(0, releaseCount.get());
       }
     }
 
-    assertEquals(1, releaseCount.get());
+    assertEquals(readChunkApi == ReadChunkApi.ZERO_COPY ? 1 : 0,
+        releaseCount.get());
   }
 
   @Test

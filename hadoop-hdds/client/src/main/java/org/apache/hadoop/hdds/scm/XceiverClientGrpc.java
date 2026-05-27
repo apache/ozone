@@ -394,18 +394,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @Override
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request) throws IOException {
-    try {
-      return sendCommandWithTraceIDAndRetry(request, null, false).
-          getResponse().get();
-    } catch (ExecutionException e) {
-      throw getIOExceptionForSendCommand(request, e);
-    } catch (InterruptedException e) {
-      LOG.error("Command execution was interrupted.");
-      Thread.currentThread().interrupt();
-      throw (IOException) new InterruptedIOException(
-          "Command " + processForDebug(request) + " was interrupted.")
-          .initCause(e);
-    }
+    return sendCommandAndWait(request, null, false);
   }
 
   @Override
@@ -485,28 +474,22 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
-    try {
-      XceiverClientReply reply =
-          sendCommandWithTraceIDAndRetry(request, validators, false);
-      return reply.getResponse().get();
-    } catch (ExecutionException e) {
-      throw getIOExceptionForSendCommand(request, e);
-    } catch (InterruptedException e) {
-      LOG.error("Command execution was interrupted.");
-      Thread.currentThread().interrupt();
-      throw (IOException) new InterruptedIOException(
-          "Command " + processForDebug(request) + " was interrupted.")
-          .initCause(e);
-    }
+    return sendCommandAndWait(request, validators, false);
   }
 
   @Override
   public ContainerCommandResponseProto sendCommandWithZeroCopy(
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
+    return sendCommandAndWait(request, validators, true);
+  }
+
+  private ContainerCommandResponseProto sendCommandAndWait(
+      ContainerCommandRequestProto request, List<Validator> validators,
+      boolean zeroCopy) throws IOException {
     try {
       XceiverClientReply reply =
-          sendCommandWithTraceIDAndRetry(request, validators, true);
+          sendCommandWithTraceIDAndRetry(request, validators, zeroCopy);
       return reply.getResponse().get();
     } catch (ExecutionException e) {
       throw getIOExceptionForSendCommand(request, e);
