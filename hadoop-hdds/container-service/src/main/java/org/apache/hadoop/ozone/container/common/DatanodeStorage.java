@@ -43,7 +43,7 @@ public class DatanodeStorage extends Storage {
   public DatanodeStorage(ConfigurationSource conf, String dataNodeId)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
-        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, getDefaultLayoutVersion(conf));
+        DATANODE_LAYOUT_VERSION_DIR, dataNodeId, getDefaultApparentVersion(conf));
   }
 
   public DatanodeStorage(OzoneConfiguration conf, String dataNodeId,
@@ -56,7 +56,7 @@ public class DatanodeStorage extends Storage {
   public DatanodeStorage(ConfigurationSource conf)
       throws IOException {
     super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
-        DATANODE_LAYOUT_VERSION_DIR, getDefaultLayoutVersion(conf));
+        DATANODE_LAYOUT_VERSION_DIR, getDefaultApparentVersion(conf));
   }
 
   @Override
@@ -94,15 +94,14 @@ public class DatanodeStorage extends Storage {
    * @return The layout version that should be used for the datanode if no
    * layout version is found on disk.
    */
-  private static int getDefaultLayoutVersion(ConfigurationSource conf) {
-    int defaultLayoutVersion = maxLayoutVersion();
+  private static int getDefaultApparentVersion(ConfigurationSource conf) {
+    int defaultApparentVersion = maxLayoutVersion();
 
     File dnIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));
     if (dnIdFile.exists()) {
-      defaultLayoutVersion =
-          HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
+      defaultApparentVersion = HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
     }
 
-    return defaultLayoutVersion;
+    return defaultApparentVersion;
   }
 }

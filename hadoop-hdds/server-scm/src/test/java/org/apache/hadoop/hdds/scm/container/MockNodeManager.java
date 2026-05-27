@@ -268,7 +268,7 @@ public class MockNodeManager implements NodeManager {
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
         DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-            UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+            UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
         long capacity = nodeMetricMap.get(dd).getCapacity().get();
         long used = nodeMetricMap.get(dd).getScmUsed().get();
@@ -347,7 +347,7 @@ public class MockNodeManager implements NodeManager {
         nodeStatus = NodeStatus.inServiceDead();
       }
       DatanodeInfo di = new DatanodeInfo(entry.getKey(), nodeStatus,
-          UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+          UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       long capacity = entry.getValue().getCapacity().get();
       long used = entry.getValue().getScmUsed().get();
@@ -436,7 +436,7 @@ public class MockNodeManager implements NodeManager {
     }
 
     DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
-        UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+        UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     long capacity = nodeMetricMap.get(dd).getCapacity().get();
     long used = nodeMetricMap.get(dd).getScmUsed().get();
     long remaining = nodeMetricMap.get(dd).getRemaining().get();
@@ -626,8 +626,8 @@ public class MockNodeManager implements NodeManager {
    * @param layoutReport
    */
   @Override
-  public void processLayoutVersionReport(DatanodeDetails dnUuid,
-                                         LayoutVersionProto layoutReport) {
+  public void processVersionReport(DatanodeDetails dnUuid,
+                                   LayoutVersionProto layoutReport) {
     // do nothing
   }
 

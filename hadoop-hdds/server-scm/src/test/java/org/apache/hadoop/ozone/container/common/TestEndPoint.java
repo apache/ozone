@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.common;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -398,7 +398,7 @@ public class TestEndPoint {
                           nodeToRegister.getID()))),
               HddsTestUtils.getRandomContainerReports(10),
               HddsTestUtils.getRandomPipelineReports(),
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       assertNotNull(responseProto);
       assertEquals(nodeToRegister.getUuidString(), responseProto.getDatanodeUUID());
       assertNotNull(responseProto.getClusterID());

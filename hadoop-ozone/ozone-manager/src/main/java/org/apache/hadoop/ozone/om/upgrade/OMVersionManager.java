@@ -116,7 +116,7 @@ public class OMVersionManager extends ComponentVersionManager {
   private static ComponentVersion computeApparentVersion(int serializedApparentVersion) throws IOException {
     if (serializedApparentVersion >= OzoneManagerVersion.ZDU.serialize()) {
       OzoneManagerVersion fromOm = OzoneManagerVersion.deserialize(serializedApparentVersion);
-      if (fromOm != OzoneManagerVersion.FUTURE_VERSION) {
+      if (fromOm != OzoneManagerVersion.UNKNOWN_VERSION) {
         return fromOm;
       }
     } else {

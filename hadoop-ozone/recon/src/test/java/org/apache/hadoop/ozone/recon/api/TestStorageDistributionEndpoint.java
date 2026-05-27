@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -225,7 +226,7 @@ public class TestStorageDistributionEndpoint {
           .build();
       pendingDeletionMetrics.add(new DatanodePendingDeletionMetrics(hostName,
           uuid.toString(), PENDING_DELETION_SIZE));
-      dataNodes.add(new DatanodeInfo(datanode, NodeStatus.inServiceHealthy(), null, 5 * 60 * 1000));
+      dataNodes.add(new DatanodeInfo(datanode, NodeStatus.inServiceHealthy(), defaultVersionProto(), 5 * 60 * 1000));
       when(nodeManager.getNodeStat(datanode))
           .thenReturn(new SCMNodeMetric(OZONE_CAPACITY, OZONE_USED, OZONE_REMAINING, COMMITTED,
               MIN_FREE_SPACE, RESERVED));

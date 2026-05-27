@@ -59,13 +59,13 @@ public class TestRpcClient {
     NULL_EXPECTED_ONE_CURRENT_ONE_FUTURE_OM(
         null,
         OzoneManagerVersion.SOFTWARE_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         true
     ),
     NULL_EXPECTED_TWO_FUTURE_OM(
         null,
-        OzoneManagerVersion.FUTURE_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         true
     ),
 
@@ -86,7 +86,7 @@ public class TestRpcClient {
         true),
     DEFAULT_EXPECTED_ONE_FUTURE_OM(
         OzoneManagerVersion.DEFAULT_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         null,
         true),
     DEFAULT_EXPECTED_TWO_DEFAULT_OM(
@@ -101,8 +101,8 @@ public class TestRpcClient {
         true),
     DEFAULT_EXPECTED_TWO_FUTURE_OM(
         OzoneManagerVersion.DEFAULT_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         true),
     DEFAULT_EXPECTED_ONE_DEFAULT_ONE_CURRENT_OM(
         OzoneManagerVersion.DEFAULT_VERSION,
@@ -112,12 +112,12 @@ public class TestRpcClient {
     DEFAULT_EXPECTED_ONE_DEFAULT_ONE_FUTURE_OM(
         OzoneManagerVersion.DEFAULT_VERSION,
         OzoneManagerVersion.DEFAULT_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         true),
     DEFAULT_EXPECTED_ONE_CURRENT_ONE_FUTURE_OM(
         OzoneManagerVersion.DEFAULT_VERSION,
         OzoneManagerVersion.SOFTWARE_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         true),
 
     CURRENT_EXPECTED_NO_OM(
@@ -137,7 +137,7 @@ public class TestRpcClient {
         true),
     CURRENT_EXPECTED_ONE_FUTURE_OM(
         OzoneManagerVersion.SOFTWARE_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         null,
         true),
     CURRENT_EXPECTED_TWO_DEFAULT_OM(
@@ -152,8 +152,8 @@ public class TestRpcClient {
         true),
     CURRENT_EXPECTED_TWO_FUTURE_OM(
         OzoneManagerVersion.SOFTWARE_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         true),
     CURRENT_EXPECTED_ONE_DEFAULT_ONE_CURRENT_OM(
         OzoneManagerVersion.SOFTWARE_VERSION,
@@ -163,12 +163,12 @@ public class TestRpcClient {
     CURRENT_EXPECTED_ONE_DEFAULT_ONE_FUTURE_OM(
         OzoneManagerVersion.SOFTWARE_VERSION,
         OzoneManagerVersion.DEFAULT_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         false),
     CURRENT_EXPECTED_ONE_CURRENT_ONE_FUTURE_OM(
         OzoneManagerVersion.SOFTWARE_VERSION,
         OzoneManagerVersion.SOFTWARE_VERSION,
-        OzoneManagerVersion.FUTURE_VERSION,
+        OzoneManagerVersion.UNKNOWN_VERSION,
         true);
 
     private final OzoneManagerVersion expectedVersion;
@@ -213,6 +213,6 @@ public class TestRpcClient {
   public void testFutureVersionShouldNotBeAnExpectedVersion() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> validateOmVersion(OzoneManagerVersion.FUTURE_VERSION, null));
+        () -> validateOmVersion(OzoneManagerVersion.UNKNOWN_VERSION, null));
   }
 }

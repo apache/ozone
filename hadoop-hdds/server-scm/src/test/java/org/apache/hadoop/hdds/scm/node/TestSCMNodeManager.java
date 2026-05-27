@@ -38,7 +38,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND_COUNT_UPDATED;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -139,17 +139,17 @@ public class TestSCMNodeManager {
 
   private static final int MAX_SOFTWARE_VERSION = HDDSLayoutVersionManager.maxLayoutVersion();
   private static final LayoutVersionProto LARGER_SOFTWARE_PROTO =
-      toLayoutVersionProto(MAX_SOFTWARE_VERSION, MAX_SOFTWARE_VERSION + 1);
+      toVersionProto(MAX_SOFTWARE_VERSION, MAX_SOFTWARE_VERSION + 1);
   private static final LayoutVersionProto SMALLER_APPARENT_VERSION_PROTO =
-      toLayoutVersionProto(MAX_SOFTWARE_VERSION - 1, MAX_SOFTWARE_VERSION);
+      toVersionProto(MAX_SOFTWARE_VERSION - 1, MAX_SOFTWARE_VERSION);
   // In a real cluster, startup is disallowed if MLV is larger than SLV, so
   // increase both numbers to test smaller SLV or larger MLV.
   private static final LayoutVersionProto SMALLER_ALL_VERSIONS_PROTO =
-      toLayoutVersionProto(MAX_SOFTWARE_VERSION - 1, MAX_SOFTWARE_VERSION - 1);
+      toVersionProto(MAX_SOFTWARE_VERSION - 1, MAX_SOFTWARE_VERSION - 1);
   private static final LayoutVersionProto LARGER_ALL_VERSIONS_PROTO =
-      toLayoutVersionProto(MAX_SOFTWARE_VERSION + 1, MAX_SOFTWARE_VERSION + 1);
+      toVersionProto(MAX_SOFTWARE_VERSION + 1, MAX_SOFTWARE_VERSION + 1);
   private static final LayoutVersionProto MATCHING_VERSION_PROTO =
-      toLayoutVersionProto(MAX_SOFTWARE_VERSION, MAX_SOFTWARE_VERSION);
+      toVersionProto(MAX_SOFTWARE_VERSION, MAX_SOFTWARE_VERSION);
 
   @BeforeEach
   public void setup() {
@@ -271,7 +271,7 @@ public class TestSCMNodeManager {
    */
   private DatanodeDetails registerWithCapacity(SCMNodeManager nodeManager) {
     return registerWithCapacity(nodeManager,
-        UpgradeUtils.defaultLayoutVersionProto(), success);
+        UpgradeUtils.defaultVersionProto(), success);
   }
 
   /**
@@ -753,7 +753,7 @@ public class TestSCMNodeManager {
           nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
       int metadataVersion =
           nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
-      nodeManager.processLayoutVersionReport(node,
+      nodeManager.processVersionReport(node,
           LayoutVersionProto.newBuilder()
               .setMetadataLayoutVersion(metadataVersion - 1)
               .setSoftwareLayoutVersion(softwareVersion)
@@ -762,7 +762,7 @@ public class TestSCMNodeManager {
               .getNumFinalizedDatanodes(),
           "Lower metadata layout version should decrement finalized count");
 
-      nodeManager.processLayoutVersionReport(node,
+      nodeManager.processVersionReport(node,
           LayoutVersionProto.newBuilder()
               .setMetadataLayoutVersion(metadataVersion)
               .setSoftwareLayoutVersion(softwareVersion)
@@ -910,7 +910,7 @@ public class TestSCMNodeManager {
         nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
     int scmSlv =
         nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
-    nodeManager.processLayoutVersionReport(node1,
+    nodeManager.processVersionReport(node1,
         LayoutVersionProto.newBuilder()
             .setMetadataLayoutVersion(scmMlv + 1)
             .setSoftwareLayoutVersion(scmSlv + 1)
@@ -942,7 +942,7 @@ public class TestSCMNodeManager {
         times(1)).fireEvent(NEW_NODE, node1);
     int scmMlv =
         nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
-    nodeManager.processLayoutVersionReport(node1,
+    nodeManager.processVersionReport(node1,
         LayoutVersionProto.newBuilder()
             .setMetadataLayoutVersion(scmMlv - 1)
             .setSoftwareLayoutVersion(scmMlv)

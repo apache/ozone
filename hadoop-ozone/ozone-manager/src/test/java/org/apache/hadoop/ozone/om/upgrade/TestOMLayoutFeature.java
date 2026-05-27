@@ -101,7 +101,7 @@ public class TestOMLayoutFeature {
   public void testAllLayoutFeaturesAreSupportedByFutureVersions() {
     for (OMLayoutFeature feature : OMLayoutFeature.values()) {
       assertSupportedBy(feature, OzoneManagerVersion.ZDU);
-      assertSupportedBy(feature, OzoneManagerVersion.FUTURE_VERSION);
+      assertSupportedBy(feature, OzoneManagerVersion.UNKNOWN_VERSION);
       // No ComponentVersion instance represents an arbitrary unknown future version.
       assertTrue(feature.isSupportedBy(Integer.MAX_VALUE));
     }

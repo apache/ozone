@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -427,7 +427,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
-    LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
+    LayoutVersionProto layoutInfo = defaultVersionProto();
 
     DatanodeDetailsProto datanodeDetailsProto3 =
         DatanodeDetailsProto.newBuilder()
@@ -471,12 +471,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build(),
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto3, nodeReportProto3,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build(),
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     });
@@ -1276,7 +1276,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
-            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
+            .setDataNodeLayoutVersion(defaultVersionProto())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
