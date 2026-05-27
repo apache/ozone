@@ -57,16 +57,15 @@ import org.junit.jupiter.params.provider.EnumSource;
  * select the closest node, and connections are re-used after a getBlock call.
  */
 public class TestXceiverClientGrpc {
+  private Pipeline pipeline;
+  private List<DatanodeDetails> dns;
+  private List<DatanodeDetails> dnsInOrder;
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
   private enum ReadChunkApi {
     LEGACY,
     ZERO_COPY
   }
-
-  private Pipeline pipeline;
-  private List<DatanodeDetails> dns;
-  private List<DatanodeDetails> dnsInOrder;
-  private OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeEach
   public void setup() {
