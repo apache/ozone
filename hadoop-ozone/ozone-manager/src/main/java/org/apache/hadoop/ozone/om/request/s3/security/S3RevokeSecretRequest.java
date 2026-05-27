@@ -50,8 +50,9 @@ public class S3RevokeSecretRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     final RevokeS3SecretRequest s3RevokeSecretRequest =
-        getOmRequest().getRevokeS3SecretRequest();
+        omRequest.getRevokeS3SecretRequest();
     final String accessId = s3RevokeSecretRequest.getKerberosID();
     final UserGroupInformation ugi =
         S3SecretRequestHelper.getOrCreateUgi(accessId);
@@ -63,16 +64,9 @@ public class S3RevokeSecretRequest extends OMClientRequest {
             RevokeS3SecretRequest.newBuilder()
                     .setKerberosID(accessId).build();
 
-    OMRequest.Builder omRequest = OMRequest.newBuilder()
+    return omRequest.toBuilder()
         .setRevokeS3SecretRequest(revokeS3SecretRequest)
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
-
-    if (getOmRequest().hasTraceID()) {
-      omRequest.setTraceID(getOmRequest().getTraceID());
-    }
-
-    return omRequest.build();
+        .build();
   }
 
   @Override

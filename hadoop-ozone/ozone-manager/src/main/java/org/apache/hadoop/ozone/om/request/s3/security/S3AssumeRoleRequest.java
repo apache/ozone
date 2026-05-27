@@ -90,7 +90,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    final AssumeRoleRequest assumeRoleRequest = getOmRequest().getAssumeRoleRequest();
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+    final AssumeRoleRequest assumeRoleRequest = omRequest.getAssumeRoleRequest();
 
     // Brief overview of flow:
     // The STS Endpoint makes the AssumeRole call, which when received by OM leader (via this method),
@@ -123,23 +124,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       updateAssumeRoleRequestBuilder.setAwsIamSessionPolicy(assumeRoleRequest.getAwsIamSessionPolicy());
     }
 
-    // Build new OMRequest with both original and update requests
-    final OMRequest.Builder omRequest = OMRequest.newBuilder()
-        .setUserInfo(getUserInfo())
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId())
-        .setAssumeRoleRequest(assumeRoleRequest)
-        .setUpdateAssumeRoleRequest(updateAssumeRoleRequestBuilder.build());
-
-    if (getOmRequest().hasS3Authentication()) {
-      omRequest.setS3Authentication(getOmRequest().getS3Authentication());
-    }
-
-    if (getOmRequest().hasTraceID()) {
-      omRequest.setTraceID(getOmRequest().getTraceID());
-    }
-
-    return omRequest.build();
+    return omRequest.toBuilder()
+        .setUpdateAssumeRoleRequest(updateAssumeRoleRequestBuilder.build())
+        .build();
   }
 
   @Override

@@ -54,9 +54,7 @@ public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
       throw new OMException("Only admins can delete revoked STS tokens", OMException.ResultCodes.PERMISSION_DENIED);
     }
 
-    return getOmRequest().toBuilder()
-        .setUserInfo(getUserInfo())
-        .build();
+    return super.preExecute(ozoneManager);
   }
 
   @Override

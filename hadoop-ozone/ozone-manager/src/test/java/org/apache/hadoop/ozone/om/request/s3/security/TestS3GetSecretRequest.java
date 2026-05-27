@@ -179,8 +179,12 @@ public class TestS3GetSecretRequest {
 
   @AfterEach
   public void tearDown() throws Exception {
+    if (omMetadataManager != null) {
+      omMetadataManager.close();
+    }
     omMetrics.unRegister();
     framework().clearInlineMocks();
+    Server.getCurCall().remove();
   }
 
   private OMRequest createTenantRequest(String tenantNameStr) {
