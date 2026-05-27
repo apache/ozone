@@ -433,7 +433,7 @@ public final class ContainerProtocolCalls  {
       requestBuilder = requestBuilder.setTraceID(traceId);
     }
     ContainerCommandResponseProto reply =
-        xceiverClient.sendCommand(requestBuilder.build(), validators);
+        xceiverClient.sendCommandWithZeroCopy(requestBuilder.build(), validators);
     final ReadChunkResponseProto response = reply.getReadChunk();
     final long readLen = getLen(response);
     if (readLen != chunk.getLen()) {

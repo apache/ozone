@@ -71,6 +71,7 @@ import org.apache.ratis.thirdparty.io.grpc.CallOptions;
 import org.apache.ratis.thirdparty.io.grpc.Channel;
 import org.apache.ratis.thirdparty.io.grpc.ClientCall;
 import org.apache.ratis.thirdparty.io.grpc.ClientInterceptor;
+import org.apache.ratis.thirdparty.io.grpc.ClientInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.Status;
@@ -154,7 +155,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   /**
    * gRPC interceptor that installs {@link #RESPONSE_MARSHALLER} as the
-   * response marshaller for the {@code send} bidi-streaming method.
+   * response marshaller for the {@code send} bidi-streaming method of the
+   * dedicated zero-copy stub.
    */
   private static final ClientInterceptor ZERO_COPY_INTERCEPTOR =
       new ClientInterceptor() {
@@ -280,7 +282,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     ManagedChannel channel = createChannel(dn, port).build();
     XceiverClientProtocolServiceStub stub = XceiverClientProtocolServiceGrpc.newStub(channel);
-    return new ChannelInfo(channel, stub);
+    XceiverClientProtocolServiceStub zeroCopyStub =
+        XceiverClientProtocolServiceGrpc.newStub(
+            ClientInterceptors.intercept(channel, ZERO_COPY_INTERCEPTOR));
+    return new ChannelInfo(channel, stub, zeroCopyStub);
   }
 
   protected NettyChannelBuilder createChannel(DatanodeDetails dn, int port)
@@ -294,10 +299,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     NettyChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(dnHost, port)
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
             .proxyDetector(uri -> null)
-            // Order matters. The zero-copy interceptor swaps the response
-            // marshaller for `send`; the tracing interceptor wraps that.
-            .intercept(new GrpcClientInterceptor())
-            .intercept(ZERO_COPY_INTERCEPTOR);
+            .intercept(new GrpcClientInterceptor());
     if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (trustManager != null) {
@@ -393,7 +395,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request) throws IOException {
     try {
-      return sendCommandWithTraceIDAndRetry(request, null).
+      return sendCommandWithTraceIDAndRetry(request, null, false).
           getResponse().get();
     } catch (ExecutionException e) {
       throw getIOExceptionForSendCommand(request, e);
@@ -484,7 +486,27 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
     try {
-      XceiverClientReply reply = sendCommandWithTraceIDAndRetry(request, validators);
+      XceiverClientReply reply =
+          sendCommandWithTraceIDAndRetry(request, validators, false);
+      return reply.getResponse().get();
+    } catch (ExecutionException e) {
+      throw getIOExceptionForSendCommand(request, e);
+    } catch (InterruptedException e) {
+      LOG.error("Command execution was interrupted.");
+      Thread.currentThread().interrupt();
+      throw (IOException) new InterruptedIOException(
+          "Command " + processForDebug(request) + " was interrupted.")
+          .initCause(e);
+    }
+  }
+
+  @Override
+  public ContainerCommandResponseProto sendCommandWithZeroCopy(
+      ContainerCommandRequestProto request, List<Validator> validators)
+      throws IOException {
+    try {
+      XceiverClientReply reply =
+          sendCommandWithTraceIDAndRetry(request, validators, true);
       return reply.getResponse().get();
     } catch (ExecutionException e) {
       throw getIOExceptionForSendCommand(request, e);
@@ -498,7 +520,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private XceiverClientReply sendCommandWithTraceIDAndRetry(
-      ContainerCommandRequestProto request, List<Validator> validators)
+      ContainerCommandRequestProto request, List<Validator> validators,
+      boolean zeroCopy)
       throws IOException {
 
     String spanName = "XceiverClientGrpc." + request.getCmdType().name();
@@ -511,7 +534,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           if (!request.hasVersion()) {
             builder.setVersion(ClientVersion.CURRENT.toProtoValue());
           }
-          return sendCommandWithRetry(builder.build(), validators);
+          return sendCommandWithRetry(builder.build(), validators, zeroCopy);
         });
   }
 
@@ -576,7 +599,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private XceiverClientReply sendCommandWithRetry(
-      ContainerCommandRequestProto request, List<Validator> validators)
+      ContainerCommandRequestProto request, List<Validator> validators,
+      boolean zeroCopy)
       throws IOException {
     ContainerCommandResponseProto responseProto = null;
     IOException ioException = null;
@@ -596,7 +620,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // sendCommandAsyncCall will create a new channel and async stub
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
-        responseProto = sendCommandAsync(request, dn).getResponse().get();
+        responseProto = (zeroCopy
+            ? sendCommandAsync(request, dn, true)
+            : sendCommandAsync(request, dn)).getResponse().get();
         if (validators != null && !validators.isEmpty()) {
           for (Validator validator : validators) {
             validator.accept(request, responseProto);
@@ -776,11 +802,19 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
+    return sendCommandAsync(request, dn, false);
+  }
+
+  @VisibleForTesting
+  protected XceiverClientReply sendCommandAsync(
+      ContainerCommandRequestProto request, DatanodeDetails dn,
+      boolean zeroCopy)
+      throws IOException, InterruptedException {
     checkOpen(dn);
     DatanodeID dnId = dn.getID();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Send command {} to datanode {}",
-          request.getCmdType(), dn);
+      LOG.debug("Send command {} to datanode {}{}",
+          request.getCmdType(), dn, zeroCopy ? " with zero-copy response" : "");
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
@@ -790,7 +824,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     // create a new grpc message stream pair for each call.
     final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        dnChannelInfoMap.get(dnId).getStub().withDeadlineAfter(timeout, TimeUnit.SECONDS)
+        (zeroCopy ? dnChannelInfoMap.get(dnId).getZeroCopyStub()
+            : dnChannelInfoMap.get(dnId).getStub())
+            .withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(new StreamObserver<ContainerCommandResponseProto>() {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
@@ -871,10 +907,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private static class ChannelInfo {
     private final ManagedChannel channel;
     private final XceiverClientProtocolServiceStub stub;
+    private final XceiverClientProtocolServiceStub zeroCopyStub;
 
-    ChannelInfo(ManagedChannel channel, XceiverClientProtocolServiceStub stub) {
+    ChannelInfo(ManagedChannel channel, XceiverClientProtocolServiceStub stub,
+        XceiverClientProtocolServiceStub zeroCopyStub) {
       this.channel = channel;
       this.stub = stub;
+      this.zeroCopyStub = zeroCopyStub;
     }
 
     public ManagedChannel getChannel() {
@@ -883,6 +922,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     public XceiverClientProtocolServiceStub getStub() {
       return stub;
+    }
+
+    public XceiverClientProtocolServiceStub getZeroCopyStub() {
+      return zeroCopyStub;
     }
 
     public boolean isChannelInactive() {

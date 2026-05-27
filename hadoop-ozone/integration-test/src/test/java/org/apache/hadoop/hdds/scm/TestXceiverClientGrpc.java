@@ -108,9 +108,9 @@ public class TestXceiverClientGrpc {
     for (int i = 0; i < 100; i++) {
       try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
-        public XceiverClientReply sendCommandAsync(
+        protected XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
-            DatanodeDetails dn) {
+            DatanodeDetails dn, boolean zeroCopy) {
           seenDN.add(dn);
           return buildValidResponse();
         }
@@ -127,9 +127,9 @@ public class TestXceiverClientGrpc {
     assertThat(allDNs.size()).isGreaterThan(1);
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
-      public XceiverClientReply sendCommandAsync(
+      protected XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
-          DatanodeDetails dn) throws IOException {
+          DatanodeDetails dn, boolean zeroCopy) throws IOException {
         allDNs.remove(dn);
         throw new IOException("Failed " + dn);
       }
@@ -148,9 +148,9 @@ public class TestXceiverClientGrpc {
     assertThat(allDNs.size()).isGreaterThan(1);
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
-      public XceiverClientReply sendCommandAsync(
+      protected XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
-          DatanodeDetails dn) throws IOException {
+          DatanodeDetails dn, boolean zeroCopy) throws IOException {
         allDNs.remove(dn);
         throw new IOException("Failed " + dn);
       }
@@ -169,9 +169,9 @@ public class TestXceiverClientGrpc {
     final AtomicInteger releaseCount = new AtomicInteger();
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
-      public XceiverClientReply sendCommandAsync(
+      protected XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
-          DatanodeDetails dn) {
+          DatanodeDetails dn, boolean zeroCopy) {
         return buildValidReadChunkResponse();
       }
 
@@ -217,6 +217,64 @@ public class TestXceiverClientGrpc {
   }
 
   @Test
+  public void testReadChunkZeroCopyIsOptInOnly() throws IOException {
+    final AtomicInteger regularCallCount = new AtomicInteger();
+    final AtomicInteger zeroCopyCallCount = new AtomicInteger();
+    final BlockID blockID = new BlockID(1, 1);
+    final ContainerProtos.ChunkInfo chunkInfo = ContainerProtos.ChunkInfo
+        .newBuilder()
+        .setChunkName("Anything")
+        .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+            .setBytesPerChecksum(1)
+            .setType(ContainerProtos.ChecksumType.CRC32)
+            .build())
+        .setLen(1)
+        .setOffset(0)
+        .build();
+    final ContainerProtos.ContainerCommandRequestProto request =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.ReadChunk)
+            .setContainerID(blockID.getContainerID())
+            .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
+            .setReadChunk(ContainerProtos.ReadChunkRequestProto.newBuilder()
+                .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+                .setChunkData(chunkInfo))
+            .build();
+
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      protected XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn, boolean zeroCopy) {
+        if (zeroCopy) {
+          zeroCopyCallCount.incrementAndGet();
+        } else {
+          regularCallCount.incrementAndGet();
+        }
+        return buildValidReadChunkResponse();
+      }
+    }) {
+      assertArrayEquals(new byte[] {1},
+          client.sendCommand(request).getReadChunk().getData().toByteArray());
+      assertEquals(1, regularCallCount.get());
+      assertEquals(0, zeroCopyCallCount.get());
+
+      ContainerProtos.ContainerCommandResponseProto reply =
+          ContainerProtocolCalls.readChunkForZeroCopy(client, chunkInfo,
+              blockID.getDatanodeBlockIDProtobuf(), null, null);
+      try {
+        assertArrayEquals(new byte[] {1},
+            reply.getReadChunk().getData().toByteArray());
+      } finally {
+        client.releaseReceivedResponse(reply);
+      }
+    }
+
+    assertEquals(1, regularCallCount.get());
+    assertEquals(1, zeroCopyCallCount.get());
+  }
+
+  @Test
   public void testReadChunkValidatorFailureReleasesResponseBeforeRetry()
       throws IOException {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
@@ -244,9 +302,9 @@ public class TestXceiverClientGrpc {
 
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
-      public XceiverClientReply sendCommandAsync(
+      protected XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
-          DatanodeDetails dn) {
+          DatanodeDetails dn, boolean zeroCopy) {
         allDNs.remove(dn);
         return buildValidReadChunkResponse();
       }
@@ -275,9 +333,9 @@ public class TestXceiverClientGrpc {
         new CompletableFuture<>();
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
-      public XceiverClientReply sendCommandAsync(
+      protected XceiverClientReply sendCommandAsync(
           ContainerProtos.ContainerCommandRequestProto request,
-          DatanodeDetails dn) {
+          DatanodeDetails dn, boolean zeroCopy) {
         return new XceiverClientReply(response);
       }
     }) {
@@ -305,9 +363,9 @@ public class TestXceiverClientGrpc {
     for (int i = 0; i < 100; i++) {
       try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
-        public XceiverClientReply sendCommandAsync(
+        protected XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
-            DatanodeDetails dn) {
+            DatanodeDetails dn, boolean zeroCopy) {
           seenDNs.add(dn);
           if (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
             return buildValidReadChunkResponse();
@@ -340,9 +398,9 @@ public class TestXceiverClientGrpc {
           setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
       try (XceiverClientGrpc client = new XceiverClientGrpc(randomPipeline, conf) {
         @Override
-        public XceiverClientReply sendCommandAsync(
+        protected XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
-            DatanodeDetails dn) {
+            DatanodeDetails dn, boolean zeroCopy) {
           seenDNs.add(dn);
           return buildValidResponse();
         }
@@ -366,9 +424,9 @@ public class TestXceiverClientGrpc {
       final Set<DatanodeDetails> seenDNs = new HashSet<>();
       try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
-        public XceiverClientReply sendCommandAsync(
+        protected XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
-            DatanodeDetails dn) {
+            DatanodeDetails dn, boolean zeroCopy) {
           seenDNs.add(dn);
           if (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
             return buildValidReadChunkResponse();

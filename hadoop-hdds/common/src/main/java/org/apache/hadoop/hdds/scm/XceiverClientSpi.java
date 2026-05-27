@@ -155,6 +155,24 @@ public abstract class XceiverClientSpi implements Closeable {
     }
   }
 
+  /**
+   * Sends a given command using an explicit zero-copy-capable response path
+   * when supported by the transport.
+   * <p>
+   * The default implementation delegates to {@link #sendCommand(
+   * ContainerCommandRequestProto, List)}, so transports without zero-copy
+   * support continue to return normal heap-backed responses.
+   *
+   * @param request Request
+   * @param validators functions to validate the response
+   * @return Response to the command
+   */
+  public ContainerCommandResponseProto sendCommandWithZeroCopy(
+      ContainerCommandRequestProto request,
+      List<Validator> validators) throws IOException {
+    return sendCommand(request, validators);
+  }
+
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
     throw new UnsupportedOperationException("Stream read is not supported");
   }
@@ -222,8 +240,9 @@ public abstract class XceiverClientSpi implements Closeable {
    * marshaller, the parsed proto's {@code bytes} fields reference the
    * Netty-managed pooled buffer of the inbound message. Those buffers must
    * be released back to Netty when the caller is done with the proto;
-   * otherwise direct memory accumulates. Callers of {@code sendCommand}
-   * that retain the response past the call (e.g. {@code ReadChunk} via
+   * otherwise direct memory accumulates. Callers of
+   * {@code sendCommandWithZeroCopy} that retain the response past the call
+   * (e.g. {@code ReadChunk} via
    * {@code ContainerProtocolCalls.readChunkForZeroCopy(...)} in
    * {@code ChunkInputStream}) must invoke this method once they are done.
    * <p>
