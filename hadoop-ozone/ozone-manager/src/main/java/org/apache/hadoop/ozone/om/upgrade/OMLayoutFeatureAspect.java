@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.om.upgrade;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 
 import java.io.IOException;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
@@ -40,7 +40,7 @@ public class OMLayoutFeatureAspect {
 
   @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
-    LayoutFeature layoutFeature = ((MethodSignature) joinPoint.getSignature())
+    ComponentVersion layoutFeature = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value();
     OMVersionManager versionManager = null;
@@ -66,7 +66,7 @@ public class OMLayoutFeatureAspect {
 
   private void checkIsAllowed(String operationName,
                               OMVersionManager omVersionManager,
-                              LayoutFeature layoutFeature) throws OMException {
+                              ComponentVersion layoutFeature) throws OMException {
     if (!omVersionManager.isAllowed(layoutFeature)) {
       throw new OMException(String.format("Operation %s cannot be invoked " +
               "before finalization. It belongs to version %s. Current apparent version is %s",

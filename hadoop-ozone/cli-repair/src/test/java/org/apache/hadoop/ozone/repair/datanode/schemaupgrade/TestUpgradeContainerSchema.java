@@ -139,7 +139,7 @@ class TestUpgradeContainerSchema {
   private void initDatanode(HDDSLayoutFeature layoutFeature) throws IOException {
     DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         datanodeDetails.getUuidString(),
-        layoutFeature.layoutVersion());
+        layoutFeature.serialize());
     layoutStorage.initialize();
 
     String idFilePath = Objects.requireNonNull(HddsServerUtil.getDatanodeIdFilePath(conf), "datanode.id path");

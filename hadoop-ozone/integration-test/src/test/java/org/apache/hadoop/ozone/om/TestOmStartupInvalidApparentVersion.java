@@ -48,7 +48,7 @@ public class TestOmStartupInvalidApparentVersion {
   @Test
   public void testStartupFailsWhenApparentVersionBetweenLastLayoutFeatureAndZdu()
       throws Exception {
-    assertStartupFailsWithComponentVersionMessage(OMLayoutFeature.SNAPSHOT_DEFRAG.layoutVersion() + 1);
+    assertStartupFailsWithComponentVersionMessage(OMLayoutFeature.SNAPSHOT_DEFRAG.serialize() + 1);
   }
 
   @Test

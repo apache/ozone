@@ -37,9 +37,9 @@ public class TestOMLayoutFeature {
     for (OMLayoutFeature lf : values) {
       // This will skip the jump from the last OMLayoutFeature to OzoneManagerVersion#ZDU,
       // since that is expected to be a larger version increment.
-      assertEquals(currVersion + 1, lf.layoutVersion(),
+      assertEquals(currVersion + 1, lf.serialize(),
           "Expected monotonically increasing layout version for " + lf);
-      currVersion = lf.layoutVersion();
+      currVersion = lf.serialize();
     }
   }
 
@@ -52,7 +52,7 @@ public class TestOMLayoutFeature {
     OMLayoutFeature lastFeature = OMLayoutFeature.values()[numOMLayoutFeatures - 1];
     assertEquals(10, numOMLayoutFeatures);
     assertEquals(OMLayoutFeature.SNAPSHOT_DEFRAG, lastFeature);
-    assertEquals(9, lastFeature.layoutVersion());
+    assertEquals(9, lastFeature.serialize());
   }
 
   @Test
@@ -87,7 +87,7 @@ public class TestOMLayoutFeature {
   public void testIsSupportedByFeatureBoundary() {
     for (OMLayoutFeature feature : OMLayoutFeature.values()) {
       // A layout feature should support itself.
-      int layoutVersion = feature.layoutVersion();
+      int layoutVersion = feature.serialize();
       assertSupportedBy(feature, feature);
       if (layoutVersion > 0) {
         // A layout feature should not be supported by older features.

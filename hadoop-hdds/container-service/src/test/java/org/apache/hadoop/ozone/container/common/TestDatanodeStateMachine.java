@@ -231,7 +231,7 @@ public class TestDatanodeStateMachine {
 
       DatanodeStorage layoutStorage = new DatanodeStorage(conf,
           UUID.randomUUID().toString(),
-          HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+          HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize());
       layoutStorage.initialize();
 
       // This execute will invoke getVersion calls against all SCM endpoints

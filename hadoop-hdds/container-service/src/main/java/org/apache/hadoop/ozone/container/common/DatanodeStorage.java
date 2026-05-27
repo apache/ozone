@@ -99,7 +99,7 @@ public class DatanodeStorage extends Storage {
 
     File dnIdFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));
     if (dnIdFile.exists()) {
-      defaultApparentVersion = HDDSLayoutFeature.INITIAL_VERSION.layoutVersion();
+      defaultApparentVersion = HDDSLayoutFeature.INITIAL_VERSION.serialize();
     }
 
     return defaultApparentVersion;

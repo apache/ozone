@@ -100,7 +100,7 @@ public class TestDNDataDistributionFinalization {
         .setNumOfOzoneManagers(1)
         .setNumDatanodes(NUM_DATANODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION.serialize())
             .build());
     this.cluster = clusterBuilder.build();
 

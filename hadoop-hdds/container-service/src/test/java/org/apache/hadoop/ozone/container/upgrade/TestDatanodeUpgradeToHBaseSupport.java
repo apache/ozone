@@ -83,7 +83,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
+        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
@@ -118,7 +118,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
+        HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));

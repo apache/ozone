@@ -60,13 +60,13 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
   private final int numDataVolumes;
   private final String reservedSpace;
-  private final Integer layoutVersion;
+  private final Integer apparentVersion;
   private final HDDSVersion initialVersion;
   private final HDDSVersion currentVersion;
 
   protected UniformDatanodesFactory(Builder builder) {
     numDataVolumes = builder.numDataVolumes;
-    layoutVersion = builder.layoutVersion;
+    apparentVersion = builder.apparentVersion;
     reservedSpace = builder.reservedSpace;
     currentVersion = builder.currentVersion;
     initialVersion = builder.initialVersion != null ? builder.initialVersion : builder.currentVersion;
@@ -104,9 +104,9 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     Files.createDirectories(ratisDir);
     dnConf.set(HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, ratisDir.toString());
 
-    if (layoutVersion != null) {
+    if (apparentVersion != null) {
       DatanodeStorage layoutStorage = new DatanodeStorage(
-          dnConf, UUID.randomUUID().toString(), layoutVersion);
+          dnConf, UUID.randomUUID().toString(), apparentVersion);
       layoutStorage.initialize();
     }
 
@@ -144,7 +144,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     private int numDataVolumes = 1;
     private String reservedSpace;
-    private Integer layoutVersion;
+    private Integer apparentVersion;
     private HDDSVersion initialVersion;
     private HDDSVersion currentVersion;
 
@@ -169,13 +169,8 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
       return this;
     }
 
-    public Builder setLayoutVersion(int layoutVersion) {
-      this.layoutVersion = layoutVersion;
-      return this;
-    }
-
-    public Builder setInitialVersion(HDDSVersion version) {
-      this.initialVersion = version;
+    public Builder setApparentVersion(int apparentVersion) {
+      this.apparentVersion = apparentVersion;
       return this;
     }
 
