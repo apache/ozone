@@ -260,32 +260,6 @@ public abstract class EndpointBase {
       s3Auth.setS3Action(originalS3Action);
     }
   }
-
-  protected OzoneBucket getBucket(String bucketName)
-      throws OS3Exception, IOException {
-    OzoneBucket bucket;
-    try {
-      bucket = client.getObjectStore().getS3Bucket(bucketName);
-    } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
-          || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (isExpiredToken(ex)) {
-        throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), ex);
-      } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
-        throw newError(S3ErrorTable.ACCESS_DENIED,
-            s3Auth.getAccessID(), ex);
-      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.TIMEOUT ||
-          ex.getResult() == ResultCodes.INTERNAL_ERROR) {
-        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      } else {
-        throw ex;
-      }
-    }
-    return bucket;
-  }
   
   protected OzoneVolume getVolume() throws IOException {
     return client.getObjectStore().getS3Volume();
