@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.om.helpers;
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 
 /**
@@ -127,7 +127,7 @@ public final class OmMultipartPartKey {
 
     @Override
     public OmMultipartPartKey fromCodecBuffer(@Nonnull CodecBuffer buffer)
-        throws IllegalArgumentException {
+        throws CodecException {
       return fromByteBuffer(buffer.asReadOnlyByteBuffer());
     }
 
@@ -157,20 +157,20 @@ public final class OmMultipartPartKey {
      * Decodes the raw byte array from the key/value store into an OmMultipartPartKey object.
      * @param rawData Byte array from the key/value store. Should not be null.
      * @return OmMultipartPartKey object represented by the raw byte array.
-     * @throws IllegalArgumentException if the rawData format is invalid
+     * @throws CodecException if the rawData format is invalid
      */
     @Override
-    public OmMultipartPartKey fromPersistedFormat(byte[] rawData) throws IllegalArgumentException {
+    public OmMultipartPartKey fromPersistedFormat(byte[] rawData) throws CodecException {
       return fromByteBuffer(ByteBuffer.wrap(rawData));
     }
 
     private OmMultipartPartKey fromByteBuffer(ByteBuffer rawData)
-        throws IllegalArgumentException {
+        throws CodecException {
       final ByteBuffer input = rawData.asReadOnlyBuffer();
       final int start = input.position();
       final int length = input.remaining();
       if (length == 0) {
-        throw new IllegalArgumentException(
+        throw new CodecException(
             "Invalid multipart part key: empty key");
       }
 
@@ -180,7 +180,7 @@ public final class OmMultipartPartKey {
 
       int separatorIndex = start + length - suffixLength - 1;
       if (separatorIndex < start) {
-        throw new IllegalArgumentException(
+        throw new CodecException(
             "Invalid multipart part key: invalid separator position");
       }
       final ByteBuffer uploadIdBuffer = input.duplicate();
@@ -188,17 +188,13 @@ public final class OmMultipartPartKey {
       uploadIdBuffer.position(start);
       byte[] uploadIdBytes = new byte[uploadIdBuffer.remaining()];
       uploadIdBuffer.get(uploadIdBytes);
-      String uploadId = StringCodec.get().fromPersistedFormat(uploadIdBytes);
-      if (!Arrays.equals(uploadIdBytes,
-          uploadId.getBytes(StandardCharsets.UTF_8))) {
-        throw new IllegalArgumentException(
-            "Invalid multipart part key: malformed UTF-8 uploadId");
-      }
+      String uploadId = StringCodec.getCodecNoFallback()
+          .fromPersistedFormat(uploadIdBytes);
       if (suffixLength == 0) {
         return prefix(uploadId);
       }
       if (start + length - (separatorIndex + 1) != Integer.BYTES) {
-        throw new IllegalArgumentException(
+        throw new CodecException(
             "Invalid multipart part key: unexpected part suffix length");
       }
       int part = input.getInt(separatorIndex + 1);
@@ -220,10 +216,10 @@ public final class OmMultipartPartKey {
    * @param start the position where key bytes start
    * @param length the number of bytes in the key
    * @return the length of the suffix (0 for prefix keys, Integer.BYTES for full keys)
-   * @throws IllegalArgumentException if the key format is invalid (missing separator or unexpected suffix length)
+   * @throws CodecException if the key format is invalid (missing separator or unexpected suffix length)
    */
   private static int getSuffixLength(ByteBuffer rawData, int start, int length)
-      throws IllegalArgumentException {
+      throws CodecException {
     int suffixLength = -1;
     // Check full-key layout first. Otherwise, part numbers whose low byte is
     // '/' (for example 47 -> 0x0000002f) are mis-classified as prefix keys.
@@ -234,7 +230,7 @@ public final class OmMultipartPartKey {
       suffixLength = 0;
     }
     if (suffixLength < 0) {
-      throw new IllegalArgumentException(
+      throw new CodecException(
           "Invalid multipart part key: missing separator");
     }
     return suffixLength;
