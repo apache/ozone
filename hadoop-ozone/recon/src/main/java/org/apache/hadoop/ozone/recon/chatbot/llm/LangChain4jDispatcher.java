@@ -43,71 +43,34 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * {@link LLMClient} implementation that sends chat requests to cloud LLM providers using
+ * {@link LLMClient} implementation backed by
  * <a href="https://github.com/langchain4j/langchain4j">LangChain4j</a>.
  *
- * <h2>Purpose</h2>
- * <p>The Recon chatbot needs to call external APIs (OpenAI, Google Gemini, Anthropic Claude)
- * with a stable Java contract. This class is the only place that talks to LangChain4j: it
- * picks the right provider, builds a {@link ChatLanguageModel} for the requested model,
- * converts messages into LangChain4j types, runs one completion, and maps the result back to
- * {@link LLMResponse}. Higher layers ({@link org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent},
- * {@link org.apache.hadoop.ozone.recon.chatbot.api.ChatbotEndpoint}) depend only on {@link LLMClient}.</p>
+ * <p>This is the only class in the chatbot that knows about LangChain4j. It resolves the
+ * correct provider for a given model, builds a {@link ChatLanguageModel}, translates the
+ * message list into LangChain4j types, fires the completion, and returns a normalised
+ * {@link LLMResponse}. Everything above this class ({@code ChatbotAgent},
+ * {@code ChatbotEndpoint}) depends only on the {@link LLMClient} interface.</p>
  *
- * <h2>Lifecycle (no background work)</h2>
- * <p>The class is registered in Guice as a singleton: one instance exists for the whole Recon process.
- * There is no timer, no scheduled task, and no long-lived outbound connection. At startup
- * the constructor only reads configuration and records which providers have API keys (for
- * {@link #isAvailable()} and {@link #getSupportedModels()}). Actual network calls happen
- * only when {@link #chatCompletion} runs on an HTTP request thread.</p>
+ * <p><b>Startup:</b> reads configuration and checks which providers have API keys. No
+ * network calls are made until {@link #chatCompletion} is first invoked.</p>
  *
- * <h2>Request flow (one chat completion)</h2>
- * <p>Each user message is handled synchronously on the thread that serves the REST call:</p>
- * <pre>
- * User HTTP request
- *         |
- *         v
- * Jersey dispatches to ChatbotEndpoint (request thread)
- *         |
- *         v
- * ChatbotAgent orchestrates tool selection / summarization
- *         |
- *         v
- * LangChain4jDispatcher.chatCompletion(...)
- *         |
- *         +-- Resolve provider (see below)
- *         |
- *         +-- Resolve or retrieve cached ChatLanguageModel for that provider + model name
- *         |
- *         +-- Translate ChatMessage list to LangChain4j messages (system / user / assistant)
- *         |
- *         +-- chatModel.chat(ChatRequest)  --&gt; outbound HTTPS to the vendor (may take seconds)
- *         |
- *         v
- * LLMResponse returned to the agent, then JSON to the client
- * </pre>
- *
- * <h2>How provider routing works</h2>
- * <p>When {@link #chatCompletion} runs, the provider is chosen in this order:</p>
+ * <p><b>Provider routing</b> — resolved in this order on every call:</p>
  * <ol>
- *   <li>Optional {@code _provider} entry in the parameters map (e.g. {@code "gemini"}).</li>
- *   <li>If the model string looks like {@code provider:model}, the prefix before {@code :}
- *       is the provider.</li>
- *   <li>Otherwise the model name: {@code gpt-} / {@code o1} / {@code o3} → {@code openai};
- *       {@code gemini} → {@code gemini}; {@code claude} → {@code anthropic}.</li>
- *   <li>If still unclear, {@link ChatbotConfigKeys#OZONE_RECON_CHATBOT_PROVIDER} is used.</li>
+ *   <li>Explicit {@code _provider} key in the parameters map, or a {@code provider:model}
+ *       prefix in the model string.</li>
+ *   <li>Reverse lookup in the configured model lists ({@link #supportedModels}): the same
+ *       map that drives {@code GET /chatbot/models}. Adding a model to
+ *       {@code ozone.recon.chatbot.openai.models} in {@code ozone-site.xml} makes it
+ *       routable with no code change.</li>
+ *   <li>If the model is not found and no hint was given, {@link LLMException} is thrown
+ *       directing the caller to {@code GET /api/v1/chatbot/models}.</li>
  * </ol>
- * <p>{@link ChatLanguageModel} instances are built once per {@code (provider, model)} pair and
- * cached in {@code modelCache} for the lifetime of the process. On the first request for a
- * given model (e.g. {@code gemini-2.5-flash}), the HTTP client, SSL context, and connection
- * pool are constructed and stored. All subsequent requests for that model — from any thread —
- * reuse the same cached instance. The heavy work is the single {@code chat(...)} call.
- * Different users on different threads each follow this flow independently; the cached model
- * instance is stateless and holds no per-request data.</p>
  *
- * <h2>Supported models listing</h2>
- * <p>{@link #getSupportedModels()} returns a fixed list per provider for which a non-empty
- * API key exists in configuration. It is not a live query to each vendor's model catalogue.</p>
+ * <p><b>Model caching:</b> building a {@link ChatLanguageModel} creates an HTTP client and
+ * SSL context, so each {@code (provider, model)} pair is built once and cached in
+ * {@link #modelCache}. If the first call with that model fails, the entry is evicted so a
+ * bad model name cannot get stuck in the cache permanently.</p>
  */
 @Singleton
 public class LangChain4jDispatcher implements LLMClient {
@@ -248,6 +211,7 @@ public class LangChain4jDispatcher implements LLMClient {
       return new LLMResponse(content, actualModel, promptTokens, completionTokens, metadata);
 
     } catch (Exception e) {
+      modelCache.remove(provider + ":" + actualModel);
       LOG.error("LangChain4j call failed for provider={}, model={}", provider, actualModel, e);
       throw new LLMException(
           "LLM request failed for provider '" + provider + "': " + e.getMessage(), e);
@@ -280,26 +244,25 @@ public class LangChain4jDispatcher implements LLMClient {
   // =========================================================================
 
   /**
-   * Determines which provider string to use for a given request.
-   * Priority: explicit provider hint → model name prefix heuristics → configured default.
+   * Returns the provider for the given model.
+   * If a hint is supplied (via explicit field or "provider:model" prefix), it is used directly.
+   * Otherwise, the model name is looked up in the configured model lists (same data the UI uses).
+   * Throws if the model is not found in any list — callers should use GET /chatbot/models.
    */
-  private String resolveProvider(String providerHint, String model) {
+  private String resolveProvider(String providerHint, String model) throws LLMException {
     if (providerHint != null && !providerHint.isEmpty()) {
       return providerHint.toLowerCase();
     }
     if (model != null) {
-      String m = model.toLowerCase();
-      if (m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3")) {
-        return "openai";
-      }
-      if (m.startsWith("gemini")) {
-        return "gemini";
-      }
-      if (m.startsWith("claude")) {
-        return "anthropic";
+      for (Map.Entry<String, List<String>> entry : supportedModels.entrySet()) {
+        if (entry.getValue().contains(model)) {
+          return entry.getKey();
+        }
       }
     }
-    return defaultProvider.toLowerCase();
+    throw new LLMException(
+        "Model '" + model + "' is not recognised. "
+        + "Use GET /api/v1/chatbot/models for the list of supported models.");
   }
 
   /**

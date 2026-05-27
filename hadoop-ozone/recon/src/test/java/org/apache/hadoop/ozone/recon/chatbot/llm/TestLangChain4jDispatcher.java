@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -35,157 +36,175 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Tests for {@link LangChain4jDispatcher}.
  *
- * <p>These tests exercise routing (which provider is selected for a given model name)
- * and availability checking without making any real network calls.
- * All tests that verify provider routing do so by confirming the correct provider name
- * appears in the exception message thrown when no API key is configured — this is the
- * cheapest way to prove the routing decision without mocking the LangChain4j internals.</p>
+ * <p>All tests avoid real network calls. Provider routing is verified either via
+ * {@link LangChain4jDispatcher#getSupportedModels()} (which reflects the configured model lists)
+ * or by confirming that an explicit provider hint reaches {@code resolveKey}, which throws a
+ * clear "No API key configured for provider X" error when no key is set — proving the correct
+ * provider code path was entered.</p>
  */
 public class TestLangChain4jDispatcher {
 
-    private OzoneConfiguration conf;
-    private CredentialHelper credentialHelper;
-    private LangChain4jDispatcher dispatcher;
+  private OzoneConfiguration conf;
+  private CredentialHelper credentialHelper;
+  private LangChain4jDispatcher dispatcher;
 
-    @BeforeEach
-    public void setUp() {
-        conf = new OzoneConfiguration();
-        conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER, "gemini");
-        credentialHelper = new CredentialHelper(conf);
-        dispatcher = new LangChain4jDispatcher(conf, credentialHelper);
-    }
+  @BeforeEach
+  public void setUp() {
+    conf = new OzoneConfiguration();
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER, "gemini");
+    credentialHelper = new CredentialHelper(conf);
+    dispatcher = new LangChain4jDispatcher(conf, credentialHelper);
+  }
 
-    @Test
-    public void testEmptyMessagesThrows() {
-        List<LLMClient.ChatMessage> messages = new ArrayList<>();
-        assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "gpt-4.1", new HashMap<>()));
-    }
+  // ── Input validation ──────────────────────────────────────────────────────
 
-    @Test
-    public void testNullMessagesThrows() {
-        assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(null, "gpt-4.1", new HashMap<>()));
-    }
+  @Test
+  public void testEmptyMessagesThrows() {
+    List<LLMClient.ChatMessage> messages = new ArrayList<>();
+    assertThrows(LLMClient.LLMException.class, () ->
+        dispatcher.chatCompletion(messages, "gpt-4.1", new HashMap<>()));
+  }
 
-    @Test
-    public void testIsAvailableWithoutKeys() {
-        // No API keys configured — no provider should be registered.
-        assertFalse(dispatcher.isAvailable());
-    }
+  @Test
+  public void testNullMessagesThrows() {
+    assertThrows(LLMClient.LLMException.class, () ->
+        dispatcher.chatCompletion(null, "gpt-4.1", new HashMap<>()));
+  }
 
-    @Test
-    public void testIsAvailableWithGeminiKey() {
-        conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "test-gemini-key");
-        credentialHelper = new CredentialHelper(conf);
-        dispatcher = new LangChain4jDispatcher(conf, credentialHelper);
-        assertTrue(dispatcher.isAvailable());
-    }
+  // ── isAvailable / getSupportedModels ─────────────────────────────────────
 
-    @Test
-    public void testIsAvailableWithOpenAIKey() {
-        conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "test-openai-key");
-        credentialHelper = new CredentialHelper(conf);
-        dispatcher = new LangChain4jDispatcher(conf, credentialHelper);
-        assertTrue(dispatcher.isAvailable());
-    }
+  @Test
+  public void testIsAvailableWithoutKeys() {
+    assertFalse(dispatcher.isAvailable());
+  }
 
-    @Test
-    public void testGetSupportedModelsEmptyWithoutKeys() {
-        // No keys configured → no supported models returned.
-        List<String> models = dispatcher.getSupportedModels();
-        assertNotNull(models);
-        assertTrue(models.isEmpty(),
-            "Without any API keys, supported models list should be empty");
-    }
+  @Test
+  public void testIsAvailableWithGeminiKey() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "fake-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+    assertTrue(dispatcher.isAvailable());
+  }
 
-    @Test
-    public void testGetSupportedModelsWithGeminiKey() {
-        conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "test-key");
-        credentialHelper = new CredentialHelper(conf);
-        dispatcher = new LangChain4jDispatcher(conf, credentialHelper);
-        List<String> models = dispatcher.getSupportedModels();
-        assertNotNull(models);
-        assertFalse(models.isEmpty(), "Should return Gemini models when key is configured");
-        assertTrue(models.stream().anyMatch(m -> m.startsWith("gemini")),
-            "Gemini models should start with 'gemini'");
-    }
+  @Test
+  public void testIsAvailableWithOpenAIKey() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "fake-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+    assertTrue(dispatcher.isAvailable());
+  }
 
-    @Test
-    public void testRoutingGeminiModel() {
-        // A "gemini-*" model name should route to the gemini provider.
-        // With no key configured the dispatcher throws mentioning "gemini".
-        List<LLMClient.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMClient.ChatMessage("user", "hello"));
+  @Test
+  public void testGetSupportedModelsEmptyWithoutKeys() {
+    List<String> models = dispatcher.getSupportedModels();
+    assertNotNull(models);
+    assertTrue(models.isEmpty());
+  }
 
-        LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "gemini-2.5-flash", new HashMap<>()));
-        assertTrue(ex.getMessage().toLowerCase().contains("gemini"),
-            "Error should mention gemini provider");
-    }
+  @Test
+  public void testGetSupportedModelsWithGeminiKey() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "fake-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+    List<String> models = dispatcher.getSupportedModels();
+    assertFalse(models.isEmpty());
+    assertTrue(models.stream().anyMatch(m -> m.startsWith("gemini")));
+  }
 
-    @Test
-    public void testRoutingOpenAIModel() {
-        // A "gpt-*" model name should route to the openai provider.
-        List<LLMClient.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMClient.ChatMessage("user", "hello"));
+  // ── Provider routing via configured model list ───────────────────────────
 
-        LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "gpt-4.1", new HashMap<>()));
-        assertTrue(ex.getMessage().toLowerCase().contains("openai"),
-            "Error should mention openai provider");
-    }
+  @Test
+  public void testGeminiModelAppearsInListWhenGeminiKeyConfigured() {
+    // Configuring the gemini key populates the gemini model list.
+    // A model in that list will be routed to gemini by the reverse-lookup in resolveProvider.
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "fake-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+    assertTrue(dispatcher.getSupportedModels().contains("gemini-2.5-flash"),
+        "gemini-2.5-flash should be in the supported list when the gemini key is configured");
+  }
 
-    @Test
-    public void testRoutingClaudeModel() {
-        // A "claude-*" model name should route to the anthropic provider.
-        List<LLMClient.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMClient.ChatMessage("user", "hello"));
+  @Test
+  public void testOpenAIModelAppearsInListWhenOpenAIKeyConfigured() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "fake-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+    assertTrue(dispatcher.getSupportedModels().contains("gpt-4.1"),
+        "gpt-4.1 should be in the supported list when the OpenAI key is configured");
+  }
 
-        LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "claude-sonnet-4-6", new HashMap<>()));
-        assertTrue(ex.getMessage().toLowerCase().contains("anthropic"),
-            "Error should mention anthropic provider");
-    }
+  @Test
+  public void testAnthropicModelAppearsInListWhenAnthropicKeyConfigured() {
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY, "fake-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
+    assertTrue(dispatcher.getSupportedModels().contains("claude-sonnet-4-6"),
+        "claude-sonnet-4-6 should be in the supported list when the Anthropic key is configured");
+  }
 
-    @Test
-    public void testUnknownModelUsesDefaultProvider() {
-        // An unrecognised model name should fall back to the configured default (gemini).
-        List<LLMClient.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMClient.ChatMessage("user", "hello"));
+  // ── Unknown / unconfigured model rejection ───────────────────────────────
 
-        LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "some-unknown-model", new HashMap<>()));
-        assertTrue(ex.getMessage().toLowerCase().contains("gemini"),
-            "Unknown model should route to the default gemini provider");
-    }
+  @Test
+  public void testUnknownModelThrowsNotRecognisedError() {
+    // No keys configured → supportedModels is empty → any model is rejected immediately.
+    List<LLMClient.ChatMessage> messages = new ArrayList<>();
+    messages.add(new LLMClient.ChatMessage("user", "hello"));
 
-    @Test
-    public void testCustomDefaultProvider() {
-        // When default is changed to openai, unknown models should route there.
-        conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER, "openai");
-        credentialHelper = new CredentialHelper(conf);
-        dispatcher = new LangChain4jDispatcher(conf, credentialHelper);
+    LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
+        dispatcher.chatCompletion(messages, "some-unknown-model", new HashMap<>()));
 
-        List<LLMClient.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMClient.ChatMessage("user", "hello"));
+    assertTrue(ex.getMessage().contains("not recognised"),
+        "Error should say the model is not recognised");
+    assertTrue(ex.getMessage().contains("GET /api/v1/chatbot/models"),
+        "Error should point the user to the models endpoint");
+  }
 
-        LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(messages, "some-unknown-model", new HashMap<>()));
-        assertTrue(ex.getMessage().toLowerCase().contains("openai"),
-            "Should route to openai when it is the configured default");
-    }
+  @Test
+  public void testModelNotInListThrowsEvenWhenOtherKeysAreConfigured() {
+    // Gemini key is set (gemini models are in the list), but the request asks for
+    // "gpt-4.1" which is an OpenAI model — and no OpenAI key is configured.
+    // resolveProvider must not fall back to gemini; it should throw.
+    conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "fake-gemini-key");
+    dispatcher = new LangChain4jDispatcher(conf, new CredentialHelper(conf));
 
-    @Test
-    public void testExplicitProviderPrefixInModelString() {
-        // "anthropic:claude-sonnet-4-6" should route to anthropic regardless of model prefix.
-        List<LLMClient.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMClient.ChatMessage("user", "hello"));
+    List<LLMClient.ChatMessage> messages = new ArrayList<>();
+    messages.add(new LLMClient.ChatMessage("user", "hello"));
 
-        LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
-            dispatcher.chatCompletion(
-                messages, "anthropic:claude-sonnet-4-6", new HashMap<>()));
-        assertTrue(ex.getMessage().toLowerCase().contains("anthropic"),
-            "Explicit provider prefix should route to anthropic");
-    }
+    LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
+        dispatcher.chatCompletion(messages, "gpt-4.1", new HashMap<>()));
+
+    assertTrue(ex.getMessage().contains("not recognised"),
+        "gpt-4.1 should not route to gemini just because the gemini key is configured");
+  }
+
+  // ── Explicit provider hint bypasses model list ───────────────────────────
+
+  @Test
+  public void testExplicitProviderHintRoutesCorrectly() {
+    // Passing "_provider" = "openai" bypasses the supportedModels lookup entirely.
+    // With no OpenAI key configured, the call fails at resolveKey — but the error
+    // confirms the request was routed to the openai code path, not rejected as "not recognised".
+    List<LLMClient.ChatMessage> messages = new ArrayList<>();
+    messages.add(new LLMClient.ChatMessage("user", "hello"));
+
+    Map<String, Object> params = new HashMap<>();
+    params.put("_provider", "openai");
+
+    LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
+        dispatcher.chatCompletion(messages, "any-model-name", params));
+
+    assertTrue(ex.getMessage().toLowerCase().contains("openai"),
+        "Error should mention openai because the explicit hint routed the call there");
+    assertFalse(ex.getMessage().contains("not recognised"),
+        "Explicit hint should bypass the model-list check — error must not say 'not recognised'");
+  }
+
+  @Test
+  public void testExplicitProviderPrefixInModelString() {
+    // "anthropic:claude-sonnet-4-6" should route to anthropic regardless of the model list.
+    List<LLMClient.ChatMessage> messages = new ArrayList<>();
+    messages.add(new LLMClient.ChatMessage("user", "hello"));
+
+    LLMClient.LLMException ex = assertThrows(LLMClient.LLMException.class, () ->
+        dispatcher.chatCompletion(messages, "anthropic:claude-sonnet-4-6", new HashMap<>()));
+
+    assertTrue(ex.getMessage().toLowerCase().contains("anthropic"),
+        "provider:model prefix should route to anthropic");
+    assertFalse(ex.getMessage().contains("not recognised"),
+        "Explicit prefix should bypass the model-list check");
+  }
 }

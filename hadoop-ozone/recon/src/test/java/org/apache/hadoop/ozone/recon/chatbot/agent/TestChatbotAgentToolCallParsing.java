@@ -27,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.IOException;
 import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -400,6 +401,77 @@ public class TestChatbotAgentToolCallParsing {
         "ChatbotException should wrap the original LLMException as its cause");
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
         anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+  }
+
+  // ── EXC-01: ToolExecutor IOException is wrapped as ChatbotException ──────
+
+  @Test
+  public void testToolExecutorIoExceptionIsWrappedAsChatbotException() throws Exception {
+    // First LLM call succeeds (tool selection), then ToolExecutor throws IOException
+    // (e.g. Recon API is down). The agent must wrap it as ChatbotException,
+    // not let the raw IOException leak to ChatbotEndpoint.
+    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+        .thenReturn(resp(SINGLE_CLUSTER_STATE));
+    when(mockToolExecutor.executeToolCallWithPolicy(
+        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+        .thenThrow(new IOException("Recon API unreachable"));
+
+    ChatbotException ex = assertThrows(ChatbotException.class,
+        () -> agent.processQuery("What is the cluster state?", null, null));
+
+    assertNotNull(ex.getCause(), "IOException must be preserved as the cause");
+    assertTrue(ex.getCause() instanceof IOException,
+        "Cause should be the original IOException, not swallowed");
+    // ToolExecutor was called — the failure happened inside it
+    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
+        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+  }
+
+  // ── EXC-02: Summarization LLM call fails after tool execution succeeds ───
+
+  @Test
+  public void testSummarizationLlmFailureIsWrappedAsChatbotException() throws Exception {
+    // First LLM call (tool selection) succeeds.
+    // ToolExecutor succeeds.
+    // Second LLM call (summarization) throws LLMException.
+    // The whole pipeline must fail with ChatbotException, not silently return null.
+    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+        .thenReturn(resp(SINGLE_CLUSTER_STATE))           // tool selection: OK
+        .thenThrow(new LLMClient.LLMException("Rate limit hit on summarization call"));
+
+    ChatbotException ex = assertThrows(ChatbotException.class,
+        () -> agent.processQuery("What is the cluster state?", null, null));
+
+    assertNotNull(ex.getCause(), "LLMException from summarization must be the cause");
+    assertTrue(ex.getCause() instanceof LLMClient.LLMException,
+        "Cause should be the original LLMException from the summarization call");
+    // Both LLM call and executor call were made before the failure
+    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
+    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
+        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+  }
+
+  // ── EXC-03: SINGLE_ENDPOINT with empty endpoint triggers fallback ─────────
+
+  @Test
+  public void testSingleEndpointWithEmptyEndpointTriggersFallback() throws Exception {
+    // LLM returns a valid SINGLE_ENDPOINT JSON but with an empty "endpoint" value.
+    // The agent must treat this as unanswerable and fall back — never call ToolExecutor
+    // with an empty string.
+    String emptyEndpoint = "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"\"," +
+        "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"none\"}";
+    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+        .thenReturn(resp(emptyEndpoint))
+        .thenReturn(resp(FALLBACK_RESPONSE));
+
+    String result = agent.processQuery("What is happening?", null, null);
+
+    assertNotNull(result);
+    // ToolExecutor must never be invoked with an empty endpoint
+    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
+        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+    // Fallback requires a second LLM call
+    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
