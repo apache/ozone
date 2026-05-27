@@ -89,9 +89,11 @@ ParsedObjectInfo parseSignatureKeyInfo(byte[] raw, boolean meaningfulOnly) {
 }
 ```
 
-### 2.3. UpdateID Gating
+### 2.3. Sequence/UpdateID Gating
 **Baseline Issue:** The baseline performs full object comparisons including timestamps to detect modifications, which is susceptible to clock skew and is computationally expensive.
-**Optimized Design:** Uses the `dbTxSequenceNumber` of the `fromSnapshot` as a strict gate. During the `toSnapshot` scan, entries are only considered candidates for diff if their `updateID > fromSnapshotDbTxSequenceNumber`.
+**Optimized Design:** Use snapshot-specific gates that align with the transactional guarantees of the deployment mode.
+- **Full diff (w/ OM HA only):** `updateID > fromSnapshot.lastTransactionInfo.txIndex`. This compares two OM/Ratis log indices.
+- **DAG diff:** Extend raw SST iterators to expose internal sequence numbers, gate with `entry.sequence > fromSnapshot.dbTxSequenceNumber`.
 
 ### 2.4. Deferred Classification & Path Resolution
 **Baseline Issue:** Baseline builds the diff key set first and then classifies entries during `generateDiffReport`, which requires resolving paths for all candidates. This causes unnecessary path lookups for entries that might ultimately be ignored.
@@ -143,8 +145,8 @@ If deletes are replayed first, `A/B` is removed before the rename and the rename
 - **oldList/newList maps**: `PersistentMap<byte[], byte[]>` keyed by `objectId`, storing `EntryValue` (`parentId`, `name`, `isDir`, `signature`).
 - **Directory path lookup**:
   - **Persisted BFS**: RocksDB CFs for edges storing `(parentID, objectID) -> name` and resolved paths `objectID -> fullPath`, with an LRU cache for hot path lookups.
- - **DiffCandidateSet**: `Set<objectIds>/Set<keys>` whose `updateID` exceeds `fromSnapshot.dbTxSequenceNumber`.
- - **SHA-256 Hashing:** Used to generate compact, fixed-size compare signatures for object metadata.
+- **DiffCandidateSet**: `Set<objectIds>/Set<keys>` captured by snapshot-specific gating rules mentioned in Section 2.3
+- **SHA-256 Hashing:** Used to generate compact, fixed-size compare signatures for object metadata.
 - **Delete retention sets (full diff only):** `deletedDirSet` and `deletedRootSet` to suppress redundant deletes.
 - **Dependency ordering graph:** adjacency list of `objectId -> children`, in-degree map, and a queue of zero in-degree nodes for Kahn's algorithm.
 - **Raw SST iterators**: `ManagedRawSSTFileIterator` yielding `(userKey, sequence, type, value)` tuples including tombstones used during DAG based diff delta SST scan.
@@ -152,14 +154,14 @@ If deletes are replayed first, `A/B` is removed before the rename and the rename
 
 ---
 
-## 4. DAG-Based Diff POC Implementation Stages
+## 4. Optimized DAG-Based Diff Implementation Stages
 
 The DAG-based diff optimizes the process by only looking at SST files that changed between snapshots. It identifies the set of SST files that differ between `fromSnapshot` and `toSnapshot` using the `RocksDBCheckpointDiffer` (compaction DAG).
 
 ### Stage 1: Sequential Read Flow + Batched Point Lookups + Directory Scans
 **Baseline Issue:** Baseline reads these delta files and then performs random reads against the snapshot DBs to find the old/new state of the keys, causing severe I/O bottlenecks.
 **Optimized Design (in order):**
-1. **Sequential scan of `toSnapshot` diff SSTs:** Use native iterators (`ManagedRawSSTFileIterator`) and a K-way merge to scan the delta SSTs **only in `toSnapshot`**. This yields the latest visible versions for changed keys and populates `newList` (for non-tombstones) plus the `DiffCandidateSet` (all tombstones + all keys with `updateID > fromSnapshotDbTxSequenceNumber`).
+1. **Sequential scan of `toSnapshot` diff SSTs:** Use native iterators (`ManagedRawSSTFileIterator`) and a K-way merge to scan the delta SSTs **only in `toSnapshot`**. This yields the latest visible versions for changed keys and populates `newList` (for non-tombstones) plus the `DiffCandidateSet` (all tombstones + all keys with `entry.sequence > fromSnapshot.dbTxSequenceNumber`).
 2. **Full table scan of `toSnapshot.directoryTable` (FSO only):** Use `tableIterator` to scan all directory entries sequentially and populate `jobId-to-edges`.
 3. **Full table scan of `fromSnapshot.directoryTable` (FSO only):** Use `tableIterator` to scan all directory entries sequentially.
    * Populate `jobId-from-edges` with `(parentId, objectId) -> name`.
@@ -187,7 +189,7 @@ A synchronized sequential iteration (merge join) is performed over the `oldList`
 
 ---
 
-## 5. Full Diff POC Implementation Stages
+## 5. Optimized Full Diff Implementation Stages
 
 The Full Diff path is used when compaction DAGs are unavailable or a full recalculation is forced.
 
@@ -196,7 +198,7 @@ Instead of random lookups, the optimization uses native RocksDB **Table Iterator
 
 **1. `toSnapshot` Directory Scan (FSO only):**
 *   Iterates sequentially through the `toSnapshot`'s `directoryTable`.
-*   Extracts `updateID` using the lightweight parser. If `updateID <= fromSnapshot.dbTxSequenceNumber`, the entry is unchanged (not created/renamed/modified) and is skipped. Otherwise, its compare signature is built and it is added to the `newList` and recorded in the `DiffCandidateSet`.
+*   Extracts `updateID` using the lightweight parser. If `updateID <= fromSnapshot.lastTransactionInfo.txIndex`, the entry is unchanged (not created/renamed/modified) and is skipped. Otherwise, its compare signature is built and it is added to the `newList` and recorded in the `DiffCandidateSet`.
 *   **Graph Construction:** Regardless of whether the entry is a candidate, the `parentID` and `name` are extracted to build the foundational edges of the `toSnapshot` directory structure graph. This is done by writing `(parentID, objectID) -> name` entries into a temporary RocksDB Column Family (`jobId-to-edges`).
 
 **2. `fromSnapshot` Directory Scan (FSO only):**
@@ -206,7 +208,7 @@ Instead of random lookups, the optimization uses native RocksDB **Table Iterator
 
 **3. `toSnapshot` Key Scan:**
 *   Iterates sequentially through the `toSnapshot`'s `key/fileTable`.
-*   Applies the same `updateID` gating logic: skips if `updateID <= fromSnapshot.dbTxSequenceNumber`.
+*   Applies the same `updateID` gating logic: skips if `updateID <= fromSnapshot.lastTransactionInfo.txIndex`.
 *   Builds the compare signature and adds to `newList`, recording these entries in the `DiffCandidateSet`. No parentID/path checks are performed at this stage.
 
 **4. `fromSnapshot` Key Scan:**
@@ -232,21 +234,21 @@ Same as Stage 3 of DAG based diff implementation.
 
 ## 6. Comparison with Baseline & Trade-offs
 
-| Feature | Baseline Implementation | POC Implementation |
-| :--- | :--- | :--- |
-| **Object Parsing** | Full Protobuf Deserialization (Heavy CPU/GC). | `SnapshotDiffValueParser` (Lightweight byte-stream parsing). |
-| **Modification Detection** | Full object equality. | Strict `updateID` gating & selective field hashing. |
-| **DAG Diff I/O Pattern** | Random point lookups (`db.get()`) for delta keys. | Sequential reads with K-way merge of SST files. |
-| **Classification Timing** | During report generation. | Deferred until merge join. |
-| **Path Resolution** | During report generation for all candidates. | Deferred to diff entries only. |
+| Feature | Baseline Implementation | Optimized Implementation                                      |
+| :--- | :--- |:--------------------------------------------------------------|
+| **Object Parsing** | Full Protobuf Deserialization (Heavy CPU/GC). | `SnapshotDiffValueParser` (Lightweight byte-stream parsing).  |
+| **Modification Detection** | Full object equality. | Key `sequence`/`updateID` gating + selective field hashing.   |
+| **DAG Diff I/O Pattern** | Random point lookups (`db.get()`) for delta keys. | Sequential reads with K-way merge of SST files.               |
+| **Classification Timing** | During report generation. | Deferred until merge join.                                    |
+| **Path Resolution** | During report generation for all candidates. | Deferred to diff entries only.                                |
 | **Delete Handling** | Emits deletes of descendants inconsistently. | Retains only top level directory deletes, dependency ordered. |
-| **Report Ordering** | Naive ordering based on Diff Type. | Dependency ordered with Kahn's algorithm. |
+| **Report Ordering** | Naive ordering based on Diff Type. | Dependency ordered with Kahn's algorithm.                     |
 
 ### Trade-offs
-1.  **Reliance on `updateID`:** The POC's speed in Full Diff relies heavily on `updateID`. If Ozone has bugs where `updateID` is not bumped during a meaningful metadata change (e.g., parent directory `modificationTime` updates during a child rename), the POC will miss the modification. Baseline catches this via full comparison, albeit much slower.
-2.  **K-way Merge Memory Overhead:** While the DAG POC eliminates random I/O, maintaining a Priority Queue for K-way merging requires slightly more active memory and CPU comparison logic than simple iteration, though this is vastly outweighed by the I/O savings.
+1.  **Reliance on `updateID` in full diff:** The optimized snapdiff's speed in Full Diff relies heavily on `updateID`. If Ozone has bugs where `updateID` is not bumped during a meaningful metadata change (e.g., parent directory `modificationTime` updates during a child rename), the optimization will miss the modification. Baseline catches this via full comparison, albeit much slower.
+2.  **K-way Merge Memory Overhead:** While the DAG optimization drastically reduces random I/O, maintaining a Priority Queue for K-way merging requires slightly more active memory and CPU comparison logic than simple iteration, though this is vastly outweighed by the I/O savings.
 3.  **Signature Collisions:** Hash-based comparison assumes no SHA-256 collisions. While statistically negligible, baseline's exact object equality has zero collision risk.
 4.  **Dependency Ordering Overhead:** Building and topologically sorting the dependency graph adds some CPU and memory overhead, especially for large delete sets.
 
 ## 7. Conclusion
-The POC implementation represents a shift from a compute-and-I/O-heavy approach to a streamlined, sequential, and deferred-evaluation model. By utilizing `SnapshotDiffValueParser` and `updateID` gating, CPU cycles and Garbage Collection pauses are drastically reduced. By replacing random reads in the DAG diff with a sequential K-way merge, disk I/O bottlenecks are eliminated. Deferred path resolution, batch RocksDB puts, and dependency ordered output ensure that resources are only spent on actual differences and replay remains consistent. Despite trade-offs around `updateID` reliance and graph ordering overhead, the POC provides a scalable and accurate snapshot diff engine suitable for massive buckets.
+The optimized implementation represents a shift from a compute-and-I/O-heavy approach to a streamlined, sequential, and deferred-evaluation model. By utilizing `SnapshotDiffValueParser` and entry `sequence`/`updateID` gating, CPU cycles and Garbage Collection pauses are drastically reduced. By replacing random reads in the DAG diff with a sequential K-way merge, disk I/O bottlenecks are eliminated. Deferred path resolution, batch RocksDB puts, and dependency ordered output ensure that resources are only spent on actual differences and replay remains consistent. Despite trade-offs around `updateID` reliance and graph ordering overhead, the optimization provides a scalable and accurate snapshot diff engine suitable for massive buckets.
