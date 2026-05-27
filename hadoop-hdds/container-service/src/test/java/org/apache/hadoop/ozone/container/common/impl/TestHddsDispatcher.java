@@ -499,6 +499,42 @@ public class TestHddsDispatcher {
   }
 
   @Test
+  public void testCreateContainerWithPutSmallFileWithStorageType() throws IOException {
+    StringBuilder hddsDirs = new StringBuilder();
+    File ssdVolume = Files.createTempDirectory(tempDir, "ssd").toFile();
+    File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
+    hddsDirs.append("[SSD]");
+    hddsDirs.append(ssdVolume);
+    hddsDirs.append(',');
+    hddsDirs.append("[DISK]");
+    hddsDirs.append(diskVolume);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());
+    HddsDispatcher dispatcher = createDispatcher(randomDatanodeDetails(), UUID.randomUUID(), conf);
+    long containerID = 1L;
+    long localId = 1L;
+
+    ContainerCommandRequestProto putSmallFileToSSD =
+        newPutSmallFile(containerID++, localId++, HddsProtos.StorageTypeProto.SSD);
+    ContainerCommandRequestProto putSmallFileToDISK =
+        newPutSmallFile(containerID++, localId++, HddsProtos.StorageTypeProto.DISK);
+    ContainerCommandRequestProto putSmallFileToRAMDISK =
+        newPutSmallFile(containerID++, localId++, HddsProtos.StorageTypeProto.RAM_DISK);
+
+    assertContainerDoNotExist(dispatcher, putSmallFileToSSD);
+    assertContainerDoNotExist(dispatcher, putSmallFileToDISK);
+    assertContainerDoNotExist(dispatcher, putSmallFileToRAMDISK);
+
+    assertContainerCreateAtSpecificVolume(dispatcher, putSmallFileToSSD,
+        Collections.singletonList(ssdVolume));
+    assertContainerCreateAtSpecificVolume(dispatcher, putSmallFileToDISK,
+        Collections.singletonList(diskVolume));
+
+    ContainerCommandResponseProto response = dispatcher.dispatch(putSmallFileToRAMDISK, null);
+    assertEquals(DISK_OUT_OF_SPACE, response.getResult());
+  }
+
+  @Test
   public void testCreateContainerRejectsInvalidStorageType() throws IOException {
     File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -522,23 +558,22 @@ public class TestHddsDispatcher {
   }
 
   private void assertContainerDoNotExist(HddsDispatcher hddsDispatcher,
-      ContainerCommandRequestProto writeChunkRequest) {
+      ContainerCommandRequestProto request) {
     ContainerCommandResponseProto response =
-        hddsDispatcher.dispatch(getReadContainerRequest(writeChunkRequest), null);
+        hddsDispatcher.dispatch(getReadContainerRequest(request), null);
     assertEquals(response.getResult(),
         ContainerProtos.Result.CONTAINER_NOT_FOUND);
   }
 
   private void assertContainerCreateAtSpecificVolume(HddsDispatcher hddsDispatcher,
-      ContainerCommandRequestProto writeChunkRequest, List<File> exceptionVolumePaths) {
+      ContainerCommandRequestProto request, List<File> exceptionVolumePaths) {
 
-    // Send write chunk request without sending create container
-    ContainerCommandResponseProto response = hddsDispatcher.dispatch(writeChunkRequest, null);
-    // Container should be created as part of write chunk request
+    // Send data command without sending create container.
+    ContainerCommandResponseProto response = hddsDispatcher.dispatch(request, null);
+    // Container should be created as part of the data command.
     assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
-    // Send read chunk request to read the chunk written above
-    response = hddsDispatcher.dispatch(getReadContainerRequest(writeChunkRequest), null);
+    response = hddsDispatcher.dispatch(getReadContainerRequest(request), null);
     assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
     // Check if any of the exceptionVolumePaths match
@@ -855,15 +890,50 @@ public class TestHddsDispatcher {
   }
 
   static ContainerCommandRequestProto newPutSmallFile(Long containerId, Long localId) {
+    return newPutSmallFile(containerId, localId, null);
+  }
+
+  static ContainerCommandRequestProto newPutBlock(Long containerId, Long localId,
+      HddsProtos.StorageTypeProto storageType) {
+    BlockID blockID = new BlockID(containerId, localId);
+    ContainerProtos.DatanodeBlockID.Builder datanodeBlockID =
+        blockID.getDatanodeBlockIDProtobuf().toBuilder();
+    if (storageType != null) {
+      datanodeBlockID.setStorageTypeID(storageType.getNumber());
+    }
+    ContainerProtos.BlockData.Builder blockData =
+        ContainerProtos.BlockData.newBuilder()
+            .setBlockID(datanodeBlockID);
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setContainerID(containerId)
+        .setDatanodeUuid(UUID.randomUUID().toString())
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(blockData))
+        .build();
+  }
+
+  static ContainerCommandRequestProto newPutSmallFile(Long containerId, Long localId,
+      HddsProtos.StorageTypeProto storageType) {
     ByteString chunkData = ByteString.copyFrom(RandomUtils.secure().randomBytes(32));
-    return newPutSmallFile(new BlockID(containerId, localId), chunkData);
+    return newPutSmallFile(new BlockID(containerId, localId), chunkData, storageType);
   }
 
   static ContainerCommandRequestProto newPutSmallFile(
       BlockID blockID, ByteString data) {
+    return newPutSmallFile(blockID, data, null);
+  }
+
+  static ContainerCommandRequestProto newPutSmallFile(
+      BlockID blockID, ByteString data, HddsProtos.StorageTypeProto storageType) {
+    ContainerProtos.DatanodeBlockID.Builder datanodeBlockID =
+        blockID.getDatanodeBlockIDProtobuf().toBuilder();
+    if (storageType != null) {
+      datanodeBlockID.setStorageTypeID(storageType.getNumber());
+    }
     final ContainerProtos.BlockData.Builder blockData
         = ContainerProtos.BlockData.newBuilder()
-        .setBlockID(blockID.getDatanodeBlockIDProtobuf());
+        .setBlockID(datanodeBlockID);
     final ContainerProtos.PutBlockRequestProto.Builder putBlockRequest
         = ContainerProtos.PutBlockRequestProto.newBuilder()
         .setBlockData(blockData);
@@ -924,13 +994,12 @@ public class TestHddsDispatcher {
    * @return container read chunk request
    */
   private ContainerCommandRequestProto getReadContainerRequest(
-      ContainerCommandRequestProto writeChunkRequest) {
-    WriteChunkRequestProto writeChunk = writeChunkRequest.getWriteChunk();
+      ContainerCommandRequestProto request) {
     return ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.ReadContainer)
-        .setContainerID(writeChunk.getBlockID().getContainerID())
-        .setTraceID(writeChunkRequest.getTraceID())
-        .setDatanodeUuid(writeChunkRequest.getDatanodeUuid())
+        .setContainerID(request.getContainerID())
+        .setTraceID(request.getTraceID())
+        .setDatanodeUuid(request.getDatanodeUuid())
         .setReadContainer(ContainerProtos.ReadContainerRequestProto.newBuilder())
         .build();
   }

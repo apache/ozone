@@ -175,10 +175,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           containerData.setCommittedSpace(true);
         } catch (DiskOutOfSpaceException ex) {
           throw new StorageContainerException("Container creation failed, " +
-              "due to disk out of space on StorageType: " + storageType, ex, DISK_OUT_OF_SPACE);
+              "due to disk out of space" + storageTypeMessage(storageType),
+              ex, DISK_OUT_OF_SPACE);
         } catch (IOException ex) {
           throw new StorageContainerException(
-              "Container creation failed on StorageType:" + storageType + ". " + ex.getMessage(), ex,
+              "Container creation failed" + storageTypeMessage(storageType) +
+                  ". " + ex.getMessage(), ex,
               CONTAINER_INTERNAL_ERROR);
         }
 
@@ -340,6 +342,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private void updateContainerFile(File containerFile)
       throws StorageContainerException {
     writeToContainerFile(containerFile, false);
+  }
+
+  private static String storageTypeMessage(StorageType storageType) {
+    return storageType == null ? "" : " on StorageType: " + storageType;
   }
 
   @Override
