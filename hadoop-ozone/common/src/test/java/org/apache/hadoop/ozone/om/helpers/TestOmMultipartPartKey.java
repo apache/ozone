@@ -209,4 +209,15 @@ public class TestOmMultipartPartKey {
     assertEquals("upload/with/slashes", decoded.getUploadId());
     assertEquals(5, decoded.getPartNumber().intValue());
   }
+
+  @Test
+  public void testEncodeRejectsMalformedUploadId() {
+    OmMultipartPartKey key = OmMultipartPartKey.of("bad-\uD800", 1);
+
+    assertThrows(CodecException.class,
+        () -> codec.toPersistedFormat(key));
+
+    assertThrows(CodecException.class,
+        () -> codec.toHeapCodecBuffer(key));
+  }
 }

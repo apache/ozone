@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -113,8 +112,10 @@ public final class OmMultipartPartKey {
 
     @Override
     public CodecBuffer toCodecBuffer(
-        @Nonnull OmMultipartPartKey key, CodecBuffer.Allocator allocator) {
-      byte[] uploadBytes = key.uploadId.getBytes(StandardCharsets.UTF_8);
+        @Nonnull OmMultipartPartKey key, CodecBuffer.Allocator allocator)
+        throws CodecException {
+      byte[] uploadBytes = StringCodec.getCodecNoFallback()
+          .toPersistedFormat(key.uploadId);
       int size = uploadBytes.length + 1
           + (key.hasPartNumber() ? Integer.BYTES : 0);
       CodecBuffer buffer = allocator.apply(size);
@@ -140,8 +141,9 @@ public final class OmMultipartPartKey {
      * @return Byte array representation of the object for storage in the key/value store.
      */
     @Override
-    public byte[] toPersistedFormat(OmMultipartPartKey key) {
-      byte[] uploadBytes = key.uploadId.getBytes(StandardCharsets.UTF_8);
+    public byte[] toPersistedFormat(OmMultipartPartKey key) throws CodecException {
+      byte[] uploadBytes = StringCodec.getCodecNoFallback()
+          .toPersistedFormat(key.uploadId);
       int size = uploadBytes.length + 1
           + (key.hasPartNumber() ? Integer.BYTES : 0);
       ByteBuffer buffer = ByteBuffer.allocate(size);
