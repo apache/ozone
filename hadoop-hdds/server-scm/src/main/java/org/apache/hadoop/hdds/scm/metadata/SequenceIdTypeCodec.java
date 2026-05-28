@@ -26,8 +26,6 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 
 /**
  * Codec to serialize/deserialize {@link SequenceIdType}.
- * It delegates directly to {@link StringCodec} to leverage its encoding/decoding
- * optimizations and fallback logic, ensuring disk format continuity.
  */
 public final class SequenceIdTypeCodec implements Codec<SequenceIdType> {
 
@@ -75,6 +73,6 @@ public final class SequenceIdTypeCodec implements Codec<SequenceIdType> {
 
   @Override
   public SequenceIdType copyObject(SequenceIdType object) {
-    return object; // Enums are singletons; safe to return direct reference
+    return object;
   }
 }
