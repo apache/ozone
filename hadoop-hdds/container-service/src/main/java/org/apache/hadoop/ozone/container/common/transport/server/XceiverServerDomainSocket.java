@@ -162,8 +162,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
       if (server != null) {
         try {
           if (domainSocket != null) {
-            // TODO: once HADOOP-19261 is merged, change it to domainSocket.close(true);
-            domainSocket.close();
+            domainSocket.close(true);
             LOG.info("UNIX domain socket server listening on {} is stopped", domainSocket.getPath());
           }
         } catch (IOException e) {

@@ -31,7 +31,6 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -40,6 +39,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for short-circuit enabled XceiverClientManager.
+ * Add Environment variables
+ *   LD_LIBRARY_PATH=$PROJECT_DIR$/target/native-lib
+ *   DYLD_LIBRARY_PATH=$PROJECT_DIR$/target/native-lib
+ *   to intellij run configuration to run it locally.
+ *   Dynamically set the java.library.path in java code doesn't affect the library loading
  */
 @Timeout(300)
 public class TestXceiverClientManagerSC {
@@ -75,7 +79,6 @@ public class TestXceiverClientManagerSC {
   }
 
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testAllocateShortCircuitClient() throws IOException {
     try (XceiverClientManager clientManager = new XceiverClientManager(config,
         config.getObject(ScmClientConfig.class), null)) {
