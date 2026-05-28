@@ -30,14 +30,18 @@ on:
       DEVELOCITY_ACCESS_KEY:
         description: 'Token for submitting build scan to Develocity'
         required: false
+      OZONE_WEBSITE_BUILD:
+        description: 'Token for publishing to apache/ozone-site'
+        required: false
       SONARCLOUD_TOKEN:
         description: 'Token for submitting coverage data to SonarCloud'
         required: false
 
 env:
+  # BUILD_ARGS and TEST_JAVA_VERSION are duplicated in populate-cache.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
-  # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml, please keep in sync
+  # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml and populate-cache.yml, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
@@ -156,6 +160,8 @@ jobs:
     uses: ./.github/workflows/update-ozone-site-config-doc.yml
     permissions:
       contents: read
+    secrets:
+      OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
 
   compile:
     needs:
@@ -391,7 +397,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage
           path: target/coverage

@@ -97,7 +97,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     if (keyArgs.hasExpectedDataGeneration()) {
       if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+          == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         ozoneManager.checkFeatureEnabled(
             OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
       } else {
@@ -474,58 +474,5 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       }
     }
     return req;
-  }
-
-  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
-      throws OMException {
-    if (keyArgs.hasExpectedDataGeneration()) {
-      long expectedGen = keyArgs.getExpectedDataGeneration();
-      // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
-        if (dbKeyInfo != null) {
-          throw new OMException("Key already exists",
-              OMException.ResultCodes.KEY_ALREADY_EXISTS);
-        }
-      } else {
-        // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
-        if (dbKeyInfo == null) {
-          throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
-        }
-        if (dbKeyInfo.getUpdateID() != expectedGen) {
-          throw new OMException("Generation mismatch during expected rewrite",
-              OMException.ResultCodes.KEY_NOT_FOUND);
-        }
-      }
-    }
-
-  }
-
-  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
-      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
-    if (!keyArgs.hasExpectedETag()) {
-      return keyArgs;
-    }
-
-    String expectedETag = keyArgs.getExpectedETag();
-    if (dbKeyInfo == null) {
-      throw new OMException("Key not found for If-Match",
-          OMException.ResultCodes.KEY_NOT_FOUND);
-    }
-    if (!dbKeyInfo.hasEtag()) {
-      throw new OMException("Key does not have an ETag",
-          OMException.ResultCodes.ETAG_NOT_AVAILABLE);
-    }
-    if (!dbKeyInfo.isEtagEquals(expectedETag)) {
-      throw new OMException("ETag mismatch",
-          OMException.ResultCodes.ETAG_MISMATCH);
-    }
-    if (keyArgs.hasExpectedDataGeneration()) {
-      return keyArgs;
-    }
-
-    return keyArgs.toBuilder()
-        .setExpectedDataGeneration(dbKeyInfo.getUpdateID())
-        .clearExpectedETag()
-        .build();
   }
 }

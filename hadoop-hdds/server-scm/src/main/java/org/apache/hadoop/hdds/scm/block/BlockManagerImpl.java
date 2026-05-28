@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -185,7 +185,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());
-      long localID = sequenceIdGen.getNextId(LOCAL_ID);
+      long localID = sequenceIdGen.getNextId(SequenceIdType.localId);
       long containerID = containerInfo.getContainerID();
       AllocatedBlock.Builder abb =  new AllocatedBlock.Builder()
           .setContainerBlockID(new ContainerBlockID(containerID, localID))

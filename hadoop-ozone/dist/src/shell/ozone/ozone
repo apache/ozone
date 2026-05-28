@@ -59,6 +59,7 @@ function ozone_usage
   ozone_add_subcommand "insight" client "tool to get runtime operation information"
   ozone_add_subcommand "version" client "print the version"
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
+  ozone_add_subcommand "interactive" client "interactive shell for ozone commands"
   ozone_add_subcommand "admin" client "Ozone admin tool"
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
@@ -103,7 +104,7 @@ function ozonecmd_case
     ;;
     completion)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.utils.AutoCompletion;
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-dist"
     ;;
     datanode)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -176,7 +177,7 @@ function ozonecmd_case
     ;;
     httpfs)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
-      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_HTTPFS_OPTS="${OZONE_HTTPFS_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
@@ -220,6 +221,11 @@ function ozonecmd_case
     dtutil)
       OZONE_CLASSNAME=org.apache.hadoop.security.token.DtUtilShell
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
+    interactive)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneInteractiveShell
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-interactive"
+      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
     ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
@@ -281,6 +287,7 @@ function check_running_ozone_services
 function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-dist" ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
     if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then

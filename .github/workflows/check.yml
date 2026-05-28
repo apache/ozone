@@ -267,7 +267,7 @@ jobs:
 
       - name: Archive build results
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ (inputs.split && format('{0}-{1}', inputs.script, inputs.split)) || inputs.script }}
           # please keep path as a single item; move to that directory all files needed in the artifact
@@ -278,7 +278,7 @@ jobs:
       # to avoid the need for 3 more inputs.
       - name: Store binaries for tests
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ozone-bin
           path: |
@@ -288,7 +288,7 @@ jobs:
 
       - name: Store source tarball for compilation
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ozone-src
           path: |
@@ -297,7 +297,7 @@ jobs:
 
       - name: Store Maven repo for tests
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ozone-repo
           path: |

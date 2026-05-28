@@ -141,7 +141,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ipc_.RPC;
@@ -1248,10 +1248,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
     GetContainerCountRequestProto request =
-        GetContainerCountRequestProto.newBuilder().build();
+        GetContainerCountRequestProto.newBuilder()
+            .setState(state)
+            .build();
 
     GetContainerCountResponseProto response =
-        submitRequest(Type.GetClosedContainerCount,
+        submitRequest(Type.GetContainerCount,
             builder -> builder.setGetContainerCountRequest(request))
             .getGetContainerCountResponse();
     return response.getContainerCount();

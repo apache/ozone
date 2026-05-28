@@ -226,8 +226,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * SCM metrics.
    */
-  private static SCMMetrics metrics;
-  private static SCMPerformanceMetrics perfMetrics;
+  private SCMMetrics metrics;
+  private SCMPerformanceMetrics perfMetrics;
   private SCMHAMetrics scmHAMetrics;
   private final NettyMetrics nettyMetrics;
 
@@ -1427,28 +1427,28 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Initialize SCM metrics.
    */
-  public static void initMetrics() {
-    metrics = SCMMetrics.create();
+  public void initMetrics() {
+    metrics = SCMMetrics.create(configuration);
   }
 
   /**
    * Return SCM metrics instance.
    */
-  public static SCMMetrics getMetrics() {
-    return metrics == null ? SCMMetrics.create() : metrics;
+  public SCMMetrics getMetrics() {
+    return metrics;
   }
 
   /**
    * Initialize SCMPerformance metrics.
    */
-  public static void initPerfMetrics() {
+  public void initPerfMetrics() {
     perfMetrics = SCMPerformanceMetrics.create();
   }
 
   /**
    * Return SCMPerformance metrics instance.
    */
-  public static SCMPerformanceMetrics getPerfMetrics() {
+  public SCMPerformanceMetrics getPerfMetrics() {
     return perfMetrics == null ? SCMPerformanceMetrics.create() : perfMetrics;
   }
 

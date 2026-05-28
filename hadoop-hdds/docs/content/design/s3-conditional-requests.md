@@ -253,7 +253,7 @@ sequenceDiagram
 
     User->>GW: PUT object with If-None-Match:* or If-Match:etag
     alt If-None-Match: *
-        GW->>OM: createKey(expectedDataGeneration = -1)
+        GW->>OM: createKey(expectedDataGeneration = 0)
         OM->>OM: Reject if key already exists
         OM-->>GW: Open key or KEY_ALREADY_EXISTS
         opt Open key created

@@ -419,7 +419,7 @@ public class TestReplicationSupervisor {
     assertEquals(0, usedSpace);
     // Increase committed bytes so that volume has only remaining 3 times container size space
     long minFreeSpace =
-        conf.getObject(DatanodeConfiguration.class).getMinFreeSpace(vol1.getCurrentUsage().getCapacity());
+        conf.getObject(DatanodeConfiguration.class).getHardLimitMinFreeSpace(vol1.getCurrentUsage().getCapacity());
     long initialCommittedBytes = vol1.getCurrentUsage().getCapacity() - containerMaxSize * 3 - minFreeSpace;
     vol1.incCommittedBytes(initialCommittedBytes);
     ContainerReplicator replicator =

@@ -286,7 +286,8 @@ class TestKeyDeletingService extends OzoneTestBase {
       BlockGroup blockGroup1 = BlockGroup.newBuilder().setKeyName("key1/1")
           .addAllDeletedBlocks(new ArrayList<>()).build();
       //Create a BlockGroup with non-empty deleted blocks
-      List<DeletedBlock> deletedBlocks = Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 1, 3));
+      List<DeletedBlock> deletedBlocks = Collections.singletonList(new DeletedBlock(new BlockID(1, 1),
+          1, 3, 1));
       BlockGroup blockGroup2 = BlockGroup.newBuilder().setKeyName("key2/2")
           .addAllDeletedBlocks(deletedBlocks).build();
       Map<String, PurgedKey> blockGroups = new HashMap<>();
@@ -892,7 +893,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             });
         BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
             .addAllDeletedBlocks(Collections.singletonList(new DeletedBlock(
-                new BlockID(1, 1), 1, 3))).build();
+                new BlockID(1, 1), 1, 3, 1))).build();
         Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
             "buck", 1, blockGroup, "key1", 30, true));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");

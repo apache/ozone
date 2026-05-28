@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtocolInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;

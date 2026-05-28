@@ -30,6 +30,12 @@
             })
             .when("/snapshots", {
                 template: "<om-snapshots></om-snapshots>"
+            })
+            .when("/ratis_events", {
+                template: "<ratis-events></ratis-events>"
+            })
+            .when("/metrics/deletion", {
+                template: "<om-deletion></om-deletion>"
             });
     });
     angular.module('ozoneManager').component('omSnapshots', {
@@ -163,6 +169,24 @@
             }
         }
     });
+    angular.module('ozoneManager').component('ratisEvents', {
+        templateUrl: 'ratis-events.html',
+        controller: function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMMetrics")
+                .then(function (result) {
+                    var metrics = result.data.beans[0];
+                    var rawEvents = metrics['tag.RatisEvents'] ? metrics['tag.RatisEvents'].split('\n') : [];
+                    ctrl.events = rawEvents.map(function(e) {
+                        var parts = e.split('|');
+                        return {
+                            timestamp: parts[0],
+                            description: parts[1]
+                        };
+                    });
+                });
+        }
+    });
     angular.module('ozoneManager').component('omMetrics', {
         templateUrl: 'om-metrics.html',
         controller: function ($http) {
@@ -249,17 +273,6 @@
         },
         controller: function ($http) {
             var ctrl = this;
-            ctrl.Date = Date;
-
-            ctrl.formatBytes = function(bytes, decimals) {
-               if(bytes == 0) return '0 Bytes';
-               if (!bytes) return 'N/A';
-               var k = 1024, // or 1024 for binary
-                   dm = decimals + 1 || 3,
-                   sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
-                   i = Math.floor(Math.log(bytes) / Math.log(k));
-               return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-            }
 
             ctrl.convertMsToTime = function(ms) {
               let seconds = (ms / 1000).toFixed(1);
@@ -289,14 +302,82 @@
                         ctrl.elapsedTime.Value = ctrl.convertMsToTime(ctrl.elapsedTime.Value);
                     }
                 });
+        }
+    });
 
-            // Add JMX query to fetch DeletingServiceMetrics data
+    angular.module('ozoneManager').component('omDeletion', {
+        templateUrl: "om-deletion.html",
+        controller: function ($http) {
+            var ctrl = this;
+            ctrl.Date = Date;
+
+            ctrl.formatBytes = function (bytes, decimals) {
+                if (bytes === 0) {
+                    return "0 Bytes";
+                }
+                if (!bytes) {
+                    return "N/A";
+                }
+                var k = 1024,
+                    dm = decimals + 1 || 3,
+                    sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"],
+                    i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+            };
+
+            ctrl.convertMsToTime = function (ms) {
+                var seconds = (ms / 1000).toFixed(1);
+                var minutes = (ms / (1000 * 60)).toFixed(1);
+                var hours = (ms / (1000 * 60 * 60)).toFixed(1);
+                var days = (ms / (1000 * 60 * 60 * 24)).toFixed(1);
+                if (seconds < 60) {
+                    return seconds + " Seconds";
+                } else if (minutes < 60) {
+                    return minutes + " Minutes";
+                } else if (hours < 24) {
+                    return hours + " Hours";
+                } else {
+                    return days + " Days";
+                }
+            };
+
+            ctrl.deletionConfigs = [];
+
+            $http.get("conf?cmd=getPropertyByTag&tags=DELETION")
+                .then(function (result) {
+                    var deletionByTag = result.data.DELETION || {};
+                    var list = [];
+                    for (var k in deletionByTag) {
+                        if (deletionByTag.hasOwnProperty(k)) {
+                            var pDel = deletionByTag[k];
+                            list.push({
+                                name: pDel.name || k,
+                                value: pDel.value,
+                                description: pDel.description || ""
+                            });
+                        }
+                    }
+                    list.sort(function (a, b) {
+                        return a.name.localeCompare(b.name);
+                    });
+                    ctrl.deletionConfigs = list;
+                });
+
+            $http.get("jmx?qry=Ratis:service=RaftServer,group=*,id=*")
+                .then(function (result) {
+                    ctrl.role = result.data.beans[0];
+                });
+
             $http.get("jmx?qry=Hadoop:service=OzoneManager,name=DeletingServiceMetrics")
                 .then(function (result) {
-                    if (result.data.beans && result.data.beans.length > 0) {
-                        // Merge the DeletingServiceMetrics data into the existing overview.jmx object
-                        ctrl.overview.jmx = {...ctrl.overview.jmx, ...result.data.beans[0]};
-                    }
+                    ctrl.del = result.data.beans && result.data.beans.length > 0
+                        ? result.data.beans[0] : null;
+                });
+
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=OMPerformanceMetrics")
+                .then(function (result) {
+                    ctrl.perf = result.data.beans && result.data.beans.length > 0
+                        ? result.data.beans[0] : null;
                 });
         }
     });
