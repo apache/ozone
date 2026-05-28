@@ -66,6 +66,7 @@ class TestOMUpgradeFinalization {
   @AfterAll
   public static void shutdown() {
     AuditLogTestUtils.deleteAuditLogFile();
+    AuditLogTestUtils.deleteSystemAuditLogFile();
   }
 
   @Test

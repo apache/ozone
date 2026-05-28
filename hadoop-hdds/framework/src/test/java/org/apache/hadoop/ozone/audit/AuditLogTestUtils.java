@@ -97,4 +97,8 @@ public final class AuditLogTestUtils {
   public static void deleteAuditLogFile() {
     FileUtils.deleteQuietly(new File(AUDITLOG_FILENAME));
   }
+
+  public static void deleteSystemAuditLogFile() {
+    FileUtils.deleteQuietly(new File(SYSTEM_AUDITLOG_FILENAME));
+  }
 }
