@@ -191,17 +191,21 @@ public abstract class BackgroundService {
   }
 
   // shutdown and make sure all threads are properly released.
-  public synchronized void shutdown() {
+  public void shutdown() {
     LOG.info("Shutting down service {}", this.serviceName);
-    exec.shutdown();
+    final ScheduledThreadPoolExecutor current;
+    synchronized (this) {
+      current = exec;
+    }
+    current.shutdown();
     try {
-      if (!exec.awaitTermination(60, TimeUnit.SECONDS)) {
-        exec.shutdownNow();
+      if (!current.awaitTermination(60, TimeUnit.SECONDS)) {
+        current.shutdownNow();
       }
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
       Thread.currentThread().interrupt();
-      exec.shutdownNow();
+      current.shutdownNow();
     }
     if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {
       threadGroup.destroy();
