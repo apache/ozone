@@ -190,6 +190,27 @@ public class TestReconContainerManager
   }
 
   @Test
+  public void testOpenContainerNotUpdatedFromUnhealthyReplicaReports()
+      throws Exception {
+    for (State replicaState : new State[] {
+        State.UNHEALTHY, State.INVALID, State.DELETED}) {
+      ContainerWithPipeline containerWithPipeline =
+          getTestContainer(120L + replicaState.ordinal(), LifeCycleState.OPEN);
+      ContainerID containerID =
+          containerWithPipeline.getContainerInfo().containerID();
+      getContainerManager().addNewContainer(containerWithPipeline);
+
+      getContainerManager().checkAndAddNewContainer(containerID, replicaState,
+          randomDatanodeDetails());
+
+      assertEquals(LifeCycleState.OPEN,
+          getContainerManager().getContainer(containerID).getState());
+      assertTrue(getContainerManager().getPipelineToOpenContainer()
+          .containsKey(containerWithPipeline.getPipeline().getId()));
+    }
+  }
+
+  @Test
   public void testClosingContainerAdvancesToQuasiClosedFromScm()
       throws Exception {
     assertClosingContainerAdvancesToScmState(101L, QUASI_CLOSED,
@@ -257,6 +278,30 @@ public class TestReconContainerManager
         getContainerManager().getContainer(containerID).getState());
   }
 
+  @Test
+  public void testDeletedContainerNotRecoveredWhenScmIsNotLive()
+      throws Exception {
+    assertDeletedContainerNotRecoveredFromScm(109L, State.CLOSED,
+        LifeCycleState.OPEN);
+    assertDeletedContainerNotRecoveredFromScm(110L, State.CLOSED, DELETING);
+    assertDeletedContainerNotRecoveredFromScm(111L, State.QUASI_CLOSED,
+        DELETED);
+  }
+
+  @Test
+  public void testOtherReconStatesDoNotInferDnReplicaTransition()
+      throws Exception {
+    ContainerWithPipeline closedContainer = getTestContainer(112L, CLOSED);
+    ContainerID containerID = closedContainer.getContainerInfo().containerID();
+    getContainerManager().addNewContainer(closedContainer);
+
+    getContainerManager().checkAndAddNewContainer(containerID,
+        State.QUASI_CLOSED, randomDatanodeDetails());
+
+    assertEquals(CLOSED,
+        getContainerManager().getContainer(containerID).getState());
+  }
+
   private void assertClosingContainerAdvancesToScmState(long id,
       LifeCycleState scmState, LifeCycleState expectedReconState)
       throws Exception {
@@ -289,6 +334,23 @@ public class TestReconContainerManager
         randomDatanodeDetails());
 
     assertEquals(scmState,
+        getContainerManager().getContainer(containerID).getState());
+  }
+
+  private void assertDeletedContainerNotRecoveredFromScm(long id,
+      State replicaState, LifeCycleState scmState) throws Exception {
+    ContainerWithPipeline deletedContainer = getTestContainer(id, DELETED);
+    ContainerID containerID = deletedContainer.getContainerInfo().containerID();
+    getContainerManager().addNewContainer(deletedContainer);
+
+    when(getContainerManager().getScmClient()
+        .getContainerWithPipeline(containerID.getId()))
+        .thenReturn(getTestContainer(id, scmState));
+
+    getContainerManager().checkAndAddNewContainer(containerID, replicaState,
+        randomDatanodeDetails());
+
+    assertEquals(DELETED,
         getContainerManager().getContainer(containerID).getState());
   }
 

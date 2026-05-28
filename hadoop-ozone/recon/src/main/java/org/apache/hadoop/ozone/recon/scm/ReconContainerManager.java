@@ -368,7 +368,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
             containerInfo.containerID(), containerInfo.getState());
       }
     } catch (IOException ex) {
-      LOG.info("Exception while adding container {}.", containerInfo.containerID(), ex);
+      LOG.info("Exception while adding container {}.",
+          containerInfo.containerID(), ex);
       PipelineID pipelineID = containerInfo.getPipelineID();
       if (pipelineID != null) {
         pipelineManager.removeContainerFromPipeline(
