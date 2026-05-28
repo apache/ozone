@@ -18,7 +18,8 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 /**
- * Represents the sequence ID types managed by {@link SequenceIdGenerator}
+ * Represents the sequence ID types managed by
+ * {@code org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator}
  * The enum constant names are kept exactly as their persisted RocksDB keys.
  */
 public enum SequenceIdType {
