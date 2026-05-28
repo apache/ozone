@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.TestClock;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -112,6 +113,7 @@ public class TestDiskBalancerTask {
   private HddsVolume sourceVolume;
   private HddsVolume destVolume;
   private DiskBalancerServiceTestImpl diskBalancerService;
+  private TestClock clock;
 
   private static final long CONTAINER_ID = 1L;
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
@@ -242,8 +244,9 @@ public class TestDiskBalancerTask {
     DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
     diskBalancerConfiguration.setDiskBalancerShouldRun(true);
     conf.setFromObject(diskBalancerConfiguration);
+    clock = TestClock.newInstance();
     diskBalancerService = new DiskBalancerServiceTestImpl(ozoneContainer,
-        100, conf, 1);
+        100, conf, 1, clock);
     diskBalancerService.setReplicaDeletionDelay(0);
     KeyValueContainer.setInjector(kvFaultInjector);
   }
@@ -579,7 +582,7 @@ public class TestDiskBalancerTask {
 
   @ContainerTestVersionInfo.ContainerTest
   public void testOldReplicaDelayedDeletion(ContainerTestVersionInfo versionInfo)
-      throws IOException, InterruptedException {
+      throws IOException, InterruptedException, TimeoutException {
     setLayoutAndSchemaForTest(versionInfo);
     long delay = 2000L; // 2 second delay
     diskBalancerService.setReplicaDeletionDelay(delay);
@@ -598,8 +601,8 @@ public class TestDiskBalancerTask {
     // create another container to trigger the deletion of old replicas
     createContainer(CONTAINER_ID + 1, sourceVolume, State.CLOSED);
     task = getTask();
-    // Wait for the delay to pass
-    Thread.sleep(delay);
+    // Advance the injected clock until the delayed deletion is eligible.
+    clock.fastForward(delay);
     task.call();
     // Verify that the old container is deleted
     assertFalse(oldContainerDir.exists());

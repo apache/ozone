@@ -49,22 +49,21 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.ratis.io.MD5Hash;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.util.MD5FileUtil;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Generate code for {@link ScmInvoker} implementations.
  * Step 1. Create the target java file in {@link #DIR}.  It will be used as an input for license header and imports.
- * Step 2. Add main method to the API interface.
+ * Step 2. Call {@link #generate(Class, boolean)} from a test or a temporary main method in any test class.
  * Step 3. Manually fix imports.
  * <p>
  * Below is an example for generating the API interface FinalizationStateManager:
  * Step 1. Copy FinalizationStateManager.java to DIR/FinalizationStateManagerInvoker.java
- * Step 2. //FinalizationStateManager
- *         static void main(String[] args) {
- *           ScmInvokerCodeGenerator.generate(FinalizationStateManager.class, true);
- *         }
+ * Step 2. ScmInvokerCodeGenerator.generate(FinalizationStateManager.class, true);
  * Step 3. Manually fix imports.
  */
 public final class ScmInvokerCodeGenerator {
@@ -85,11 +84,16 @@ public final class ScmInvokerCodeGenerator {
   private final StringWriter out = new StringWriter();
   private String indentation = "";
 
-  private ScmInvokerCodeGenerator(Class<?> api) {
+  ScmInvokerCodeGenerator(Class<?> api) {
     this.api = api;
     this.apiName = api.getSimpleName();
-    this.invokerClassName = apiName + "Invoker";
+    this.invokerClassName = getInvokerClassName(api);
+  }
 
+  static String getInvokerClassName(Class<?> api) {
+    final String name = api.getSimpleName() + "Invoker";
+    final Class<?> enclosing = api.getEnclosingClass();
+    return enclosing == null ? name : enclosing.getSimpleName() + name;
   }
 
   void printf(String format, Object... args) {
@@ -294,7 +298,9 @@ public final class ScmInvokerCodeGenerator {
   List<Method> getMethods(Predicate<Method> filter) {
     return Arrays.stream(api.getMethods())
         .filter(filter)
-        .sorted(Comparator.comparing(Method::getName).thenComparing(Method::getParameterCount))
+        .sorted(Comparator.comparing(Method::getName)
+            .thenComparing(Method::getParameterCount)
+            .thenComparing(m -> Arrays.toString(m.getParameterTypes())))
         .collect(Collectors.toList());
   }
 
@@ -562,12 +568,14 @@ public final class ScmInvokerCodeGenerator {
       final String args = IntStream.range(0, method.getParameterCount())
           .mapToObj(i -> "arg" + i)
           .reduce("", (a, b) -> a.isEmpty() ? b : a + ", " + b);
-      final String returnString = method.getReturnType() == void.class ? "" : "return ";
+      final Class<?> returnType = method.getReturnType();
       if (r != null) {
+        final String returnString = returnType == void.class ? "" : "return (" + returnType.getSimpleName() + ")";
         final String type = r.invocationType() == Replicate.InvocationType.DIRECT ? "Direct" : "Client";
         println("final Object[] args = {%s};", args);
         println("%sinvoker.invokeReplicate%s(ReplicateMethod.%s, args);", returnString, type, method.getName());
       } else {
+        final String returnString = returnType == void.class ? "" : "return ";
         println("%sinvoker.getImpl().%s(%s);", returnString, method.getName(), args);
       }
     }
@@ -603,15 +611,17 @@ public final class ScmInvokerCodeGenerator {
     return out.toString();
   }
 
-  File updateFile(String classString) throws IOException {
-    final File java = new File(DIR, invokerClassName + ".java");
+  File updateFile(String classString, String dir, boolean overwrite) throws IOException {
+    final File java = new File(dir, invokerClassName + ".java");
     if (!java.isFile()) {
       throw new FileNotFoundException("Not found: " + java.getAbsolutePath());
     }
-    final File tmp = new File(DIR, invokerClassName + "_tmp.java");
+    final File tmp = new File(dir, invokerClassName + "_tmp.java");
     if (tmp.exists()) {
-      throw new IOException("Already exist: " + java.getAbsolutePath());
+      throw new IOException("Already exist: " + tmp.getAbsolutePath());
     }
+    tmp.deleteOnExit();
+
     try (InputStream inStream = Files.newInputStream(java.toPath());
          BufferedReader in = new BufferedReader(new InputStreamReader(new BufferedInputStream(inStream), UTF_8));
          OutputStream outStream = Files.newOutputStream(tmp.toPath(), StandardOpenOption.CREATE_NEW);
@@ -630,8 +640,18 @@ public final class ScmInvokerCodeGenerator {
       out.print(classString);
     }
 
-    Files.move(tmp.toPath(), java.toPath(), StandardCopyOption.REPLACE_EXISTING);
-    return java;
+    final MD5Hash javaMd5 = MD5FileUtil.computeMd5ForFile(java);
+    final MD5Hash tmpMd5 = MD5FileUtil.computeMd5ForFile(tmp);
+    if (Arrays.equals(javaMd5.getDigest(), tmpMd5.getDigest())) {
+      Files.delete(tmp.toPath());
+      return null;
+    }
+    if (overwrite) {
+      Files.move(tmp.toPath(), java.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      return java;
+    } else {
+      return tmp;
+    }
   }
 
   public static void generate(Class<?> api, boolean updateFile) {
@@ -644,11 +664,15 @@ public final class ScmInvokerCodeGenerator {
 
     final File file;
     try {
-      file = generator.updateFile(classString);
+      file = generator.updateFile(classString, DIR, true);
     } catch (IOException e) {
       throw new IllegalStateException("Failed to updateFile", e);
     }
-    System.out.printf("Successfully update file: %s%n", file);
+    if (file == null) {
+      System.out.printf("No change for %s%n", getInvokerClassName(api));
+    } else {
+      System.out.printf("Successfully update file: %s%n", file);
+    }
   }
 
   static class DeclaredMethod {
