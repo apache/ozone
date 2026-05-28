@@ -249,6 +249,21 @@ export OZONE_OS_TYPE=${OZONE_OS_TYPE:-$(uname -s)}
 # export OZONE_SECURE_LOG_DIR=${OZONE_LOG_DIR}
 
 ###
+# Netty native (direct) memory caps (HDDS-11234)
+###
+# Both unshaded io.netty and the Ratis-shaded copy default their pooled
+# direct-memory ceiling to MaxDirectMemorySize (≈ -Xmx) per JVM, which
+# can let the resident size of a busy DataNode or S3 Gateway grow well
+# beyond the heap. To put a hard cap on each pool, export one or both
+# of the following before starting Ozone daemons. Values are raw byte
+# counts (suffixes like "m" or "g" are NOT supported by Netty's
+# property parser); for example, 536870912 = 512 MiB.
+#
+# For example, to cap each pool at 4 GiB on a DataNode with -Xmx16g:
+# export OZONE_NETTY_MAX_DIRECT_MEMORY=4294967296
+# export OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY=4294967296
+
+###
 # Ozone Manager specific parameters
 ###
 # Specify the JVM options to be used when starting the Ozone Manager.
