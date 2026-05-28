@@ -99,8 +99,9 @@ public class OMUpgradeFinalizeService extends BackgroundService {
 
     @Override
     public BackgroundTaskResult call() {
+      final long run =  RUN_COUNT.incrementAndGet();
       if (!ozoneManager.isLeaderReady()) {
-        LOG.debug("OMUpgradeFinalizeService: skipping check — not the leader.");
+        LOG.debug("OMUpgradeFinalizeService: skipping check — not the leader. Run count {}", run);
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
       if (versionManager.needsFinalization()) {
@@ -110,27 +111,33 @@ public class OMUpgradeFinalizeService extends BackgroundService {
           String finalizationInProgress =
               ozoneManager.getMetadataManager().getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY);
           if (finalizationInProgress == null) {
-            LOG.debug("OMUpgradeFinalizeService: skipping check — finalization is not in progress.");
+            LOG.debug("OMUpgradeFinalizeService: skipping check — finalization is not in progress. Run count {}", run);
             return BackgroundTaskResult.EmptyTaskResult.newResult();
           }
 
           HddsProtos.UpgradeStatus upgradeStatus = scmClient.getContainerClient().queryUpgradeStatus();
           if (upgradeStatus.getShouldFinalize()) {
-            LOG.info("The SCM Upgrade has been finalized. OM will now finalize");
+            LOG.info("The SCM Upgrade has been finalized. OM will now finalize. Run count {}", run);
 
             OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
                 .setClientId(clientId.toString())
                 .build();
             OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
-                ozoneManager, omRequest, clientId, RUN_COUNT.getAndIncrement());
+                ozoneManager, omRequest, clientId, run);
             if (!response.getSuccess()) {
-              LOG.error("Failed to send FinalizeUpgradeRequest to over Ratis. {}", response.getMessage());
+              LOG.error("Failed to send FinalizeUpgradeRequest to over Ratis. {}. Run count {}",
+                  response.getMessage(), run);
             }
+          } else {
+            LOG.debug("The SCM Upgrade has not been finalized. Run count {}", run);
           }
         } catch (Exception e) {
-          LOG.error("An exception occurred while trying to check the SCM Upgrade status or finalize OM", e);
+          LOG.error("An exception occurred while trying to check the SCM Upgrade status or finalize OM. Run count {}",
+              run, e);
         }
+      } else {
+        LOG.debug("Finalization is not in progress. Run count {}", run);
       }
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
