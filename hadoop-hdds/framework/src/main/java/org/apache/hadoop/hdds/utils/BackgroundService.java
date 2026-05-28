@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -77,7 +76,7 @@ public abstract class BackgroundService {
   }
 
   @VisibleForTesting
-  public synchronized ExecutorService getExecutorService() {
+  public synchronized ScheduledThreadPoolExecutor getExecutorService() {
     return this.exec;
   }
 
@@ -126,7 +125,7 @@ public abstract class BackgroundService {
     this.unit = newUnit;
   }
 
-  protected synchronized long getIntervalMillis() {
+  public synchronized long getIntervalMillis() {
     return this.unit.toMillis(interval);
   }
 
