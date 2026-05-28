@@ -52,6 +52,7 @@ public class OMUpgradeFinalizeService extends BackgroundService {
   private final OMVersionManager versionManager;
   private final ScmClient scmClient;
   private final AtomicBoolean stopInitiated = new AtomicBoolean(false);
+  private final ClientId clientId = ClientId.randomId();
 
   /**
    * Creates an {@code OMUpgradeFinalizeService} with a custom check interval.
@@ -119,10 +120,10 @@ public class OMUpgradeFinalizeService extends BackgroundService {
 
             OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade)
-                .setClientId(ozoneManager.getOMNodeId())
+                .setClientId(clientId.toString())
                 .build();
             OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
-                ozoneManager, omRequest, ClientId.randomId(), RUN_COUNT.getAndIncrement());
+                ozoneManager, omRequest, clientId, RUN_COUNT.getAndIncrement());
             if (!response.getSuccess()) {
               LOG.error("Failed to send FinalizeUpgradeRequest to over Ratis. {}", response.getMessage());
             }
