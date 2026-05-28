@@ -46,7 +46,7 @@ public abstract class BackgroundService {
   private long interval;
   private volatile long serviceTimeoutInNanos;
   private TimeUnit unit;
-  private final int threadPoolSize;
+  private int threadPoolSize;
   private final String threadNamePrefix;
   private final PeriodicalTask service;
   private CompletableFuture<Void> future;
@@ -89,6 +89,7 @@ public abstract class BackgroundService {
     // the corePoolSize will always less maximumPoolSize.
     // So we can directly set the corePoolSize
     exec.setCorePoolSize(size);
+    threadPoolSize = size;
   }
 
   public synchronized void setServiceTimeoutInNanos(long newTimeout) {
