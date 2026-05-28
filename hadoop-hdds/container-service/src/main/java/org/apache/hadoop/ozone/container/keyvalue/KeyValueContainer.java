@@ -147,13 +147,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  @Deprecated
-  public void create(VolumeSet volumeSet, VolumeChoosingPolicy
-      volumeChoosingPolicy, String clusterId) throws StorageContainerException {
-    create(volumeSet, volumeChoosingPolicy, clusterId, null);
-  }
-
-  @Override
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
       volumeChoosingPolicy, String clusterId, StorageType storageType)
       throws StorageContainerException {
@@ -172,11 +165,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         HddsVolume containerVolume;
         String hddsVolumeDir;
         try {
-          // TODO Use the `chooseVolume` that supports `storageType`
-          containerVolume = storageType == null
-              ? volumeChoosingPolicy.chooseVolume(volumes, maxSize)
-              : volumeChoosingPolicy.chooseVolume(
-                  volumes, maxSize, storageType);
+          containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize, storageType);
           hddsVolumeDir = containerVolume.getHddsRootDir().toString();
           // Set volume before getContainerDBFile(), because we may need the
           // volume to deduce the db file.
@@ -186,10 +175,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           containerData.setCommittedSpace(true);
         } catch (DiskOutOfSpaceException ex) {
           throw new StorageContainerException("Container creation failed, " +
-              "due to disk out of space", ex, DISK_OUT_OF_SPACE);
+              "due to disk out of space" + storageTypeMessage(storageType),
+              ex, DISK_OUT_OF_SPACE);
         } catch (IOException ex) {
           throw new StorageContainerException(
-              "Container creation failed. " + ex.getMessage(), ex,
+              "Container creation failed" + storageTypeMessage(storageType) +
+                  ". " + ex.getMessage(), ex,
               CONTAINER_INTERNAL_ERROR);
         }
 
@@ -351,6 +342,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private void updateContainerFile(File containerFile)
       throws StorageContainerException {
     writeToContainerFile(containerFile, false);
+  }
+
+  private static String storageTypeMessage(StorageType storageType) {
+    return storageType == null ? "" : " on StorageType: " + storageType;
   }
 
   @Override

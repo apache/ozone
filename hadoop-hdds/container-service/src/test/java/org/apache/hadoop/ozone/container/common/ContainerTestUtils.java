@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -384,7 +385,7 @@ public final class ContainerTestUtils {
 
     KeyValueContainer container =
         new KeyValueContainer(keyValueContainerData, conf);
-    container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
+    container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId, StorageType.DISK);
 
     container.close();
 

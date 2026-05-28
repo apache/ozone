@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -499,16 +500,28 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     createRequest.setContainerType(containerType);
 
     if (containerRequest.hasWriteChunk()) {
-      createRequest.setReplicaIndex(
-          containerRequest.getWriteChunk().getBlockID().getReplicaIndex());
+      DatanodeBlockID blockID = containerRequest.getWriteChunk().getBlockID();
+      createRequest.setReplicaIndex(blockID.getReplicaIndex());
+      if (blockID.hasStorageTypeID() && blockID.getStorageTypeID() > 0) {
+        createRequest.setStorageTypeID(blockID.getStorageTypeID());
+      }
     }
 
     if (containerRequest.hasPutBlock()) {
-      createRequest.setReplicaIndex(
-          containerRequest.getPutBlock().getBlockData().getBlockID()
-              .getReplicaIndex());
+      DatanodeBlockID blockID = containerRequest.getPutBlock().getBlockData().getBlockID();
+      createRequest.setReplicaIndex(blockID.getReplicaIndex());
+      if (blockID.hasStorageTypeID() && blockID.getStorageTypeID() > 0) {
+        createRequest.setStorageTypeID(blockID.getStorageTypeID());
+      }
     }
 
+    if (containerRequest.hasPutSmallFile()) {
+      // PutSmallFile Not support EC yet
+      DatanodeBlockID blockID = containerRequest.getPutSmallFile().getBlock().getBlockData().getBlockID();
+      if (blockID.hasStorageTypeID() && blockID.getStorageTypeID() > 0) {
+        createRequest.setStorageTypeID(blockID.getStorageTypeID());
+      }
+    }
     ContainerCommandRequestProto.Builder requestBuilder =
         ContainerCommandRequestProto.newBuilder()
             .setCmdType(Type.CreateContainer)

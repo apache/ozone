@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.fs.StorageType;
@@ -30,22 +31,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 public interface VolumeChoosingPolicy {
 
   /**
-   * Choose a volume to place a container,
-   * given a list of volumes and the max container size sought for storage.
-   *
-   * The implementations of this interface must be thread-safe.
-   *
-   * @param volumes - a list of available volumes.
-   * @param maxContainerSize - the maximum size of the container for which a
-   *                         volume is sought.
-   * @return the chosen volume.
-   * @throws IOException when disks are unavailable or are full.
-   */
-  @Deprecated
-  HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize)
-      throws IOException;
-
-  /**
    * Choose a volume to place a container, optionally constraining the choice
    * to a specific storage type.
    *
@@ -57,6 +42,6 @@ public interface VolumeChoosingPolicy {
    * @return the chosen volume.
    * @throws IOException when disks are unavailable or are full.
    */
-  HddsVolume chooseVolume(List<HddsVolume> volumes,
-      long maxContainerSize, StorageType storageType) throws IOException;
+  HddsVolume chooseVolume(List<HddsVolume> volumes, long maxContainerSize,
+      @Nullable StorageType storageType) throws IOException;
 }

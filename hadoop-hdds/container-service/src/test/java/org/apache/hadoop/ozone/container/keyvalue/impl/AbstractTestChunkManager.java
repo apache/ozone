@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.abort;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +36,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -93,7 +95,7 @@ public abstract class AbstractTestChunkManager {
 
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy =
         mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -104,7 +106,7 @@ public abstract class AbstractTestChunkManager {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, config);
 
     keyValueContainer.create(volumeSet, volumeChoosingPolicy,
-        UUID.randomUUID().toString());
+        UUID.randomUUID().toString(), StorageType.DISK);
 
     header = "my header".getBytes(UTF_8);
     byte[] bytes = "testing write chunks".getBytes(UTF_8);

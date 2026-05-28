@@ -32,12 +32,6 @@ public abstract class AbstractStorageTypeChoosingPolicy
   @Override
   @Deprecated
   public HddsVolume chooseVolume(List<HddsVolume> volumes,
-      long maxContainerSize) throws IOException {
-    return chooseVolume(volumes, maxContainerSize, null);
-  }
-
-  @Override
-  public HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize, StorageType storageType) throws IOException {
     List<HddsVolume> candidates = volumes;
     if (storageType != null) {

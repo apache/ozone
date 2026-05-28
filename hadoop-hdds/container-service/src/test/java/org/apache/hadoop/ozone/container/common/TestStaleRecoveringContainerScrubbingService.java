@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +43,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -103,7 +105,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
         .thenReturn(hddsVolume);
   }
 
@@ -133,7 +135,7 @@ public class TestStaleRecoveringContainerScrubbingService {
           new KeyValueContainer(recoveringContainerData,
               conf);
       recoveringKeyValueContainer.create(
-          volumeSet, volumeChoosingPolicy, clusterID);
+          volumeSet, volumeChoosingPolicy, clusterID, StorageType.DISK);
       containerSet.addContainer(recoveringKeyValueContainer);
       createdIds.add((long) containerIdNum);
     }

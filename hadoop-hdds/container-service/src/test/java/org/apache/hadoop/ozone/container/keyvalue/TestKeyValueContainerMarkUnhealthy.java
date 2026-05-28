@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -79,7 +81,7 @@ public class TestKeyValueContainerMarkUnhealthy {
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -145,7 +147,7 @@ public class TestKeyValueContainerMarkUnhealthy {
     initTestData(layoutVersion);
     // We need to create the container so the compact-on-close operation
     // does not NPE.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     keyValueContainer.close();
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
@@ -159,7 +161,7 @@ public class TestKeyValueContainerMarkUnhealthy {
     initTestData(layoutVersion);
     // We need to create the container so the sync-on-quasi-close operation
     // does not NPE.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     keyValueContainer.quasiClose();
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);

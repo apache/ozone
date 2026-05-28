@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -329,7 +330,7 @@ public class GeneratorDatanode extends BaseGenerator {
         new KeyValueContainer(keyValueContainerData, config);
 
     try {
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
     } catch (StorageContainerException ex) {
       throw new RuntimeException(ex);
     }

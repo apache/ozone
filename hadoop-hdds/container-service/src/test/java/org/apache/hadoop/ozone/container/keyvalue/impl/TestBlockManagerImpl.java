@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -95,7 +97,7 @@ public class TestBlockManagerImpl {
     VolumeSet volumeSet = mock(MutableVolumeSet.class);
 
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(), eq(StorageType.DISK)))
         .thenReturn(hddsVolume);
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(1L,
@@ -106,7 +108,7 @@ public class TestBlockManagerImpl {
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, config);
 
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, StorageType.DISK);
 
     // Creating BlockData
     BlockID blockID = new BlockID(1L, 1L);
