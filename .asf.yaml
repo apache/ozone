@@ -49,3 +49,9 @@ github:
         - root
       restrict_deletion: true
       restrict_force_push: true
+  copilot_code_review:
+    enabled: true
+    review_drafts: false
+    review_on_push: true
+    # Ensures the prompt logic is validated across any active feature branch
+    target_branches: [ "*" ]
