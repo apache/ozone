@@ -43,7 +43,7 @@ public abstract class HDDSVersionManager extends ComponentVersionManager {
   private static ComponentVersion computeApparentVersion(int serializedApparentVersion) throws IOException {
     if (serializedApparentVersion >= HDDSVersion.ZDU.serialize()) {
       HDDSVersion fromHdds = HDDSVersion.deserialize(serializedApparentVersion);
-      if (fromHdds != HDDSVersion.FUTURE_VERSION) {
+      if (fromHdds != HDDSVersion.UNKNOWN_VERSION) {
         return fromHdds;
       }
     } else {

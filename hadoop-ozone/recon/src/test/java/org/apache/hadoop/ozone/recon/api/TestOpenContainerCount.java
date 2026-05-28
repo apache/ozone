@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -321,7 +321,7 @@ public class TestOpenContainerCount {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto,
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     });
@@ -411,7 +411,7 @@ public class TestOpenContainerCount {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
               containerReportsProto, pipelineReportsProto,
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     });

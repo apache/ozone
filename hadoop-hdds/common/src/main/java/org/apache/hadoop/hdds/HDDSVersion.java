@@ -41,8 +41,8 @@ public enum HDDSVersion implements ComponentVersion {
 
   ZDU(100, "Version that supports zero downtime upgrade"),
 
-  FUTURE_VERSION(-1, "Used internally in the client when the server side is "
-      + " newer and an unknown server version has arrived to the client.");
+  UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
+      " component, which may indicate it came from a component in a newer version");
 
   //////////////////////////////  //////////////////////////////
 
@@ -85,11 +85,11 @@ public enum HDDSVersion implements ComponentVersion {
 
   /**
    * @param value The serialized version to convert.
-   * @return The version corresponding to this serialized value, or {@link #FUTURE_VERSION} if no matching version is
+   * @return The version corresponding to this serialized value, or {@link #UNKNOWN_VERSION} if no matching version is
    *    found.
    */
   public static HDDSVersion deserialize(int value) {
-    return BY_VALUE.getOrDefault(value, FUTURE_VERSION);
+    return BY_VALUE.getOrDefault(value, UNKNOWN_VERSION);
   }
 
   @Override

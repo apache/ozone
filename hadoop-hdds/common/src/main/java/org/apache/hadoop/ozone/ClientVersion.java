@@ -42,7 +42,7 @@ public enum ClientVersion implements ComponentVersion {
       "This client version has support for Object Store and File " +
           "System Optimized Bucket Layouts."),
 
-  FUTURE_VERSION(-1, "Used internally when the server side is older and an"
+  FUTURE_VERSION(-1, "Used internally by the server when the server side is older and an"
       + " unknown client version has arrived from the client.");
 
   private static final SortedMap<Integer, ClientVersion> BY_VALUE =

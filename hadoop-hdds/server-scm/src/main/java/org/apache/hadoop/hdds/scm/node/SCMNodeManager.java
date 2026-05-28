@@ -407,8 +407,8 @@ public class SCMNodeManager implements NodeManager {
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto layoutInfo) {
-    int dnSlvRegister = layoutInfo.getSoftwareLayoutVersion();
+      LayoutVersionProto dnVersionInfo) {
+    int dnSlvRegister = dnVersionInfo.getSoftwareLayoutVersion();
     int scmSlvRegister = scmLayoutVersionManager.getSoftwareLayoutVersion();
     if (shouldFenceDatanode(dnSlvRegister, scmSlvRegister)) {
       return RegisteredCommand.newBuilder()
@@ -440,7 +440,7 @@ public class SCMNodeManager implements NodeManager {
     if (!isNodeRegistered(datanodeDetails)) {
       try {
         clusterMap.add(datanodeDetails);
-        nodeStateManager.addNode(datanodeDetails, layoutInfo);
+        nodeStateManager.addNode(datanodeDetails, dnVersionInfo);
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
@@ -466,7 +466,7 @@ public class SCMNodeManager implements NodeManager {
             hostName, ipAddress, dnId)) {
           LOG.info("Updating datanode from {} to {}", oldNode, datanodeDetails);
           clusterMap.update(oldNode, datanodeDetails);
-          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
+          nodeStateManager.updateNode(datanodeDetails, dnVersionInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
           Preconditions.checkState(dn.getParent() != null);
           processNodeReport(datanodeDetails, nodeReport);
@@ -476,7 +476,7 @@ public class SCMNodeManager implements NodeManager {
           LOG.info("Update the version for registered datanode {}, " +
               "oldVersion = {}, newVersion = {}.",
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
-          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
+          nodeStateManager.updateNode(datanodeDetails, dnVersionInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -735,11 +735,11 @@ public class SCMNodeManager implements NodeManager {
    * Process Layout Version report.
    *
    * @param datanodeDetails
-   * @param layoutVersionReport
+   * @param versionReport
    */
   @Override
-  public void processLayoutVersionReport(DatanodeDetails datanodeDetails,
-                                LayoutVersionProto layoutVersionReport) {
+  public void processVersionReport(DatanodeDetails datanodeDetails,
+                                   LayoutVersionProto versionReport) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing Layout Version report from [datanode={}]",
           datanodeDetails.getHostName());
@@ -747,27 +747,27 @@ public class SCMNodeManager implements NodeManager {
     if (LOG.isTraceEnabled()) {
       LOG.trace("HB is received from [datanode={}]: <json>{}</json>",
           datanodeDetails.getHostName(),
-          layoutVersionReport.toString().replaceAll("\n", "\\\\n"));
+          versionReport.toString().replaceAll("\n", "\\\\n"));
     }
 
     try {
-      nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
-          layoutVersionReport);
+      nodeStateManager.updateLastKnownVersionInfo(datanodeDetails,
+          versionReport);
     } catch (NodeNotFoundException e) {
       LOG.error("SCM trying to process Layout Version from an " +
           "unregistered node {}.", datanodeDetails);
       return;
     }
 
-    sendFinalizeToDatanodeIfNeeded(datanodeDetails, layoutVersionReport);
+    sendFinalizeToDatanodeIfNeeded(datanodeDetails, versionReport);
   }
 
   protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutVersionReport) {
+      LayoutVersionProto versionReport) {
     // Software layout version is hardcoded to the SCM.
     int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
-    int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
-    int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
+    int dnSlv = versionReport.getSoftwareLayoutVersion();
+    int dnMlv = versionReport.getMetadataLayoutVersion();
 
     // A datanode with a larger software layout version is from a future
     // version of ozone. It should not have been added to the cluster.

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
@@ -67,16 +67,16 @@ public class DatanodeInfo extends DatanodeDetails {
    * Constructs DatanodeInfo from DatanodeDetails.
    *
    * @param datanodeDetails Details about the datanode
-   * @param layoutInfo Details about the LayoutVersionProto
+   * @param versionInfo Details about the LayoutVersionProto
    */
   public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
-       LayoutVersionProto layoutInfo, long containerRollIntervalMs) {
+       LayoutVersionProto versionInfo, long containerRollIntervalMs) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
-    lastKnownLayoutVersion = toLayoutVersionProto(
-        layoutInfo != null ? layoutInfo.getMetadataLayoutVersion() : 0,
-        layoutInfo != null ? layoutInfo.getSoftwareLayoutVersion() : 0);
+    lastKnownLayoutVersion = toVersionProto(
+        versionInfo != null ? versionInfo.getMetadataLayoutVersion() : 0,
+        versionInfo != null ? versionInfo.getSoftwareLayoutVersion() : 0);
     this.storageReports = Collections.emptyList();
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
@@ -108,15 +108,15 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
-   * Updates the last LayoutVersion.
+   * Updates the last known version reported by this datanode.
    */
-  public void updateLastKnownLayoutVersion(LayoutVersionProto version) {
+  public void updateLastKnownVersions(LayoutVersionProto version) {
     if (version == null) {
       return;
     }
     try {
       lock.writeLock().lock();
-      lastKnownLayoutVersion = toLayoutVersionProto(
+      lastKnownLayoutVersion = toVersionProto(
           version.getMetadataLayoutVersion(),
           version.getSoftwareLayoutVersion());
     } finally {

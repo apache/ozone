@@ -39,7 +39,7 @@ public class TestOzoneManagerVersion extends AbstractComponentVersionTest {
 
   @Override
   protected ComponentVersion getFutureVersion() {
-    return OzoneManagerVersion.FUTURE_VERSION;
+    return OzoneManagerVersion.UNKNOWN_VERSION;
   }
 
   @Override

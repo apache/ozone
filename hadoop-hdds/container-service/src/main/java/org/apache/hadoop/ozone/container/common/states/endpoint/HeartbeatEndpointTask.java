@@ -21,8 +21,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors;
@@ -129,13 +128,13 @@ public class HeartbeatEndpointTask
     try {
       Preconditions.checkState(this.datanodeDetailsProto != null);
 
-      LayoutVersionProto layoutinfo = toLayoutVersionProto(
-          versionManager.getApparentVersion().serialize(),
-          versionManager.getSoftwareVersion().serialize());
+      LayoutVersionProto versionInfo = toVersionProto(
+          versionManager.getApparentVersion(),
+          versionManager.getSoftwareVersion());
 
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanodeDetailsProto)
-          .setDataNodeLayoutVersion(layoutinfo);
+          .setDataNodeLayoutVersion(versionInfo);
       addReports(requestBuilder);
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);

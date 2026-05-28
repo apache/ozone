@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -71,17 +71,16 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         .getContainerReport();
     NodeReportProto dnNodeReport = request.getNodeReport();
     PipelineReportsProto pipelineReport = request.getPipelineReports();
-    LayoutVersionProto layoutInfo = null;
+    LayoutVersionProto versionInfo = null;
     if (request.hasDataNodeLayoutVersion()) {
-      layoutInfo = request.getDataNodeLayoutVersion();
+      versionInfo = request.getDataNodeLayoutVersion();
     } else {
       // Backward compatibility to make sure old Datanodes can still talk to
       // SCM.
-      layoutInfo = toLayoutVersionProto(INITIAL_VERSION.layoutVersion(),
-          INITIAL_VERSION.layoutVersion());
+      versionInfo = toVersionProto(INITIAL_VERSION, INITIAL_VERSION);
     }
     return impl.register(request.getExtendedDatanodeDetails(), dnNodeReport,
-        containerRequestProto, pipelineReport, layoutInfo);
+        containerRequestProto, pipelineReport, versionInfo);
   }
 
   @Override

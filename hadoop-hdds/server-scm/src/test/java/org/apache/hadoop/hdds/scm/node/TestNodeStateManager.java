@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.util.Time;
@@ -86,7 +87,7 @@ public class TestNodeStateManager {
       throws NodeAlreadyExistsException, NodeNotFoundException {
     // Create a datanode, then add and retrieve it
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
     assertEquals(dn.getUuid(), nsm.getNode(dn).getUuid());
     // Now get the status of the newly added node and it should be
     // IN_SERVICE and HEALTHY
@@ -98,9 +99,9 @@ public class TestNodeStateManager {
   public void testGetAllNodesReturnsCorrectly()
       throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
     dn = generateDatanode();
-    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
     assertEquals(2, nsm.getAllNodes().size());
     assertEquals(2, nsm.getTotalNodeCount());
   }
@@ -109,7 +110,7 @@ public class TestNodeStateManager {
   public void testGetNodeCountReturnsCorrectly()
       throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
     assertEquals(1, nsm.getNodes(NodeStatus.inServiceHealthy()).size());
     assertEquals(0, nsm.getNodes(NodeStatus.inServiceStale()).size());
   }
@@ -117,7 +118,7 @@ public class TestNodeStateManager {
   @Test
   public void testGetNodeCount() throws NodeAlreadyExistsException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
     assertEquals(1, nsm.getNodeCount(NodeStatus.inServiceHealthy()));
     assertEquals(0, nsm.getNodeCount(NodeStatus.inServiceStale()));
   }
@@ -132,15 +133,15 @@ public class TestNodeStateManager {
     long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
 
     DatanodeDetails staleDn = generateDatanode();
-    nsm.addNode(staleDn, defaultLayoutVersionProto());
+    nsm.addNode(staleDn, defaultVersionProto());
     nsm.getNode(staleDn).updateLastHeartbeatTime(now - staleLimit);
 
     DatanodeDetails deadDn = generateDatanode();
-    nsm.addNode(deadDn, defaultLayoutVersionProto());
+    nsm.addNode(deadDn, defaultVersionProto());
     nsm.getNode(deadDn).updateLastHeartbeatTime(now - deadLimit);
 
     DatanodeDetails healthyDn = generateDatanode();
-    nsm.addNode(healthyDn, defaultLayoutVersionProto());
+    nsm.addNode(healthyDn, defaultVersionProto());
     nsm.getNode(healthyDn).updateLastHeartbeatTime();
 
     nsm.checkNodesHealth();
@@ -165,7 +166,7 @@ public class TestNodeStateManager {
     long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
 
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, defaultLayoutVersionProto());
+    nsm.addNode(dn, defaultVersionProto());
     DatanodeInfo dni = nsm.getNode(dn);
     dni.updateLastHeartbeatTime();
 
@@ -209,7 +210,7 @@ public class TestNodeStateManager {
   public void testNodeOpStateCanBeSet()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
 
     nsm.setNodeOperationalState(dn,
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
@@ -223,7 +224,7 @@ public class TestNodeStateManager {
   public void testContainerCanBeAddedAndRemovedFromDN()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
 
     nsm.addContainer(dn.getID(), ContainerID.valueOf(1));
     nsm.addContainer(dn.getID(), ContainerID.valueOf(2));
@@ -244,7 +245,7 @@ public class TestNodeStateManager {
   public void testHealthEventsFiredWhenOpStateChanged()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     DatanodeDetails dn = generateDatanode();
-    nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
+    nsm.addNode(dn, UpgradeUtils.defaultVersionProto());
 
     // First set the node to decommissioned, then run through all op states in
     // order and ensure the unhealthy_to_healthy event gets fired
@@ -297,7 +298,7 @@ public class TestNodeStateManager {
     String hostName = "test-host";
     StorageContainerDatanodeProtocolProtos.LayoutVersionProto
             layoutVersionProto =
-            UpgradeUtils.toLayoutVersionProto(1, 2);
+            UpgradeUtils.toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSLayoutFeature.INITIAL_VERSION);
     DatanodeDetails dn = DatanodeDetails.newBuilder()
             .setUuid(dnUuid)
             .setIpAddress(ipAddress)
@@ -309,7 +310,7 @@ public class TestNodeStateManager {
     String newIpAddress = "2.3.4.5";
     String newHostName = "new-host";
     StorageContainerDatanodeProtocolProtos.LayoutVersionProto
-            newLayoutVersionProto = UpgradeUtils.defaultLayoutVersionProto();
+            newLayoutVersionProto = UpgradeUtils.defaultVersionProto();
     DatanodeDetails newDn = DatanodeDetails.newBuilder()
             .setUuid(dnUuid)
             .setIpAddress(newIpAddress)

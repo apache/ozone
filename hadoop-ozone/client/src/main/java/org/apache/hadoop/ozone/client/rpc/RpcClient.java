@@ -361,7 +361,7 @@ public class RpcClient implements ClientProtocol {
 
   static boolean validateOmVersion(OzoneManagerVersion minimumVersion,
                                    List<ServiceInfo> serviceInfoList) {
-    if (minimumVersion == OzoneManagerVersion.FUTURE_VERSION) {
+    if (minimumVersion == OzoneManagerVersion.UNKNOWN_VERSION) {
       // A FUTURE_VERSION should not be expected ever.
       throw new IllegalArgumentException("Configuration error, expected "
           + "OzoneManager version config evaluates to a future version.");

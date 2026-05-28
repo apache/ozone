@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 
 import jakarta.annotation.Nullable;
 import java.io.Closeable;
@@ -91,7 +91,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
-        defaultLayoutVersionProto());
+        defaultVersionProto());
   }
 
   /**
@@ -372,8 +372,8 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param datanodeDetails
    * @param layoutReport
    */
-  void processLayoutVersionReport(DatanodeDetails datanodeDetails,
-                         LayoutVersionProto layoutReport);
+  void processVersionReport(DatanodeDetails datanodeDetails,
+                            LayoutVersionProto layoutReport);
 
   /**
    * Get the number of commands of the given type queued on the datanode at the
@@ -476,7 +476,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   default HDDSLayoutVersionManager getLayoutVersionManager() {
     return null;
   }
-  
+
   /**
    * This API allows removal of only DECOMMISSIONED, IN_MAINTENANCE and DEAD nodes
    * from NodeManager data structures and cleanup memory.
