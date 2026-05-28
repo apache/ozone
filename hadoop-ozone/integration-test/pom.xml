@@ -575,7 +575,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.basedir}/../../target/native-lib</argLine>
+          <argLine>${maven-surefire-plugin.argLine} ${maven-surefire-plugin.argLineAccessArgs} @{argLine} -Djava.library.path=${project.basedir}/../../target/native-lib</argLine>
           <environmentVariables>
             <LD_LIBRARY_PATH>${project.basedir}/../../target/native-lib</LD_LIBRARY_PATH>
             <DYLD_LIBRARY_PATH>${project.basedir}/../../target/native-lib</DYLD_LIBRARY_PATH>

@@ -58,7 +58,7 @@ import org.slf4j.event.Level;
  *  to intellij run configuration.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestShortCircuitChunkInputStream extends TestChunkInputStream {
+public class TestLocalChunkInputStream extends TestChunkInputStream {
 
   @TempDir
   private File dir;
