@@ -45,8 +45,13 @@ mkdir -p target/coverage-classes
 
 #Unzip all the classes from the last build
 find hadoop-ozone/dist/target/*/share/ozone/lib -name 'hdds-*.jar' -or -name 'ozone-*.jar' | \
-    grep -v -E 'shaded|hadoop2|hadoop3|tests' | \
+    grep -v -E 'shaded|hadoop2|hadoop3|tests|iceberg' | \
     xargs -n1 unzip -o -q -d target/coverage-classes
+    
+ICEBERG_JAR=$(find hadoop-ozone/dist/target/*/share/ozone/lib -name 'ozone-iceberg-*.jar' | head -1)
+if [[ -n "${ICEBERG_JAR}" ]]; then
+  unzip -o -q "${ICEBERG_JAR}" 'org/apache/hadoop/ozone/iceberg/*' -d target/coverage-classes
+fi
 
 #Exclude some classes from the coverage
 find target/coverage-classes -type d \( -name proto -or -name codegen -or -name generated -or -name v1 -or -name freon \) \

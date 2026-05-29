@@ -213,7 +213,6 @@ EDL 1.0
    com.sun.activation:jakarta.activation
    jakarta.activation:jakarta.activation-api
    jakarta.xml.bind:jakarta.xml.bind-api
-   org.locationtech.jts:jts-core
 
 
 EPL 2.0
@@ -281,7 +280,6 @@ Apache License 2.0
    com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
-   com.github.ben-manes.caffeine:caffeine
    com.github.jnr:jnr-a64asm
    com.github.jnr:jnr-constants
    com.github.jnr:jnr-ffi
@@ -368,7 +366,6 @@ Apache License 2.0
    log4j:apache-log4j-extras
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
-   org.apache.avro:avro
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
    org.apache.commons:commons-collections4
@@ -384,16 +381,9 @@ Apache License 2.0
    org.apache.hadoop:hadoop-common
    org.apache.hadoop:hadoop-hdfs
    org.apache.hadoop:hadoop-hdfs-client
-   org.apache.hadoop:hadoop-mapreduce-client-core
    org.apache.hadoop:hadoop-shaded-guava
    org.apache.hadoop:hadoop-shaded-protobuf_3_25
    org.apache.httpcomponents:httpcore
-   org.apache.iceberg:iceberg-api
-   org.apache.iceberg:iceberg-bundled-guava
-   org.apache.iceberg:iceberg-common
-   org.apache.iceberg:iceberg-core
-   org.apache.iceberg:iceberg-orc
-   org.apache.iceberg:iceberg-parquet
    org.apache.kerby:kerb-admin
    org.apache.kerby:kerb-client
    org.apache.kerby:kerb-common
@@ -411,16 +401,6 @@ Apache License 2.0
    org.apache.kerby:token-provider
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
-   org.apache.orc:orc-core
-   org.apache.orc:orc-shims
-   org.apache.parquet:parquet-avro
-   org.apache.parquet:parquet-column
-   org.apache.parquet:parquet-common
-   org.apache.parquet:parquet-encoding
-   org.apache.parquet:parquet-format-structures
-   org.apache.parquet:parquet-hadoop
-   org.apache.parquet:parquet-jackson
-   org.apache.parquet:parquet-variant
    org.apache.ranger:ranger-audit-core
    org.apache.ranger:ranger-authz-api
    org.apache.ranger:ranger-intg

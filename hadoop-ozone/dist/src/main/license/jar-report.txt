@@ -11,7 +11,6 @@ share/ozone/lib/asm.jar
 share/ozone/lib/asm-tree.jar
 share/ozone/lib/asm-util.jar
 share/ozone/lib/aspectjrt.jar
-share/ozone/lib/avro.jar
 share/ozone/lib/aws-java-sdk-core.jar
 share/ozone/lib/aws-java-sdk-kms.jar
 share/ozone/lib/aws-java-sdk-s3.jar
@@ -19,7 +18,6 @@ share/ozone/lib/bcpkix-jdk18on.jar
 share/ozone/lib/bcprov-jdk18on.jar
 share/ozone/lib/bcutil-jdk18on.jar
 share/ozone/lib/bonecp.RELEASE.jar
-share/ozone/lib/caffeine.jar
 share/ozone/lib/cdi-api.SP1.jar
 share/ozone/lib/commons-beanutils.jar
 share/ozone/lib/commons-cli.jar
@@ -64,7 +62,6 @@ share/ozone/lib/hadoop-auth.jar
 share/ozone/lib/hadoop-common.jar
 share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
-share/ozone/lib/hadoop-mapreduce-client-core.jar
 share/ozone/lib/hadoop-shaded-guava.jar
 share/ozone/lib/hadoop-shaded-protobuf_3_25.jar
 share/ozone/lib/hdds-cli-common.jar
@@ -87,12 +84,6 @@ share/ozone/lib/hk2-utils.jar
 share/ozone/lib/hppc.jar
 share/ozone/lib/httpclient.jar
 share/ozone/lib/httpcore.jar
-share/ozone/lib/iceberg-api.jar
-share/ozone/lib/iceberg-bundled-guava.jar
-share/ozone/lib/iceberg-common.jar
-share/ozone/lib/iceberg-core.jar
-share/ozone/lib/iceberg-orc.jar
-share/ozone/lib/iceberg-parquet.jar
 share/ozone/lib/istack-commons-runtime.jar
 share/ozone/lib/j2objc-annotations.jar
 share/ozone/lib/jackson-annotations.jar
@@ -168,7 +159,6 @@ share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jspecify.jar
 share/ozone/lib/jsr311-api.jar
-share/ozone/lib/jts-core.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerb-crypto.jar
 share/ozone/lib/kerb-util.jar
@@ -218,8 +208,6 @@ share/ozone/lib/opentelemetry-sdk-logs.jar
 share/ozone/lib/opentelemetry-sdk-metrics.jar
 share/ozone/lib/opentelemetry-sdk-trace.jar
 share/ozone/lib/opentelemetry-sdk.jar
-share/ozone/lib/orc-core-nohive.jar
-share/ozone/lib/orc-shims.jar
 share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-client.jar
 share/ozone/lib/ozone-cli-admin.jar
@@ -247,14 +235,6 @@ share/ozone/lib/ozone-s3-secret-store.jar
 share/ozone/lib/ozone-s3gateway.jar
 share/ozone/lib/ozone-tools.jar
 share/ozone/lib/ozone-vapor.jar
-share/ozone/lib/parquet-avro.jar
-share/ozone/lib/parquet-column.jar
-share/ozone/lib/parquet-common.jar
-share/ozone/lib/parquet-encoding.jar
-share/ozone/lib/parquet-format-structures.jar
-share/ozone/lib/parquet-hadoop.jar
-share/ozone/lib/parquet-jackson.jar
-share/ozone/lib/parquet-variant.jar
 share/ozone/lib/perfmark-api.jar
 share/ozone/lib/picocli.jar
 share/ozone/lib/picocli-shell-jline3.jar
