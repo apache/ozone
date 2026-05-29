@@ -31,14 +31,14 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSequenceIdTypeCodec {
 
-  private final Codec<SequenceIdType> enumCodec = SequenceIdTypeCodec.get();
+  private final Codec<SequenceIdType> enumCodec = SequenceIdType.getCodec();
   private final Codec<String> stringCodec = StringCodec.get();
 
   @Test
   public void testCodecBuffersWithOzoneTestUtil() throws Exception {
     for (SequenceIdType type : SequenceIdType.values()) {
       // Verify codec compatibility with heap and direct byte buffers.
-      CodecTestUtil.runTest(enumCodec, type, null, null);
+      CodecTestUtil.runTest(enumCodec, type, type.getByteArray().length, null);
     }
   }
 

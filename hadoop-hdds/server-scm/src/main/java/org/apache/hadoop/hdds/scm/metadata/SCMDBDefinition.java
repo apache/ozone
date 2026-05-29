@@ -87,7 +87,7 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
       SEQUENCE_ID =
       new DBColumnFamilyDefinition<>(
           "sequenceId",
-          SequenceIdTypeCodec.get(),
+          SequenceIdType.getCodec(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<ContainerID,
