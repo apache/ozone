@@ -2776,6 +2776,8 @@
             <configuration>
               <includes>
                 <include>org.apache.hadoop.ozone.client.**</include>
+                <include>org.apache.hadoop.hdds.TestXceiverServerDomainSocket</include>
+                <include>org.apache.hadoop.hdds.scm.TestXceiverClientManagerSC</include>
               </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2869,6 +2871,8 @@
                 <include>org.apache.hadoop.hdds.**</include>
               </includes>
               <excludes>
+                <exclude>org.apache.hadoop.hdds.TestXceiverServerDomainSocket</exclude>
+                <exclude>org.apache.hadoop.hdds.scm.TestXceiverClientManagerSC</exclude>
                 <exclude>org.apache.hadoop.hdds.scm.container.**</exclude>
                 <!-- default excludes -->
                 <exclude>**/*$*</exclude>
@@ -2953,7 +2957,7 @@
       </build>
     </profile>
     <profile>
-      <id>test-short-circuit</id>
+      <id>hadoop-native-lib</id>
       <build>
         <plugins>
           <plugin>
