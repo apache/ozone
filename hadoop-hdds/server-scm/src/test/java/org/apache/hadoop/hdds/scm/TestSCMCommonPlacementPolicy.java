@@ -568,7 +568,7 @@ public class TestSCMCommonPlacementPolicy {
 
   /**
    * HDDS-15350: when the network topology transiently reports zero racks
-   * (observed during a DN decommission), validateContainerPlacement must
+   * (due to DNS resolution problems), validateContainerPlacement must
    * not crash with ArithmeticException ("/ by zero") in
    * getMaxReplicasPerRack. Without the fix this test throws and SCM's
    * ReplicationMonitor thread dies along with it.
