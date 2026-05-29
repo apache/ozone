@@ -235,9 +235,9 @@ public class ToolExecutor {
    * HTTP calls with direct in-process invocations of the Recon service beans (injected via
    * Guice), which avoids the network hop and the auth requirement entirely. Until then, this
    * code works correctly for non-Kerberos deployments (the common Docker Compose use case).
-   * TODO: Replace loopback HTTP with direct in-process service calls (HDDS-XXXX).</p>
+   * TODO: Replace loopback HTTP with direct in-process service calls .</p>
    */
-  private JsonNode executeSingleCall(String endpoint, String method,
+  JsonNode executeSingleCall(String endpoint, String method,
                                      Map<String, String> parameters)
       throws IOException {
     String url = buildUrl(endpoint, parameters);

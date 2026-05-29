@@ -33,6 +33,8 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,9 +66,11 @@ public class ChatbotAgent {
    * This is the primary defence against prompt injection: even if an attacker tricks
    * the LLM into outputting an arbitrary endpoint, the Java layer will reject it here
    * before ToolExecutor makes any network call. Only paths listed here can ever be
-   * executed. The check uses prefix matching so that parameterised paths like
-   * /api/v1/containers/unhealthy/MISSING are covered by the /api/v1/containers entry.
+   * executed. Paths are canonicalized (.. resolved) and matched with a boundary-aware
+   * prefix check so /api/v1/keys2 does not match /api/v1/keys.
    */
+  private static final String API_V1_ROOT = "/api/v1";
+
   private static final Set<String> ALLOWED_ENDPOINT_PREFIXES =
       Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
           "/api/v1/clusterState",
@@ -261,19 +265,22 @@ public class ChatbotAgent {
               toolCall.getEndpoint(), clarification);
           return clarification;
         }
-        // Go fetch the data using our ToolExecutor!
-        ToolExecutor.ToolExecutionOutcome outcome = toolExecutor.executeToolCallWithPolicy(
-            toolCall.getEndpoint(),
-            toolCall.getMethod(),
-            toolCall.getParameters(),
-            maxRecordsPerAnswer,
-            maxPagesPerAnswer,
-            pageSizePerCall);
+        try {
+          ToolExecutor.ToolExecutionOutcome outcome = toolExecutor.executeToolCallWithPolicy(
+              toolCall.getEndpoint(),
+              toolCall.getMethod(),
+              toolCall.getParameters(),
+              maxRecordsPerAnswer,
+              maxPagesPerAnswer,
+              pageSizePerCall);
 
-        // Save the raw JSON data the API returned
-        apiResponses = new HashMap<>();
-        apiResponses.put(toolCall.getEndpoint(), outcome.getResponseBody());
-        executionMetadata.put(toolCall.getEndpoint(), createExecutionMetadataMap(outcome));
+          // Save the raw JSON data the API returned
+          apiResponses = new HashMap<>();
+          apiResponses.put(toolCall.getEndpoint(), outcome.getResponseBody());
+          executionMetadata.put(toolCall.getEndpoint(), createExecutionMetadataMap(outcome));
+        } catch (Exception e) {
+          throw new ChatbotException("Error executing tool call: " + e.getMessage(), e);
+        }
       }
 
       // STEP 3: Send the raw JSON data BACK to the LLM to format a nice answer
@@ -281,6 +288,8 @@ public class ChatbotAgent {
           apiResponses.size(), apiResponses.keySet());
       return summarizeResponse(userQuery, apiResponses, executionMetadata, effectiveModel, provider);
 
+    } catch (ChatbotException e) {
+      throw e;
     } catch (Exception e) {
       throw new ChatbotException("Failed to process chatbot query: " + e.getMessage(), e);
     }
@@ -382,7 +391,7 @@ public class ChatbotAgent {
                                    Map<String, Object> apiResponses,
                                    Map<String, Object> executionMetadata,
                                    String model, String provider)
-      throws LLMClient.LLMException {
+      throws ChatbotException {
 
     // Give the LLM a new set of rules
     String systemPrompt = buildSummarizationPrompt();
@@ -401,16 +410,20 @@ public class ChatbotAgent {
       parameters.put("_provider", provider);
     }
 
-    LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
+    try {
+      LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
 
-    LOG.info("Summarization LLM response: model={}, promptTokens={}, " +
-            "completionTokens={}, totalTokens={}",
-        response.getModel(),
-        response.getPromptTokens(),
-        response.getCompletionTokens(),
-        response.getTotalTokens());
+      LOG.info("Summarization LLM response: model={}, promptTokens={}, " +
+              "completionTokens={}, totalTokens={}",
+          response.getModel(),
+          response.getPromptTokens(),
+          response.getCompletionTokens(),
+          response.getTotalTokens());
 
-    return response.getContent();
+      return response.getContent();
+    } catch (Exception e) {
+      throw new ChatbotException("Error generating response: " + e.getMessage(), e);
+    }
   }
 
   /**
@@ -423,7 +436,7 @@ public class ChatbotAgent {
    * a {@code %} character (e.g. "What is 50% of cluster capacity?").
    */
   private String handleFallback(String userQuery, String model,
-                                String provider) throws LLMClient.LLMException {
+                                String provider) throws ChatbotException {
     String prompt = fallbackPromptTemplate.replace("%s", userQuery);
 
     List<ChatMessage> messages = new ArrayList<>();
@@ -436,9 +449,13 @@ public class ChatbotAgent {
       parameters.put("_provider", provider);
     }
 
-    LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
+    try {
+      LLMResponse response = llmClient.chatCompletion(messages, model, parameters);
 
-    return response.getContent();
+      return response.getContent();
+    } catch (Exception e) {
+      throw new ChatbotException("Error generating fallback response: " + e.getMessage(), e);
+    }
   }
 
   /**
@@ -527,12 +544,18 @@ public class ChatbotAgent {
     if (toolCall == null || toolCall.getEndpoint() == null) {
       return null;
     }
-    String endpoint = normalizeEndpoint(toolCall.getEndpoint());
+    String rawEndpoint = normalizeEndpoint(toolCall.getEndpoint());
+    String endpoint = canonicalizeEndpointPath(rawEndpoint);
+    if (endpoint.isEmpty()) {
+      LOG.warn("Blocked invalid endpoint path from LLM output: {}", rawEndpoint);
+      return "I can only query known Recon APIs. The requested endpoint '" +
+          rawEndpoint + "' is not in the list of permitted paths.";
+    }
 
     // Layer 1: Allowlist — reject anything not in our known-safe prefix set.
     boolean allowed = false;
     for (String prefix : ALLOWED_ENDPOINT_PREFIXES) {
-      if (endpoint.startsWith(prefix)) {
+      if (matchesAllowedPrefix(endpoint, prefix)) {
         allowed = true;
         break;
       }
@@ -548,30 +571,83 @@ public class ChatbotAgent {
       return null;
     }
 
-    // If the LLM tries to query the "/keys/listKeys" endpoint...
     if (!endpoint.endsWith(LIST_KEYS_ENDPOINT_SUFFIX)) {
       return null;
     }
 
-    // We MUST make sure it provides a specific bucket to search in.
-    // If it asks for the ENTIRE cluster ("/"), we block it and ask for clarification,
-    // otherwise our server would run out of memory!
     String startPrefix = null;
     if (toolCall.getParameters() != null) {
       startPrefix = toolCall.getParameters().get("startPrefix");
     }
-    if (startPrefix == null || startPrefix.trim().isEmpty() ||
-        "/".equals(startPrefix.trim())) {
+    if (!isBucketScopedListKeysPrefix(startPrefix)) {
       return "I need a bucket-scoped prefix to run listKeys safely. " +
           "Please provide startPrefix in the form /<volume>/<bucket> " +
           "(optionally with a deeper path), plus optional limit and page " +
           "range if you want targeted analysis.";
     }
-    if (!startPrefix.trim().startsWith("/")) {
-      return "The provided startPrefix must start with '/'. Please use " +
-          "a value like /<volume>/<bucket> or deeper path.";
+    return null;
+  }
+
+  /**
+   * Resolves {@code .} and {@code ..} in the path and ensures it stays under {@link #API_V1_ROOT}.
+   * Returns an empty string when the path is invalid, contains a scheme ({@code ://}),
+   * or escapes the Recon API root after normalization.
+   */
+  static String canonicalizeEndpointPath(String endpointPath) {
+    if (endpointPath == null || endpointPath.trim().isEmpty()) {
+      return "";
     }
-    return null; // All good
+    if (endpointPath.indexOf("://") >= 0) {
+      return "";
+    }
+    String pathOnly = endpointPath;
+    int queryIdx = pathOnly.indexOf('?');
+    if (queryIdx >= 0) {
+      pathOnly = pathOnly.substring(0, queryIdx);
+    }
+    try {
+      URI uri = new URI(null, null, pathOnly, null, null);
+      String normalized = uri.normalize().getPath();
+      if (normalized == null || normalized.isEmpty()) {
+        return "";
+      }
+      if (!normalized.equals(API_V1_ROOT) && !normalized.startsWith(API_V1_ROOT + "/")) {
+        return "";
+      }
+      return normalized;
+    } catch (URISyntaxException e) {
+      return "";
+    }
+  }
+
+  /**
+   * True when {@code path} is exactly {@code prefix} or a sub-path ({@code prefix + "/..."}).
+   */
+  static boolean matchesAllowedPrefix(String path, String prefix) {
+    return path.equals(prefix) || path.startsWith(prefix + "/");
+  }
+
+  /**
+   * {@code listKeys} requires {@code startPrefix} scoped to at least volume/bucket level.
+   */
+  private static boolean isBucketScopedListKeysPrefix(String startPrefix) {
+    if (startPrefix == null) {
+      return false;
+    }
+    String trimmed = startPrefix.trim();
+    if (trimmed.isEmpty() || "/".equals(trimmed)) {
+      return false;
+    }
+    if (!trimmed.startsWith("/") || trimmed.contains("..")) {
+      return false;
+    }
+    int segments = 0;
+    for (String part : trimmed.split("/")) {
+      if (!part.isEmpty()) {
+        segments++;
+      }
+    }
+    return segments >= 2;
   }
 
   private String normalizeEndpoint(String endpoint) {

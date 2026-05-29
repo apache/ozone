@@ -40,6 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,19 +53,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests for {@link ChatbotEndpoint} — the JAX-RS REST entry point for the chatbot.
+ * Tests the HTTP contract and REST layer of the Chatbot API.
  *
- * <p>All tests instantiate {@code ChatbotEndpoint} directly (no servlet container)
- * and inject mocked {@link ChatbotAgent} and {@link LLMClient} dependencies.
- * The thread pool and queue behaviour is tested using a small pool configuration
- * and concurrent submissions from a test {@link ExecutorService}.</p>
+ * <p><b>Lifecycle Phase:</b> Pre-LLM (Phase 0). Tests the entry point before any LLM calls.</p>
  *
- * <p>Verified properties per test:</p>
+ * <p><b>Key scenarios tested:</b></p>
  * <ul>
- *   <li>HTTP status code returned by {@code Response.getStatus()}.</li>
- *   <li>Response entity type and content (no stack traces, no secrets).</li>
- *   <li>Whether the mocked agent was called the expected number of times.</li>
- *   <li>Concurrency limits: queue saturation → 503, request timeout → 504.</li>
+ *   <li><b>HTTP Status Codes:</b> Handling 200 OK, 400 Bad Request, and 500 Internal Server Error.</li>
+ *   <li><b>Feature Toggles:</b> Returning 503 when the chatbot is disabled.</li>
+ *   <li><b>Concurrency:</b> Rejecting excess requests with 429 Too Many Requests.</li>
+ *   <li><b>Timeouts:</b> Aborting requests that exceed the configured timeout.</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -98,40 +96,32 @@ public class TestChatbotEndpoint {
 
   @Test
   public void testEmptyQueryReturnsBadRequest() {
-    ChatbotEndpoint.ChatRequest request = new ChatbotEndpoint.ChatRequest();
-    request.setQuery("");
-
-    Response response = endpoint.chat(request);
+    Response response = endpoint.chat(chatRequest(""));
 
     assertEquals(400, response.getStatus());
-    assertErrorMessagePresent(response);
+    assertExactErrorMessage(response, "Query cannot be empty");
   }
 
   @Test
   public void testNullQueryReturnsBadRequest() {
-    ChatbotEndpoint.ChatRequest request = new ChatbotEndpoint.ChatRequest();
-    request.setQuery(null);
-
-    Response response = endpoint.chat(request);
+    Response response = endpoint.chat(chatRequest(null));
 
     assertEquals(400, response.getStatus());
-    assertErrorMessagePresent(response);
+    assertExactErrorMessage(response, "Query cannot be empty");
   }
 
   @Test
   public void testWhitespaceOnlyQueryReturnsBadRequest() {
-    ChatbotEndpoint.ChatRequest request = new ChatbotEndpoint.ChatRequest();
-    request.setQuery("   ");
-
-    Response response = endpoint.chat(request);
+    Response response = endpoint.chat(chatRequest("   "));
 
     assertEquals(400, response.getStatus());
+    assertExactErrorMessage(response, "Query cannot be empty");
   }
 
-  // ── Happy path ────────────────────────────────────────────────────────────
+  // ── Happy path — data answer ───────────────────────────────────────────────
 
   @Test
-  public void testSuccessfulResponseReturnsOkWithSuccessFlag() throws Exception {
+  public void testSuccessfulResponseReturnsHttp200WithSuccessTrue() throws Exception {
     when(mockAgent.processQuery(anyString(), any(), any()))
         .thenReturn("The cluster has 5 healthy datanodes.");
 
@@ -141,56 +131,96 @@ public class TestChatbotEndpoint {
     ChatbotEndpoint.ChatResponse body =
         (ChatbotEndpoint.ChatResponse) response.getEntity();
     assertNotNull(body);
-    assertTrue(body.isSuccess(), "Response success flag should be true");
-    assertNotNull(body.getResponse(), "Response text should not be null");
+    assertTrue(body.isSuccess(), "success flag must be true on HTTP 200");
+    assertEquals("The cluster has 5 healthy datanodes.", body.getResponse());
   }
 
-  // ── Chatbot disabled ──────────────────────────────────────────────────────
+  // ── Happy path — fallback answer (HTTP 200, not an error) ─────────────────
 
   @Test
-  public void testChatbotDisabledReturnsServiceUnavailable() {
+  public void testFallbackResponseReturnsHttp200WithSuccessTrue() throws Exception {
+    // Fallback text is what the agent returns when the LLM cannot map the query
+    // to any Recon API. It is still a successful chatbot response at the HTTP level.
+    String fallbackText =
+        "I can only answer questions about Ozone Recon cluster data such as " +
+        "containers, datanodes, pipelines, keys, volumes, and cluster state.";
+    when(mockAgent.processQuery(anyString(), any(), any()))
+        .thenReturn(fallbackText);
+
+    Response response = endpoint.chat(chatRequest("What is the weather in London?"));
+
+    assertEquals(200, response.getStatus());
+    ChatbotEndpoint.ChatResponse body =
+        (ChatbotEndpoint.ChatResponse) response.getEntity();
+    assertNotNull(body);
+    assertTrue(body.isSuccess(),
+        "Fallback response must still return success=true at the HTTP level");
+    assertNotNull(body.getResponse(), "Fallback response text must not be null");
+  }
+
+  // ── Chatbot disabled ───────────────────────────────────────────────────────
+
+  @Test
+  public void testChatbotDisabledOnChatReturnsServiceUnavailable() {
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ENABLED, false);
-    // Re-create endpoint with disabled flag
     ChatbotEndpoint disabledEndpoint =
         new ChatbotEndpoint(mockAgent, mockLlmClient, conf);
     try {
       Response response = disabledEndpoint.chat(chatRequest("test query"));
+
       assertEquals(503, response.getStatus());
+      assertExactErrorMessage(response, "Chatbot service is not enabled");
     } finally {
       disabledEndpoint.shutdown();
     }
   }
 
-  // ── Agent exception handling ──────────────────────────────────────────────
+  @Test
+  public void testChatbotDisabledOnModelsEndpointReturns503() {
+    conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ENABLED, false);
+    ChatbotEndpoint disabledEndpoint =
+        new ChatbotEndpoint(mockAgent, mockLlmClient, conf);
+    try {
+      Response response = disabledEndpoint.getSupportedModels();
+
+      assertEquals(503, response.getStatus());
+      assertExactErrorMessage(response, "Chatbot service is not enabled");
+    } finally {
+      disabledEndpoint.shutdown();
+    }
+  }
+
+  // ── Agent exception handling ───────────────────────────────────────────────
 
   @Test
-  public void testAgentChatbotExceptionReturnsInternalServerError() throws Exception {
+  public void testAgentChatbotExceptionReturns500WithGenericMessage() throws Exception {
     when(mockAgent.processQuery(anyString(), any(), any()))
-        .thenThrow(new ChatbotException("LLM API unavailable"));
+        .thenThrow(new ChatbotException("LLM API unavailable — rate limit hit"));
 
     Response response = endpoint.chat(chatRequest("What is the state?"));
 
     assertEquals(500, response.getStatus());
-    assertErrorMessagePresent(response);
-    // Error message must not contain stack traces or internal exception details
+    // Client must get the generic message, not the internal exception detail
+    assertExactErrorMessage(response, "An error occurred processing your request.");
+    // Confirm no internal information leaks into the body
     String errorBody = response.getEntity().toString();
     assertFalse(errorBody.contains("ChatbotException"),
-        "Error response must not expose exception class names");
+        "Exception class name must not be exposed to the client");
     assertFalse(errorBody.contains("at org.apache"),
-        "Error response must not contain stack trace fragments");
+        "Stack trace must not be exposed to the client");
+    assertFalse(errorBody.contains("rate limit"),
+        "Internal error detail must not be exposed to the client");
   }
 
-  // ── CON-02: Request timeout → 504 ────────────────────────────────────────
+  // ── CON-02: Request timeout → 504 ─────────────────────────────────────────
 
   @Test
   public void testSlowAgentExceedingTimeoutReturns504() throws Exception {
-    // Configure a very short timeout (200ms)
     conf.setLong(ChatbotConfigKeys.OZONE_RECON_CHATBOT_REQUEST_TIMEOUT_MS, 200L);
     ChatbotEndpoint shortTimeoutEndpoint =
         new ChatbotEndpoint(mockAgent, mockLlmClient, conf);
 
     try {
-      // Agent sleeps much longer than the timeout
       when(mockAgent.processQuery(anyString(), any(), any()))
           .thenAnswer(inv -> {
             Thread.sleep(5_000L);
@@ -202,21 +232,21 @@ public class TestChatbotEndpoint {
       long elapsed = System.currentTimeMillis() - start;
 
       assertEquals(504, response.getStatus());
-      assertErrorMessagePresent(response);
-      // The Jetty thread should have unblocked well within 2 seconds
+      // Error message must mention timeout so the user knows what happened
+      assertErrorMessageContains(response, "timed out");
       assertTrue(elapsed < 2_000L,
-          "Endpoint should have returned 504 within 2s, but took " + elapsed + "ms");
+          "Endpoint should have unblocked within 2s but took " + elapsed + "ms");
     } finally {
       shortTimeoutEndpoint.shutdown();
     }
   }
 
-  // ── CON-01: Queue saturation → 503 ───────────────────────────────────────
+  // ── CON-01: Queue saturation → 503 ────────────────────────────────────────
 
   @Test
   public void testQueueSaturationReturnsServiceUnavailable() throws Exception {
-    // Pool=2, Queue=2 → capacity=4. Submitting 10 concurrent requests means
-    // at least 6 should be rejected immediately with HTTP 503.
+    // Pool=2, Queue=2 → total capacity 4.
+    // Send 10 concurrent requests: at least 6 must be rejected immediately with 503.
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_THREAD_POOL_SIZE, 2);
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_QUEUE_SIZE, 2);
     conf.setLong(ChatbotConfigKeys.OZONE_RECON_CHATBOT_REQUEST_TIMEOUT_MS, 10_000L);
@@ -224,56 +254,60 @@ public class TestChatbotEndpoint {
     CountDownLatch agentLatch = new CountDownLatch(1);
     ChatbotEndpoint smallEndpoint =
         new ChatbotEndpoint(mockAgent, mockLlmClient, conf);
+    AtomicReference<String> capturedQueueErrorMessage = new AtomicReference<>();
 
     try {
-      // All agent calls block until we release the latch, ensuring the pool stays full
       when(mockAgent.processQuery(anyString(), any(), any()))
           .thenAnswer(inv -> {
-            try {
-              agentLatch.await(8, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-            }
+            agentLatch.await(8, TimeUnit.SECONDS);
             return "done";
           });
 
       ExecutorService testPool = Executors.newFixedThreadPool(10);
       List<Future<Response>> futures = new ArrayList<>();
-      ChatbotEndpoint.ChatRequest request = chatRequest("test query");
 
       for (int i = 0; i < 10; i++) {
-        futures.add(testPool.submit(() -> smallEndpoint.chat(request)));
+        futures.add(testPool.submit(() -> smallEndpoint.chat(chatRequest("query"))));
       }
 
-      // Give threads time to be submitted and queued/rejected
       Thread.sleep(300);
-
-      // Release the latch so accepted tasks can complete
       agentLatch.countDown();
 
-      // Collect all responses
       AtomicInteger count503 = new AtomicInteger(0);
       for (Future<Response> f : futures) {
         Response r = f.get(12, TimeUnit.SECONDS);
         if (r.getStatus() == 503) {
           count503.incrementAndGet();
+          // Capture error message from first 503 to assert the exact text
+          if (capturedQueueErrorMessage.get() == null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = (Map<String, Object>) r.getEntity();
+            if (body != null && body.get("error") != null) {
+              capturedQueueErrorMessage.set(body.get("error").toString());
+            }
+          }
         }
       }
 
       testPool.shutdown();
       testPool.awaitTermination(5, TimeUnit.SECONDS);
 
-      // Pool=2 + Queue=2 = capacity 4. The remaining 6 must receive 503.
       assertTrue(count503.get() >= 6,
-          "Expected >= 6 requests to get 503 due to queue saturation, but got: "
-              + count503.get());
+          "Expected >=6 requests rejected with 503, got: " + count503.get());
+      // Verify the exact queue-full error message is returned
+      assertNotNull(capturedQueueErrorMessage.get(),
+          "A 503 queue-full response must contain an error message");
+      assertTrue(
+          capturedQueueErrorMessage.get().contains("too many requests"),
+          "Queue-full error should say 'too many requests', got: "
+              + capturedQueueErrorMessage.get());
     } finally {
-      agentLatch.countDown(); // Ensure tasks are not stuck if test fails early
+      agentLatch.countDown();
       smallEndpoint.shutdown();
     }
   }
 
-  // ── CON-03: Singleton — agent called N times, not re-initialized ──────────
+  // ── CON-03: Singleton — same instance handles all requests ────────────────
 
   @Test
   public void testSingleEndpointInstanceHandlesMultipleRequestsWithoutReinit()
@@ -281,21 +315,17 @@ public class TestChatbotEndpoint {
     when(mockAgent.processQuery(anyString(), any(), any()))
         .thenReturn("response");
 
-    // Submit 5 sequential requests through the same endpoint instance
     for (int i = 0; i < 5; i++) {
-      Response r = endpoint.chat(chatRequest("query " + i));
-      assertEquals(200, r.getStatus());
+      assertEquals(200, endpoint.chat(chatRequest("query " + i)).getStatus());
     }
 
-    // The mock agent (representing the singleton) must have been called 5 times
-    // on the same instance — not a new instance per request.
     verify(mockAgent, times(5)).processQuery(anyString(), any(), any());
   }
 
-  // ── Health endpoint ───────────────────────────────────────────────────────
+  // ── Health endpoint ────────────────────────────────────────────────────────
 
   @Test
-  public void testHealthEndpointReturnsEnabledStatus() {
+  public void testHealthEndpointReturnsEnabledTrue() {
     when(mockLlmClient.isAvailable()).thenReturn(true);
 
     Response response = endpoint.health();
@@ -303,10 +333,8 @@ public class TestChatbotEndpoint {
     assertEquals(200, response.getStatus());
     @SuppressWarnings("unchecked")
     Map<String, Object> body = (Map<String, Object>) response.getEntity();
-    assertNotNull(body);
-    assertTrue((Boolean) body.get("enabled"), "Health endpoint should report enabled=true");
-    assertTrue((Boolean) body.get("llmClientAvailable"),
-        "Health endpoint should report llmClientAvailable=true");
+    assertTrue((Boolean) body.get("enabled"));
+    assertTrue((Boolean) body.get("llmClientAvailable"));
   }
 
   @Test
@@ -318,11 +346,10 @@ public class TestChatbotEndpoint {
     assertEquals(200, response.getStatus());
     @SuppressWarnings("unchecked")
     Map<String, Object> body = (Map<String, Object>) response.getEntity();
-    assertFalse((Boolean) body.get("llmClientAvailable"),
-        "Health endpoint should report llmClientAvailable=false when no key is configured");
+    assertFalse((Boolean) body.get("llmClientAvailable"));
   }
 
-  // ── Models endpoint ───────────────────────────────────────────────────────
+  // ── Models endpoint ────────────────────────────────────────────────────────
 
   @Test
   public void testModelsEndpointReturnsSupportedModelList() {
@@ -334,11 +361,11 @@ public class TestChatbotEndpoint {
     assertEquals(200, response.getStatus());
     @SuppressWarnings("unchecked")
     Map<String, Object> body = (Map<String, Object>) response.getEntity();
-    assertNotNull(body);
-    assertTrue(body.containsKey("models"), "Response should contain 'models' key");
+    assertTrue(body.containsKey("models"));
     @SuppressWarnings("unchecked")
     List<String> models = (List<String>) body.get("models");
-    assertFalse(models.isEmpty(), "Model list must not be empty");
+    assertFalse(models.isEmpty());
+    assertTrue(models.contains("gemini-2.5-flash"));
   }
 
   @Test
@@ -365,9 +392,23 @@ public class TestChatbotEndpoint {
     Object entity = response.getEntity();
     assertNotNull(entity, "Error response entity must not be null");
     Map<String, Object> body = (Map<String, Object>) entity;
-    assertTrue(body.containsKey("error"),
-        "Error response must contain an 'error' key");
-    assertNotNull(body.get("error"),
-        "Error message must not be null");
+    assertTrue(body.containsKey("error"), "Error response must have an 'error' key");
+    assertNotNull(body.get("error"), "Error message must not be null");
+  }
+
+  @SuppressWarnings("unchecked")
+  private void assertExactErrorMessage(Response response, String expected) {
+    assertErrorMessagePresent(response);
+    Map<String, Object> body = (Map<String, Object>) response.getEntity();
+    assertEquals(expected, body.get("error").toString(),
+        "Error message text does not match expected");
+  }
+
+  @SuppressWarnings("unchecked")
+  private void assertErrorMessageContains(Response response, String substring) {
+    assertErrorMessagePresent(response);
+    Map<String, Object> body = (Map<String, Object>) response.getEntity();
+    assertTrue(body.get("error").toString().contains(substring),
+        "Error message should contain '" + substring + "' but was: " + body.get("error"));
   }
 }

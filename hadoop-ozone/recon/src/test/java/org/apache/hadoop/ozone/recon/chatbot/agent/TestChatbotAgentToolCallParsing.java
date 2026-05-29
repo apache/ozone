@@ -45,15 +45,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests for {@link ChatbotAgent} tool-call routing through {@code processQuery()}.
+ * Tests for {@link ChatbotAgent} tool-call routing and JSON parsing through {@code processQuery()}.
  *
- * <p>All tests use a mocked {@link LLMClient} to inject controlled LLM responses
- * and a mocked {@link ToolExecutor} to capture execution calls without any real
- * network activity. Verified properties per test:
+ * <p>This class verifies how the agent parses the LLM's JSON responses, routes them to
+ * the correct execution path (single endpoint, multi-endpoint, documentation query, or fallback),
+ * and handles malformed or unexpected LLM outputs.</p>
+ *
+ * <p><b>Lifecycle Phase:</b> Post-1st LLM Call to 2nd LLM Call. This tests the orchestration after the first LLM call
+ * returns, including routing to the executor, and triggering the second LLM call (summarization or fallback).</p>
+ *
+ * <p><b>Key scenarios tested:</b></p>
  * <ul>
- *   <li>Whether {@code ToolExecutor.executeToolCallWithPolicy} was called and how many times.</li>
- *   <li>Whether a second LLM call (summarization or fallback) was made.</li>
- *   <li>Whether the returned string is non-null and user-facing (not a stack trace).</li>
+ *   <li><b>Routing:</b> Ensures SINGLE_ENDPOINT, MULTI_ENDPOINT, and DOCUMENTATION_QUERY are routed correctly.</li>
+ *   <li><b>Robustness:</b> Verifies fallbacks are triggered for truncated JSON, missing fields, or plain prose responses.</li>
+ *   <li><b>Exception handling:</b> Ensures LLM exceptions and ToolExecutor IOExceptions are properly wrapped in ChatbotException.</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)

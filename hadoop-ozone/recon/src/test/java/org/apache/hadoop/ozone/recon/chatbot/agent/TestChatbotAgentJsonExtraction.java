@@ -25,14 +25,17 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Unit tests for {@link ChatbotAgent#extractFirstJsonObject(String)}.
+ * Tests the extraction of JSON objects from LLM responses.
  *
- * <p>{@code extractFirstJsonObject} is a package-visible static method that uses
- * brace-counting with string-awareness to reliably extract the first outermost
- * JSON object from a string, regardless of surrounding prose or nested content.
- * These tests verify both happy-path extraction and graceful handling of every
- * category of malformed or adversarial LLM output described in the test plan
- * (ROB-01 through ROB-05 and additional edge cases).</p>
+ * <p><b>Lifecycle Phase:</b> Post-1st LLM Call. Tests processing of raw LLM text before parsing.</p>
+ *
+ * <p><b>Key scenarios tested:</b></p>
+ * <ul>
+ *   <li><b>Prose-wrapped JSON:</b> Extracting JSON surrounded by conversational text.</li>
+ *   <li><b>Nested braces:</b> Handling braces inside JSON string values correctly.</li>
+ *   <li><b>Truncated JSON:</b> Returning null gracefully for incomplete JSON.</li>
+ *   <li><b>Edge cases:</b> Handling empty strings, null inputs, and multiple JSON objects.</li>
+ * </ul>
  */
 public class TestChatbotAgentJsonExtraction {
 

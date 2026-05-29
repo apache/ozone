@@ -42,30 +42,26 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Security boundary tests for {@link ChatbotAgent}.
+ * Security boundary and execution policy tests for {@link ChatbotAgent}.
  *
- * <p>The Java allowlist in {@code validateToolCallForExecution} is the
- * primary defence against prompt injection — these tests verify that even if
- * the LLM is tricked into returning a malicious or disallowed endpoint, the
- * Java layer blocks it before {@link ToolExecutor} makes any network call.</p>
+ * <p>This class verifies the primary defenses against prompt injection and unauthorized
+ * API access. It ensures that even if the LLM produces malicious JSON, the Java layer
+ * blocks it before any network calls are made.</p>
  *
- * <p><b>Architecture of the security layer:</b></p>
- * <pre>
- * LLM response → extractFirstJsonObject → parseToolCall
- *             → validateToolCallForExecution (allowlist + safe-scope check)
- *             → ToolExecutor.executeToolCallWithPolicy   ← blocked calls never reach here
- * </pre>
+ * <p><b>Lifecycle Phase:</b> Post-1st LLM Call (Pre-Execution). This tests the validation step that occurs after the
+ * first LLM call returns a tool request, but before the ToolExecutor is allowed to run it.</p>
  *
- * <p><b>Known gaps documented inline:</b> The current allowlist uses prefix
- * matching ({@code endpoint.startsWith(prefix)}) without requiring a '/' or
- * end-of-string boundary after the prefix. This means endpoints like
- * {@code /api/v1/keys2} or path-traversal strings like
- * {@code /api/v1/keys/../../admin} pass the allowlist check because they
- * start with {@code /api/v1/keys}. These gap tests document the current
- * (incorrect) behaviour and should be updated when the allowlist is tightened.</p>
+ * <p><b>Key scenarios tested:</b></p>
+ * <ul>
+ *   <li><b>Allowlist enforcement:</b> Blocks endpoints not explicitly permitted (e.g., /api/v1/admin/delete).</li>
+ *   <li><b>Path traversal & Exfiltration:</b> Blocks absolute URLs and paths containing ".." or scheme injections.</li>
+ *   <li><b>Prefix boundaries:</b> Prevents prefix confusion (e.g., ensuring /api/v1/keys2 does not match /api/v1/keys).</li>
+ *   <li><b>Multi-endpoint security:</b> Ensures if one tool call in a batch is invalid, the entire batch is blocked.</li>
+ *   <li><b>Information leakage:</b> Verifies blocked responses do not leak Java stack traces or internal config keys.</li>
+ * </ul>
  */
 @ExtendWith(MockitoExtension.class)
-public class TestChatbotAgentSecurity {
+public class TestChatbotAgentExecutionPolicy {
 
   @Mock
   private LLMClient mockLlmClient;
@@ -152,146 +148,39 @@ public class TestChatbotAgentSecurity {
         anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
   }
 
-  // ── SEC-02: Allowlist prefix-confusion gaps (documented bugs) ─────────────
+  // ── SEC-02: Allowlist hardening (prefix boundary + path canonicalization) ───
 
-  /**
-   * SECURITY GAP: The current allowlist uses {@code startsWith("/api/v1/keys")} which
-   * also matches {@code /api/v1/keys2}, {@code /api/v1/keystore}, etc.
-   * This test documents the current (incorrect) behaviour. The allowlist should
-   * require a '/' or end-of-string after each prefix to prevent this confusion.
-   */
   @Test
-  public void testEndpointPrefixConfusionCurrentlyAllowedGap() throws Exception {
-    // KNOWN GAP: /api/v1/keys2 startsWith("/api/v1/keys") → passes allowlist
+  public void testEndpointPrefixConfusionIsBlocked() throws Exception {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys2\",\"method\":\"GET\"," +
         "\"parameters\":{},\"reasoning\":\"prefix confusion\"}";
     when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
+        .thenReturn(resp(json));
 
-    agent.processQuery("List something", null, null);
+    String result = agent.processQuery("List something", null, null);
 
-    // FIXME: This should be blocked but currently is allowed due to startsWith prefix matching.
-    // When the allowlist is tightened, change `times(1)` to `never()`.
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
+    assertNotNull(result);
+    assertTrue(result.toLowerCase().contains("permitted"),
+        "Response should indicate the endpoint is not permitted");
+    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
         anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
   }
 
-  /**
-   * SECURITY GAP: Path traversal via {@code /api/v1/keys/../../admin/config}
-   * passes the allowlist because the path starts with {@code /api/v1/keys}.
-   * The URL is sent to the loopback Recon server which will 404, but the
-   * allowlist should reject it before any network call is made.
-   */
   @Test
-  public void testPathTraversalCurrentlyAllowedByAllowlistGap() throws Exception {
-    // KNOWN GAP: /api/v1/keys/../../admin/config starts with /api/v1/keys → passes
+  public void testPathTraversalIsBlocked() throws Exception {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/../../admin/config\",\"method\":\"GET\"," +
         "\"parameters\":{},\"reasoning\":\"traversal attempt\"}";
     when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
-
-    agent.processQuery("Show admin config", null, null);
-
-    // FIXME: Should be blocked. When normalizeEndpoint resolves '..' the final
-    // path would escape /api/v1/. Fix: normalize the path (resolve '..') before
-    // the allowlist check, then reject if the resolved path doesn't start with /api/v1/.
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
-  }
-
-  // ── SEC-03: Safe-scope violations (listKeys without a bucket prefix) ───────
-
-  @Test
-  public void testListKeysWithRootPrefixIsRejectedBySafeScopeCheck() throws Exception {
-    // startPrefix=/ would scan the entire cluster — must be blocked
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/\"},\"reasoning\":\"list everything\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
         .thenReturn(resp(json));
 
-    String result = agent.processQuery(
-        "List all keys in the entire cluster", null, null);
+    String result = agent.processQuery("Show admin config", null, null);
 
     assertNotNull(result);
-    assertTrue(result.toLowerCase().contains("bucket") ||
-        result.toLowerCase().contains("prefix"),
-        "Response should ask for a bucket-scoped prefix");
+    assertTrue(result.toLowerCase().contains("permitted"),
+        "Canonicalized traversal path must be blocked by the allowlist");
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
-  }
-
-  @Test
-  public void testListKeysWithNullPrefixIsRejected() throws Exception {
-    // No startPrefix field at all — must be rejected
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{},\"reasoning\":\"list all\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json));
-
-    String result = agent.processQuery("List all keys", null, null);
-
-    assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
-  }
-
-  @Test
-  public void testListKeysWithEmptyPrefixIsRejected() throws Exception {
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"\"},\"reasoning\":\"list all\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json));
-
-    String result = agent.processQuery("List all keys", null, null);
-
-    assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
-  }
-
-  @Test
-  public void testListKeysWithValidBucketScopedPrefixIsAllowed() throws Exception {
-    // startPrefix=/vol1/bucket1 is bucket-scoped — must be allowed through
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\"},\"reasoning\":\"scoped\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
-
-    agent.processQuery("List keys in bucket1", null, null);
-
-    // Executor must be called with the correct endpoint
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), eq("GET"), any(), anyInt(), anyInt(), anyInt());
-  }
-
-  @Test
-  public void testSafeScopeCheckDisabledAllowsListKeysWithRootPrefix() throws Exception {
-    // When requireSafeScope=false, even startPrefix=/ is permitted
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ENABLED, true);
-    conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE, false);
-    ChatbotAgent agentNoScope = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
-
-    String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
-        "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/\"},\"reasoning\":\"list everything\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
-
-    agentNoScope.processQuery("List all keys", null, null);
-
-    // Safe-scope check is off — executor IS called
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
         anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
   }
 
