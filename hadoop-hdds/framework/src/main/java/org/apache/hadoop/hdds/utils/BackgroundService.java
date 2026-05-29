@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -47,7 +46,7 @@ public abstract class BackgroundService {
   private long interval;
   private volatile long serviceTimeoutInNanos;
   private TimeUnit unit;
-  private final int threadPoolSize;
+  private int threadPoolSize;
   private final String threadNamePrefix;
   private final PeriodicalTask service;
   private CompletableFuture<Void> future;
@@ -77,7 +76,7 @@ public abstract class BackgroundService {
   }
 
   @VisibleForTesting
-  public synchronized ExecutorService getExecutorService() {
+  public synchronized ScheduledThreadPoolExecutor getExecutorService() {
     return this.exec;
   }
 
@@ -90,6 +89,7 @@ public abstract class BackgroundService {
     // the corePoolSize will always less maximumPoolSize.
     // So we can directly set the corePoolSize
     exec.setCorePoolSize(size);
+    threadPoolSize = size;
   }
 
   public synchronized void setServiceTimeoutInNanos(long newTimeout) {
@@ -126,7 +126,7 @@ public abstract class BackgroundService {
     this.unit = newUnit;
   }
 
-  protected synchronized long getIntervalMillis() {
+  public synchronized long getIntervalMillis() {
     return this.unit.toMillis(interval);
   }
 

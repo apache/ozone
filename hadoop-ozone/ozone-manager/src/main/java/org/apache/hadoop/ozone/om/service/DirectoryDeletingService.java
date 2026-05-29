@@ -204,7 +204,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     });
   }
 
-  private synchronized void updateAndRestart(OzoneConfiguration conf) {
+  synchronized void updateAndRestart(OzoneConfiguration conf) {
     long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
         OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     int newCorePoolSize = conf.getInt(OZONE_THREAD_NUMBER_DIR_DELETION,

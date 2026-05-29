@@ -41,7 +41,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -267,13 +266,7 @@ public class DiskBalancerService extends BackgroundService {
     setStopAfterDiskEven(validated.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
     setContainerStates(validated.getMovableContainerStates());
-
-    // Default executorService is ScheduledThreadPoolExecutor, so we can
-    // update the poll size by setting corePoolSize.
-    if ((getExecutorService() instanceof ScheduledThreadPoolExecutor)) {
-      ((ScheduledThreadPoolExecutor) getExecutorService())
-          .setCorePoolSize(parallelThread);
-    }
+    setPoolSize(parallelThread);
   }
 
   /**
