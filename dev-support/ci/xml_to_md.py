@@ -156,7 +156,6 @@ def main():
   for file_name in os.listdir(extract_path):
     if (file_name.startswith('hdds-') or file_name.startswith('ozone-')) \
         and not file_name.startswith('ozone-filesystem-hadoop') \
-        and not file_name.startswith('ozone-iceberg') \
         and file_name.endswith('.jar'):
       jar_path = os.path.join(extract_path, file_name)
       xml_contents = extract_xml_from_jar(jar_path, xml_filename)
