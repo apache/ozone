@@ -18,8 +18,12 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -36,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +60,44 @@ class TestReconStorageContainerSyncHelper {
         new OzoneConfiguration(),
         mockContainerManager
     );
+  }
+
+  @Test
+  void testContainerSyncMetricsTrackPreSyncDriftAndDuration() throws Exception {
+    ReconScmContainerSyncMetrics metrics = ReconScmContainerSyncMetrics.create();
+    try {
+      ReconStorageContainerSyncHelper helperWithMetrics =
+          new ReconStorageContainerSyncHelper(
+              mockScmServiceProvider,
+              new OzoneConfiguration(),
+              mockContainerManager,
+              metrics);
+
+      when(mockScmServiceProvider.getContainerCount(OPEN)).thenReturn(5L);
+      when(mockScmServiceProvider.getContainerCount(QUASI_CLOSED)).thenReturn(1L);
+      when(mockScmServiceProvider.getContainerCount(CLOSED)).thenReturn(8L);
+      when(mockScmServiceProvider.getContainerCount(DELETED)).thenReturn(9L);
+      when(mockContainerManager.getContainerStateCount(OPEN)).thenReturn(3);
+      when(mockContainerManager.getContainerStateCount(QUASI_CLOSED)).thenReturn(1);
+      when(mockContainerManager.getContainerStateCount(CLOSED)).thenReturn(10);
+      when(mockContainerManager.getContainerStateCount(DELETED)).thenReturn(7);
+      when(mockScmServiceProvider.getListOfContainerIDs(
+          any(), any(Integer.class), any())).thenReturn(Collections.emptyList());
+
+      boolean result = helperWithMetrics.syncWithSCMContainerInfo();
+
+      assertTrue(result);
+      assertEquals(2L, metrics.getLastContainerCountDrift(OPEN));
+      assertEquals(0L, metrics.getLastContainerCountDrift(QUASI_CLOSED));
+      assertEquals(-2L, metrics.getLastContainerCountDrift(CLOSED));
+      assertEquals(2L, metrics.getLastContainerCountDrift(DELETED));
+      assertTrue(metrics.getLastContainerSyncDurationMs(OPEN) >= 0);
+      assertTrue(metrics.getLastContainerSyncDurationMs(QUASI_CLOSED) >= 0);
+      assertTrue(metrics.getLastContainerSyncDurationMs(CLOSED) >= 0);
+      assertTrue(metrics.getLastContainerSyncDurationMs(DELETED) >= 0);
+    } finally {
+      metrics.unRegister();
+    }
   }
 
   @Test

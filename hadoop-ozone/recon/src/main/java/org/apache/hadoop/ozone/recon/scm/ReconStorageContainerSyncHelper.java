@@ -42,7 +42,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,13 +142,22 @@ class ReconStorageContainerSyncHelper {
   private final StorageContainerServiceProvider scmServiceProvider;
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconContainerManager containerManager;
+  private final ReconScmContainerSyncMetrics containerSyncMetrics;
 
   ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
                                   OzoneConfiguration ozoneConfiguration,
                                   ReconContainerManager containerManager) {
+    this(scmServiceProvider, ozoneConfiguration, containerManager, null);
+  }
+
+  ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
+                                  OzoneConfiguration ozoneConfiguration,
+                                  ReconContainerManager containerManager,
+                                  ReconScmContainerSyncMetrics containerSyncMetrics) {
     this.scmServiceProvider = scmServiceProvider;
     this.ozoneConfiguration = ozoneConfiguration;
     this.containerManager = containerManager;
+    this.containerSyncMetrics = containerSyncMetrics;
   }
 
   /**
@@ -167,8 +178,10 @@ class ReconStorageContainerSyncHelper {
    */
   private boolean syncContainersForState(HddsProtos.LifeCycleState scmState,
                                          boolean incrementalOpen) {
+    long startTime = Time.monotonicNow();
     try {
       long total = scmServiceProvider.getContainerCount(scmState);
+      updateContainerCountDrift(scmState, total);
       if (total == 0) {
         LOG.debug("{} sync: no containers found in SCM.", scmState);
         return true;
@@ -222,6 +235,8 @@ class ReconStorageContainerSyncHelper {
     } catch (Exception e) {
       LOG.error("{} sync: unexpected error.", scmState, e);
       return false;
+    } finally {
+      updateContainerSyncDuration(scmState, Time.monotonicNow() - startTime);
     }
   }
 
@@ -359,7 +374,9 @@ class ReconStorageContainerSyncHelper {
    * @return {@code true} if all RPC calls completed without error
    */
   private boolean syncDeletedContainers() {
+    long startTime = Time.monotonicNow();
     try {
+      updateDeletedContainerCountDrift();
       int configuredBatch = ozoneConfiguration.getInt(
           OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE,
           OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE_DEFAULT);
@@ -390,6 +407,39 @@ class ReconStorageContainerSyncHelper {
     } catch (Exception e) {
       LOG.error("DELETED sync: unexpected error.", e);
       return false;
+    } finally {
+      updateContainerSyncDuration(HddsProtos.LifeCycleState.DELETED,
+          Time.monotonicNow() - startTime);
+    }
+  }
+
+  private void updateDeletedContainerCountDrift() {
+    if (containerSyncMetrics == null) {
+      return;
+    }
+    try {
+      long total = scmServiceProvider.getContainerCount(
+          HddsProtos.LifeCycleState.DELETED);
+      updateContainerCountDrift(HddsProtos.LifeCycleState.DELETED, total);
+    } catch (Exception e) {
+      LOG.warn("DELETED sync: unable to update pre-sync count drift metric.", e);
+    }
+  }
+
+  private void updateContainerCountDrift(HddsProtos.LifeCycleState state,
+                                         long scmCount) {
+    if (containerSyncMetrics == null) {
+      return;
+    }
+    long reconCount = containerManager.getContainerStateCount(state);
+    containerSyncMetrics.setLastContainerCountDrift(state,
+        scmCount - reconCount);
+  }
+
+  private void updateContainerSyncDuration(HddsProtos.LifeCycleState state,
+                                           long durationMs) {
+    if (containerSyncMetrics != null) {
+      containerSyncMetrics.setLastContainerSyncDurationMs(state, durationMs);
     }
   }
 

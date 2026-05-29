@@ -548,7 +548,8 @@ public class ReconStorageContainerManagerFacade
     containerSyncHelper = new ReconStorageContainerSyncHelper(
         scmServiceProvider,
         ozoneConfiguration,
-        containerManager
+        containerManager,
+        containerSyncMetrics
     );
   }
 
