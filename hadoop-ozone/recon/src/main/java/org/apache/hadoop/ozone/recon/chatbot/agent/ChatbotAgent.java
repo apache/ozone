@@ -128,11 +128,11 @@ public class ChatbotAgent {
     // Load prompt texts from classpath resources so they can be edited as plain text
     // without touching Java code. If a file is missing the method returns "" and the
     // prompt builder falls back to an inline default.
-    this.toolSelectionPreamble = loadApiGuideFromClasspath(
+    this.toolSelectionPreamble = ChatbotUtils.loadResourceFromClasspath(
         "chatbot/recon-tool-selection-prompt-preamble.txt");
-    this.summarizationPrompt = loadApiGuideFromClasspath(
+    this.summarizationPrompt = ChatbotUtils.loadResourceFromClasspath(
         "chatbot/recon-summarization-prompt.txt");
-    this.fallbackPromptTemplate = loadApiGuideFromClasspath(
+    this.fallbackPromptTemplate = ChatbotUtils.loadResourceFromClasspath(
         "chatbot/recon-fallback-prompt-template.txt");
 
     if (!toolSelectionPreamble.isEmpty()) {
@@ -333,7 +333,7 @@ public class ChatbotAgent {
 
     // Extract the first complete JSON object from the response.
     // LLMs sometimes wrap their JSON in prose text despite being instructed not to.
-    String jsonStr = extractFirstJsonObject(content);
+    String jsonStr = ChatbotUtils.extractFirstJsonObject(content);
     if (jsonStr == null) {
       LOG.warn("No JSON found in LLM response");
       return null;
@@ -544,8 +544,8 @@ public class ChatbotAgent {
     if (toolCall == null || toolCall.getEndpoint() == null) {
       return null;
     }
-    String rawEndpoint = normalizeEndpoint(toolCall.getEndpoint());
-    String endpoint = canonicalizeEndpointPath(rawEndpoint);
+    String rawEndpoint = ChatbotUtils.normalizeEndpoint(toolCall.getEndpoint());
+    String endpoint = ChatbotUtils.canonicalizeEndpointPath(rawEndpoint);
     if (endpoint.isEmpty()) {
       LOG.warn("Blocked invalid endpoint path from LLM output: {}", rawEndpoint);
       return "I can only query known Recon APIs. The requested endpoint '" +
@@ -555,7 +555,7 @@ public class ChatbotAgent {
     // Layer 1: Allowlist — reject anything not in our known-safe prefix set.
     boolean allowed = false;
     for (String prefix : ALLOWED_ENDPOINT_PREFIXES) {
-      if (matchesAllowedPrefix(endpoint, prefix)) {
+      if (ChatbotUtils.matchesAllowedPrefix(endpoint, prefix)) {
         allowed = true;
         break;
       }
@@ -579,7 +579,7 @@ public class ChatbotAgent {
     if (toolCall.getParameters() != null) {
       startPrefix = toolCall.getParameters().get("startPrefix");
     }
-    if (!isBucketScopedListKeysPrefix(startPrefix)) {
+    if (!ChatbotUtils.isBucketScopedListKeysPrefix(startPrefix)) {
       return "I need a bucket-scoped prefix to run listKeys safely. " +
           "Please provide startPrefix in the form /<volume>/<bucket> " +
           "(optionally with a deeper path), plus optional limit and page " +
@@ -588,77 +588,6 @@ public class ChatbotAgent {
     return null;
   }
 
-  /**
-   * Resolves {@code .} and {@code ..} in the path and ensures it stays under {@link #API_V1_ROOT}.
-   * Returns an empty string when the path is invalid, contains a scheme ({@code ://}),
-   * or escapes the Recon API root after normalization.
-   */
-  static String canonicalizeEndpointPath(String endpointPath) {
-    if (endpointPath == null || endpointPath.trim().isEmpty()) {
-      return "";
-    }
-    if (endpointPath.indexOf("://") >= 0) {
-      return "";
-    }
-    String pathOnly = endpointPath;
-    int queryIdx = pathOnly.indexOf('?');
-    if (queryIdx >= 0) {
-      pathOnly = pathOnly.substring(0, queryIdx);
-    }
-    try {
-      URI uri = new URI(null, null, pathOnly, null, null);
-      String normalized = uri.normalize().getPath();
-      if (normalized == null || normalized.isEmpty()) {
-        return "";
-      }
-      if (!normalized.equals(API_V1_ROOT) && !normalized.startsWith(API_V1_ROOT + "/")) {
-        return "";
-      }
-      return normalized;
-    } catch (URISyntaxException e) {
-      return "";
-    }
-  }
-
-  /**
-   * True when {@code path} is exactly {@code prefix} or a sub-path ({@code prefix + "/..."}).
-   */
-  static boolean matchesAllowedPrefix(String path, String prefix) {
-    return path.equals(prefix) || path.startsWith(prefix + "/");
-  }
-
-  /**
-   * {@code listKeys} requires {@code startPrefix} scoped to at least volume/bucket level.
-   */
-  private static boolean isBucketScopedListKeysPrefix(String startPrefix) {
-    if (startPrefix == null) {
-      return false;
-    }
-    String trimmed = startPrefix.trim();
-    if (trimmed.isEmpty() || "/".equals(trimmed)) {
-      return false;
-    }
-    if (!trimmed.startsWith("/") || trimmed.contains("..")) {
-      return false;
-    }
-    int segments = 0;
-    for (String part : trimmed.split("/")) {
-      if (!part.isEmpty()) {
-        segments++;
-      }
-    }
-    return segments >= 2;
-  }
-
-  private String normalizeEndpoint(String endpoint) {
-    if (endpoint == null) {
-      return "";
-    }
-    if (endpoint.startsWith("/api/v1/")) {
-      return endpoint;
-    }
-    return "/api/v1" + (endpoint.startsWith("/") ? endpoint : "/" + endpoint);
-  }
 
   private String buildResponseKey(ToolCall toolCall, int index, int total) {
     String endpoint = toolCall == null ? "unknown" : toolCall.getEndpoint();
@@ -811,66 +740,6 @@ public class ChatbotAgent {
     return toolCall;
   }
 
-  // =========================================================================
-  // JSON Extraction
-  // =========================================================================
-
-  /**
-   * <p>LLMs sometimes wrap their JSON response in prose text (e.g. "Here is the result: {...}")
-   * despite being instructed to return JSON only. A simple greedy regex like {@code \{.*\}}
-   * fails for nested objects because it can match from the first {@code {} to the last {@code }}
-   * in the entire string, returning multiple concatenated objects or truncating nested ones.
-   *
-   * <p>This method uses brace-counting with string-awareness to reliably extract the first
-   * outermost JSON object regardless of surrounding text, nesting depth, or number of
-   * objects in the response:
-   *
-   * @param text the raw LLM response string, which may contain prose before/after JSON
-   * @return the first complete JSON object string, or {@code null} if none is found
-   */
-  static String extractFirstJsonObject(String text) {
-    if (text == null) {
-      return null;
-    }
-    int depth = 0;
-    int start = -1;
-    boolean inString = false;
-    boolean escape = false;
-    for (int i = 0; i < text.length(); i++) {
-      char c = text.charAt(i);
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (c == '\\' && inString) {
-        escape = true;
-        continue;
-      }
-      if (c == '"') {
-        inString = !inString;
-        continue;
-      }
-      if (inString) {
-        continue;
-      }
-      if (c == '{') {
-        if (depth == 0) {
-          start = i;
-        }
-        depth++;
-      } else if (c == '}') {
-        depth--;
-        if (depth == 0 && start != -1) {
-          return text.substring(start, i + 1);
-        }
-      }
-    }
-    return null;
-  }
-
-  // =========================================================================
-  // File Loading
-  // =========================================================================
 
   /**
    * Loads the API context for the LLM tool-selection prompt.
@@ -885,8 +754,8 @@ public class ChatbotAgent {
    * </p>
    */
   private String loadApiSchema() {
-    String guide = loadApiGuideFromClasspath("chatbot/recon-api-guide.md");
-    String yaml = loadApiGuideFromClasspath("chatbot/recon-api.yaml");
+    String guide = ChatbotUtils.loadResourceFromClasspath("chatbot/recon-api-guide.md");
+    String yaml = ChatbotUtils.loadResourceFromClasspath("chatbot/recon-api.yaml");
 
     if (guide.isEmpty() && yaml.isEmpty()) {
       LOG.warn("Neither recon-api-guide.md nor recon-api.yaml found on classpath — using empty schema");
@@ -908,25 +777,6 @@ public class ChatbotAgent {
     return schema.toString();
   }
 
-  private String loadApiGuideFromClasspath(String resourcePath) {
-    try (InputStream is = getClass().getClassLoader()
-        .getResourceAsStream(resourcePath)) {
-      if (is == null) {
-        return "";
-      }
-      ByteArrayOutputStream result = new ByteArrayOutputStream();
-      byte[] buffer = new byte[8192];
-      int length;
-      while ((length = is.read(buffer)) != -1) {
-        result.write(buffer, 0, length);
-      }
-      return result.toString(StandardCharsets.UTF_8.name());
-    } catch (IOException e) {
-      LOG.error("Failed to load API guide/schema resource: {}",
-          resourcePath, e);
-      return "";
-    }
-  }
 
   /**
    * Data Transfer Object representing the JSON tool call the LLM returned.

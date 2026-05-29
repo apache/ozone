@@ -107,7 +107,7 @@ public class ToolExecutor {
     Map<String, String> safeParams = parameters == null ? new HashMap<>() : new HashMap<>(parameters);
 
     // Normalize string. E.g., Change "clusterState" to "/api/v1/clusterState"
-    String fullEndpoint = normalizeEndpoint(endpoint);
+    String fullEndpoint = ChatbotUtils.normalizeEndpoint(endpoint);
 
     // If the LLM asked to list keys, redirect to our special paging loop logic!
     if (fullEndpoint.endsWith(LIST_KEYS_ENDPOINT_SUFFIX) && "GET".equalsIgnoreCase(method)) {
@@ -118,7 +118,7 @@ public class ToolExecutor {
     JsonNode response = executeSingleCall(fullEndpoint, method, safeParams);
 
     // Count how many records we got back and return our structured DTO tracker
-    int records = estimateRecordCount(response);
+    int records = ChatbotUtils.estimateRecordCount(response);
     return new ToolExecutionOutcome(response, records, 1, false, null,
         createLimitsMap(maxRecords, maxPages, pageSize));
   }
@@ -141,7 +141,7 @@ public class ToolExecutor {
     }
 
     // Figure out limits... Either use what the LLM specifically requested, or our system defaults.
-    int requestedLimit = parsePositiveInt(parameters.get("limit"), pageSize);
+    int requestedLimit = ChatbotUtils.parsePositiveInt(parameters.get("limit"), pageSize);
     int effectivePageSize = Math.max(1, Math.min(pageSize, requestedLimit));
     int safeMaxRecords = Math.max(1, maxRecords);
     int safeMaxPages = Math.max(1, maxPages);
@@ -194,7 +194,7 @@ public class ToolExecutor {
       }
 
       // Find the ID of the last row on this page so we can pass it into the loop for the next page
-      String lastKey = extractStringField(pageResponse, "lastKey");
+      String lastKey = ChatbotUtils.extractStringField(pageResponse, "lastKey");
       if (lastKey == null || lastKey.isEmpty() || pageCount == 0) {
         nextCursor = null;
         break;
@@ -259,8 +259,8 @@ public class ToolExecutor {
       // Execute request.
       int statusCode = conn.getResponseCode();
       if (statusCode != 200) {
-        // If the server threw a 500 error or a 404, capture the failure text and throw an exception
-        String errorBody = readErrorStream(conn);
+      // If the server threw a 500 error or a 404, capture the failure text and throw an exception
+      String errorBody = ChatbotUtils.readErrorStream(conn);
         String errorMsg = String.format(
             "API request failed with status %d: %s",
             statusCode, errorBody);
@@ -269,8 +269,8 @@ public class ToolExecutor {
       }
 
       // Request succeeded! Read the raw byte data and convert it into a string
-      String body = readInputStream(conn);
-      return parseJsonSafely(body);
+      String body = ChatbotUtils.readInputStream(conn);
+      return ChatbotUtils.parseJsonSafely(body);
     } finally {
       // Always disconnect to free up memory on the server
       if (conn != null) {
@@ -279,18 +279,6 @@ public class ToolExecutor {
     }
   }
 
-  private String normalizeEndpoint(String endpoint) {
-    if (endpoint == null || endpoint.trim().isEmpty()) {
-      throw new IllegalArgumentException("Tool endpoint cannot be empty");
-    }
-    String fullEndpoint = endpoint;
-
-    // Ensure the path always starts with "/api/v1/"
-    if (!fullEndpoint.startsWith("/api/v1/")) {
-      fullEndpoint = "/api/v1" + (endpoint.startsWith("/") ? endpoint : "/" + endpoint);
-    }
-    return fullEndpoint;
-  }
 
   /**
    * Transforms the LLM's parameters into a raw URL.
@@ -330,83 +318,6 @@ public class ToolExecutor {
     return reconBaseUrl + resolvedPath + queryBuilder.toString();
   }
 
-  private String readInputStream(HttpURLConnection conn)
-      throws IOException {
-    StringBuilder sb = new StringBuilder();
-    try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
-      String line;
-      while ((line = br.readLine()) != null) {
-        sb.append(line);
-      }
-    }
-    return sb.toString();
-  }
-
-  private String readErrorStream(HttpURLConnection conn) {
-    try {
-      if (conn.getErrorStream() != null) {
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "UTF-8"))) {
-          String line;
-          while ((line = br.readLine()) != null) {
-            sb.append(line);
-          }
-        }
-        return sb.toString();
-      }
-    } catch (IOException e) {
-      LOG.debug("Failed to read error stream", e);
-    }
-    return "";
-  }
-
-  private JsonNode parseJsonSafely(String body) throws IOException {
-    if (body == null || body.trim().isEmpty()) {
-      return MAPPER.createObjectNode();
-    }
-    return MAPPER.readTree(body);
-  }
-
-  private int estimateRecordCount(JsonNode response) {
-    if (response == null) {
-      return 0;
-    }
-    if (response.isArray()) {
-      return response.size();
-    }
-    JsonNode keys = response.get("keys");
-    if (keys != null && keys.isArray()) {
-      return keys.size();
-    }
-    JsonNode data = response.get("data");
-    if (data != null && data.isArray()) {
-      return data.size();
-    }
-    return 0;
-  }
-
-  private int parsePositiveInt(String value, int defaultValue) {
-    if (value == null || value.trim().isEmpty()) {
-      return defaultValue;
-    }
-    try {
-      int parsed = Integer.parseInt(value.trim());
-      return parsed > 0 ? parsed : defaultValue;
-    } catch (NumberFormatException e) {
-      return defaultValue;
-    }
-  }
-
-  private String extractStringField(JsonNode node, String field) {
-    if (node == null || field == null || field.isEmpty()) {
-      return null;
-    }
-    JsonNode fieldNode = node.get(field);
-    if (fieldNode == null || fieldNode.isNull()) {
-      return null;
-    }
-    return fieldNode.asText("");
-  }
 
   private Map<String, Object> createLimitsMap(int maxRecords, int maxPages,
                                               int pageSize) {

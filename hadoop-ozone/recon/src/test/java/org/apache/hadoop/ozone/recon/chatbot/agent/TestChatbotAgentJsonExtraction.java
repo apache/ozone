@@ -44,25 +44,25 @@ public class TestChatbotAgentJsonExtraction {
   @Test
   public void testSimpleJsonObjectReturnedUnchanged() {
     String input = "{\"type\":\"SINGLE_ENDPOINT\"}";
-    assertEquals(input, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(input, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   @Test
   public void testEmptyJsonObjectReturnedUnchanged() {
-    assertEquals("{}", ChatbotAgent.extractFirstJsonObject("{}"));
+    assertEquals("{}", ChatbotUtils.extractFirstJsonObject("{}"));
   }
 
   @Test
   public void testFullSingleEndpointJson() {
     String input = "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/clusterState\"," +
         "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"need cluster data\"}";
-    assertEquals(input, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(input, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   @Test
   public void testDeeplyNestedJsonReturnedCorrectly() {
     String input = "{\"a\":{\"b\":{\"c\":{\"d\":\"val\"}}}}";
-    assertEquals(input, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(input, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   @Test
@@ -71,7 +71,7 @@ public class TestChatbotAgentJsonExtraction {
     String input = "{\"type\":\"MULTI_ENDPOINT\",\"tool_calls\":[" +
         "{\"endpoint\":\"/api/v1/datanodes\"}," +
         "{\"endpoint\":\"/api/v1/pipelines\"}]}";
-    assertEquals(input, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(input, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   // ── ROB-01: Prose-wrapped JSON ─────────────────────────────────────────────
@@ -81,7 +81,7 @@ public class TestChatbotAgentJsonExtraction {
     // LLM wraps the JSON in prose despite being told not to
     String json = "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/datanodes\"}";
     String input = "Certainly! Here is the tool call: " + json + " Let me know if you need more.";
-    assertEquals(json, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(json, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   @Test
@@ -89,7 +89,7 @@ public class TestChatbotAgentJsonExtraction {
     // LLM returns JSON inside a markdown code block
     String json = "{\"type\":\"SINGLE_ENDPOINT\"}";
     String input = "```json\n" + json + "\n```";
-    assertEquals(json, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(json, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   // ── ROB-02: Nested braces inside string fields ─────────────────────────────
@@ -98,21 +98,21 @@ public class TestChatbotAgentJsonExtraction {
   public void testBracesInsideStringFieldDoNotConfuseCounter() {
     // The reasoning field contains braces — must not terminate extraction early
     String input = "{\"reasoning\":\"I found a nested {object} here\",\"type\":\"SINGLE_ENDPOINT\"}";
-    assertEquals(input, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(input, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   @Test
   public void testClosingBraceInStringFieldDoesNotTerminateEarly() {
     // A closing brace inside a string value must not end the object
     String input = "{\"reasoning\":\"closing brace } inside\",\"type\":\"X\"}";
-    assertEquals(input, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(input, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   @Test
   public void testEscapedQuoteInsideStringFieldHandledCorrectly() {
     // An escaped quote must not toggle the inString flag
     String input = "{\"key\":\"value with \\\" escaped quote\",\"type\":\"X\"}";
-    assertEquals(input, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(input, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   // ── ROB-03: Truncated JSON ────────────────────────────────────────────────
@@ -121,41 +121,41 @@ public class TestChatbotAgentJsonExtraction {
   public void testTruncatedJsonReturnsNull() {
     // Missing closing brace — no complete JSON object
     String input = "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/clusterState\"";
-    assertNull(ChatbotAgent.extractFirstJsonObject(input));
+    assertNull(ChatbotUtils.extractFirstJsonObject(input));
   }
 
   @Test
   public void testJsonMissingOpeningBraceReturnsNull() {
     // Only a closing brace present — no opening brace
-    assertNull(ChatbotAgent.extractFirstJsonObject("\"key\":\"val\"}"));
+    assertNull(ChatbotUtils.extractFirstJsonObject("\"key\":\"val\"}"));
   }
 
   // ── Null / empty / whitespace inputs ─────────────────────────────────────
 
   @Test
   public void testNullInputReturnsNullWithoutException() {
-    assertNull(ChatbotAgent.extractFirstJsonObject(null));
+    assertNull(ChatbotUtils.extractFirstJsonObject(null));
   }
 
   @Test
   public void testEmptyStringReturnsNull() {
-    assertNull(ChatbotAgent.extractFirstJsonObject(""));
+    assertNull(ChatbotUtils.extractFirstJsonObject(""));
   }
 
   @Test
   public void testWhitespaceOnlyReturnsNull() {
-    assertNull(ChatbotAgent.extractFirstJsonObject("   \n\t  "));
+    assertNull(ChatbotUtils.extractFirstJsonObject("   \n\t  "));
   }
 
   @Test
   public void testNoSuitableEndpointLiteralReturnsNull() {
     // The fallback sentinel the LLM is told to return — no JSON present
-    assertNull(ChatbotAgent.extractFirstJsonObject("NO_SUITABLE_ENDPOINT"));
+    assertNull(ChatbotUtils.extractFirstJsonObject("NO_SUITABLE_ENDPOINT"));
   }
 
   @Test
   public void testPlainProseWithNoJsonReturnsNull() {
-    assertNull(ChatbotAgent.extractFirstJsonObject("I don't know how to answer this question."));
+    assertNull(ChatbotUtils.extractFirstJsonObject("I don't know how to answer this question."));
   }
 
   // ── Multiple JSON objects: returns first ──────────────────────────────────
@@ -164,7 +164,7 @@ public class TestChatbotAgentJsonExtraction {
   public void testMultipleJsonObjectsReturnsFirstOnly() {
     // Should extract the first complete JSON object and ignore the rest
     String input = "{\"a\":1} {\"b\":2}";
-    assertEquals("{\"a\":1}", ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals("{\"a\":1}", ChatbotUtils.extractFirstJsonObject(input));
   }
 
   // ── JSON arrays ───────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ public class TestChatbotAgentJsonExtraction {
     // should not occur in practice — but if it does, the inner object is returned rather
     // than null. The caller (getToolCall) will then fail to find a known "type" field
     // and route to handleFallback.
-    assertEquals("{\"a\":1}", ChatbotAgent.extractFirstJsonObject("[{\"a\":1}]"));
+    assertEquals("{\"a\":1}", ChatbotUtils.extractFirstJsonObject("[{\"a\":1}]"));
   }
 
   // ── Unicode and special characters ────────────────────────────────────────
@@ -185,14 +185,14 @@ public class TestChatbotAgentJsonExtraction {
   @Test
   public void testUnicodeCharactersInStringFieldHandledCorrectly() {
     String input = "{\"key\":\"你好世界\"}";
-    assertEquals(input, ChatbotAgent.extractFirstJsonObject(input));
+    assertEquals(input, ChatbotUtils.extractFirstJsonObject(input));
   }
 
   @Test
   public void testControlCharacterInStringFieldDoesNotCrash() {
     // Null character inside a string value must not cause an exception
     String input = "{\"k\":\"v\u0000alue\"}";
-    String result = ChatbotAgent.extractFirstJsonObject(input);
+    String result = ChatbotUtils.extractFirstJsonObject(input);
     assertNotNull(result);
     assertTrue(result.startsWith("{") && result.endsWith("}"));
   }
@@ -207,7 +207,7 @@ public class TestChatbotAgentJsonExtraction {
       longValue.append("x");
     }
     String input = "{\"key\":\"" + longValue + "\"}";
-    String result = ChatbotAgent.extractFirstJsonObject(input);
+    String result = ChatbotUtils.extractFirstJsonObject(input);
     assertNotNull(result);
     assertTrue(result.startsWith("{") && result.endsWith("}"));
   }
