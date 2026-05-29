@@ -2780,78 +2780,6 @@
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>
-          <plugin>
-            <groupId>com.googlecode.maven-download-plugin</groupId>
-            <artifactId>download-maven-plugin</artifactId>
-            <version>${download-maven-plugin.version}</version>
-            <inherited>false</inherited>
-            <executions>
-              <execution>
-                <id>fetch-linux-library</id>
-                <goals>
-                  <goal>wget</goal>
-                </goals>
-                <phase>generate-resources</phase>
-                <configuration>
-                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
-                  <unpack>false</unpack>
-                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
-                  <skipCache>false</skipCache>
-                </configuration>
-              </execution>
-              <execution>
-                <id>fetch-mac-library</id>
-                <goals>
-                  <goal>wget</goal>
-                </goals>
-                <phase>generate-resources</phase>
-                <configuration>
-                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
-                  <unpack>false</unpack>
-                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
-                  <skipCache>false</skipCache>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-antrun-plugin</artifactId>
-            <version>${maven-antrun-plugin.version}</version>
-            <inherited>false</inherited>
-            <executions>
-              <execution>
-                <id>extract-linux-library</id>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-                <phase>prepare-package</phase>
-                <configuration>
-                  <target>
-                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
-                      <arg value="-c" />
-                      <arg value="ln -sf libhadoop_linux_x86_64.so libhadoop.so" />
-                    </exec>
-                  </target>
-                </configuration>
-              </execution>
-              <execution>
-                <id>extract-mac-library</id>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-                <phase>prepare-package</phase>
-                <configuration>
-                  <target>
-                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
-                      <arg value="-c" />
-                      <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
-                    </exec>
-                  </target>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
         </plugins>
       </build>
     </profile>
@@ -3020,6 +2948,85 @@
               <groups>flaky</groups>
               <excludedGroups>slow | unhealthy</excludedGroups>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>test-short-circuit</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <artifactId>download-maven-plugin</artifactId>
+            <version>${download-maven-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>fetch-linux-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_linux_x86_64.so</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fetch-mac-library</id>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <url>https://raw.githubusercontent.com/apache/ozone-thirdparty/master/hadoop-native-lib/${hadoop.version}/libhadoop_osx_aarch_64.dylib</url>
+                  <unpack>false</unpack>
+                  <outputDirectory>${project.build.directory}/native-lib</outputDirectory>
+                  <skipCache>false</skipCache>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>${maven-antrun-plugin.version}</version>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>extract-linux-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>prepare-package</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_linux_x86_64.so libhadoop.so" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>extract-mac-library</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <phase>prepare-package</phase>
+                <configuration>
+                  <target>
+                    <exec dir="${project.build.directory}/native-lib" executable="bash" failonerror="true">
+                      <arg value="-c" />
+                      <arg value="ln -sf libhadoop_osx_aarch_64.dylib libhadoop.dylib" />
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>
