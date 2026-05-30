@@ -156,7 +156,7 @@ public class TestSequenceIDGenerator {
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable()) {
       @Override
       public StateManager createStateManager(
-          SCMHAManager scmhaManager, Table<String, Long> sequenceIdTable) {
+          SCMHAManager scmhaManager, Table<SequenceIdType, Long> sequenceIdTable) {
         Objects.requireNonNull(scmhaManager, "scmhaManager == null");
         return stateManager;
       }
@@ -227,7 +227,7 @@ public class TestSequenceIDGenerator {
 
     SequenceIdType idType = SequenceIdType.containerId;
     // Simulate an SCM restart by writing a raw String directly to the database.
-    scmMetadataStore.getSequenceIdTable().put(idType.name(), 100L);
+    scmMetadataStore.getSequenceIdTable().put(idType, 100L);
 
     // Create the StateManager directly using its Builder
     SequenceIdGenerator.StateManager stateManager =
