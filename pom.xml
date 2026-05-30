@@ -144,7 +144,7 @@
     <maven-replacer-plugin.version>1.5.3</maven-replacer-plugin.version>
     <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
-    <maven-site-plugin.version>3.21.0</maven-site-plugin.version>
+    <maven-site-plugin.version>3.22.0</maven-site-plugin.version>
     <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
     <maven-surefire-plugin.argLine>-Xmx8192m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.argLineAccessArgs />
