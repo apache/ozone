@@ -35,12 +35,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -409,14 +407,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     LOG.info("Draining orphan snapshot cleanup queue with {} seed snapshots",
         queuedSnapshotIds.size());
     for (UUID snapshotId : queuedSnapshotIds) {
-      // A descendant processed earlier in this batch may already have checked this
-      // snapshot as an ancestor. If it re-queued itself for retry, leave that retry
-      // for the next scheduler iteration instead of checking it twice in one pass.
-      if (processedSnapshotIds.contains(snapshotId)) {
-        LOG.debug("Skipping queued snapshot {} because it was already processed earlier in this drain",
-            snapshotId);
-        continue;
-      }
       cascadeOrphanSnapshotChecksFrom(metadataManager, chainManager, snapshotId, processedSnapshotIds);
     }
     LOG.debug("Finished orphan snapshot cleanup drain; {} snapshots remain queued for future runs",
@@ -487,14 +477,15 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   void cascadeOrphanSnapshotChecksFrom(OMMetadataManager metadataManager,
       SnapshotChainManager chainManager, UUID snapshotId, Set<UUID> processedSnapshotIds)
       throws IOException {
-    Deque<UUID> snapshotsToCheck = new ArrayDeque<>();
-    Set<UUID> queuedSnapshotIds = new HashSet<>();
-    queueSnapshotForOrphanCheck(snapshotsToCheck, queuedSnapshotIds, snapshotId);
-
-    while (!snapshotsToCheck.isEmpty()) {
-      UUID currentSnapshotId = snapshotsToCheck.removeFirst();
-      queuedSnapshotIds.remove(currentSnapshotId);
-      processedSnapshotIds.add(currentSnapshotId);
+    for (UUID currentSnapshotId = snapshotId; currentSnapshotId != null;) {
+      // A descendant processed earlier in the same drain may already have checked
+      // this snapshot as an ancestor. If it re-queued itself for retry, leave that
+      // retry for the next scheduler iteration instead of checking it twice now.
+      if (!processedSnapshotIds.add(currentSnapshotId)) {
+        LOG.debug("Skipping snapshot {} because it was already processed earlier in this orphan cleanup pass",
+            currentSnapshotId);
+        return;
+      }
       // Some callers invoke this method directly without first adding the snapshot to the
       // orphan-check map, so only consume a queued count when one was present for this pass.
       Integer countBeforeCheck = snapshotToBeCheckedForOrphans.get(currentSnapshotId);
@@ -511,18 +502,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       if (previousSnapshotIdToCheck != null) {
         LOG.debug("Queueing previous snapshot {} after orphan cleanup removed data from snapshot {}",
             previousSnapshotIdToCheck, currentSnapshotId);
-        queueSnapshotForOrphanCheck(snapshotsToCheck, queuedSnapshotIds, previousSnapshotIdToCheck);
       }
-    }
-  }
-
-  /**
-   * Adds {@code snapshotId} to the local queue exactly once for the current drain pass.
-   */
-  private void queueSnapshotForOrphanCheck(Deque<UUID> snapshotsToCheck, Set<UUID> queuedSnapshotIds,
-      UUID snapshotId) {
-    if (snapshotId != null && queuedSnapshotIds.add(snapshotId)) {
-      snapshotsToCheck.addLast(snapshotId);
+      currentSnapshotId = previousSnapshotIdToCheck;
     }
   }
 
