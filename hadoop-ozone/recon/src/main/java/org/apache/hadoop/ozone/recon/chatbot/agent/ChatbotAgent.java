@@ -1,26 +1,35 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.chatbot.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
@@ -30,21 +39,6 @@ import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ChatMessage;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.LLMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Main chatbot agent that orchestrates the conversation flow.
@@ -63,7 +57,7 @@ public class ChatbotAgent {
 
   /**
    * Allowlist of Recon API path prefixes the chatbot is permitted to call.
-   *
+   * <p>
    * This is the primary defence against prompt injection: even if an attacker tricks
    * the LLM into outputting an arbitrary endpoint, the Java layer will reject it here
    * before ToolExecutor makes any network call. Only paths listed here can ever be
@@ -108,7 +102,6 @@ public class ChatbotAgent {
 
   // Max API calls we allow per question (so the LLM doesn't DOS our server)
   private final int maxToolCalls;
-
 
   private final String defaultModel;
   private final int maxRecordsPerAnswer;
@@ -461,7 +454,7 @@ public class ChatbotAgent {
 
   /**
    * Creates the system prompt for tool selection (Step 1 LLM call).
-   *
+   * <p>
    * The preamble (security rules, task description, JSON format examples, safety rules)
    * is loaded from {@code chatbot/recon-tool-selection-prompt-preamble.txt} at startup.
    * The API specification is appended at runtime so the schema stays the single source
@@ -525,21 +518,20 @@ public class ChatbotAgent {
     return clarificationMessages.get(0);
   }
 
-
   /**
    * Safety check: validates the endpoint the LLM wants to call before ToolExecutor
    * makes any network request.
-   *
+   * <p>
    * Two layers of defence:
-   *
+   * <p>
    * 1. Allowlist check (always active): the normalised endpoint path must start with
-   *    one of the known Recon API prefixes in ALLOWED_ENDPOINT_PREFIXES. This is the
-   *    hard Java-side guard against prompt injection — regardless of what the LLM
-   *    was tricked into outputting, only pre-approved paths can ever be called.
-   *
+   * one of the known Recon API prefixes in ALLOWED_ENDPOINT_PREFIXES. This is the
+   * hard Java-side guard against prompt injection — regardless of what the LLM
+   * was tricked into outputting, only pre-approved paths can ever be called.
+   * <p>
    * 2. Safe-scope check (when requireSafeScope is true): additional validation for
-   *    endpoints that can return unbounded data, e.g. /keys/listKeys requires a
-   *    bucket-scoped startPrefix to avoid memory exhaustion.
+   * endpoints that can return unbounded data, e.g. /keys/listKeys requires a
+   * bucket-scoped startPrefix to avoid memory exhaustion.
    */
   private String validateToolCallForExecution(ToolCall toolCall) {
     if (toolCall == null || toolCall.getEndpoint() == null) {
@@ -588,7 +580,6 @@ public class ChatbotAgent {
     }
     return null;
   }
-
 
   private String buildResponseKey(ToolCall toolCall, int index, int total) {
     String endpoint = toolCall == null ? "unknown" : toolCall.getEndpoint();
@@ -657,29 +648,33 @@ public class ChatbotAgent {
     String type = jsonNode.path("type").asText("");
 
     switch (type) {
-      case "SINGLE_ENDPOINT": {
-        return parseSingleToolCall(jsonNode);
-      }
-      case "MULTI_ENDPOINT": {
-        ToolCall toolCall = new ToolCall();
-        toolCall.setMultipleEndpoints(true);
-        toolCall.setToolCalls(parseToolCallList(jsonNode.get("tool_calls")));
-        return toolCall;
-      }
-      case "DOCUMENTATION_QUERY": {
-        ToolCall toolCall = new ToolCall();
-        toolCall.setDocumentationQuery(true);
-        toolCall.setAnswer(jsonNode.path("answer").asText(""));
-        toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
-        return toolCall;
-      }
-      default: {
-        // "type" is missing or unrecognized — the LLM returned something unexpected.
-        // Return null so the caller triggers handleFallback() with a graceful error response.
-        LOG.warn("Unrecognized LLM response type '{}' — cannot parse tool call, using fallback", type);
-        return null;
-      }
+    case "SINGLE_ENDPOINT":
+      return parseSingleToolCall(jsonNode);
+    case "MULTI_ENDPOINT":
+      return parseMultiEndpointToolCall(jsonNode);
+    case "DOCUMENTATION_QUERY":
+      return parseDocumentationQueryToolCall(jsonNode);
+    default:
+      // "type" is missing or unrecognized — the LLM returned something unexpected.
+      // Return null so the caller triggers handleFallback() with a graceful error response.
+      LOG.warn("Unrecognized LLM response type '{}' — cannot parse tool call, using fallback", type);
+      return null;
     }
+  }
+
+  private ToolCall parseMultiEndpointToolCall(JsonNode jsonNode) {
+    ToolCall toolCall = new ToolCall();
+    toolCall.setMultipleEndpoints(true);
+    toolCall.setToolCalls(parseToolCallList(jsonNode.get("tool_calls")));
+    return toolCall;
+  }
+
+  private ToolCall parseDocumentationQueryToolCall(JsonNode jsonNode) {
+    ToolCall toolCall = new ToolCall();
+    toolCall.setDocumentationQuery(true);
+    toolCall.setAnswer(jsonNode.path("answer").asText(""));
+    toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
+    return toolCall;
   }
 
   /**
@@ -741,7 +736,6 @@ public class ChatbotAgent {
     return toolCall;
   }
 
-
   /**
    * Loads the API context for the LLM tool-selection prompt.
    *
@@ -777,7 +771,6 @@ public class ChatbotAgent {
     }
     return schema.toString();
   }
-
 
   /**
    * Data Transfer Object representing the JSON tool call the LLM returned.

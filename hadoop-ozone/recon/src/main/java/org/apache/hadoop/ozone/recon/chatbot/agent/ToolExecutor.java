@@ -1,20 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.chatbot.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,22 +23,19 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Executes tool calls by making HTTP requests to Recon API endpoints.
@@ -123,7 +120,6 @@ public class ToolExecutor {
     return new ToolExecutionOutcome(response, records, 1, false, null,
         createLimitsMap(maxRecords, maxPages, pageSize));
   }
-
 
   /**
    * The listKeys Pager - It uses a while() loop to continuously execute API calls, stitching all the
@@ -260,8 +256,8 @@ public class ToolExecutor {
       // Execute request.
       int statusCode = conn.getResponseCode();
       if (statusCode != 200) {
-      // If the server threw a 500 error or a 404, capture the failure text and throw an exception
-      String errorBody = ChatbotUtils.readErrorStream(conn);
+        // If the server threw a 500 error or a 404, capture the failure text and throw an exception
+        String errorBody = ChatbotUtils.readErrorStream(conn);
         String errorMsg = String.format(
             "API request failed with status %d: %s",
             statusCode, errorBody);
@@ -279,7 +275,6 @@ public class ToolExecutor {
       }
     }
   }
-
 
   /**
    * Transforms the LLM's parameters into a raw URL.
@@ -300,11 +295,9 @@ public class ToolExecutor {
       // directly inline and do NOT add it to the URL query string.
       if (resolvedPath.contains(placeholder)) {
         resolvedPath = resolvedPath.replace(placeholder, value);
-      }
-      // 2. Otherwise, it must be an optional Query Parameter!
-      // If the placeholder block wasn't found, we assume this is a URL filter (like ?limit=10)
-      // and append it safely encoded to the end of the URL.
-      else {
+      } else {
+        // If the placeholder block wasn't found, we assume this is a URL filter (like ?limit=10)
+        // and append it safely encoded to the end of the URL.
         queryBuilder.append(firstQueryParam ? '?' : '&');
         try {
           queryBuilder.append(key).append('=').append(URLEncoder.encode(value, "UTF-8"));
@@ -318,7 +311,6 @@ public class ToolExecutor {
     // Combine the base URL, the resolved path, and the query string
     return reconBaseUrl + resolvedPath + queryBuilder.toString();
   }
-
 
   private Map<String, Object> createLimitsMap(int maxRecords, int maxPages,
                                               int pageSize) {

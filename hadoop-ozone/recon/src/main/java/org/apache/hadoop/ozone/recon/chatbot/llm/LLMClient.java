@@ -1,20 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.chatbot.llm;
 
 import java.util.List;
@@ -22,12 +22,12 @@ import java.util.Map;
 
 /**
  * LLMClient is the "Master Contract" for the whole Chatbot system.
- * 
+ * <p>
  * Purpose:
  * The ChatbotAgent doesn't know (or care) if it's talking to OpenAI, Gemini, or a Local LLM.
  * It strictly relies on this interface. This interface forces every AI client to guarantee
  * that they will accept exactly the same input and return exactly the same output.
- * 
+ * <p>
  * By using this contract, we can add 10 new AI models to Recon tomorrow,
  * and we will never have to edit the ChatbotAgent's code to support them!
  */
@@ -54,7 +54,7 @@ public interface LLMClient {
       Map<String, Object> parameters) throws LLMException;
 
   /**
-   * Quick check to see if this client is ready to work (e.g., does it have an API key saved?)
+   * Returns whether this client is ready to work (e.g. has an API key configured).
    */
   boolean isAvailable();
 
@@ -71,7 +71,7 @@ public interface LLMClient {
 
   /**
    * A single message in a conversation.
-   * Every message needs a "role" (who is speaking: user or assistant) 
+   * Every message needs a "role" (who is speaking: user or assistant)
    * and "content" (what they actually said).
    */
   class ChatMessage {
@@ -98,19 +98,19 @@ public interface LLMClient {
    * our background code forces them both to output this clean Java object.
    */
   class LLMResponse {
-    
+
     // The actual text the AI typed out
     private final String content;
-    
+
     // Which AI model specifically answered this? (e.g. "gpt-4")
     private final String model;
-    
+
     // How many "words" the user asked
     private final int promptTokens;
-    
+
     // How many "words" the AI answered with
     private final int completionTokens;
-    
+
     // Extra sneaky information about the answer (like why it stopped typing)
     private final Map<String, Object> metadata;
 
@@ -151,12 +151,12 @@ public interface LLMClient {
   }
 
   /**
-   * A standardized Error object. 
+   * A standardized Error object.
    * No matter which AI crashes, we wrap their specific crash report in an LLMException
    * so the ChatbotAgent always knows how to "catch" it and show a friendly error to the user.
    */
   class LLMException extends Exception {
-    
+
     // Keep track of the HTTP Error Code (like 401 Unauthorized or 404 Not Found)
     private final int statusCode;
 

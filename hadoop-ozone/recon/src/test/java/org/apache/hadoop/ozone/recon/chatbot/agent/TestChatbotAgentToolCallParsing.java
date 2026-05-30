@@ -1,34 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.chatbot.agent;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
-import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.io.IOException;
-import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -44,6 +31,18 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.util.HashMap;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 /**
  * Tests for {@link ChatbotAgent} tool-call routing and JSON parsing through {@code processQuery()}.
  *
@@ -57,8 +56,10 @@ import static org.mockito.Mockito.when;
  * <p><b>Key scenarios tested:</b></p>
  * <ul>
  *   <li><b>Routing:</b> Ensures SINGLE_ENDPOINT, MULTI_ENDPOINT, and DOCUMENTATION_QUERY are routed correctly.</li>
- *   <li><b>Robustness:</b> Verifies fallbacks are triggered for truncated JSON, missing fields, or plain prose responses.</li>
- *   <li><b>Exception handling:</b> Ensures LLM exceptions and ToolExecutor IOExceptions are properly wrapped in ChatbotException.</li>
+ *   <li><b>Robustness:</b> Verifies fallbacks are triggered for truncated JSON, missing fields,
+ *       or plain prose responses.</li>
+ *   <li><b>Exception handling:</b> Ensures LLM exceptions and ToolExecutor IOExceptions are
+ *       properly wrapped in ChatbotException.</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -76,24 +77,24 @@ public class TestChatbotAgentToolCallParsing {
 
   private static final String SINGLE_CLUSTER_STATE =
       "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/clusterState\"," +
-      "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"need cluster data\"}";
+          "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"need cluster data\"}";
 
   private static final String SINGLE_DATANODES =
       "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/datanodes\"," +
-      "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"need datanodes\"}";
+          "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"need datanodes\"}";
 
   private static final String MULTI_TWO_ENDPOINTS =
       "{\"type\":\"MULTI_ENDPOINT\",\"reasoning\":\"need both\"," +
-      "\"tool_calls\":[" +
-      "{\"endpoint\":\"/api/v1/clusterState\",\"method\":\"GET\",\"parameters\":{}," +
-      "\"reasoning\":\"cluster\"}," +
-      "{\"endpoint\":\"/api/v1/datanodes\",\"method\":\"GET\",\"parameters\":{}," +
-      "\"reasoning\":\"nodes\"}]}";
+          "\"tool_calls\":[" +
+          "{\"endpoint\":\"/api/v1/clusterState\",\"method\":\"GET\",\"parameters\":{}," +
+          "\"reasoning\":\"cluster\"}," +
+          "{\"endpoint\":\"/api/v1/datanodes\",\"method\":\"GET\",\"parameters\":{}," +
+          "\"reasoning\":\"nodes\"}]}";
 
   private static final String DOC_QUERY =
       "{\"type\":\"DOCUMENTATION_QUERY\"," +
-      "\"answer\":\"Apache Ozone is a scalable distributed storage system.\"," +
-      "\"reasoning\":\"general knowledge\"}";
+          "\"answer\":\"Apache Ozone is a scalable distributed storage system.\"," +
+          "\"reasoning\":\"general knowledge\"}";
 
   private static final String SUMMARY_RESPONSE = "The cluster has 5 healthy datanodes.";
   private static final String FALLBACK_RESPONSE =
@@ -110,7 +111,7 @@ public class TestChatbotAgentToolCallParsing {
     // Tests that never reach the executor (fallback/doc paths) won't fail
     // because of this unused stub.
     lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+            anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
         .thenReturn(defaultOutcome());
 
     agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);

@@ -1,20 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.chatbot.llm;
 
 import com.google.inject.Inject;
@@ -29,19 +29,18 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.TokenUsage;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
-import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
+import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link LLMClient} implementation backed by
@@ -106,7 +105,7 @@ public class LangChain4jDispatcher implements LLMClient {
 
   @Inject
   public LangChain4jDispatcher(OzoneConfiguration configuration,
-                                CredentialHelper credentialHelper) {
+                               CredentialHelper credentialHelper) {
     this.configuration = configuration;
     this.credentialHelper = credentialHelper;
 
@@ -263,7 +262,7 @@ public class LangChain4jDispatcher implements LLMClient {
     }
     throw new LLMException(
         "Model '" + model + "' is not recognised. "
-        + "Use GET /api/v1/chatbot/models for the list of supported models.");
+            + "Use GET /api/v1/chatbot/models for the list of supported models.");
   }
 
   /**
@@ -290,44 +289,53 @@ public class LangChain4jDispatcher implements LLMClient {
    */
   private ChatLanguageModel buildModelInternal(String provider, String model) throws LLMException {
     switch (provider) {
-      case "openai": {
-        String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "openai");
-        String baseUrl = configuration.get(
-            ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL,
-            ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT);
-        return OpenAiChatModel.builder()
-            .apiKey(key)
-            .modelName(model)
-            .baseUrl(baseUrl)
-            .timeout(timeout)
-            .build();
-      }
-      case "gemini": {
-        String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "gemini");
-        return GoogleAiGeminiChatModel.builder()
-            .apiKey(key)
-            .modelName(model)
-            .timeout(timeout)
-            .build();
-      }
-      case "anthropic": {
-        String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY, "anthropic");
-        String betaHeader = configuration.get(
-            ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER,
-            ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER_DEFAULT);
-        AnthropicChatModel.AnthropicChatModelBuilder builder =
-            AnthropicChatModel.builder()
-                .apiKey(key)
-                .modelName(model)
-                .timeout(timeout);
-        if (betaHeader != null && !betaHeader.isEmpty()) {
-          builder.beta(betaHeader);
-        }
-        return builder.build();
-      }
-      default:
-        throw new LLMException("Unknown or unconfigured provider: '" + provider + "'");
+    case "openai":
+      return buildOpenAiModel(model);
+    case "gemini":
+      return buildGeminiModel(model);
+    case "anthropic":
+      return buildAnthropicModel(model);
+    default:
+      throw new LLMException("Unknown or unconfigured provider: '" + provider + "'");
     }
+  }
+
+  private ChatLanguageModel buildOpenAiModel(String model) throws LLMException {
+    String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_API_KEY, "openai");
+    String baseUrl = configuration.get(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL,
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT);
+    return OpenAiChatModel.builder()
+        .apiKey(key)
+        .modelName(model)
+        .baseUrl(baseUrl)
+        .timeout(timeout)
+        .build();
+  }
+
+  private ChatLanguageModel buildGeminiModel(String model) throws LLMException {
+    String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "gemini");
+    return GoogleAiGeminiChatModel.builder()
+        .apiKey(key)
+        .modelName(model)
+        .timeout(timeout)
+        .build();
+  }
+
+  private ChatLanguageModel buildAnthropicModel(String model) throws LLMException {
+    String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_API_KEY, "anthropic");
+    String betaHeader = configuration.get(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER,
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER_DEFAULT);
+    AnthropicChatModel.AnthropicChatModelBuilder builder =
+        AnthropicChatModel.builder()
+            .apiKey(key)
+            .modelName(model)
+            .timeout(timeout);
+    if (betaHeader != null && !betaHeader.isEmpty()) {
+      builder.beta(betaHeader);
+    }
+    return builder.build();
   }
 
   /**
@@ -340,7 +348,7 @@ public class LangChain4jDispatcher implements LLMClient {
     if (configured == null || configured.isEmpty()) {
       throw new LLMException(
           "No API key configured for provider '" + providerName + "'. "
-          + "Set " + configKey + " in ozone-site.xml or the Hadoop credential store.");
+              + "Set " + configKey + " in ozone-site.xml or the Hadoop credential store.");
     }
     return configured;
   }
@@ -359,15 +367,15 @@ public class LangChain4jDispatcher implements LLMClient {
     List<dev.langchain4j.data.message.ChatMessage> result = new ArrayList<>();
     for (ChatMessage msg : messages) {
       switch (msg.getRole()) {
-        case "system":
-          result.add(SystemMessage.from(msg.getContent()));
-          break;
-        case "assistant":
-          result.add(AiMessage.from(msg.getContent()));
-          break;
-        default:
-          result.add(UserMessage.from(msg.getContent()));
-          break;
+      case "system":
+        result.add(SystemMessage.from(msg.getContent()));
+        break;
+      case "assistant":
+        result.add(AiMessage.from(msg.getContent()));
+        break;
+      default:
+        result.add(UserMessage.from(msg.getContent()));
+        break;
       }
     }
     return result;
@@ -397,7 +405,9 @@ public class LangChain4jDispatcher implements LLMClient {
     return models;
   }
 
-  /** Safely unboxes a nullable Integer, returning 0 for null. */
+  /**
+   * Safely unboxes a nullable Integer, returning 0 for null.
+   */
   private int safeInt(Integer value) {
     return value != null ? value : 0;
   }

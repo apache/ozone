@@ -1,22 +1,35 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.chatbot.agent;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.HashMap;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
@@ -25,21 +38,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.HashMap;
-
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * Security boundary and execution policy tests for {@link ChatbotAgent}.
@@ -53,11 +51,16 @@ import static org.mockito.Mockito.when;
  *
  * <p><b>Key scenarios tested:</b></p>
  * <ul>
- *   <li><b>Allowlist enforcement:</b> Blocks endpoints not explicitly permitted (e.g., /api/v1/admin/delete).</li>
- *   <li><b>Path traversal & Exfiltration:</b> Blocks absolute URLs and paths containing ".." or scheme injections.</li>
- *   <li><b>Prefix boundaries:</b> Prevents prefix confusion (e.g., ensuring /api/v1/keys2 does not match /api/v1/keys).</li>
- *   <li><b>Multi-endpoint security:</b> Ensures if one tool call in a batch is invalid, the entire batch is blocked.</li>
- *   <li><b>Information leakage:</b> Verifies blocked responses do not leak Java stack traces or internal config keys.</li>
+ *   <li><b>Allowlist enforcement:</b> Blocks endpoints not explicitly permitted
+ *       (e.g., /api/v1/admin/delete).</li>
+ *   <li><b>Path traversal & Exfiltration:</b> Blocks absolute URLs and paths containing ".."
+ *       or scheme injections.</li>
+ *   <li><b>Prefix boundaries:</b> Prevents prefix confusion (e.g., ensuring /api/v1/keys2
+ *       does not match /api/v1/keys).</li>
+ *   <li><b>Multi-endpoint security:</b> Ensures if one tool call in a batch is invalid,
+ *       the entire batch is blocked.</li>
+ *   <li><b>Information leakage:</b> Verifies blocked responses do not leak Java stack traces
+ *       or internal config keys.</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -83,7 +86,7 @@ public class TestChatbotAgentExecutionPolicy {
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS, 5);
 
     lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+            anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
         .thenReturn(defaultOutcome());
 
     agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
@@ -106,7 +109,7 @@ public class TestChatbotAgentExecutionPolicy {
 
     assertNotNull(result);
     assertTrue(result.toLowerCase().contains("not in the list of permitted paths") ||
-        result.toLowerCase().contains("permitted"),
+            result.toLowerCase().contains("permitted"),
         "Response should inform user the endpoint is not permitted");
     // The executor must NEVER be called for a disallowed endpoint
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(

@@ -1,36 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.chatbot.agent;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
-import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,6 +32,20 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 /**
  * Tests for {@link ChatbotAgent} specifically handling the listKeys endpoint.
  *
@@ -60,8 +59,10 @@ import static org.mockito.Mockito.when;
  *
  * <p><b>Key scenarios tested:</b></p>
  * <ul>
- *   <li><b>Safe-scope validation:</b> Ensures listKeys requests without a bucket-scoped prefix (e.g., "/") are blocked.</li>
- *   <li><b>Parameter pass-through:</b> Verifies optional LLM parameters (limit, replicationType) are passed to the executor.</li>
+ *   <li><b>Safe-scope validation:</b> Ensures listKeys requests without a bucket-scoped prefix
+ *       (e.g., "/") are blocked.</li>
+ *   <li><b>Parameter pass-through:</b> Verifies optional LLM parameters (limit, replicationType)
+ *       are passed to the executor.</li>
  *   <li><b>Exception handling:</b> Ensures executor and LLM failures are properly wrapped in
  *   {@link org.apache.hadoop.ozone.recon.chatbot.ChatbotException}.</li>
  * </ul>
@@ -87,7 +88,7 @@ public class TestChatbotAgentListKeysPolicy {
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS, 5);
 
     lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+            anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
         .thenReturn(defaultOutcome());
 
     agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
@@ -109,7 +110,7 @@ public class TestChatbotAgentListKeysPolicy {
 
     assertNotNull(result);
     assertTrue(result.toLowerCase().contains("bucket") ||
-        result.toLowerCase().contains("prefix"),
+            result.toLowerCase().contains("prefix"),
         "Response should ask for a bucket-scoped prefix");
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
         anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
@@ -232,7 +233,7 @@ public class TestChatbotAgentListKeysPolicy {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
         "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\"},\"reasoning\":\"scoped\"}";
-    
+
     // First call returns valid tool call JSON, second call throws exception
     when(mockLlmClient.chatCompletion(anyList(), any(), any()))
         .thenReturn(resp(json))
@@ -242,11 +243,12 @@ public class TestChatbotAgentListKeysPolicy {
       agent.processQuery("List keys in bucket1", null, null);
     });
 
-    assertTrue(exception.getMessage().contains("Error executing tool call") || exception.getMessage().contains("Error generating response"));
+    assertTrue(exception.getMessage().contains("Error executing tool call") ||
+        exception.getMessage().contains("Error generating response"));
     assertNotNull(exception.getCause());
     assertTrue(exception.getCause() instanceof RuntimeException);
     assertEquals("LLM summarization failed", exception.getCause().getMessage());
-    
+
     // Executor should have been called successfully
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
         anyString(), eq("GET"), any(), anyInt(), anyInt(), anyInt());
@@ -257,7 +259,9 @@ public class TestChatbotAgentListKeysPolicy {
   public void testOptionalParametersArePassedToToolExecutor() throws Exception {
     String json = "{\"type\":\"SINGLE_ENDPOINT\"," +
         "\"endpoint\":\"/api/v1/keys/listKeys\",\"method\":\"GET\"," +
-        "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\",\"limit\":\"50\",\"replicationType\":\"RATIS\",\"keySize\":\"1024\"},\"reasoning\":\"scoped with filters\"}";
+        "\"parameters\":{\"startPrefix\":\"/vol1/bucket1\",\"limit\":\"50\"," +
+        "\"replicationType\":\"RATIS\",\"keySize\":\"1024\"}," +
+        "\"reasoning\":\"scoped with filters\"}";
     when(mockLlmClient.chatCompletion(anyList(), any(), any()))
         .thenReturn(resp(json))
         .thenReturn(resp(SUMMARY_RESPONSE));

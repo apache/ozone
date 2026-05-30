@@ -30,9 +30,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.AdminOnly;
-import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAdminFilter;
 import org.apache.hadoop.ozone.recon.api.filters.ReconAuthFilter;
+import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.glassfish.hk2.api.ServiceLocator;
 import org.glassfish.jersey.internal.inject.InjectionManager;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -126,7 +126,7 @@ public class ReconRestServletModule extends ServletModule {
 
       boolean authorizationEnabled = OzoneSecurityUtil.isAuthorizationEnabled(conf);
       if (authorizationEnabled) {
-        for (String path: adminSubPaths) {
+        for (String path : adminSubPaths) {
           String adminPath =
               UriBuilder.fromPath(basePath).path(path + "*").build().toString();
           filter(adminPath).through(ReconAdminFilter.class);
