@@ -259,7 +259,10 @@ public class TestChatbotEndpoint {
     try {
       when(mockAgent.processQuery(anyString(), any(), any()))
           .thenAnswer(inv -> {
-            agentLatch.await(8, TimeUnit.SECONDS);
+            boolean awaited = agentLatch.await(8, TimeUnit.SECONDS);
+            if (!awaited) {
+              throw new RuntimeException("Latch timed out waiting for agent");
+            }
             return "done";
           });
 
