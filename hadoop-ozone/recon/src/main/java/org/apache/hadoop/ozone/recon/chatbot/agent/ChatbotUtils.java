@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.chatbot.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +54,7 @@ public final class ChatbotUtils {
   // =========================================================================
 
   public static String normalizeEndpoint(String endpoint) {
-    if (endpoint == null || endpoint.trim().isEmpty()) {
+    if (StringUtils.isBlank(endpoint)) {
       return "";
     }
     String fullEndpoint = endpoint;
@@ -69,7 +70,7 @@ public final class ChatbotUtils {
    * or escapes the Recon API root after normalization.
    */
   public static String canonicalizeEndpointPath(String endpointPath) {
-    if (endpointPath == null || endpointPath.trim().isEmpty()) {
+    if (StringUtils.isBlank(endpointPath)) {
       return "";
     }
     if (endpointPath.indexOf("://") >= 0) {
@@ -183,7 +184,7 @@ public final class ChatbotUtils {
   }
 
   public static int parsePositiveInt(String value, int defaultValue) {
-    if (value == null || value.trim().isEmpty()) {
+    if (StringUtils.isBlank(value)) {
       return defaultValue;
     }
     try {
@@ -224,7 +225,7 @@ public final class ChatbotUtils {
   }
 
   public static JsonNode parseJsonSafely(String body) throws IOException {
-    if (body == null || body.trim().isEmpty()) {
+    if (StringUtils.isBlank(body)) {
       return MAPPER.createObjectNode();
     }
     return MAPPER.readTree(body);

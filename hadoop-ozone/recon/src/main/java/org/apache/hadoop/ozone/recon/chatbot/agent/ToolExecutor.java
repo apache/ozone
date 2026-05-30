@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
@@ -135,7 +136,7 @@ public class ToolExecutor {
 
     // Safety Check: Did the LLM provide a bucket path to search in?
     String startPrefix = parameters.get("startPrefix");
-    if (startPrefix == null || startPrefix.trim().isEmpty() || "/".equals(startPrefix.trim())) {
+    if (StringUtils.isBlank(startPrefix) || "/".equals(startPrefix.trim())) {
       throw new IllegalArgumentException(
           "listKeys requires 'startPrefix' at bucket level or deeper (for example /volume/bucket).");
     }
@@ -304,9 +305,9 @@ public class ToolExecutor {
       // If the placeholder block wasn't found, we assume this is a URL filter (like ?limit=10)
       // and append it safely encoded to the end of the URL.
       else {
-        queryBuilder.append(firstQueryParam ? "?" : "&");
+        queryBuilder.append(firstQueryParam ? '?' : '&');
         try {
-          queryBuilder.append(key).append("=").append(URLEncoder.encode(value, "UTF-8"));
+          queryBuilder.append(key).append('=').append(URLEncoder.encode(value, "UTF-8"));
         } catch (UnsupportedEncodingException e) {
           throw new RuntimeException("UTF-8 not supported", e);
         }

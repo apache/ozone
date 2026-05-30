@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
@@ -190,7 +191,7 @@ public class ChatbotAgent {
       throws ChatbotException {
 
     // Safety check
-    if (userQuery == null || userQuery.trim().isEmpty()) {
+    if (StringUtils.isBlank(userQuery)) {
       throw new ChatbotException("Query cannot be empty");
     }
 
@@ -488,7 +489,7 @@ public class ChatbotAgent {
     sb.append("User asked: \"").append(userQuery).append("\"\n\n");
 
     for (Map.Entry<String, Object> entry : apiResponses.entrySet()) {
-      sb.append("Endpoint: ").append(entry.getKey()).append("\n");
+      sb.append("Endpoint: ").append(entry.getKey()).append('\n');
       try {
         String responseJson = MAPPER.writeValueAsString(entry.getValue());
         sb.append("Response: ").append(responseJson).append("\n\n");

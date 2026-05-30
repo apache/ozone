@@ -45,14 +45,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestLangChain4jDispatcher {
 
   private OzoneConfiguration conf;
-  private CredentialHelper credentialHelper;
   private LangChain4jDispatcher dispatcher;
 
   @BeforeEach
   public void setUp() {
     conf = new OzoneConfiguration();
     conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER, "gemini");
-    credentialHelper = new CredentialHelper(conf);
+    CredentialHelper credentialHelper = new CredentialHelper(conf);
     dispatcher = new LangChain4jDispatcher(conf, credentialHelper);
   }
 

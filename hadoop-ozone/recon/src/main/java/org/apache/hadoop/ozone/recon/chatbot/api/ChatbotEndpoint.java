@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.chatbot.api;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent;
@@ -173,7 +174,7 @@ public class ChatbotEndpoint {
           .build();
     }
 
-    if (request.getQuery() == null || request.getQuery().trim().isEmpty()) {
+    if (StringUtils.isBlank(request.getQuery())) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity(Collections.singletonMap("error", "Query cannot be empty"))
           .build();

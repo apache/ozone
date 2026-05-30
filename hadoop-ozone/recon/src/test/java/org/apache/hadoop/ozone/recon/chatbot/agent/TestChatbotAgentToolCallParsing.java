@@ -320,7 +320,7 @@ public class TestChatbotAgentToolCallParsing {
     sb.append("{\"type\":\"MULTI_ENDPOINT\",\"reasoning\":\"need many\",\"tool_calls\":[");
     for (int i = 0; i < 20; i++) {
       if (i > 0) {
-        sb.append(",");
+        sb.append(',');
       }
       sb.append("{\"endpoint\":\"/api/v1/clusterState\",\"method\":\"GET\"," +
           "\"parameters\":{},\"reasoning\":\"call ").append(i).append("\"}");

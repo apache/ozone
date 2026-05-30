@@ -29,6 +29,7 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.TokenUsage;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
@@ -383,7 +384,7 @@ public class LangChain4jDispatcher implements LLMClient {
                                       String configKey,
                                       String defaultValue) {
     String raw = conf.get(configKey, defaultValue);
-    if (raw == null || raw.trim().isEmpty()) {
+    if (StringUtils.isBlank(raw)) {
       raw = defaultValue;
     }
     List<String> models = new ArrayList<>();

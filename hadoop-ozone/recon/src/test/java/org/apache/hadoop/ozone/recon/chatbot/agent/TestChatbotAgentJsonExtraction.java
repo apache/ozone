@@ -204,7 +204,7 @@ public class TestChatbotAgentJsonExtraction {
     // JSON with a very long string value — must not crash, time out, or OOM
     StringBuilder longValue = new StringBuilder();
     for (int i = 0; i < 10000; i++) {
-      longValue.append("x");
+      longValue.append('x');
     }
     String input = "{\"key\":\"" + longValue + "\"}";
     String result = ChatbotUtils.extractFirstJsonObject(input);

@@ -34,18 +34,6 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_ENABLED = OZONE_RECON_CHATBOT_PREFIX + "enabled";
   public static final boolean OZONE_RECON_CHATBOT_ENABLED_DEFAULT = false;
 
-  /**
-   * Returns whether the chatbot feature is enabled in the given configuration.
-   * Centralised here so that both {@code ReconControllerModule} (Guice wiring)
-   * and {@code ChatbotEndpoint} (request handling) use the same check without
-   * duplicating the key name or default value.
-   */
-  public static boolean isChatbotEnabled(OzoneConfiguration configuration) {
-    return configuration.getBoolean(
-        OZONE_RECON_CHATBOT_ENABLED,
-        OZONE_RECON_CHATBOT_ENABLED_DEFAULT);
-  }
-
   // ── Provider selection ──────────────────────────────────────
   /**
    * Active default provider: openai, gemini, anthropic.
@@ -187,4 +175,16 @@ public final class ChatbotConfigKeys {
       OZONE_RECON_CHATBOT_PREFIX + "anthropic.beta.header";
   public static final String OZONE_RECON_CHATBOT_ANTHROPIC_BETA_HEADER_DEFAULT =
       "context-1m-2025-08-07";
+
+  /**
+   * Returns whether the chatbot feature is enabled in the given configuration.
+   * Centralised here so that both {@code ReconControllerModule} (Guice wiring)
+   * and {@code ChatbotEndpoint} (request handling) use the same check without
+   * duplicating the key name or default value.
+   */
+  public static boolean isChatbotEnabled(OzoneConfiguration configuration) {
+    return configuration.getBoolean(
+        OZONE_RECON_CHATBOT_ENABLED,
+        OZONE_RECON_CHATBOT_ENABLED_DEFAULT);
+  }
 }
