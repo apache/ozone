@@ -36,6 +36,7 @@ share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
+share/ozone/lib/converter-gson.jar
 share/ozone/lib/converter-jackson.jar
 share/ozone/lib/curator-client.jar
 share/ozone/lib/curator-framework.jar
@@ -180,6 +181,7 @@ share/ozone/lib/langchain4j-open-ai.jar
 share/ozone/lib/listenablefuture-empty-to-avoid-conflict-with-guava.jar
 share/ozone/lib/log4j-api.jar
 share/ozone/lib/log4j-core.jar
+share/ozone/lib/logging-interceptor.jar
 share/ozone/lib/metrics-core.jar
 share/ozone/lib/netty-buffer.Final.jar
 share/ozone/lib/netty-codec-http.Final.jar
