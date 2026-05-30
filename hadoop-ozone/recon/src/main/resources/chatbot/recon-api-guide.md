@@ -222,7 +222,7 @@ Retrieve container-level metadata, health, and reconciliation status from Recon.
 
 ---
 
-### **Gemini Behavior Guide (for this module)**
+### **Routing Guide (for this module)**
 
 **When user asks about:**
 
@@ -281,7 +281,7 @@ Fetch metadata about all Ozone volumes tracked by Recon. Each volume represents 
 
 ---
 
-### **Gemini Behavior Guide (for this module)**
+### **Routing Guide (for this module)**
 
 **When user asks about:**
 
@@ -366,7 +366,7 @@ Retrieve metadata about all buckets across all volumes in the Ozone cluster. Eac
 
 ---
 
-### **Gemini Behavior Guide (for this module)**
+### **Routing Guide (for this module)**
 
 **When user asks about:**
 
@@ -461,16 +461,12 @@ Each container entry contains the following fields:
 
 ---
 
-### **Example Natural-Language Mappings (for Gemini)**
+### **Example Natural-Language Mappings**
 
 - “How many containers exist?” → return `data.totalCount`
 - “List all container IDs.” → iterate over `data.containers[].ContainerID`
 - “How many keys are in container 1?” → `NumberOfKeys` where `ContainerID=1`
 - “What pipeline is container 5 using?” → `pipelines` for that container
-
----
-
-Here’s the **Gemini-optimized documentation block** for the `DeletedContainers` schema — structured for clarity, prompt-friendly interpretation, and consistent with the earlier Recon API sections:
 
 ---
 
@@ -571,17 +567,13 @@ Each entry in the array includes:
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 - “Show all deleted containers.” → list of `containerId` from array.
 - “When was container 1015 deleted?” → `stateEnterTime` for that container.
 - “Which replication type was used for deleted containers?” → `replicationConfig.replicationType`.
 - “List deleted containers last used before yesterday.” → filter by `lastUsed` timestamp.
 - “How many replicas did deleted container 1015 have?” → `replicationConfig.replicationNodes`.
-
----
-
-Here’s the **Gemini-optimized documentation** for both `KeyMetadata` and `ReplicaHistory` schemas — fully structured for accurate semantic grounding, cross-endpoint mapping, and natural-language question understanding:
 
 ---
 
@@ -701,7 +693,7 @@ Each key entry includes:
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 - “List all keys in a bucket.” → iterate over `keys[].Key`.
 - “Show key paths under volume X.” → use `CompletePath`.
@@ -781,17 +773,13 @@ Tracks per-container replica history across Datanodes. Used by `/containers/{id}
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 - “Show replica history for container 5.” → `/containers/5/replicaHistory`.
 - “Which Datanodes held container 2?” → list of `datanodeHost`.
 - “When was this replica last seen?” → `lastSeenTime`.
 - “Which replicas are in OPEN state?” → filter by `state`.
 - “Find replicas that disappeared recently.” → compare `lastSeenTime` to current time.
-
----
-
-Here’s the **Gemini-ready structured documentation** for both `ReplicaHistory` (for completeness) and `MissingContainerMetadata`. This version is written for direct ingestion into your chatbot’s context, preserving all relationships, field semantics, and example usage for reasoning.
 
 ---
 
@@ -962,17 +950,13 @@ Represents containers currently **missing from the expected replication topology
 
 ---
 
-### **Key Insights for Gemini**
+### **Routing Notes**
 
-- When the user asks for *“missing containers”*, Gemini should use `/containers/missing`.
+- When the user asks for *“missing containers”*, use `/containers/missing`.
 - If the user requests *“when a container went missing”*, extract `missingSince`.
 - For *replica history of missing containers*, read nested `replicas[]`.
 - Combine `keys` with `totalCount` for aggregate impact summaries.
 - If no containers are missing, respond: *“All containers are currently accounted for; no missing entries found.”*
-
----
-
-Here’s the **Gemini-optimized documentation** for the `UnhealthyContainerMetadata` schema — fully structured to convey every field’s role, logical relationships, and query mapping for intelligent question answering:
 
 ---
 
@@ -1107,7 +1091,7 @@ Each entry in the `containers[]` array describes one unhealthy container:
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 | **User Query Example** | **Relevant Field(s)** | **Action / Endpoint** |
 | --- | --- | --- |
@@ -1120,7 +1104,7 @@ Each entry in the `containers[]` array describes one unhealthy container:
 
 ---
 
-### **Model Behavior Guide (for Gemini)**
+### **Routing Guide**
 
 - Use `/containers/unhealthy` when the query includes generic phrases like *“unhealthy containers,” “replication issues,” “missing data,”* or *“replica imbalance.”*
 - Use `/containers/unhealthy/{state}` when the query specifies *missing, under-replicated, over-replicated,* or *mis-replicated.*
@@ -1132,8 +1116,6 @@ Each entry in the `containers[]` array describes one unhealthy container:
 
 
 ---
-
-Here’s a **fully detailed and Gemini-optimized documentation** for both schemas — `MismatchedContainers` and `DeletedMismatchedContainers`.
 
 Every field, sub-object, and logical relationship is explicitly covered to ensure complete understanding and reliable natural-language mapping.
 
@@ -1284,7 +1266,7 @@ Each pipeline entry includes:
 
 ---
 
-### **Natural-Language Mappings (for Gemini)**
+### **Natural-Language Mappings**
 
 | **User Query Example** | **Relevant Field(s)** | **Recommended Endpoint** |
 | --- | --- | --- |
@@ -1296,7 +1278,7 @@ Each pipeline entry includes:
 
 ---
 
-### **Gemini Behavior Guide**
+### **Routing Guide**
 
 - Use `/containers/mismatch` for queries involving **OM–SCM mismatches** or **metadata inconsistencies**.
 - If the user mentions *“containers missing in SCM”* → filter where `existsAt = "OM"`.
@@ -1413,7 +1395,7 @@ Used by `/containers/mismatch/deleted` endpoint to find orphaned entries that sh
 
 ---
 
-### **Natural-Language Mappings (for Gemini)**
+### **Natural-Language Mappings**
 
 | **User Query Example** | **Relevant Field(s)** | **Recommended Endpoint** |
 | --- | --- | --- |
@@ -1424,7 +1406,7 @@ Used by `/containers/mismatch/deleted` endpoint to find orphaned entries that sh
 
 ---
 
-### **Gemini Behavior Guide**
+### **Routing Guide**
 
 - Use `/containers/mismatch/deleted` when queries mention *deleted containers still appearing in OM* or *inconsistent deletion*.
 - Combine with `/containers/mismatch` when user requests *all types of container mismatches*.
@@ -1433,10 +1415,6 @@ Used by `/containers/mismatch/deleted` endpoint to find orphaned entries that sh
 
   *“No deleted containers remain in OM; SCM and OM container metadata are consistent.”*
 
-
----
-
-Below is a **fully thorough, Gemini-optimized documentation block** that includes *all parameters* from **OpenKeysSummary**, **OpenKeys**, **OMKeyInfoList**, **VersionLocation**, and **LocationList** — precisely mapped and exhaustively described for natural-language querying and structured reasoning.
 
 ---
 
@@ -1776,7 +1754,7 @@ Each block object includes:
 
 ---
 
-### **Natural-Language Mappings (for Gemini)**
+### **Natural-Language Mappings**
 
 | Query | Field |
 | --- | --- |
@@ -1788,7 +1766,7 @@ Each block object includes:
 
 ---
 
-### **Gemini Behavior Guide**
+### **Routing Guide**
 
 - Use `OpenKeys` and `OpenKeysSummary` for **active/open file tracking**.
 - Use `OMKeyInfoList` to access **static metadata** for stored or versioned keys.
@@ -1798,8 +1776,6 @@ Each block object includes:
 - For incomplete uploads or multipart debugging, check `multipartKey` and `underConstruction`.
 
 ---
-
-Here’s a **comprehensive Gemini-ready documentation block** for all the schemas you listed —
 
 `DeletePendingKeys`, `DeletePendingSummary`, `DeletePendingDirs`, `DeletePendingBlocks`, and `ACL`.
 
@@ -1894,7 +1870,7 @@ Returned by `/keys/deletePending` endpoint to show files marked for removal but 
 
 ---
 
-### **Natural-Language Mappings (for Gemini)**
+### **Natural-Language Mappings**
 
 | User Query | Relevant Field |
 | --- | --- |
@@ -2164,11 +2140,12 @@ Defines the **Access Control List** structure applied to volumes, buckets, and k
 
 ---
 
-### **Gemini Behavior Guide (Summary)**
+### **Routing Guide (Summary)**
 
 | User Intent | Recommended Endpoint | Key Fields |
 | --- | --- | --- |
 | “Pending key deletions” | `/keys/deletePending` | `deletedKeyInfo[]`, `replicatedDataSize` |
+| “List or filter keys/files in a bucket” | `/keys/listKeys` | `keys[]`, `startPrefix`, `replicationType`, `keySize` |
 | “Pending directory deletions” | `/dirs/deletePending` | `deletedDirInfo[]` |
 | “Pending block deletions” | `/blocks/deletePending` | `OPEN[].localIDList` |
 | “Deletion statistics summary” | `/keys/deletePending/summary` | `totalDeletedKeys` |
@@ -2178,7 +2155,6 @@ Defines the **Access Control List** structure applied to volumes, buckets, and k
 
 This section now exhaustively documents **every parameter and sub-object** under the Delete-Pending and ACL-related schemas, in full depth and consistent structure with your Recon API specification.
 
-Below is a **fully comprehensive, Gemini-ready documentation** for every parameter inside
 
 `NamespaceMetadataResponse`, `MetadataDiskUsage`, `MetadataQuota`, and `MetadataSpaceDist`.
 
@@ -2233,7 +2209,7 @@ Returned by `/namespace/metadata` endpoint.
 
 ---
 
-### **Natural-Language Mappings (for Gemini)**
+### **Natural-Language Mappings**
 
 | Query | Field |
 | --- | --- |
@@ -2411,7 +2387,7 @@ Returned by `/namespace/spaceDist` or integrated into Recon UI visualizations.
 
 ---
 
-## **Gemini Behavior Guide (Cross-Schema)**
+## **Routing Guide (Cross-Schema)**
 
 | Intent | Schema | Key Fields |
 | --- | --- | --- |
@@ -2423,9 +2399,8 @@ Returned by `/namespace/spaceDist` or integrated into Recon UI visualizations.
 
 ---
 
-This documentation now covers **every property and nested element** across the four metadata schemas, with clear field definitions, examples, usage context, and Gemini query mappings.
+This documentation now covers **every property and nested element** across the four metadata schemas, with clear field definitions, examples, usage context, and natural-language query mappings.
 
-Below is a **Gemini-optimized documentation block** for the `StorageReport`, `ClusterState`, `DatanodesSummary`, `RemovedDatanodesResponse`, `DatanodesDecommissionInfo`, and `ByteString` schemas.
 
 All fields are expanded, typed, and semantically linked so the model can map user intent to exact parameters and metrics.
 
@@ -2470,7 +2445,7 @@ Used inside multiple APIs such as `/clusterState`, `/datanodes`, and `/pipelines
 - Helps detect imbalance or external data occupying Ozone disks.
 - Commonly nested in `ClusterState` or `DatanodesSummary`.
 
-**Typical Questions Gemini Should Map**
+**Typical Question Mappings**
 
 - “How much total storage is available in the cluster?” → `capacity`
 - “What portion of space is used by non-Ozone data?” → `nonOzoneUsed`
@@ -2707,7 +2682,7 @@ Used internally for data encoding and transmission validation.
 
 ---
 
-### **Gemini Behavior Guide (Summary)**
+### **Routing Guide (Summary)**
 
 - For cluster-level queries → use **ClusterState**.
 - For node-level health and capacity → use **DatanodesSummary**.
@@ -2715,9 +2690,8 @@ Used internally for data encoding and transmission validation.
 - For raw capacity metrics → use **StorageReport** (nested in multiple schemas).
 - For encoding checks → use **ByteString**.
 
-This textual structure gives Gemini both semantic understanding (purpose, usage, relationships) and low-level grounding (exact field names and examples).
+This structure provides both semantic understanding (purpose, usage, relationships) and low-level grounding (exact field names and examples).
 
-Here’s a **complete and Gemini-optimized documentation block** for the
 
 `DatanodeDetails` schema. Every parameter is included and concisely explained so the model can interpret, map, and reason over it without ambiguity.
 
@@ -2817,7 +2791,7 @@ Used in APIs like `/datanodes`, `/datanodes/decommission/info`, and internal clu
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 | Example Query | Map To |
 | --- | --- |
@@ -2831,7 +2805,7 @@ Used in APIs like `/datanodes`, `/datanodes/decommission/info`, and internal clu
 
 ---
 
-### **Gemini Behavior Guide**
+### **Routing Guide**
 
 - Use `DatanodeDetails` whenever queries involve **specific node identity**, **network placement**, or **state management**.
 - Prefer textual fields (`ipAddress`, `hostName`, `networkLocation`) for user-facing responses; the `ByteString` variants exist only for internal matching.
@@ -2839,9 +2813,8 @@ Used in APIs like `/datanodes`, `/datanodes/decommission/info`, and internal clu
 
 ---
 
-This version includes every field, nested object, and its purpose — with short, clear summaries optimized for Gemini’s retrieval and reasoning.
+This version includes every field, nested object, and its purpose — with short, clear summaries for structured retrieval and reasoning.
 
-Here is the **complete Gemini-optimized documentation** for the
 
 `PipelinesSummary` schema — fully expanded, with every parameter explained concisely and consistently with your `DatanodeDetails` format.
 
@@ -2996,7 +2969,7 @@ Each element within `pipelines[]` includes:
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 | Example Query | Maps To |
 | --- | --- |
@@ -3012,18 +2985,12 @@ Each element within `pipelines[]` includes:
 
 ---
 
-### **Gemini Behavior Guide**
+### **Routing Guide**
 
 - Use `PipelinesSummary` for all user intents involving **replication groups**, **leaders**, or **container-to-pipeline mappings**.
 - When a query includes keywords like “RATIS,” “pipeline,” “replica,” “leader,” or “container group,” this schema is most relevant.
 - Combine with `DatanodesSummary` for topology-aware explanations (e.g., “Which rack hosts all nodes of this pipeline?”).
 - If `status = CLOSED`, the pipeline should be excluded from write path discussions.
-
----
-
-This version includes every parameter, short one-line summaries for all fields (including nested arrays), structured examples, and clear guidance for Gemini’s context reasoning.
-
-Here is the **complete, Gemini-optimized documentation** for the `TasksStatus` schema — written in the same detailed, field-by-field format as your previous ones, with full parameter coverage, context, and reasoning guidance.
 
 ---
 
@@ -3094,7 +3061,7 @@ Each entry in the array corresponds to one background task being tracked by Reco
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 | Example Query | Maps To |
 | --- | --- |
@@ -3106,7 +3073,7 @@ Each entry in the array corresponds to one background task being tracked by Reco
 
 ---
 
-### **Gemini Behavior Guide**
+### **Routing Guide**
 
 - Use this schema when queries involve **Recon sync progress**, **task freshness**, or **lag detection**.
 - Keywords like *“last updated,” “task progress,” “delta sync,” “background service,”* or *“status of tasks”* map directly here.
@@ -3115,8 +3082,6 @@ Each entry in the array corresponds to one background task being tracked by Reco
 
 ---
 
-This version covers every field in `TasksStatus`, includes clear operational meaning, examples, and precise mappings for Gemini to reason about synchronization and background processing health.
-
 ---
 
 ## Module: Keys (Advanced Listing)
@@ -3124,53 +3089,192 @@ This version covers every field in `TasksStatus`, includes clear operational mea
 ### **Endpoint:** `/keys/listKeys`
 
 **Intent Keywords:**
-list keys, list files, filter keys, large keys, ratis keys, ec keys, keys by date, keys by size
+list keys, list files, browse bucket, filter keys, large keys, ratis keys, ec keys, keys by date, keys by size, keys under prefix, paginate keys
 
 **Purpose:**
-Return keys/files under a prefix with optional filters on replication type, creation date, and key size.
+Return committed keys and files under a bucket-scoped prefix with optional filters on replication type, creation date, and minimum size. Supports pagination across large buckets (OBS, LEGACY, and FSO layouts).
+
+Use this endpoint when the user wants to **enumerate or filter stored keys**, not open/in-progress writes (use `/keys/open` for those).
 
 **Method:** `GET`
 
 **Query Parameters:**
-- `replicationType` (string, optional): `RATIS` or `EC`
-- `creationDate` (string, optional): format `MM-dd-yyyy HH:mm:ss`
-- `keySize` (long, optional, default `0`): keys with size >= keySize (bytes)
-- `startPrefix` (string, optional, default `/`): must be bucket level or deeper
-- `prevKey` (string, optional): pagination cursor
-- `limit` (integer, optional, default `1000`): max number of keys
 
-**Response Highlights:**
-- `status`
-- `path`
-- `replicatedDataSize`
-- `unReplicatedDataSize`
-- `lastKey`
-- `keys[]` with:
-  - `key`
-  - `path`
-  - `size`
-  - `replicatedSize`
-  - `replicationInfo` (`replicationType`, `replicationFactor`, `requiredNodes`)
-  - `creationTime`
-  - `modificationTime`
-  - `isKey`
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| **`startPrefix`** | `string` | **Yes (effective)** | `/` | Path prefix to search under. **Must be bucket level or deeper** — at minimum `/<volume>/<bucket>`. Examples: `/volume1/fso-bucket`, `/volume1/obs-bucket/dir1/`. Returns HTTP 400 if missing, empty, or not at least volume+bucket depth. |
+| **`replicationType`** | `string` | No | (none) | Filter by replication backend. Common values: `RATIS`, `EC`. Omit to include all replication types. |
+| **`creationDate`** | `string` | No | (none) | Return keys created **on or after** this timestamp. Format: `MM-dd-yyyy HH:mm:ss` (server local timezone). Example: `02-10-2026 00:00:00`. |
+| **`keySize`** | `integer` | No | `0` | Minimum logical size in bytes. Only keys with `size >= keySize` are returned. Example: `1073741824` for 1 GB. |
+| **`prevKey`** | `string` | No | `""` | Pagination cursor. Set to the `lastKey` value from the previous response to fetch the next page. |
+| **`limit`** | `integer` | No | `1000` | Maximum number of keys to return in one response. |
+
+**Important constraints for the chatbot:**
+- **Always** set `startPrefix` to at least `/<volume>/<bucket>`. Never use `/` alone — that scans the entire cluster and is blocked by Recon chatbot safety policy.
+- If the user names a volume and bucket, construct `startPrefix=/volumeName/bucketName`.
+- If the user names a directory under a bucket, include it: `/volume1/fso-bucket/dir1/`.
+- Use `/keys/open` instead when the question is about **open/uncommitted** files.
+- Use `/keys/open/summary` for aggregate open-key statistics without listing individual files.
+
+**Response schema:** `ListKeysResponse` (see below)
+
+**HTTP status notes:**
+- `200` — Keys found and returned.
+- `204` / empty match — No keys matched the filters under the prefix.
+- `400` — Invalid `startPrefix` (not bucket-scoped).
+- `503` — Recon OM metadata still initializing (`status: INITIALIZING`).
 
 **Example Queries:**
 - "List keys under /volume1/fso-bucket."
-- "Show RATIS keys larger than 1 GB."
-- "Find EC keys created after 02-10-2026 00:00:00."
-- "List keys under /volume1/obs-bucket with pagination."
+- "Show RATIS keys larger than 1 GB in bucket obs-bucket on volume vol1."
+- "Find EC keys in /vol1/bucket2 created after 02-10-2026 00:00:00."
+- "List the next page of keys in /volume1/obs-bucket using pagination."
 
-**Example Request:**
-`/api/v1/keys/listKeys?startPrefix=/volume1/fso-bucket&limit=100&replicationType=RATIS&keySize=1048576`
+**Example Requests:**
+- `/api/v1/keys/listKeys?startPrefix=/volume1/fso-bucket&limit=100`
+- `/api/v1/keys/listKeys?startPrefix=/volume1/fso-bucket&limit=100&replicationType=RATIS&keySize=1048576`
+- `/api/v1/keys/listKeys?startPrefix=/volume1/obs-bucket&prevKey=/volume1/obs-bucket/key6&limit=100`
 
 **Related Endpoints:**
-- `/keys/open`
-- `/keys/open/summary`
-- `/keys/deletePending`
-- `/keys/deletePending/summary`
+- `/keys/open` — keys currently open (not yet committed)
+- `/keys/open/summary` — aggregate stats for open keys
+- `/keys/deletePending` — keys marked for deletion
+- `/keys/deletePending/summary` — deletion summary counts
+- `/namespace/summary` — namespace counts without listing individual keys
 
-Here is the **complete, Gemini-optimized documentation** for the `FileSizeUtilization` schema — following the same structure, depth, and tone as your previous sections. Every parameter is covered and concisely summarized with examples and reasoning context for model comprehension.
+---
+
+## **Schema: ListKeysResponse**
+
+**Purpose:**
+
+Paginated listing of committed keys/files under a prefix, with optional filters applied. Returned by `/keys/listKeys`.
+
+Unlike `/keys/open`, this endpoint searches **committed** keys across LEGACY, FSO, and OBS bucket layouts.
+
+---
+
+### **Top-Level Fields**
+
+- **`status`** *(string)* — Result status. Common values: `OK`, `INITIALIZING`.
+
+  *Example:* `"OK"`
+
+- **`path`** *(string)* — Echo of the requested `startPrefix`.
+
+  *Example:* `"/volume1/fso-bucket"`
+
+- **`replicatedDataSize`** *(integer)* — Sum of `replicatedSize` for all keys in this response page (bytes after replication).
+
+  *Example:* `188743680`
+
+- **`unReplicatedDataSize`** *(integer)* — Sum of logical `size` for all keys in this response page.
+
+  *Example:* `62914560`
+
+- **`lastKey`** *(string)* — Internal key identifier of the last entry in `keys[]`. Pass this value as `prevKey` to fetch the next page.
+
+  *Example:* `"/volume1/obs-bucket/key6"`
+
+- **`keys[]`** *(array)* — List of matching key/file entries (see below).
+
+---
+
+### **`keys[]` Entry Fields**
+
+Each element describes one key or directory prefix:
+
+- **`key`** *(string)* — Internal RocksDB/table key used for pagination. FSO buckets may show numeric object IDs here; use `path` for human-readable names.
+
+  *Example:* `"/volume1/obs-bucket/key1"`
+
+- **`path`** *(string)* — Human-readable path relative to the Ozone namespace (`volume/bucket/...`).
+
+  *Example:* `"volume1/fso-bucket/dir1/file1"`
+
+- **`size`** *(integer)* — Logical data size in bytes (before replication).
+
+  *Example:* `10485760`
+
+- **`replicatedSize`** *(integer)* — Physical size after applying the replication factor.
+
+  *Example:* `31457280`
+
+- **`replicationInfo`** *(object)* — Replication configuration:
+  - **`replicationType`** *(string)* — `RATIS` or `EC`.
+  - **`replicationFactor`** *(string)* — e.g. `ONE`, `THREE`.
+  - **`requiredNodes`** *(integer)* — Number of replicas/nodes required.
+
+- **`creationTime`** *(integer)* — Epoch milliseconds when the key was created.
+
+- **`modificationTime`** *(integer)* — Epoch milliseconds when the key was last modified.
+
+- **`isKey`** *(boolean)* — `true` for a file, `false` for a directory entry.
+
+---
+
+### **Example Response**
+
+```json
+{
+  "status": "OK",
+  "path": "/volume1/obs-bucket",
+  "replicatedDataSize": 62914560,
+  "unReplicatedDataSize": 62914560,
+  "lastKey": "/volume1/obs-bucket/key6",
+  "keys": [
+    {
+      "key": "/volume1/obs-bucket/key1",
+      "path": "volume1/obs-bucket/key1",
+      "size": 10485760,
+      "replicatedSize": 10485760,
+      "replicationInfo": {
+        "replicationFactor": "ONE",
+        "requiredNodes": 1,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1715781418742,
+      "modificationTime": 1715781419762,
+      "isKey": true
+    }
+  ]
+}
+```
+
+---
+
+### **Usage Notes**
+
+- Combines results from LEGACY and FSO key tables; OBS keys appear under non-FSO paths.
+- Filters (`replicationType`, `creationDate`, `keySize`) are applied while scanning; omit them to list all keys under the prefix.
+- For large buckets, keep `limit` modest (e.g. 100–200) and paginate with `prevKey`/`lastKey`.
+- `creationDate` filter is inclusive of keys created at or after the parsed timestamp.
+
+---
+
+### **Natural-Language Mappings**
+
+| Query | Parameter / Field |
+| --- | --- |
+| "List keys in bucket X on volume Y" | `startPrefix=/Y/X` |
+| "Show only RATIS keys" | `replicationType=RATIS` |
+| "Keys larger than 1 GB" | `keySize=1073741824` |
+| "Keys created after Feb 10 2026" | `creationDate=02-10-2026 00:00:00` |
+| "Next page of results" | `prevKey=<lastKey from prior response>` |
+| "How much data do these keys use?" | `replicatedDataSize`, `unReplicatedDataSize` |
+| "Is this a file or directory?" | `isKey` |
+
+---
+
+### **Routing Guide**
+
+- Choose `/keys/listKeys` when the user asks to **list, browse, search, or filter committed keys/files** in a bucket or subdirectory.
+- **Require** a bucket-scoped `startPrefix` before calling. If the user only names a volume, ask which bucket to scope to.
+- Do **not** use `/keys/listKeys` for open/in-progress uploads — route those to `/keys/open`.
+- Do **not** use `/keys/listKeys` for deletion candidates — route those to `/keys/deletePending`.
+- When combining filters, include every filter the user mentioned (`replicationType`, `keySize`, `creationDate`).
+- If the response includes `lastKey` and the user wants more results, suggest pagination with `prevKey`.
+- If `status` is `INITIALIZING`, tell the user Recon is still syncing OM metadata and to retry shortly.
 
 ---
 
@@ -3249,7 +3353,7 @@ it implies heavy use of small files — common in workloads with metadata-intens
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 | Example Query | Maps To |
 | --- | --- |
@@ -3261,19 +3365,13 @@ it implies heavy use of small files — common in workloads with metadata-intens
 
 ---
 
-### **Gemini Behavior Guide**
+### **Routing Guide**
 
 - Use this schema for **data size analytics**, **file count summaries**, and **storage optimization queries**.
 - When the query includes phrases like *“file size utilization,” “file count by bucket,” “how many small files,”* or *“storage distribution,”* this schema applies.
 - For broader space usage (including replicas), correlate with `MetadataDiskUsage`.
 - If user asks for totals or averages, aggregate across `count` and `fileSize` fields.
 - If `fileSize` appears constant across many buckets, highlight uneven data spread as a cluster optimization insight.
-
----
-
-This section includes every parameter in the `FileSizeUtilization` schema, a short yet explicit summary for each field, complete operational context, example data, and reasoning logic to guide Gemini’s semantic mapping and query handling.
-
-Here is the **complete Gemini-optimized documentation** for the `ContainerUtilization` schema — every parameter included, one-line summaries for each, clear examples, and detailed behavioral guidance for context-aware use.
 
 ---
 
@@ -3340,7 +3438,7 @@ If smaller containers dominate, it may indicate premature container closures or 
 
 ---
 
-### **Natural-Language Query Mappings (for Gemini)**
+### **Natural-Language Query Mappings**
 
 | Example Query | Maps To |
 | --- | --- |
@@ -3352,7 +3450,7 @@ If smaller containers dominate, it may indicate premature container closures or 
 
 ---
 
-### **Gemini Behavior Guide**
+### **Routing Guide**
 
 - Use `ContainerUtilization` when queries mention *“container size,” “container distribution,” “storage utilization per container,”* or *“how many containers of size X.”*
 - When user queries require percentage or trend analysis, compute relative proportions of `count` for each `containerSize`.
@@ -3362,4 +3460,3 @@ If smaller containers dominate, it may indicate premature container closures or 
 
 ---
 
-This documentation covers **every parameter** in the schema, provides short, unambiguous summaries, operational meaning, and guidance for Gemini to map natural-language queries precisely to structured data fields.

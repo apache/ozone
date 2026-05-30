@@ -366,60 +366,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/OpenKeysSummary'
 
-  /keys/listKeys:
-    get:
-      tags:
-        - Keys
-      summary: List keys/files with replication, size and date filters
-      operationId: listKeys
-      parameters:
-        - name: replicationType
-          in: query
-          description: Filter for replication type (for example RATIS or EC)
-          required: false
-          schema:
-            type: string
-        - name: creationDate
-          in: query
-          description: Filter for keys created after this timestamp in MM-dd-yyyy HH:mm:ss format
-          required: false
-          schema:
-            type: string
-        - name: keySize
-          in: query
-          description: Filter for keys with size greater than or equal to this value in bytes
-          required: false
-          schema:
-            type: integer
-            default: 0
-        - name: startPrefix
-          in: query
-          description: Search prefix path, expected at bucket level or deeper
-          required: false
-          schema:
-            type: string
-            default: /
-        - name: prevKey
-          in: query
-          description: Previous key cursor for pagination
-          required: false
-          schema:
-            type: string
-        - name: limit
-          in: query
-          description: Limit for the number of keys to return
-          required: false
-          schema:
-            type: integer
-            default: 1000
-      responses:
-        '200':
-          description: Successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KeyMetadata'
-
   /keys/deletePending:
     get:
       tags:
@@ -508,6 +454,63 @@ paths:
                 properties:
                   totalDeletedDirectories:
                     type: integer
+  /keys/listKeys:
+    get:
+      tags:
+        - Keys
+      summary: List keys/files with replication, size and date filters
+      operationId: listKeys
+      parameters:
+        - name: replicationType
+          in: query
+          description: Filter for replication type (for example RATIS or EC)
+          required: false
+          schema:
+            type: string
+        - name: creationDate
+          in: query
+          description: Filter for keys created after this timestamp in MM-dd-yyyy HH:mm:ss format
+          required: false
+          schema:
+            type: string
+        - name: keySize
+          in: query
+          description: Filter for keys with size greater than or equal to this value in bytes
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: startPrefix
+          in: query
+          description: Search prefix path, expected at bucket level or deeper (for example /volume1/bucket1)
+          required: false
+          schema:
+            type: string
+            default: /
+        - name: prevKey
+          in: query
+          description: Previous key cursor for pagination
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Limit for the number of keys to return
+          required: false
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListKeysResponse'
+        '400':
+          description: Bad request when startPrefix is missing or not bucket-scoped
+        '503':
+          description: Recon OM metadata is still initializing
   /containers/{id}/keys:
     get:
       tags:
@@ -1366,6 +1369,63 @@ components:
           type: integer
         totalOpenKeys:
           type: integer
+    ListKeysResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: OK
+        path:
+          type: string
+          example: /volume1/fso-bucket
+        replicatedDataSize:
+          type: integer
+          description: Total replicated size in bytes for keys returned in this response
+        unReplicatedDataSize:
+          type: integer
+          description: Total logical size in bytes for keys returned in this response
+        lastKey:
+          type: string
+          description: Cursor for pagination; pass as prevKey on the next request
+          example: /volume1/fso-bucket/key6
+        keys:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                description: Internal RocksDB key used for pagination
+              path:
+                type: string
+                description: Human-readable path (volume/bucket/...)
+              size:
+                type: integer
+                description: Logical key size in bytes
+              replicatedSize:
+                type: integer
+                description: Physical size after replication
+              replicationInfo:
+                type: object
+                properties:
+                  replicationFactor:
+                    type: string
+                    example: THREE
+                  requiredNodes:
+                    type: integer
+                    example: 3
+                  replicationType:
+                    type: string
+                    example: RATIS
+              creationTime:
+                type: integer
+                description: Epoch milliseconds
+              modificationTime:
+                type: integer
+                description: Epoch milliseconds
+              isKey:
+                type: boolean
+                description: True when the entry is a file, false for a directory prefix
     OpenKeys:
       type: object
       required: ['lastKey', 'replicatedDataSize', 'unreplicatedDataSize', 'status']
@@ -1818,9 +1878,15 @@ components:
             - 0
             - 100
             - 40
-    StorageReport:
+    DataNodeStorageReport:
       type: object
       properties:
+        datanodeUuid:
+          type: string
+          example: 841be80f-0454-47df-b676
+        hostName:
+          type: string
+          example: ozone-datanode-1
         capacity:
           type: number
           example: 270429917184
@@ -1833,6 +1899,51 @@ components:
         committed:
           type: number
           example: 27007111
+        minimumFreeSpace:
+          type: number
+          example: 20480
+        reserved:
+          type: number
+          example: 31457280
+        filesystemCapacity:
+          type: number
+          example: 270461374464
+        filesystemUsed:
+          type: number
+          example: 390262784
+        filesystemAvailable:
+          type: number
+          example: 270071111680
+      ClusterStorageReport:
+        type: object
+        properties:
+          capacity:
+            type: number
+            example: 270429917184
+          used:
+            type: number
+            example: 358805504
+          remaining:
+            type: number
+            example: 270071111680
+          committed:
+            type: number
+            example: 27007111
+          minimumFreeSpace:
+            type: number
+            example: 20480
+          reserved:
+            type: number
+            example: 31457280
+          filesystemCapacity:
+            type: number
+            example: 270461374464
+          filesystemUsed:
+            type: number
+            example: 390262784
+          filesystemAvailable:
+            type: number
+            example: 270071111680
     ClusterState:
       type: object
       properties:
@@ -1860,7 +1971,7 @@ components:
           type: integer
           example: 4
         storageReport:
-          $ref: "#/components/schemas/StorageReport"
+          $ref: "#/components/schemas/ClusterStorageReport"
         containers:
           type: integer
           example: 26
@@ -1911,7 +2022,7 @@ components:
                 type: number
                 example: 1605738400544
               storageReport:
-                $ref: "#/components/schemas/StorageReport"
+                $ref: "#/components/schemas/DataNodeStorageReport"
               pipelines:
                 type: array
                 items:
