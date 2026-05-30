@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.apache.ozone.test.GenericTestUtils;
@@ -93,6 +94,19 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager,
         reconGlobalStatsManager, reconFileMetadataManager);
     reconTaskController.start();
+  }
+
+  @Test
+  public void testStopCompletesPromptly() {
+    // stop() must not block on the graceful shutdown timeout. The event
+    // processing loop only exits on interrupt, so a plain shutdown() can never
+    // drain it and awaitTermination would otherwise burn the full 30s timeout.
+    long start = Time.monotonicNow();
+    reconTaskController.stop();
+    long elapsed = Time.monotonicNow() - start;
+    assertThat(elapsed)
+        .as("stop() should return promptly, not wait out the shutdown timeout")
+        .isLessThan(5000L);
   }
 
   @Test
