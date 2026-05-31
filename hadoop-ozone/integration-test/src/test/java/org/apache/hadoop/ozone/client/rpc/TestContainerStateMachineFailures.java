@@ -600,6 +600,8 @@ public class TestContainerStateMachineFailures {
             .getContainerState(),
         ContainerProtos.ContainerDataProto.State.CLOSED);
     assertTrue(stateMachine.isStateMachineHealthy());
+    GenericTestUtils.waitFor(() -> stateMachine.getLastAppliedTermIndex().getIndex() != markIndex1 ,
+        1000, 30000);
     try {
       stateMachine.takeSnapshot();
     } finally {
