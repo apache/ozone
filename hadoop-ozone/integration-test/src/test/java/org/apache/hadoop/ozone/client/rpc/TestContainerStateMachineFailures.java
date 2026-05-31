@@ -21,9 +21,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -100,7 +102,6 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
@@ -109,11 +110,15 @@ import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 
 /**
  * Tests the containerStateMachine failure handling.
  */
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestContainerStateMachineFailures {
 
   private static MiniOzoneCluster cluster;
@@ -138,7 +143,9 @@ public class TestContainerStateMachineFailures {
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
+    conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, TimeUnit.SECONDS);
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
@@ -254,7 +261,6 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
-  @Flaky("HDDS-12215")
   public void testContainerStateMachineRestartWithDNChangePipeline()
       throws Exception {
     try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -304,7 +310,12 @@ public class TestContainerStateMachineFailures {
     }
   }
 
+  // This test case is placed at the end because it resets the Ratis storage location.
+  // This causes pipelines to break. Those pipelines are closed passively
+  // via client-side retries rather than by the ScrubbingService.
+  // Running this test earlier would leave a dirty pipeline pool for subsequent tests.
   @Test
+  @Order(Integer.MAX_VALUE)
   public void testContainerStateMachineFailures() throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -532,7 +543,6 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
-  @Flaky("HDDS-6115")
   void testApplyTransactionIdempotencyWithClosedContainer()
       throws Exception {
     OzoneOutputStream key =
@@ -618,7 +628,6 @@ public class TestContainerStateMachineFailures {
   // not be marked unhealthy and pipeline should not fail if container gets
   // closed here.
   @Test
-  @Flaky("HDDS-13482")
   void testWriteStateMachineDataIdempotencyWithClosedContainer()
       throws Exception {
     OzoneOutputStream key =
@@ -683,7 +692,7 @@ public class TestContainerStateMachineFailures {
     };
     Runnable r2 = () -> {
       try {
-        ByteString data = ByteString.copyFromUtf8("hello");
+        ByteString data = ByteString.copyFromUtf8("ratis");
         ContainerProtos.ContainerCommandRequestProto.Builder writeChunkRequest =
             ContainerTestHelper.newWriteChunkRequestBuilder(pipeline,
                 omKeyLocationInfo.getBlockID(), data.size());
@@ -698,7 +707,7 @@ public class TestContainerStateMachineFailures {
           failCount.incrementAndGet();
         }
         String message = e.getMessage();
-        assertThat(message).doesNotContain("hello");
+        assertThat(message).doesNotContain("ratis");
         assertThat(message).contains(HddsUtils.REDACTED.toStringUtf8());
       }
     };
@@ -745,7 +754,6 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
-  @Flaky("HDDS-14101")
   void testContainerStateMachineSingleFailureRetry()
       throws Exception {
     try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -776,7 +784,6 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
-  @Flaky("HDDS-14101")
   void testContainerStateMachineDualFailureRetry()
       throws Exception {
     OzoneOutputStream key =
