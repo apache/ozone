@@ -42,7 +42,7 @@ summary: 数据节点的磁盘平衡器.
 磁盘平衡器功能已通过功能标志引入。默认情况下，此功能处于禁用状态。
 
 可以通过在“ozone-site.xml”配置文件中将以下属性设置为“true”来**启用**该功能：
-`hdds.datanode.disk.balancer.enabled = false`
+`hdds.datanode.disk.balancer.enabled = true`
 
 ### 身份验证和授权
 
@@ -153,9 +153,9 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 | `--json`                            | 输出格式设置为JSON。                                                                                                                                                                                                     | `--json`                                       |
 | `-t/--threshold-percentage`         | 磁盘使用率阈值百分比（默认值：10.0）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                 | `-t 5`<br>`--threshold-percentage 5.0`        |
 | `-b/--bandwidth-in-mb`              | 最大磁盘带宽，单位为 MB/s（默认值：10）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                             | `-b 20`<br>`--bandwidth-in-mb 50`              |
-| `-p/--parallel-thread`              | 并行线程数（默认值：1）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                        | `-p 5`<br>`--parallel-thread 10`               |
-| `-s/--stop-after-disk-even`         | 磁盘平衡完成后自动停止（默认值：false）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
-| `-c/--container-states`             | 以逗号分隔的容器生命周期状态名称，表示可在磁盘之间移动的状态。配合 `start` 和 `update` 命令使用。                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states OPEN,CLOSED` |
+| `-p/--parallel-thread`              | 并行线程数（默认值：5）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                        | `-p 5`<br>`--parallel-thread 10`               |
+| `-s/--stop-after-disk-even`         | 磁盘平衡完成后自动停止（默认值：true）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                              | `-s false`<br>`--stop-after-disk-even true`    |
+| `-c/--container-states`             | 以逗号分隔的容器生命周期状态名称，表示可在磁盘之间移动的状态。配合 `start` 和 `update` 命令使用。                                                                                                         | `-c CLOSED,QUASI_CLOSED`<br>`--container-states CLOSED` |
 
 ### 示例
 **启动 DiskBalancer：**
@@ -233,7 +233,7 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 
 | Property                                                    | Default Value                          | Description                                                                                                                                                                 |
 |-------------------------------------------------------------|----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `hdds.datanode.disk.balancer.enabled`                       | `false`                                | 如果为 false，则 Datanode 上的 DiskBalancer 服务将被禁用。将其配置为 true 可启用 DiskBalancer。                                                      |                                                            |                                                                                        |                                                                                                                                                                              |
+| `hdds.datanode.disk.balancer.enabled`                       | `false`                                | 如果为 false，则 Datanode 上的 DiskBalancer 服务将被禁用。将其配置为 true 可启用 DiskBalancer。                                                      |
 | `hdds.datanode.disk.balancer.volume.density.threshold.percent` | `10.0`                                 | 百分比（0-100）。如果对于每个卷，其利用率与平均数据节点利用率之差不超过此阈值，则认为数据节点处于平衡状态。    |
 | `hdds.datanode.disk.balancer.max.disk.throughputInMBPerSec` | `10`                                   | 平衡器可用于移动数据的最大带宽（以 MB/s 为单位），以避免影响客户端 I/O。                                                                    |
 | `hdds.datanode.disk.balancer.parallel.thread`               | `5`                                    | 用于并行移动容器的工作线程数。                                                                                                       |
@@ -244,4 +244,3 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 | `hdds.datanode.disk.balancer.container.choosing.policy` | `org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy` | 用于选择源/目标卷以及要移动的容器的策略。                                                                             |
 | `hdds.datanode.disk.balancer.service.timeout`               | `300s`                                 | Datanode DiskBalancer 服务操作超时。                                                                                                                    |
 | `hdds.datanode.disk.balancer.should.run.default`            | `false`                                | 如果平衡器无法读取其持久配置，则该值决定服务是否应默认运行。                                                       |
-
