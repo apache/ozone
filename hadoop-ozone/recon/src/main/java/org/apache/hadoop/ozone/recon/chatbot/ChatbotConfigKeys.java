@@ -58,6 +58,9 @@ public final class ChatbotConfigKeys {
   // ── Per-provider base URL overrides (optional) ──────────────
   public static final String OZONE_RECON_CHATBOT_OPENAI_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "openai.base.url";
   public static final String OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT = "https://api.openai.com";
+  
+  public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL = OZONE_RECON_CHATBOT_PREFIX + "gemini.base.url";
+  public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
   // ── Execution policy ────────────────────────────────────────
   public static final String OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS = OZONE_RECON_CHATBOT_PREFIX

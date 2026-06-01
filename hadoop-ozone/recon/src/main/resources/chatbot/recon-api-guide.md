@@ -1,3 +1,27 @@
+# Recon API Guide
+
+## 1. Global Routing Rules (CRITICAL)
+Before selecting an endpoint, you must disambiguate the user's intent according to these rules:
+
+* **Aggregation vs. Enumeration (The `du` vs `ls` rule):**
+  * If the user asks for "totals", "size", "disk usage", or "how much space", ALWAYS use `/namespace/usage`. Do NOT use `/keys/listKeys` to calculate totals.
+  * If the user asks to "list files", "find files", or filter files by size/date, ALWAYS use `/keys/listKeys`. Do NOT use `/namespace/usage` as it only shows top-level directories.
+* **Open vs. Committed Keys:**
+  * If the user asks about "open", "in-progress", or "uncommitted" files, use `/keys/open`.
+  * If the user asks to list normal/committed files, use `/keys/listKeys`.
+* **Missing vs. Deleted Containers:**
+  * If the user asks about containers that are "missing" or "lost", use `/containers/missing`.
+  * If the user asks about containers that were "deleted", use `/containers/deleted`.
+
+## 2. Module Index
+* **Containers:** `/containers`, `/containers/missing`, `/containers/unhealthy`, `/containers/deleted`
+* **Volumes & Buckets:** `/volumes`, `/buckets`
+* **Keys (Files):** `/keys/listKeys`, `/keys/open`, `/keys/deletePending`
+* **Namespace & Usage:** `/namespace/usage`, `/namespace/summary`, `/namespace/quota`, `/utilization/filesize`
+* **Cluster Health:** `/clusterState`, `/datanodes`, `/pipelines`, `/task/status`
+
+---
+
 ## Module: Containers
 
 **Category Purpose:**

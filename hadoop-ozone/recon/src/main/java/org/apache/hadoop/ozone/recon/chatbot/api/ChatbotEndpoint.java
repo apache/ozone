@@ -220,7 +220,7 @@ public class ChatbotEndpoint {
       return Response.status(Response.Status.GATEWAY_TIMEOUT)
           .entity(Collections.singletonMap("error",
               "The chatbot request timed out. The LLM or Recon API took too long " +
-                  "to respond. Please try again or use a faster model."))
+                  "to respond. Please try again or use a different model."))
           .build();
 
     } catch (ExecutionException e) {

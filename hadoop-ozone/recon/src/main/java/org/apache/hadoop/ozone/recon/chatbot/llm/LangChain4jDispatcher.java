@@ -26,7 +26,6 @@ import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
-import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.TokenUsage;
 import java.time.Duration;
@@ -315,9 +314,17 @@ public class LangChain4jDispatcher implements LLMClient {
 
   private ChatLanguageModel buildGeminiModel(String model) throws LLMException {
     String key = resolveKey(ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY, "gemini");
-    return GoogleAiGeminiChatModel.builder()
+    String baseUrl = configuration.get(
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_BASE_URL,
+        ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT);
+
+    // LangChain4j 0.35.0's native Gemini client has a known bug where it ignores read timeouts.
+    // Since Google's Gemini API is fully compatible with the OpenAI API spec via the /openai/
+    // endpoint, we route Gemini requests through the OpenAiChatModel to ensure timeouts are honored.
+    return OpenAiChatModel.builder()
         .apiKey(key)
         .modelName(model)
+        .baseUrl(baseUrl)
         .timeout(timeout)
         .build();
   }
