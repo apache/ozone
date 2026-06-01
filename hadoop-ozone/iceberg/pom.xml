@@ -32,6 +32,14 @@
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+    </dependency>
 
     <!-- Iceberg dependencies -->
     <dependency>
@@ -66,19 +74,17 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-common</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.avro</groupId>
-          <artifactId>avro</artifactId>
-        </exclusion>
-      </exclusions>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-filesystem</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
 

@@ -20,6 +20,9 @@ BASEDIR=$1
 #hdds.version
 HDDS_VERSION=$2
 
+# true when ozone-iceberg is built (JDK 11+), false for JDK 8 builds
+INCLUDE_ICEBERG=${3:-false}
+
 ## @audience     private
 ## @stability    evolving
 function run()
@@ -96,6 +99,11 @@ run cp "${ROOT}/hadoop-hdds/framework/src/main/resources/network-topology-nodegr
 run cp -r "${ROOT}/hadoop-ozone/dist/src/main/dockerlibexec/." "libexec/"
 
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone" "bin/"
+
+if [[ "${INCLUDE_ICEBERG}" == "true" ]]; then
+  run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone-iceberg" "bin/"
+  run chmod 755 "bin/ozone-iceberg"
+fi
 
 
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone-config.sh" "libexec/"

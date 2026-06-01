@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Entry point for the Iceberg CLI
+#it’s the standard Ozone way to turn ozone-iceberg JAR + main class into a runnable command.
+OZONE_SHELL_EXECNAME="ozone-iceberg"
+MYNAME="${BASH_SOURCE-$0}"
+bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
+JVM_PID="$$"
+
+# load functions
+for dir in "${OZONE_LIBEXEC_DIR}" "${OZONE_HOME}/libexec" "${HADOOP_LIBEXEC_DIR}" "${HADOOP_HOME}/libexec" "${bin}/../libexec"; do
+  if [[ -e "${dir}/ozone-functions.sh" ]]; then
+    # shellcheck source=ozone-functions.sh
+    . "${dir}/ozone-functions.sh"
+    if declare -F ozone_bootstrap >& /dev/null; then
+      break
+    fi
+  fi
+done
+
+if ! declare -F ozone_bootstrap >& /dev/null; then
+  echo "ERROR: Cannot find ozone-functions.sh." 2>&1
+  exit 1
+fi
+
+## @description  Usage for ozone-iceberg (used by ozone-config.sh / ozone_exit_with_usage).
+## @audience     public
+function ozone_usage
+{
+  ozone_reset_usage
+
+  ozone_add_subcommand "rewrite-path" client "rewrite Iceberg table paths for table migration (see ${OZONE_SHELL_EXECNAME} rewrite-path --help for tool options)"
+
+  ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
+}
+
+ozone_bootstrap
+# shellcheck source=ozone-config.sh
+. "${OZONE_LIBEXEC_DIR}/ozone-config.sh"
+
+MYNAME=$(ozone_abs "${MYNAME}")
+
+if [[ $# -eq 0 ]] || [[ "$1" != "rewrite-path" ]]; then
+  echo "Usage: ozone-iceberg rewrite-path [OPTIONS]" >&2
+  exit 1
+fi
+shift
+
+OZONE_CLASSNAME="org.apache.hadoop.ozone.iceberg.RewriteTablePathCommand"
+OZONE_RUN_ARTIFACT_NAME="ozone-iceberg"
+OZONE_SUBCMD="iceberg"
+OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
+OZONE_SUBCMD_ARGS=("$@")
+
+ozone_validate_classpath
+
+if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
+  OZONE_LOGLEVEL=OFF
+  OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
+  OZONE_OPTS="${OZONE_OPTS} -Dslf4j.internal.verbosity=ERROR"
+fi
+
+ozone_assemble_classpath
+
+ozone_add_client_opts
+ozone_add_server_opts
+
+ozone_subcommand_opts "ozone" "iceberg"
+
+ozone_add_default_gc_opts
+
+ozone_generic_java_subcmd_handler
