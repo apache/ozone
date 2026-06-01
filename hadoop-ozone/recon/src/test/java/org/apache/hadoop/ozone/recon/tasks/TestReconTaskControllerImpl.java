@@ -610,9 +610,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         .thenReturn(false)  // First call fails
         .thenReturn(true);  // Second call succeeds
     
-    // Stop async processing to control event processing manually
-    controllerSpy.stop();
-    
+    // Stop async processing on the real controller so we can drive event
+    // processing manually. Stopping controllerSpy would only flip the flag on
+    // the Mockito copy, not the live event-processing thread.
+    controllerImpl.stop();
+
     // Create and manually process a reinitialization event
     ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES,
@@ -746,9 +748,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(controllerSpy.reInitializeTasks(any(ReconOMMetadataManager.class), any()))
         .thenReturn(true);  // Succeed
     
-    // Stop async processing to control event processing manually
-    controllerSpy.stop();
-    
+    // Stop async processing on the real controller so we can drive event
+    // processing manually. Stopping controllerSpy would only flip the flag on
+    // the Mockito copy, not the live event-processing thread.
+    controllerImpl.stop();
+
     // Create reinitialization event with checkpointed manager
     ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW,
