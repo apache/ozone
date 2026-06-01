@@ -29,9 +29,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -257,6 +259,112 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
       assertNotNull(processResult.getSubTaskSeekPositions().get(NSSummaryTask.BucketType.FSO.name()));
       assertNotNull(processResult.getSubTaskSeekPositions().get(NSSummaryTask.BucketType.LEGACY.name()));
       assertNotNull(processResult.getSubTaskSeekPositions().get(NSSummaryTask.BucketType.OBS.name()));
+    }
+  }
+
+  /**
+   * Regression test for the field-level OmBucketInfo cache in
+   * {@link NSSummaryTaskDbEventHandler}. A bucket deleted and recreated under
+   * the same volume/bucket name gets a new objectID but reuses the same DB key.
+   * The cached entry must be invalidated when the bucketTable event is observed,
+   * otherwise key events for the recreated bucket would be attributed to the
+   * stale (old) bucket objectID.
+   */
+  @Nested
+  public class TestProcessBucketRecreate {
+
+    private static final String RECREATE_BUCKET = "bucketrecreate";
+    private static final long OLD_BUCKET_OBJECT_ID = 100L;
+    private static final long NEW_BUCKET_OBJECT_ID = 200L;
+    private static final long FIRST_KEY_OBJECT_ID = 101L;
+    private static final long SECOND_KEY_OBJECT_ID = 201L;
+    private static final long RECREATE_KEY_SIZE = 1024L;
+
+    @Test
+    public void testBucketCacheInvalidatedOnRecreate() throws IOException {
+      ReconOMMetadataManager reconMetadataMgr = getReconOMMetadataManager();
+      String bucketKey = reconMetadataMgr.getBucketKey(VOL, RECREATE_BUCKET);
+
+      // The bucket initially exists as an OBS bucket with the old objectID.
+      reconMetadataMgr.getBucketTable()
+          .put(bucketKey, buildObsBucketInfo(OLD_BUCKET_OBJECT_ID));
+
+      // A fresh task starts with an empty bucket cache and exercises the full
+      // parallel sub-task dispatch.
+      NSSummaryTask task = new NSSummaryTask(getReconNamespaceSummaryManager(),
+          reconMetadataMgr, getOmConfiguration());
+
+      // Batch 1: a key lands in the original bucket. This warms the OBS
+      // sub-task's bucket cache with the old objectID.
+      OMDBUpdateEvent firstKeyPut =
+          obsKeyPutEvent(bucketKey, KEY_ONE, FIRST_KEY_OBJECT_ID, OLD_BUCKET_OBJECT_ID);
+      task.process(new OMUpdateEventBatch(
+          Collections.singletonList(firstKeyPut), 0L), Collections.emptyMap());
+
+      NSSummary oldBucketSummary =
+          getReconNamespaceSummaryManager().getNSSummary(OLD_BUCKET_OBJECT_ID);
+      assertNotNull(oldBucketSummary);
+      assertEquals(1, oldBucketSummary.getNumOfFiles());
+
+      // The bucket is deleted and recreated under the same name with a new
+      // objectID (same DB key, different identity).
+      reconMetadataMgr.getBucketTable()
+          .put(bucketKey, buildObsBucketInfo(NEW_BUCKET_OBJECT_ID));
+
+      // Batch 2 mirrors the real recreate sequence: the old bucket is deleted,
+      // a new bucket is created under the same name, then a key lands in it.
+      // The bucketTable delete event must invalidate the stale cache entry so
+      // the key event re-reads the recreated bucket's objectID.
+      OMDBUpdateEvent bucketDelete = new OMDBUpdateEvent
+          .OMUpdateEventBuilder<String, OmBucketInfo>()
+          .setKey(bucketKey)
+          .setValue(buildObsBucketInfo(OLD_BUCKET_OBJECT_ID))
+          .setTable(reconMetadataMgr.getBucketTable().getName())
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .build();
+      OMDBUpdateEvent bucketPut = new OMDBUpdateEvent
+          .OMUpdateEventBuilder<String, OmBucketInfo>()
+          .setKey(bucketKey)
+          .setValue(buildObsBucketInfo(NEW_BUCKET_OBJECT_ID))
+          .setTable(reconMetadataMgr.getBucketTable().getName())
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .build();
+      OMDBUpdateEvent secondKeyPut =
+          obsKeyPutEvent(bucketKey, KEY_TWO, SECOND_KEY_OBJECT_ID, NEW_BUCKET_OBJECT_ID);
+      task.process(new OMUpdateEventBatch(
+          Arrays.asList(bucketDelete, bucketPut, secondKeyPut), 0L), Collections.emptyMap());
+
+      // The new key must be attributed to the recreated bucket's objectID...
+      NSSummary newBucketSummary =
+          getReconNamespaceSummaryManager().getNSSummary(NEW_BUCKET_OBJECT_ID);
+      assertNotNull(newBucketSummary);
+      assertEquals(1, newBucketSummary.getNumOfFiles());
+
+      // ...and the stale (old) bucket must not have absorbed it.
+      assertEquals(1, getReconNamespaceSummaryManager()
+          .getNSSummary(OLD_BUCKET_OBJECT_ID).getNumOfFiles());
+    }
+
+    private OmBucketInfo buildObsBucketInfo(long objectId) {
+      return OmBucketInfo.newBuilder()
+          .setVolumeName(VOL)
+          .setBucketName(RECREATE_BUCKET)
+          .setObjectID(objectId)
+          .setBucketLayout(getOBSBucketLayout())
+          .build();
+    }
+
+    private OMDBUpdateEvent obsKeyPutEvent(String bucketKey, String keyName,
+                                           long keyObjectId, long parentObjectId) {
+      String omKey = bucketKey + OM_KEY_PREFIX + keyName;
+      OmKeyInfo keyInfo = buildOmKeyInfo(VOL, RECREATE_BUCKET, keyName, keyName,
+          keyObjectId, parentObjectId, RECREATE_KEY_SIZE);
+      return new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(omKey)
+          .setValue(keyInfo)
+          .setTable(getReconOMMetadataManager().getKeyTable(getOBSBucketLayout()).getName())
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .build();
     }
   }
 }

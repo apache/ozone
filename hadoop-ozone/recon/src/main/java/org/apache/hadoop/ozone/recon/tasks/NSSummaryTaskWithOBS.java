@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
@@ -201,10 +202,21 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
       eventCounter++;
 
-      // We only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
-      boolean updateOnKeyTable = table.equals(KEY_TABLE);
-      if (!updateOnKeyTable) {
+      // A bucket can be deleted and recreated under the same name with a new
+      // objectID. A recreate is always preceded by a delete, so dropping the
+      // cached OmBucketInfo on the delete event is enough for a later key event
+      // to re-read the recreated bucket. Bucket property updates don't change
+      // objectID or layout, so they need not invalidate the cache.
+      if (table.equals(BUCKET_TABLE)) {
+        if (action == OMDBUpdateEvent.OMDBUpdateAction.DELETE) {
+          invalidateBucketCache(omdbUpdateEvent.getKey());
+        }
+        continue;
+      }
+
+      // We only process updates on OM's KeyTable
+      if (!table.equals(KEY_TABLE)) {
         continue;
       }
 
