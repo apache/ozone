@@ -242,6 +242,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint, boolean readOnly) throws IOException {
+    return createCheckpointMetadataManager(conf, checkpoint, readOnly, true);
+  }
+
+  public static OmMetadataManagerImpl createCheckpointMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint, boolean readOnly,
+      boolean enableRocksDbMetrics) throws IOException {
     Path path = checkpoint.getCheckpointLocation();
     Path parent = path.getParent();
     if (parent == null) {
@@ -254,7 +260,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throw new IllegalStateException("DB checkpoint dir name should not "
           + "have been null. Checkpoint path is " + path);
     }
-    return new OmMetadataManagerImpl(conf, dir, name.toString(), readOnly);
+    return new OmMetadataManagerImpl(
+        conf, dir, name.toString(), readOnly, enableRocksDbMetrics);
   }
 
   protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name) throws IOException {
@@ -271,6 +278,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   public OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name, boolean readOnly)
       throws IOException {
+    this(conf, dir, name, readOnly, true);
+  }
+
+  /**
+   * Metadata constructor for checkpoints.
+   *
+   * @param conf - Ozone conf.
+   * @param dir - Checkpoint parent directory.
+   * @param name - Checkpoint directory name.
+   * @param readOnly - Whether to open the checkpoint DB read-only.
+   * @param enableRocksDbMetrics - Whether to register generic RocksDB metrics.
+   *     Pass false for transient checkpoint DBs whose column families may be
+   *     dropped or recreated while the DB is open.
+   * @throws IOException
+   */
+  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir,
+      String name, boolean readOnly, boolean enableRocksDbMetrics)
+      throws IOException {
     lock = new OmReadOnlyLock();
     hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
     omEpoch = 0;
@@ -282,7 +307,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .setMaxNumberOfOpenFiles(maxOpenFiles)
         .setEnableCompactionDag(false, null)
         .setCreateCheckpointDirs(false)
-        .setEnableRocksDbMetrics(true)
+        .setEnableRocksDbMetrics(enableRocksDbMetrics)
         .build();
     initializeOmTables(CacheType.PARTIAL_CACHE, false);
     perfMetrics = null;

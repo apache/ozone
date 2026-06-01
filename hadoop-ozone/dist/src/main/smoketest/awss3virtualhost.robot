@@ -17,11 +17,10 @@
 Documentation       S3 gateway test with aws cli using virtual host style address
 Library             OperatingSystem
 Library             String
-Resource            ../commonlib.robot
-Resource            ./commonawslib.robot
+Resource            commonlib.robot
+Resource            s3/commonawslib.robot
 Test Timeout        5 minutes
 Suite Setup         Setup s3 tests
-Default Tags        virtual-host
 
 *** Variables ***
 ${ENDPOINT_URL}                http://s3g.internal:9878

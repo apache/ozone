@@ -3516,24 +3516,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.scm.connection.request.timeout</name>
-    <value>5s</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Connection request timeout in milliseconds for HTTP call made by Recon to
-      request SCM DB snapshot.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.scm.connection.timeout</name>
-    <value>5s</value>
-    <tag>OZONE, RECON, SCM</tag>
-    <description>
-      Connection timeout for HTTP call in milliseconds made by Recon to request
-      SCM snapshot.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.scmclient.rpc.timeout</name>
     <value>1m</value>
     <tag>OZONE, RECON, SCM</tag>
@@ -3625,11 +3607,11 @@
   </property>
   <property>
     <name>ozone.recon.scm.container.threshold</name>
-    <value>100</value>
+    <value>1000000</value>
     <tag>OZONE, RECON, SCM</tag>
     <description>
-      Threshold value for the difference in number of containers
-      in SCM and RECON.
+      Container-count drift threshold used during initial SCM DB setup to decide
+      whether Recon should refresh from an SCM snapshot before serving requests.
     </description>
   </property>
   <property>
@@ -4220,12 +4202,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
-    <value>1024</value>
-    <tag>SCM, OZONE</tag>
-    <description>Raft snapshot gap index after which snapshot can be taken.</description>
-  </property>
-  <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
     <value>60s</value>
     <tag>SCM, OZONE</tag>
@@ -4608,20 +4584,34 @@
   </property>
 
   <property>
-    <name>ozone.recon.scm.snapshot.task.initial.delay</name>
+    <name>ozone.recon.scm.container.sync.task.initial.delay</name>
     <value>1m</value>
-    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <tag>OZONE, MANAGEMENT, RECON, SCM</tag>
     <description>
-      Initial delay in MINUTES by Recon to request SCM DB Snapshot.
+      Initial delay before Recon starts the incremental SCM container sync task.
+      This gives Recon startup enough time to initialize the SCM DB before the
+      first incremental sync runs.
     </description>
   </property>
-
   <property>
-    <name>ozone.recon.scm.snapshot.task.interval.delay</name>
-    <value>24h</value>
-    <tag>OZONE, MANAGEMENT, RECON</tag>
+    <name>ozone.recon.scm.container.sync.task.interval.delay</name>
+    <value>6h</value>
+    <tag>OZONE, MANAGEMENT, RECON, SCM</tag>
     <description>
-      Interval in MINUTES by Recon to request SCM DB Snapshot.
+      Interval between incremental SCM container sync runs in Recon. Each cycle
+      evaluates drift between SCM and Recon and either runs the targeted
+      multi-pass sync or takes no action.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scm.deleted.container.check.batch.size</name>
+    <value>1000000</value>
+    <tag>OZONE, RECON, SCM, PERFORMANCE</tag>
+    <description>
+      Maximum number of SCM DELETED containers fetched per page during targeted
+      Recon container sync. DELETED sync reads SCM's DELETED list and reconciles
+      Recon forward to DELETED; the configured value is capped by the Hadoop IPC
+      message-size limit.
     </description>
   </property>
   <property>
@@ -4777,7 +4767,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.cleanup.service.run.interval</name>
-    <value>1m</value>
+    <value>60m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which snapshot diff clean up service will run.

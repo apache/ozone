@@ -15,27 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha;
-
 /**
- * Represents the sequence ID types managed by {@link SequenceIdGenerator}
- * The enum constant names are kept exactly as their persisted RocksDB keys.
+ * Top-level interactive CLI for Ozone.
  */
-public enum SequenceIdType {
-
-  localId,
-  delTxnId,
-  containerId,
-
-  /**
-   * Certificate ID for all services, including root certificates.
-   */
-  CertificateId,
-
-  /**
-   * @deprecated Use {@link #CertificateId} instead.
-   */
-  @Deprecated
-  rootCertificateId;
-
-}
+package org.apache.hadoop.ozone.shell;

@@ -30,19 +30,9 @@ class CallReturn {
     EXCEPTION,
     /** Call should be retried according to the {@link RetryPolicy}. */
     RETRY,
-    /** Call should wait and then retry according to the {@link RetryPolicy}. */
-    WAIT_RETRY,
-    /** Call, which is async, is still in progress. */
-    ASYNC_CALL_IN_PROGRESS,
-    /** Call, which is async, just has been invoked. */
-    ASYNC_INVOKED
   }
 
-  static final CallReturn ASYNC_CALL_IN_PROGRESS = new CallReturn(
-      State.ASYNC_CALL_IN_PROGRESS);
-  static final CallReturn ASYNC_INVOKED = new CallReturn(State.ASYNC_INVOKED);
   static final CallReturn RETRY = new CallReturn(State.RETRY);
-  static final CallReturn WAIT_RETRY = new CallReturn(State.WAIT_RETRY);
 
   private final Object returnValue;
   private final Throwable thrown;

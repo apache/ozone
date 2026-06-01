@@ -248,6 +248,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       serviceRuntimeInfo.setHostName(hostname);
+      serviceRuntimeInfo.setDatanodeUuid(datanodeDetails.getUuidString());
       datanodeDetails.validateDatanodeIpAddress();
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());

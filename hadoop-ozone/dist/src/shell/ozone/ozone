@@ -104,7 +104,7 @@ function ozonecmd_case
     ;;
     completion)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.utils.AutoCompletion;
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-dist"
     ;;
     datanode)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -177,7 +177,7 @@ function ozonecmd_case
     ;;
     httpfs)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
-      OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_HTTPFS_OPTS="${OZONE_HTTPFS_OPTS} ${RATIS_OPTS} -Dhttpfs.home.dir=${OZONE_HOME} -Dhttpfs.config.dir=${OZONE_CONF_DIR} -Dhttpfs.log.dir=${OZONE_HOME}/log -Dhttpfs.temp.dir=${OZONE_HOME}/temp -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME='org.apache.ozone.fs.http.server.HttpFSServerWebServer'
       OZONE_RUN_ARTIFACT_NAME="ozone-httpfsgateway"
     ;;
@@ -224,14 +224,8 @@ function ozonecmd_case
     ;;
     interactive)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneInteractiveShell
-      OZONE_RUN_ARTIFACT_NAME="ozone-cli-shell"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-interactive"
       OZONE_OPTS="${OZONE_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      # Add all CLI classpaths to support all subcommands dynamically
-      for cp_file in "ozone-cli-admin" "ozone-cli-debug" "ozone-cli-repair" "ozone-tools"; do
-        if [[ -f "${OZONE_HOME}/share/ozone/classpath/${cp_file}.classpath" ]]; then
-          ozone_add_classpath_from_file "${OZONE_HOME}/share/ozone/classpath/${cp_file}.classpath"
-        fi
-      done
     ;;
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
@@ -293,6 +287,7 @@ function check_running_ozone_services
 function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-dist" ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
     if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
