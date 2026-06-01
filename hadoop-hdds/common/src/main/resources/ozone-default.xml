@@ -5140,4 +5140,19 @@
       lifecycle rules.
     </description>
   </property>
+  <property>
+    <name>ozone.lifecycle.service.state.save.interval.ms</name>
+    <value>300000</value>
+    <tag>OZONE</tag>
+    <description>The interval of bucket scan task saves its pointer to DB. Default is 5 mins.</description>
+  </property>
+  <property>
+    <name>ozone.lifecycle.service.state.save.keys.processed</name>
+    <value>100000</value>
+    <tag>OZONE</tag>
+    <description>Bucket scan task will save its pointer to DB by default every 100000 keys are scanned. Bucket scan
+      pointer save will happen when either ozone.lifecycle.service.state.save.interval.ms or
+      ozone.lifecycle.service.state.save.keys.processed is satisfied.
+    </description>
+  </property>
 </configuration>

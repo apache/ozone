@@ -105,6 +105,39 @@ class TestOmLCRule {
   }
 
   @Test
+  public void testCreateFSOLCRule() throws OMException {
+    long currentTime = System.currentTimeMillis();
+    OmLCExpiration exp = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+
+    OmLCRule.Builder r1 = new OmLCRule.Builder()
+        .setId("remove Spark logs after 30 days")
+        .setEnabled(true)
+        .setPrefix("spark/logs")
+        .setAction(exp);
+    assertOMException(() -> r1.build().valid(BucketLayout.FILE_SYSTEM_OPTIMIZED, currentTime),
+        INVALID_REQUEST, "FILE_SYSTEM_OPTIMIZED bucket prefix must end with '/'");
+
+    OmLCRule.Builder r2 = new OmLCRule.Builder()
+        .setEnabled(true)
+        .setPrefix("spark/logs/")
+        .setAction(exp);
+    assertDoesNotThrow(() -> r2.build().valid(BucketLayout.FILE_SYSTEM_OPTIMIZED, currentTime));
+
+    OmLCRule.Builder r3 = new OmLCRule.Builder()
+        .setEnabled(true)
+        .setPrefix("")
+        .setAction(exp);
+    OmLCRule omLCRule = assertDoesNotThrow(r3::build);
+    assertDoesNotThrow(() -> omLCRule.valid(BucketLayout.FILE_SYSTEM_OPTIMIZED, currentTime));
+
+    // Empty id should generate a 48 (default) bit one.
+    assertEquals(OmLCRule.LC_ID_LENGTH, omLCRule.getId().length(),
+        "Expected a " + OmLCRule.LC_ID_LENGTH + " length generated ID");
+  }
+
+  @Test
   public void testMultipleActionsInRule() throws OMException {
     long currentTime = System.currentTimeMillis();
     OmLCExpiration expiration1 = new OmLCExpiration.Builder()

@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -334,6 +335,13 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
       StringCodec.get(),
       OmLifecycleConfiguration.getCodec());
 
+  public static final String LIFECYCLE_SCAN_STATE_TABLE =
+      "lifecycleScanStateTable";
+  public static final DBColumnFamilyDefinition<String, OmLifecycleScanState> LIFECYCLE_SCAN_STATE_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(LIFECYCLE_SCAN_STATE_TABLE,
+      StringCodec.get(),
+      OmLifecycleScanState.getCodec());
+
   //---------------------------------------------------------------------------
   private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
       = DBColumnFamilyDefinition.newUnmodifiableMap(
@@ -360,7 +368,8 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           TRANSACTION_INFO_TABLE_DEF,
           USER_TABLE_DEF,
           VOLUME_TABLE_DEF,
-          LIFECYCLE_CONFIGURATION_TABLE_DEF);
+          LIFECYCLE_CONFIGURATION_TABLE_DEF,
+          LIFECYCLE_SCAN_STATE_TABLE_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 
