@@ -168,8 +168,8 @@ public final class AutoCompletion extends GenericCli {
     private String jvmargs;
 
     @Option(names = {"--validate"},
-        description = "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath " +
-            "file are present, command execution shall continue post validation failure if 'continue' is passed")
+        description = "validate that all required jars are present on the classpath; " +
+            "with 'continue', keep running even if validation fails")
     private String validate;
   }
 }
