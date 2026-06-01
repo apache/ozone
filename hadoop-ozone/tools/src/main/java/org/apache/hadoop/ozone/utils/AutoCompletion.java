@@ -139,7 +139,7 @@ public final class AutoCompletion extends GenericCli {
     private String debug;
 
     @Option(names = {"--daemon"},
-        description = "attempt to add class files from build tree")
+        description = "operate on a daemon")
     private String daemon;
 
     @Option(names = {"--help"},
