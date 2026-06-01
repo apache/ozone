@@ -120,7 +120,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         info.getDatanodeDetails().getID());
     System.out.printf("%-24s: %s %n", "IP Address",
         info.getDatanodeDetails().getIpAddress());
-        System.out.printf("%-24s: %s %n", "Hostname",
+    System.out.printf("%-24s: %s %n", "Hostname",
         info.getDatanodeDetails().getHostName());
 
     if (info.hasFilesystemUsage()) {
