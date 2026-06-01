@@ -447,7 +447,7 @@ class TestRewriteTablePathOzoneAction {
   }
 
   @ParameterizedTest
-  @EnumSource(value = FileFormat.class, names = {"AVRO", "ORC"})
+  @EnumSource(value = FileFormat.class, names = {"AVRO", "ORC", "PARQUET"})
   void positionDeletesAvroAndOrcRoundTrip(FileFormat format, @TempDir Path temp) throws IOException {
     String extension = format.name().toLowerCase();
     String path = temp.resolve("test." + extension).toUri().toString();

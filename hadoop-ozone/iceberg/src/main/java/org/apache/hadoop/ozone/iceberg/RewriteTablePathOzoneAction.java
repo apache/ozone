@@ -722,7 +722,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
      *
      * 1. Dependency: Manifests MUST be rewritten first because they are the source of truth used to identify which 
      *    position delete files exist and need processing.
-     * 2. Issue: Because manifests are written before the delete files are updated, the'file_size_in_bytes' field 
+     * 2. Issue: Because manifests are written before the delete files are updated, the 'file_size_in_bytes' field 
      *    in the manifest reflects the original size, not the new size.
      * 3. Impact: Some catalogs (e.g., REST catalogs like Polaris) will fail to read these files as the reader uses
      *    the stale size from the manifest.
