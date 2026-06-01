@@ -248,7 +248,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "sum(increase(container_balancer_metrics_data_size_moved_gb[$__range]))",
+                      "expr": "sum(container_balancer_metrics_data_size_moved_gb_in_latest_iteration)",
                       "legendFormat": "Moved Data Size (GB)",
                       "range": true
                     },
@@ -1060,7 +1060,7 @@
                   "hidden": false,
                   "query": {
                     "datasource": {
-                      "name": "dfm13nk97y9kwf"
+                      "name": "${datasource}"
                     },
                     "group": "prometheus",
                     "kind": "DataQuery",
@@ -1360,8 +1360,8 @@
       "spec": {
         "allowCustomValue": true,
         "current": {
-          "text": "prometheus",
-          "value": "dfm13nk97y9kwf"
+          "text": "default",
+          "value": "default"
         },
         "hide": "dontHide",
         "includeAll": false,
