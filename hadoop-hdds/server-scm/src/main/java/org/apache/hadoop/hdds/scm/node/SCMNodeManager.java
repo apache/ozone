@@ -1066,7 +1066,7 @@ public class SCMNodeManager implements NodeManager {
       return nodeStateManager.getNode(dn);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot retrieve DatanodeInfo, datanode {} not found.",
-          dn.getUuid());
+          dn.getID());
       return null;
     }
   }

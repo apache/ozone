@@ -119,7 +119,7 @@ public class DNContainerOperationClient implements AutoCloseable {
   public static Pipeline createSingleNodePipeline(DatanodeDetails dn) {
     return Pipeline.newBuilder()
         .setNodes(ImmutableList.of(dn))
-        .setId(PipelineID.valueOf(dn.getUuid()))
+        .setId(dn.getID().toPipelineID())
         .setState(Pipeline.PipelineState.CLOSED)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE)).build();

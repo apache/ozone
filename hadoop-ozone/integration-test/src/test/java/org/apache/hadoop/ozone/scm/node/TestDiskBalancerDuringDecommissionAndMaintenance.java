@@ -222,16 +222,16 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // in DiskBalancer report and status (since we only queried IN_SERVICE nodes)
     boolean isDecommissionedDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToDecommission.getUuid().toString()));
+            equals(dnToDecommission.getID().toString()));
     boolean isMaintenanceDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToMaintenance.getUuid().toString()));
+            equals(dnToMaintenance.getID().toString()));
     boolean isDecommissionedDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToDecommission.getUuid().toString()));
+            equals(dnToDecommission.getID().toString()));
     boolean isMaintenanceDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(dnToMaintenance.getUuid().toString()));
+            equals(dnToMaintenance.getID().toString()));
 
     // Assert that the decommissioned DN is not present in both report and status
     assertFalse(isDecommissionedDnInReport);
@@ -262,10 +262,10 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     boolean isRecommissionedDnInReport = reportProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(recommissionedDn.getUuid().toString()));
+            equals(recommissionedDn.getID().toString()));
     boolean isRecommissionedDnInStatus = statusProtoList.stream()
         .anyMatch(proto -> proto.getNode().getUuid().
-            equals(recommissionedDn.getUuid().toString()));
+            equals(recommissionedDn.getID().toString()));
 
     // Verify that the recommissioned DN is included in both report and status
     assertTrue(isRecommissionedDnInReport);

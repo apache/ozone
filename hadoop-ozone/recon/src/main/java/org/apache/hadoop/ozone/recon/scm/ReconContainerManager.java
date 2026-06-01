@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
@@ -34,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -70,8 +70,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconContainerMetadataManager cdbServiceProvider;
   private final Table<DatanodeID, DatanodeDetails> nodeDB;
-  // Container ID -> Datanode UUID -> Timestamp
-  private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
+  // Container ID -> DatanodeID -> Timestamp
+  private final Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap;
   // Pipeline -> # of open containers
   private final Map<PipelineID, Integer> pipelineToOpenContainer;
 
@@ -307,13 +307,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
     super.updateContainerReplica(containerID, replica);
 
     final long currTime = System.currentTimeMillis();
-    final long id = containerID.getId();
+    final long cid = containerID.getId();
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
-    final UUID uuid = dnInfo.getUuid();
+    final DatanodeID id = dnInfo.getID();
 
-    // Map from DataNode UUID to replica last seen time
-    final Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
-        replicaHistoryMap.get(id);
+    // Map from DataNode ID to replica last seen time
+    final Map<DatanodeID, ContainerReplicaHistory> replicaLastSeenMap =
+        replicaHistoryMap.get(cid);
 
     boolean flushToDB = false;
     long bcsId = replica.getSequenceId() != null ? replica.getSequenceId() : -1;
@@ -323,19 +323,19 @@ public class ReconContainerManager extends ContainerManagerImpl {
     // If replica doesn't exist in in-memory map, add to DB and add to map
     if (replicaLastSeenMap == null) {
       // putIfAbsent to avoid TOCTOU
-      replicaHistoryMap.putIfAbsent(id,
-          new ConcurrentHashMap<UUID, ContainerReplicaHistory>() {{
-            put(uuid, new ContainerReplicaHistory(uuid, currTime, currTime,
+      replicaHistoryMap.putIfAbsent(cid,
+          new ConcurrentHashMap<DatanodeID, ContainerReplicaHistory>() {{
+            put(id, new ContainerReplicaHistory(id, currTime, currTime,
                 bcsId, state, checksums));
           }});
       flushToDB = true;
     } else {
       // ContainerID exists, update timestamp in memory
-      final ContainerReplicaHistory ts = replicaLastSeenMap.get(uuid);
+      final ContainerReplicaHistory ts = replicaLastSeenMap.get(id);
       if (ts == null) {
         // New Datanode
-        replicaLastSeenMap.put(uuid,
-            new ContainerReplicaHistory(uuid, currTime, currTime, bcsId,
+        replicaLastSeenMap.put(id,
+            new ContainerReplicaHistory(id, currTime, currTime, bcsId,
                 state, checksums));
         flushToDB = true;
       } else {
@@ -348,7 +348,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     }
 
     if (flushToDB) {
-      upsertContainerHistory(id, uuid, currTime, bcsId, state, checksums);
+      upsertContainerHistory(cid, id, currTime, bcsId, state, checksums);
     }
   }
 
@@ -361,20 +361,20 @@ public class ReconContainerManager extends ContainerManagerImpl {
       ContainerReplicaNotFoundException {
     super.removeContainerReplica(containerID, replica);
 
-    final long id = containerID.getId();
+    final long cid = containerID.getId();
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
-    final UUID uuid = dnInfo.getUuid();
+    final DatanodeID id = dnInfo.getID();
     String state = replica.getState().toString();
 
-    final Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
-        replicaHistoryMap.get(id);
+    final Map<DatanodeID, ContainerReplicaHistory> replicaLastSeenMap =
+        replicaHistoryMap.get(cid);
     if (replicaLastSeenMap != null) {
-      final ContainerReplicaHistory ts = replicaLastSeenMap.get(uuid);
+      final ContainerReplicaHistory ts = replicaLastSeenMap.get(id);
       if (ts != null) {
         // Flush to DB, then remove from in-memory map
-        upsertContainerHistory(id, uuid, ts.getLastSeenTime(), ts.getBcsId(),
+        upsertContainerHistory(cid, id, ts.getLastSeenTime(), ts.getBcsId(),
             state, ts.getChecksums());
-        replicaLastSeenMap.remove(uuid);
+        replicaLastSeenMap.remove(id);
       }
     }
   }
@@ -385,13 +385,13 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   @VisibleForTesting
-  public Map<Long, Map<UUID, ContainerReplicaHistory>> getReplicaHistoryMap() {
+  public Map<Long, Map<DatanodeID, ContainerReplicaHistory>> getReplicaHistoryMap() {
     return replicaHistoryMap;
   }
 
   public List<ContainerHistory> getAllContainerHistory(long containerID) {
     // First, get the existing entries from DB
-    Map<UUID, ContainerReplicaHistory> resMap;
+    Map<DatanodeID, ContainerReplicaHistory> resMap;
     try {
       resMap = cdbServiceProvider.getContainerReplicaHistory(containerID);
     } catch (IOException ex) {
@@ -401,10 +401,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
     // Then, update the entries with the latest in-memory info, if available
     if (replicaHistoryMap != null) {
-      Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
+      Map<DatanodeID, ContainerReplicaHistory> replicaLastSeenMap =
           replicaHistoryMap.get(containerID);
       if (replicaLastSeenMap != null) {
-        Map<UUID, ContainerReplicaHistory> finalResMap = resMap;
+        Map<DatanodeID, ContainerReplicaHistory> finalResMap = resMap;
         replicaLastSeenMap.forEach((k, v) ->
             finalResMap.merge(k, v, (old, latest) -> latest));
         resMap = finalResMap;
@@ -413,19 +413,19 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
     // Finally, convert map to list for output
     List<ContainerHistory> resList = new ArrayList<>();
-    for (Map.Entry<UUID, ContainerReplicaHistory> entry : resMap.entrySet()) {
-      final UUID uuid = entry.getKey();
+    for (Map.Entry<DatanodeID, ContainerReplicaHistory> entry : resMap.entrySet()) {
+      final DatanodeID id = entry.getKey();
       String hostname = "N/A";
       // Attempt to retrieve hostname from NODES table
       if (nodeDB != null) {
         try {
-          final DatanodeDetails dnDetails = nodeDB.get(DatanodeID.of(uuid));
+          final DatanodeDetails dnDetails = nodeDB.get(id);
           if (dnDetails != null) {
             hostname = dnDetails.getHostName();
           }
         } catch (IOException ex) {
           LOG.debug("Unable to retrieve from NODES table of node {}. {}",
-              uuid, ex.getMessage());
+              id, ex.getMessage());
         }
       }
       final long firstSeenTime = entry.getValue().getFirstSeenTime();
@@ -434,7 +434,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       String state = entry.getValue().getState();
       long dataChecksum = entry.getValue().getDataChecksum();
 
-      resList.add(new ContainerHistory(containerID, uuid.toString(), hostname,
+      resList.add(new ContainerHistory(containerID, id.toString(), hostname,
           firstSeenTime, lastSeenTime, bcsId, state, dataChecksum));
     }
     return resList;
@@ -469,15 +469,15 @@ public class ReconContainerManager extends ContainerManagerImpl {
     }
   }
 
-  public void upsertContainerHistory(long containerID, UUID uuid, long time,
+  public void upsertContainerHistory(long containerID, DatanodeID id, long time,
                                      long bcsId, String state, ContainerChecksums checksums) {
-    Map<UUID, ContainerReplicaHistory> tsMap;
+    Map<DatanodeID, ContainerReplicaHistory> tsMap;
     try {
       tsMap = cdbServiceProvider.getContainerReplicaHistory(containerID);
-      ContainerReplicaHistory ts = tsMap.get(uuid);
+      ContainerReplicaHistory ts = tsMap.get(id);
       if (ts == null) {
         // New entry
-        tsMap.put(uuid, new ContainerReplicaHistory(uuid, time, time, bcsId,
+        tsMap.put(id, new ContainerReplicaHistory(id, time, time, bcsId,
             state, checksums));
       } else {
         // Entry exists, update last seen time and put it back to DB.
