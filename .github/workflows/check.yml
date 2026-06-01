@@ -129,6 +129,11 @@ on:
         default: true
         required: false
 
+    secrets:
+      DEVELOCITY_ACCESS_KEY:
+        description: 'Token for submitting build scan to Develocity'
+        required: false
+
 env:
   HADOOP_IMAGE: ghcr.io/apache/hadoop
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
@@ -138,6 +143,8 @@ env:
   OZONE_VOLUME_OWNER: 1000
   SCRIPT: ${{ inputs.script }}
 
+permissions: { }
+
 jobs:
   check:
     name: ${{ (inputs.split && format('{0} ({1})', inputs.script, inputs.split)) || inputs.script }}
@@ -146,14 +153,15 @@ jobs:
     steps:
       - name: Checkout project
         if: ${{ !inputs.needs-ozone-source-tarball }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          persist-credentials: false
           ref: ${{ inputs.sha }}
           fetch-depth: ${{ inputs.checkout-fetch-depth }}
 
       - name: Download Ozone source tarball
         if: ${{ inputs.needs-ozone-source-tarball }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ozone-src
 
@@ -164,7 +172,7 @@ jobs:
 
       - name: Cache for NPM dependencies
         if: ${{ inputs.needs-npm-cache }}
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.pnpm-store
@@ -174,7 +182,7 @@ jobs:
 
       - name: Cache for Maven dependencies
         if: ${{ inputs.needs-maven-cache }}
-        uses: actions/cache/restore@v5.0.5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -186,7 +194,7 @@ jobs:
       - name: Download Ozone repo
         id: download-ozone-repo
         if: ${{ inputs.needs-ozone-repo }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ozone-repo
           path: |
@@ -194,7 +202,7 @@ jobs:
 
       - name: Download Ratis repo
         if: ${{ inputs.ratis-args != '' }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ratis-jars
           path: |
@@ -202,7 +210,7 @@ jobs:
 
       - name: Download Ozone binary tarball
         if: ${{ inputs.needs-ozone-binary-tarball }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ozone-bin
 
@@ -215,7 +223,7 @@ jobs:
 
       - name: Setup java ${{ inputs.java-version }}
         if: ${{ inputs.java-version }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: 'temurin'
           java-version: ${{ inputs.java-version }}
@@ -259,7 +267,7 @@ jobs:
 
       - name: Archive build results
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ (inputs.split && format('{0}-{1}', inputs.script, inputs.split)) || inputs.script }}
           # please keep path as a single item; move to that directory all files needed in the artifact
@@ -270,7 +278,7 @@ jobs:
       # to avoid the need for 3 more inputs.
       - name: Store binaries for tests
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ozone-bin
           path: |
@@ -280,7 +288,7 @@ jobs:
 
       - name: Store source tarball for compilation
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ozone-src
           path: |
@@ -289,7 +297,7 @@ jobs:
 
       - name: Store Maven repo for tests
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ozone-repo
           path: |

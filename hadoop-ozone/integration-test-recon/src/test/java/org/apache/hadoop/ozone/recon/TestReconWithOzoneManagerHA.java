@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,7 @@ import org.junit.jupiter.api.Test;
 /**
  * This class sets up a MiniOzoneOMHACluster to test with Recon.
  */
+@Flaky("HDDS-15221")
 public class TestReconWithOzoneManagerHA {
 
   private MiniOzoneHAClusterImpl cluster;

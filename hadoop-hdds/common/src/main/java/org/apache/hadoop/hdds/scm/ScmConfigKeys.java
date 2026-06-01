@@ -584,15 +584,6 @@ public final class ScmConfigKeys {
   public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
           1000L;
 
-  /**
-   * the config will transfer value to ratis config
-   * raft.server.snapshot.creation.gap, used by ratis to take snapshot
-   * when manual trigger using api.
-   */
-  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_GAP
-      = "ozone.scm.ha.ratis.server.snapshot.creation.gap";
-  public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT =
-      1024L;
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =
           "ozone.scm.ha.ratis.snapshot.dir";
 
@@ -628,6 +619,10 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT
       = "ozone.scm.ha.raft.server.rpc.first-election.timeout";
   public static final String HDDS_SCM_HTTP_AUTH_TYPE = "hdds.scm.http.auth.type";
+
+  public static final String OZONE_SCM_RATIS_EVENTS_MAX_LIMIT =
+      "ozone.scm.ratis.events.max.limit";
+  public static final int OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
 
   /**
    * Never constructed.

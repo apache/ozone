@@ -542,6 +542,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       } catch (InterruptedException e) {
         LOG.error("Command execution was interrupted ", e);
         Thread.currentThread().interrupt();
+        throw (IOException) new InterruptedIOException(
+            "Command " + processForDebug(request) + " was interrupted.")
+            .initCause(e);
       }
     }
 

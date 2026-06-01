@@ -23,8 +23,9 @@ x-common-config:
   env_file:
     - docker-config
 
-x-replication:
-  &replication
+x-environment:
+  &environment
+  OZONE_OPTS:
   OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-1}
 
 services:
@@ -34,14 +35,14 @@ services:
       - 19864
       - 9882
     environment:
-      <<: *replication
+      <<: *environment
     command: ["ozone","datanode"]
   om1:
     <<: *common-config
     environment:
       WAITFOR: scm3:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      <<: *replication
+      <<: *environment
     ports:
       - 9874:9874
       - 9862
@@ -52,7 +53,7 @@ services:
     environment:
       WAITFOR: scm3:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      <<: *replication
+      <<: *environment
     ports:
       - 9874
       - 9862
@@ -63,7 +64,7 @@ services:
     environment:
       WAITFOR: scm3:9894
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      <<: *replication
+      <<: *environment
     ports:
       - 9874
       - 9862
@@ -76,7 +77,7 @@ services:
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-      <<: *replication
+      <<: *environment
     command: ["ozone","scm"]
   scm2:
     <<: *common-config
@@ -86,7 +87,7 @@ services:
       WAITFOR: scm1:9894
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-      <<: *replication
+      <<: *environment
     command: ["ozone","scm"]
   scm3:
     <<: *common-config
@@ -96,20 +97,20 @@ services:
       WAITFOR: scm2:9894
       ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-      <<: *replication
+      <<: *environment
     command: ["ozone","scm"]
   httpfs:
     <<: *common-config
     environment:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
-      <<: *replication
+      <<: *environment
     ports:
       - 14000:14000
     command: [ "ozone","httpfs" ]
   s3g:
     <<: *common-config
     environment:
-      <<: *replication
+      <<: *environment
     ports:
       - 9878:9878
     command: ["ozone","s3g"]
@@ -118,5 +119,5 @@ services:
     ports:
       - 9888:9888
     environment:
-      <<: *replication
+      <<: *environment
     command: ["ozone","recon"]

@@ -162,11 +162,10 @@ public class DiskUsageSubCommand implements Callable {
           if (cnt >= limit) {
             break;
           }
-          String subPath = subPathDU.path("path").asText("");
+          String pathValue = subPathDU.path("path").asText("");
           // differentiate key from other types
-          if (!subPathDU.path("isKey").asBoolean(false)) {
-            subPath += OM_KEY_PREFIX;
-          }
+          boolean isDir = !subPathDU.path("isKey").asBoolean(false);
+          String subPath = isDir ? (pathValue + OM_KEY_PREFIX) : pathValue;
           long size = subPathDU.path("size").asLong(-1);
           long sizeWithReplica = subPathDU.path("sizeWithReplica").asLong(-1);
           if (subPath.startsWith(seekStr)) {

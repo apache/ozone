@@ -92,7 +92,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
@@ -937,12 +936,11 @@ public class TestPipelineManagerImpl {
   }
 
   /**
-   * {@link PipelineManager#hasEnoughSpace(Pipeline, long)} should return false if all the
-   * volumes on any Datanode in the pipeline have less than equal to the space required for creating a new container.
+   * {@link PipelineManager#hasEnoughSpace(Pipeline)} should return false if all the
+   * volumes on any Datanode in the pipeline have space less than or equal to the configured container size.
    */
   @Test
   public void testHasEnoughSpace() throws IOException {
-    // create a Mock NodeManager, the MockNodeManager class doesn't work for this test
     NodeManager mockedNodeManager = Mockito.mock(NodeManager.class);
     PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(conf,
         SCMHAManagerStub.getInstance(true),
@@ -953,50 +951,30 @@ public class TestPipelineManagerImpl {
         serviceManager,
         testClock);
 
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setNodes(ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
-            MockDatanodeDetails.randomDatanodeDetails(),
-            MockDatanodeDetails.randomDatanodeDetails()))
+        .setNodes(ImmutableList.of(dn1, dn2, dn3))
         .setState(OPEN)
         .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, THREE))
         .build();
-    List<DatanodeDetails> nodes = pipeline.getNodes();
-    assertEquals(3, nodes.size());
-
-    long containerSize = 100L;
 
     // Case 1: All nodes have enough space.
-    List<DatanodeInfo> datanodeInfoList = new ArrayList<>();
-    for (DatanodeDetails dn : nodes) {
-      // the method being tested needs NodeManager to return DatanodeInfo because DatanodeInfo has storage
-      // information (it extends DatanodeDetails)
-      DatanodeInfo info = new DatanodeInfo(dn, null, null);
-      info.updateStorageReports(HddsTestUtils.createStorageReports(dn.getID(), 200L, 200L, 10L));
-      doReturn(info).when(mockedNodeManager).getDatanodeInfo(dn);
-      datanodeInfoList.add(info);
-    }
-    assertTrue(pipelineManager.hasEnoughSpace(pipeline, containerSize));
+    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn1.getID());
+    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn2.getID());
+    doReturn(true).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn3.getID());
+    assertTrue(pipelineManager.hasEnoughSpace(pipeline));
 
-    // Case 2: One node does not have enough space.
-    /*
-     Interestingly, SCMCommonPlacementPolicy#hasEnoughSpace returns false if exactly the required amount of space
-      is available. Which means it won't allow creating a pipeline on a node if all volumes have exactly 5 GB
-      available. We follow the same behavior here in the case of a new replica.
-
-      So here, remaining - committed == containerSize, and hasEnoughSpace returns false.
-      TODO should this return true instead?
-     */
-    DatanodeInfo datanodeInfo = datanodeInfoList.get(0);
-    datanodeInfo.updateStorageReports(HddsTestUtils.createStorageReports(datanodeInfo.getID(), 200L, 120L,
-        20L));
-    assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
+    // Case 2: One node does not have enough space — pipeline should be rejected.
+    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn1.getID());
+    assertFalse(pipelineManager.hasEnoughSpace(pipeline));
 
     // Case 3: All nodes do not have enough space.
-    for (DatanodeInfo info : datanodeInfoList) {
-      info.updateStorageReports(HddsTestUtils.createStorageReports(info.getID(), 200L, 100L, 20L));
-    }
-    assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
+    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn2.getID());
+    doReturn(false).when(mockedNodeManager).hasSpaceForNewContainerAllocation(dn3.getID());
+    assertFalse(pipelineManager.hasEnoughSpace(pipeline));
   }
 
   private Set<ContainerReplica> createContainerReplicasList(

@@ -410,6 +410,16 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(
+      String volumeName, String bucketName, String keyName, String uploadID,
+      Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .completeMultipartUpload(keyName, uploadID, partsMap,
+            expectedDataGeneration, expectedETag);
+  }
+
+  @Override
   public void abortMultipartUpload(String volumeName, String bucketName,
                                    String keyName, String uploadID)
       throws IOException {
@@ -675,11 +685,6 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public void setThreadLocalS3Auth(S3Auth s3Auth) {
-
-  }
-
-  @Override
-  public void setIsS3Request(boolean isS3Request) {
 
   }
 

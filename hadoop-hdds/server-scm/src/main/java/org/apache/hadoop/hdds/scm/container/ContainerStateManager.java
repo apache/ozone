@@ -236,4 +236,5 @@ public interface ContainerStateManager extends SCMHandler {
   @Replicate
   void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
       throws IOException;
+
 }

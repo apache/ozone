@@ -193,7 +193,7 @@ public class HddsVolume extends StorageVolume {
     StorageLocationReport.Builder builder = super.reportBuilder();
     if (!builder.isFailed()) {
       builder.setCommitted(getCommittedBytes())
-          .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
+          .setFreeSpaceToSpare(getReportedFreeSpaceToSpare(builder.getCapacity()));
     }
     return builder;
   }
@@ -327,7 +327,7 @@ public class HddsVolume extends StorageVolume {
    */
   @VisibleForTesting
   public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
-    if (!getDiskCheckEnabled()) {
+    if (!(getDiskCheckEnabled() && getDatanodeConfig().isRocksDbDiskCheckEnabled())) {
       return VolumeCheckResult.HEALTHY;
     }
 
@@ -439,8 +439,20 @@ public class HddsVolume extends StorageVolume {
     return committedBytes.get();
   }
 
-  public long getFreeSpaceToSpare(long volumeCapacity) {
+  /**
+   * Minimum free space reported to SCM (heartbeat), from
+   * {@code hdds.datanode.volume.min.free.space.percent}.
+   */
+  public long getReportedFreeSpaceToSpare(long volumeCapacity) {
     return getDatanodeConfig().getMinFreeSpace(volumeCapacity);
+  }
+
+  /**
+   * Minimum free space enforced locally for writes (see
+   * {@code hdds.datanode.volume.min.free.space.hard.limit.percent}).
+   */
+  public long getFreeSpaceToSpare(long volumeCapacity) {
+    return getDatanodeConfig().getHardLimitMinFreeSpace(volumeCapacity);
   }
 
   @Override

@@ -142,8 +142,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
         OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     SCMHATransactionBufferMonitorTask monitorTask
-        = new SCMHATransactionBufferMonitorTask(
-        transactionBuffer, ratisServer, interval);
+        = new SCMHATransactionBufferMonitorTask(transactionBuffer, interval);
     trxBufferMonitorService =
         new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
             .setScmContext(scm.getScmContext())
