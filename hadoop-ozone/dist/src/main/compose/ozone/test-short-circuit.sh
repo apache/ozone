@@ -21,7 +21,7 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
+export OZONE_REPLICATION_FACTOR=1
 export SHORT_CIRCUIT_READ_ENABLED=true
 
 # shellcheck source=/dev/null
@@ -29,7 +29,8 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 export COMPOSE_FILE=docker-compose.yaml:short-circuit.yaml
 
-start_docker_env 3
+start_docker_env 1
 
 execute_robot_test datanode freon/read-write-key.robot
+execute_robot_test datanode short-circuit
 
