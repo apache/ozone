@@ -150,19 +150,19 @@ public class PendingContainerTracker {
      * @param containerID the container being allocated
      * @return true if space was available and the container was recorded, false otherwise
      */
+
     synchronized boolean checkSpaceAndAdd(
         List<StorageReportProto> storageReports, long maxContainerSize, ContainerID containerID) {
-      long pendingAllocationSize = getCount() * maxContainerSize;
-      long effectiveAllocatableSpace = 0L;
+      final int pendingAllocationCount = getCount();
+      long allocatableCount = 0;
       for (StorageReportProto report : storageReports) {
-        long usableSpace = VolumeUsage.getUsableSpace(report);
-        long containersOnThisDisk = usableSpace / maxContainerSize;
-        effectiveAllocatableSpace += containersOnThisDisk * maxContainerSize;
-        if (effectiveAllocatableSpace - pendingAllocationSize >= maxContainerSize) {
-          boolean added = currentWindow.add(containerID);
+        final long allocatableCountOnThisDisk = VolumeUsage.getUsableSpace(report) / maxContainerSize;
+        allocatableCount += allocatableCountOnThisDisk;
+        if (allocatableCount > pendingAllocationCount) {
+          final boolean added = currentWindow.add(containerID);
           LOG.debug("Recorded pending container {} on DataNode {}. Added={}, Total pending={}",
               containerID, datanodeID, added, getCount());
-          return true;
+          return added;
         }
       }
       return false;
@@ -197,12 +197,10 @@ public class PendingContainerTracker {
 
     boolean added = datanodeInfo.getPendingContainerAllocations()
         .checkSpaceAndAdd(storageReports, maxContainerSize, containerID);
-    if (added) {
-      if (metrics != null) {
+    if (metrics != null) {
+      if (added) {
         metrics.incNumPendingContainersAdded();
-      }
-    } else {
-      if (metrics != null) {
+      } else {
         metrics.incNumSkippedFullNodeContainerAllocation();
       }
     }

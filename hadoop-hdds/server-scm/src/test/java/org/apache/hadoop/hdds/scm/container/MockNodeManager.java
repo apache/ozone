@@ -454,15 +454,11 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID) {
-    DatanodeDetails dd = nodeMetricMap.keySet().stream()
-        .filter(d -> d.getID().equals(datanodeID))
-        .findFirst().orElse(null);
-    DatanodeInfo info = getDatanodeInfo(dd);
-    if (info == null) {
+  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    if (datanodeInfo == null) {
       return false;
     }
-    return pendingContainerTracker.checkSpaceAndRecordAllocation(info, containerID);
+    return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
   }
 
   @Override

@@ -1080,12 +1080,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
-  public boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID) {
-    DatanodeInfo datanodeInfo = getNode(datanodeID);
-    if (datanodeInfo == null) {
-      LOG.warn("DatanodeInfo not found for node {}", datanodeID);
-      return false;
-    }
+  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
     return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
   }
 

@@ -252,7 +252,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID) {
+  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
     return true;
   }
 

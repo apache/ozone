@@ -637,14 +637,22 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
-    List<DatanodeDetails> successfulNodes = new ArrayList<>();
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (!nodeManager.checkSpaceAndRecordAllocation(dn.getID(), containerID)) {
-        for (DatanodeDetails rollbackNode : successfulNodes) {
-          DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(rollbackNode);
-          if (datanodeInfo != null) {
-            nodeManager.removePendingAllocationForDatanode(datanodeInfo, containerID);
-          }
+    final Set<DatanodeDetails> datanodeDetails = pipeline.getNodeSet();
+    final List<DatanodeInfo> datanodeInfos = new ArrayList<>(datanodeDetails.size());
+    for (DatanodeDetails dn : datanodeDetails) {
+      final DatanodeInfo info = nodeManager.getDatanodeInfo(dn);
+      if (info == null) {
+        LOG.warn("DatanodeInfo not found for {}", dn.getID());
+        return false;
+      }
+      datanodeInfos.add(info);
+    }
+
+    final List<DatanodeInfo> successfulNodes = new ArrayList<>(datanodeInfos.size());
+    for (DatanodeInfo dn : datanodeInfos) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(dn, containerID)) {
+        for (DatanodeInfo rollbackNode : successfulNodes) {
+          nodeManager.removePendingAllocationForDatanode(rollbackNode, containerID);
         }
         return false;
       }

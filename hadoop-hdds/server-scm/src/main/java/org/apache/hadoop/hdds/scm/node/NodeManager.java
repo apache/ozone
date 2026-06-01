@@ -189,11 +189,11 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * if space is available. This prevents race conditions where multiple threads check space
    * concurrently and over-allocate.
    *
-   * @param datanodeID the ID of the DataNode receiving the allocation
+   * @param datanodeInfo node info of the receiving the allocation
    * @param containerID the container being allocated
    * @return true if space was available and allocation was recorded, false otherwise
    */
-  boolean checkSpaceAndRecordAllocation(DatanodeID datanodeID, ContainerID containerID);
+  boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID);
 
   /**
    * Removes a pending container allocation from a datanode.
