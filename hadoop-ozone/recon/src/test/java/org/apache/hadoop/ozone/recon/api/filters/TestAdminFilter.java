@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.recon.api.NodeEndpoint;
 import org.apache.hadoop.ozone.recon.api.PipelineEndpoint;
 import org.apache.hadoop.ozone.recon.api.TaskStatusService;
 import org.apache.hadoop.ozone.recon.api.UtilizationEndpoint;
+import org.apache.hadoop.ozone.recon.chatbot.api.ChatbotEndpoint;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.reflections.Reflections;
@@ -87,6 +88,7 @@ public class TestAdminFilter {
     nonAdminEndpoints.add(ClusterStateEndpoint.class);
     nonAdminEndpoints.add(MetricsProxyEndpoint.class);
     nonAdminEndpoints.add(NodeEndpoint.class);
+    nonAdminEndpoints.add(ChatbotEndpoint.class);
     nonAdminEndpoints.add(PipelineEndpoint.class);
     nonAdminEndpoints.add(TaskStatusService.class);
 
