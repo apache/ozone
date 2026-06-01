@@ -534,8 +534,7 @@ public class TestContainerStateMachineFailures {
       try {
         final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
         assertEquals(snapshot.getPath(), latestSnapshot.getPath());
-      } catch (Throwable e) {
-        assertFalse(snapshot.getPath().toFile().exists());
+      } catch (IOException ioe) {
       }
     }
 
