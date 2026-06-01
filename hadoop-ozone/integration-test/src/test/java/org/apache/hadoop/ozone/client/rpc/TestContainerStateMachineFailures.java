@@ -47,7 +47,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -490,13 +489,8 @@ public class TestContainerStateMachineFailures {
     long containerID = omKeyLocationInfo.getContainerID();
     // delete the container db file
     FileUtil.fullyDelete(new File(keyValueContainerData.getContainerPath()));
-    final FileInfo snapshot = getSnapshotFileInfo(storage);
-    final Path parentPath = snapshot.getPath();
-    // Since the snapshot threshold is set to 1, since there are
-    // applyTransactions, we should see snapshots
-    assertThat(Objects.requireNonNull(parentPath.getParent().toFile().listFiles()).length)
-        .isGreaterThan(0);
-    assertNotNull(snapshot);
+    long bcsid = containerData.getBlockCommitSequenceId();
+
     Pipeline pipeline = cluster.getStorageContainerLocationClient()
         .getContainerWithPipeline(containerID).getPipeline();
     XceiverClientSpi xceiverClient =
@@ -528,15 +522,13 @@ public class TestContainerStateMachineFailures {
       assertInstanceOf(StateMachineException.class, ioe);
     }
 
-    if (snapshot.getPath().toFile().exists()) {
-      // Make sure the latest snapshot is same as the previous one
-      try {
-        final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
-        assertEquals(snapshot.getPath(), latestSnapshot.getPath());
-      } catch (IOException ioe) {
-      }
-    }
+    assertEquals(bcsid, dn.getDatanodeStateMachine()
+        .getContainer().getContainerSet()
+        .getContainer(omKeyLocationInfo.getContainerID())
+        .getContainerData().getBlockCommitSequenceId());
 
+
+    final FileInfo snapshot = getSnapshotFileInfo(storage);
     // when remove pipeline, group dir including snapshot will be deleted
     LambdaTestUtils.await(10000, 500,
         () -> (!snapshot.getPath().toFile().exists()));
