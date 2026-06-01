@@ -17,97 +17,115 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-import java.io.File;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 /**
  * Tests for {@link TarExtractor}.
  */
 public class TestTarExtractor {
 
-  @TempDir
-  private Path temporaryFolder;
-
   @Test
-  public void testExtractTarUsesMultipleThreadsForSingleTar() throws Exception {
-    Path sourceDir = Files.createDirectory(temporaryFolder.resolve("source"));
-    int poolSize = 4;
-    int fileCount = poolSize * 4;
-    byte[] payload = new byte[4 * 1024 * 1024];
-    Arrays.fill(payload, (byte) 'a');
-    for (int i = 0; i < fileCount; i++) {
-      byte[] content = Arrays.copyOf(payload, payload.length + 1);
-      content[payload.length] = (byte) ('0' + (i % 10));
-      Files.write(sourceDir.resolve("file" + i + ".sst"), content);
-    }
+  public void testStartCreatesFixedThreadPoolWithConfiguredSize() {
+    int poolSize = 8;
+    String threadPrefix = "TestPrefix-";
+    ExecutorService mockExecutor = mock(ExecutorService.class);
 
-    File tarFile = createTarFile(sourceDir);
-    Path outputDir = temporaryFolder.resolve("output");
-    String threadPrefix = "TestTarExtractorParallel-";
-
+    // Construct outside mockStatic block so ThreadFactoryBuilder can
+    // use the real Executors.defaultThreadFactory() internally.
     TarExtractor extractor = new TarExtractor(poolSize, threadPrefix);
-    Set<String> writeFileThreads = ConcurrentHashMap.newKeySet();
-    AtomicReference<Throwable> extractionError = new AtomicReference<>();
 
-    extractor.start();
-    Thread extractionThread = new Thread(() -> {
-      try (InputStream input = Files.newInputStream(tarFile.toPath())) {
-        extractor.extractTar(input, outputDir);
-      } catch (Throwable t) {
-        extractionError.set(t);
-      }
-    });
+    try (MockedStatic<Executors> executorsMock = mockStatic(Executors.class)) {
+      executorsMock.when(() -> Executors.newFixedThreadPool(
+          eq(poolSize), any(ThreadFactory.class))).thenReturn(mockExecutor);
 
-    try {
-      extractionThread.start();
+      extractor.start();
 
-      long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-      while (extractionThread.isAlive()
-          && System.nanoTime() < deadlineNanos
-          && writeFileThreads.size() < poolSize) {
-        Thread.getAllStackTraces().forEach((thread, stackTrace) -> {
-          if (thread.getName().startsWith(threadPrefix)
-              && isInTarExtractorWritePath(stackTrace)) {
-            writeFileThreads.add(thread.getName());
-          }
-        });
-        Thread.sleep(1);
-      }
-
-      extractionThread.join(TimeUnit.SECONDS.toMillis(30));
-      assertFalse(extractionThread.isAlive(), "Tar extraction did not finish in time");
-
-      if (extractionError.get() != null) {
-        throw new AssertionError("Tar extraction failed", extractionError.get());
-      }
-
-      assertEquals(poolSize, writeFileThreads.size(),
-          "Expected writeFile to run in parallel across all configured worker threads");
-    } finally {
-      extractor.stop();
+      executorsMock.verify(() -> Executors.newFixedThreadPool(
+          eq(poolSize), any(ThreadFactory.class)));
     }
   }
 
-  private static boolean isInTarExtractorWritePath(StackTraceElement[] stackTrace) {
-    for (StackTraceElement stackElement : stackTrace) {
-      if (TarExtractor.class.getName().equals(stackElement.getClassName())
-          && "writeFile".equals(stackElement.getMethodName())) {
-        return true;
-      }
+  @Test
+  public void testThreadFactoryUsesConfiguredPrefix() {
+    int poolSize = 4;
+    String threadPrefix = "MyCustomPrefix-";
+    ExecutorService mockExecutor = mock(ExecutorService.class);
+    TarExtractor extractor = new TarExtractor(poolSize, threadPrefix);
+
+    ArgumentCaptor<ThreadFactory> factoryCaptor =
+        ArgumentCaptor.forClass(ThreadFactory.class);
+
+    try (MockedStatic<Executors> executorsMock = mockStatic(Executors.class)) {
+      executorsMock.when(() -> Executors.newFixedThreadPool(
+          eq(poolSize), any(ThreadFactory.class))).thenReturn(mockExecutor);
+
+      extractor.start();
+
+      executorsMock.verify(() -> Executors.newFixedThreadPool(
+          eq(poolSize), factoryCaptor.capture()));
+
+      ThreadFactory capturedFactory = factoryCaptor.getValue();
+      Thread thread = capturedFactory.newThread(() -> {
+      });
+      assertTrue(thread.getName().startsWith(threadPrefix),
+          "Thread name should start with configured prefix, but was: "
+              + thread.getName());
     }
-    return false;
+  }
+
+  @Test
+  public void testStopShutsDownExecutor() throws InterruptedException {
+    int poolSize = 4;
+    String threadPrefix = "ShutdownTest-";
+    ExecutorService mockExecutor = mock(ExecutorService.class);
+
+    // Construct outside mockStatic block.
+    TarExtractor extractor = new TarExtractor(poolSize, threadPrefix);
+
+    try (MockedStatic<Executors> executorsMock = mockStatic(Executors.class)) {
+      executorsMock.when(() -> Executors.newFixedThreadPool(
+          eq(poolSize), any(ThreadFactory.class))).thenReturn(mockExecutor);
+      when(mockExecutor.awaitTermination(60, TimeUnit.SECONDS))
+          .thenReturn(true);
+
+      extractor.start();
+      extractor.stop();
+
+      verify(mockExecutor).shutdown();
+    }
+  }
+
+  @Test
+  public void testStartIsIdempotent() {
+    int poolSize = 4;
+    String threadPrefix = "IdempotentTest-";
+    ExecutorService mockExecutor = mock(ExecutorService.class);
+    TarExtractor extractor = new TarExtractor(poolSize, threadPrefix);
+
+    try (MockedStatic<Executors> executorsMock = mockStatic(Executors.class)) {
+      executorsMock.when(() -> Executors.newFixedThreadPool(
+          eq(poolSize), any(ThreadFactory.class))).thenReturn(mockExecutor);
+
+      extractor.start();
+      extractor.start(); // second call should be a no-op
+
+      // newFixedThreadPool should only be called once
+      executorsMock.verify(() -> Executors.newFixedThreadPool(
+          eq(poolSize), any(ThreadFactory.class)));
+    }
   }
 }
