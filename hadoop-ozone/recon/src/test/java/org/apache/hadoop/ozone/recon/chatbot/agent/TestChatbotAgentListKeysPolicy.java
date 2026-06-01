@@ -88,7 +88,7 @@ public class TestChatbotAgentListKeysPolicy {
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS, 5);
 
     lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-            anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+            anyString(), anyString(), any(), anyInt(), anyInt()))
         .thenReturn(defaultOutcome());
 
     agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
@@ -113,7 +113,7 @@ public class TestChatbotAgentListKeysPolicy {
             result.toLowerCase().contains("prefix"),
         "Response should ask for a bucket-scoped prefix");
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -129,7 +129,7 @@ public class TestChatbotAgentListKeysPolicy {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -144,7 +144,7 @@ public class TestChatbotAgentListKeysPolicy {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -162,7 +162,7 @@ public class TestChatbotAgentListKeysPolicy {
     assertTrue(result.toLowerCase().contains("bucket"),
         "Response should ask for a bucket-scoped prefix");
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -179,7 +179,7 @@ public class TestChatbotAgentListKeysPolicy {
 
     // Executor must be called with the correct endpoint
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), eq("GET"), any(), anyInt(), anyInt(), anyInt());
+        anyString(), eq("GET"), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -201,7 +201,7 @@ public class TestChatbotAgentListKeysPolicy {
 
     // Safe-scope check is off — executor IS called
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── Exception Handling and Parameter Pass-through ───────────────────────
@@ -215,7 +215,7 @@ public class TestChatbotAgentListKeysPolicy {
         .thenReturn(resp(json));
 
     when(mockToolExecutor.executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+        anyString(), anyString(), any(), anyInt(), anyInt()))
         .thenThrow(new IOException("Recon API is down"));
 
     ChatbotException exception = assertThrows(ChatbotException.class, () -> {
@@ -251,7 +251,7 @@ public class TestChatbotAgentListKeysPolicy {
 
     // Executor should have been called successfully
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), eq("GET"), any(), anyInt(), anyInt(), anyInt());
+        anyString(), eq("GET"), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -270,7 +270,7 @@ public class TestChatbotAgentListKeysPolicy {
 
     ArgumentCaptor<Map<String, String>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        eq("/api/v1/keys/listKeys"), eq("GET"), paramsCaptor.capture(), anyInt(), anyInt(), anyInt());
+        eq("/api/v1/keys/listKeys"), eq("GET"), paramsCaptor.capture(), anyInt(), anyInt());
 
     Map<String, String> capturedParams = paramsCaptor.getValue();
     assertEquals("/vol1/bucket1", capturedParams.get("startPrefix"));

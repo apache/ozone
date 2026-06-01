@@ -381,6 +381,7 @@ public class LangChain4jDispatcher implements LLMClient {
         result.add(AiMessage.from(msg.getContent()));
         break;
       default:
+        LOG.warn("Unknown message role '{}', treating as user message", msg.getRole());
         result.add(UserMessage.from(msg.getContent()));
         break;
       }

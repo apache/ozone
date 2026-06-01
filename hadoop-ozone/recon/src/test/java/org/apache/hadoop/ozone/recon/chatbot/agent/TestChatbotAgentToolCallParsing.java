@@ -111,7 +111,7 @@ public class TestChatbotAgentToolCallParsing {
     // Tests that never reach the executor (fallback/doc paths) won't fail
     // because of this unused stub.
     lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-            anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+            anyString(), anyString(), any(), anyInt(), anyInt()))
         .thenReturn(defaultOutcome());
 
     agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
@@ -132,7 +132,7 @@ public class TestChatbotAgentToolCallParsing {
     assertNotNull(result);
     // Executor must be called once with the exact endpoint from the LLM response
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     // Summarization requires a second LLM call
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
@@ -151,7 +151,7 @@ public class TestChatbotAgentToolCallParsing {
     assertNotNull(result);
     // Executor must be called once per tool_call in the MULTI_ENDPOINT array
     verify(mockToolExecutor, times(2)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
 
@@ -171,7 +171,7 @@ public class TestChatbotAgentToolCallParsing {
         "Response should contain the answer from the DOCUMENTATION_QUERY");
     // No Recon API call should ever happen for documentation queries
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     // Only one LLM call — no summarization step
     verify(mockLlmClient, times(1)).chatCompletion(anyList(), any(), any());
   }
@@ -189,7 +189,7 @@ public class TestChatbotAgentToolCallParsing {
     assertNotNull(result);
     // Executor must never be called when the type is unrecognized
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     // Fallback requires a second LLM call
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
@@ -205,7 +205,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
 
@@ -222,7 +222,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
 
@@ -237,7 +237,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
 
@@ -252,7 +252,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     // First call returns NO_SUITABLE_ENDPOINT; second call is the fallback
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
@@ -273,7 +273,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -290,7 +290,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── Missing required endpoint field ──────────────────────────────────────
@@ -308,7 +308,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
 
@@ -336,7 +336,7 @@ public class TestChatbotAgentToolCallParsing {
 
     // Must cap at maxToolCalls=5, not execute all 20
     verify(mockToolExecutor, atMost(5)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -351,7 +351,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }
 
@@ -389,7 +389,7 @@ public class TestChatbotAgentToolCallParsing {
 
     assertNotNull(result);
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── LLM exception propagation ─────────────────────────────────────────────
@@ -406,7 +406,7 @@ public class TestChatbotAgentToolCallParsing {
     assertNotNull(ex.getCause(),
         "ChatbotException should wrap the original LLMException as its cause");
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── EXC-01: ToolExecutor IOException is wrapped as ChatbotException ──────
@@ -419,7 +419,7 @@ public class TestChatbotAgentToolCallParsing {
     when(mockLlmClient.chatCompletion(anyList(), any(), any()))
         .thenReturn(resp(SINGLE_CLUSTER_STATE));
     when(mockToolExecutor.executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+        anyString(), anyString(), any(), anyInt(), anyInt()))
         .thenThrow(new IOException("Recon API unreachable"));
 
     ChatbotException ex = assertThrows(ChatbotException.class,
@@ -430,7 +430,7 @@ public class TestChatbotAgentToolCallParsing {
         "Cause should be the original IOException, not swallowed");
     // ToolExecutor was called — the failure happened inside it
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── EXC-02: Summarization LLM call fails after tool execution succeeds ───
@@ -454,7 +454,7 @@ public class TestChatbotAgentToolCallParsing {
     // Both LLM call and executor call were made before the failure
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
     verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── EXC-03: SINGLE_ENDPOINT with empty endpoint triggers fallback ─────────
@@ -475,7 +475,7 @@ public class TestChatbotAgentToolCallParsing {
     assertNotNull(result);
     // ToolExecutor must never be invoked with an empty endpoint
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     // Fallback requires a second LLM call
     verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
   }

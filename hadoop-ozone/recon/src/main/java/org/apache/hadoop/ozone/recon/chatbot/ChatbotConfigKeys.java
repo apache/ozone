@@ -63,10 +63,7 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
   // ── Execution policy ────────────────────────────────────────
-  public static final String OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS = OZONE_RECON_CHATBOT_PREFIX
-      + "exec.max.records";
-  public static final int OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS_DEFAULT = 1000;
-
+  // Total records aggregated for an answer are bounded by exec.max.pages * exec.page.size.
   public static final String OZONE_RECON_CHATBOT_EXEC_MAX_PAGES = OZONE_RECON_CHATBOT_PREFIX + "exec.max.pages";
   public static final int OZONE_RECON_CHATBOT_EXEC_MAX_PAGES_DEFAULT = 5;
   public static final String OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE = OZONE_RECON_CHATBOT_PREFIX + "exec.page.size";

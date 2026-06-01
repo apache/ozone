@@ -104,7 +104,6 @@ public class ChatbotAgent {
   private final int maxToolCalls;
 
   private final String defaultModel;
-  private final int maxRecordsPerAnswer;
   private final int maxPagesPerAnswer;
   private final int pageSizePerCall;
   private final boolean requireSafeScope;
@@ -146,9 +145,6 @@ public class ChatbotAgent {
     this.defaultModel = configuration.get(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_DEFAULT_MODEL,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_DEFAULT_MODEL_DEFAULT);
-    this.maxRecordsPerAnswer = configuration.getInt(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS_DEFAULT);
     this.maxPagesPerAnswer = configuration.getInt(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_PAGES,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_PAGES_DEFAULT);
@@ -159,10 +155,9 @@ public class ChatbotAgent {
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE_DEFAULT);
 
-    LOG.info("ChatbotAgent initialized with model={}, maxRecords={}, " +
-            "maxPages={}, pageSize={}, requireSafeScope={}",
-        defaultModel, maxRecordsPerAnswer, maxPagesPerAnswer,
-        pageSizePerCall, requireSafeScope);
+    LOG.info("ChatbotAgent initialized with model={}, maxPages={}, " +
+            "pageSize={}, requireSafeScope={}",
+        defaultModel, maxPagesPerAnswer, pageSizePerCall, requireSafeScope);
   }
 
   /**
@@ -264,7 +259,6 @@ public class ChatbotAgent {
               toolCall.getEndpoint(),
               toolCall.getMethod(),
               toolCall.getParameters(),
-              maxRecordsPerAnswer,
               maxPagesPerAnswer,
               pageSizePerCall);
 
@@ -353,7 +347,6 @@ public class ChatbotAgent {
             toolCall.getEndpoint(),
             toolCall.getMethod(),
             toolCall.getParameters(),
-            maxRecordsPerAnswer,
             maxPagesPerAnswer,
             pageSizePerCall);
         responses.put(responseKey, outcome.getResponseBody());

@@ -86,7 +86,7 @@ public class TestChatbotAgentExecutionPolicy {
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS, 5);
 
     lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-            anyString(), anyString(), any(), anyInt(), anyInt(), anyInt()))
+            anyString(), anyString(), any(), anyInt(), anyInt()))
         .thenReturn(defaultOutcome());
 
     agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
@@ -113,7 +113,7 @@ public class TestChatbotAgentExecutionPolicy {
         "Response should inform user the endpoint is not permitted");
     // The executor must NEVER be called for a disallowed endpoint
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
     // No summarization LLM call — clarification is returned directly
     verify(mockLlmClient, times(1)).chatCompletion(anyList(), any(), any());
   }
@@ -132,7 +132,7 @@ public class TestChatbotAgentExecutionPolicy {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -148,7 +148,7 @@ public class TestChatbotAgentExecutionPolicy {
 
     assertNotNull(result);
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── SEC-02: Allowlist hardening (prefix boundary + path canonicalization) ───
@@ -167,7 +167,7 @@ public class TestChatbotAgentExecutionPolicy {
     assertTrue(result.toLowerCase().contains("permitted"),
         "Response should indicate the endpoint is not permitted");
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   @Test
@@ -184,7 +184,7 @@ public class TestChatbotAgentExecutionPolicy {
     assertTrue(result.toLowerCase().contains("permitted"),
         "Canonicalized traversal path must be blocked by the allowlist");
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── Multi-endpoint: one invalid blocks all calls ──────────────────────────
@@ -208,7 +208,7 @@ public class TestChatbotAgentExecutionPolicy {
     assertNotNull(result);
     // Neither the valid nor the invalid call is executed — all blocked
     verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt(), anyInt());
+        anyString(), anyString(), any(), anyInt(), anyInt());
   }
 
   // ── Response must not leak internals ─────────────────────────────────────

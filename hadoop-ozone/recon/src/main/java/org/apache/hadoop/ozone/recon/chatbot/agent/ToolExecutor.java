@@ -53,9 +53,6 @@ public class ToolExecutor {
   private final String reconBaseUrl;
   private final int connectTimeoutMs;
   private final int readTimeoutMs;
-  private final int defaultMaxRecords;  // Max records to fetch in total
-  private final int defaultMaxPages;   // Max pages to loop through
-  private final int defaultPageSize;  // Default size of one page
 
   @Inject
   public ToolExecutor(OzoneConfiguration configuration) {
@@ -73,20 +70,11 @@ public class ToolExecutor {
     this.readTimeoutMs = configuration.getInt(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_READ_TIMEOUT_MS,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_READ_TIMEOUT_MS_DEFAULT);
-    this.defaultMaxRecords = configuration.getInt(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS_DEFAULT);
-    this.defaultMaxPages = configuration.getInt(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_PAGES,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_PAGES_DEFAULT);
-    this.defaultPageSize = configuration.getInt(
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE,
-        ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE_DEFAULT);
 
-    LOG.info("ToolExecutor initialized with Recon URL: {}, connectTimeoutMs={}, " +
-            "readTimeoutMs={}, maxRecords={}, maxPages={}, pageSize={}",
-        reconBaseUrl, connectTimeoutMs, readTimeoutMs,
-        defaultMaxRecords, defaultMaxPages, defaultPageSize);
+    // Execution-policy limits (max pages, page size) are owned by ChatbotAgent and
+    // passed into executeToolCallWithPolicy(...) per request; we do not re-read them here.
+    LOG.info("ToolExecutor initialized with Recon URL: {}, connectTimeoutMs={}, readTimeoutMs={}",
+        reconBaseUrl, connectTimeoutMs, readTimeoutMs);
   }
 
   /**
@@ -97,7 +85,6 @@ public class ToolExecutor {
       String endpoint,
       String method,
       Map<String, String> parameters,
-      int maxRecords,
       int maxPages,
       int pageSize) throws IOException {
 
@@ -109,7 +96,7 @@ public class ToolExecutor {
 
     // If the LLM asked to list keys, redirect to our special paging loop logic!
     if (fullEndpoint.endsWith(LIST_KEYS_ENDPOINT_SUFFIX) && "GET".equalsIgnoreCase(method)) {
-      return executeListKeysWithPaging(fullEndpoint, method, safeParams, maxRecords, maxPages, pageSize);
+      return executeListKeysWithPaging(fullEndpoint, method, safeParams, maxPages, pageSize);
     }
 
     // For EVERY OTHER endpoint, just run a single, normal HTTP request
@@ -118,7 +105,7 @@ public class ToolExecutor {
     // Count how many records we got back and return our structured DTO tracker
     int records = ChatbotUtils.estimateRecordCount(response);
     return new ToolExecutionOutcome(response, records, 1, false, null,
-        createLimitsMap(maxRecords, maxPages, pageSize));
+        createLimitsMap(maxPages, pageSize));
   }
 
   /**
@@ -127,7 +114,7 @@ public class ToolExecutor {
    */
   private ToolExecutionOutcome executeListKeysWithPaging(
       String endpoint, String method, Map<String, String> parameters,
-      int maxRecords, int maxPages, int pageSize)
+      int maxPages, int pageSize)
       throws IOException {
 
     // Safety Check: Did the LLM provide a bucket path to search in?
@@ -140,24 +127,19 @@ public class ToolExecutor {
     // Figure out limits... Either use what the LLM specifically requested, or our system defaults.
     int requestedLimit = ChatbotUtils.parsePositiveInt(parameters.get("limit"), pageSize);
     int effectivePageSize = Math.max(1, Math.min(pageSize, requestedLimit));
-    int safeMaxRecords = Math.max(1, maxRecords);
     int safeMaxPages = Math.max(1, maxPages);
-
 
     ObjectNode merged = null;                               // This will hold the final, massive JSON object
     ArrayNode aggregatedKeys = MAPPER.createArrayNode();    // This will hold all the individual rows we find
     String nextCursor = parameters.get("prevKey");          // The "ID" of the last record so we know where to pick up
     int recordsProcessed = 0;                               // Counter for rows
     int pagesFetched = 0;                                   // Counter for pages
-    boolean truncated = false;                              // Did we hit a hard limit?
 
-    // THE ENGINE LOOP: Keep pulling pages until we hit our max Page count or Record count
-    while (pagesFetched < safeMaxPages && recordsProcessed < safeMaxRecords) {
-      // Calculate how many records we still need and inject it into the API call
+    // THE ENGINE LOOP: Keep pulling pages until data runs out or we hit the max page cap.
+    // Total records are naturally bounded by safeMaxPages * effectivePageSize.
+    while (pagesFetched < safeMaxPages) {
       Map<String, String> pageParams = new HashMap<>(parameters);
-      int remaining = safeMaxRecords - recordsProcessed;
-      int pageLimit = Math.max(1, Math.min(effectivePageSize, remaining));
-      pageParams.put("limit", String.valueOf(pageLimit));
+      pageParams.put("limit", String.valueOf(effectivePageSize));
 
       // If we have a cursor from a previous page, inject it so Recon gives us the NEXT page
       if (nextCursor != null && !nextCursor.isEmpty()) {
@@ -180,10 +162,6 @@ public class ToolExecutor {
       int pageCount = 0;
       if (keys != null && keys.isArray()) {
         for (JsonNode key : keys) {
-          if (recordsProcessed >= safeMaxRecords) {
-            truncated = true;
-            break;
-          }
           aggregatedKeys.add(key);
           recordsProcessed++;
           pageCount++;
@@ -197,12 +175,10 @@ public class ToolExecutor {
         break;
       }
       nextCursor = lastKey;
-
-      // If we hit limits, flag this dataset as truncated
-      if (recordsProcessed >= safeMaxRecords || pagesFetched >= safeMaxPages) {
-        truncated = true;
-      }
     }
+
+    // If we stopped because of the page cap but a cursor still remains, more data exists upstream.
+    boolean truncated = nextCursor != null && !nextCursor.isEmpty();
 
     // Now that the loop is finished, reconstruct the final JSON block
     if (merged == null) {
@@ -219,7 +195,7 @@ public class ToolExecutor {
 
     // Package the results and send them back up to the ChatbotAgent
     return new ToolExecutionOutcome(merged, recordsProcessed, pagesFetched, truncated, nextCursor,
-        createLimitsMap(safeMaxRecords, safeMaxPages, effectivePageSize));
+        createLimitsMap(safeMaxPages, effectivePageSize));
   }
 
   /**
@@ -312,10 +288,8 @@ public class ToolExecutor {
     return reconBaseUrl + resolvedPath + queryBuilder.toString();
   }
 
-  private Map<String, Object> createLimitsMap(int maxRecords, int maxPages,
-                                              int pageSize) {
+  private Map<String, Object> createLimitsMap(int maxPages, int pageSize) {
     Map<String, Object> limits = new HashMap<>();
-    limits.put("maxRecordsPerAnswer", maxRecords);
     limits.put("maxPagesPerAnswer", maxPages);
     limits.put("pageSize", pageSize);
     return limits;

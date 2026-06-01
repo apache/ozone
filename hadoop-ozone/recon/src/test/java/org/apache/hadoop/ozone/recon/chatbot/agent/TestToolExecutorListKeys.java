@@ -62,7 +62,6 @@ public class TestToolExecutorListKeys {
   @BeforeEach
   public void setUp() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS, 1000);
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_PAGES, 5);
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE, 200);
 
@@ -79,7 +78,7 @@ public class TestToolExecutorListKeys {
     doReturn(page1).when(toolExecutor).executeSingleCall(anyString(), anyString(), any());
 
     ToolExecutor.ToolExecutionOutcome outcome =
-        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 1000, 5, 200);
+        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 5, 200);
 
     verify(toolExecutor, times(1)).executeSingleCall(anyString(), anyString(), any());
     assertEquals(2, outcome.getRecordsProcessed());
@@ -102,7 +101,7 @@ public class TestToolExecutorListKeys {
     doReturn(page1).doReturn(page2).when(toolExecutor).executeSingleCall(anyString(), anyString(), any());
 
     ToolExecutor.ToolExecutionOutcome outcome =
-        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 1000, 5, 200);
+        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 5, 200);
 
     verify(toolExecutor, times(2)).executeSingleCall(anyString(), anyString(), any());
     assertEquals(3, outcome.getRecordsProcessed());
@@ -124,7 +123,7 @@ public class TestToolExecutorListKeys {
 
     // Set maxPages to 3 for this test
     ToolExecutor.ToolExecutionOutcome outcome =
-        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 1000, 3, 200);
+        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 3, 200);
 
     // Should stop exactly at 3 pages
     verify(toolExecutor, times(3)).executeSingleCall(anyString(), anyString(), any());
@@ -138,33 +137,6 @@ public class TestToolExecutorListKeys {
   }
 
   @Test
-  public void testMaxRecordsLimit() throws Exception {
-    Map<String, String> params = new HashMap<>();
-    params.put("startPrefix", "/vol1/bucket1");
-
-    // A page with 5 keys
-    JsonNode largePage = MAPPER.readTree(
-        "{\"keys\": [{\"key\":\"k1\"}, {\"key\":\"k2\"}, {\"key\":\"k3\"}, " +
-        "{\"key\":\"k4\"}, {\"key\":\"k5\"}], \"lastKey\": \"next\"}");
-    doReturn(largePage).when(toolExecutor).executeSingleCall(anyString(), anyString(), any());
-
-    // Set maxRecords to 7
-    ToolExecutor.ToolExecutionOutcome outcome =
-        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 7, 5, 200);
-
-    // First page gives 5. Second page gives 5 more, but we stop at 7 total.
-    // So it should make 2 calls.
-    verify(toolExecutor, times(2)).executeSingleCall(anyString(), anyString(), any());
-    assertEquals(7, outcome.getRecordsProcessed());
-    assertEquals(2, outcome.getPagesFetched());
-    assertTrue(outcome.isTruncated());
-
-    JsonNode resultNode = (JsonNode) outcome.getResponseBody();
-    assertEquals(7, resultNode.get("keys").size());
-    assertTrue(resultNode.get("truncated").asBoolean());
-  }
-
-  @Test
   public void testEmptyKeys() throws Exception {
     Map<String, String> params = new HashMap<>();
     params.put("startPrefix", "/vol1/bucket1");
@@ -173,7 +145,7 @@ public class TestToolExecutorListKeys {
     doReturn(emptyPage).when(toolExecutor).executeSingleCall(anyString(), anyString(), any());
 
     ToolExecutor.ToolExecutionOutcome outcome =
-        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 1000, 5, 200);
+        toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 5, 200);
 
     verify(toolExecutor, times(1)).executeSingleCall(anyString(), anyString(), any());
     assertEquals(0, outcome.getRecordsProcessed());
@@ -190,7 +162,7 @@ public class TestToolExecutorListKeys {
     // No startPrefix
 
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-      toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 1000, 5, 200);
+      toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 5, 200);
     });
 
     assertTrue(exception.getMessage().contains("requires 'startPrefix'"));
@@ -204,7 +176,7 @@ public class TestToolExecutorListKeys {
     params.put("startPrefix", "/");
 
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-      toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 1000, 5, 200);
+      toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 5, 200);
     });
 
     assertTrue(exception.getMessage().contains("requires 'startPrefix'"));
@@ -220,7 +192,7 @@ public class TestToolExecutorListKeys {
         .executeSingleCall(anyString(), anyString(), any());
 
     IOException exception = assertThrows(IOException.class, () -> {
-      toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 1000, 5, 200);
+      toolExecutor.executeToolCallWithPolicy("/api/v1/keys/listKeys", "GET", params, 5, 200);
     });
 
     assertEquals("API request failed with status 500", exception.getMessage());
