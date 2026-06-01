@@ -48,6 +48,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -487,16 +488,16 @@ public class TestContainerStateMachineFailures {
             getHddsDatanodes().get(index), omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    stateMachine.takeSnapshot();
+    long containerID = omKeyLocationInfo.getContainerID();
+    // delete the container db file
+    FileUtil.fullyDelete(new File(keyValueContainerData.getContainerPath()));
     final FileInfo snapshot = getSnapshotFileInfo(storage);
     final Path parentPath = snapshot.getPath();
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
-    assertThat(parentPath.getParent().toFile().listFiles().length).isGreaterThan(0);
+    assertThat(Objects.requireNonNull(parentPath.getParent().toFile().listFiles()).length)
+        .isGreaterThan(0);
     assertNotNull(snapshot);
-    long containerID = omKeyLocationInfo.getContainerID();
-    // delete the container db file
-    FileUtil.fullyDelete(new File(keyValueContainerData.getContainerPath()));
     Pipeline pipeline = cluster.getStorageContainerLocationClient()
         .getContainerWithPipeline(containerID).getPipeline();
     XceiverClientSpi xceiverClient =
@@ -517,12 +518,13 @@ public class TestContainerStateMachineFailures {
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
     // Make sure the container is marked unhealthy
-    assertSame(dn.getDatanodeStateMachine()
+    GenericTestUtils.waitFor(() -> dn.getDatanodeStateMachine()
         .getContainer().getContainerSet().getContainer(containerID)
-        .getContainerState(), UNHEALTHY);
+        .getContainerState() == UNHEALTHY, 100, 5000);
     try {
       // try to take a new snapshot, ideally it should just fail
       stateMachine.takeSnapshot();
+      fail("Should have thrown StateMachineException because it is UNHEALTHY");
     } catch (IOException ioe) {
       assertInstanceOf(StateMachineException.class, ioe);
     }
