@@ -43,9 +43,9 @@ A disk is considered a candidate for balancing if its
 
 ## Feature Flag
 
-The Disk Balancer feature is introduced with a feature flag. By default, this feature is disabled.
+The Disk Balancer feature is introduced with a feature flag. By default, this feature is enabled.
 
-The feature can be **enabled** by setting the following property to `true` in the `ozone-site.xml` configuration file:
+The feature can be **disabled** by setting the following property to `false` in the `ozone-site.xml` configuration file:
 `hdds.datanode.disk.balancer.enabled = false`
 
 ### Authentication and Authorization
@@ -119,8 +119,8 @@ restart the datanode service for the changes to take effect.
 ## Command Line Usage
 The DiskBalancer is managed through the `ozone admin datanode diskbalancer` command.
 
-**Note:** This command is hidden from the main help message (`ozone admin datanode --help`). This is because the feature
-is currently considered experimental and is disabled by default. The command is, however, fully functional for those who wish to enable and use the feature.
+**Note:** DiskBalancer is enabled by default on datanodes. Use `hdds.datanode.disk.balancer.enabled=false` in
+`ozone-site.xml` to disable the service on datanodes and prevent CLI commands from running.
 
 ### Command Syntax
 
@@ -241,7 +241,7 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 
 | Property                                                       | Default Value                                                                          | Description                                                                                                                                                                                                                                                                                                                            |
 |----------------------------------------------------------------|----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `hdds.datanode.disk.balancer.enabled`                          | `false`                                                                                | If false, the DiskBalancer service on the Datanode is disabled. Configure it to true for diskBalancer to be enabled.                                                                                                                                                                                                                   |
+| `hdds.datanode.disk.balancer.enabled`                          | `true`                                                                                 | If false, the DiskBalancer service on the Datanode is disabled. By default, DiskBalancer is enabled on datanodes.                                                                                                                                                                                                                    |
 | `hdds.datanode.disk.balancer.volume.density.threshold.percent` | `10.0`                                                                                 | A percentage (0-100). A datanode is considered balanced if for each volume, its utilization differs from the average datanode utilization by no more than this threshold.                                                                                                                                                              |
 | `hdds.datanode.disk.balancer.max.disk.throughputInMBPerSec`    | `10`                                                                                   | The maximum bandwidth (in MB/s) that the balancer can use for moving data, to avoid impacting client I/O.                                                                                                                                                                                                                              |
 | `hdds.datanode.disk.balancer.parallel.thread`                  | `5`                                                                                    | The number of worker threads to use for moving containers in parallel.                                                                                                                                                                                                                                                                 |

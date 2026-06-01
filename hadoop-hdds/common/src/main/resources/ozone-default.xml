@@ -218,11 +218,9 @@
   </property>
   <property>
     <name>hdds.datanode.disk.balancer.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, DATANODE, DISKBALANCER</tag>
-    <description>If this property is set to true, then the Disk Balancer
-      feature is enabled on Datanodes, and users can use
-      this service. By default, this is disabled.
+    <description>By default Disk Balancer feature is enabled on Datanodes.
     </description>
   </property>
   <property>

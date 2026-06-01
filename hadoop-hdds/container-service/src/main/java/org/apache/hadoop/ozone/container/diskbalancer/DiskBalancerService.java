@@ -746,9 +746,9 @@ public class DiskBalancerService extends BackgroundService {
       HddsVolume volume = v.getVolume();
       VolumeReportProto.Builder builder = VolumeReportProto.newBuilder()
           .setStorageId(volume.getStorageID())
-          .setOzoneCapacity(v.getUsage().getCapacity())
+          .setTotalCapacity(v.getUsage().getCapacity())
           .setOzoneAvailable(v.getUsage().getAvailable())
-          .setOzoneUsedSpace(v.getUsage().getUsedSpace())
+          .setUsedSpace(v.getUsage().getUsedSpace())
           .setCommittedBytes(volume.getCommittedBytes())
           .setEffectiveUsedSpace(v.getEffectiveUsed())
           .setUtilization(v.getUtilization());

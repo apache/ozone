@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -44,8 +43,6 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -96,24 +93,18 @@ public class TestDiskBalancerSubCommands {
    * Helper class to hold all mocks needed for DiskBalancer tests.
    */
   private static class DiskBalancerMocks implements AutoCloseable {
-    private final MockedConstruction<OzoneConfiguration> mockedConf;
     private final MockedConstruction<ContainerOperationClient> mockedClient;
     private final MockedStatic<DiskBalancerSubCommandUtil> mockedUtil;
     
     DiskBalancerMocks(
-        MockedConstruction<OzoneConfiguration> mockedConf,
         MockedConstruction<ContainerOperationClient> mockedClient,
         MockedStatic<DiskBalancerSubCommandUtil> mockedUtil) {
-      this.mockedConf = mockedConf;
       this.mockedClient = mockedClient;
       this.mockedUtil = mockedUtil;
     }
     
     @Override
     public void close() {
-      if (mockedConf != null) {
-        mockedConf.close();
-      }
       if (mockedClient != null) {
         mockedClient.close();
       }
@@ -128,14 +119,6 @@ public class TestDiskBalancerSubCommands {
    * Returns a DiskBalancerMocks object containing all three mocks.
    */
   private DiskBalancerMocks setupAllMocks() {
-    MockedConstruction<OzoneConfiguration> mockedConf = 
-        mockConstruction(OzoneConfiguration.class, (mock, context) -> {
-          when(mock.getBoolean(
-              eq(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY),
-              eq(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)))
-              .thenReturn(true);
-        });
-    
     MockedConstruction<ContainerOperationClient> mockedClient = 
         mockConstruction(ContainerOperationClient.class);
     
@@ -184,7 +167,7 @@ public class TestDiskBalancerSubCommands {
       return addressPort;
     });
 
-    return new DiskBalancerMocks(mockedConf, mockedClient, mockedUtil);
+    return new DiskBalancerMocks(mockedClient, mockedUtil);
   }
 
   @AfterEach
@@ -847,9 +830,9 @@ public class TestDiskBalancerSubCommands {
         .setStoragePath(path1)
         .setUtilization(util1)
         .setCommittedBytes(committed1)
-        .setOzoneCapacity(capacity1)
+        .setTotalCapacity(capacity1)
         .setOzoneAvailable(available1)
-        .setOzoneUsedSpace(used1)
+        .setUsedSpace(used1)
         .setEffectiveUsedSpace(effective1)
         .build();
     VolumeReportProto vol2 = VolumeReportProto.newBuilder()
@@ -857,9 +840,9 @@ public class TestDiskBalancerSubCommands {
         .setStoragePath(path2)
         .setUtilization(util2)
         .setCommittedBytes(committed2)
-        .setOzoneCapacity(capacity2)
+        .setTotalCapacity(capacity2)
         .setOzoneAvailable(available2)
-        .setOzoneUsedSpace(used2)
+        .setUsedSpace(used2)
         .setEffectiveUsedSpace(effective2)
         .build();
 

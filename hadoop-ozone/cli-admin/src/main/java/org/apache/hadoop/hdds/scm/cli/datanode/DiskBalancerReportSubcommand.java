@@ -143,9 +143,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
           formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
           contentList.add(v.hasStorageId() ? v.getStorageId() : "-");
           contentList.add(v.hasStoragePath() ? v.getStoragePath() : "-");
-          contentList.add(v.hasOzoneCapacity() ? StringUtils.byteDesc(v.getOzoneCapacity()) : "-");
+          contentList.add(v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
           contentList.add(v.hasOzoneAvailable() ? StringUtils.byteDesc(v.getOzoneAvailable()) : "-");
-          contentList.add(v.hasOzoneUsedSpace() ? StringUtils.byteDesc(v.getOzoneUsedSpace()) : "-");
+          contentList.add(v.hasUsedSpace() ? StringUtils.byteDesc(v.getUsedSpace()) : "-");
           contentList.add(StringUtils.byteDesc(v.getCommittedBytes()));
           contentList.add(v.hasEffectiveUsedSpace() ? StringUtils.byteDesc(v.getEffectiveUsedSpace()) : "-");
           contentList.add(formatPercent(v.getUtilization()));
@@ -168,9 +168,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         .append("  - VolumeDensity: Deviation of a particular volume's utilization from IdealUsage.%n")
         .append("  - Utilization: how much a particular volume is utilized ")
         .append("effectiveUsedSpace / ozoneCapacity) in %%.%n")
-        .append("  - OzoneCapacity: Ozone volume capacity.%n")
-        .append("  - OzoneAvailable: Ozone available space.%n")
-        .append("  - OzoneUsed: Ozone used space.%n")
+        .append("  - OzoneCapacity: Ozone data volume capacity.%n")
+        .append("  - OzoneAvailable: Ozone data volume available space.%n")
+        .append("  - OzoneUsed: Ozone data volume used space.%n")
         .append("  - ContainerPreAllocatedSpace: Space reserved for containers not yet written to disk.%n")
         .append("  - EffectiveUsedSpace: This is the actual used space of volume which is visible")
         .append(" to the diskBalancer : (ozoneCapacity minus ozoneAvailable) + containerPreAllocatedSpace + ")
@@ -222,9 +222,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         Map<String, Object> vm = new LinkedHashMap<>();
         vm.put("storageId", v.getStorageId());
         vm.put("storagePath", v.hasStoragePath() ? v.getStoragePath() : "-");
-        vm.put("ozoneCapacity", v.hasOzoneCapacity() ? StringUtils.byteDesc(v.getOzoneCapacity()) : "-");
+        vm.put("ozoneCapacity", v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
         vm.put("ozoneAvailable", v.hasOzoneAvailable() ? StringUtils.byteDesc(v.getOzoneAvailable()) : "-");
-        vm.put("ozoneUsed", v.hasOzoneUsedSpace() ? StringUtils.byteDesc(v.getOzoneUsedSpace()) : "-");
+        vm.put("ozoneUsed", v.hasUsedSpace() ? StringUtils.byteDesc(v.getUsedSpace()) : "-");
         vm.put("containerPreAllocatedSpace", StringUtils.byteDesc(v.getCommittedBytes()));
         vm.put("effectiveUsedSpace", v.hasEffectiveUsedSpace() ?
             StringUtils.byteDesc(v.getEffectiveUsedSpace()) : "-");

@@ -107,9 +107,9 @@ class TestDiskBalancerProtocolServer {
             .setStoragePath(TEST_STORAGE_PATH_1)
             .setUtilization(TEST_UTILIZATION_1)
             .setCommittedBytes(TEST_COMMITTED_BYTES_1)
-            .setOzoneCapacity(TEST_TOTAL_CAPACITY)
+            .setTotalCapacity(TEST_TOTAL_CAPACITY)
             .setOzoneAvailable(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_1)
-            .setOzoneUsedSpace(TEST_USED_SPACE_1)
+            .setUsedSpace(TEST_USED_SPACE_1)
             .setEffectiveUsedSpace(TEST_EFFECTIVE_USED_SPACE_1)
             .build(),
         VolumeReportProto.newBuilder()
@@ -117,9 +117,9 @@ class TestDiskBalancerProtocolServer {
             .setStoragePath(TEST_STORAGE_PATH_2)
             .setUtilization(TEST_UTILIZATION_2)
             .setCommittedBytes(TEST_COMMITTED_BYTES_2)
-            .setOzoneCapacity(TEST_TOTAL_CAPACITY)
+            .setTotalCapacity(TEST_TOTAL_CAPACITY)
             .setOzoneAvailable(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_2)
-            .setOzoneUsedSpace(TEST_USED_SPACE_2)
+            .setUsedSpace(TEST_USED_SPACE_2)
             .setEffectiveUsedSpace(TEST_EFFECTIVE_USED_SPACE_2)
             .build()));
     
@@ -158,17 +158,17 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_STORAGE_PATH_1, volReport0.getStoragePath());
     assertEquals(TEST_UTILIZATION_1, volReport0.getUtilization());
     assertEquals(TEST_COMMITTED_BYTES_1, volReport0.getCommittedBytes());
-    assertEquals(TEST_TOTAL_CAPACITY, volReport0.getOzoneCapacity());
+    assertEquals(TEST_TOTAL_CAPACITY, volReport0.getTotalCapacity());
     assertEquals(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_1, volReport0.getOzoneAvailable());
-    assertEquals(TEST_USED_SPACE_1, volReport0.getOzoneUsedSpace());
+    assertEquals(TEST_USED_SPACE_1, volReport0.getUsedSpace());
     assertEquals(TEST_EFFECTIVE_USED_SPACE_1, volReport0.getEffectiveUsedSpace());
     assertEquals(TEST_STORAGE_ID_2, volReport1.getStorageId());
     assertEquals(TEST_STORAGE_PATH_2, volReport1.getStoragePath());
     assertEquals(TEST_UTILIZATION_2, volReport1.getUtilization());
     assertEquals(TEST_COMMITTED_BYTES_2, volReport1.getCommittedBytes());
-    assertEquals(TEST_TOTAL_CAPACITY, volReport1.getOzoneCapacity());
+    assertEquals(TEST_TOTAL_CAPACITY, volReport1.getTotalCapacity());
     assertEquals(TEST_TOTAL_CAPACITY - TEST_USED_SPACE_2, volReport1.getOzoneAvailable());
-    assertEquals(TEST_USED_SPACE_2, volReport1.getOzoneUsedSpace());
+    assertEquals(TEST_USED_SPACE_2, volReport1.getUsedSpace());
     assertEquals(TEST_EFFECTIVE_USED_SPACE_2, volReport1.getEffectiveUsedSpace());
   }
 
