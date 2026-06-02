@@ -76,9 +76,9 @@ public class OMBucketDeleteRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    super.preExecute(ozoneManager);
+    OMRequest request = super.preExecute(ozoneManager);
     DeleteBucketRequest deleteBucketRequest =
-        getOmRequest().getDeleteBucketRequest();
+        request.getDeleteBucketRequest();
     String volumeName = deleteBucketRequest.getVolumeName();
     String bucketName = deleteBucketRequest.getBucketName();
 
@@ -95,14 +95,12 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         auditMap.put(OzoneConsts.BUCKET, bucketName);
         markForAudit(ozoneManager.getAuditLogger(),
             buildAuditMessage(OMAction.DELETE_BUCKET, auditMap, ex,
-                getOmRequest().getUserInfo()));
+                request.getUserInfo()));
         throw ex;
       }
     }
 
-    return getOmRequest().toBuilder()
-        .setUserInfo(getUserIfNotExists(ozoneManager))
-        .build();
+    return request;
   }
 
   @Override

@@ -64,16 +64,16 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    super.preExecute(ozoneManager);
+    OMRequest request = super.preExecute(ozoneManager);
 
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
-        setBucketPropertyRequestBuilder = getOmRequest()
+        setBucketPropertyRequestBuilder = request
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
     SetBucketPropertyRequest setBucketPropertyRequest =
-        getOmRequest().getSetBucketPropertyRequest();
+        request.getSetBucketPropertyRequest();
     BucketArgs bucketArgs = setBucketPropertyRequest.getBucketArgs();
     String volumeName = bucketArgs.getVolumeName();
     String bucketName = bucketArgs.getBucketName();
@@ -90,14 +90,13 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
         Map<String, String> auditMap = omBucketArgs.toAuditMap();
         markForAudit(ozoneManager.getAuditLogger(),
             buildAuditMessage(OMAction.SET_OWNER, auditMap, ex,
-                getOmRequest().getUserInfo()));
+                request.getUserInfo()));
         throw ex;
       }
     }
 
-    return getOmRequest().toBuilder()
+    return request.toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
-        .setUserInfo(getUserIfNotExists(ozoneManager))
         .build();
   }
 
