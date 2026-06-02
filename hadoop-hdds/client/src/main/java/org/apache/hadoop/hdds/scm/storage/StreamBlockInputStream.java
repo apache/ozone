@@ -82,7 +82,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientGrpc xceiverClient;
 
-  private ByteBuffer buffer;
+  private ReadBuffer readBuffer;
   private long position = 0;
   private long requestedLength = 0;
   private StreamingReader streamingReader;
@@ -136,7 +136,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
-    int value = buffer.get();
+    final int value = readBuffer.getByteBuffer().get();
     advancePosition(1, preRead);
     return value;
   }
@@ -159,6 +159,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       if (!dataAvailableToRead(targetBuf.remaining(), preRead)) {
         break;
       }
+
+      final ByteBuffer buffer = readBuffer.getByteBuffer();
       int toCopy = Math.min(buffer.remaining(), targetBuf.remaining());
       ByteBuffer tmpBuf = buffer.duplicate();
       tmpBuf.limit(tmpBuf.position() + toCopy);
@@ -179,7 +181,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (bufferHasRemaining()) {
       return true;
     }
-    buffer = streamingReader.read(length, preRead);
+    readBuffer = streamingReader.read(length, preRead);
     return bufferHasRemaining();
   }
 
@@ -192,6 +194,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private synchronized boolean bufferHasRemaining() {
+    final ByteBuffer buffer = readBuffer.getByteBuffer();
     return buffer != null && buffer.hasRemaining();
   }
 
@@ -213,7 +216,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       return;
     }
     LOG.debug("{}: seek {} -> {}", getName(streamingReader), position, pos);
-    buffer = null;
+    if (streamingReader != null) {
+      streamingReader.offerToQueue(readBuffer.getProto());
+    }
+    readBuffer = null;
     position = pos;
     requestedLength = pos;
   }
@@ -231,14 +237,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private synchronized void closeReader(String reason) {
+    readBuffer = null;
     if (streamingReader == null) {
-      buffer = null;
       return;
     }
 
     final StreamingReader reader = streamingReader;
     streamingReader = null;
-    buffer = null;
     LOG.debug("{} closeReader for {}", getName(reader), reason);
 
     reader.onCompleted();
@@ -388,6 +393,24 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return reader != null ? reader : name;
   }
 
+  static class ReadBuffer {
+    private final ReadBlockResponseProto proto;
+    private final ByteBuffer buffer;
+
+    ReadBuffer(ReadBlockResponseProto proto, ByteBuffer buffer) {
+      this.proto = proto;
+      this.buffer = buffer;
+    }
+
+    ReadBlockResponseProto getProto() {
+      return proto;
+    }
+
+    ByteBuffer getByteBuffer() {
+      return buffer;
+    }
+  }
+
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
    */
@@ -441,7 +464,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       }
     }
 
-    private ByteBuffer read(int length, boolean preRead) throws IOException {
+    private ReadBuffer read(int length, boolean preRead) throws IOException {
       checkError();
       if (future.isDone()) {
         return null; // Stream ended
@@ -450,14 +473,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       readBlock(length, preRead);
 
       while (true) {
-        final ByteBuffer buf = readFromQueue();
+        final ReadBuffer readBuffer = readFromQueue();
+        final ByteBuffer buf = readBuffer.getByteBuffer();
         if (buf != null && buf.hasRemaining()) {
-          return buf;
+          return readBuffer;
         }
       }
     }
 
-    ByteBuffer readFromQueue() throws IOException {
+    ReadBuffer readFromQueue() throws IOException {
       final ReadBlockResponseProto readBlock = poll();
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
@@ -476,7 +500,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       }
       LOG.debug("{}: return response positon {}, length {} (block offset {}, length {})",
           name, pos, dataBuffer.remaining(), blockOffset, data.size());
-      return dataBuffer;
+      return new ReadBuffer(readBlock, dataBuffer);
     }
 
     private void releaseResources() {
