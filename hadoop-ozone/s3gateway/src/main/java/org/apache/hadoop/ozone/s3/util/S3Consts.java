@@ -133,6 +133,7 @@ public final class S3Consts {
     // GetBucketLocation is not implemented
     public static final String LOCATION = "location";
     public static final String MARKER = "marker";
+    public static final String MAX_DIRECTORY_BUCKETS = "max-directory-buckets";
     public static final String MAX_KEYS = "max-keys";
     public static final String MAX_PARTS = "max-parts";
     public static final String MAX_UPLOADS = "max-uploads";
