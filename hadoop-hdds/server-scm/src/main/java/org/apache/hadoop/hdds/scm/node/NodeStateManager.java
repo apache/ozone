@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -124,7 +125,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private final long deadNodeIntervalMs;
 
-  private final long containerRollIntervalMs = 5 * 60 * 1000;  //TODO
+  private final long containerRollIntervalMs;
 
   /**
    * The future is used to pause/unpause the scheduled checks.
@@ -213,6 +214,11 @@ public class NodeStateManager implements Runnable, Closeable {
         FinalizationManager.shouldTellDatanodesToFinalize(
             scmContext.getFinalizationCheckpoint()) &&
             !layoutMatchCondition.test(layout);
+
+    containerRollIntervalMs = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL,
+        ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
 
     scheduleNextHealthCheck();
   }

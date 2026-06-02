@@ -334,15 +334,13 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public boolean hasEnoughSpace(Pipeline pipeline) {
-    return false;
-  }
-
-  @Override
-  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
+      if (!nodeManager.checkSpaceAndRecordAllocation(nodeManager.getDatanodeInfo(dn), containerID)) {
+        return false;
+      }
     }
+    return true;
   }
 
   @Override

@@ -269,6 +269,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_STALENODE_INTERVAL_DEFAULT =
       "5m";
 
+  public static final String OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL =
+      "ozone.scm.pending.container.roll.interval";
+  public static final String OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT =
+      "5m";
+
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT =
       "ozone.scm.heartbeat.rpc-timeout";
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT =
