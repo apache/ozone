@@ -178,11 +178,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
     initialize();
 
-    if (bufferHasRemaining()) {
+    if (hasRemaining(readBuffer)) {
       return true;
     }
     readBuffer = streamingReader.read(length, preRead);
-    return bufferHasRemaining();
+    return hasRemaining(readBuffer);
   }
 
   private synchronized void advancePosition(long delta, boolean preRead) {
@@ -193,9 +193,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private synchronized boolean bufferHasRemaining() {
-    final ByteBuffer buffer = readBuffer.getByteBuffer();
-    return buffer != null && buffer.hasRemaining();
+  private static boolean hasRemaining(ReadBuffer read) {
+    return read != null && read.getByteBuffer().hasRemaining();
   }
 
   @Override
@@ -216,7 +215,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       return;
     }
     LOG.debug("{}: seek {} -> {}", getName(streamingReader), position, pos);
-    if (streamingReader != null) {
+    if (streamingReader != null && readBuffer != null) {
       streamingReader.offerToQueue(readBuffer.getProto());
     }
     readBuffer = null;
@@ -456,9 +455,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
 
         final long elapsedNanos = System.nanoTime() - startTime;
-        if (elapsedNanos >= readTimeoutNanos) {
-          setFailedAndThrow(new TimeoutIOException(
-              "Timed out waiting for response after " + readTimeout));
+        if (elapsedNanos >= readTimeoutNanos && !future.isDone()) {
+          final TimeoutIOException e = new TimeoutIOException(
+              this + ": Failed to poll a response, timed out " + readTimeout);
+          if (setFailed(e)) {
+            throw e;
+          }
           return null;
         }
       }
@@ -474,8 +476,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
       while (true) {
         final ReadBuffer read = readFromQueue();
-        final ByteBuffer buf = read.getByteBuffer();
-        if (buf != null && buf.hasRemaining()) {
+        if (hasRemaining(read)) {
           return read;
         }
       }
@@ -554,12 +555,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     StreamingReadResponse getResponse() {
       return response.get();
-    }
-
-    private <T extends Throwable> void setFailedAndThrow(T throwable) throws T {
-      if (setFailed(throwable)) {
-        throw throwable;
-      }
     }
 
     private boolean setFailed(Throwable throwable) {
