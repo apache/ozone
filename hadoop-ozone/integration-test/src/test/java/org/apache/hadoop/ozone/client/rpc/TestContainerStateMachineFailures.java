@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -511,9 +512,15 @@ public class TestContainerStateMachineFailures {
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
     // Make sure the container is marked unhealthy
-    GenericTestUtils.waitFor(() -> dn.getDatanodeStateMachine()
-        .getContainer().getContainerSet().getContainer(containerID)
-        .getContainerState() == UNHEALTHY, 100, 5000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return !((ContainerStateMachine)((XceiverServerRatis)dn.getDatanodeStateMachine()
+            .getContainer().getWriteChannel()).getServer().getDivision(
+            RatisHelper.newRaftGroup(pipeline).getGroupId()).getStateMachine()).isStateMachineHealthy();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 5000);
     try {
       // try to take a new snapshot, ideally it should just fail
       stateMachine.takeSnapshot();
