@@ -45,7 +45,6 @@ class TestVolumeInfoMetrics {
     when(volume.getCommittedBytes()).thenReturn(10L);
     when(volume.getContainers()).thenReturn(3L);
     when(volume.getReportedFreeSpaceToSpare(anyLong())).thenReturn(20L);
-    when(volume.getFreeSpaceToSpare(anyLong())).thenReturn(10L);
 
     VolumeUsage volumeUsage = mock(VolumeUsage.class);
     when(volume.getVolumeUsage()).thenReturn(volumeUsage);
