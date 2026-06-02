@@ -263,17 +263,14 @@ CDDL 1.1 + GPLv2 with classpath exception
 
 Apache License 2.0
 =====================
-   com.squareup.okhttp3:logging-interceptor
    com.squareup.okhttp3:okhttp
    com.squareup.okhttp3:okhttp-sse
    com.squareup.okio:okio
-   com.squareup.retrofit2:converter-gson
    com.squareup.retrofit2:converter-jackson
    com.squareup.retrofit2:retrofit
    dev.ai4j:openai4j
    dev.langchain4j:langchain4j-anthropic
    dev.langchain4j:langchain4j-core
-   dev.langchain4j:langchain4j-google-ai-gemini
    dev.langchain4j:langchain4j-open-ai
    org.jetbrains.kotlin:kotlin-stdlib-common
    org.jetbrains.kotlin:kotlin-stdlib-jdk7
