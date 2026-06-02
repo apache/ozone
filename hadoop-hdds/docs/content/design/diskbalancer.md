@@ -104,6 +104,8 @@ D1     ----> C1-CLOSED  --- (5) ---> C1-DELETED
 D2      ----> Temp C1-CLOSED  --- (2) ---> Temp C1-RECOVERING --- (3) ---> C1-RECOVERING --- (4) ---> C1-CLOSED
 ```
 
+**Note:** By default, `hdds.datanode.disk.balancer.container.states` includes **CLOSED** and **QUASI_CLOSED**. The same move process applies for any state listed there.
+
 ### Lazy Deletion of Source Container Replica
 
 The source container on D1 is **not** deleted immediately after the move completes. Instead, it is scheduled for deletion after a configurable delay using config `hdds.datanode.disk.balancer.replica.deletion.delay`, **default: 5 minutes**.
@@ -120,16 +122,10 @@ and balanced state will be visible only after the configured delay, when the sou
 By default, the DiskBalancer uses specific policies to decide which disks to balance and which containers to move. These
 are configurable, but the default implementations provide robust and safe behavior.
 
-*   **`DefaultVolumeChoosingPolicy`**: This is the default policy for selecting the source and destination volumes. It 
-identifies the most over-utilized volume as the source and the most under-utilized volume as the destination by comparing
-each volume's utilization against the Datanode's average. The calculation is smart enough to account for data that is 
-already in the process of being moved, ensuring it makes accurate decisions based on the future state of the volumes.
-
-*   **`DefaultContainerChoosingPolicy`**: This is the default policy for selecting which container to move from a source
-volume. It iterates through the containers on the source disk and picks the first one that is in a **CLOSED** state 
-and is not already being moved by another balancing operation. To optimize performance and avoid re-scanning the same 
-containers repeatedly, it caches the list of containers for each volume which auto expires after one hour of its last 
-used time or if the container iterator for that is invalidated on full utilisation.
+*   **`DefaultContainerChoosingPolicy`**: This is the default policy that consolidates both volume selection and container
+selection into a single operation. It identifies the most over-utilized volume as the source and the most under-utilized
+volume with sufficient space as the destination, then iterates through containers on the source to pick the first one
+that is movable (per `hdds.datanode.disk.balancer.container.states`, default **CLOSED** and **QUASI_CLOSED**) and is not already being moved. It caches the list of containers for each volume which auto expires after one hour.
 
 ## Security Design
 DiskBalancer follows the same security model as other services:

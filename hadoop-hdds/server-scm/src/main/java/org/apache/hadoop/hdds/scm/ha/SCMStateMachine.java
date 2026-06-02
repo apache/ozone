@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -38,8 +39,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -76,7 +79,9 @@ public class SCMStateMachine extends BaseStateMachine {
 
   private StorageContainerManager scm;
   private Map<RequestType, Object> handlers;
+  private Map<RequestType, ScmInvoker<?>> invokers;
   private SCMHADBTransactionBuffer transactionBuffer;
+  private final SCMMetrics metrics;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final boolean isInitialized;
@@ -92,7 +97,9 @@ public class SCMStateMachine extends BaseStateMachine {
       SCMHADBTransactionBuffer buffer) {
     this.scm = scm;
     this.handlers = new EnumMap<>(RequestType.class);
+    this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
+    this.metrics = scm.getMetrics();
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isDefault()) {
       updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
@@ -110,10 +117,22 @@ public class SCMStateMachine extends BaseStateMachine {
 
   public SCMStateMachine() {
     isInitialized = false;
+    this.metrics = null;
   }
 
   public void registerHandler(RequestType type, Object handler) {
     handlers.put(type, handler);
+  }
+
+  private void addRatisEvent(String message) {
+    if (metrics != null) {
+      metrics.addRatisEvent(message);
+    }
+  }
+
+  public void registerInvoker(RequestType type,
+      ScmInvoker<?> invoker) {
+    invokers.put(type, invoker);
   }
 
   @Override
@@ -141,6 +160,7 @@ public class SCMStateMachine extends BaseStateMachine {
       final TransactionContext trx) {
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
+    transactionBuffer.beginApplyingTransaction();
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
@@ -173,23 +193,30 @@ public class SCMStateMachine extends BaseStateMachine {
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
     return applyTransactionFuture;
   }
 
   private Message process(final SCMRatisRequest request) throws Exception {
-    try {
-      final Object handler = handlers.get(request.getType());
+    final ScmInvoker<?> invoker = invokers.get(request.getType());
+    if (invoker != null) {
+      return invoker.invokeLocal(request.getOperation(), request.getArguments());
+    }
+    return process(request, handlers.get(request.getType()));
+  }
 
+  public static Message process(final SCMRatisRequest request, Object handler) throws Exception {
+    try {
       if (handler == null) {
         throw new IOException("No handler found for request type " +
             request.getType());
       }
 
-      final Object result = handler.getClass().getMethod(
-          request.getOperation(), request.getParameterTypes())
-          .invoke(handler, request.getArguments());
-      return SCMRatisResponse.encode(result);
+      final Method method = handler.getClass().getMethod(request.getOperation(), request.getParameterTypes());
+      final Object result = method.invoke(handler, request.getArguments());
+      return SCMRatisResponse.encode(result, method.getReturnType());
     } catch (NoSuchMethodException | SecurityException ex) {
       throw new InvalidProtocolBufferException(ex.getMessage());
     } catch (InvocationTargetException e) {
@@ -210,7 +237,9 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
-    LOG.info("current leader SCM steps down.");
+    String message = "SCM " + scm.getScmId() + " steps down from being leader.";
+    LOG.info(message);
+    addRatisEvent(message);
 
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
@@ -241,6 +270,8 @@ public class SCMStateMachine extends BaseStateMachine {
     final String leaderNodeId = leaderDetails.get().getNodeId();
     LOG.info("Received install snapshot notification from SCM leader: {} with "
         + "term index: {}", leaderAddress, firstTermIndexInLog);
+    addRatisEvent("Installing snapshot from SCM leader " + leaderNodeId +
+        ", term index: " + firstTermIndexInLog);
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
         () -> {
@@ -294,11 +325,17 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
-      LOG.info("leader changed, yet current SCM is still follower.");
+      String message = "Leader changed to " + newLeaderId +
+          ", current SCM " + scm.getScmId() + " is still follower.";
+      LOG.info(message);
+      addRatisEvent(message);
       return;
     }
 
-    LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
+    String message = "current SCM " + scm.getScmId() +
+        " becomes leader of term " + currentLeaderTerm;
+    LOG.info(message);
+    addRatisEvent(message);
 
     scm.getScmContext().updateLeaderAndTerm(true,
         currentLeaderTerm.get());
@@ -329,23 +366,28 @@ public class SCMStateMachine extends BaseStateMachine {
       return lastAppliedIndex;
     }
 
-    long startTime = Time.monotonicNow();
+    transactionBuffer.beginApplyingTransaction();
+    try {
+      long startTime = Time.monotonicNow();
 
-    TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
-    final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
+      TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
+      final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
 
-    if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
-      transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
-      transactionBuffer.setLatestSnapshot(lastAppliedTrxInfo.toSnapshotInfo());
-    } else {
-      lastAppliedIndex = latestTrxInfo.getTransactionIndex();
+      if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
+        transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
+        transactionBuffer.setLatestSnapshot(lastAppliedTrxInfo.toSnapshotInfo());
+      } else {
+        lastAppliedIndex = latestTrxInfo.getTransactionIndex();
+      }
+
+      transactionBuffer.flush();
+
+      LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
+          lastAppliedIndex, Time.monotonicNow() - startTime);
+      return lastAppliedIndex;
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
-
-    transactionBuffer.flush();
-
-    LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
-        lastAppliedIndex, Time.monotonicNow() - startTime);
-    return lastAppliedIndex;
   }
 
   @Override
@@ -365,7 +407,12 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (transactionBuffer != null) {
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
+      transactionBuffer.beginApplyingTransaction();
+      try {
+        transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
+      } finally {
+        transactionBuffer.endApplyingTransaction();
+      }
     }
 
     if (currentLeaderTerm.get() == term) {
@@ -392,11 +439,15 @@ public class SCMStateMachine extends BaseStateMachine {
     scm.getScmContext().setLeaderReady();
     scm.getSCMServiceManager().notifyStatusChanged();
     scm.getFinalizationManager().onLeaderReady();
+    addRatisEvent("SCM " + scm.getScmId() +
+        " is ready to serve requests as the leader");
   }
 
   @Override
   public void notifyConfigurationChanged(long term, long index,
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
+    addRatisEvent("Configuration changed at term index (" + term + ", " + index +
+        ") to " + newRaftConfiguration.toString());
   }
 
   @Override
@@ -429,6 +480,7 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     LOG.info("{}: SCMStateMachine is reinitializing. newTermIndex = {}", getId(), termIndex);
+    addRatisEvent("reinitialize: " + termIndex);
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
     try {

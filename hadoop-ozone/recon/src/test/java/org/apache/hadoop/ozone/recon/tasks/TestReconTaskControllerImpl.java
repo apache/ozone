@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.apache.ozone.test.GenericTestUtils;
@@ -93,6 +94,19 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager,
         reconGlobalStatsManager, reconFileMetadataManager);
     reconTaskController.start();
+  }
+
+  @Test
+  public void testStopCompletesPromptly() {
+    // stop() must not block on the graceful shutdown timeout. The event
+    // processing loop only exits on interrupt, so a plain shutdown() can never
+    // drain it and awaitTermination would otherwise burn the full 30s timeout.
+    long start = Time.monotonicNow();
+    reconTaskController.stop();
+    long elapsed = Time.monotonicNow() - start;
+    assertThat(elapsed)
+        .as("stop() should return promptly, not wait out the shutdown timeout")
+        .isLessThan(5000L);
   }
 
   @Test
@@ -596,9 +610,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         .thenReturn(false)  // First call fails
         .thenReturn(true);  // Second call succeeds
     
-    // Stop async processing to control event processing manually
-    controllerSpy.stop();
-    
+    // Stop async processing on the real controller so we can drive event
+    // processing manually. Stopping controllerSpy would only flip the flag on
+    // the Mockito copy, not the live event-processing thread.
+    controllerImpl.stop();
+
     // Create and manually process a reinitialization event
     ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES,
@@ -732,9 +748,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(controllerSpy.reInitializeTasks(any(ReconOMMetadataManager.class), any()))
         .thenReturn(true);  // Succeed
     
-    // Stop async processing to control event processing manually
-    controllerSpy.stop();
-    
+    // Stop async processing on the real controller so we can drive event
+    // processing manually. Stopping controllerSpy would only flip the flag on
+    // the Mockito copy, not the live event-processing thread.
+    controllerImpl.stop();
+
     // Create reinitialization event with checkpointed manager
     ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW,

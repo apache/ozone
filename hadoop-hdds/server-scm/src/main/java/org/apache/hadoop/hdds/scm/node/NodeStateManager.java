@@ -124,6 +124,8 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private final long deadNodeIntervalMs;
 
+  private final long containerRollIntervalMs = 5 * 60 * 1000;  //TODO
+
   /**
    * The future is used to pause/unpause the scheduled checks.
    */
@@ -310,7 +312,7 @@ public class NodeStateManager implements Runnable, Closeable {
 
   private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, LayoutVersionProto layout) {
     final NodeStatus status = newNodeStatus(datanode, layout);
-    return new DatanodeInfo(datanode, status, layout);
+    return new DatanodeInfo(datanode, status, layout, containerRollIntervalMs);
   }
 
   /**

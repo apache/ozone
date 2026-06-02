@@ -210,8 +210,8 @@ public final class DatabaseHelper {
         int cols = rsm.getColumnCount();
         while (rs.next()) {
           for (int index = 1; index <= cols; index++) {
-            result.append(rs.getObject(index));
-            result.append('\t');
+            result.append(rs.getObject(index))
+                .append('\t');
           }
           result.append('\n');
         }

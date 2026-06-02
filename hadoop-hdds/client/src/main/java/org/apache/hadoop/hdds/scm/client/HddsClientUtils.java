@@ -29,8 +29,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
@@ -71,31 +71,35 @@ public final class HddsClientUtils {
   private HddsClientUtils() {
   }
 
-  private static void doNameChecks(String resName, String resType) {
+  private static void doNameChecks(String resName, String resType, boolean isStrictS3) {
     if (resName == null) {
       throw new IllegalArgumentException(resType + " name is null");
     }
 
-    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH) {
-      throw new IllegalArgumentException(resType +
-          " name '" + resName + "' is too short, " +
-          VALID_LENGTH_MESSAGE);
-    }
+    boolean applyS3LengthConstraint = !resType.equals("bucket") || isStrictS3;
 
-    if (resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
-      String nameToReport;
-
-      if (resName.length() > MAX_BUCKET_NAME_LENGTH_IN_LOG) {
-        nameToReport = String.format(
-            "%s...",
-            resName.substring(0, MAX_BUCKET_NAME_LENGTH_IN_LOG));
-      } else {
-        nameToReport = resName;
+    if (applyS3LengthConstraint) {
+      if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH) {
+        throw new IllegalArgumentException(resType +
+            " name '" + resName + "' is too short, " +
+            VALID_LENGTH_MESSAGE);
       }
 
-      throw new IllegalArgumentException(resType +
-          " name '" + nameToReport + "' is too long, " +
-          VALID_LENGTH_MESSAGE);
+      if (resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+        String nameToReport;
+
+        if (resName.length() > MAX_BUCKET_NAME_LENGTH_IN_LOG) {
+          nameToReport = String.format(
+              "%s...",
+              resName.substring(0, MAX_BUCKET_NAME_LENGTH_IN_LOG));
+        } else {
+          nameToReport = resName;
+        }
+
+        throw new IllegalArgumentException(resType +
+            " name '" + nameToReport + "' is too long, " +
+            VALID_LENGTH_MESSAGE);
+      }
     }
 
     if (resName.charAt(0) == '.' || resName.charAt(0) == '-') {
@@ -191,7 +195,7 @@ public final class HddsClientUtils {
           " name cannot be an IPv4 address or all numeric");
     }
 
-    doNameChecks(resName, resType);
+    doNameChecks(resName, resType, isStrictS3);
   }
 
   /**

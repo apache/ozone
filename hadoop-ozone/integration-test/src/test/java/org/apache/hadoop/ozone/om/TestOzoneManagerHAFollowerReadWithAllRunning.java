@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -487,7 +486,9 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
       // This will trigger getServiceId so the client should point to the leader
       leaderOnlyClient = OzoneClientFactory.getRpcClient(getOmServiceId(), clientConf);
       ObjectStore leaderOnlyObjectStore = leaderOnlyClient.getObjectStore();
-      assertNull(OmTestUtil.getFollowerReadFailoverProxyProvider(leaderOnlyObjectStore));
+      // FollowerReadProxyProvider is the unified proxy provider regardless of whether follower
+      // read is enabled or not
+      assertNotNull(OmTestUtil.getFollowerReadFailoverProxyProvider(leaderOnlyObjectStore));
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxyProvider =
           OmTestUtil.getFailoverProxyProvider(leaderOnlyObjectStore);
 

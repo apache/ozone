@@ -17,13 +17,19 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
+import java.util.stream.Stream;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -146,6 +152,41 @@ public class TestS3Utils {
   @Test
   public void testGenerateCanonicalUserId() {
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
+  }
+
+  static Stream<Arguments> wrongContentMD5Provider() throws Exception {
+    String serverMD5 = Hex.encodeHexString(
+        MessageDigest.getInstance("MD5").digest("bar".getBytes(StandardCharsets.UTF_8)));
+
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest("wrong".getBytes(StandardCharsets.UTF_8));
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    String shortBase64 = Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8));
+
+    return Stream.of(
+        Arguments.of(null, serverMD5, S3ErrorTable.INVALID_DIGEST.getCode()),
+        Arguments.of("wrong-base64", serverMD5, S3ErrorTable.INVALID_DIGEST.getCode()),
+        Arguments.of(shortBase64, serverMD5, S3ErrorTable.INVALID_DIGEST.getCode()),
+        Arguments.of(wrongMd5Base64, serverMD5, S3ErrorTable.BAD_DIGEST.getCode())
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testValidateContentMD5WithInvalidInput(
+      String clientMD5, String serverMD5, String expectedErrorCode) {
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> S3Utils.validateContentMD5(clientMD5, serverMD5, "test-resource"));
+    assertEquals(expectedErrorCode, ex.getCode());
+  }
+
+  @Test
+  public void testValidateContentMD5WithValidInput() throws Exception {
+    byte[] md5Bytes = MessageDigest.getInstance("MD5").digest("bar".getBytes(StandardCharsets.UTF_8));
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+    String md5Hex = Hex.encodeHexString(md5Bytes);
+
+    assertDoesNotThrow(() -> S3Utils.validateContentMD5(md5Base64, md5Hex, "test-resource"));
   }
 
 }

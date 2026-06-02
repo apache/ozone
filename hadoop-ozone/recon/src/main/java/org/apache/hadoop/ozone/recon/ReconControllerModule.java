@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotModule;
+import org.apache.hadoop.ozone.recon.api.ExportJobManager;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
@@ -112,6 +113,7 @@ public class ReconControllerModule extends AbstractModule {
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
 
     bind(ContainerHealthSchemaManager.class).in(Singleton.class);
+    bind(ExportJobManager.class).in(Singleton.class);
     bind(ReconContainerMetadataManager.class)
         .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
     bind(ReconFileMetadataManager.class)

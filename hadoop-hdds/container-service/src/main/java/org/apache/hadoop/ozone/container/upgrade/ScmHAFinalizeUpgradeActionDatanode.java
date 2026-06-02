@@ -54,6 +54,7 @@ public class ScmHAFinalizeUpgradeActionDatanode
         if (volume instanceof HddsVolume) {
           HddsVolume hddsVolume = (HddsVolume) volume;
           if (!upgradeVolume(hddsVolume, hddsVolume.getClusterID())) {
+            LOG.error("Marking volume {} as failed", volume.getStorageDir().getAbsolutePath());
             volumeSet.failVolume(volume.getStorageDir().getAbsolutePath());
           }
         }

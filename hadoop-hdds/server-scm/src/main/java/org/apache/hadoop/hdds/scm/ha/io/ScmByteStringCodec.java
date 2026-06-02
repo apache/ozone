@@ -22,7 +22,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 /**
  * A dummy codec that serializes a ByteString object to ByteString.
  */
-public class ScmByteStringCodec implements ScmCodec<ByteString> {
+class ScmByteStringCodec implements ScmCodec<ByteString> {
 
   @Override
   public ByteString serialize(ByteString object) {
@@ -30,7 +30,7 @@ public class ScmByteStringCodec implements ScmCodec<ByteString> {
   }
 
   @Override
-  public ByteString deserialize(Class<?> type, ByteString value) {
+  public ByteString deserialize(ByteString value) {
     return value;
   }
 }

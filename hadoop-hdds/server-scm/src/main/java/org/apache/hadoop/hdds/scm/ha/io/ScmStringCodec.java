@@ -33,7 +33,7 @@ public class ScmStringCodec implements ScmCodec<String> {
   }
 
   @Override
-  public String deserialize(Class<?> type, ByteString value) {
+  public String deserialize(ByteString value) {
     return new String(value.toByteArray(), UTF_8);
   }
 }

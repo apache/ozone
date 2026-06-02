@@ -30,6 +30,9 @@ public final class OMConfigKeys {
   public static final String OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY =
       "ozone.filesystem.snapshot.enabled";
   public static final boolean OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT = true;
+  public static final String OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY =
+      "ozone.om.snapshot.rename.allowed";
+  public static final boolean OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT = false;
 
   // Location where the OM stores its DB files. In the future we may support
   // multiple entries for performance (sharding)..
@@ -162,6 +165,10 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.rocksdb.metrics.enabled";
   public static final boolean
       OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL =
+      "ozone.om.snapshot.directory.metrics.update.interval";
+  public static final String OZONE_OM_SNAPSHOT_DIRECTORY_METRICS_UPDATE_INTERVAL_DEFAULT = "5m";
 
   /**
    * OM Ratis related configurations.
@@ -394,7 +401,7 @@ public final class OMConfigKeys {
    * Configuration properties for Snapshot Directory Service.
    */
   public static final String OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED = "ozone.snapshot.deep.cleaning.enabled";
-  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = false;
+  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = true;
   /**
    * DirectoryDeepCleaning snapshots have been moved from SnapshotDirectoryCleaningService to DirectoryDeletingService.
    * Configs related to SnapshotDirectoryCleaningService are deprecated as this won't be used anywhere.
@@ -543,6 +550,11 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT
       = 100_000;
 
+  public static final String OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE
+      = "ozone.om.container.location.datanode.cache.size";
+  public static final int
+      OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT = 10_000;
+
   public static final String OZONE_OM_CONTAINER_LOCATION_CACHE_TTL
       = "ozone.om.container.location.cache.ttl";
 
@@ -609,7 +621,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.cache.cleanup.service.run.interval";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.MINUTES.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(60);
   public static final long
       OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);
@@ -667,7 +679,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
-      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
+      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
 
   /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
@@ -686,6 +698,10 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL =
       "ozone.om.snapshot.local.data.manager.service.interval";
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
+
+  public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
+      "ozone.om.ratis.events.max.limit";
+  public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
 
   /**
    * Never constructed.

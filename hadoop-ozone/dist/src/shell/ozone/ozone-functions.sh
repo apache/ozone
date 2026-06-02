@@ -1420,6 +1420,17 @@ function ozone_java_setup
     RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${RATIS_OPTS}"
   fi
 
+  # Opt-in caps on Netty's pooled direct-memory arena (HDDS-11234). Two
+  # properties are needed because Ozone runs both the unshaded io.netty
+  # *and* the Ratis-shaded copy in the same JVM, each with its own
+  # independent ceiling.
+  if [[ -n "${OZONE_NETTY_MAX_DIRECT_MEMORY:-}" ]]; then
+    OZONE_OPTS="-Dio.netty.maxDirectMemory=${OZONE_NETTY_MAX_DIRECT_MEMORY} ${OZONE_OPTS}"
+  fi
+  if [[ -n "${OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY:-}" ]]; then
+    RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.maxDirectMemory=${OZONE_RATIS_NETTY_MAX_DIRECT_MEMORY} ${RATIS_OPTS}"
+  fi
+
   ozone_set_module_access_args
 }
 
@@ -1520,17 +1531,15 @@ function ozone_translate_cygwin_path
 ## @replaceable  yes
 function ozone_add_default_gc_opts
 {
-  java_major_version=$(ozone_get_java_major_version)
   if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
-    if [[ ! "$OZONE_OPTS" =~ "-XX" ]] ; then
-      OZONE_OPTS="${OZONE_OPTS} -XX:ParallelGCThreads=8"
-      if [[ "$java_major_version" -lt 15 ]]; then
-        OZONE_OPTS="${OZONE_OPTS} -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the OZONE_OPTS"
-      else
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8' to the OZONE_OPTS"
-      fi
+    local gc_opts
+    local java_major_version
+    java_major_version=$(ozone_get_java_major_version)
+    gc_opts="-XX:ParallelGCThreads=8"
+    if [[ "$java_major_version" -lt 15 ]]; then
+      gc_opts="${gc_opts} -XX:+UseConcMarkSweepGC -XX:NewRatio=3 -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
     fi
+    ozone_add_param OZONE_OPTS XX "${gc_opts}"
   fi
 }
 

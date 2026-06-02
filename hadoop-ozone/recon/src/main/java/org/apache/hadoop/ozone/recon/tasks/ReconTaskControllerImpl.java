@@ -88,6 +88,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
   private final OMUpdateEventBuffer eventBuffer;
   private ExecutorService eventProcessingExecutor;
+  private volatile boolean running = false;
   private final AtomicBoolean tasksFailed = new AtomicBoolean(false);
   private volatile ReconOMMetadataManager currentOMMetadataManager;
   private final OzoneConfiguration configuration;
@@ -284,8 +285,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         reconContainerMetadataManager.reinitialize(reconDBProvider);
         reconGlobalStatsManager.reinitialize(reconDBProvider);
         reconFileMetadataManager.reinitialize(reconDBProvider);
+        //Tasks with staged instances must reload instance state in init() after reinit.
+        localReconOmTaskMap.values().forEach(ReconOmTask::init);
         recordAllTaskStatus(localReconOmTaskMap, 0, omMetadataManager.getLastSequenceNumberFromDB());
-
         // Track reprocess success
         controllerMetrics.incrReprocessSuccessCount();
 
@@ -358,6 +360,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             .build());
     
     // Start async event processing thread
+    running = true;
     eventProcessingExecutor = Executors.newSingleThreadExecutor(
         new ThreadFactoryBuilder().setNameFormat("ReconEventProcessor-%d")
             .build());
@@ -368,6 +371,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void stop() {
     LOG.info("Stopping Recon Task Controller.");
+    // Signal the event processing loop to exit on its next poll cycle so the
+    // graceful shutdown below can complete without waiting out the timeout.
+    running = false;
     shutdownExecutorGracefully(this.executorService, "main task executor");
     shutdownExecutorGracefully(this.eventProcessingExecutor, "event processing executor");
   }
@@ -480,7 +486,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private void processBufferedEventsAsync() {
     LOG.info("Started async buffered event processing thread");
     
-    while (!Thread.currentThread().isInterrupted()) {
+    while (running && !Thread.currentThread().isInterrupted()) {
       try {
         ReconEvent event = eventBuffer.poll(1000); // 1 second timeout
         if (event != null) {

@@ -195,7 +195,7 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     when(mockContainerManager.getContainerStateCount(HddsProtos.LifeCycleState.DELETED))
         .thenReturn(0);
     when(mockContainerHealthSchemaManager.getUnhealthyContainers(
-        any(), anyLong(), any(), anyInt())).thenReturn(Collections.emptyList());
+        any(), anyLong(), anyLong(), anyInt())).thenReturn(Collections.emptyList());
 
     SCMNodeStat scmNodeStat = new SCMNodeStat(
         1000L, 400L, 600L, 300L, 50L, 20L);
