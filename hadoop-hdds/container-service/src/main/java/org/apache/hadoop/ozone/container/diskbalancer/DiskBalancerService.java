@@ -750,6 +750,7 @@ public class DiskBalancerService extends BackgroundService {
       VolumeReportProto.Builder builder = VolumeReportProto.newBuilder()
           .setStorageId(volume.getStorageID())
           .setTotalCapacity(v.getUsage().getCapacity())
+          .setOzoneAvailable(v.getUsage().getAvailable())
           .setUsedSpace(v.getUsage().getUsedSpace())
           .setCommittedBytes(volume.getCommittedBytes())
           .setEffectiveUsedSpace(v.getEffectiveUsed())
