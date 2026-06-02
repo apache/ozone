@@ -109,11 +109,14 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     List<String> keysPassingAcl = new ArrayList<>();
     List<String> aclDeniedKeys = new ArrayList<>();
     if (ozoneManager.getAclsEnabled()) {
+      OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
       for (String keyName : keys) {
         try {
+          long startNanosAclCheck = Time.monotonicNowNanos();
           checkKeyAcls(ozoneManager, resolvedVolume, resolvedBucket, keyName,
               IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
               volumeOwner);
+          perfMetrics.setDeleteKeysAclCheckLatencyNs(Time.monotonicNowNanos() - startNanosAclCheck);
           keysPassingAcl.add(keyName);
         } catch (IOException ex) {
           LOG.warn("ACL check failed for key {} during preExecute: {}",
