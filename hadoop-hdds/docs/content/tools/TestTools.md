@@ -27,7 +27,7 @@ Note: we have more tests (like TCP-DS, TCP-H tests via Spark or Hive) which are 
 
 ## Unit test
 
-As every almost every java project we have the good old unit tests inside each of our projects.
+As with every Java project, we have the good old unit tests within each of our projects.
 
 ## Integration test (JUnit)
 
@@ -82,7 +82,7 @@ The number of volumes/buckets/keys can be configured. The replication type and f
 
 For more information use:
 
-bin/ozone freon --help
+ozone freon --help
 
 For example:
 
