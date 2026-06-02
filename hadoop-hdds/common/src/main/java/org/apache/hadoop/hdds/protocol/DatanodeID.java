@@ -44,11 +44,6 @@ public final class DatanodeID implements Comparable<DatanodeID> {
     this.uuidByteString = StringWithByteString.valueOf(uuid.toString());
   }
 
-  // Mainly used for JSON conversion
-  public String getUuid() {
-    return toString();
-  }
-
   @Override
   public int compareTo(final DatanodeID that) {
     return this.uuid.compareTo(that.uuid);
@@ -68,6 +63,10 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   @Override
   public String toString() {
     return uuidByteString.getString();
+  }
+
+  public String getUuidStringForTesting() {
+    return toString();
   }
 
   /**
