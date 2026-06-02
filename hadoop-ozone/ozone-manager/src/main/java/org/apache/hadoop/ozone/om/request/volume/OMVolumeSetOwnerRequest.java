@@ -62,7 +62,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    super.preExecute(ozoneManager);
+    OMRequest request = super.preExecute(ozoneManager);
 
     long modificationTime = Time.now();
     SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
@@ -87,14 +87,13 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
             setVolumePropertyRequest.getOwnerName());
         markForAudit(ozoneManager.getAuditLogger(),
             buildAuditMessage(OMAction.SET_OWNER, auditMap, ex,
-                getOmRequest().getUserInfo()));
+                request.getUserInfo()));
         throw ex;
       }
     }
 
-    return getOmRequest().toBuilder()
+    return request.toBuilder()
         .setSetVolumePropertyRequest(setPropertyRequestBuilder)
-        .setUserInfo(getUserIfNotExists(ozoneManager))
         .build();
   }
 

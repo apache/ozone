@@ -62,7 +62,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    super.preExecute(ozoneManager);
+    OMRequest request = super.preExecute(ozoneManager);
     DeleteVolumeRequest deleteVolumeRequest =
         getOmRequest().getDeleteVolumeRequest();
     Objects.requireNonNull(deleteVolumeRequest);
@@ -80,14 +80,12 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
         auditMap.put(OzoneConsts.VOLUME, volume);
         markForAudit(ozoneManager.getAuditLogger(),
             buildAuditMessage(OMAction.DELETE_VOLUME, auditMap, ex,
-                getOmRequest().getUserInfo()));
+                request.getUserInfo()));
         throw ex;
       }
     }
 
-    return getOmRequest().toBuilder()
-        .setUserInfo(getUserIfNotExists(ozoneManager))
-        .build();
+    return request;
   }
 
   @Override
