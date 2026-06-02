@@ -45,7 +45,7 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   }
 
   // Mainly used for JSON conversion
-  public String getID() {
+  public String getUuid() {
     return toString();
   }
 

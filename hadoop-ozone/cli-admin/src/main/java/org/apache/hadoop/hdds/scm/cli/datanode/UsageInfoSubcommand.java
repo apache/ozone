@@ -117,7 +117,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
    */
   private void printInfo(DatanodeUsage info) {
     System.out.printf("%-24s: %s %n", "ID",
-        info.getDatanodeDetails().getID());
+        info.getDatanodeDetails().getUuidString());
     System.out.printf("%-24s: %s %n", "IP Address",
         info.getDatanodeDetails().getIpAddress());
     System.out.printf("%-24s: %s %n", "Hostname",
