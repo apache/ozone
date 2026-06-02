@@ -1162,10 +1162,10 @@ public class TestReplicationSupervisor {
     assertEquals(7, threadPoolSize.get());
 
     rs.nodeStateUpdated(DECOMMISSIONING);
-    assertEquals(14, threadPoolSize.get());
+    assertEquals(repConf.scaleOutOfServiceLimit(7), threadPoolSize.get());
 
     rs.setReplicationMaxStreams(3);
-    assertEquals(6, threadPoolSize.get());
+    assertEquals(repConf.scaleOutOfServiceLimit(3), threadPoolSize.get());
 
     rs.nodeStateUpdated(IN_SERVICE);
     assertEquals(3, threadPoolSize.get());
