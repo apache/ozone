@@ -110,6 +110,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     this.responseDataSize = config.getStreamReadResponseDataSize();
     this.readTimeout = config.getStreamReadTimeout();
     this.readTimeoutNanos = readTimeout.toNanos();
+
+    LOG.debug("{}: new StreamBlockInputStream", name);
   }
 
   @Override
@@ -130,11 +132,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized int read() throws IOException {
     checkOpen();
-    if (!dataAvailableToRead(1, true)) {
+    final boolean preRead = true;
+    if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
     int value = buffer.get();
-    advancePosition(1);
+    advancePosition(1, preRead);
     return value;
   }
 
@@ -161,7 +164,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       tmpBuf.limit(tmpBuf.position() + toCopy);
       targetBuf.put(tmpBuf);
       buffer.position(tmpBuf.position());
-      advancePosition(toCopy);
+      advancePosition(toCopy, preRead);
       read += toCopy;
     }
     return read > 0 ? read : EOF;
@@ -180,10 +183,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return bufferHasRemaining();
   }
 
-  private synchronized void advancePosition(long delta) {
+  private synchronized void advancePosition(long delta, boolean preRead) {
+    LOG.debug("{}: advance {} -> {}", getName(streamingReader), position, position + delta);
     position += delta;
-    if (position >= blockLength && streamingReader != null) {
-      closeStream();
+    if (preRead && position >= blockLength) {
+      closeReader("advancePosition");
     }
   }
 
@@ -208,8 +212,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (pos == position) {
       return;
     }
-    LOG.debug("{}: seek {} -> {}", this, position, pos);
-    closeStream();
+    LOG.debug("{}: seek {} -> {}", getName(streamingReader), position, pos);
+    buffer = null;
     position = pos;
     requestedLength = pos;
   }
@@ -226,7 +230,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     releaseClient();
   }
 
-  private synchronized void closeStream() {
+  private synchronized void closeReader(String reason) {
     if (streamingReader == null) {
       buffer = null;
       return;
@@ -235,10 +239,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     final StreamingReader reader = streamingReader;
     streamingReader = null;
     buffer = null;
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Closing {}", reader);
-    }
+    LOG.debug("{} closeReader for {}", getName(reader), reason);
 
     reader.onCompleted();
 
@@ -293,6 +294,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       try {
         acquireClient();
         final StreamingReader reader = new StreamingReader();
+        LOG.debug("{}: new StreamingReader", getName(reader));
         xceiverClient.initStreamRead(blockID, reader);
         streamingReader = reader;
       } catch (IOException ioe) {
@@ -342,7 +344,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   protected synchronized void releaseClient() {
     if (xceiverClientFactory != null && xceiverClient != null) {
-      closeStream();
+      closeReader("releaseClient");
       xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
       xceiverClient = null;
     }
@@ -380,6 +382,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   /** Visible for testing: returns the configured streaming read timeout. */
   public Duration getReadTimeout() {
     return readTimeout;
+  }
+
+  private Object getName(StreamingReader reader) {
+    return reader != null ? reader : name;
   }
 
   /**
@@ -461,9 +467,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       final long blockOffset = readBlock.getOffset();
       final long pos = getPos();
       if (pos < blockOffset) {
-        // This should not happen, and if it does, we have a bug.
-        setFailedAndThrow(new IllegalStateException(
-            this + ": out of order, position " + pos + " < block offset " + blockOffset));
+        // This can happen after seek, just drop the buffer
+        return null;
       }
       final long offset = pos - blockOffset;
       if (offset > 0) {
