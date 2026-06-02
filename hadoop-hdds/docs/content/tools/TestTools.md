@@ -56,7 +56,7 @@ cd compose/ozone
 
 [Blockade](https://github.com/worstcase/blockade) is a tool to test network failures and partitions (it's inspired by the legendary [Jepsen tests](https://jepsen.io/analyses)).
 
-The Blockade test suite is shipped with the Ozone distribution as Python tests under `tests/blockade`. After you build or unpack the distribution, run the commands below from that directory:
+The Blockade test suite is shipped as Python tests under `tests/blockade`. After you build or unpack the distribution, run the commands below from that directory:
 
 ```
 cd tests/blockade

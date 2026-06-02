@@ -56,7 +56,7 @@ cd compose/ozone
 
 [Blockade](https://github.com/worstcase/blockade) 是一个测试网络故障和分片的工具（灵感来自于大名鼎鼎的[Jepsen 测试](https://jepsen.io/analyses)）。
 
-Blockade 测试以 Python 脚本形式包含在 Ozone 发行包的 `tests/blockade` 目录中。构建或解压发行包后，进入该目录并运行下面的命令：
+Blockade 测试以 Python 脚本形式包含在 `tests/blockade` 目录中。构建或解压发行包后，进入该目录并运行下面的命令：
 
 ```
 cd tests/blockade
