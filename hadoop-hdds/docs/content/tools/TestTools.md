@@ -60,7 +60,7 @@ Blockade tests are implemented with the help of tests and can be started from th
 
 ```
 cd blockade
-pip install pytest==2.8.7,blockade
+pip install pytest==2.8.7 blockade
 python -m pytest -s .
 ```
 
