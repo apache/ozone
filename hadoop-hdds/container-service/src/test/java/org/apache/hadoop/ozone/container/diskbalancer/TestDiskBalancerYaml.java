@@ -134,6 +134,12 @@ public class TestDiskBalancerYaml {
             .replace("threshold: 10.0\n", "threshold: 0.0\n"),
             "Invalid DiskBalancer configuration in persisted info"),
         Arguments.of(validYaml()
+            .replace("bandwidthInMB: 100\n", "bandwidthInMB: 0\n"),
+            "Invalid DiskBalancer configuration in persisted info"),
+        Arguments.of(validYaml()
+            .replace("parallelThread: 5\n", "parallelThread: 0\n"),
+            "Invalid DiskBalancer configuration in persisted info"),
+        Arguments.of(validYaml()
             .replace("containerStates: CLOSED,QUASI_CLOSED\n",
                 "containerStates: OPEN\n"),
             "Invalid DiskBalancer configuration in persisted info"));
