@@ -473,10 +473,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       readBlock(length, preRead);
 
       while (true) {
-        final ReadBuffer readBuffer = readFromQueue();
-        final ByteBuffer buf = readBuffer.getByteBuffer();
+        final ReadBuffer read = readFromQueue();
+        final ByteBuffer buf = read.getByteBuffer();
         if (buf != null && buf.hasRemaining()) {
-          return readBuffer;
+          return read;
         }
       }
     }
