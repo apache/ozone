@@ -61,7 +61,7 @@ Ozone components currently define their version in two classes: ComponentVersion
 
 The existing upgrade framework uses the following terminology:
 
-**Component version**: The logical versioning system used to track incompatible changes to components that affect client/server network compatibility. Currently it is only used in communication with clients outside of Ozone, not within Ozone components itself. The component version is hardcoded in the software and does not change. We currently use the following component versions:
+**Component version**: The logical versioning system used to track incompatible changes to components that affect client/server network compatibility. Currently it is only used in communication with clients outside of Ozone, not within Ozone components themselves. The component version is hardcoded in the software and does not change. We currently use the following component versions:
 - **OM Version**: Provided to external clients communicating with OM in case a newer external client needs to handle compatibility.
 - **Datanode Version**: Provided by Datanodes to external clients in case a newer external client needs to handle compatibility.
 - **Client Version**: Provided by external clients to internal Ozone components (OM and Datanode) in case a newer Ozone server needs to handle compatibility.
@@ -76,7 +76,7 @@ The existing upgrade framework uses the following terminology:
 
 **Pre-finalized:** State a component enters when the MLV is less than the SLV after an upgrade. At this time existing features are fully operational. New features are blocked, but the cluster can be downgraded to the old software version. Pre-finalized status does not affect component version, which always reflects the version of the software currently running.
 
-**Finalized:** State a component enters when the MLV is equal to the SLV. A component makes this transition from pre-finalized to finalized when it receives a finalize command from the admin. At this time all new features are fully operational,  but downgrade is not allowed. Finalized status does not affect component version, which always reflects the version of the software currently running.
+**Finalized:** State a component enters when the MLV is equal to the SLV. A component makes this transition from pre-finalized to finalized when it receives a finalize command from the admin. At this time all new features are fully operational, but downgrade is not allowed. Finalized status does not affect component version, which always reflects the version of the software currently running.
 
 In the existing upgrade framework, OM and SCM can be finalized in any order. SCM will finalize before instructing datanodes to finalize. Recon currently has no finalization process, and S3 gateway does not need finalization because it is stateless.
 
@@ -84,7 +84,7 @@ In the existing upgrade framework, OM and SCM can be finalized in any order. SCM
 
 In practice, tracking network and disk changes separately has proven difficult to reason about. Developers are often confused about whether one or both versions need to be changed for a feature, and each version’s relationship with finalization. Before adding complexity to the upgrade flow with ZDU, it will be beneficial to simplify the two versioning schemes into one version that gets incremented for any incompatible change. This gives us the following new definitions:
 
-**Component version**: The logical versioning system used to track incompatible changes to a component, regardless whether they affect disk or network compatibility between the same or different types of components. This will extend the existing component version framework. We will use the following component versions:
+**Component version**: The logical versioning system used to track incompatible changes to a component, regardless of whether they affect disk or network compatibility between the same or different types of components. This will extend the existing component version framework. We will use the following component versions:
 - **OM Version**: Used within the Ozone Manager ring and provided to external clients in case a newer external client needs to handle compatibility.
 - **HDDS Version**: Used within SCM and Datanodes and provided to external clients in case a newer external client needs to handle compatibility. One shared version is required so that SCM can orchestrate Datanode finalization.
 - **Client Version**: Provided by external clients to internal Ozone components in case a newer Ozone server needs to handle compatibility.
@@ -139,13 +139,13 @@ This migration will be transparent in client/server interactions for network cha
 
 This migration will need some handling for disk changes. When the upgraded component starts up with software version 100 and sees a version less than that persisted to the disk, it must use the old `LayoutFeature` enum to look up that version until the cluster is finalized. After finalization, version 100 will be written to the disk and all versions from here on can be referenced from the `ComponentVersion` enum.
 
-In the current code, Datanodes use their own `DatanodeComponentVersion` and there is no `ScmComponentVersion`. However, Datanodes and SCM share the same `HDDSLayoutFeature` for disk versioning. We need to collapse these into a single `HDDSVersion` in the new versioning framework. The existing `DatanodeVersion` can simply be renamed to  `HDDSVersion` , since there is no `ScmVersion` to merge it with. From there, migrating from `HDDSLayoutFeature` to `HDDSVersion` can be done using the same process outlined above.
+In the current code, Datanodes use their own `DatanodeComponentVersion` and there is no `ScmComponentVersion`. However, Datanodes and SCM share the same `HDDSLayoutFeature` for disk versioning. We need to collapse these into a single `HDDSVersion` in the new versioning framework. The existing `DatanodeVersion` can simply be renamed to `HDDSVersion`, since there is no `ScmVersion` to merge it with. From there, migrating from `HDDSLayoutFeature` to `HDDSVersion` can be done using the same process outlined above.
 
 ##  Strategy To Achieve ZDU
 
 ###  Prerequisites
 
-Before an Ozone cluster can use ZDU in an upgrade, the initial version being upgraded must also support ZDU. All software versions from 100 onward will be ZDU ready, and any Ozone changes after version 100 have to be made in a ZDU compatible way. We can say that version 100 is the minimal eligible version for ZDU. For example, a cluster would need to be upgraded from version 5 version to 105 with the existing non-rolling upgrade process. All upgrades starting from version 105 could then optionally be done with ZDU or non-rolling upgrades.
+Before an Ozone cluster can use ZDU in an upgrade, the initial version being upgraded must also support ZDU. All software versions from 100 onward will be ZDU ready, and any Ozone changes after version 100 have to be made in a ZDU compatible way. We can say that version 100 is the minimal eligible version for ZDU. For example, a cluster would need to be upgraded from version 5 to version 105 with the existing non-rolling upgrade process. All upgrades starting from version 105 could then optionally be done with ZDU or non-rolling upgrades.
 
 ###  Invariants
 
@@ -185,7 +185,7 @@ During the upgrade, the cluster’s fault tolerance will not change. As nodes ar
 
 Initially, this design considered pausing some background operations to remove risk during upgrade. Snapshots are an area with complex storage requirements that must be mirrored across the OMs. However a ZDU can take several days and removing the ability to take or delete snapshots during that time would impact backup and disaster recovery schedules which would not be acceptable. Similarly block deletion was considered and similar concerns were uncovered around freeing space on clusters with capacity issues. It would also not be wise to suspend replication for an extended period.
 
-DIsk and datanode balancing could be safely suspended if required. For disk balancing, the process is all within the same datanode process, so mixed component versions are not a concern. Cross node balancing uses the container replication mechanism internally, and we would not gain much by pausing it during upgrades either.
+Disk and datanode balancing could be safely suspended if required. For disk balancing, the process is all within the same datanode process, so mixed component versions are not a concern. Cross node balancing uses the container replication mechanism internally, and we would not gain much by pausing it during upgrades either.
 
 ##  The Finalization Process Per Component
 
@@ -193,7 +193,7 @@ After a cluster has all components started with the new software version, the cl
 
 ### Client Command
 
-To keep the finalization process simple for admins, we will maintain a single command that finalizes the whole cluster. The server-side entry point for this command must be OM, even though it finalizes after SCM and Datanodes. The single command cannot be sent to SCM because there may be releases where we add new OM component versions without new HDDS component versions. In this case if the command is sent to SCM and OM polls SCM's finalization status to learn to finalize after SCM, OM would finalize immediately on startup when no command is provided since SCM would start in a finalized state by default. A single client command cannot call SCM and OM separately in a secure environment without kerberos workarounds since they are usually configured with different admin principals. SCM is the server during OM/SCM interaction so SCM cannot forward a command to OM when it receives it from the admin. Therefore, OM must receive receive the command and forward it to SCM so SCM can begin the finalization process.
+To keep the finalization process simple for admins, we will maintain a single command that finalizes the whole cluster. The server-side entry point for this command must be OM, even though it finalizes after SCM and Datanodes. The single command cannot be sent to SCM because there may be releases where we add new OM component versions without new HDDS component versions. In this case if the command is sent to SCM and OM polls SCM's finalization status to learn to finalize after SCM, OM would finalize immediately on startup when no command is provided since SCM would start in a finalized state by default. A single client command cannot call SCM and OM separately in a secure environment without kerberos workarounds since they are usually configured with different admin principals. SCM is the server during OM/SCM interaction so SCM cannot forward a command to OM when it receives it from the admin. Therefore, OM must receive the command and forward it to SCM so SCM can begin the finalization process.
 
 ### OM and SCM Ratis Group Version Validation
 
@@ -223,11 +223,11 @@ The following table shows what would happen if finalize is incorrectly sent to m
  
 ###  OM
 
-When OM receives the command the finalize command from the admin:
+When OM receives the finalize command from the admin:
 1. OM will call SCM and instruct it to finalize. This is a synchronous call made in the pre-execute request processing stage before anything is submitted to Ratis.
 2. When SCM responds that it has finalized, OM will persist a marker in the DB indicating that cluster finalization is in progress.
 3. The command will return success to the user, indicating that the cluster will continue finalizing in the background. A separate status command can be used to monitor finalization progress.
-4. When the marker is present, the leader will run a background service to poll SCM and check for the combined finalization status of SCM and Datanodes. Note that the comamnd to finalize SCM finalizes SCM synchronously but Datanodes asynchronously.
+4. When the marker is present, the leader will run a background service to poll SCM and check for the combined finalization status of SCM and Datanodes. Note that the command to finalize SCM finalizes SCM synchronously but Datanodes asynchronously.
 5. When SCM returns that it and all healthy datanodes have finalized, the OM leader will send a finalize command to all OMs over Ratis.
 6. The same Ratis transaction that finalizes the OMs will remove the marker file from the DB. This will cause the background service polling SCM to terminate.
 
@@ -235,7 +235,7 @@ On OM restarts or leader changes when OM is in a pre-finalized state, the leader
 
 At this stage the HDDS layer of the cluster is ready for any new features or on-disk formats. As clients learn the cluster version from OM, OM must be finalized before any of the new features are unlocked.
 
-Upon receiving the “ok to finalize” reply from SCM, OM will finalize and send the finalize command to all followers over Ratis. This ensures that all OMs will replay the finalize request in the correct order with other commands and ensure consistency across the cluster.Once all OMs are finalized, OM will stop polling the SCM endpoint.
+Upon receiving the “ok to finalize” reply from SCM, OM will finalize and send the finalize command to all followers over Ratis. This ensures that all OMs will replay the finalize request in the correct order with other commands and ensure consistency across the cluster. Once all OMs are finalized, OM will stop polling the SCM endpoint.
 
 ###  SCM
 
@@ -249,7 +249,7 @@ Although OM first receives the command, the first component to finalize is SCM. 
 4. SCM returns success for the RPC command
 5. SCM instructs all Datanodes to finalize, and keeps track of their apparent versions for progress, resending the command as necessary.
 6. Until all Datanodes finalize, SCM's upgrade status API will return a flag indicating that all of HDDS has not been finalized yet. Once all live Datanodes have finalized, this flag is set to true.
-    - This flag combined with the the OM DB marker key indicating a finalize command was given tell OM that it should finalize.
+    - This flag combined with the OM DB marker key indicating a finalize command was given tells OM that it should finalize.
 ###  Datanodes
 
 Unlike SCM, all datanodes are not in a Ratis ring together and therefore it is impossible to finalize all datanodes at the same time. SCM will issue the finalize command to datanodes after it has been finalized over the Datanode heartbeat. SCM will not consider the datanodes as finalized until all registered datanodes have reported success. On each heartbeat, a Datanode will report its software version and apparent version. Any Datanodes that are offline (dead) need not be considered as they will need to re-register. If the cluster is finalized and the Datanode is not finalized, its registration will be rejected and it will be instructed to finalize and register again before it can join the cluster.
@@ -289,7 +289,7 @@ It was considered to have SCM give clients the finalized version instead of the 
 * Datanode finalization is already designed to be asynchronous within each datanode, because the finalize request can come in from the SCM heartbeat at any time. Adding a blocking element to the write is therefore not necessary for correctness.  
 * Slow clients who allocated blocks before datanodes finalized and took a long time to get back to the datanode to actually write them will still write using the older version anyways.
 
-Significantly, it has one security drawback: Rogue/custom clients could instruct a datanode to finalize with just a block token. Block tokens are the only way clients authenticate to the datanode. They are scoped to the current block and are not intended to permit node-wide changes like finalization. A client with permissions to write a block could use the token to create a command  with a higher version and get the datanode to finalize ahead of SCM, causing the datanode to be fenced out of the cluster. To get around this, we would need to add a new [Access Mode](https://github.com/apache/ozone/blob/a534ac2f38891a088bfa8c821e8c228b16864a82/hadoop-hdds/interface-client/src/main/proto/hdds.proto#L394) to the block token to specifically permit finalization, which does not seem worth it given the marginal value this feature would provide.
+Significantly, it has one security drawback: Rogue/custom clients could instruct a datanode to finalize with just a block token. Block tokens are the only way clients authenticate to the datanode. They are scoped to the current block and are not intended to permit node-wide changes like finalization. A client with permissions to write a block could use the token to create a command with a higher version and get the datanode to finalize ahead of SCM, causing the datanode to be fenced out of the cluster. To get around this, we would need to add a new [Access Mode](https://github.com/apache/ozone/blob/a534ac2f38891a088bfa8c821e8c228b16864a82/hadoop-hdds/interface-client/src/main/proto/hdds.proto#L394) to the block token to specifically permit finalization, which does not seem worth it given the marginal value this feature would provide.
 
 ####  Mixed Datanode Versions During Replication
 
@@ -436,7 +436,7 @@ This problem **does need** a version gate flag from two perspectives.
 1. If a new client is talking to a pre-atomic rewrite OM, then the old OM would happily accept the expectedDataGeneration in the existing create key protobuf message. However, it would not know to check for its existence and simply ignore it. The client would therefore believe it is performing “atomic rewrites” when it is not. Unlike with the isEmpty flag example, the old OM ignoring the flag can do some harm (the client could overwrite a newer version of a key than it intended).  
 2. There is a change to the persisted disk data. If a new version client sends a message to a new version OM, it will persist the new expectedDataGeneration field in the database. If this transaction is replayed on an older OM, it would not persist the field as it does not know about it. This can result in database mismatches between OM. If a failover occurred to the old version OM before the key is committed, then the atomic overwrite cannot be checked as the field is not replicated, and the code is not there to check it anyway.
 
-In this case, it is essential that OM “acts as of” its old version and rejects any requests from a client which contain the expectedDataGeneration field. A client should ideally also fail to allow the new API to be used at the client side as it can ask OM what its current version is. The client check is somewhat optional in this case provided integrity is enforced at the server level. However in other cases, the client can decide which API to call depending on the server version returned.
+In this case, it is essential that OM “act as” its old version and rejects any requests from a client which contain the expectedDataGeneration field. A client should ideally also fail to allow the new API to be used at the client side as it can ask OM what its current version is. The client check is somewhat optional in this case provided integrity is enforced at the server level. However in other cases, the client can decide which API to call depending on the server version returned.
 
 ####  List Keys Light
 
@@ -446,7 +446,7 @@ This is a read only API and there are no concerns about calls to it modifying da
 
 When running an Ozone client with a version that knows about listKeys Light, it will attempt to use it rather than the legacy version. However, if the OM is older, it will not know about the new API and it would fail to process requests from the new client.
 
-Therefore a OM version was added called LIGHTWEIGHT\_LIST\_STATUS. When the Ozone client is started, it first sends an RPC to OM to get its version. Then it can decide to use List Keys Light if it is available, or fall back to the old version if it is not.
+Therefore an OM version was added called LIGHTWEIGHT\_LIST\_STATUS. When the Ozone client is started, it first sends an RPC to OM to get its version. Then it can decide to use List Keys Light if it is available, or fall back to the old version if it is not.
 
 With the proposal in this document, we would also tag List Keys Light in OM so that it is not available until OM is “acting as” a version which is greater or equal to when List Keys Light was introduced. This is not strictly necessary from a data integrity standpoint, but it brings consistency to the availability of new APIs across OM leader changes and makes it clear to developers that all such APIs should be version gated for ZDU. It also should not be possible to call the new API from the client, because the OM version returned to the client during upgrade would be the “acting as” version, rather than the latest version of the component the software supports.
 
@@ -498,7 +498,7 @@ Recon currently does not use finalization, so this step is a trivial restart in 
 
 ### 3. Datanodes: Deploy New Software
 
-Datanodes can be restarted with the new software in any order. Restarting Datanodes one by one will ensure that data is always available, but will take the longest time. If temporary unavailability is tolerable, or data is are already grouped using rack placement, then Datanodes can be restarted in larger groups. For example, say all data is written with EC-3-2 replication and rack scatter placement with six total racks. Then datanodes could be upgraded one rack at a time while maintaining full availability for reads and writes.
+Datanodes can be restarted with the new software in any order. Restarting Datanodes one by one will ensure that data is always available, but will take the longest time. If temporary unavailability is tolerable, or data are already grouped using rack placement, then Datanodes can be restarted in larger groups. For example, say all data is written with EC-3-2 replication and rack scatter placement with six total racks. Then datanodes could be upgraded one rack at a time while maintaining full availability for reads and writes.
 
 Since SCM has been upgraded but not finalized, all Datanodes in versions 100/100 and **100/105** will be accepted by SCM. This means Datanodes can begin participating in the cluster again individually as soon as they restart, regardless of the upgrade status of their peers.
 
@@ -521,7 +521,7 @@ Unlike the current non-rolling upgrade framework, there is no need to use "prepa
 
 ### 5. External Clients (S3 Gateway, HTTPFS): Deploy New Software
 
-External clients are stateless and Ozone supports full external client/server cross compatibility, so no finalization is required for this step. After this point, all components are running the new software. Regression testing can be be done on the new version, and a downgrade is possible by reversing the previous steps.
+External clients are stateless and Ozone supports full external client/server cross compatibility, so no finalization is required for this step. After this point, all components are running the new software. Regression testing can be done on the new version, and a downgrade is possible by reversing the previous steps.
 
 ### 6. OM: Receives Finalize Command From Admin
 
