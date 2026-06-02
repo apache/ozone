@@ -13,3 +13,9 @@ This email address is a private mailing list for discussion of potential securit
 This mailing list is **NOT** for end-user questions and discussion on security. Please use the dev@ozone.apache.org list for such issues.
 
 In order to post to the list, it is **NOT** necessary to first subscribe to it.
+
+## Threat Model
+
+What the project treats as in scope and out of scope, the security
+properties it provides and disclaims, the adversary model, and how
+findings are triaged are documented in [THREAT_MODEL.md](./THREAT_MODEL.md).
