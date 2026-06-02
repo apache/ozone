@@ -149,7 +149,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 | Option                              | Description                                                                                                                                                                                                      | Example                                        |
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
 | `<datanode-address>`                | 一个或多个数据节点地址作为位置参数。地址可以是：<br>- 主机名（例如，`DN-1`）- 使用默认的 CLIENT_RPC 端口 (19864)<br>- 带端口的主机名（例如，`DN-1:19864`）<br>- IP 地址（例如，`192.168.1.10`）<br>- 带端口的 IP 地址（例如，`192.168.1.10:19864`）<br>- 标准输入 (`-`) - 从标准输入读取数据节点地址，每行一个 | `DN-1`<br>`DN-1:19864`<br>`192.168.1.10`<br>`-` |
-| `--in-service-datanodes`            | 它向 SCM 查询所有 IN_SERVICE 数据节点，并在所有这些数据节点上执行该命令。                                                                                                                                                                    | `--in-service-datanodes`                       |
+| `--in-service-datanodes`            | 它向 SCM 查询所有 IN_SERVICE 且 HEALTHY 的数据节点，并在所有这些数据节点上执行该命令。                                                                                                                                                                    | `--in-service-datanodes`                       |
 | `--json`                            | 输出格式设置为JSON。                                                                                                                                                                                                     | `--json`                                       |
 | `-t/--threshold-percentage`         | 磁盘使用率阈值百分比（默认值：10.0）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                                 | `-t 5`<br>`--threshold-percentage 5.0`        |
 | `-b/--bandwidth-in-mb`              | 最大磁盘带宽，单位为 MB/s（默认值：10）。与 `start` 和 `update` 命令一起使用。                                                                                                                                                             | `-b 20`<br>`--bandwidth-in-mb 50`              |
@@ -164,7 +164,7 @@ ozone admin datanode diskbalancer report [<datanode-address> ...] [--in-service-
 # 在多个数据节点上启动 DiskBalancer
 ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
 
-# 在所有运行中的数据节点上启动 DiskBalancer
+# 在所有 IN_SERVICE 且 HEALTHY 的数据节点上启动 DiskBalancer
 ozone admin datanode diskbalancer start --in-service-datanodes
 
 # 使用配置参数启动 DiskBalancer
@@ -183,7 +183,7 @@ ozone admin datanode diskbalancer start DN-1 --json
 # 在多个数据节点上停止 DiskBalancer
 ozone admin datanode diskbalancer stop DN-1 DN-2 DN-3
 
-# 在所有运行中的数据节点上停止 DiskBalancer
+# 在所有 IN_SERVICE 且 HEALTHY 的数据节点上停止 DiskBalancer
 ozone admin datanode diskbalancer stop --in-service-datanodes
 
 # 停止 DiskBalancer 并输出 JSON 信息
@@ -195,7 +195,7 @@ ozone admin datanode diskbalancer stop DN-1 --json
 # 更新多个参数
 ozone admin datanode diskbalancer update DN-1 -t 5 -b 50 -p 10
 
-# 更新所有 IN_SERVICE 数据节点
+# 更新所有 IN_SERVICE 且 HEALTHY 的数据节点
 ozone admin datanode diskbalancer update --in-service-datanodes -t 5
 
 # 更新并输出 JSON 格式
@@ -208,7 +208,7 @@ ozone admin datanode diskbalancer update DN-1 -b 50 --json
 # 从多个数据节点获取状态
 ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
 
-# 从所有处于服务状态的数据节点获取状态
+# 从所有 IN_SERVICE 且 HEALTHY 的数据节点获取状态
 ozone admin datanode diskbalancer status --in-service-datanodes
 
 # 以 JSON 格式获取状态
@@ -220,7 +220,7 @@ ozone admin datanode diskbalancer status --in-service-datanodes --json
 # 从多个数据节点获取报告
 ozone admin datanode diskbalancer report DN-1 DN-2 DN-3
 
-# 从所有处于服务状态的数据节点获取报告
+# 从所有 IN_SERVICE 且 HEALTHY 的数据节点获取报告
 ozone admin datanode diskbalancer report --in-service-datanodes
 
 # 以 JSON 格式获取报告
@@ -240,7 +240,7 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 | `hdds.datanode.disk.balancer.service.interval`              | `60s`                                  | Datanode DiskBalancer 服务检查不平衡并更新其配置的时间间隔。                                                             |
 | `hdds.datanode.disk.balancer.stop.after.disk.even`          | `true`                                 | 如果为真，则一旦磁盘被视为平衡（即所有卷密度都在阈值内），DiskBalancer 将自动停止其平衡活动。           |
 | `hdds.datanode.disk.balancer.replica.deletion.delay`       | `5m`                                   | 容器成功从源卷移动到目标卷后，源容器副本被删除前的延迟时间。这种延迟删除机制旨在避免旧副本的即时删除导致持有旧容器副本的线程数据读取失败。单位：ns、ms、s、m、h、d。|
-| `hdds.datanode.disk.balancer.container.states`              | `CLOSED,QUASI_CLOSED`                  | 以逗号分隔的容器生命周期状态名称列表，指定了允许在不同磁盘之间移动的容器状态（须与枚举名完全一致，使用大写）。默认包含 **CLOSED** 和 **QUASI_CLOSED**；若需对更多状态的容器进行负载均衡，请扩展此列表。所有已定义的容器状态包括：OPEN、CLOSING、QUASI_CLOSED、CLOSED、UNHEALTHY、INVALID、DELETED 和 RECOVERING。 |
+| `hdds.datanode.disk.balancer.container.states`              | `CLOSED,QUASI_CLOSED`                  | 以逗号分隔的容器生命周期状态名称列表，指定可在不同磁盘之间移动的容器状态（须与枚举名完全一致，使用大写）。默认包含 **CLOSED** 和 **QUASI_CLOSED**；若需对更多状态的容器进行负载均衡，请扩展此列表。可移动的已定义容器状态包括：QUASI_CLOSED、CLOSED、UNHEALTHY、INVALID。 |
 | `hdds.datanode.disk.balancer.container.choosing.policy` | `org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy` | 用于选择源/目标卷以及要移动的容器的策略。                                                                             |
 | `hdds.datanode.disk.balancer.service.timeout`               | `300s`                                 | Datanode DiskBalancer 服务操作超时。                                                                                                                    |
 | `hdds.datanode.disk.balancer.should.run.default`            | `false`                                | 如果平衡器无法读取其持久配置，则该值决定服务是否应默认运行。                                                       |
