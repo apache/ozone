@@ -244,3 +244,4 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 | `hdds.datanode.disk.balancer.container.choosing.policy` | `org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy` | 用于选择源/目标卷以及要移动的容器的策略。                                                                             |
 | `hdds.datanode.disk.balancer.service.timeout`               | `300s`                                 | Datanode DiskBalancer 服务操作超时。                                                                                                                    |
 | `hdds.datanode.disk.balancer.should.run.default`            | `false`                                | 如果平衡器无法读取其持久配置，则该值决定服务是否应默认运行。                                                       |
+
