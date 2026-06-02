@@ -60,7 +60,7 @@ Blockade 测试在其它测试的基础上实现，可以在分发包中的 `./b
 
 ```
 cd blockade
-pip install pytest==2.8.7,blockade
+pip install pytest==2.8.7 blockade
 python -m pytest -s .
 ```
 
