@@ -168,11 +168,12 @@ This is a high level summary of all the steps that will happen during a rolling 
 4. Deploy the new software version to all OMs and rolling restart the OMs.  
 5. Deploy the new software and rolling restart all client processes like S3 Gateway, HTTPFS, Prometheus etc. These processes are all Ozone clients and sit somewhat outside of the core Ozone cluster.
     - At this stage, the cluster is operating with the new software version, but is still “acting as” the older apparent version. No data will be written to disk in a new format, and new features will be unavailable.
-6. The finalize command is sent to SCM by the admin - this is what is used to switch the cluster to act as the new version. Upon receipt of the finalize command:  
-   7. SCM will finalize itself over Ratis, saving the new finalized version.
-   8. It will notify datanodes over the heartbeat to finalize.
-   9. After all healthy datanodes have been finalized, OM can be finalized. To do this, OM will have been polling SCM periodically to see if it should finalize. Only after SCM and all datanodes have been finalized will OM get a “ready to finalize” response from the poll. The OM leader will then send a finalize command over Ratis to all OMs.
-   10. As OM is the entry point to the cluster for external clients, finalizing OM unlocks any new features in the upgraded version.
+6. The finalize command is sent to OM by the admin - this is what is used to switch the cluster to act as the new version. Upon receipt of the finalize command:  
+   7. OM will forward the finalization request to SCM, and persist a marker in the DB indicating that the leader must poll SCM to learn when HDDS has finished finalizing. The command returns to the client and finalization continues throughout the cluster asynchronously.
+   8. SCM will finalize itself over Ratis, saving the new finalized version.
+   9. SCM will notify datanodes over the heartbeat to finalize.
+   10. Only after SCM and all healthy datanodes have been finalized will OM get a “ready to finalize” response from the poll. The OM leader will then send a finalize command over Ratis to all OMs.
+   11. As OM is the entry point to the cluster for external clients, finalizing OM unlocks any new external facing features in the upgraded version.
 
 If the previous upgrade was never finalized, the cluster can still be upgraded to the next version. This is because the logical versioning system is not tied to any particular Ozone release, it is just a relationship between the number written to the disk and the one saved in the code. Any features that have never been finalized will remain unfinalized until the finalize command is given.
 
@@ -188,57 +189,80 @@ DIsk and datanode balancing could be safely suspended if required. For disk bala
 
 ##  The Finalization Process Per Component
 
-After a cluster has all components started with the new software version, the cluster will be operating without any of the features in the new version until it is finalized. The finalization process is started when an administrator issues a “finalize” command to the cluster. This will be received by SCM, which will coordinate the process for the whole cluster. The existing OM Finalize command will be deprecated and become a no-op for compatibility. The cluster will make best effort checks that the admin has properly updated the software of all components before processing the finalization command, but if they have not done so it is user error and the result is ultimately undefined.
+After a cluster has all components started with the new software version, the cluster will be operating without any of the features in the new version until it is finalized. The finalization process is started when an administrator issues a “finalize” command to the cluster. This will be received by OM and then forwarded to SCM which will coordinate the process for the whole cluster. The existing SCM finalize command will be deprecated and become a no-op for compatibility. The cluster will make best effort checks that the admin has properly updated the software of all components before processing the finalization command, but if they have not done so it is user error and the result is ultimately undefined. Also note that finalization is asynchronous. Not all components can be updated simultaneously so the cluster will be finalized a short time after the command has been issued.
 
-Also note that finalization is asynchronous. Not all components can be updated simultaneously so the cluster will be finalized a short time after the command has been issued.
+### Client Command
+
+To keep the finalization process simple for admins, we will maintain a single command that finalizes the whole cluster. The server-side entry point for this command must be OM, even though it finalizes after SCM and Datanodes. The single command cannot be sent to SCM because there may be releases where we add new OM component versions without new HDDS component versions. In this case if the command is sent to SCM and OM polls SCM's finalization status to learn to finalize after SCM, OM would finalize immediately on startup when no command is provided since SCM would start in a finalized state by default. A single client command cannot call SCM and OM separately in a secure environment without kerberos workarounds since they are usually configured with different admin principals. SCM is the server during OM/SCM interaction so SCM cannot forward a command to OM when it receives it from the admin. Therefore, OM must receive receive the command and forward it to SCM so SCM can begin the finalization process.
+
+### OM and SCM Ratis Group Version Validation
+
+When OM and SCM receive a finalize command, they will perform best effort verifications to ensure that the other members of their Ratis group are running the latest software version before proceeding with the request. This can potentially catch cases where an admin has incorrectly updated the software before running finalize and some components are still in the old version. This is intended as a best effort safety check against user error but is not guaranteed to prevent all cases.
+
+1. Before submitting the finalize request to Ratis, the leader will call the same “finalization status” API used by clients on each group member to get their software versions. If these do not match its version, it will fail the request.  
+    - Note that this is a best effort check. It is possible that after this check succeeds, a finalize request is appended to the log in one version, the component is restarted in a different version, and then the request is applied to the state machine.  
+2. When applying the finalize transaction to the Ratis state machine, SCM will verify that the software version in the request matches its own software version.  
+    - If the software version matches, the component can safely apply the request.  
+    - If the software version is less than this component’s software version, it will no-op the request.
+       - This would happen if finalize was sent from a leader running the old software.
+       - We cannot crash this component in this case because it would never recover trying to apply the transaction since it is already at the latest software version.
+      - Even if the follower skips this finalize command, it is expected that the leader and follower's apparent versions still match since the cluster has not been fully finalized.
+3. If the software version is greater than this component's software version, it will terminate itself.  
+      - This would happen if finalize is sent from a leader running the new software while one or both followers are still running the old software.
+      - To recover, the admin must restart the component with the new software version which will match the leader issuing the request, completing the in-progress upgrade.
+      - We cannot no-op this request because the leader and follower would then have different apparent versions, violating one of our upgrade safety invariants.
+
+The following table shows what would happen if finalize is incorrectly sent to members of a Ratis group with different software version combinations and the request makes it all the way to the apply transaction phase of Ratis.
+
+| Leader      | Follower 1  | Follower 2  | Outcome in Apply Transaction                                                                                                                                                   |
+| :---------- | :---------- | :---------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **100/105** | **100/105** | **100/105** | Finalize should succeed and move all components' apparent versions to 105 atomically                                                                                           |
+| 100/100     | **100/105** | **100/105** | Finalize ignored on leader. Passed to followers and ignored there too.                                                                                                         |
+| **100/105** | **100/105** | 100/100     | Finalize will fail on follower 2 and it should exit. It must be upgraded to version 105 to proceed.                                                                            |
+| **105/105** | **105/105** | **105/105** | Cluster is already finalized, but the command can still be submitted in case there are any lagging followers. Followers will ignore the command if they are already finalized. |
+ 
+###  OM
+
+When OM receives the command the finalize command from the admin:
+1. OM will call SCM and instruct it to finalize. This is a synchronous call made in the pre-execute request processing stage before anything is submitted to Ratis.
+2. When SCM responds that it has finalized, OM will persist a marker in the DB indicating that cluster finalization is in progress.
+3. The command will return success to the user, indicating that the cluster will continue finalizing in the background. A separate status command can be used to monitor finalization progress.
+4. When the marker is present, the leader will run a background service to poll SCM and check for the combined finalization status of SCM and Datanodes. Note that the comamnd to finalize SCM finalizes SCM synchronously but Datanodes asynchronously.
+5. When SCM returns that it and all healthy datanodes have finalized, the OM leader will send a finalize command to all OMs over Ratis.
+6. The same Ratis transaction that finalizes the OMs will remove the marker file from the DB. This will cause the background service polling SCM to terminate.
+
+On OM restarts or leader changes when OM is in a pre-finalized state, the leader OM will see the DB marker and poll the SCM endpoint periodically to see if it should finalize. This will be a small metadata based RPC call that does not need to run very frequently, perhaps once a minute. SCM will only reply OK after SCM has finalized and all Datanodes have finalized.  This ensures that once the finalize command is acked as in-progress back to the user, finalization will continue even after restarts.
+
+At this stage the HDDS layer of the cluster is ready for any new features or on-disk formats. As clients learn the cluster version from OM, OM must be finalized before any of the new features are unlocked.
+
+Upon receiving the “ok to finalize” reply from SCM, OM will finalize and send the finalize command to all followers over Ratis. This ensures that all OMs will replay the finalize request in the correct order with other commands and ensure consistency across the cluster.Once all OMs are finalized, OM will stop polling the SCM endpoint.
 
 ###  SCM
 
-The first component to finalize is SCM. This will unlock any new APIs in SCM, but these will not be called until other components who are clients of SCM are also finalized. To coordinate between all SCM instances and ensure they switch to any new behaviour simultaneously, the finalize command is sent over Ratis, and hence will be replayed on the followers alongside other commands in the correct order.
+Although OM first receives the command, the first component to finalize is SCM. This will unlock any new APIs in SCM, but these will not be called until other components who are clients of SCM are also finalized. To coordinate between all SCM instances and ensure they switch to any new behaviour simultaneously, the finalize command is sent over Ratis, and hence will be replayed on the followers alongside other commands in the correct order.
 
-When SCM receives a finalize command, it will perform best effort verifications to ensure that other components are running the latest software version before it proceeds. This can potentially catch cases where an admin has incorrectly updated the software before running finalize and some components are still in the old version, but is not guaranteed in all cases.
-
-1. SCM will make sure that all registered datanodes are heartbeating a software version that matches the latest datanode component version shipped with the SCM code.  
-   1. If SCM’s node set contains any nodes with an older software version, finalization will fail.  
-   2. Datanodes which are dead/offline during finalization and are running an old software version will need to be updated to the new software version before SCM allows them to re-register.  
-2. SCM will check that the other SCMs in its Ratis ring are running the same software version.  
-   1. Before submitting the finalize request to Ratis, the leader SCM will call the same “finalization status” API used by clients on each SCM to get their software versions. If these do not match its version, it will fail the request.  
-   2. Note that this is a best effort check. It is possible that a finalize request is applied to the log in one version and the SCM is restarted in a different version and then the request is applied.  
-3. When applying the finalize transaction through Ratis, SCM will verify that the software version in the request matches its own software version.  
-   1. If the version matches, SCM can safely apply the request.  
-   2. If the version is less than SCM’s software version, it will no-op the request.  
-      1. This would happen if finalize was sent from an SCM running the old bits. We cannot crash this SCM in this case because it would never recover trying to apply the transaction.  
-      2. In this case the leader and follower still have matching apparent versions so it is safe to keep running.  
-   3. If the version is greater than SCM’s software version, it will terminate itself.  
-      1. To recover, the SCM must be restarted with the new software version which will match the leader issuing the request.  
-      2. We cannot no-op this request because the leader and follower would then have different apparent versions, violating one of our upgrade invariants.
-
-The following table shows what would happen if finalize is incorrectly sent to SCMs before they are all on the same software version and the request makes it all the way to the apply transaction phase of Ratis (case 3 above).
-
-| Leader      | Follower 1  | Follower 2  | Outcome in Apply Transaction                                                                                                             |
-| :---------- | :---------- | :---------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| **100/105** | **100/105** | **100/105** | Finalize should succeed and move all SCMs’ apparent versions to 105 atomically                                                           |
-| 100/100     | **100/105** | **100/105** | Finalize ignored on leader. Passed to followers and ignored there too.                                                                   |
-| **100/105** | **100/105** | 100/100     | Finalize will fail on follower 2 and it should exit. It must be upgraded to version 105 to proceed.                                      |
-| **105/105** | **105/105** | **105/105** | Cluster is already finalized, but the command can be forwarded in case there are any lagging followers and get ignored on the followers. |
-
+1. SCM receives the finalize RPC command from OM
+2. SCM will make sure that all registered datanodes are heartbeating a software version that matches the latest datanode component version shipped with the SCM code.  
+    - If SCM’s node set contains any nodes with an older software version, the command will be failed.
+    - Datanodes which are dead/offline during finalization and are running an old software version will need to be updated to the new software version before a finalized SCM allows them to re-register.  
+3. SCM sends the finalize command over Ratis to finalize all SCMs.
+4. SCM returns success for the RPC command
+5. SCM instructs all Datanodes to finalize, and keeps track of their apparent versions for progress, resending the command as necessary.
+6. Until all Datanodes finalize, SCM's upgrade status API will return a flag indicating that all of HDDS has not been finalized yet. Once all live Datanodes have finalized, this flag is set to true.
+    - This flag combined with the the OM DB marker key indicating a finalize command was given tell OM that it should finalize.
 ###  Datanodes
 
-Unlike SCM, all datanodes are not in a Ratis ring together and therefore it is impossible to finalize all datanodes at the same time. SCM will issue the finalize command to datanodes after it has been finalized over the Datanode heartbeat. SCM will not consider the datanodes as finalized until all registered DNs have reported success. On each heartbeat, a Datanode will report its software version and apparent version. Any Datanodes that are offline (dead) need not be considered as they will need to re-register. If the cluster is finalized and the Datanode is not finalized, its registration will be rejected and it will be instructed to finalize and register again before it can join the cluster.
+Unlike SCM, all datanodes are not in a Ratis ring together and therefore it is impossible to finalize all datanodes at the same time. SCM will issue the finalize command to datanodes after it has been finalized over the Datanode heartbeat. SCM will not consider the datanodes as finalized until all registered datanodes have reported success. On each heartbeat, a Datanode will report its software version and apparent version. Any Datanodes that are offline (dead) need not be considered as they will need to re-register. If the cluster is finalized and the Datanode is not finalized, its registration will be rejected and it will be instructed to finalize and register again before it can join the cluster.
 
-When the datanode software version matches the max Datanode Software version known to SCM, SCM knows that datanode is running the latest software version.
+When the datanode software version matches the max Datanode software version known to SCM, SCM knows that datanode is running the latest software version and it is safe for SCM to finalize.  SCM will not allow the finalize command to be passed to any datanode (or finalize itself) until all datanodes are running the latest version.
 
-When a datanode is reporting the same software and apparent version, and that version matches the max datanode version known to SCM, SCM knows the datanode is running the latest version and is finalized.
+When a datanode is reporting the same software and apparent version, and that version matches the max datanode version known to SCM, SCM knows the datanode is running the latest version and is finalized. SCM will consider Datanode finalization complete when all healthy datanodes are reporting the correct software version and report a matching Apparent Version.
 
 If a Datanode attempts to register with a software version greater than the max version known to SCM, then it will be rejected. This can only occur if the Datanode has been upgraded to a version newer than the SCM version. As the ZDU requirement is for SCM to be upgraded first, Datanodes having a higher version is invalid.
 
 If a Datanode attempts to register and its software version is less than the one known by SCM, it indicates that Datanode is still running the old software version. If SCM is pre-finalized, it is expected that datanodes can register with the older version, as the DNs will be upgraded after SCM. If SCM is finalized, any Datanodes attempting to register at an older software version should be rejected permanently until the datanode is upgraded so that the versions match.
 
-SCM will not allow the finalize command to be passed to any datanode (or finalize itself) until all DNs are running the latest version.
-
-SCM will consider Datanode finalization complete when all healthy datanodes are reporting the correct software version and report a matching Apparent Version.
-
-See the [appendix](#Appendix%20Step%20by%20Step%20ZDU%20Process) for a complete table of how SCM to Datanode version relationships.
+See the [appendix](#Appendix%20Step%20by%20Step%20ZDU%20Process) for a complete table of SCM to Datanode version relationships.
 
 ####  Mixed Datanode Versions During Write
 
@@ -265,23 +289,15 @@ It was considered to have SCM give clients the finalized version instead of the 
 * Datanode finalization is already designed to be asynchronous within each datanode, because the finalize request can come in from the SCM heartbeat at any time. Adding a blocking element to the write is therefore not necessary for correctness.  
 * Slow clients who allocated blocks before datanodes finalized and took a long time to get back to the datanode to actually write them will still write using the older version anyways.
 
-    Significantly, it has one security drawback: Rogue/custom clients could instruct a datanode to finalize with just a block token. Block tokens are the only way clients authenticate to the datanode. They are scoped to the current block and are not intended to permit node-wide changes like finalization. A client with permissions to write a block could use the token to create a command  with a higher version and get the datanode to finalize ahead of SCM, causing the datanode to be fenced out of the cluster. To get around this, we would need to add a new [Access Mode](https://github.com/apache/ozone/blob/a534ac2f38891a088bfa8c821e8c228b16864a82/hadoop-hdds/interface-client/src/main/proto/hdds.proto#L394) to the block token to specifically permit finalization, which does not seem worth it given the marginal value this feature would provide.
+Significantly, it has one security drawback: Rogue/custom clients could instruct a datanode to finalize with just a block token. Block tokens are the only way clients authenticate to the datanode. They are scoped to the current block and are not intended to permit node-wide changes like finalization. A client with permissions to write a block could use the token to create a command  with a higher version and get the datanode to finalize ahead of SCM, causing the datanode to be fenced out of the cluster. To get around this, we would need to add a new [Access Mode](https://github.com/apache/ozone/blob/a534ac2f38891a088bfa8c821e8c228b16864a82/hadoop-hdds/interface-client/src/main/proto/hdds.proto#L394) to the block token to specifically permit finalization, which does not seem worth it given the marginal value this feature would provide.
 
 ####  Mixed Datanode Versions During Replication
 
-Datanodes act in a client server relationship between themselves for replication. In general the replication process is quite simple - commands are sent to a datanode hosting a container replica, and it is told to push the data to another node. Therefore incompatible changes are unlikely. However they can be handled in a similar way to above. 
+Datanodes act in a client server relationship between themselves for replication. In general the replication process is quite simple - commands are sent to a datanode hosting a container replica (the replication client), and it is told to push/upload the data to another node (the replication server). Incompatible changes in this area can be handled in a similar way to write requests.
 
-The Datanode’s apparent version can be sent along with the replication request. If the server is at a newer version (e.g. source/client is at 100 and server/target is at 105) then the server can process the request as of version 100. 
+SCM knows the apparent version of all Datanodes since their last heartbeat. The last known apparent version of the target/server Datanode can be included in the replicate command sent by SCM to the source/client Datanode. It is always the job of the newer component to handle compatibility, whether it involves software or apparent version. If the source/client Datanode is newer in software or apparent version, it must "downgrade" its request to the lowest common apparent version supported by the server indicated by the SCM command. A newer target/server Datanode will not make incompatible changes to existing APIs, so old client Datanodes will continue to work.
 
-If the client is ahead of the server, this would trigger the finalize command on the receiving server Datanode, as it needs to finalize anyway. There is no initial handshake in the container replication process for the new client to learn the old server’s version and downgrade its request to match. After the datanode server finalizes, it will begin processing the request with the new version that matches the client. Note that the datanode sending the replica possesses a container token, which is internal to the cluster and therefore sufficient to permit finalization, unlike block tokens.
-
-###  OM
-
-When OM is started in a pre-finalized state, it will poll a new SCM endpoint periodically to see if it should finalize. This will be a small metadata based RPC call that does not need to run very frequently, perhaps once a minute. SCM will only reply OK after SCM has finalized and all Datanodes have finalized. 
-
-At this stage the HDDS layer of the cluster is ready for any new features or on-disk formats. As clients learn the cluster version from OM, OM must be finalized before any of the new features are unlocked.
-
-Upon receiving the “ok to finalize” reply from SCM, OM will finalize and send the finalize command to all followers over Ratis. This ensures that all OMs will replay the finalize request in the correct order with other commands and ensure consistency across the cluster. The software version the OMs are finalizing too will be sent with the finalize command and the same logic can be applied as in the [SCM table](#scm) to determine what to do if some OMs are not at the correct version. Once all OMs are finalized, OM will stop polling the SCM endpoint.
+Note that software version can increase or decrease during upgrade or downgrade, but apparent version can only increase. Therefore even if SCM's apparent version information for a Datanode is stale when it sends the replicate command, the version used will still always be less than the maximum supported version and is therefore still valid.
 
 ###  S3G
 
@@ -311,7 +327,9 @@ The current upgrade process requires a "prepare for upgrade” step before the O
 
 ### Finalization Commands
 
-There is currently no requirement in the code about whether OM or HDDS needs to be finalized first. The user is free to send the two commands in any order. For rolling upgrades, SCM will be orchestrating the finalization process to ensure that servers always finalize first, so we will only expose a single `ozone admin finalize` command which starts this process. The existing commands will be hidden and become no-ops for CLI compatibility. OM will maintain its own API to query finalization status though. This allows us to have an `ozone admin finalize --status` command that reaches out to both OM and SCM to return the finalization status for all component types.
+There is currently no requirement in the code about whether OM or HDDS needs to be finalized first. The user is free to send the two commands in any order. For rolling upgrades, SCM will be orchestrating the finalization process to ensure that servers always finalize first, so we will only expose a single `ozone admin upgrade finalize` command which starts this process. The existing commands will be hidden and become no-ops for CLI compatibility. OM will expose the finalization API to the admin and forward the request to SCM, while polling HDDS finalization status through SCM to determine when it should finalize.
+
+We will also use one `ozone admin upgrade status` command that provides upgrade and finalization information for the whole cluster. This command will go to OM, OM will gather HDDS upgrade status from SCM, then add its own status and return the result to the client.
 
 ### Upgrade Actions
 
@@ -501,22 +519,25 @@ Unlike the current non-rolling upgrade framework, there is no need to use "prepa
 | OM2 is stopped and started with the new version                                                | **100/105** | **100/105** | 100/100     |
 | New version has been deployed on all OMs, but they have not yet finalized to use new features. | **100/105** | **100/105** | **100/105** |
 
-After completing this step, the leader OM will begin polling SCM to learn whether HDDS has finished finalizing, and therefore it should finalize.
-
 ### 5. External Clients (S3 Gateway, HTTPFS): Deploy New Software
 
 External clients are stateless and Ozone supports full external client/server cross compatibility, so no finalization is required for this step. After this point, all components are running the new software. Regression testing can be be done on the new version, and a downgrade is possible by reversing the previous steps.
 
-### 6. SCM: Receives Finalize Command From Admin
+### 6. OM: Receives Finalize Command From Admin
 
-The admin will send this command when they have completed regression testing in the new version and do not wish to downgrade. SCM will first verify that all live Datanodes and its peer SCMs are running the newest software version 105. If any of these components are not, the finalize command will be rejected.
+The admin will send this command to OM when they have completed regression testing in the new version and do not wish to downgrade. OM will verify that all its Ratis peers are running matching software versions. Then OM will forward the finalize command to SCM. Once SCM succeeds, OM will write a marker in the DB indicating that a finalize command was issued and it should poll SCM until it receives an indication that it should finalize. The finalize command will return success to the admin indicating that finalization is in progress. Meanwhile OM will wait for SCM to indicate that Datanodes have finalized.
+
+
+### 7. SCM: Receives Finalize Command From OM
+
+When OM tells SCM to finalize, SCM will first verify that all live Datanodes and its peer SCMs are running the newest software version 105. If any of these components are not, the finalize command will be rejected. If this check passes, SCM will finalize via Ratis and return success back to the OM. OM will return to the admin that finalization has been successfully initiated but is not complete. SCM will continue to asynchronously finalize the Datanodes while OM waits for this step to complete before finalizing itself.
 
 | Status                                                                                          | SCM1        | SCM2        | SCM3        | DN Pipeline Version | Datanodes 100/100 | Datanodes 100/105 | Datanodes 105/105 |
 | ----------------------------------------------------------------------------------------------- | ----------- | ----------- | ----------- | ------------------- | ----------------- | ----------------- | ----------------- |
 | New version has been deployed on all SCMs, but they have not yet finalized to use new features  | **100/105** | **100/105** | **100/105** | 100                 | Rejected          | Accepted          | Rejected          |
 | Finalize command has been sent over Ratis. All SCMs move to the new apparent version atomically | **105/105** | **105/105** | **105/105** | 100                 | Rejected          | Accepted          | Accepted          |
 
-### 7. Datanodes: Receive Finalize Command From SCM
+### 8. Datanodes: Receive Finalize Command From SCM
 
 After SCM has finalized, the leader will send finalize commands to all Datanodes. It will retry sending this command until all Datanodes heartbeat back that they have finalized. Once all Datanodes have finalized, SCM can increase the `DN Pipeline Version` so any new features on the Datanode write path can be used.
 
@@ -525,11 +546,11 @@ After SCM has finalized, the leader will send finalize commands to all Datanodes
 | All SCMs have finalized, and the leader begins instructing Datanodes to finalize | **105/105** | **105/105** | **105/105** | 100                 | Rejected          | Accepted                                                    | Accepted          |
 | All live datanodes have finalized                                                | **105/105** | **105/105** | **105/105** | **105**             | Rejected          | Rejected, but instructed to finalize and retry registration | Accepted          |
 
-### 8. OM: Learns to Finalize From Polling SCM 
+### 9. OM: Learns to Finalize From Polling SCM 
 
-| Status                                                                                                                         | OM1         | OM2         | OM3         |
-| ------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- | ----------- |
-| New version has been deployed on all OMs, but they have not yet finalized to use new features.                                 | **100/105** | **100/105** | **100/105** |
-| SCM finalization is detected and the finalize command is sent over Ratis. All OMs move to the new apparent version atomically. | **105/105** | **105/105** | **105/105** |
+| Status                                                                                                                              | OM1         | OM2         | OM3         |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------- | ----------- |
+| New version has been deployed on all OMs, but they have not yet finalized to use new features.                                      | **100/105** | **100/105** | **100/105** |
+| SCM + DN finalization is detected and the finalize command is sent over Ratis. All OMs move to the new apparent version atomically. | **105/105** | **105/105** | **105/105** |
 
 Once these steps have completed, OM will stop polling SCM. The upgrade is complete.
