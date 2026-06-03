@@ -225,19 +225,11 @@ public abstract class TestOmSnapshot {
   }
 
   /**
-   * Pins a config-independent heavyweight test to exactly one subclass so it
-   * runs once instead of across the whole 8-class matrix (HDDS-10308). The test
-   * fast-skips in the other 7 classes.
-   *
-   * <p>The canonical config is the FSO, non-linked bucket layout. The native
-   * lib dimension selects between the two such classes:
-   * {@code requiresNativeDiff == true} resolves to {@code
-   * TestOmSnapshotFsoWithNativeLib} (native on, {@code disableNativeDiff ==
-   * false}); {@code requiresNativeDiff == false} resolves to {@code
-   * TestOmSnapshotFsoWithoutNativeLib} (native off, {@code disableNativeDiff ==
-   * true}).
-   *
-   * @param requiresNativeDiff whether the test needs the native diff lib enabled
+   * Pins a config-independent heavyweight test to exactly one subclass so it runs
+   * once instead of across the whole 8-class matrix (HDDS-10308); fast-skips in the
+   * other 7. The canonical config is FSO + non-linked. requiresNativeDiff picks
+   * between TestOmSnapshotFsoWithNativeLib (native on) and
+   * TestOmSnapshotFsoWithoutNativeLib (native off).
    */
   private void assumeCanonicalConfig(boolean requiresNativeDiff) {
     assumeTrue(bucketLayout.isFileSystemOptimized()
