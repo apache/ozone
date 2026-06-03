@@ -74,7 +74,6 @@ public class TestOMFinalizeUpgradeRequest extends TestOMKeyRequest {
     OMFinalizeUpgradeRequest request = new OMFinalizeUpgradeRequest(omRequest);
     ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
 
-    OMFinalizeUpgradeRequest finalizeUpgradeRequest = new OMFinalizeUpgradeRequest(omRequest);
     OzoneManagerProtocolProtos.OMRequest modifiedOmRequest = request.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set.
