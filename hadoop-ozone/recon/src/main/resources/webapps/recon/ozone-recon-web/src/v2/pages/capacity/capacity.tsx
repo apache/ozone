@@ -303,6 +303,16 @@ const Capacity: React.FC<object> = () => {
     </span>
   );
 
+  const hasSCMPendingDeletionError = (
+    scmPendingDeletes.data.totalBlocksize < 0
+    || scmPendingDeletes.data.totalReplicatedBlockSize < 0
+    || scmPendingDeletes.data.totalBlocksCount < 0
+  );
+
+  const scmReplicatedPendingDeletionSize = hasSCMPendingDeletionError
+    ? 0
+    : scmPendingDeletes.data.totalReplicatedBlockSize;
+
   return (
     <>
       <div className='page-header-v2'>
@@ -381,7 +391,7 @@ const Capacity: React.FC<object> = () => {
             ),
             value: (
               omPendingDeletes.data.totalSize
-              + scmPendingDeletes.data.totalReplicatedBlockSize
+              + scmReplicatedPendingDeletionSize
               + (dnPendingDeletes.data.totalPendingDeletionSize ?? 0)
             ),
             color: "#10073b"
@@ -406,7 +416,10 @@ const Capacity: React.FC<object> = () => {
               }]
             }, {
               title: 'STORAGE CONTAINER MANAGER',
-              size: scmPendingDeletes.data.totalReplicatedBlockSize,
+              size: hasSCMPendingDeletionError ? 0 : scmPendingDeletes.data.totalReplicatedBlockSize,
+              hasError: hasSCMPendingDeletionError,
+              errorMessage: 'SCM pending deletion details are currently unavailable.',
+              errorTestId: 'pending-deletion-scm-error',
               breakdown: [{
                 label: 'BLOCKS',
                 value: scmPendingDeletes.data.totalReplicatedBlockSize,
