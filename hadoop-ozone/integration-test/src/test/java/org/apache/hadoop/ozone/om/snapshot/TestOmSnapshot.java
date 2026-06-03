@@ -224,6 +224,27 @@ public abstract class TestOmSnapshot {
     }
   }
 
+  /**
+   * Pins a config-independent heavyweight test to exactly one subclass so it
+   * runs once instead of across the whole 8-class matrix (HDDS-10308). The test
+   * fast-skips in the other 7 classes.
+   *
+   * <p>The canonical config is the FSO, non-linked bucket layout. The native
+   * lib dimension selects between the two such classes:
+   * {@code requiresNativeDiff == true} resolves to {@code
+   * TestOmSnapshotFsoWithNativeLib} (native on, {@code disableNativeDiff ==
+   * false}); {@code requiresNativeDiff == false} resolves to {@code
+   * TestOmSnapshotFsoWithoutNativeLib} (native off, {@code disableNativeDiff ==
+   * true}).
+   *
+   * @param requiresNativeDiff whether the test needs the native diff lib enabled
+   */
+  private void assumeCanonicalConfig(boolean requiresNativeDiff) {
+    assumeTrue(bucketLayout.isFileSystemOptimized()
+        && (requiresNativeDiff != disableNativeDiff)
+        && !createLinkedBucket);
+  }
+
   private void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
@@ -2050,6 +2071,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
+    assumeCanonicalConfig(false);
     String snapPrefix = createSnapshot(volumeName, bucketName);
     try (UncheckedAutoCloseableSupplier<IOmMetadataReader> snapshotSupplier =
              cluster.getOzoneManager().getOmSnapshotManager()
@@ -2172,6 +2194,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testCompactionDagDisableForSnapshotMetadata() throws Exception {
+    assumeCanonicalConfig(false);
     String snapshotName = createSnapshot(volumeName, bucketName);
 
     RDBStore activeDbStore = getRdbStore();
@@ -2399,6 +2422,7 @@ public abstract class TestOmSnapshot {
   // column families are used in SST diff calculation.
   @Test
   public void testSnapshotCompactionDag() throws Exception {
+    assumeCanonicalConfig(true);
     String volume1 = "volume-1-" + RandomStringUtils.secure().nextNumeric(5);
     String bucket1 = "bucket-1-" + RandomStringUtils.secure().nextNumeric(5);
     String bucket2 = "bucket-2-" + RandomStringUtils.secure().nextNumeric(5);
@@ -2543,6 +2567,7 @@ public abstract class TestOmSnapshot {
 
   @Test
   public void testSnapshotReuseSnapName() throws Exception {
+    assumeCanonicalConfig(false);
     // start KeyManager for this test
     startKeyManager();
     String volume = "vol-" + counter.incrementAndGet();
