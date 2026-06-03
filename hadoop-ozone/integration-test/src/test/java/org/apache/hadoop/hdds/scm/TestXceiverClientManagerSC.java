@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -62,6 +63,7 @@ public class TestXceiverClientManagerSC {
     clientConfig.setShortCircuit(true);
     config.setFromObject(clientConfig);
     config.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
+    DomainSocket.disableBindPathValidation();
     cluster = MiniOzoneCluster.newBuilder(config)
         .setNumDatanodes(3)
         .build();

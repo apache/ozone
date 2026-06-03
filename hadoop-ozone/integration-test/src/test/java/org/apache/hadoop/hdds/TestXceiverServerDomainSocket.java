@@ -126,6 +126,7 @@ public class TestXceiverServerDomainSocket {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setShortCircuit(true);
     clientConfig.setShortCircuitReadDisableInterval(1000);
+    DomainSocket.disableBindPathValidation();
     conf.setFromObject(clientConfig);
     metrics = ContainerMetrics.create(conf);
     readTimeout = 5 * 1000;
