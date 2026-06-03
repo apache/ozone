@@ -29,7 +29,6 @@ import java.util.List;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.ozone.common.Storage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -38,17 +37,16 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Shared tests for concrete {@link ComponentVersionManager} implementations.
  *
- * <p>Each subclass {@linkplain #createManager(int) builds} the version manager with a real {@link Storage}
- * instance rooted under a JUnit temporary directory (see for example {@code TestOMStorage} in ozone-manager).
- * Assertions use {@link ComponentVersionManager#getStorageForTesting()} and {@link Storage#getApparentVersion()}
- * to confirm what was persisted, instead of Mockito interaction verification.
+ * <p>Each subclass {@linkplain #createManager(int) builds} the version manager with real storage rooted under a JUnit
+ * temporary directory (see for example {@code TestOMStorage} in ozone-manager). Assertions use
+ * {@link ComponentVersionManager#getPersistedApparentVersion()} to confirm what was persisted, instead of Mockito
+ * interaction verification.
  */
 public abstract class AbstractComponentVersionManagerTest {
 
   /**
-   * Creates a new manager for {@code serializedApparentVersion}. The implementation must initialize real
-   * {@link Storage} on disk with that apparent version (and return a manager whose
-   * {@link ComponentVersionManager#getStorageForTesting()} is that instance).
+   * Creates a new manager for {@code serializedApparentVersion}. The implementation must initialize real storage on
+   * disk with that apparent version.
    */
   protected abstract ComponentVersionManager createManager(int serializedApparentVersion) throws IOException;
 
@@ -112,8 +110,7 @@ public abstract class AbstractComponentVersionManagerTest {
       assertApparentVersion(versionManager, expectedSoftwareVersion());
       assertFalse(versionManager.needsFinalization());
 
-      Storage storage = versionManager.getStorageForTesting();
-      assertEquals(expectedSoftwareVersion().serialize(), storage.getApparentVersion(),
+      assertEquals(expectedSoftwareVersion().serialize(), versionManager.getPersistedApparentVersion(),
           "Storage apparent version should match software version after finalization");
     }
   }
@@ -124,13 +121,12 @@ public abstract class AbstractComponentVersionManagerTest {
       assertApparentVersion(versionManager, expectedSoftwareVersion());
       assertFalse(versionManager.needsFinalization());
 
-      Storage storage = versionManager.getStorageForTesting();
-      int apparentOnStorageBefore = storage.getApparentVersion();
+      int apparentOnStorageBefore = versionManager.getPersistedApparentVersion();
       versionManager.finalizeUpgrade();
 
       assertApparentVersion(versionManager, expectedSoftwareVersion());
       assertFalse(versionManager.needsFinalization());
-      assertEquals(apparentOnStorageBefore, storage.getApparentVersion(),
+      assertEquals(apparentOnStorageBefore, versionManager.getPersistedApparentVersion(),
           "No-op finalize should not change the persisted apparent version");
     }
   }

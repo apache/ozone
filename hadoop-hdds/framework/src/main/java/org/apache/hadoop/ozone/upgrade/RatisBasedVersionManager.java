@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import java.io.IOException;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,9 +32,8 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(RatisBasedVersionManager.class);
 
-  protected RatisBasedVersionManager(Storage storage, ComponentVersion apparentVersion,
-      ComponentVersion softwareVersion) {
-    super(storage, apparentVersion, softwareVersion);
+  protected RatisBasedVersionManager(ComponentVersion apparentVersion, ComponentVersion softwareVersion) {
+    super(apparentVersion, softwareVersion);
   }
 
   public void validateDBVersion(Table<String, String> finalizationStore) throws IOException {

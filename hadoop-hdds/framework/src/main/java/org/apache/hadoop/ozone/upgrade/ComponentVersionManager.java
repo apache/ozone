@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.ozone.common.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,13 +54,11 @@ public abstract class ComponentVersionManager implements Closeable {
   // Software version will never change.
   private final ComponentVersion softwareVersion;
   private final ComponentVersionManagerMetrics metrics;
-  private final Storage storage;
 
   private static final Logger LOG = LoggerFactory.getLogger(ComponentVersionManager.class);
 
-  protected ComponentVersionManager(Storage storage, ComponentVersion apparentVersion,
+  protected ComponentVersionManager(ComponentVersion apparentVersion,
       ComponentVersion softwareVersion) {
-    this.storage = storage;
     this.apparentVersion = apparentVersion;
     this.softwareVersion = softwareVersion;
 
@@ -87,20 +84,20 @@ public abstract class ComponentVersionManager implements Closeable {
   }
 
   /**
-   * Test-only accessor for the {@link Storage} instance supplied to the constructor.
+   * Returns the apparent version currently persisted in storage.
    */
   @VisibleForTesting
-  protected Storage getStorageForTesting() {
-    return storage;
-  }
+  public abstract int getPersistedApparentVersion();
 
   public void finalizeUpgrade() throws UpgradeException {
-    for (ComponentVersion version : getUnfinalizedVersions()) {
-      validateForFinalization(version);
-      runUpgradeAction(version);
-      persistApparentVersion(version);
+    ComponentVersion prevVersion = apparentVersion;
+    for (ComponentVersion newVersion : getUnfinalizedVersions()) {
+      validateForFinalization(newVersion);
+      runUpgradeAction(newVersion);
+      persistApparentVersion(newVersion, prevVersion);
+      prevVersion = newVersion;
 
-      LOG.info("Version {} has been finalized.", version);
+      LOG.info("Version {} has been finalized.", newVersion);
     }
     LOG.info("Finalization is complete.");
   }
@@ -155,19 +152,26 @@ public abstract class ComponentVersionManager implements Closeable {
     }
   }
 
-  private void persistApparentVersion(ComponentVersion version) throws UpgradeException {
-    int prevVersion = storage.getApparentVersion();
-
-    storage.setApparentVersion(version.serialize());
+  private void persistApparentVersion(ComponentVersion newVersion, ComponentVersion prevVersion)
+      throws UpgradeException {
     try {
-      storage.persistCurrentState();
+      persistApparentVersion(newVersion);
     } catch (IOException e) {
-      storage.setApparentVersion(prevVersion);
-      logAndThrow(e, "Updating version in the VERSION file from " + prevVersion + " to " + version +
+      if (prevVersion != null) {
+        try {
+          persistApparentVersion(prevVersion);
+        } catch (IOException rollbackFailure) {
+          LOG.warn("Failed to roll back apparent version to {} after persist failure.", prevVersion,
+              rollbackFailure);
+        }
+      }
+      logAndThrow(e, "Updating version in the VERSION file from " + prevVersion + " to " + newVersion +
           " failed.", APPARENT_VERSION_UPDATE_FAILED);
     }
-    apparentVersion = version;
+    apparentVersion = newVersion;
   }
+
+  protected abstract void persistApparentVersion(ComponentVersion newVersion) throws IOException;
 
   protected void logAndThrow(Exception e, String msg, UpgradeException.ResultCodes resultCode) throws UpgradeException {
     LOG.error(msg, e);

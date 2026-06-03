@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
  */
 public class DatanodeVersionManager extends ComponentVersionManager {
 
+  private final DatanodeStorage storage;
   private final Map<ComponentVersion, DatanodeUpgradeAction> upgradeActions;
   private final DatanodeStateMachine upgradeActionArg;
 
@@ -46,11 +47,22 @@ public class DatanodeVersionManager extends ComponentVersionManager {
   @VisibleForTesting
   public DatanodeVersionManager(DatanodeStorage storage, DatanodeStateMachine upgradeActionArg,
       ComponentUpgradeActionProvider<DatanodeUpgradeAction> upgradeActionProvider) throws IOException {
-    super(storage,
-        HDDSVersionUtils.deserializedPersistedApparentVersion(storage.getApparentVersion()),
+    super(HDDSVersionUtils.deserializedPersistedApparentVersion(storage.getApparentVersion()),
         HDDSVersion.SOFTWARE_VERSION);
+    this.storage = storage;
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();
+  }
+
+  @Override
+  protected void persistApparentVersion(ComponentVersion newVersion) throws IOException {
+    storage.setApparentVersion(newVersion.serialize());
+    storage.persistCurrentState();
+  }
+
+  @Override
+  public int getPersistedApparentVersion() {
+    return storage.getApparentVersion();
   }
 
   @VisibleForTesting
