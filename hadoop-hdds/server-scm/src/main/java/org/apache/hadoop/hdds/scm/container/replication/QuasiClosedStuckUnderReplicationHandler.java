@@ -128,6 +128,10 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
           totalCommandsSent++;
         } catch (CommandTargetOverloadedException e) {
           LOG.warn("Cannot replicate container {} because all sources are overloaded.", containerInfo);
+          // Roll back the PendingContainerTracker slot: target was recorded by getTargetDatanodes
+          // but no replication command was dispatched.
+          ReplicationManagerUtil.rollbackTargets(
+              Collections.singletonList(target), containerInfo, replicationManager.getNodeManager());
           if (firstException == null) {
             firstException = e;
           }
@@ -166,7 +170,8 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
         used, used.size(), excluded, excluded.size());
 
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
-        additionalRequired, used, excluded, currentContainerSize, containerInfo);
+        additionalRequired, used, excluded, currentContainerSize, containerInfo,
+        replicationManager.getNodeManager());
   }
 
 }

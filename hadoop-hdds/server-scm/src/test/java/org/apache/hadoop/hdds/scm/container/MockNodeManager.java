@@ -462,6 +462,11 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
+  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+    return false;
+  }
+
+  @Override
   public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
     if (datanodeInfo != null) {
       pendingContainerTracker.removePendingAllocation(
