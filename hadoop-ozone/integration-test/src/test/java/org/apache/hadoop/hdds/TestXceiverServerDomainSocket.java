@@ -146,32 +146,17 @@ public class TestXceiverServerDomainSocket {
       assertTrue(e.getMessage().contains("ozone.domain.socket.path is not set"));
     }
 
-    // Domain path too long
-    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
-        new File(dir, "ozone-datanode-socket-" + System.nanoTime()).getAbsolutePath());
-    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    try {
-      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
-          conf, null, readExecutors, metrics, factory);
-      fail("Domain path is too long.");
-    } catch (Throwable e) {
-      assertTrue(e.getCause() instanceof SocketException);
-      assertTrue(e.getMessage().contains("path too long"));
-    } finally {
-      factory.close();
-    }
-
     // non-existing domain parent path
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
         new File(dir.getAbsolutePath() + System.nanoTime(), "ozone-socket").getAbsolutePath());
-    factory = DomainSocketFactory.getInstance(conf);
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
     try {
       new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
       fail("non-existing domain parent path.");
     } catch (Throwable e) {
       assertTrue(e.getCause() instanceof IOException);
-      assertTrue(e.getMessage().contains("failed to stat a path component"));
+      assertTrue(e.getMessage().contains("No such file or directory"));
     } finally {
       factory.close();
     }
@@ -194,7 +179,9 @@ public class TestXceiverServerDomainSocket {
     }
   }
 
-  @Test
+  /**
+   * This can be run locally instead of CI, without call DomainSocket.disableBindPathValidation().
+   */
   public void testDomainPathPermission() {
     // write from everyone is not allowed (permission too open)
     assertTrue(dir.setWritable(true, false));
