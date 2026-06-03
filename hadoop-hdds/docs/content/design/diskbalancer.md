@@ -165,7 +165,7 @@ This ensures DiskBalancer respects datanode lifecycle management and does not in
 
 ## Feature Flag
 
-The DiskBalancer feature is gated behind a feature flag (`hdds.datanode.disk.balancer.enabled`) to allow controlled rollout. By default, the feature is disabled. When disabled, the DiskBalancer service is not initialized on datanodes, and the CLI commands are hidden from the main help output to prevent accidental usage.
+The DiskBalancer feature is gated behind a feature flag (`hdds.datanode.disk.balancer.enabled`) to allow controlled rollout. By default, the feature is enabled. When disabled, the DiskBalancer service is not initialized on datanodes, and the CLI commands refuse to run until the flag is set back to true.
 
 ## DiskBalancer Metrics
 

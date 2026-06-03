@@ -124,6 +124,7 @@
     <junit5.version>5.14.4</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
+    <langchain4j.version>0.35.0</langchain4j.version>
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
     <log4j2.version>2.26.0</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
@@ -237,6 +238,13 @@
         <groupId>com.google.inject</groupId>
         <artifactId>guice-bom</artifactId>
         <version>${guice.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>dev.langchain4j</groupId>
+        <artifactId>langchain4j-bom</artifactId>
+        <version>${langchain4j.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -1602,6 +1610,17 @@
         <version>${jooq.version}</version>
       </dependency>
       <dependency>
+        <!-- langchain4j-bom pins JUnit 5.10.0; override to keep Ozone on ${junit5.version}. -->
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>${junit5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-params</artifactId>
+        <version>${junit5.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.kohsuke.metainf-services</groupId>
         <artifactId>metainf-services</artifactId>
         <version>${metainf-services.version}</version>
@@ -1655,6 +1674,57 @@
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
         <version>${snakeyaml.version}</version>
+      </dependency>
+      <dependency>
+        <!-- langchain4j-bom pins AWS SDK 2.21.44; override to keep Ozone on ${aws-java-sdk2.version}. -->
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>apache-client</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>auth</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>aws-core</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>http-client-spi</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>identity-spi</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>regions</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>s3</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>s3-transfer-manager</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>sdk-core</artifactId>
+        <version>${aws-java-sdk2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>utils</artifactId>
+        <version>${aws-java-sdk2.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

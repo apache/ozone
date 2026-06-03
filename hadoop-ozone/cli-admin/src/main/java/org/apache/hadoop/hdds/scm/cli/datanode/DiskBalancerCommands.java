@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import picocli.CommandLine.Command;
 
@@ -155,11 +157,10 @@ import picocli.CommandLine.Command;
 
 @Command(
     name = "diskbalancer",
-    description = "DiskBalancer specific operations. It is disabled by default." +
-        " To enable it, set 'hdds.datanode.disk.balancer.enabled' as true",
+    description = "DiskBalancer specific operations to ensure even disk utilization." +
+        " It is enabled by default. Set " + HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY + " to false to disable.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
-    hidden = true,
     subcommands = {
         DiskBalancerStartSubcommand.class,
         DiskBalancerStopSubcommand.class,
