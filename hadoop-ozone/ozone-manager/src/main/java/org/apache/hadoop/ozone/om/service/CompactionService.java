@@ -121,6 +121,11 @@ public class CompactionService extends BackgroundService {
     return compactableTables;
   }
 
+  @VisibleForTesting
+  public ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction() {
+    return bottommostLevelCompaction;
+  }
+
   /**
    * Returns the number of manual compactions performed.
    *
