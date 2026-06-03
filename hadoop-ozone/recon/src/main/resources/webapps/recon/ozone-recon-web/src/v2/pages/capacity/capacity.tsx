@@ -113,15 +113,7 @@ const Capacity: React.FC<object> = () => {
     })
   }
 
-  const loadDNData = () => {
-    dnPendingDeletes.refetch();
-    setState({
-      isDNPending: dnPendingDeletes.data.status !== "FINISHED",
-      lastUpdated: Number(moment())
-    })
-  } 
-
-  const autoReload = useAutoReload(loadDNData, PENDING_POLL_INTERVAL);
+  const autoReload = useAutoReload(loadData);
 
   const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
@@ -192,24 +184,22 @@ const Capacity: React.FC<object> = () => {
     }
   };
 
-  // Poll every 5s until status is FINISHED, then stop
+  // Poll DN pending deletion every 5s until status is FINISHED
   React.useEffect(() => {
-    if (dnPendingDeletes.data.status !== "FINISHED") {
-      if (!autoReload.isPolling) {
-        autoReload.startPolling(PENDING_POLL_INTERVAL);
-      }
+    if (dnPendingDeletes.data.status === "FINISHED") {
       return;
     }
 
-    if (autoReload.isPolling) {
-      autoReload.stopPolling();
-    }
-  }, [
-    dnPendingDeletes.data.status,
-    autoReload.isPolling,
-    autoReload.startPolling,
-    autoReload.stopPolling
-  ]);
+    dnPendingDeletes.refetch();
+
+    const intervalId = window.setInterval(() => {
+      dnPendingDeletes.refetch();
+    }, PENDING_POLL_INTERVAL);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [dnPendingDeletes.data.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dnReportStatus = (
     (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
