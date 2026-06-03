@@ -261,7 +261,7 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
 
     return Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("DiskUsage-" + params.getPath() + "-%n")
+            .setNameFormat("DiskUsage-" + params.getPath() + "-%d")
             .build());
   }
 }
