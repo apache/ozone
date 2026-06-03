@@ -376,6 +376,40 @@ public class TestPendingContainerTracker {
     assertFalse(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(1)));
   }
 
+  /**
+   * Pending in-flight replications recorded via checkSpaceAndRecordAllocation count against
+   * slots, same as write-path containers. hasAvailableSpace reflects the combined total.
+   */
+  @Test
+  public void testInFlightReplicationCountsAgainstAvailableSlots() {
+    long containerSize = MAX_CONTAINER_SIZE;
+    DatanodeInfo dnInfo = datanodes.get(0);
+
+    // Two slots of usable space
+    List<StorageReportProto> twoSlotReports = new ArrayList<>();
+    twoSlotReports.add(createStorageReport(dnInfo, 10 * containerSize, 2 * containerSize, 0));
+    dnInfo.updateStorageReports(twoSlotReports);
+
+    assertTrue(tracker.hasAvailableSpace(dnInfo)); // 2 slots free
+    assertTrue(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(0)));  // slot 1 used
+    assertTrue(tracker.hasAvailableSpace(dnInfo));               // 1 slot free
+    assertTrue(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(1)));  // slot 2 used
+    assertFalse(tracker.hasAvailableSpace(dnInfo));              // 0 slots free
+    assertFalse(tracker.checkSpaceAndRecordAllocation(dnInfo, containers.get(2))); // rejected
+  }
+
+  /**
+   * hasAvailableSpace on a DN with no storage reports returns false.
+   */
+  @Test
+  public void testHasAvailableSpaceWithNoStorageReports() {
+    DatanodeInfo emptyDn = new DatanodeInfo(
+        MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    // No storage reports set
+    assertFalse(tracker.hasAvailableSpace(emptyDn));
+  }
+
   private StorageReportProto createStorageReport(DatanodeInfo dn, long capacity, long remaining, long committed) {
     return HddsTestUtils.createStorageReports(dn.getID(), capacity, remaining, committed).get(0);
   }
