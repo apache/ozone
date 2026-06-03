@@ -1591,6 +1591,15 @@
       If this is empty, no column families are compacted.
     </description>
   </property>
+  <property>
+    <name>ozone.om.compaction.service.bottommostlevelcompaction</name>
+    <value>0</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Bottommost level compaction type for manual compaction.
+      Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce).
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.snapshot.compact.non.snapshot.diff.tables</name>

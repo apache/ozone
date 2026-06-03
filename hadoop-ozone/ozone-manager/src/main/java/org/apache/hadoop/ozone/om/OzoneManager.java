@@ -60,6 +60,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
@@ -221,6 +222,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
@@ -5644,8 +5646,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public void compactOMDB(String columnFamily) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
+    int compactionType = Integer.parseInt(configuration.get(
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
+        OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
+    ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction =
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+    if (bottommostLevelCompaction == null) {
+      compactionType = Integer.parseInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+      bottommostLevelCompaction = ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+    }
     CompletableFuture<Void> compactFuture =
-        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily, bottommostLevelCompaction);
     compactFuture.whenComplete((result, throwable) -> {
       if (throwable == null) {
         LOG.info("Compaction request for column family \"{}\" completed successfully.",

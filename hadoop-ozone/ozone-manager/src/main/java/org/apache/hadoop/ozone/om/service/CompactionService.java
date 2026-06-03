@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.slf4j.Logger;
@@ -53,6 +55,7 @@ public class CompactionService extends BackgroundService {
   private final AtomicBoolean suspended;
   // list of tables that can be compacted
   private final List<String> compactableTables;
+  private final ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction;
 
   public CompactionService(OzoneManager ozoneManager, TimeUnit unit, long interval, long timeout,
                            List<String> tables) {
@@ -65,6 +68,16 @@ public class CompactionService extends BackgroundService {
     this.numCompactions = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.compactableTables = validateTables(tables);
+    int compactionType = Integer.parseInt(ozoneManager.getConfiguration().get(
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
+    ManagedCompactRangeOptions.BottommostLevelCompaction level =
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+    if (level == null) {
+      compactionType = Integer.parseInt(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+      level = ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
+    }
+    this.bottommostLevelCompaction = level;
   }
 
   private List<String> validateTables(List<String> tables) {
@@ -141,11 +154,11 @@ public class CompactionService extends BackgroundService {
    * @return CompletableFuture that completes when compaction finishes
    */
   public CompletableFuture<Void> compactTableAsync(String tableName) {
-    return CompactDBUtil.compactTableAsync(omMetadataManager, tableName);
+    return CompactDBUtil.compactTableAsync(omMetadataManager, tableName, bottommostLevelCompaction);
   }
 
   protected void compactFully(String tableName) throws IOException {
-    CompactDBUtil.compactTable(omMetadataManager, tableName);
+    CompactDBUtil.compactTable(omMetadataManager, tableName, bottommostLevelCompaction);
   }
 
   private class CompactTask implements BackgroundTask {

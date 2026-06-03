@@ -38,13 +38,13 @@ public final class CompactDBUtil {
   private CompactDBUtil() {
   }
 
-  public static void compactTable(OMMetadataManager omMetadataManager,
-                                  String tableName) throws IOException {
+  public static void compactTable(OMMetadataManager omMetadataManager, String tableName,
+      ManagedCompactRangeOptions.BottommostLevelCompaction compactionType) throws IOException {
     long startTime = Time.monotonicNow();
     LOG.info("Compacting column family: {}", tableName);
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-      options.setBottommostLevelCompaction(
-          ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+      options.setBottommostLevelCompaction(compactionType);
+      LOG.debug("Setting bottommost level compaction type to {}", options.bottommostLevelCompaction());
       options.setExclusiveManualCompaction(true);
       RocksDatabase rocksDatabase =
           ((RDBStore) omMetadataManager.getStore()).getDb();
@@ -62,10 +62,11 @@ public final class CompactDBUtil {
     }
   }
 
-  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName) {
+  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName,
+      ManagedCompactRangeOptions.BottommostLevelCompaction compactionType) {
     return CompletableFuture.runAsync(() -> {
       try {
-        compactTable(metadataManager, tableName);
+        compactTable(metadataManager, tableName, compactionType);
       } catch (Exception e) {
         LOG.warn("Failed to compact column family: {}", tableName, e);
         throw new CompletionException("Compaction failed for column family: " + tableName, e);

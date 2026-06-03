@@ -74,6 +74,7 @@ class TestCompactionService {
     ozoneManager = mock(OzoneManager.class);
     OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
+    when(ozoneManager.getConfiguration()).thenReturn(conf);
     TypedTable table = mock(TypedTable.class);
 
     Set<String> tables = new HashSet<>();
