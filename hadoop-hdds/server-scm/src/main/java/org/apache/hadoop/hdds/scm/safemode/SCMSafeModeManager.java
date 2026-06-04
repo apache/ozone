@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,6 +90,9 @@ public class SCMSafeModeManager implements SafeModeManager {
   private ScheduledExecutorService safeModeLogExecutor;
   private ScheduledFuture<?> safeModeLogTask;
 
+  /** Monotonic time when SCM entered safe mode; used to report exit duration. */
+  private long safeModeEnteredAtNanos = -1L;
+
   public SCMSafeModeManager(final ConfigurationSource conf,
                             final NodeManager nodeManager,
                             final PipelineManager pipelineManager,
@@ -120,6 +124,9 @@ public class SCMSafeModeManager implements SafeModeManager {
   }
 
   public void start() {
+    if (getInSafeMode()) {
+      safeModeEnteredAtNanos = Time.monotonicNowNanos();
+    }
     emitSafeModeStatus();
     startSafeModePeriodicLogger();
   }
@@ -177,13 +184,18 @@ public class SCMSafeModeManager implements SafeModeManager {
       LOG.info("ScmSafeModeManager, all rules are successfully validated");
       LOG.info("SCM exiting safe mode.");
       emitSafeModeStatus();
+      recordSafeModeExitDuration();
     }
   }
 
   public void forceExitSafeMode() {
+    boolean wasInSafeMode = getInSafeMode();
     LOG.info("SCM force-exiting safe mode.");
     status.set(SafeModeStatus.OUT_OF_SAFE_MODE);
     emitSafeModeStatus();
+    if (wasInSafeMode) {
+      recordSafeModeExitDuration();
+    }
   }
 
   /**
@@ -306,6 +318,17 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (!getInSafeMode()) {
       stopSafeModePeriodicLogger();
     }
+  }
+
+  private void recordSafeModeExitDuration() {
+    if (safeModeEnteredAtNanos < 0) {
+      return;
+    }
+    long durationMs =
+        TimeUnit.NANOSECONDS.toMillis(Time.monotonicNowNanos() - safeModeEnteredAtNanos);
+    safeModeEnteredAtNanos = -1;
+    safeModeMetrics.setScmSafeModeExitDurationMs(durationMs);
+    LOG.info("SCM safe mode exit duration {} ms (since start() while in safe mode)", durationMs);
   }
 
   /**

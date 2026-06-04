@@ -33,4 +33,4 @@ source "$COMPOSE_DIR/../testlib.sh"
 start_docker_env
 
 ## Run virtual host test cases
-execute_robot_test s3g -N s3-virtual-host s3/awss3virtualhost.robot
+execute_robot_test s3g -N s3-virtual-host awss3virtualhost.robot

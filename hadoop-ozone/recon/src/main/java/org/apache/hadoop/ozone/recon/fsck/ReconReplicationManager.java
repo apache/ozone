@@ -297,7 +297,7 @@ public class ReconReplicationManager extends ReplicationManager {
     // Get all containers (same as parent)
     final List<ContainerInfo> containers = containerManager.getContainers();
 
-    LOG.info("Processing {} containers", containers.size());
+    LOG.debug("Processing {} containers", containers.size());
     final int logEvery = Math.max(1, containers.size() / 100);
 
     // Process each container (reuses inherited processContainer and health check chain)

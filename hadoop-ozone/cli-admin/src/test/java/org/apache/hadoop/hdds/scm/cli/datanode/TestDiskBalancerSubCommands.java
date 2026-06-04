@@ -18,10 +18,10 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -42,8 +42,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -56,6 +55,9 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import picocli.CommandLine;
@@ -91,24 +93,18 @@ public class TestDiskBalancerSubCommands {
    * Helper class to hold all mocks needed for DiskBalancer tests.
    */
   private static class DiskBalancerMocks implements AutoCloseable {
-    private final MockedConstruction<OzoneConfiguration> mockedConf;
     private final MockedConstruction<ContainerOperationClient> mockedClient;
     private final MockedStatic<DiskBalancerSubCommandUtil> mockedUtil;
     
     DiskBalancerMocks(
-        MockedConstruction<OzoneConfiguration> mockedConf,
         MockedConstruction<ContainerOperationClient> mockedClient,
         MockedStatic<DiskBalancerSubCommandUtil> mockedUtil) {
-      this.mockedConf = mockedConf;
       this.mockedClient = mockedClient;
       this.mockedUtil = mockedUtil;
     }
     
     @Override
     public void close() {
-      if (mockedConf != null) {
-        mockedConf.close();
-      }
       if (mockedClient != null) {
         mockedClient.close();
       }
@@ -123,14 +119,6 @@ public class TestDiskBalancerSubCommands {
    * Returns a DiskBalancerMocks object containing all three mocks.
    */
   private DiskBalancerMocks setupAllMocks() {
-    MockedConstruction<OzoneConfiguration> mockedConf = 
-        mockConstruction(OzoneConfiguration.class, (mock, context) -> {
-          when(mock.getBoolean(
-              eq(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY),
-              eq(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)))
-              .thenReturn(true);
-        });
-    
     MockedConstruction<ContainerOperationClient> mockedClient = 
         mockConstruction(ContainerOperationClient.class);
     
@@ -179,7 +167,7 @@ public class TestDiskBalancerSubCommands {
       return addressPort;
     });
 
-    return new DiskBalancerMocks(mockedConf, mockedClient, mockedUtil);
+    return new DiskBalancerMocks(mockedClient, mockedUtil);
   }
 
   @AfterEach
@@ -450,6 +438,24 @@ public class TestDiskBalancerSubCommands {
     }
   }
 
+  @Test
+  public void testUpdateWithInvalidContainerStatesReportsError() throws Exception {
+    DiskBalancerUpdateSubcommand cmd = new DiskBalancerUpdateSubcommand();
+    doThrow(new IllegalArgumentException(
+        "Invalid container state 'NOT_A_CONTAINER_STATE' in"))
+        .when(mockProtocol).updateDiskBalancerConfiguration(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("-c", "CLOSED,NOT_A_CONTAINER_STATE", "host-1");
+      cmd.call();
+
+      String err = errContent.toString(DEFAULT_ENCODING);
+      assertTrue(err.contains("Error on node"));
+      assertTrue(err.contains("Invalid container state"));
+    }
+  }
+
   // ========== DiskBalancerStatusSubcommand Tests ==========
 
   @Test
@@ -572,6 +578,45 @@ public class TestDiskBalancerSubCommands {
 
   // ========== DiskBalancerReportSubcommand Tests ==========
 
+  static Stream<Arguments> thresholdRangeReportCases() {
+    return Stream.of(
+        Arguments.of(0.08426521, 10.0, false,
+            "ThresholdRange: (0.00%, 18.43%)", "ThresholdRange: (-"),
+        Arguments.of(0.95, 10.0, false,
+            "ThresholdRange: (85.00%, 100.00%)", "105.00%"),
+        Arguments.of(0.95, 10.0, true,
+            "\"thresholdRange\" : \"(85.00%, 100.00%)\"", "105.00%"));
+  }
+
+  @ParameterizedTest(name = "idealUsage={0}, threshold={1}%, json={2}")
+  @MethodSource("thresholdRangeReportCases")
+  public void testReportThresholdRangeClamped(double idealUsage,
+      double thresholdPercent, boolean jsonOutput, String expectedRangeSubstring,
+      String mustNotContain) throws Exception {
+    outContent.reset();
+    errContent.reset();
+
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+    DatanodeDiskBalancerInfoProto reportProto =
+        createReportProto("host-1", idealUsage, thresholdPercent);
+
+    when(mockProtocol.getDiskBalancerInfo()).thenReturn(reportProto);
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      if (jsonOutput) {
+        c.parseArgs("--json", "host-1");
+      } else {
+        c.parseArgs("host-1");
+      }
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      assertThat(output).contains(expectedRangeSubstring);
+      assertThat(output).doesNotContain(mustNotContain);
+    }
+  }
+
   @Test
   public void testReportDiskBalancerWithInServiceDatanodes() throws Exception {
     DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
@@ -620,8 +665,9 @@ public class TestDiskBalancerSubCommands {
       assertTrue(output.contains("\"volumes\""));
       assertTrue(output.contains("\"storageId\""));
       assertTrue(output.contains("\"storagePath\""));
-      assertTrue(output.contains("\"totalCapacity\""));
-      assertTrue(output.contains("\"usedSpace\""));
+      assertTrue(output.contains("\"ozoneCapacity\""));
+      assertTrue(output.contains("\"ozoneAvailable\""));
+      assertTrue(output.contains("\"ozoneUsed\""));
       assertTrue(output.contains("\"effectiveUsedSpace\""));
       assertTrue(output.contains("\"utilization\""));
       assertTrue(output.contains("\"volumeDensity\""));
@@ -773,6 +819,8 @@ public class TestDiskBalancerSubCommands {
     double util2 = idealUsage - random.nextDouble() * 0.1;
     long used1 = (long) (capacity1 * util1);
     long used2 = (long) (capacity2 * util2);
+    long available1 = capacity1 - used1;
+    long available2 = capacity2 - used2;
     long effective1 = used1 + committed1;
     long effective2 = used2 + committed2;
     String path1 = "/data/hdds-" + hostname + "-1";
@@ -783,6 +831,7 @@ public class TestDiskBalancerSubCommands {
         .setUtilization(util1)
         .setCommittedBytes(committed1)
         .setTotalCapacity(capacity1)
+        .setOzoneAvailable(available1)
         .setUsedSpace(used1)
         .setEffectiveUsedSpace(effective1)
         .build();
@@ -792,6 +841,7 @@ public class TestDiskBalancerSubCommands {
         .setUtilization(util2)
         .setCommittedBytes(committed2)
         .setTotalCapacity(capacity2)
+        .setOzoneAvailable(available2)
         .setUsedSpace(used2)
         .setEffectiveUsedSpace(effective2)
         .build();
@@ -803,6 +853,25 @@ public class TestDiskBalancerSubCommands {
         .setDiskBalancerConf(configProto)
         .addVolumeInfo(vol1)
         .addVolumeInfo(vol2)
+        .build();
+  }
+
+  private DatanodeDiskBalancerInfoProto createReportProto(String hostname, double idealUsage,
+      double thresholdPercent) {
+    DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(nodeProto)
+        .setCurrentVolumeDensitySum(0.1408700123786014)
+        .setIdealUsage(idealUsage)
+        .setDiskBalancerConf(createConfigProto(thresholdPercent, 100L, 5, true))
         .build();
   }
 

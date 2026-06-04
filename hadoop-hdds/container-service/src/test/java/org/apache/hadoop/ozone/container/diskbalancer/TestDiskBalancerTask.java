@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -83,6 +82,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.TestClock;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -113,6 +113,7 @@ public class TestDiskBalancerTask {
   private HddsVolume sourceVolume;
   private HddsVolume destVolume;
   private DiskBalancerServiceTestImpl diskBalancerService;
+  private TestClock clock;
 
   private static final long CONTAINER_ID = 1L;
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
@@ -243,8 +244,9 @@ public class TestDiskBalancerTask {
     DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
     diskBalancerConfiguration.setDiskBalancerShouldRun(true);
     conf.setFromObject(diskBalancerConfiguration);
+    clock = TestClock.newInstance();
     diskBalancerService = new DiskBalancerServiceTestImpl(ozoneContainer,
-        100, conf, 1);
+        100, conf, 1, clock);
     diskBalancerService.setReplicaDeletionDelay(0);
     KeyValueContainer.setInjector(kvFaultInjector);
   }
@@ -266,7 +268,6 @@ public class TestDiskBalancerTask {
     kvFaultInjector.reset();
     KeyValueContainer.setInjector(null);
     DiskBalancerService.setInjector(null);
-    DefaultContainerChoosingPolicy.setTest(false);
   }
 
   @ParameterizedTest
@@ -289,9 +290,6 @@ public class TestDiskBalancerTask {
     assertFalse(containerIterator.hasNext());
 
     String oldContainerPath = container.getContainerData().getContainerPath();
-    if (containerState == State.QUASI_CLOSED) {
-      DefaultContainerChoosingPolicy.setTest(true);
-    }
     DiskBalancerService.DiskBalancerTask task = getTask();
     task.call();
     assertEquals(State.DELETED, container.getContainerState());
@@ -459,7 +457,6 @@ public class TestDiskBalancerTask {
         .when(spyContainerSet).updateContainer(any(Container.class));
     when(ozoneContainer.getContainerSet()).thenReturn(spyContainerSet);
 
-    DefaultContainerChoosingPolicy.setTest(true);
     DiskBalancerService.DiskBalancerTask task = getTask();
     CompletableFuture completableFuture = CompletableFuture.runAsync(() -> task.call());
 
@@ -585,7 +582,7 @@ public class TestDiskBalancerTask {
 
   @ContainerTestVersionInfo.ContainerTest
   public void testOldReplicaDelayedDeletion(ContainerTestVersionInfo versionInfo)
-      throws IOException, InterruptedException {
+      throws IOException, InterruptedException, TimeoutException {
     setLayoutAndSchemaForTest(versionInfo);
     long delay = 2000L; // 2 second delay
     diskBalancerService.setReplicaDeletionDelay(delay);
@@ -604,20 +601,18 @@ public class TestDiskBalancerTask {
     // create another container to trigger the deletion of old replicas
     createContainer(CONTAINER_ID + 1, sourceVolume, State.CLOSED);
     task = getTask();
-    // Wait for the delay to pass
-    Thread.sleep(delay);
+    // Advance the injected clock until the delayed deletion is eligible.
+    clock.fastForward(delay);
     task.call();
     // Verify that the old container is deleted
     assertFalse(oldContainerDir.exists());
   }
 
   /**
-   * Testing that invalid states (including QUASI_CLOSED in production mode) are correctly rejected.
-   * Here, with QUASI_CLOSED state, we ensure that the test runs in production mode
-   * where QUASI_CLOSED is not allowed for move.
+   * Testing that invalid states are correctly rejected.
    */
   @ParameterizedTest
-  @EnumSource(names = {"OPEN", "CLOSING", "QUASI_CLOSED", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
+  @EnumSource(names = {"OPEN", "CLOSING", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
   public void testMoveSkippedWhenContainerStateChanged(State invalidState)
       throws IOException, InterruptedException, TimeoutException {
     LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
