@@ -135,7 +135,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   }
 
   private void printDetails(DatanodeDetails datanode) {
-    System.out.println("\nDatanode: " + datanode.getUuidString() +
+    System.out.println("\nDatanode: " + datanode.getID() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + ")");
   }
