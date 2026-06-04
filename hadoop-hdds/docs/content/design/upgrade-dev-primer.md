@@ -44,13 +44,15 @@ Class to add  a new layout feature being brought in. Layout version is typically
 
 **DataNode** uses [`org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/upgrade/DatanodeVersionManager.java) with upgrade actions via [`org.apache.hadoop.ozone.container.upgrade.DatanodeUpgradeActionProvider`](https://github.com/apache/ozone/blob/master/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/upgrade/DatanodeUpgradeActionProvider.java). Both SCM and DataNode expose apparent/software `ComponentVersion` and `isAllowed(ComponentVersion)` for gating (including legacy [`HDDSLayoutFeature`](https://github.com/apache/ozone/blob/master/hadoop-hdds/framework/src/main/java/org/apache/hadoop/hdds/upgrade/HDDSLayoutFeature.java) checks where still used).
 
+**Recon** uses [`org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-ozone/recon/src/main/java/org/apache/hadoop/ozone/recon/upgrade/ReconVersionManager.java) for Derby SQL schema versioning, with versions defined in [`ReconVersion`](https://github.com/apache/ozone/blob/master/hadoop-ozone/recon/src/main/java/org/apache/hadoop/ozone/recon/upgrade/ReconVersion.java) and upgrade actions via [`ReconUpgradeActionProvider`](https://github.com/apache/ozone/blob/master/hadoop-ozone/recon/src/main/java/org/apache/hadoop/ozone/recon/upgrade/ReconUpgradeActionProvider.java). Apparent version is stored in `RECON_SCHEMA_VERSION`. Recon also runs [`ScmVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/server/upgrade/ScmVersionManager.java) for SCM-lite metadata and finalizes both tracks on startup.
+
 ## @DisallowedUntilLayoutVersion Annotation
 Method level annotation used to "disallow" an API if current layout version does not include the associated layout feature. Currently it is added only to the OM module, but can easily be moved down to a common module based on need on the HDDS layer.
 
 ## @BelongsToLayoutVersion Annotation
 Annotation to mark an OM request class that it belongs to a specific Layout Version. Until that version is available post finalize, this request will not be supported. A newer version of an existing OM request can be created (by inheritance or a fully new class) and marked with a newer layout version. Until finalizing this layout version, the older request class is used. Post finalizing, the newer version of the request class is used.
 
-## Upgrade Action (UpgradeActionOm, UpgradeActionScm & UpgradeActionDatanode)
+## Upgrade Action (UpgradeActionOm, UpgradeActionScm, UpgradeActionDatanode & UpgradeActionRecon)
 Annotation to specify upgrade action run during finalization. Each layout feature can optionally define a single upgrade action that will be executed when the feature is finalized. This action should be idempotent and execute quickly. The action must complete for the feature to finish
 finalizing, so if there is an error executing the action it will be retried. This partial failure should not leave the component inoperable.
 

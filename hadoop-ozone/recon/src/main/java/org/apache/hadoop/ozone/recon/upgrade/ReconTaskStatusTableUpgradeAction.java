@@ -17,13 +17,17 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.jooq.impl.DSL.field;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
 import javax.sql.DataSource;
-import org.apache.ozone.recon.schema.ReconTaskSchemaDefinition;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
 import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
@@ -32,64 +36,87 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Upgrade action for TASK_STATUS_STATISTICS feature layout change, which adds
- * <code>last_task_run_status</code> and <code>current_task_run_status</code> columns to
- * {@link ReconTaskSchemaDefinition} in case it is missing .
+ * Upgrade action for {@link ReconVersion#TASK_STATUS_STATISTICS}, which refreshes the
+ * UNHEALTHY_CONTAINERS check constraint and adds task status statistics columns.
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.TASK_STATUS_STATISTICS)
+@UpgradeActionRecon(feature = ReconVersion.TASK_STATUS_STATISTICS)
 public class ReconTaskStatusTableUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconTaskStatusTableUpgradeAction.class);
 
-  /**
-   * Utility function to add provided column to RECON_TASK_STATUS table as INTEGER type.
-   * @param dslContext  Stores {@link DSLContext} to perform alter operations
-   * @param columnName  Name of the column to be inserted to the table
-   */
   private void addColumnToTable(DSLContext dslContext, String columnName) {
-    //Column is set as nullable to avoid any errors.
     dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
         .addColumn(columnName, SQLDataType.INTEGER.nullable(true)).execute();
   }
 
-  /**
-   *  Utility function to set the provided column as Non-Null to enforce constraints in RECON_TASK_STATUS table.
-   * @param dslContext Stores {@link DSLContext} to perform alter operations
-   * @param columnName Name of the column to set as non-null
-   */
   private void setColumnAsNonNullable(DSLContext dslContext, String columnName) {
     dslContext.alterTable(RECON_TASK_STATUS_TABLE_NAME)
         .alterColumn(DSL.name(columnName)).setNotNull()
         .execute();
   }
 
+  private void upgradeUnhealthyContainersConstraint(DSLContext dslContext) {
+    String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
+    dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .dropConstraint(constraintName)
+        .execute();
+    LOG.debug("Dropped the existing constraint: {}", constraintName);
+
+    String[] enumStates = Arrays
+        .stream(ContainerSchemaDefinition.UnHealthyContainerStates.values())
+        .map(Enum::name)
+        .toArray(String[]::new);
+
+    dslContext.alterTable(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .add(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
+            .check(field(DSL.name("container_state"))
+                .in(enumStates)))
+        .execute();
+
+    LOG.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",
+        Arrays.toString(enumStates));
+  }
+
+  private void upgradeTaskStatusTable(DSLContext dslContext) {
+    // JOOQ doesn't support Derby DB officially, there is no way to run 'ADD COLUMN' command in single call
+    // for multiple columns. Hence, we run it as two separate steps.
+    LOG.info("Adding 'last_task_run_status' column to task status table");
+    addColumnToTable(dslContext, "last_task_run_status");
+    LOG.info("Adding 'is_current_task_running' column to task status table");
+    addColumnToTable(dslContext, "is_current_task_running");
+
+    //Handle previous table values with new columns default values
+    int updatedRowCount = dslContext.update(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
+        .set(DSL.field(DSL.name("last_task_run_status"), SQLDataType.INTEGER), 0)
+        .set(DSL.field(DSL.name("is_current_task_running"), SQLDataType.INTEGER), 0)
+        .execute();
+    LOG.info("Updated {} rows with default value for new columns", updatedRowCount);
+
+    // Now we will set the column as not-null to enforce constraints
+    setColumnAsNonNullable(dslContext, "last_task_run_status");
+    setColumnAsNonNullable(dslContext, "is_current_task_running");
+  }
+
   @Override
-  public void execute(DataSource dataSource) throws DataAccessException {
+  public void execute(DataSource dataSource) throws Exception {
     try (Connection conn = dataSource.getConnection()) {
-      if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
-        return;
+      DSLContext dslContext = DSL.using(conn);
+
+      if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+        upgradeUnhealthyContainersConstraint(dslContext);
       }
 
-      DSLContext dslContext = DSL.using(conn);
-      // JOOQ doesn't support Derby DB officially, there is no way to run 'ADD COLUMN' command in single call
-      // for multiple columns. Hence, we run it as two separate steps.
-      LOG.info("Adding 'last_task_run_status' column to task status table");
-      addColumnToTable(dslContext, "last_task_run_status");
-      LOG.info("Adding 'is_current_task_running' column to task status table");
-      addColumnToTable(dslContext, "is_current_task_running");
-
-      //Handle previous table values with new columns default values
-      int updatedRowCount = dslContext.update(DSL.table(RECON_TASK_STATUS_TABLE_NAME))
-          .set(DSL.field(DSL.name("last_task_run_status"), SQLDataType.INTEGER), 0)
-          .set(DSL.field(DSL.name("is_current_task_running"), SQLDataType.INTEGER), 0)
-          .execute();
-      LOG.info("Updated {} rows with default value for new columns", updatedRowCount);
-
-      // Now we will set the column as not-null to enforce constraints
-      setColumnAsNonNullable(dslContext, "last_task_run_status");
-      setColumnAsNonNullable(dslContext, "is_current_task_running");
+      if (TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
+        upgradeTaskStatusTable(dslContext);
+      }
     } catch (SQLException | DataAccessException ex) {
-      LOG.error("Error while upgrading RECON_TASK_STATUS table.", ex);
+      LOG.error("Error while upgrading for TASK_STATUS_STATISTICS.", ex);
+      throw ex;
     }
+  }
+
+  @VisibleForTesting
+  void upgradeUnhealthyContainersConstraintForTesting(DSLContext dslContext) {
+    upgradeUnhealthyContainersConstraint(dslContext);
   }
 }

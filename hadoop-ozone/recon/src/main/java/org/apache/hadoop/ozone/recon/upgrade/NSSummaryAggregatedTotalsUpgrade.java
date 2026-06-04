@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * Recon startup is not blocked. During rebuild, APIs that depend on
  * the tree may return initializing responses as designed.
  */
-@UpgradeActionRecon(feature = ReconLayoutFeature.NSSUMMARY_AGGREGATED_TOTALS)
+@UpgradeActionRecon(feature = ReconVersion.NSSUMMARY_AGGREGATED_TOTALS)
 public class NSSummaryAggregatedTotalsUpgrade implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(NSSummaryAggregatedTotalsUpgrade.class);
