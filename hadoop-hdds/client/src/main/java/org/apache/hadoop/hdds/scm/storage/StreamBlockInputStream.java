@@ -79,6 +79,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final long readTimeoutNanos;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
+  private String encodedToken;
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientGrpc xceiverClient;
 
@@ -102,6 +103,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     this.blockLength = length;
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
+    this.encodedToken = token != null ? token.encodeToUrlString() : null;
     this.xceiverClientFactory = xceiverClientFactory;
     this.verifyChecksum = config.isChecksumVerify();
     this.retryPolicy = getReadRetryPolicy(config);
@@ -323,7 +325,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
     xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
-        blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
+        blockID, requestedLength, length, responseDataSize, encodedToken, pipelineRef.get()), r);
   }
 
   private void handleExceptions(IOException cause) throws IOException {
@@ -356,6 +358,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private void refreshBlockInfo(IOException cause) throws IOException {
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
+    final Token<OzoneBlockTokenIdentifier> refreshed = tokenRef.get();
+    encodedToken = refreshed != null ? refreshed.encodeToUrlString() : null;
   }
 
   private synchronized void releaseStreamResources() {
