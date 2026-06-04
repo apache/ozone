@@ -258,7 +258,7 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
-    return false;
+    return true;
   }
 
   @Override
