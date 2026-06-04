@@ -33,15 +33,18 @@ class S3ObjectWriteGuard implements AutoCloseable {
 
   private final OutputStream outputStream;
   private final long expectedLength;
+  private final String keyPath;
   private final List<CheckedRunnable<IOException>> preCommits =
       new ArrayList<>();
   private long writtenLength;
+  private Throwable transferFailure;
 
   S3ObjectWriteGuard(
       OzoneOutputStream outputStream, long expectedLength, String keyPath) {
     this.outputStream = outputStream;
     this.expectedLength = expectedLength;
-    addContentLengthValidation(keyPath);
+    this.keyPath = keyPath;
+    addCommitGuard();
     outputStream.setPreCommits(getPreCommits());
   }
 
@@ -49,12 +52,28 @@ class S3ObjectWriteGuard implements AutoCloseable {
       OutputStream outputStream, long expectedLength, String keyPath) {
     this.outputStream = outputStream;
     this.expectedLength = expectedLength;
-    addContentLengthValidation(keyPath);
+    this.keyPath = keyPath;
+    addCommitGuard();
   }
 
-  private void addContentLengthValidation(String keyPath) {
-    preCommits.add(() -> EndpointBase.validateContentLength(
-        expectedLength, writtenLength, keyPath).run());
+  private void addCommitGuard() {
+    preCommits.add(this::validateBeforeCommit);
+  }
+
+  private void validateBeforeCommit() throws IOException {
+    if (transferFailure != null) {
+      throw new IOException(
+          "S3 object transfer failed before commit: " + keyPath,
+          transferFailure);
+    }
+    EndpointBase.validateContentLength(
+        expectedLength, writtenLength, keyPath).run();
+  }
+
+  private void recordTransferFailure(Throwable failure) {
+    if (transferFailure == null) {
+      transferFailure = failure;
+    }
   }
 
   protected List<CheckedRunnable<IOException>> getPreCommits() {
@@ -70,11 +89,22 @@ class S3ObjectWriteGuard implements AutoCloseable {
     while (writtenLength < expectedLength) {
       int toRead = Math.toIntExact(
           Math.min(bufferSize, expectedLength - writtenLength));
-      int readLength = body.read(buffer, 0, toRead);
+      final int readLength;
+      try {
+        readLength = body.read(buffer, 0, toRead);
+      } catch (IOException | RuntimeException ex) {
+        recordTransferFailure(ex);
+        throw ex;
+      }
       if (readLength == -1) {
         break;
       }
-      write(buffer, 0, readLength);
+      try {
+        write(buffer, 0, readLength);
+      } catch (IOException | RuntimeException ex) {
+        recordTransferFailure(ex);
+        throw ex;
+      }
       writtenLength += readLength;
     }
     return writtenLength;
