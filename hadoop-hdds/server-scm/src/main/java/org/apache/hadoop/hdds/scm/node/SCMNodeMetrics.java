@@ -136,6 +136,14 @@ public final class SCMNodeMetrics implements MetricsSource {
     numPendingContainersRemoved.incr();
   }
 
+  public long getNumPendingContainersAdded() {
+    return numPendingContainersAdded.value();
+  }
+
+  public long getNumPendingContainersRemoved() {
+    return numPendingContainersRemoved.value();
+  }
+
   void incNumSkippedFullNodeContainerAllocation() {
     numSkippedFullNodeContainerAllocation.incr();
   }
