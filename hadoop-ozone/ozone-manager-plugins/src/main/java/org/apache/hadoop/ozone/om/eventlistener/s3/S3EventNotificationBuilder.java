@@ -63,12 +63,8 @@ public class S3EventNotificationBuilder {
   private String objectVersionId;
   private String objectSequencer;
 
-  public S3EventNotificationBuilder(String objectKey,
-                                    String bucketName,
-                                    String bucketArn,
-                                    String eventName,
-                                    Instant eventTime,
-                                    String etag) {
+  public S3EventNotificationBuilder(String objectKey, String bucketName, String bucketArn, String eventName,
+      Instant eventTime, String etag) {
     this.objectKey = objectKey;
     this.bucketName = bucketName;
     this.bucketArn = bucketArn;

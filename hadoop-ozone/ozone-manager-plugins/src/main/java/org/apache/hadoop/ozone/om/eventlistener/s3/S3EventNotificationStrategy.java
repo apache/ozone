@@ -48,40 +48,32 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
     switch (requestInfo.getCmdType()) {
     case CreateVolume:
       return Collections.singletonList(createS3Event("OzoneVolumeCreated:Put",
-              requestInfo.getVolumeName(),
-              null,
-              null,
-              Collections.emptyMap())
-      );
+          requestInfo.getVolumeName(), null, null, Collections.emptyMap(),
+          requestInfo.getTrxLogIndex()));
     case DeleteVolume:
       return Collections.singletonList(createS3Event("OzoneVolumeRemoved:Delete",
-              requestInfo.getVolumeName(),
-              null,
-              null,
-              Collections.emptyMap())
-      );
+          requestInfo.getVolumeName(), null, null, Collections.emptyMap(),
+          requestInfo.getTrxLogIndex()));
     case CreateBucket:
       return Collections.singletonList(createS3Event("OzoneBucketCreated:Put",
-              requestInfo.getVolumeName(),
-              requestInfo.getBucketName(),
-              null,
-              Collections.emptyMap())
-      );
+          requestInfo.getVolumeName(), requestInfo.getBucketName(), null,
+          Collections.emptyMap(), requestInfo.getTrxLogIndex()));
     case DeleteBucket:
       return Collections.singletonList(createS3Event("OzoneBucketRemoved:Delete",
-              requestInfo.getVolumeName(),
-              requestInfo.getBucketName(),
-              null,
-              Collections.emptyMap())
-      );
+          requestInfo.getVolumeName(), requestInfo.getBucketName(), null,
+          Collections.emptyMap(), requestInfo.getTrxLogIndex()));
     case CreateKey:
-    case CommitKey:
+      Map<String, Object> createKeyData = new HashMap<>();
+      createKeyData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateKey");
       return Collections.singletonList(createS3Event("ObjectCreated:Put",
-              requestInfo.getVolumeName(),
-              requestInfo.getBucketName(),
-              requestInfo.getKeyName(),
-              Collections.emptyMap())
-      );
+          requestInfo.getVolumeName(), requestInfo.getBucketName(), requestInfo.getKeyName(),
+          createKeyData, requestInfo.getTrxLogIndex()));
+    case CommitKey:
+      Map<String, Object> commitKeyData = new HashMap<>();
+      commitKeyData.put(OzoneEventDataKey.OP_TYPE.toString(), "CommitKey");
+      return Collections.singletonList(createS3Event("ObjectCreated:Put",
+          requestInfo.getVolumeName(), requestInfo.getBucketName(), requestInfo.getKeyName(),
+          commitKeyData, requestInfo.getTrxLogIndex()));
     case CreateFile:
       OmCompletedRequestInfo.OperationArgs.CreateFileArgs createFileArgs
           = (OmCompletedRequestInfo.OperationArgs.CreateFileArgs) requestInfo.getOpArgs();
@@ -92,15 +84,15 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
       // required so it is unclear as to their necessity.
       Map<String, Object> createFileEventData = new HashMap<>();
       createFileEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), false);
-      createFileEventData.put(OzoneEventDataKey.IS_RECURSIVE.toString(), createFileArgs.isRecursive());
-      createFileEventData.put(OzoneEventDataKey.IS_OVERWRITE.toString(), createFileArgs.isOverwrite());
+      createFileEventData.put(OzoneEventDataKey.IS_RECURSIVE.toString(),
+          createFileArgs.isRecursive());
+      createFileEventData.put(OzoneEventDataKey.IS_OVERWRITE.toString(),
+          createFileArgs.isOverwrite());
+      createFileEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateFile");
 
       return Collections.singletonList(createS3Event("ObjectCreated:Put",
-              requestInfo.getVolumeName(),
-              requestInfo.getBucketName(),
-              requestInfo.getKeyName(),
-              createFileEventData)
-      );
+          requestInfo.getVolumeName(), requestInfo.getBucketName(), requestInfo.getKeyName(),
+          createFileEventData, requestInfo.getTrxLogIndex()));
     case CreateDirectory:
       // XXX: ozoneEventData is an Ozone extension. It is unclear if this
       // schema makes sense but the general S3 schema is somewhat
@@ -108,27 +100,21 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
       // required so it is unclear as to their necessity.
       Map<String, Object> createEventData = new HashMap<>();
       createEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), true);
+      createEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateDirectory");
 
       return Collections.singletonList(createS3Event("ObjectCreated:Put",
-              requestInfo.getVolumeName(),
-              requestInfo.getBucketName(),
-              requestInfo.getKeyName(),
-              createEventData)
-      );
+          requestInfo.getVolumeName(), requestInfo.getBucketName(), requestInfo.getKeyName(),
+          createEventData, requestInfo.getTrxLogIndex()));
     case DeleteKey:
       return Collections.singletonList(createS3Event("ObjectRemoved:Delete",
-              requestInfo.getVolumeName(),
-              requestInfo.getBucketName(),
-              requestInfo.getKeyName(),
-              Collections.emptyMap())
-      );
+          requestInfo.getVolumeName(), requestInfo.getBucketName(), requestInfo.getKeyName(),
+          Collections.emptyMap(), requestInfo.getTrxLogIndex()));
     case RenameKey:
       OmCompletedRequestInfo.OperationArgs.RenameKeyArgs renameKeyArgs
           = (OmCompletedRequestInfo.OperationArgs.RenameKeyArgs) requestInfo.getOpArgs();
 
       String renameFromKey = S3OzoneEventKeyFormatter.getOzoneKey(requestInfo.getVolumeName(),
-                                                      requestInfo.getBucketName(),
-                                                      requestInfo.getKeyName());
+          requestInfo.getBucketName(), requestInfo.getKeyName());
 
       // XXX: it would be good to be able to convey that this was a
       // file vs directory rename
@@ -138,11 +124,8 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
       // NOTE: ObjectRenamed:Rename is an Ozone extension as is the
       // ozoneEventData map in the S3 event schema.
       return Collections.singletonList(createS3Event("ObjectRenamed:Rename",
-              requestInfo.getVolumeName(),
-              requestInfo.getBucketName(),
-              renameKeyArgs.getToKeyName(),
-              ozoneEventData)
-      );
+          requestInfo.getVolumeName(), requestInfo.getBucketName(), renameKeyArgs.getToKeyName(),
+          ozoneEventData, requestInfo.getTrxLogIndex()));
     default:
       LOG.debug("No events for operation {} on {}",
            requestInfo.getCmdType(),
@@ -151,11 +134,8 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
     }
   }
 
-  static String createS3Event(String eventName,
-                              String volumeName,
-                              String bucketName,
-                              String keyName,
-                              Map<String, Object> ozoneEventData) {
+  static String createS3Event(String eventName, String volumeName, String bucketName, String keyName,
+      Map<String, Object> ozoneEventData, long trxLogIndex) {
     try {
       String objectKey = S3OzoneEventKeyFormatter.getOzoneKey(volumeName, bucketName, keyName);
       String bucketArn = (bucketName == null)
@@ -164,10 +144,16 @@ public class S3EventNotificationStrategy implements OMEventListenerNotificationS
       Instant eventTime = Instant.now();
       String etag = UUID.randomUUID().toString();
 
-      S3EventNotification event = new S3EventNotificationBuilder(objectKey, bucketName, bucketArn,
-                                                                 eventName, eventTime, etag)
-          .addAllEventData(ozoneEventData)
-          .build();
+      Map<String, Object> eventData = new HashMap<>();
+      if (ozoneEventData != null) {
+        eventData.putAll(ozoneEventData);
+      }
+      eventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), trxLogIndex);
+
+      S3EventNotification event =
+          new S3EventNotificationBuilder(objectKey, bucketName, bucketArn, eventName, eventTime, etag)
+              .addAllEventData(eventData)
+              .build();
 
       return MAPPER.writer().writeValueAsString(event);
     } catch (Exception ex) {

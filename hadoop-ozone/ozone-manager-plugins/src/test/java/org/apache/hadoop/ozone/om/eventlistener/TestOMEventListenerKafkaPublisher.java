@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotification;
 import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotification.OzoneEventDataKey;
 import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotification.S3EventNotificationRecord;
@@ -112,6 +113,30 @@ public class TestOMEventListenerKafkaPublisher {
 
     assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
     assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key1");
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateKey");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 1);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
+  }
+
+  @Test
+  public void testCommitKeyRequestProducesS3CreatedEvent() throws InterruptedException, IOException {
+    OmCompletedRequestInfo commitRequest = buildCompletedRequestInfo(8L, Type.CommitKey, "some/key1_commit",
+        new OperationArgs.NoArgs());
+
+    List<String> events = captureEventsProducedByOperation(commitRequest, 1);
+    S3EventNotificationRecord record = getFirstRecord(events);
+
+    assertThat(record.getEventName()).isEqualTo("ObjectCreated:Put");
+    assertThat(record.getS3().getObject().getKey()).isEqualTo("vol1/bucket1/some/key1_commit");
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CommitKey");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 8);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
 
   @Test
@@ -132,6 +157,8 @@ public class TestOMEventListenerKafkaPublisher {
     expectedEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), false);
     expectedEventData.put(OzoneEventDataKey.IS_RECURSIVE.toString(), false);
     expectedEventData.put(OzoneEventDataKey.IS_OVERWRITE.toString(), true);
+    expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateFile");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 2);
 
     assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
@@ -149,6 +176,8 @@ public class TestOMEventListenerKafkaPublisher {
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.IS_DIRECTORY.toString(), true);
+    expectedEventData.put(OzoneEventDataKey.OP_TYPE.toString(), "CreateDirectory");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 3);
 
     assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
@@ -166,6 +195,7 @@ public class TestOMEventListenerKafkaPublisher {
 
     Map<String, Object> expectedEventData = new HashMap<>();
     expectedEventData.put(OzoneEventDataKey.RENAME_FROM_KEY.toString(), "vol1/bucket1/some/key4");
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 4);
 
     assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
@@ -191,6 +221,11 @@ public class TestOMEventListenerKafkaPublisher {
     assertThat(record.getEventName()).isEqualTo("OzoneVolumeCreated:Put");
     assertThat(record.getS3().getBucket().getName()).isNull();
     assertThat(record.getS3().getObject().getKey()).isEqualTo(VOLUME_NAME);
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 6);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
 
   @Test
@@ -211,6 +246,11 @@ public class TestOMEventListenerKafkaPublisher {
     assertThat(record.getEventName()).isEqualTo("OzoneBucketCreated:Put");
     assertThat(record.getS3().getBucket().getName()).isEqualTo(BUCKET_NAME);
     assertThat(record.getS3().getObject().getKey()).isEqualTo(VOLUME_NAME + "/" + BUCKET_NAME);
+
+    Map<String, Object> expectedEventData = new HashMap<>();
+    expectedEventData.put(OzoneEventDataKey.TRX_LOG_INDEX.toString(), 7);
+
+    assertThat(record.getOzoneEventData()).isEqualTo(expectedEventData);
   }
 
   @Test
@@ -231,5 +271,35 @@ public class TestOMEventListenerKafkaPublisher {
 
     // Also ensure it is actually parsable by the standard Java 8 API
     java.time.OffsetDateTime.parse(eventTimeStr);
+  }
+
+  @Test
+  public void testInitializeFailsWhenStrategyInstantiationThrows() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setClass("ozone.om.plugin.kafka.notification.strategy",
+        ThrowingStrategy.class, OMEventListenerNotificationStrategy.class);
+
+    OMEventListenerKafkaPublisher plugin = new OMEventListenerKafkaPublisher();
+    try (MockedConstruction<OMEventListenerKafkaPublisher.KafkaClientWrapper> mockedKafkaClientWrapper =
+             mockConstruction(OMEventListenerKafkaPublisher.KafkaClientWrapper.class)) {
+
+      org.junit.jupiter.api.Assertions.assertThrows(OzoneIllegalArgumentException.class, () -> {
+        plugin.initialize(conf, pluginContext);
+      });
+    }
+  }
+
+  /**
+   * A mock strategy that throws an exception during instantiation for testing.
+   */
+  public static class ThrowingStrategy implements OMEventListenerNotificationStrategy {
+    public ThrowingStrategy() {
+      throw new RuntimeException("Simulated instantiation failure");
+    }
+
+    @Override
+    public List<String> determineEventsForOperation(OmCompletedRequestInfo completedRequestInfo) {
+      return null;
+    }
   }
 }

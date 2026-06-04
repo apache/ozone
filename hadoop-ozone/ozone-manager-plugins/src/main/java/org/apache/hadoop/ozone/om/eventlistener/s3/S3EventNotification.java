@@ -84,7 +84,9 @@ public class S3EventNotification {
         IS_DIRECTORY("isDirectory"),
         IS_RECURSIVE("isRecursive"),
         IS_OVERWRITE("isOverwrite"),
-        RENAME_FROM_KEY("renameFromKey");
+        RENAME_FROM_KEY("renameFromKey"),
+        TRX_LOG_INDEX("trxLogIndex"),
+        OP_TYPE("opType");
 
         private final String jsonKey;
 
@@ -468,7 +470,8 @@ public class S3EventNotification {
                 @JsonProperty(value = "ozoneEventData") Map<String, Object> ozoneEventData)
                 //@JsonProperty(value = "glacierEventData") GlacierEventDataEntity glacierEventData,
                 //@JsonProperty(value = "lifecycleEventData") LifecycleEventDataEntity lifecycleEventData,
-                //@JsonProperty(value = "intelligentTieringEventData") IntelligentTieringEventDataEntity intelligentTieringEventData,
+                //@JsonProperty(value = "intelligentTieringEventData")
+                //IntelligentTieringEventDataEntity intelligentTieringEventData,
                 //@JsonProperty(value = "replicationEventData") ReplicationEventDataEntity replicationEventData)
         {
             this.awsRegion = awsRegion;
@@ -547,7 +550,9 @@ public class S3EventNotification {
 
         //public LifecycleEventDataEntity getLifecycleEventData() { return lifecycleEventData; }
 
-        //public IntelligentTieringEventDataEntity getIntelligentTieringEventData() { return intelligentTieringEventData; }
+        //public IntelligentTieringEventDataEntity getIntelligentTieringEventData() {
+        //    return intelligentTieringEventData;
+        //}
 
         //public ReplicationEventDataEntity getReplicationEventDataEntity() { return replicationEventDataEntity; }
 

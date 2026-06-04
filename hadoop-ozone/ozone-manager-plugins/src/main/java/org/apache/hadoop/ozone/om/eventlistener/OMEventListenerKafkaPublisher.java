@@ -26,6 +26,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.om.eventlistener.s3.S3EventNotificationStrategy;
 import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -77,9 +78,11 @@ public class OMEventListenerKafkaPublisher implements OMEventListener {
     try {
       this.notificationStrategy = strategyClass.getDeclaredConstructor().newInstance();
     } catch (Exception ex) {
-      LOG.error("Failed to instantiate notification strategy: {}. " +
-          "Falling back to NoOp strategy.", strategyClass, ex);
-      this.notificationStrategy = new NoOpOMEventListenerNotificationStrategy();
+      LOG.error("Failed to instantiate notification strategy: {}", strategyClass, ex);
+      OzoneIllegalArgumentException exception = new OzoneIllegalArgumentException(
+          "Failed to instantiate notification strategy: " + strategyClass);
+      exception.initCause(ex);
+      throw exception;
     }
     this.seekPosition = new OMEventListenerLedgerPollerSeekPosition();
 
