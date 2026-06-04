@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -338,14 +339,14 @@ abstract class AbstractContainerReportHandler {
           targetState = LifeCycleState.CLOSED;
           getLogger().info("Resurrecting container {} from {} to CLOSED due to non-empty CLOSED replica " +
               "(keyCount={}, BCSID={}) from {}",
-              containerId, container.getState(), replica.getKeyCount(), replica.getBlockCommitSequenceId(), 
+              containerId, container.getState(), replica.getKeyCount(), replica.getBlockCommitSequenceId(),
               detailsForLogging);
         } else {
           // For OPEN, CLOSING, UNHEALTHY, QUASI_CLOSED replicas, transition to QUASI_CLOSED state
           targetState = LifeCycleState.QUASI_CLOSED;
           getLogger().info("Resurrecting container {} from {} to QUASI_CLOSED due to non-empty {} replica " +
               "(keyCount={}, BCSID={}) from {}",
-              containerId, container.getState(), replica.getState(), replica.getKeyCount(), 
+              containerId, container.getState(), replica.getState(), replica.getKeyCount(),
               replica.getBlockCommitSequenceId(), detailsForLogging);
         }
         containerManager.transitionDeletingOrDeletedToTargetState(containerId, targetState);
@@ -379,7 +380,7 @@ abstract class AbstractContainerReportHandler {
                                       final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
 
-    final ContainerReplica replica = ContainerReplica.newBuilder()
+    final ContainerReplica.ContainerReplicaBuilder replicaBuilder = ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(replicaProto.getState())
         .setDatanodeDetails(datanodeDetails)
@@ -388,8 +389,11 @@ abstract class AbstractContainerReportHandler {
         .setKeyCount(replicaProto.getKeyCount())
         .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
-        .setEmpty(replicaProto.getIsEmpty())
-        .setChecksums(ContainerChecksums.of(replicaProto.getDataChecksum()))
+        .setEmpty(replicaProto.getIsEmpty());
+    if (replicaProto.hasStorageType()) {
+      replicaBuilder.setStorageType(StorageTypeUtils.getFromProtobuf(replicaProto.getStorageType()));
+    }
+    ContainerReplica replica = replicaBuilder.setChecksums(ContainerChecksums.of(replicaProto.getDataChecksum()))
         .build();
 
     if (replica.getState().equals(State.DELETED)) {
