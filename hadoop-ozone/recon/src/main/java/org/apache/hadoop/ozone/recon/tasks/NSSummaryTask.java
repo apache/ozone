@@ -87,8 +87,11 @@ public class NSSummaryTask implements ReconOmTask {
   // The sub-tasks operate on disjoint slices of the event stream (filtered by
   // table and bucket layout) and write to disjoint NSSummary entries, so they
   // are safe to run in parallel.
-  private final ExecutorService subTaskExecutor = Executors.newFixedThreadPool(
-      3, new ThreadFactoryBuilder().setNameFormat("NSSummarySubTask-%d").setDaemon(true).build());
+  private static final ExecutorService SUB_TASK_EXECUTOR =
+      Executors.newFixedThreadPool(3, new ThreadFactoryBuilder()
+          .setNameFormat("NSSummarySubTask-%d")
+          .setDaemon(true)
+          .build());
 
   /**
    * Rebuild state enum to track NSSummary tree rebuild status.
@@ -185,11 +188,11 @@ public class NSSummaryTask implements ReconOmTask {
     int legacySeek = subTaskSeekPosMap.getOrDefault(BucketType.LEGACY.name(), 0);
     int obsSeek = subTaskSeekPosMap.getOrDefault(BucketType.OBS.name(), 0);
 
-    Future<Pair<Integer, Boolean>> fsoFuture = subTaskExecutor.submit(
+    Future<Pair<Integer, Boolean>> fsoFuture = SUB_TASK_EXECUTOR.submit(
         () -> nsSummaryTaskWithFSO.processWithFSO(events, fsoSeek));
-    Future<Pair<Integer, Boolean>> legacyFuture = subTaskExecutor.submit(
+    Future<Pair<Integer, Boolean>> legacyFuture = SUB_TASK_EXECUTOR.submit(
         () -> nsSummaryTaskWithLegacy.processWithLegacy(events, legacySeek));
-    Future<Pair<Integer, Boolean>> obsFuture = subTaskExecutor.submit(
+    Future<Pair<Integer, Boolean>> obsFuture = SUB_TASK_EXECUTOR.submit(
         () -> nsSummaryTaskWithOBS.processWithOBS(events, obsSeek));
 
     boolean anyFailure = false;

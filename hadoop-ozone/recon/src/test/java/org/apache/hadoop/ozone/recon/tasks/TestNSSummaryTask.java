@@ -21,10 +21,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -67,6 +69,24 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
         getReconOMMetadataManager(),
         getOmConfiguration()
     );
+  }
+
+  @Test
+  public void testTaskInstancesReuseSharedProcessExecutor() throws Exception {
+    NSSummaryTask anotherTask = new NSSummaryTask(
+        getReconNamespaceSummaryManager(),
+        getReconOMMetadataManager(),
+        getOmConfiguration());
+
+    assertSame(getSubTaskExecutor(nSSummaryTask),
+        getSubTaskExecutor(anotherTask));
+  }
+
+  private Object getSubTaskExecutor(NSSummaryTask task) throws Exception {
+    Field executorField = NSSummaryTask.class.getDeclaredField(
+        "SUB_TASK_EXECUTOR");
+    executorField.setAccessible(true);
+    return executorField.get(task);
   }
 
   /**
