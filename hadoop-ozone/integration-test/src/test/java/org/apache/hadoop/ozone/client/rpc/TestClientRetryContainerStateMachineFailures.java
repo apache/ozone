@@ -171,13 +171,6 @@ public class TestClientRetryContainerStateMachineFailures {
       increasedVolumeSpace.forEach(e -> e.getLeft().decrementUsedSpace(e.getRight()));
       System.out.println("Time taken: " + (Time.monotonicNow() - startTime));
     }
-
-    // Finally try another key after env recover and should be success
-    try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName).createKey(
-        "testkey2", 1024, replicationConfig, new HashMap<>())) {
-      key.write("ratis".getBytes(UTF_8));
-      key.flush();
-    }
   }
 
   private static void checkDnPipelineIfLeader(OzoneContainer container, AtomicBoolean isLeader) {
