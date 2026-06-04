@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -255,6 +256,136 @@ public class TestStreamBlockInputStream {
       // After the fix: all 4 bytes are returned successfully.
       assertDoesNotThrow(() -> sbis.read(buf), "should not NPE when onCompleted fires before poll");
       assertEquals(data.length, buf.position(), "all bytes should be read");
+    }
+  }
+
+  /**
+   * Realistic test for the checksum-alignment skip path.
+   *
+   * After a seek, the server aligns its response to the nearest checksum boundary,
+   * which may be before the client's current position. With a small responseDataSize
+   * (4 bytes), the server sends two 4-byte chunks:
+   *   chunk 1: blockOffset=0, data=[0,1,2,3] — entirely before seek position 4
+   *   chunk 2: blockOffset=4, data=[4,5,6,7] — starts at seek position
+   *
+   * The while(true) loop in read() must:
+   *   iteration 1: receive chunk 1, skip all 4 bytes (pos-blockOffset=4 == data.size()),
+   *                empty buffer → continue
+   *   iteration 2: receive chunk 2, no skip needed → return buffer with [4,5,6,7]
+   *
+   * This was an infinite loop or MPE before fixes in the PR that added this test.
+   */
+  @Test
+  public void testSeekReadsCorrectBytesWhenFirstResponseIsFullyBeforePosition() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setStreamReadResponseDataSize(4); // 4-byte chunks match the test data
+    BlockID blockID = new BlockID(1L, 12L);
+    long length = 8;
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+
+    // Server aligns to checksum boundary 0 and sends two 4-byte responses.
+    // The first chunk (bytes 0–3) is entirely before seek position 4 and will be
+    // fully skipped. The second chunk (bytes 4–7) starts at our position.
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = readerRef.get();
+      reader.onNext(buildResponseProto(new byte[]{0, 1, 2, 3}, 0)); // fully skipped
+      reader.onNext(buildResponseProto(new byte[]{4, 5, 6, 7}, 4)); // has our data
+      reader.onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, length, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+
+      sbis.seek(4);
+
+      byte[] out = new byte[4];
+      int bytesRead = sbis.read(out, 0, 4);
+      assertEquals(4, bytesRead);
+      assertArrayEquals(new byte[]{4, 5, 6, 7}, out,
+          "should return bytes starting from seek position, skipping the checksum-aligned preamble");
+    }
+  }
+
+  /**
+   * Defensive test for readFromQueue() which NPE'ed when poll() returns null.
+   *
+   * This tests a server-error / edge-case scenario: the server sends only a
+   * single response whose data ends before the client's seek position, then
+   * immediately completes the stream. The while(true) loop in read() skips
+   * all bytes in the response (empty buffer), then calls poll() again. poll()
+   * finds the queue empty and isDone()==true and returns null.
+   *
+   * A well-behaved server would never complete the stream without covering the
+   * client's position, so this scenario represents a protocol violation rather
+   * than normal operation, but it serves to reproduce the NPE exception before
+   * fixing the code.
+   */
+  @Test
+  public void testReadFromQueueNpeWhenStreamCompletesWithoutCoveringSeekPosition() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    // Short timeout so the test completes quickly rather than waiting 5 s.
+    clientConfig.setStreamReadTimeout(Duration.ofMillis(200));
+
+    BlockID blockID = new BlockID(1L, 13L);
+    long length = 8;
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any());
+
+    // Server only sends bytes 0–3 (before seek position 4) then completes —
+    // simulating a protocol violation or a truncated/corrupt response.
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = readerRef.get();
+      reader.onNext(buildResponseProto(new byte[]{0, 1, 2, 3}, 0));
+      reader.onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, length, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+
+      sbis.seek(4);
+
+      ByteBuffer buf = ByteBuffer.allocate(4);
+      // Before the fixes: threw NullPointerException (Bug 1) or looped forever (Bug 3).
+      // After the fixes: returns gracefully with 0 / EOF rather than crashing.
+      assertDoesNotThrow(() -> sbis.read(buf),
+          "should not NPE when server completes stream without covering the seek position");
     }
   }
 
