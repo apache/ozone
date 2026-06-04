@@ -51,15 +51,20 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -72,6 +77,7 @@ public abstract class TestMisReplicationHandler {
   private ContainerInfo container;
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
+  private NodeManager nodeManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private final AtomicBoolean throwThrottledException =
       new AtomicBoolean(false);
@@ -82,7 +88,17 @@ public abstract class TestMisReplicationHandler {
       NotLeaderException {
     conf = SCMTestUtils.getConf(testDir);
 
+    nodeManager = mock(NodeManager.class);
+    when(nodeManager.getDatanodeInfo(any(DatanodeDetails.class))).thenAnswer(invocation -> {
+      DatanodeDetails dd = invocation.getArgument(0);
+      return new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultLayoutVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+    });
+    when(nodeManager.checkSpaceAndRecordAllocation(any(DatanodeInfo.class), any(ContainerID.class)))
+        .thenReturn(true);
+
     replicationManager = mock(ReplicationManager.class);
+    when(replicationManager.getNodeManager()).thenReturn(nodeManager);
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
