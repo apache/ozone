@@ -5643,9 +5643,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public void compactOMDB(String columnFamily) throws IOException {
+    compactOMDB(columnFamily, 0);
+  }
+
+  public void compactOMDB(String columnFamily, int bottommostLevelCompaction) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
     CompletableFuture<Void> compactFuture =
-        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily, bottommostLevelCompaction);
     compactFuture.whenComplete((result, throwable) -> {
       if (throwable == null) {
         LOG.info("Compaction request for column family \"{}\" completed successfully.",

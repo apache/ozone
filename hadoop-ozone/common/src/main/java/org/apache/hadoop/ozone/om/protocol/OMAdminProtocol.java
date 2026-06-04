@@ -47,6 +47,18 @@ public interface OMAdminProtocol extends Closeable {
   void compactOMDB(String columnFamily) throws IOException;
 
   /**
+   * Requests compaction of a column family of om.db with the specified
+   * BottommostLevelCompaction option.
+   *
+   * @param columnFamily              column family name
+   * @param bottommostLevelCompaction rocksId of BottommostLevelCompaction
+   *                                  (0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce)
+   */
+  default void compactOMDB(String columnFamily, int bottommostLevelCompaction) throws IOException {
+    compactOMDB(columnFamily);
+  }
+
+  /**
    * Triggers the Snapshot Defragmentation Service to run immediately.
    * @param noWait if true, return immediately without waiting for completion
    * @return true if defragmentation completed successfully (when noWait is false),

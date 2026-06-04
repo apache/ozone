@@ -40,11 +40,19 @@ public final class CompactDBUtil {
 
   public static void compactTable(OMMetadataManager omMetadataManager,
                                   String tableName) throws IOException {
+    compactTable(omMetadataManager, tableName, 0);
+  }
+
+  public static void compactTable(OMMetadataManager omMetadataManager,
+      String tableName,
+      int bottommostLevelCompaction) throws IOException {
     long startTime = Time.monotonicNow();
-    LOG.info("Compacting column family: {}", tableName);
+    ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
+        getBottommostLevelCompaction(bottommostLevelCompaction);
+    LOG.info("Compacting column family: {} with BottommostLevelCompaction={}",
+        tableName, blcOption.name());
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
-      options.setBottommostLevelCompaction(
-          ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+      options.setBottommostLevelCompaction(blcOption);
       options.setExclusiveManualCompaction(true);
       RocksDatabase rocksDatabase =
           ((RDBStore) omMetadataManager.getStore()).getDb();
@@ -63,13 +71,33 @@ public final class CompactDBUtil {
   }
 
   public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName) {
+    return compactTableAsync(metadataManager, tableName, 0);
+  }
+
+  public static CompletableFuture<Void> compactTableAsync(
+      OMMetadataManager metadataManager, String tableName, int bottommostLevelCompaction) {
     return CompletableFuture.runAsync(() -> {
       try {
-        compactTable(metadataManager, tableName);
+        compactTable(metadataManager, tableName, bottommostLevelCompaction);
       } catch (Exception e) {
         LOG.warn("Failed to compact column family: {}", tableName, e);
         throw new CompletionException("Compaction failed for column family: " + tableName, e);
       }
     });
+  }
+
+  /**
+   * Converts the given rocksId to a
+   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum.
+   * Defaults to kSkip if the value is invalid.
+   */
+  static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(int rocksId) {
+    ManagedCompactRangeOptions.BottommostLevelCompaction blc =
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(rocksId);
+    if (blc == null) {
+      LOG.warn("Invalid BottommostLevelCompaction value: {}. Defaulting to kSkip.", rocksId);
+      return ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
+    }
+    return blc;
   }
 }

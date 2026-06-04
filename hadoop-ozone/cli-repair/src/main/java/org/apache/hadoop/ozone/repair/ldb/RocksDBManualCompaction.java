@@ -62,6 +62,13 @@ public class RocksDBManualCompaction extends RepairTool {
       description = "Column family name")
   private String columnFamilyName;
 
+  @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
+      description = "BottommostLevelCompaction option for RocksDB compaction." +
+          " Valid values: 0 (kSkip), 1 (kIfHaveCompactionFilter), 2 (kForce)." +
+          " Default: 0 (kSkip).",
+      defaultValue = "0")
+  private int bottommostLevelCompaction;
+
   private String getConsoleReadLineWithFormat() {
     err().printf(WARNING_TO_STOP_SERVICE);
     return getScanner().nextLine().trim();
@@ -96,11 +103,14 @@ public class RocksDBManualCompaction extends RepairTool {
             " is not in a column family in DB for the given path.");
       }
 
-      info("Running compaction on " + columnFamilyName);
+      ManagedCompactRangeOptions.BottommostLevelCompaction blcOption =
+          getBottommostLevelCompaction(bottommostLevelCompaction);
+      info("Running compaction on " + columnFamilyName +
+          " with BottommostLevelCompaction=" + blcOption.name());
       long startTime = Time.monotonicNow();
       if (!isDryRun()) {
         ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions();
-        compactOptions.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+        compactOptions.setBottommostLevelCompaction(blcOption);
         db.get().compactRange(cfh, null, null, compactOptions);
       }
       long duration = Time.monotonicNow() - startTime;
@@ -116,5 +126,16 @@ public class RocksDBManualCompaction extends RepairTool {
       IOUtils.closeQuietly(dbOptions);
       IOUtils.closeQuietly(cfHandleList);
     }
+  }
+
+  /**
+   * Converts the given rocksId to a
+   * {@link ManagedCompactRangeOptions.BottommostLevelCompaction} enum.
+   * Defaults to kSkip if the value is invalid.
+   */
+  static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(int rocksId) {
+    ManagedCompactRangeOptions.BottommostLevelCompaction blc =
+        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(rocksId);
+    return blc != null ? blc : ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip;
   }
 }
