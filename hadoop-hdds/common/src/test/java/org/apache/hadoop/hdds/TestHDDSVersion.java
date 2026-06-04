@@ -37,7 +37,7 @@ public class TestHDDSVersion extends AbstractComponentVersionTest {
   }
 
   @Override
-  protected ComponentVersion getFutureVersion() {
+  protected ComponentVersion getUnknownVersion() {
     return HDDSVersion.UNKNOWN_VERSION;
   }
 

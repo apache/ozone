@@ -35,7 +35,7 @@ public class TestClientVersion extends AbstractComponentVersionTest {
   }
 
   @Override
-  protected ComponentVersion getFutureVersion() {
+  protected ComponentVersion getUnknownVersion() {
     return ClientVersion.FUTURE_VERSION;
   }
 
