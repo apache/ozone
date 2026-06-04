@@ -77,7 +77,6 @@ public abstract class TestMisReplicationHandler {
   private ContainerInfo container;
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
-  private NodeManager nodeManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private final AtomicBoolean throwThrottledException =
       new AtomicBoolean(false);
@@ -88,7 +87,7 @@ public abstract class TestMisReplicationHandler {
       NotLeaderException {
     conf = SCMTestUtils.getConf(testDir);
 
-    nodeManager = mock(NodeManager.class);
+    NodeManager nodeManager = mock(NodeManager.class);
     when(nodeManager.getDatanodeInfo(any(DatanodeDetails.class))).thenAnswer(invocation -> {
       DatanodeDetails dd = invocation.getArgument(0);
       return new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
