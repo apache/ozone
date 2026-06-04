@@ -158,6 +158,39 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   }
 
   @Override
+  public ChunkBuffer put(byte[] b, int offset, int length) {
+    Objects.requireNonNull(b, "b == null");
+    Preconditions.checkArgument(offset >= 0 && length >= 0,
+        "offset = %s, length = %s", offset, length);
+    Preconditions.checkArgument(length <= b.length - offset,
+        "length = %s out of range for array.length = %s, offset = %s",
+        length, b.length, offset);
+    if (length > remaining()) {
+      final BufferOverflowException boe = new BufferOverflowException();
+      boe.initCause(new IllegalArgumentException(
+          "Failed to put since length = " + length
+              + " > this.remaining() = " + remaining()));
+      throw boe;
+    }
+
+    final int end = offset + length;
+    int off = offset;
+    while (off < end) {
+      final ByteBuffer cur = current();
+      final int bytes = Math.min(cur.remaining(), end - off);
+      cur.put(b, off, bytes);
+      off += bytes;
+      advanceCurrent();
+    }
+    return this;
+  }
+
+  @Override
+  public ChunkBuffer put(byte[] b) {
+    return put(b, 0, b.length);
+  }
+
+  @Override
   public ChunkBuffer duplicate(int newPosition, int newLimit) {
     Preconditions.checkArgument(newPosition >= 0);
     Preconditions.checkArgument(newPosition <= newLimit);
