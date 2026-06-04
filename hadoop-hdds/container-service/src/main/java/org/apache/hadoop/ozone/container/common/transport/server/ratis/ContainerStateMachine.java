@@ -796,13 +796,12 @@ public class ContainerStateMachine extends BaseStateMachine {
         }
       });
     } catch (Throwable e) {
-      metrics.incNumWriteStateMachineFails();
       closeServer(e);
       return completeExceptionally(e);
     }
   }
 
-  public CompletableFuture<Message> writeImpl(LogEntryProto entry, TransactionContext trx) {
+  private CompletableFuture<Message> writeImpl(LogEntryProto entry, TransactionContext trx) {
     metrics.incNumWriteStateMachineOps();
     long writeStateMachineStartTime = Time.monotonicNowNanos();
     final Context context = (Context) trx.getStateMachineContext();
@@ -825,7 +824,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private void closeServer(Throwable e) {
     metrics.incNumWriteStateMachineFails();
     try {
-      LOG.error("{}: Failed, close server", getId(), e);
+      LOG.error("{}: Failed to writeStateMachineData, close server", getId(), e);
       getServer().get().getDivision(getGroupId()).close();
     } catch (Throwable t) {
       e.addSuppressed(t);
