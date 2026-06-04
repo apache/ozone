@@ -1284,9 +1284,8 @@ public class BasicRootedOzoneClientAdapterImpl
               ozoneBucket.getName(), pathStr);
     }
     Path path = new Path(pathStr);
-    ReplicationConfig rc = ozoneBucket.getReplicationConfig();
-    boolean isEc = rc != null && rc.getReplicationType() == HddsProtos.ReplicationType.EC;
-    String ecPolicy = isEc ? rc.getReplication() : "";
+    boolean isEc = false;
+    String ecPolicy = "";
     return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
