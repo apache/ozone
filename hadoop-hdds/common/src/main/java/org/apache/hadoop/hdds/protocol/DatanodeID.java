@@ -65,7 +65,8 @@ public final class DatanodeID implements Comparable<DatanodeID> {
     return uuidByteString.getString();
   }
 
-  public String getUuidStringForTesting() {
+  // Mainly used for JSON conversion
+  public String getUuid() {
     return toString();
   }
 
