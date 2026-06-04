@@ -56,7 +56,7 @@ public final class OMServiceManager {
    */
   public synchronized void start() {
     for (OMService service : services) {
-      LOG.debug("Stopping service:{}.", service.getServiceName());
+      LOG.debug("Starting service:{}.", service.getServiceName());
       try {
         service.start();
       } catch (OMServiceException e) {
