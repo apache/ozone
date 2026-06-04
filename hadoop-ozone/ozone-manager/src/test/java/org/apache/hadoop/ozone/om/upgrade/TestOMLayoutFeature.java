@@ -98,7 +98,7 @@ public class TestOMLayoutFeature {
   }
 
   @Test
-  public void testAllLayoutFeaturesAreSupportedByFutureVersions() {
+  public void testAllLayoutFeaturesAreSupportedByUnknownFutureVersions() {
     for (OMLayoutFeature feature : OMLayoutFeature.values()) {
       assertSupportedBy(feature, OzoneManagerVersion.ZDU);
       assertSupportedBy(feature, OzoneManagerVersion.UNKNOWN_VERSION);
