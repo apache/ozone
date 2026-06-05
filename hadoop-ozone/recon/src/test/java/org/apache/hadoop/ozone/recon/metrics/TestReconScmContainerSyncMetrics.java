@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 import static org.apache.ozone.test.MetricsAsserts.eqName;
+import static org.apache.ozone.test.MetricsAsserts.getIntGauge;
 import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,37 +57,41 @@ class TestReconScmContainerSyncMetrics {
 
   @Test
   void testStateMetricsAreEmittedForReconciledStatesOnly() {
-    metrics.setLastContainerSyncDurationMs(OPEN, 10L);
-    metrics.setLastContainerSyncDurationMs(QUASI_CLOSED, 20L);
-    metrics.setLastContainerSyncDurationMs(CLOSED, 30L);
-    metrics.setLastContainerSyncDurationMs(DELETED, 40L);
-    metrics.setLastContainerCountDrift(OPEN, 2L);
-    metrics.setLastContainerCountDrift(QUASI_CLOSED, 0L);
-    metrics.setLastContainerCountDrift(CLOSED, -3L);
-    metrics.setLastContainerCountDrift(DELETED, 4L);
-    metrics.setLastContainerCountDrift(CLOSING, 100L);
-    metrics.setLastContainerSyncDurationMs(DELETING, 200L);
+    metrics.setContainerSyncDurationMs(OPEN, 10L);
+    metrics.setContainerSyncDurationMs(QUASI_CLOSED, 20L);
+    metrics.setContainerSyncDurationMs(CLOSED, 30L);
+    metrics.setContainerSyncDurationMs(DELETED, 40L);
+    metrics.setContainerCountDrift(OPEN, 2L);
+    metrics.setContainerCountDrift(QUASI_CLOSED, 0L);
+    metrics.setContainerCountDrift(CLOSED, -3L);
+    metrics.setContainerCountDrift(DELETED, 4L);
+    metrics.setContainerCountDrift(CLOSING, 100L);
+    metrics.setContainerSyncDurationMs(DELETING, 200L);
+    metrics.setScmContainerSyncStatus(
+        ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_SUCCESS);
 
     MetricsRecordBuilder builder = getMetrics(metrics);
 
-    assertEquals(10L, getLongGauge("lastOpenContainerSyncDurationMs", builder));
+    assertEquals(ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_SUCCESS,
+        getIntGauge("scmContainerSyncStatus", builder));
+    assertEquals(10L, getLongGauge("openContainerSyncDurationMs", builder));
     assertEquals(20L,
-        getLongGauge("lastQuasiClosedContainerSyncDurationMs", builder));
-    assertEquals(30L, getLongGauge("lastClosedContainerSyncDurationMs", builder));
-    assertEquals(40L, getLongGauge("lastDeletedContainerSyncDurationMs", builder));
-    assertEquals(2L, getLongGauge("lastOpenContainerCountDrift", builder));
+        getLongGauge("quasiClosedContainerSyncDurationMs", builder));
+    assertEquals(30L, getLongGauge("closedContainerSyncDurationMs", builder));
+    assertEquals(40L, getLongGauge("deletedContainerSyncDurationMs", builder));
+    assertEquals(2L, getLongGauge("openContainerCountDrift", builder));
     assertEquals(0L,
-        getLongGauge("lastQuasiClosedContainerCountDrift", builder));
-    assertEquals(-3L, getLongGauge("lastClosedContainerCountDrift", builder));
-    assertEquals(4L, getLongGauge("lastDeletedContainerCountDrift", builder));
+        getLongGauge("quasiClosedContainerCountDrift", builder));
+    assertEquals(-3L, getLongGauge("closedContainerCountDrift", builder));
+    assertEquals(4L, getLongGauge("deletedContainerCountDrift", builder));
 
     verify(builder, never()).addGauge(
-        eqName(info("lastClosingContainerSyncDurationMs", "")), eq(100L));
+        eqName(info("closingContainerSyncDurationMs", "")), eq(100L));
     verify(builder, never()).addGauge(
-        eqName(info("lastDeletingContainerSyncDurationMs", "")), eq(200L));
+        eqName(info("deletingContainerSyncDurationMs", "")), eq(200L));
     verify(builder, never()).addGauge(
-        eqName(info("lastClosingContainerCountDrift", "")), eq(100L));
+        eqName(info("closingContainerCountDrift", "")), eq(100L));
     verify(builder, never()).addGauge(
-        eqName(info("lastDeletingContainerCountDrift", "")), eq(200L));
+        eqName(info("deletingContainerCountDrift", "")), eq(200L));
   }
 }

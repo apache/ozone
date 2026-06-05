@@ -87,14 +87,14 @@ class TestReconStorageContainerSyncHelper {
       boolean result = helperWithMetrics.syncWithSCMContainerInfo();
 
       assertTrue(result);
-      assertEquals(2L, metrics.getLastContainerCountDrift(OPEN));
-      assertEquals(0L, metrics.getLastContainerCountDrift(QUASI_CLOSED));
-      assertEquals(-2L, metrics.getLastContainerCountDrift(CLOSED));
-      assertEquals(2L, metrics.getLastContainerCountDrift(DELETED));
-      assertTrue(metrics.getLastContainerSyncDurationMs(OPEN) >= 0);
-      assertTrue(metrics.getLastContainerSyncDurationMs(QUASI_CLOSED) >= 0);
-      assertTrue(metrics.getLastContainerSyncDurationMs(CLOSED) >= 0);
-      assertTrue(metrics.getLastContainerSyncDurationMs(DELETED) >= 0);
+      assertEquals(2L, metrics.getContainerCountDrift(OPEN));
+      assertEquals(0L, metrics.getContainerCountDrift(QUASI_CLOSED));
+      assertEquals(-2L, metrics.getContainerCountDrift(CLOSED));
+      assertEquals(2L, metrics.getContainerCountDrift(DELETED));
+      assertTrue(metrics.getContainerSyncDurationMs(OPEN) >= 0);
+      assertTrue(metrics.getContainerSyncDurationMs(QUASI_CLOSED) >= 0);
+      assertTrue(metrics.getContainerSyncDurationMs(CLOSED) >= 0);
+      assertTrue(metrics.getContainerSyncDurationMs(DELETED) >= 0);
     } finally {
       metrics.unRegister();
     }

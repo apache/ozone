@@ -912,16 +912,16 @@ public class ReconStorageContainerManagerFacade
 
   private boolean runTargetedSyncWithMetrics() {
     long startTime = Time.monotonicNow();
-    containerSyncMetrics.setTargetedSyncStatus(
+    containerSyncMetrics.setScmContainerSyncStatus(
         ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_IN_PROGRESS);
     try {
       boolean success = containerSyncHelper.syncWithSCMContainerInfo();
-      containerSyncMetrics.setTargetedSyncStatus(success
+      containerSyncMetrics.setScmContainerSyncStatus(success
           ? ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_SUCCESS
           : ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_FAILURE);
       return success;
     } catch (RuntimeException | Error e) {
-      containerSyncMetrics.setTargetedSyncStatus(
+      containerSyncMetrics.setScmContainerSyncStatus(
           ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_FAILURE);
       throw e;
     } finally {

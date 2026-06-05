@@ -432,14 +432,14 @@ class ReconStorageContainerSyncHelper {
       return;
     }
     long reconCount = containerManager.getContainerStateCount(state);
-    containerSyncMetrics.setLastContainerCountDrift(state,
+    containerSyncMetrics.setContainerCountDrift(state,
         scmCount - reconCount);
   }
 
   private void updateContainerSyncDuration(HddsProtos.LifeCycleState state,
                                            long durationMs) {
     if (containerSyncMetrics != null) {
-      containerSyncMetrics.setLastContainerSyncDurationMs(state, durationMs);
+      containerSyncMetrics.setContainerSyncDurationMs(state, durationMs);
     }
   }
 

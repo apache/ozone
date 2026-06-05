@@ -52,9 +52,9 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
       HddsProtos.LifeCycleState.DELETED
   };
 
-  private static final MetricsInfo TARGETED_SYNC_STATUS = Interns.info(
-      "targetedSyncStatus",
-      "Targeted sync status: 0=idle, 1=in progress, 2=success, 3=failure");
+  private static final MetricsInfo SCM_CONTAINER_SYNC_STATUS = Interns.info(
+      "scmContainerSyncStatus",
+      "SCM container sync status: 0=idle, 1=in progress, 2=success, 3=failure");
 
   private static final MetricsInfo LAST_TARGETED_SYNC_DURATION_MS = Interns.info(
       "lastTargetedSyncDurationMs",
@@ -77,20 +77,20 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
    */
   public static final int TARGETED_SYNC_STATUS_FAILURE = 3;
 
-  private final AtomicInteger targetedSyncStatus = new AtomicInteger();
+  private final AtomicInteger scmContainerSyncStatus = new AtomicInteger();
   private final AtomicLong lastTargetedSyncDurationMs = new AtomicLong();
   private final Map<HddsProtos.LifeCycleState, AtomicLong>
-      lastContainerSyncDurationMs;
+      containerSyncDurationMs;
   private final Map<HddsProtos.LifeCycleState, AtomicLong>
-      lastContainerCountDrift;
+      containerCountDrift;
   private final Map<HddsProtos.LifeCycleState, MetricsInfo>
       containerSyncDurationMetricInfo;
   private final Map<HddsProtos.LifeCycleState, MetricsInfo>
       containerCountDriftMetricInfo;
 
   private ReconScmContainerSyncMetrics() {
-    lastContainerSyncDurationMs = initStateGaugeValues();
-    lastContainerCountDrift = initStateGaugeValues();
+    containerSyncDurationMs = initStateGaugeValues();
+    containerCountDrift = initStateGaugeValues();
     containerSyncDurationMetricInfo = initSyncDurationMetricInfo();
     containerCountDriftMetricInfo = initCountDriftMetricInfo();
   }
@@ -107,53 +107,53 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
     ms.unregisterSource(SOURCE_NAME);
   }
 
-  public void setTargetedSyncStatus(int status) {
-    targetedSyncStatus.set(status);
+  public void setScmContainerSyncStatus(int status) {
+    scmContainerSyncStatus.set(status);
   }
 
   public void setLastTargetedSyncDurationMs(long durationMs) {
     lastTargetedSyncDurationMs.set(durationMs);
   }
 
-  public void setLastContainerSyncDurationMs(
+  public void setContainerSyncDurationMs(
       HddsProtos.LifeCycleState state, long durationMs) {
-    setStateGauge(lastContainerSyncDurationMs, state, durationMs);
+    setStateGauge(containerSyncDurationMs, state, durationMs);
   }
 
-  public void setLastContainerCountDrift(
+  public void setContainerCountDrift(
       HddsProtos.LifeCycleState state, long drift) {
-    setStateGauge(lastContainerCountDrift, state, drift);
+    setStateGauge(containerCountDrift, state, drift);
   }
 
-  public int getTargetedSyncStatus() {
-    return targetedSyncStatus.get();
+  public int getScmContainerSyncStatus() {
+    return scmContainerSyncStatus.get();
   }
 
   public long getLastTargetedSyncDurationMs() {
     return lastTargetedSyncDurationMs.get();
   }
 
-  public long getLastContainerSyncDurationMs(
+  public long getContainerSyncDurationMs(
       HddsProtos.LifeCycleState state) {
-    return getStateGauge(lastContainerSyncDurationMs, state);
+    return getStateGauge(containerSyncDurationMs, state);
   }
 
-  public long getLastContainerCountDrift(
+  public long getContainerCountDrift(
       HddsProtos.LifeCycleState state) {
-    return getStateGauge(lastContainerCountDrift, state);
+    return getStateGauge(containerCountDrift, state);
   }
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(SOURCE_NAME);
-    builder.addGauge(TARGETED_SYNC_STATUS, getTargetedSyncStatus());
+    builder.addGauge(SCM_CONTAINER_SYNC_STATUS, getScmContainerSyncStatus());
     builder.addGauge(LAST_TARGETED_SYNC_DURATION_MS,
         getLastTargetedSyncDurationMs());
     for (HddsProtos.LifeCycleState state : SYNC_STATES) {
       builder.addGauge(containerSyncDurationMetricInfo.get(state),
-          getLastContainerSyncDurationMs(state));
+          getContainerSyncDurationMs(state));
       builder.addGauge(containerCountDriftMetricInfo.get(state),
-          getLastContainerCountDrift(state));
+          getContainerCountDrift(state));
     }
   }
 
@@ -174,8 +174,9 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
     for (HddsProtos.LifeCycleState state : SYNC_STATES) {
       String stateName = metricStateName(state);
       metrics.put(state, Interns.info(
-          "last" + stateName + "ContainerSyncDurationMs",
-          "Time taken by the last " + stateName
+          CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, stateName)
+              + "ContainerSyncDurationMs",
+          "Time taken by the " + stateName
               + " container sync pass in milliseconds"));
     }
     return Collections.unmodifiableMap(metrics);
@@ -188,8 +189,9 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
     for (HddsProtos.LifeCycleState state : SYNC_STATES) {
       String stateName = metricStateName(state);
       metrics.put(state, Interns.info(
-          "last" + stateName + "ContainerCountDrift",
-          "Last pre-sync observed " + stateName
+          CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, stateName)
+              + "ContainerCountDrift",
+          "Pre-sync observed " + stateName
               + " container count drift, computed as SCM count minus Recon count"));
     }
     return Collections.unmodifiableMap(metrics);
