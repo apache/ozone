@@ -178,11 +178,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
     initialize();
 
-    if (hasRemaining(readBuffer)) {
-      return true;
+    if (!hasRemaining(readBuffer)) {
+      readBuffer = streamingReader.read(length, preRead);
     }
-    readBuffer = streamingReader.read(length, preRead);
-    return hasRemaining(readBuffer);
+    Preconditions.assertTrue(hasRemaining(readBuffer));
+    return true;
   }
 
   private synchronized void advancePosition(long delta, boolean preRead) {
@@ -215,12 +215,37 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       return;
     }
     LOG.debug("{}: seek {} -> {}", getName(streamingReader), position, pos);
-    if (streamingReader != null && readBuffer != null) {
-      streamingReader.offerToQueue(readBuffer.getProto());
-    }
-    readBuffer = null;
+    readBuffer = reuseReadBuffer(readBuffer, pos);
     position = pos;
     requestedLength = pos;
+  }
+
+  static ReadBuffer reuseReadBuffer(ReadBuffer previous, long blockOffset) {
+    if (previous != null) {
+      final ByteBuffer buffer = getByteBuffer(previous.getProto(), blockOffset);
+      if (buffer != null && buffer.hasRemaining()) {
+        previous.getByteBuffer().position(buffer.position());
+        Preconditions.assertSame(buffer.remaining(), previous.getByteBuffer().remaining(), "remaining");
+        return previous;
+      }
+    }
+    return null;
+  }
+
+  static ByteBuffer getByteBuffer(ReadBlockResponseProto proto, long blockOffset) {
+    final ByteBuffer buffer = proto.getData().asReadOnlyByteBuffer();
+    // Adjust buffer position since the server always returns data starting at checksum boundary.
+    final long protoOffset = proto.getOffset();
+    if (blockOffset < protoOffset) {
+      // This can happen after seek, just drop it for now
+      // TODO: consider to cache the proto, which will be useful when seeking back.
+      return null;
+    }
+    final long offset = blockOffset - protoOffset;
+    if (offset > 0) {
+      buffer.position(Math.toIntExact(Math.min(offset, buffer.limit())));
+    }
+    return buffer;
   }
 
   @Override
@@ -408,6 +433,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     ByteBuffer getByteBuffer() {
       return buffer;
     }
+
+    @Override
+    public String toString() {
+      return "ReadBuffer: offset=" + proto.getOffset()
+          + ", dataSize=" + proto.getData().size()
+          + ", buffer=" + buffer;
+    }
   }
 
   /**
@@ -475,33 +507,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       readBlock(length, preRead);
 
       while (true) {
-        final ReadBuffer read = readFromQueue();
+        final ReadBlockResponseProto proto = poll();
+        final ByteBuffer buffer = getByteBuffer(proto, getPos());
+        final ReadBuffer read = buffer != null ? new ReadBuffer(proto, buffer) : null;
         if (hasRemaining(read)) {
+          LOG.debug("{}: read(length={}, preRead={}) returns {}", name, length, preRead, read);
           return read;
         }
       }
-    }
-
-    ReadBuffer readFromQueue() throws IOException {
-      final ReadBlockResponseProto readBlock = poll();
-      // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
-      // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
-      // If the reader position is behind
-      final ByteString data = readBlock.getData();
-      final ByteBuffer dataBuffer = data.asReadOnlyByteBuffer();
-      final long blockOffset = readBlock.getOffset();
-      final long pos = getPos();
-      if (pos < blockOffset) {
-        // This can happen after seek, just drop the buffer
-        return null;
-      }
-      final long offset = pos - blockOffset;
-      if (offset > 0) {
-        dataBuffer.position(Math.toIntExact(Math.min(offset, dataBuffer.limit())));
-      }
-      LOG.debug("{}: return response positon {}, length {} (block offset {}, length {})",
-          name, pos, dataBuffer.remaining(), blockOffset, data.size());
-      return new ReadBuffer(readBlock, dataBuffer);
     }
 
     private void releaseResources() {
