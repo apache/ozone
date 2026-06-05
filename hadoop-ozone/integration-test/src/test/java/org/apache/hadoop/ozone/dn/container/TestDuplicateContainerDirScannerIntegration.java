@@ -37,6 +37,7 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -93,6 +94,7 @@ class TestDuplicateContainerDirScannerIntegration {
             .build())
         .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
 
     ozoneClient = OzoneClientFactory.getRpcClient(cluster.getConf());
     store = ozoneClient.getObjectStore();
@@ -142,6 +144,7 @@ class TestDuplicateContainerDirScannerIntegration {
 
     cluster.restartHddsDatanode(0, true);
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
 
     assertFullContainerLayout(pathA);
     assertPartialContainerLayout(pathB);
@@ -184,10 +187,11 @@ class TestDuplicateContainerDirScannerIntegration {
   private void assertScannerSeesDuplicate(long containerId, String volumeARoot, String volumeBRoot, 
       String pathA, String pathB) throws IOException {
     OzoneConfiguration scanConf = cluster.getHddsDatanodes().get(0).getConf();
-    Map<Long, List<ContainerDiskOccurrence>> scanResult = new ContainerDirectoryScanner().scan(scanConf);
+    Map<Long, List<ContainerDiskOccurrence>> enrichedDuplicates =
+        ContainerDirectoryScanner.enrichDuplicates(ContainerDirectoryScanner.scan(scanConf).getDuplicates());
 
-    assertThat(scanResult).containsKey(containerId);
-    List<ContainerDiskOccurrence> occurrences = scanResult.get(containerId);
+    assertThat(enrichedDuplicates).containsKey(containerId);
+    List<ContainerDiskOccurrence> occurrences = enrichedDuplicates.get(containerId);
     assertThat(occurrences).hasSize(2);
 
     ContainerDiskOccurrence onA = findOnVolume(occurrences, volumeARoot);
@@ -203,7 +207,7 @@ class TestDuplicateContainerDirScannerIntegration {
 
   private static ContainerDiskOccurrence findOnVolume(List<ContainerDiskOccurrence> occurrences, String volumeRoot) {
     return occurrences.stream()
-        .filter(o -> o.getVolumeRoot().equals(volumeRoot))
+        .filter(o -> Paths.get(o.getContainerPath()).startsWith(Paths.get(volumeRoot)))
         .findFirst()
         .orElseThrow(() -> new AssertionError(
             "No occurrence on volume root " + volumeRoot + ", got " + occurrences));

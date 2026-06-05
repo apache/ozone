@@ -21,7 +21,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -34,11 +33,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -51,30 +48,29 @@ import org.slf4j.LoggerFactory;
 /**
  * Read-only walker for container directories under {@code hdds.datanode.dir}.
  *
- * <p>Unlike {@link org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader},
- * this scanner records every container directory it finds, including those with
- * missing or invalid metadata and duplicate copies across volumes.
+ * <p>This scanner surfaces duplicate copies across volumes. Singleton container IDs
+ * are stored as a single path in {@link ContainerScanResult#getSingles()}; duplicate
+ * IDs are stored as path lists in {@link ContainerScanResult#getDuplicates()}.
+ * Size and metadata status are computed later via {@link #enrichDuplicates(Map)}.
  */
-public class ContainerDirectoryScanner {
+public final class ContainerDirectoryScanner {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerDirectoryScanner.class);
 
-  /**
-   * Scan all configured DataNode storage volumes and return every container
-   * directory found on disk.
-   *
-   * @return map of container ID to all on-disk occurrences for that ID
-   */
-  public Map<Long, List<ContainerDiskOccurrence>> scan(ConfigurationSource conf) throws IOException {
-    Collection<String> storageDirs = HddsServerUtil.getDatanodeStorageDirs(conf);
-    
-    if (storageDirs.isEmpty()) {
-      return Collections.emptyMap();
+  private ContainerDirectoryScanner() {
+    //Never constructed
+  }
+
+  public static ContainerScanResult scan(ConfigurationSource conf) throws IOException {
+    Map<Long, String> singles = new ConcurrentHashMap<>();
+    Map<Long, List<String>> duplicates = new ConcurrentHashMap<>();
+    List<String> volumeScanErrors = Collections.synchronizedList(new ArrayList<>());
+    List<String> volumeRootsToScan = resolveExistingVolumeRoots(conf);
+    if (volumeRootsToScan.isEmpty()) {
+      return new ContainerScanResult(singles, duplicates, volumeScanErrors);
     }
-    
-    validateStorageDirectories(storageDirs);
-    Map<Long, List<ContainerDiskOccurrence>> result = new ConcurrentHashMap<>();
-    int volumeCount = storageDirs.size();
+
+    int volumeCount = volumeRootsToScan.size();
     ExecutorService executor = Executors.newFixedThreadPool(volumeCount,
         new ThreadFactoryBuilder()
             .setDaemon(true)
@@ -83,14 +79,13 @@ public class ContainerDirectoryScanner {
     
     try {
       List<Future<?>> futures = new ArrayList<>(volumeCount);
-      for (String storageDir : storageDirs) {
-        String volumeRoot = StorageLocation.parse(storageDir).getUri().getPath();
+      for (String volumeRoot : volumeRootsToScan) {
         futures.add(executor.submit(() -> {
           try {
-            scanVolume(volumeRoot, result);
+            scanVolume(volumeRoot, singles, duplicates);
           } catch (IOException e) {
-            throw new RuntimeException(
-                "Failed to scan volume " + volumeRoot, e);
+            LOG.warn("Failed to scan volume {}", volumeRoot, e);
+            volumeScanErrors.add(volumeRoot + ": " + e.getMessage());
           }
         }));
       }
@@ -98,11 +93,7 @@ public class ContainerDirectoryScanner {
         try {
           future.get();
         } catch (ExecutionException e) {
-          Throwable cause = e.getCause();
-          if (cause instanceof RuntimeException) {
-            throw (RuntimeException) cause;
-          }
-          throw new IOException(cause);
+          throw new IOException("Unexpected error scanning volume", e.getCause());
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           throw new IOException("Volume scan interrupted", e);
@@ -111,14 +102,28 @@ public class ContainerDirectoryScanner {
     } finally {
       executor.shutdownNow();
     }
+    return new ContainerScanResult(singles, duplicates, volumeScanErrors);
+  }
 
-    return Collections.unmodifiableMap(toImmutableLists(result));
+  private static List<String> resolveExistingVolumeRoots(ConfigurationSource conf) throws IOException {
+    List<String> volumeRootsToScan = new ArrayList<>();
+    for (String storageDir : HddsServerUtil.getDatanodeStorageDirs(conf)) {
+      String volumeRoot = StorageLocation.parse(storageDir).getUri().getPath();
+      if (!new File(volumeRoot).exists()) {
+        LOG.warn("Configured storage path {} does not exist, skipping", volumeRoot);
+        continue;
+      }
+      volumeRootsToScan.add(volumeRoot);
+    }
+    return volumeRootsToScan;
   }
 
   /**
-   * Scan a single DataNode storage volume root and merge results into {@code result}.
+   * Scan a single DataNode storage volume root and merge results into {@code singles}
+   * and {@code duplicates}.
    */
-  private void scanVolume(String volumeRoot, Map<Long, List<ContainerDiskOccurrence>> result) throws IOException {
+  private static void scanVolume(String volumeRoot, Map<Long, String> singles,
+      Map<Long, List<String>> duplicates) throws IOException {
     File hddsRoot = new File(volumeRoot, HddsVolume.HDDS_VOLUME_DIR);
     if (!hddsRoot.isDirectory()) {
       LOG.warn("HDDS root {} does not exist or is not a directory, skipping volume {}", hddsRoot, volumeRoot);
@@ -156,16 +161,12 @@ public class ContainerDirectoryScanner {
         continue;
       }
       for (File containerDir : containerDirs) {
-        recordContainerDir(containerDir, volumeRoot, result);
+        recordContainerDir(containerDir, singles, duplicates);
       }
     }
   }
 
-  /**
-   * Resolve {@code .../current} using the same rules as
-   * {@link org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader#readVolume(File)}.
-   */
-  static File resolveCurrentDir(File hddsRoot, String clusterId) throws IOException {
+  private static File resolveCurrentDir(File hddsRoot, String clusterId) throws IOException {
     File[] storageDirs = hddsRoot.listFiles(File::isDirectory);
     if (storageDirs == null) {
       throw new IOException("IO error listing " + hddsRoot);
@@ -173,20 +174,11 @@ public class ContainerDirectoryScanner {
     if (storageDirs.length == 0) {
       return null;
     }
-
-    File clusterIdDir = new File(hddsRoot, clusterId);
-    File idDir = clusterIdDir;
-    if (storageDirs.length == 1 && !clusterIdDir.exists()) {
-      idDir = storageDirs[0];
-    } else if (!clusterIdDir.exists()) {
-      throw new IOException("Volume " + hddsRoot + " is in an inconsistent state. "
-          + "Expected cluster ID directory " + clusterIdDir + " not found.");
-    }
-    return new File(idDir, Storage.STORAGE_DIR_CURRENT);
+    return StorageVolumeUtil.resolveContainerCurrentDir(hddsRoot, clusterId, storageDirs);
   }
 
-  private static void recordContainerDir(File containerDir, String volumeRoot,
-      Map<Long, List<ContainerDiskOccurrence>> result) {
+  private static void recordContainerDir(File containerDir, Map<Long, String> singles,
+      Map<Long, List<String>> duplicates) {
     long containerId;
     try {
       containerId = ContainerUtils.getContainerID(containerDir);
@@ -195,6 +187,44 @@ public class ContainerDirectoryScanner {
       return;
     }
 
+    String containerPath = containerDir.getAbsolutePath();
+    singles.compute(containerId, (id, firstPath) -> {
+      List<String> dupList = duplicates.get(id);
+      if (dupList != null) {
+        dupList.add(containerPath);
+        return null;
+      }
+      if (firstPath == null) {
+        return containerPath;
+      }
+      List<String> list = new ArrayList<>(2);
+      list.add(firstPath);
+      list.add(containerPath);
+      duplicates.put(id, list);
+      return null;
+    });
+  }
+
+  public static Map<Long, List<ContainerDiskOccurrence>> enrichDuplicates(Map<Long, List<String>> duplicates) {
+    Map<Long, List<ContainerDiskOccurrence>> enriched = new HashMap<>(duplicates.size());
+    for (Map.Entry<Long, List<String>> entry : duplicates.entrySet()) {
+      long containerId = entry.getKey();
+      List<String> containerPaths = new ArrayList<>(entry.getValue());
+      Collections.sort(containerPaths);
+      List<ContainerDiskOccurrence> occurrences = new ArrayList<>(containerPaths.size());
+      for (String containerPath : containerPaths) {
+        occurrences.add(enrichOccurrence(containerId, containerPath));
+      }
+      enriched.put(containerId, Collections.unmodifiableList(occurrences));
+    }
+    return Collections.unmodifiableMap(enriched);
+  }
+
+  /**
+   * Compute directory size and metadata status for on-disk container path.
+   */
+  static ContainerDiskOccurrence enrichOccurrence(long containerId, String containerPath) {
+    File containerDir = new File(containerPath);
     File containerFile = ContainerUtils.getContainerFile(containerDir);
     ContainerDiskScanStatus status;
     if (!containerFile.exists()) {
@@ -203,33 +233,20 @@ public class ContainerDirectoryScanner {
       status = readMetadataStatus(containerId, containerFile);
     }
 
+    boolean sizeKnown = true;
     long sizeBytes;
     try {
       sizeBytes = FileUtils.sizeOfDirectory(containerDir);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Failed to compute size for container directory {}, using 0", containerDir, e);
+      LOG.warn("Failed to compute size for container directory {}", containerDir, e);
       sizeBytes = 0L;
+      sizeKnown = false;
     }
 
-    ContainerDiskOccurrence occurrence = new ContainerDiskOccurrence(
-        containerId,
-        containerDir.getAbsolutePath(),
-        volumeRoot,
-        sizeBytes,
-        status);
-    result.compute(containerId, (id, existing) -> {
-      if (existing == null) {
-        List<ContainerDiskOccurrence> list = new ArrayList<>();
-        list.add(occurrence);
-        return list;
-      }
-      existing.add(occurrence);
-      return existing;
-    });
+    return new ContainerDiskOccurrence(containerId, containerPath, sizeBytes, sizeKnown, status);
   }
 
-  private static ContainerDiskScanStatus readMetadataStatus(long containerId,
-      File containerFile) {
+  private static ContainerDiskScanStatus readMetadataStatus(long containerId, File containerFile) {
     try {
       ContainerData containerData = ContainerDataYaml.readContainerFile(containerFile);
       if (containerId != containerData.getContainerID()) {
@@ -242,30 +259,6 @@ public class ContainerDirectoryScanner {
       LOG.warn("Failed to parse container metadata file {}", containerFile, e);
       return ContainerDiskScanStatus.INVALID_METADATA;
     }
-  }
-
-  private static void validateStorageDirectories(Collection<String> storageDirs) throws IOException {
-    List<String> missingDirs = new ArrayList<>();
-    for (String storageDir : storageDirs) {
-      String storageDirPath = StorageLocation.parse(storageDir).getUri().getPath();
-      if (!new File(storageDirPath).exists()) {
-        missingDirs.add(storageDirPath);
-      }
-    }
-    if (!missingDirs.isEmpty()) {
-      throw new IOException(String.join(", ", missingDirs)
-          + " configured in '" + ScmConfigKeys.HDDS_DATANODE_DIR_KEY
-          + "' does not exist. Please provide the correct value for config.");
-    }
-  }
-
-  private static Map<Long, List<ContainerDiskOccurrence>> toImmutableLists(
-      Map<Long, List<ContainerDiskOccurrence>> mutable) {
-    Map<Long, List<ContainerDiskOccurrence>> immutable = new HashMap<>();
-    for (Map.Entry<Long, List<ContainerDiskOccurrence>> entry : mutable.entrySet()) {
-      immutable.put(entry.getKey(), Collections.unmodifiableList(new ArrayList<>(entry.getValue())));
-    }
-    return immutable;
   }
 
   /**

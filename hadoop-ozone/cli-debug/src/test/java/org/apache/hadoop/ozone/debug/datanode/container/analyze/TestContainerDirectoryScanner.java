@@ -19,14 +19,11 @@ package org.apache.hadoop.ozone.debug.datanode.container.analyze;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -71,13 +68,9 @@ public class TestContainerDirectoryScanner {
     File volumeRoot = formatVolume("volume0");
     long containerId = 1001L;
     createContainerDirectory(volumeRoot, containerId, true, containerId);
-
-    Map<Long, List<ContainerDiskOccurrence>> result = scan(volumeRoot);
-
-    assertEquals(1, result.size());
-    ContainerDiskOccurrence occurrence = result.get(containerId).get(0);
+    ContainerDiskOccurrence occurrence = enrichSingleContainer(volumeRoot, containerId);
     assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.VALID, occurrence.getStatus());
-    assertEquals(volumeRoot.getAbsolutePath(), occurrence.getVolumeRoot());
+    assertThat(occurrence.getContainerPath()).startsWith(volumeRoot.getAbsolutePath());
     assertThat(occurrence.getSizeBytes()).isGreaterThan(0L);
   }
 
@@ -86,11 +79,8 @@ public class TestContainerDirectoryScanner {
     File volumeRoot = formatVolume("volume0");
     long containerId = 2002L;
     createContainerDirectory(volumeRoot, containerId, false, containerId);
-
-    Map<Long, List<ContainerDiskOccurrence>> result = scan(volumeRoot);
-
-    assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.MISSING_METADATA,
-        result.get(containerId).get(0).getStatus());
+    ContainerDiskOccurrence occurrence = enrichSingleContainer(volumeRoot, containerId);
+    assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.MISSING_METADATA, occurrence.getStatus());
   }
 
   @Test
@@ -98,29 +88,17 @@ public class TestContainerDirectoryScanner {
     File volumeRoot = formatVolume("volume0");
     long containerId = 3003L;
     createContainerDirectory(volumeRoot, containerId, true, 9999L);
-
-    Map<Long, List<ContainerDiskOccurrence>> result = scan(volumeRoot);
-
-    assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.INVALID_METADATA,
-        result.get(containerId).get(0).getStatus());
+    ContainerDiskOccurrence occurrence = enrichSingleContainer(volumeRoot, containerId);
+    assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.INVALID_METADATA, occurrence.getStatus());
   }
 
   @Test
   public void testInvalidMetadataEmptyContainerFile() throws Exception {
     File volumeRoot = formatVolume("volume0");
     long containerId = 5005L;
-
-    Path containerBase = containerTopDir(volumeRoot).resolve(Long.toString(containerId));
-    Files.createDirectories(containerBase.resolve("metadata"));
-    Files.createDirectories(containerBase.resolve("chunks"));
-    // File must exist at the expected name, but have no parseable content
-    Files.createFile(ContainerUtils.getContainerFile(containerBase.toFile()).toPath());
-
-    Map<Long, List<ContainerDiskOccurrence>> result = scan(volumeRoot);
-
-    assertEquals(1, result.size());
-    assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.INVALID_METADATA,
-        result.get(containerId).get(0).getStatus());
+    createEmptyContainerFileOnVolume(volumeRoot, containerId);
+    ContainerDiskOccurrence occurrence = enrichSingleContainer(volumeRoot, containerId);
+    assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.INVALID_METADATA, occurrence.getStatus());
   }
 
   @Test
@@ -133,11 +111,28 @@ public class TestContainerDirectoryScanner {
 
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         volumeRoot1.getAbsolutePath() + "," + volumeRoot2.getAbsolutePath());
-    ContainerDirectoryScanner scanner = new ContainerDirectoryScanner();
-    Map<Long, List<ContainerDiskOccurrence>> result = scanner.scan(conf);
+    ContainerScanResult scanResult = ContainerDirectoryScanner.scan(conf);
 
-    assertEquals(1, result.size());
-    assertEquals(2, result.get(containerId).size());
+    assertEquals(1, scanResult.getDuplicates().size());
+    assertEquals(2, scanResult.getDuplicates().get(containerId).size());
+    assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.VALID,
+        ContainerDirectoryScanner.enrichOccurrence(containerId, 
+            scanResult.getDuplicates().get(containerId).get(0)).getStatus());
+  }
+
+  @Test
+  public void testSingletonStoredInSinglesNotDuplicates() throws Exception {
+    File volumeRoot = formatVolume("volume0");
+    long containerId = 6006L;
+    createContainerDirectory(volumeRoot, containerId, true, containerId);
+
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeRoot.getAbsolutePath());
+    ContainerScanResult scanResult = ContainerDirectoryScanner.scan(conf);
+
+    assertEquals(1, scanResult.getSingles().size());
+    assertThat(scanResult.getSingles()).containsKey(containerId);
+    assertThat(scanResult.getSingles().get(containerId)).isNotBlank();
+    assertThat(scanResult.getDuplicates()).isEmpty();
   }
 
   @Test
@@ -146,24 +141,36 @@ public class TestContainerDirectoryScanner {
     Path invalidDir = containerTopDir(volumeRoot).resolve("not-a-container");
     Files.createDirectories(invalidDir);
 
-    Map<Long, List<ContainerDiskOccurrence>> result = scan(volumeRoot);
-
-    assertThat(result).isEmpty();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeRoot.getAbsolutePath());
+    ContainerScanResult scanResult = ContainerDirectoryScanner.scan(conf);
+    assertThat(scanResult.getSingles()).isEmpty();
+    assertThat(scanResult.getDuplicates()).isEmpty();
+    assertThat(scanResult.getVolumeScanErrors()).isEmpty();
   }
 
   @Test
-  public void testMissingConfiguredVolumeFails() {
-    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-        tempDir.resolve("missing-volume").toString());
-    ContainerDirectoryScanner scanner = new ContainerDirectoryScanner();
-
-    assertThrows(IOException.class, () -> scanner.scan(conf));
+  public void testMissingConfiguredVolumeSkipped() throws IOException {
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.resolve("missing-volume").toString());
+    ContainerScanResult scanResult = ContainerDirectoryScanner.scan(conf);
+    assertThat(scanResult.getSingles()).isEmpty();
+    assertThat(scanResult.getDuplicates()).isEmpty();
+    assertThat(scanResult.getVolumeScanErrors()).isEmpty();
   }
 
-  private Map<Long, List<ContainerDiskOccurrence>> scan(File volumeRoot)
-      throws IOException {
+  private ContainerDiskOccurrence enrichSingleContainer(File volumeRoot, long containerId) throws IOException {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeRoot.getAbsolutePath());
-    return new ContainerDirectoryScanner().scan(conf);
+    ContainerScanResult scanResult = ContainerDirectoryScanner.scan(conf);
+    assertThat(scanResult.getDuplicates()).isEmpty();
+    String containerPath = scanResult.getSingles().get(containerId);
+    assertThat(containerPath).isNotBlank();
+    return ContainerDirectoryScanner.enrichOccurrence(containerId, containerPath);
+  }
+
+  private void createEmptyContainerFileOnVolume(File volumeRoot, long containerId) throws IOException {
+    Path containerBase = containerTopDir(volumeRoot).resolve(Long.toString(containerId));
+    Files.createDirectories(containerBase.resolve("metadata"));
+    Files.createDirectories(containerBase.resolve("chunks"));
+    Files.createFile(ContainerUtils.getContainerFile(containerBase.toFile()).toPath());
   }
 
   private File formatVolume(String name) throws IOException {

@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import picocli.CommandLine;
@@ -49,47 +48,59 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
       throw new IOException("Count must be an integer greater than 0.");
     }
     OzoneConfiguration conf = getOzoneConf();
-    ContainerDirectoryScanner scanner = new ContainerDirectoryScanner();
-    Map<Long, List<ContainerDiskOccurrence>> diskScan = scanner.scan(conf);
+    ContainerScanResult scanResult = ContainerDirectoryScanner.scan(conf);
+    Map<Long, List<ContainerDiskOccurrence>> enrichedDuplicates =
+        ContainerDirectoryScanner.enrichDuplicates(scanResult.getDuplicates());
 
     // TODO: SCM metadata lookup from --scm-db when provided.
-    // TODO: Identify orphan containers wrt SCM.
-    // TODO: Identify deleted-but-present containers (DELETED state in SCM, but still on disk(/current)).
+    // TODO: For each id in scanResult.getSingles().keySet() classified NOT_IN_SCM or DELETED:
+    //   enrichOccurrence(id, scanResult.getSingles().get(id)) and report.
+    // TODO: For each id in enrichedDuplicates.keySet() classified NOT_IN_SCM or DELETED:
+    //   enrichedDuplicates.get(id) is already enriched — just report.
 
-    printDuplicates(diskScan);
+    printDuplicates(enrichedDuplicates);
+    printVolumeScanErrors(scanResult.getVolumeScanErrors());
     return null;
   }
 
-  private void printDuplicates(Map<Long, List<ContainerDiskOccurrence>> diskScan) {
-    List<Map.Entry<Long, List<ContainerDiskOccurrence>>> duplicates =
-            diskScan.entrySet().stream()
-                    .filter(e -> e.getValue().size() > 1)
-                    .sorted(Map.Entry.comparingByKey())
-                    .collect(Collectors.toList());
-
+  private void printDuplicates(Map<Long, List<ContainerDiskOccurrence>> duplicates) {
     long totalDuplicateIds = duplicates.size();
-    out().printf("Duplicate container directories on this DataNode: %d%n", totalDuplicateIds);
+    out().printf("Number of containers with duplicate container directories on this DataNode: %d%n", totalDuplicateIds);
 
     if (totalDuplicateIds == 0) {
       return;
     }
 
-    List<Map.Entry<Long, List<ContainerDiskOccurrence>>> duplicatesToShow =
-            duplicates.stream().limit(count).collect(Collectors.toList());
-
     if (totalDuplicateIds > count) {
       out().printf("Showing first %d:%n", count);
     }
 
-    for (Map.Entry<Long, List<ContainerDiskOccurrence>> entry : duplicatesToShow) {
-      long containerId = entry.getKey();
-      List<ContainerDiskOccurrence> occurrences = entry.getValue();
-      out().printf("Container %d (%d occurrences):%n", containerId, occurrences.size());
-      for (ContainerDiskOccurrence o : occurrences) {
-        out().printf("  volume=%s%n", o.getVolumeRoot());
-        out().printf("  path=%s%n", o.getContainerPath());
-        out().printf("  status=%s size=%d bytes%n", o.getStatus(), o.getSizeBytes());
-      }
+    duplicates.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .limit(count)
+        .forEach(entry -> {
+          long containerId = entry.getKey();
+          List<ContainerDiskOccurrence> occurrences = entry.getValue();
+          out().printf("Container %d (%d occurrences):%n", containerId, occurrences.size());
+          for (ContainerDiskOccurrence o : occurrences) {
+            out().printf("  path=%s%n", o.getContainerPath());
+            if (o.isSizeKnown()) {
+              out().printf("  status=%s size=%d bytes%n", o.getStatus(), o.getSizeBytes());
+            } else {
+              out().printf("  status=%s size=unavailable (failed to compute directory size)%n",
+                  o.getStatus());
+            }
+          }
+        });
+  }
+
+  private void printVolumeScanErrors(List<String> volumeScanErrors) {
+    if (volumeScanErrors.isEmpty()) {
+      return;
+    }
+    out().printf("%nVolumes that failed to scan (%d):%n", volumeScanErrors.size());
+    for (String error : volumeScanErrors) {
+      out().printf("  %s%n", error);
     }
   }
 }

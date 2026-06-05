@@ -20,22 +20,22 @@ package org.apache.hadoop.ozone.debug.datanode.container.analyze;
 import java.util.Objects;
 
 /**
- * One on-disk occurrence of a container directory on a DataNode volume.
+ * On-disk occurrence of a container directory on a DataNode volume.
  */
 public final class ContainerDiskOccurrence {
 
   private final long containerId;
   private final String containerPath;
-  private final String volumeRoot;
   private final long sizeBytes;
+  private final boolean sizeKnown;
   private final ContainerDirectoryScanner.ContainerDiskScanStatus status;
 
-  public ContainerDiskOccurrence(long containerId, String containerPath,
-      String volumeRoot, long sizeBytes, ContainerDirectoryScanner.ContainerDiskScanStatus status) {
+  ContainerDiskOccurrence(long containerId, String containerPath, long sizeBytes,
+      boolean sizeKnown, ContainerDirectoryScanner.ContainerDiskScanStatus status) {
     this.containerId = containerId;
     this.containerPath = Objects.requireNonNull(containerPath, "containerPath");
-    this.volumeRoot = Objects.requireNonNull(volumeRoot, "volumeRoot");
     this.sizeBytes = sizeBytes;
+    this.sizeKnown = sizeKnown;
     this.status = Objects.requireNonNull(status, "status");
   }
 
@@ -47,12 +47,12 @@ public final class ContainerDiskOccurrence {
     return containerPath;
   }
 
-  public String getVolumeRoot() {
-    return volumeRoot;
-  }
-
   public long getSizeBytes() {
     return sizeBytes;
+  }
+
+  public boolean isSizeKnown() {
+    return sizeKnown;
   }
 
   public ContainerDirectoryScanner.ContainerDiskScanStatus getStatus() {
