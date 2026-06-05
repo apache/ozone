@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.awssdk;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.awssdk.v1.AbstractS3SDKV1Tests;
+import org.apache.hadoop.ozone.s3.awssdk.v2.AbstractListDirectoryBucketsV2Tests;
 import org.apache.hadoop.ozone.s3.awssdk.v2.AbstractS3SDKV2Tests;
 import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Nested;
@@ -43,6 +44,14 @@ abstract class OzoneS3SDKTests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class V2 extends AbstractS3SDKV2Tests {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ListDirectoryBuckets extends AbstractListDirectoryBucketsV2Tests {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

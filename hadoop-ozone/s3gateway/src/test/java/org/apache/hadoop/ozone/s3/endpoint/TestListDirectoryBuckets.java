@@ -51,7 +51,7 @@ public class TestListDirectoryBuckets {
     rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
         .setClient(clientStub)
         .setSignatureInfo(new SignatureInfo.Builder(SignatureInfo.Version.V4)
-            .setCredentialScope("20260101/us-west-2/s3/aws4_request")
+            .setCredentialScope("20260101/us-west-2/s3express/aws4_request")
             .build())
         .build();
 
@@ -162,18 +162,6 @@ public class TestListDirectoryBuckets {
     assertEquals("fso-bucket", response.getBuckets().get(0).getName());
     assertEquals("aws-global", response.getBuckets().get(0).getBucketRegion());
     assertNull(response.getContinuationToken());
-  }
-
-  @Test
-  public void testListAllBucketsUnchangedWithoutDirectoryParam() throws Exception {
-    createFsoBucket("fso-bucket");
-    clientStub.getObjectStore().createS3Bucket("obs-bucket");
-
-    ListBucketResponse response =
-        (ListBucketResponse) rootEndpoint.get().getEntity();
-
-    assertEquals(2, response.getBucketsNum());
-    assertEquals("root", response.getOwner().getDisplayName());
   }
 
   @Test

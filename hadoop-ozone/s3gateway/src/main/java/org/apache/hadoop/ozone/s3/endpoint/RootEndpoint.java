@@ -58,18 +58,18 @@ public class RootEndpoint extends EndpointBase {
   @GET
   public Response get()
       throws OS3Exception, IOException {
-    if (isListDirectoryBucketsRequest()) {
+    if (isS3ExpressSignedRequest()) {
       return listDirectoryBuckets();
     }
     return listAllBuckets();
   }
 
-  private boolean isListDirectoryBucketsRequest() {
-    return queryParams().get(QueryParams.MAX_DIRECTORY_BUCKETS) != null
-        || queryParams().get(QueryParams.CONTINUATION_TOKEN) != null
-        || isS3ExpressSignedRequest();
-  }
-
+  /**
+   * AWS SDKs and CLI sign requests to S3 Express Regional endpoints (s3express-control.<region>.amazonaws.com)
+   * using "s3express" as the SigV4 service name in the credential scope
+   * (<date>/<region>/s3express/aws4_request), even though this is not explicitly documented
+   * on the ListDirectoryBuckets API page.
+   */
   private boolean isS3ExpressSignedRequest() {
     if (signatureInfo == null) {
       return false;
