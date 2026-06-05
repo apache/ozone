@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -217,7 +218,9 @@ public class ReconStorageContainerManagerFacade
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, ReconSCMDBDefinition.get());
 
-    this.scmVersionManager = new ScmVersionManager(scmStorageConfig, this);
+    // Use a version manager with no upgrade actions. The version will only be used to track Datanode versions,
+    // not run SCM specific reformatting on upgrade.
+    this.scmVersionManager = new ScmVersionManager(scmStorageConfig, this, HashMap::new);
     this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
