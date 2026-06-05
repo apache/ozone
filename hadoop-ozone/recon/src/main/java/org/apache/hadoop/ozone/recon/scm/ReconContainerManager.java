@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CL
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FORCE_CLOSE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -221,11 +222,11 @@ public class ReconContainerManager extends ContainerManagerImpl {
    * Check if Recon's container lifecycle state can be corrected based on a DN
    * replica report and SCM's authoritative state.
    *
-   * <p>OPEN uses the DN replica state as the signal: only a healthy non-OPEN
-   * replica can move Recon to CLOSING. For CLOSING, the DN report is only a
-   * wake-up signal and Recon queries SCM before advancing. For DELETED, Recon
-   * recovers only on a live terminal replica report and only when SCM still
-   * reports the container as live.
+   * <p>Closed or quasi-closed DN reports wake Recon to query SCM and reconcile
+   * the existing container using SCM's authoritative state. Other healthy
+   * non-OPEN reports can still move an OPEN Recon container to CLOSING. For
+   * DELETED, any non-DELETED DN report can trigger recovery, but Recon still
+   * recovers only when SCM reports the container as live.
    *
    * @param containerID containerID to check
    * @param state replica state reported by a DataNode
@@ -236,45 +237,100 @@ public class ReconContainerManager extends ContainerManagerImpl {
     ContainerInfo containerInfo = getContainer(containerID);
     HddsProtos.LifeCycleState reconState = containerInfo.getState();
 
-    if (reconState == HddsProtos.LifeCycleState.OPEN) {
-      if (state.equals(ContainerReplicaProto.State.OPEN) || !isHealthy(state)) {
-        return;
-      }
-      LOG.info("Container {} has state OPEN, but given state is {}.",
-          containerID, state);
-      transitionOpenToClosing(containerID, containerInfo);
-      return;
-    }
-
-    if (reconState == HddsProtos.LifeCycleState.CLOSING) {
-      reconcileClosingContainerFromScm(containerID);
+    if (isClosedReplicaState(state)) {
+      reconcileContainerFromScm(containerID, containerInfo, reconState, state);
       return;
     }
 
     if (reconState == HddsProtos.LifeCycleState.DELETED) {
       recoverDeletedContainerFromScm(containerID, state);
+      return;
+    }
+
+    if (reconState == HddsProtos.LifeCycleState.OPEN
+        && state != ContainerReplicaProto.State.OPEN && isHealthy(state)) {
+      LOG.info("Container {} has state OPEN, but given state is {}.",
+          containerID, state);
+      transitionOpenToClosing(containerID, containerInfo);
     }
   }
 
-  private void reconcileClosingContainerFromScm(ContainerID containerID)
+  private void reconcileContainerFromScm(ContainerID containerID,
+      ContainerInfo containerInfo, HddsProtos.LifeCycleState reconState,
+      ContainerReplicaProto.State replicaState)
       throws IOException, InvalidStateTransitionException {
-    HddsProtos.LifeCycleState scmState = getScmContainerState(containerID);
+    ContainerWithPipeline scmContainer =
+        scmClient.getContainerWithPipeline(containerID.getId());
+    HddsProtos.LifeCycleState scmState =
+        scmContainer.getContainerInfo().getState();
+
+    if (reconState == HddsProtos.LifeCycleState.DELETED) {
+      recoverDeletedContainerFromScm(containerID, replicaState, scmContainer);
+      return;
+    }
 
     if (scmState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
-      updateContainerState(containerID, QUASI_CLOSE);
-      LOG.info("Container {} advanced to QUASI_CLOSED in Recon "
-          + "based on SCM state.", containerID);
+      reconcileToQuasiClosed(containerID, containerInfo, reconState);
     } else if (scmState == HddsProtos.LifeCycleState.CLOSED) {
+      reconcileToClosed(containerID, containerInfo, reconState);
+    } else if (scmState == HddsProtos.LifeCycleState.DELETING
+        || scmState == HddsProtos.LifeCycleState.DELETED) {
+      reconcileToDeleted(containerID, containerInfo, reconState, scmState);
+    }
+  }
+
+  private void reconcileToQuasiClosed(ContainerID containerID,
+      ContainerInfo containerInfo, HddsProtos.LifeCycleState reconState)
+      throws IOException, InvalidStateTransitionException {
+    if (reconState == HddsProtos.LifeCycleState.OPEN) {
+      transitionOpenToClosing(containerID, containerInfo);
+      reconState = HddsProtos.LifeCycleState.CLOSING;
+    }
+    if (reconState == HddsProtos.LifeCycleState.CLOSING) {
+      updateContainerState(containerID, QUASI_CLOSE);
+      LOG.info("Container {} advanced to QUASI_CLOSED in Recon based on "
+          + "SCM state.", containerID);
+    }
+  }
+
+  private void reconcileToClosed(ContainerID containerID,
+      ContainerInfo containerInfo, HddsProtos.LifeCycleState reconState)
+      throws IOException, InvalidStateTransitionException {
+    if (reconState == HddsProtos.LifeCycleState.OPEN) {
+      transitionOpenToClosing(containerID, containerInfo);
+      reconState = HddsProtos.LifeCycleState.CLOSING;
+    }
+    if (reconState == HddsProtos.LifeCycleState.CLOSING) {
       updateContainerState(containerID, CLOSE);
       LOG.info("Container {} advanced to CLOSED in Recon based on SCM state.",
           containerID);
-    } else if (scmState == HddsProtos.LifeCycleState.DELETING
-        || scmState == HddsProtos.LifeCycleState.DELETED) {
+    } else if (reconState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+      updateContainerState(containerID, FORCE_CLOSE);
+      LOG.info("Container {} advanced from QUASI_CLOSED to CLOSED in Recon "
+          + "based on SCM state.", containerID);
+    }
+  }
+
+  private void reconcileToDeleted(ContainerID containerID,
+      ContainerInfo containerInfo, HddsProtos.LifeCycleState reconState,
+      HddsProtos.LifeCycleState scmState)
+      throws IOException, InvalidStateTransitionException {
+    if (reconState == HddsProtos.LifeCycleState.OPEN) {
+      transitionOpenToClosing(containerID, containerInfo);
+      reconState = HddsProtos.LifeCycleState.CLOSING;
+    }
+    if (reconState == HddsProtos.LifeCycleState.CLOSING) {
       updateContainerState(containerID, CLOSE);
+      reconState = HddsProtos.LifeCycleState.CLOSED;
+    }
+    if (reconState == HddsProtos.LifeCycleState.CLOSED
+        || reconState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
       updateContainerState(containerID, DELETE);
-      if (scmState == HddsProtos.LifeCycleState.DELETED) {
-        updateContainerState(containerID, CLEANUP);
-      }
+      reconState = HddsProtos.LifeCycleState.DELETING;
+    }
+    if (scmState == HddsProtos.LifeCycleState.DELETED
+        && reconState == HddsProtos.LifeCycleState.DELETING) {
+      updateContainerState(containerID, CLEANUP);
       LOG.info("Container {} advanced to {} in Recon based on SCM state.",
           containerID, scmState);
     }
@@ -282,13 +338,18 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
   private void recoverDeletedContainerFromScm(ContainerID containerID,
       ContainerReplicaProto.State replicaState) throws IOException {
-    if (replicaState != ContainerReplicaProto.State.CLOSED
-        && replicaState != ContainerReplicaProto.State.QUASI_CLOSED) {
+    if (replicaState == ContainerReplicaProto.State.DELETED) {
       return;
     }
 
     ContainerWithPipeline scmContainer =
         scmClient.getContainerWithPipeline(containerID.getId());
+    recoverDeletedContainerFromScm(containerID, replicaState, scmContainer);
+  }
+
+  private void recoverDeletedContainerFromScm(ContainerID containerID,
+      ContainerReplicaProto.State replicaState, ContainerWithPipeline scmContainer)
+      throws IOException {
     HddsProtos.LifeCycleState scmState =
         scmContainer.getContainerInfo().getState();
     if (scmState != HddsProtos.LifeCycleState.CLOSED
@@ -306,10 +367,9 @@ public class ReconContainerManager extends ContainerManagerImpl {
         containerID, scmState, replicaState, scmState);
   }
 
-  private HddsProtos.LifeCycleState getScmContainerState(ContainerID containerID)
-      throws IOException {
-    return scmClient.getContainerWithPipeline(containerID.getId())
-        .getContainerInfo().getState();
+  private boolean isClosedReplicaState(ContainerReplicaProto.State replicaState) {
+    return replicaState == ContainerReplicaProto.State.CLOSED
+        || replicaState == ContainerReplicaProto.State.QUASI_CLOSED;
   }
 
   private boolean isHealthy(ContainerReplicaProto.State replicaState) {

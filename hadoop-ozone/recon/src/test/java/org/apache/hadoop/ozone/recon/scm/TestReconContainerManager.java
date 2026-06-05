@@ -179,14 +179,35 @@ public class TestReconContainerManager
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
 
-    // First report with "CLOSED" replica state moves container state to
+    // First report with "CLOSING" replica state moves container state to
     // "CLOSING".
-    getContainerManager().checkAndAddNewContainer(containerID, State.CLOSED,
+    getContainerManager().checkAndAddNewContainer(containerID, State.CLOSING,
         datanodeDetails);
     assertEquals(CLOSING,
         getContainerManager().getContainer(containerID).getState());
     assertFalse(getContainerManager().getPipelineToOpenContainer()
         .containsKey(containerWithPipeline.getPipeline().getId()));
+  }
+
+  @Test
+  public void testOpenContainerReconcilesToClosedFromScmOnClosedDnReport()
+      throws Exception {
+    ContainerWithPipeline openContainer =
+        getTestContainer(113L, LifeCycleState.OPEN);
+    ContainerID containerID = openContainer.getContainerInfo().containerID();
+    getContainerManager().addNewContainer(openContainer);
+
+    when(getContainerManager().getScmClient()
+        .getContainerWithPipeline(containerID.getId()))
+        .thenReturn(getTestContainer(113L, CLOSED));
+
+    getContainerManager().checkAndAddNewContainer(containerID, State.CLOSED,
+        randomDatanodeDetails());
+
+    assertEquals(CLOSED,
+        getContainerManager().getContainer(containerID).getState());
+    assertFalse(getContainerManager().getPipelineToOpenContainer()
+        .containsKey(openContainer.getPipeline().getId()));
   }
 
   @Test
@@ -234,20 +255,16 @@ public class TestReconContainerManager
   }
 
   @Test
-  public void testClosingContainerReconcilesFromScmEvenForUnhealthyReplica()
+  public void testClosingContainerNotUpdatedFromUnhealthyReplicaReport()
       throws Exception {
     ContainerWithPipeline closingContainer = getTestContainer(105L, CLOSING);
     ContainerID containerID = closingContainer.getContainerInfo().containerID();
     getContainerManager().addNewContainer(closingContainer);
 
-    when(getContainerManager().getScmClient()
-        .getContainerWithPipeline(containerID.getId()))
-        .thenReturn(getTestContainer(105L, CLOSED));
-
     getContainerManager().checkAndAddNewContainer(containerID, State.UNHEALTHY,
         randomDatanodeDetails());
 
-    assertEquals(CLOSED,
+    assertEquals(CLOSING,
         getContainerManager().getContainer(containerID).getState());
   }
 
@@ -265,17 +282,9 @@ public class TestReconContainerManager
   }
 
   @Test
-  public void testDeletedContainerNotRecoveredFromOpenReplicaReport()
+  public void testDeletedContainerRecoversFromOpenDnReportWhenScmIsLive()
       throws Exception {
-    ContainerWithPipeline deletedContainer = getTestContainer(108L, DELETED);
-    ContainerID containerID = deletedContainer.getContainerInfo().containerID();
-    getContainerManager().addNewContainer(deletedContainer);
-
-    getContainerManager().checkAndAddNewContainer(containerID, State.OPEN,
-        randomDatanodeDetails());
-
-    assertEquals(DELETED,
-        getContainerManager().getContainer(containerID).getState());
+    assertDeletedContainerRecoversFromScm(108L, State.OPEN, CLOSED);
   }
 
   @Test
@@ -296,7 +305,7 @@ public class TestReconContainerManager
     getContainerManager().addNewContainer(closedContainer);
 
     getContainerManager().checkAndAddNewContainer(containerID,
-        State.QUASI_CLOSED, randomDatanodeDetails());
+        State.CLOSING, randomDatanodeDetails());
 
     assertEquals(CLOSED,
         getContainerManager().getContainer(containerID).getState());
