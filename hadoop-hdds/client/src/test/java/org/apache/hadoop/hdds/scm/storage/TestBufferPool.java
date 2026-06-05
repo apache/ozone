@@ -59,6 +59,8 @@ class TestBufferPool {
     // As the pool is full, allocation will need to wait until a buffer is released.
     assertFull(pool);
 
+    assertEquals(buffers.size(), pool.getAllocatedBuffers().size());
+
     AtomicReference<ChunkBuffer> allocated = new AtomicReference<>();
     AtomicBoolean allocatorStarted = new AtomicBoolean();
     Thread allocator = new Thread(() -> {
@@ -81,9 +83,9 @@ class TestBufferPool {
         throw new RuntimeException(e);
       }
     }
-
     releaser.start();
     allocator.join();
+    assertEquals(buffers.size() + 1, pool.getAllocatedBuffers().size());
     assertEquals(toRelease, allocated.get());
   }
 
