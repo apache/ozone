@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
  */
 @Path("/triggerdbsync")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class TriggerDBSyncEndpoint {
 
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;

@@ -76,7 +76,6 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/storageDistribution")
 @Produces("application/json")
-@AdminOnly
 public class StorageDistributionEndpoint {
   private final ReconNodeManager nodeManager;
   private final NSSummaryEndpoint nsSummaryEndpoint;
