@@ -16,20 +16,34 @@
  * limitations under the License.
  */
 
-type BreadcrumbNameMap = {
-  [path: string]: string;
+export interface ChatbotHealthResponse {
+  enabled: boolean;
+  llmClientAvailable: boolean;
 }
 
-export const breadcrumbNameMap: BreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Volumes': 'Volumes',
-  '/Buckets': 'Buckets',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/Containers': 'Containers',
-  '/Insights': 'Insights',
-  '/NamespaceUsage': 'Namespace Usage',
-  '/Heatmap': 'Heatmap',
-  '/Om': 'OM DB Insights',
-  '/Assistant': 'Recon AI'
-};
+export interface ChatbotModelsResponse {
+  models: string[];
+}
+
+export interface ChatbotChatRequest {
+  query: string;
+  model?: string;
+  provider?: string;
+  userId?: string;
+}
+
+export interface ChatbotChatResponse {
+  response: string;
+  success: boolean;
+}
+
+export interface ChatbotErrorResponse {
+  error: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  timestamp: number;
+}
