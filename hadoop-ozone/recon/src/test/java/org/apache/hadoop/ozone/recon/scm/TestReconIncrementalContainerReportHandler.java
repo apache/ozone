@@ -129,9 +129,13 @@ public class TestReconIncrementalContainerReportHandler
           containerId++, OPEN);
       ContainerID containerID =
           containerWithPipeline.getContainerInfo().containerID();
+      LifeCycleState expectedState = getContainerStateFromReplicaState(state);
 
       ReconContainerManager containerManager = getContainerManager();
       containerManager.addNewContainer(containerWithPipeline);
+      when(containerManager.getScmClient()
+          .getContainerWithPipeline(containerID.getId()))
+          .thenReturn(getTestContainer(containerID.getId(), expectedState));
 
       DatanodeDetails datanodeDetails =
           containerWithPipeline.getPipeline().getFirstNode();
@@ -155,7 +159,6 @@ public class TestReconIncrementalContainerReportHandler
       assertTrue(containerManager.containerExist(containerID));
       assertEquals(1,
           containerManager.getContainerReplicas(containerID).size());
-      LifeCycleState expectedState = getContainerStateFromReplicaState(state);
       LifeCycleState actualState =
           containerManager.getContainer(containerID).getState();
       assertEquals(expectedState, actualState,
