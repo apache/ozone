@@ -26,8 +26,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 /**
- * CLI to rewrite Iceberg table paths. The {@code ozone-iceberg} shell script strips the
- * {@code rewrite-path} token before invoking this class (same pattern as {@code ozone debug}).
+ * CLI to rewrite Iceberg table paths.
  */
 @Command(
     name = "rewrite-path",

@@ -23,6 +23,16 @@ MYNAME="${BASH_SOURCE-$0}"
 bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
 JVM_PID="$$"
 
+## @description  true when the ozone-iceberg artifact is present in this distribution
+## @audience     private
+function ozone_iceberg_available
+{
+  local lib_dir="${HDDS_LIB_JARS_DIR:-${OZONE_HOME}/share/ozone/lib}"
+
+  [[ -f "${OZONE_HOME}/share/ozone/classpath/ozone-iceberg.classpath" ]] \
+    && compgen -G "${lib_dir}/ozone-iceberg-*.jar" > /dev/null
+}
+
 ## @description  build up the ozone command's usage text.
 ## @audience     public
 ## @stability    stable
@@ -65,7 +75,9 @@ function ozone_usage
   ozone_add_subcommand "repair" client "Ozone repair tool"
   ozone_add_subcommand "ratis" client "Ozone ratis tool"
   ozone_add_subcommand "vapor" client "Ozone server simulator"
-
+  if ozone_iceberg_available; then
+    ozone_add_subcommand "iceberg" client "rewrite Iceberg table paths for table migration (see ozone iceberg rewrite-path --help for tool options)"
+  fi
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
 
@@ -252,6 +264,21 @@ function ozonecmd_case
       OZONE_VAPOR_OPTS="${OZONE_VAPOR_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-vapor"
     ;;
+    iceberg)
+      if ! ozone_iceberg_available; then
+        ozone_error "ERROR: ozone iceberg is not available in this distribution (requires JDK 11+ build)."
+        exit 1
+      fi
+      if [[ $# -eq 0 ]] || [[ "$1" != "rewrite-path" ]]; then
+        echo "Usage: ozone iceberg rewrite-path [OPTIONS]" >&2
+        exit 1
+      fi
+      shift
+      OZONE_CLASSNAME="org.apache.hadoop.ozone.iceberg.RewriteTablePathCommand"
+      OZONE_RUN_ARTIFACT_NAME="ozone-iceberg"
+      OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
+      OZONE_SUBCMD_ARGS=("$@")
+    ;;
     *)
       OZONE_CLASSNAME="${subcmd}"
       if ! ozone_validate_classname "${OZONE_CLASSNAME}"; then
@@ -288,7 +315,8 @@ function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-dist" ]] \
-      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]] \
+      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-iceberg" ]]; then
     if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
       OZONE_LOGLEVEL=OFF
