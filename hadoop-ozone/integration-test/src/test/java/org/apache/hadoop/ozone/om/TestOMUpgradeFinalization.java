@@ -25,14 +25,18 @@ import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
@@ -40,10 +44,8 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -64,11 +66,14 @@ class TestOMUpgradeFinalization {
   @AfterAll
   public static void shutdown() {
     AuditLogTestUtils.deleteAuditLogFile();
+    AuditLogTestUtils.deleteSystemAuditLogFile();
   }
 
   @Test
   void testOMUpgradeFinalizationWithOneOMDown() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, INITIAL_VERSION.layoutVersion());
+    conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     try (MiniOzoneHAClusterImpl cluster = newCluster(conf)) {
       cluster.waitForClusterToBeReady();
 
@@ -77,7 +82,7 @@ class TestOMUpgradeFinalization {
         for (OzoneManager om : runningOms) {
           assertEquals(INITIAL_VERSION, om.getVersionManager().getApparentVersion());
           // The OMs have not been finalized yet, so no version has been written to the DB.
-          Assertions.assertNull(om.getMetadataManager().getMetaTable().get(APPARENT_VERSION_KEY));
+          assertNull(om.getMetadataManager().getMetaTable().get(APPARENT_VERSION_KEY));
         }
 
         final int shutdownOMIndex = 2;
@@ -93,15 +98,25 @@ class TestOMUpgradeFinalization {
         long prepareIndex = omClient.prepareOzoneManager(120L, 5L);
         assertClusterPrepared(prepareIndex, runningOms);
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_PREPARE, AuditEventStatus.SUCCESS);
-
         omClient.cancelOzoneManagerPrepare();
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_CANCEL, AuditEventStatus.SUCCESS);
-        StatusAndMessages response =
-            omClient.finalizeUpgrade("finalize-test");
-        System.out.println("Finalization Messages : " + response.msgs());
-        AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
+        // TODO - OZONE_FINAL_COMMAND - change to sending command when it is ready. This will trigger OM finalization
+        cluster.getOzoneManagersList().forEach(om -> {
+          try {
+            om.getMetadataManager().getMetaTable()
+                .addCacheEntry(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore", 1);
+            om.getMetadataManager().getMetaTable()
+                .put(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY, "ignore");
+          } catch (RocksDatabaseException | CodecException e) {
+            throw new RuntimeException(e);
+          }
+        });
 
         waitForFinalization(omClient);
+        AuditLogTestUtils.verifySystemAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
+        // Ensure the finalization in progress key has been removed.
+        assertNull(cluster.getOzoneManager().getMetadataManager()
+            .getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY));
         cluster.restartOzoneManager(downedOM, true);
 
         OzoneManagerStateMachine omStateMachine = downedOM.getOmRatisServer()

@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.util.Time;
 import picocli.CommandLine;
@@ -131,22 +133,21 @@ public class UpgradeContainerSchema extends RepairTool {
     DatanodeDetails dnDetail =
         UpgradeUtils.getDatanodeDetails(configuration);
 
-    Pair<HDDSLayoutFeature, HDDSLayoutFeature> layoutFeature =
-        UpgradeUtils.getLayoutFeature(dnDetail, configuration);
-    final HDDSLayoutFeature softwareLayoutFeature = layoutFeature.getLeft();
-    final HDDSLayoutFeature metadataLayoutFeature = layoutFeature.getRight();
-    final int needLayoutVersion =
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion();
+    DatanodeStorage storage = new DatanodeStorage(configuration, dnDetail.getUuidString());
+    try (DatanodeVersionManager versionManager = new DatanodeVersionManager(storage, null)) {
+      // Ensure repair tool is not run in a newer version that supports schema V3 while the datanode that will read the
+      // containers does not.
+      if (!HDDSLayoutFeature.DATANODE_SCHEMA_V3.isSupportedBy(HDDSVersion.SOFTWARE_VERSION)) {
+        fatal("Please upgrade your software version to at least %s, current software version is %s",
+            HDDSLayoutFeature.DATANODE_SCHEMA_V3, HDDSVersion.SOFTWARE_VERSION);
+        return;
+      }
 
-    if (metadataLayoutFeature.layoutVersion() < needLayoutVersion ||
-        softwareLayoutFeature.layoutVersion() < needLayoutVersion) {
-      fatal(
-          "Please upgrade your software version, no less than %s," +
-              " current metadata layout version is %s," +
-              " software layout version is %s",
-          HDDSLayoutFeature.DATANODE_SCHEMA_V3.toString(),
-          metadataLayoutFeature.toString(), softwareLayoutFeature.toString());
-      return;
+
+      if (!versionManager.isAllowed(HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
+        fatal("Please finalize the cluster to enable support for Datanode container schema V3");
+        return;
+      }
     }
 
     if (!Strings.isNullOrEmpty(volume)) {
