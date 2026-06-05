@@ -96,7 +96,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   private String startVersionName;
   private String endVersionName;
   private String stagingDir;
-  private int parallelism;
+  private int threads;
 
   private ExecutorService executorService;
   private static final int MAX_INFLIGHT_MULTIPLIER = 4;
@@ -106,12 +106,16 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
   public RewriteTablePathOzoneAction(Table table) {
     this.table = table;
-    this.parallelism = DEFAULT_THREAD_COUNT;
+    this.threads = DEFAULT_THREAD_COUNT;
   }
 
-  public RewriteTablePathOzoneAction(Table table, int parallelism) {
+  public RewriteTablePathOzoneAction(Table table, int threads) {
     this.table = table;
-    this.parallelism = parallelism;
+    this.threads = threads;
+  }
+
+  int getThreads() {
+    return threads;
   }
 
   @Override
@@ -147,7 +151,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   @Override
   public Result execute() {
     validateInputs();
-    executorService = Executors.newFixedThreadPool(parallelism);
+    executorService = Executors.newFixedThreadPool(threads);
     try {
       return doExecute();
     } finally {
@@ -326,7 +330,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
   private Set<String> manifestsToRewrite(Set<Snapshot> validSnapshots, Set<Long> deltaSnapshotIds) {
 
     Set<String> manifestPaths = ConcurrentHashMap.newKeySet();
-    int maxInFlight = parallelism * MAX_INFLIGHT_MULTIPLIER;
+    int maxInFlight = threads * MAX_INFLIGHT_MULTIPLIER;
     Semaphore semaphore = new Semaphore(maxInFlight);
 
     ExecutorCompletionService<Void> completionService = new ExecutorCompletionService<>(executorService);
@@ -441,7 +445,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
       return new RewriteResult<>();
     }
 
-    int maxInFlight = parallelism * MAX_INFLIGHT_MULTIPLIER;
+    int maxInFlight = threads * MAX_INFLIGHT_MULTIPLIER;
     Semaphore semaphore = new Semaphore(maxInFlight);
     ExecutorCompletionService<RewriteResult<ManifestFile>> completionService =
         new ExecutorCompletionService<>(executorService);
@@ -535,7 +539,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
       return new RewriteContentFileResult();
     }
 
-    int maxInFlight = parallelism * MAX_INFLIGHT_MULTIPLIER;
+    int maxInFlight = threads * MAX_INFLIGHT_MULTIPLIER;
     Semaphore semaphore = new Semaphore(maxInFlight);
     ExecutorCompletionService<RewriteContentFileResult> completionService =
         new ExecutorCompletionService<>(executorService);
@@ -735,7 +739,7 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
     }
     
     RewriteTablePathUtil.PositionDeleteReaderWriter posDeleteReaderWriter = new OzonePositionDeleteReaderWriter();
-    int maxInFlight = parallelism * MAX_INFLIGHT_MULTIPLIER;
+    int maxInFlight = threads * MAX_INFLIGHT_MULTIPLIER;
     Semaphore semaphore = new Semaphore(maxInFlight);
     ExecutorCompletionService<Void> completionService = new ExecutorCompletionService<>(executorService);
     int submittedTasks = 0;

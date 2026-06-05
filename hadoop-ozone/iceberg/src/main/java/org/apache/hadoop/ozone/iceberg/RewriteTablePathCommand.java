@@ -77,10 +77,11 @@ public class RewriteTablePathCommand implements Runnable {
   private String endVersion;
 
   @Option(
-      names = {"--parallelism"},
-      description = "Number of threads to use"
+      names = {"--threads"},
+      description = "Number of threads to use (positive integer). "
+          + "If omitted or zero, the default thread count is used."
   )
-  private int parallelism;
+  private int threads;
 
   @Override
   public void run() {
@@ -90,7 +91,6 @@ public class RewriteTablePathCommand implements Runnable {
     System.out.println("Target prefix: " + targetPrefix);
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
 
     Table table = null;
     if (tableLocation != null && !tableLocation.isBlank()) {
@@ -100,11 +100,12 @@ public class RewriteTablePathCommand implements Runnable {
     }
 
     RewriteTablePathOzoneAction action;
-    if (parallelism > 0) {
-      action = new RewriteTablePathOzoneAction(table, parallelism);
+    if (threads > 0) {
+      action = new RewriteTablePathOzoneAction(table, threads);
     } else {
       action = new RewriteTablePathOzoneAction(table);
     }
+    System.out.println("Threads: " + action.getThreads());
 
     RewriteTablePath rewriteAction = action.rewriteLocationPrefix(sourcePrefix, targetPrefix);
 
@@ -125,10 +126,12 @@ public class RewriteTablePathCommand implements Runnable {
 
     RewriteTablePath.Result result = rewriteAction.execute();
 
-    System.out.println("\nRewrite completed successfully");
+    System.out.println();
+    System.out.println("Rewrite completed successfully");
     System.out.println("  Latest version: " + result.latestVersion());
     System.out.println("  Staging location: " + result.stagingLocation());
-    System.out.println("\nNext step: Copy files from source to target using the file list");
+    System.out.println();
+    System.out.println("Next step: Copy files from source to target using the file list");
     System.out.println("  File list location: " + result.fileListLocation());
   }
 

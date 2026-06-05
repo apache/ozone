@@ -142,7 +142,7 @@ class TestRewriteTablePathOzoneAction {
 
   @Test
   void fullTablePathRewrite() throws Exception {
-    String fileListLocation = executeRewriteCommand("--parallelism", "2");
+    String fileListLocation = executeRewriteCommand("--threads", "2");
 
     List<String> metadataPaths = metadataLogEntryPaths(table);
     Set<String> expectedTargets = new HashSet<>();
