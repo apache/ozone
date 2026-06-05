@@ -145,6 +145,22 @@ public class TestOmMultipartKeyInfo {
     assertThrows(IllegalStateException.class, subject::getProto);
   }
 
+  @Test
+  public void builderFromProtoRejectsUnsupportedSchemaVersion() {
+    OmMultipartKeyInfo subject = createSubject()
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE))
+        .build();
+
+    OzoneManagerProtocolProtos.MultipartKeyInfo invalidProto = subject.getProto()
+        .toBuilder()
+        .setSchemaVersion(256)
+        .build();
+
+    assertThrows(IllegalArgumentException.class,
+        () -> OmMultipartKeyInfo.getFromProto(invalidProto));
+  }
+
   private static OmMultipartKeyInfo.Builder createSubject() {
     return new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())

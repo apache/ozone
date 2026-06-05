@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -27,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.jupiter.api.Test;
@@ -124,6 +127,42 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
     assertEquals(OzoneManagerProtocolProtos.Status
         .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheAllowsSchemaVersionOneAfterFinalization()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    when(ozoneManager.getVersionManager()
+        .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)).thenReturn(true);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    createParentPath(volumeName, bucketName);
+
+    String multipartUploadID =
+        initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
+            keyName, (byte) 1);
+
+    OMRequest abortMPURequest =
+        doPreExecuteAbortMPU(volumeName, bucketName, keyName,
+            multipartUploadID);
+
+    S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
+        getS3MultipartUploadAbortReq(abortMPURequest);
+
+    OMClientResponse omClientResponse =
+        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+    assertNotEquals(OzoneManagerProtocolProtos.Status
+            .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
         omClientResponse.getOMResponse().getStatus());
   }
 

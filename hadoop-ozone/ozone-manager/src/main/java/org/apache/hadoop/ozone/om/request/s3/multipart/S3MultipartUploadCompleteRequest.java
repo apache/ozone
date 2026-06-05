@@ -269,18 +269,22 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      if (!ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
+      // This gate runs in the replicated apply path, so the check must remain
+      // deterministic across replicas for a given log index. MLV advances only
+      // via the Ratis-logged finalize-upgrade request.
+      if (!ozoneManager.getVersionManager()
+          .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
           && multipartKeyInfo.getSchemaVersion() != 0) {
         throw new OMException("MPU parts-table split behavior is not allowed " +
-          "before cluster finalization for commit part request.",
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+            "before cluster finalization for complete request.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
 
       // Conditional write validation (If-None-Match / If-Match).
       // BUCKET_LOCK is held, so validation and commit are atomic.
       // Only 412 PreconditionFailed is possible; 409 Conflict cannot occur.
       OmKeyInfo existingKeyInfo =
-          getOmKeyInfoFromKeyTable(dbOzoneKey, keyName, omMetadataManager);
+          omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
       validateAtomicRewrite(existingKeyInfo, keyArgs);
       validateIfMatchETag(keyArgs, existingKeyInfo);
 

@@ -148,25 +148,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
 
-      if (multipartKeyInfo == null) {
-        // This can occur when user started uploading part by the time commit
-        // of that part happens, in between the user might have requested
-        // abort multipart upload. If we just throw exception, then the data
-        // will not be garbage collected, so move this part to delete table
-        // and throw error
-        // Move this part to delete table.
-        throw new OMException("No such Multipart upload is with specified " +
-            "uploadId " + uploadID,
-            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
-      }
-
-      if (!ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
-          && multipartKeyInfo.getSchemaVersion() != 0) {
-        throw new OMException("MPU parts-table split behavior is not allowed " +
-          "before cluster finalization for commit part request.",
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
-      }
-
       openKey = getOpenKey(volumeName, bucketName, keyName, omMetadataManager,
               clientID);
 
@@ -179,6 +160,33 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         throw new OMException("Failed to commit Multipart Upload key, as " +
             openKey + "entry is not found in the openKey table",
             KEY_NOT_FOUND);
+      }
+
+      if (multipartKeyInfo == null) {
+        // This can occur when user started uploading part by the time commit
+        // of that part happens, in between the user might have requested
+        // abort multipart upload. If we just throw exception, then the data
+        // will not be garbage collected, so move this part to delete table
+        // and throw error.
+        throw new OMException("No such Multipart upload is with specified " +
+            "uploadId " + uploadID,
+            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
+
+      // This gate runs in the replicated apply path, so the check must remain
+      // deterministic across replicas for a given log index. MLV advances only
+      // via the Ratis-logged finalize-upgrade request.
+      if (!ozoneManager.getVersionManager()
+          .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
+          && multipartKeyInfo.getSchemaVersion() != 0) {
+        throw new OMException("MPU parts-table split behavior is not allowed " +
+            "before cluster finalization for commit part request.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+      if (multipartKeyInfo.getSchemaVersion() == 1) {
+        throw new OMException("MPU parts-table split commit path is not " +
+            "supported in this write flow.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
       }
       // Add/Update user defined metadata.
       // Set the UpdateID to current transactionLogIndex
