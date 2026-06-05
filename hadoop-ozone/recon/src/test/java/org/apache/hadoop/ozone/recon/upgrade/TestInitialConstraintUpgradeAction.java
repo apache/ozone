@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.constraintExists;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -60,9 +63,6 @@ public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
     DataSource dataSource = getInjector().getInstance(DataSource.class);
     when(mockScmFacade.getDataSource()).thenReturn(dataSource);
 
-    // Set the DataSource and DSLContext directly
-    upgradeAction.setDslContext(dslContext);
-
     // Check if the table already exists
     try (Connection conn = dataSource.getConnection()) {
       DatabaseMetaData dbMetaData = conn.getMetaData();
@@ -79,6 +79,17 @@ public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
             .execute();
       }
     }
+  }
+
+  @Test
+  public void testExecuteIsIdempotent() throws SQLException {
+    DataSource dataSource = getInjector().getInstance(DataSource.class);
+    upgradeAction.execute(dataSource);
+    try (Connection conn = dataSource.getConnection()) {
+      assertTrue(constraintExists(conn, UNHEALTHY_CONTAINERS_TABLE_NAME,
+          UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1"));
+    }
+    assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
   }
 
   @Test
