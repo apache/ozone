@@ -90,6 +90,7 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
               out().printf("  status=%s size=unavailable (failed to compute directory size)%n",
                   o.getStatus());
             }
+            out().println();
           }
         });
   }
