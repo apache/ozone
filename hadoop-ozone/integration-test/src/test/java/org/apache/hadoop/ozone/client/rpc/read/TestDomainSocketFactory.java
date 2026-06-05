@@ -25,12 +25,16 @@ import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests for {@link DomainSocketFactory}'s functionality.
+ * For local intellij run, please follow the steps below:
+ * Add Environment variables
+ *  LD_LIBRARY_PATH=$PROJECT_DIR$/target/native-lib
+ *  DYLD_LIBRARY_PATH=$PROJECT_DIR$/target/native-lib
+ *  to intellij run configuration.
  */
 public class TestDomainSocketFactory {
 
@@ -56,7 +60,6 @@ public class TestDomainSocketFactory {
   }
 
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testShortCircuitDisableTemporary() {
     DomainSocketFactory factory = getDomainSocketFactory();
     try {

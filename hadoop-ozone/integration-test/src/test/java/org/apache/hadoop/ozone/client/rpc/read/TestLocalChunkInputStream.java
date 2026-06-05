@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.TestBucket;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,9 +51,14 @@ import org.slf4j.event.Level;
 
 /**
  * Tests {@link LocalChunkInputStream}.
+ * For local intellij run, please follow the steps below:
+ *  Add Environment variables
+ *  LD_LIBRARY_PATH=$PROJECT_DIR$/target/native-lib
+ *  DYLD_LIBRARY_PATH=$PROJECT_DIR$/target/native-lib
+ *  to intellij run configuration.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestShortCircuitChunkInputStream extends TestChunkInputStream {
+public class TestLocalChunkInputStream extends TestChunkInputStream {
 
   @TempDir
   private File dir;
@@ -89,7 +93,6 @@ public class TestShortCircuitChunkInputStream extends TestChunkInputStream {
    */
   @ContainerLayoutTestInfo.ContainerTest
   @Override
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   void testAll(ContainerLayoutVersion layout) throws Exception {
     try (OzoneClient client = getCluster().newClient()) {
       updateConfig(layout);
@@ -115,7 +118,6 @@ public class TestShortCircuitChunkInputStream extends TestChunkInputStream {
   }
 
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   void testFallbackToGrpc() throws Exception {
     try (OzoneClient client = getCluster().newClient()) {
       assumeTrue(DomainSocketFactory.getInstance(getCluster().getConf()).isServiceReady());

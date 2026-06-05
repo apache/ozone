@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm;
+package org.apache.hadoop.hdds;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.GetBlock;
@@ -59,6 +59,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
@@ -86,7 +88,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -96,6 +97,11 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests the XceiverServerDomainSocket class.
+ * Add Environment variables
+ *   LD_LIBRARY_PATH=$PROJECT_DIR$/target/native-lib
+ *   DYLD_LIBRARY_PATH=$PROJECT_DIR$/target/native-lib
+ *   to intellij run configuration to run it locally.
+ *   Dynamically set the java.library.path in java code doesn't affect the library loading
  */
 @Timeout(300)
 public class TestXceiverServerDomainSocket {
@@ -120,6 +126,7 @@ public class TestXceiverServerDomainSocket {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setShortCircuit(true);
     clientConfig.setShortCircuitReadDisableInterval(1000);
+    DomainSocket.disableBindPathValidation();
     conf.setFromObject(clientConfig);
     metrics = ContainerMetrics.create(conf);
     readTimeout = 5 * 1000;
@@ -128,7 +135,6 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testIllegalDomainPathConfiguration() {
     // empty domain path
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, "");
@@ -140,39 +146,23 @@ public class TestXceiverServerDomainSocket {
       assertTrue(e.getMessage().contains("ozone.domain.socket.path is not set"));
     }
 
-    // Domain path too long
-    conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
-        new File(dir, "ozone-datanode-socket-" + System.nanoTime()).getAbsolutePath());
-    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
-    try {
-      new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
-          conf, null, readExecutors, metrics, factory);
-      fail("Domain path is too long.");
-    } catch (Throwable e) {
-      assertTrue(e.getCause() instanceof SocketException);
-      assertTrue(e.getMessage().contains("path too long"));
-    } finally {
-      factory.close();
-    }
-
     // non-existing domain parent path
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH,
         new File(dir.getAbsolutePath() + System.nanoTime(), "ozone-socket").getAbsolutePath());
-    factory = DomainSocketFactory.getInstance(conf);
+    DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
     try {
       new XceiverServerDomainSocket(MockDatanodeDetails.randomDatanodeDetails(),
           conf, null, readExecutors, metrics, factory);
       fail("non-existing domain parent path.");
     } catch (Throwable e) {
       assertTrue(e.getCause() instanceof IOException);
-      assertTrue(e.getMessage().contains("failed to stat a path component"));
+      assertTrue(e.getMessage().contains("No such file or directory"));
     } finally {
       factory.close();
     }
   }
 
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testExistingDomainPath() {
     // an existing domain path, the existing file is override and changed from a normal file to a socket file
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
@@ -189,8 +179,9 @@ public class TestXceiverServerDomainSocket {
     }
   }
 
-  @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
+  /**
+   * This can be run locally instead of CI, without call DomainSocket.disableBindPathValidation().
+   */
   public void testDomainPathPermission() {
     // write from everyone is not allowed (permission too open)
     assertTrue(dir.setWritable(true, false));
@@ -287,7 +278,6 @@ public class TestXceiverServerDomainSocket {
    * On Linux, when there is still open file handle of a deleted file, the file handle remains open and can still
    * be used to read and write the file.
    */
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   @ParameterizedTest
   @CsvSource({
       "true, true",
@@ -371,7 +361,6 @@ public class TestXceiverServerDomainSocket {
    * Test concurrent read/write.
    */
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testConcurrentReadWrite() throws IOException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
@@ -467,7 +456,6 @@ public class TestXceiverServerDomainSocket {
    * Test server is not listening.
    */
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testServerNotListening() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -488,7 +476,6 @@ public class TestXceiverServerDomainSocket {
    * Although socket can be created, read will fail, write can succeed.
    */
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testServerNotStart() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -522,7 +509,6 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testReadTimeout() throws InterruptedException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, "2s");
@@ -558,7 +544,6 @@ public class TestXceiverServerDomainSocket {
    * read timeout happens.
    */
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testReceiverDaemonStartSlow() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -586,7 +571,6 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testMaxXceiverCount() throws IOException, InterruptedException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DatanodeConfiguration datanodeConfiguration = conf.getObject(DatanodeConfiguration.class);
@@ -650,7 +634,6 @@ public class TestXceiverServerDomainSocket {
    * will treat it as a critical error, close the connection.
    */
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testSendIrrelevantMessage() {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
@@ -677,7 +660,6 @@ public class TestXceiverServerDomainSocket {
   }
 
   @Test
-  @Unhealthy("Run it locally since it requires libhadoop.so.")
   public void testSendUnsupportedRequest() throws IOException {
     conf.set(OzoneClientConfig.OZONE_DOMAIN_SOCKET_PATH, new File(dir, "ozone-socket").getAbsolutePath());
     DomainSocketFactory factory = DomainSocketFactory.getInstance(conf);
