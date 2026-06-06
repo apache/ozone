@@ -977,6 +977,13 @@ public class TestOMRatisSnapshots {
     writeKeysToIncreaseLogIndex(followerOM.getOmRatisServer(),
         leaderCheckpointTermIndex.getIndex() + 100);
 
+    // Wait for the follower to finish applying in-flight transactions, so
+    // that the TermIndex read below matches what installCheckpoint observes.
+    long leaderAppliedIndex = leaderOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    GenericTestUtils.waitFor(() -> followerRatisServer
+        .getLastAppliedTermIndex().getIndex() >= leaderAppliedIndex, 100, 10_000);
+
     // Install the old checkpoint on the follower OM. This should fail as the
     // followerOM is already ahead of that transactionLogIndex and the OM
     // state should be reloaded.
