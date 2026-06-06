@@ -31,12 +31,12 @@ load ozone-functions_test_helper
   [[ "$OZONE_OPTS" =~ "-Dozone.http.request.logger=INFO,console" ]]
 }
 
-@test "HTTP request logger: daemon value is propagated to OZONE_OPTS" {
-  export OZONE_HTTP_REQUEST_LOGGER="INFO,HttpAccess"
-  export OZONE_OPTS=""
+@test "HTTP request logger: defaults are set by ozone_basic_init" {
+  unset OZONE_HTTP_REQUEST_LOGGER
+  unset OZONE_DAEMON_HTTP_REQUEST_LOGGER
 
-  ozone_finalize_opts
+  ozone_basic_init
 
-  echo "$OZONE_OPTS"
-  [[ "$OZONE_OPTS" =~ "-Dozone.http.request.logger=INFO,HttpAccess" ]]
+  [[ "$OZONE_HTTP_REQUEST_LOGGER" == "INFO,console" ]]
+  [[ "$OZONE_DAEMON_HTTP_REQUEST_LOGGER" == "INFO,HttpAccess" ]]
 }
