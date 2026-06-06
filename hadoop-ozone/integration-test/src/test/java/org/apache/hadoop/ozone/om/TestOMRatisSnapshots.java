@@ -169,11 +169,13 @@ public class TestOMRatisSnapshots {
     clientConfig.setRpcTimeOut(TimeUnit.SECONDS.toMillis(5));
     conf.setFromObject(clientConfig);
 
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId("om-service-test1")
+    MiniOzoneHAClusterImpl.Builder clusterBuilder =
+        MiniOzoneCluster.newHABuilder(conf);
+    clusterBuilder.setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(NUM_OF_OMS)
         .setNumOfActiveOMs(2)
-        .build();
+        .setNumDatanodes(1);
+    cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
