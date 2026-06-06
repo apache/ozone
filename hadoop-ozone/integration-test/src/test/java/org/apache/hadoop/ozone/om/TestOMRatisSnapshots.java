@@ -789,9 +789,6 @@ public class TestOMRatisSnapshots {
     });
     List<String> newKeys = writeFuture.get();
 
-    // Wait checkpoint installation to finish
-    Thread.sleep(5000);
-
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 3s
@@ -836,7 +833,16 @@ public class TestOMRatisSnapshots {
           TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
-    Thread.sleep(5000);
+    OMMetadataManager catchUpMetaMgr = followerOM.getMetadataManager();
+    String lastNewKey = newKeys.get(newKeys.size() - 1);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return catchUpMetaMgr.getKeyTable(TEST_BUCKET_LAYOUT)
+            .get(catchUpMetaMgr.getOzoneKey(volumeName, bucketName, lastNewKey)) != null;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 30_000);
     followerOMMetaMgr = followerOM.getMetadataManager();
     for (String key : newKeys) {
       assertNotNull(followerOMMetaMgr.getKeyTable(
@@ -931,8 +937,6 @@ public class TestOMRatisSnapshots {
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
-    // Wait installation finish
-    Thread.sleep(5000);
     // Verify checkpoint installation was happened.
     assertLogCapture(logCapture, "Reloaded OM state");
     assertLogCapture(logCapture, "Install Checkpoint is finished");
