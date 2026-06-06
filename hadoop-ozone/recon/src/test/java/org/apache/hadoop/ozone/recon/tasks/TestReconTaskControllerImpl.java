@@ -585,7 +585,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // Iterations 1-6: should return RETRY_LATER and increment retry count
     for (int i = 1; i <= 6; i++) {
       if (i > 1) {
-        Thread.sleep(2500); // Wait for retry delay
+        Thread.sleep(2100); // Wait for retry delay
       }
       result = controllerSpy.queueReInitializationEvent(
           ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
@@ -596,7 +596,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     
     // Iteration 7: should return MAX_RETRIES_EXCEEDED (eventProcessRetryCount is now 6,
     // which >= MAX_EVENT_PROCESS_RETRIES)
-    Thread.sleep(2500); // Wait for retry delay
+    Thread.sleep(2100); // Wait for retry delay
     result = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result,
