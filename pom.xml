@@ -124,7 +124,7 @@
     <junit5.version>5.14.4</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
-    <langchain4j.version>0.35.0</langchain4j.version>
+    <langchain4j.version>0.36.2</langchain4j.version>
     <license-maven-plugin.version>2.7.1</license-maven-plugin.version>
     <log4j2.version>2.26.0</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
