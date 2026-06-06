@@ -843,19 +843,9 @@ public final class HttpServer2 implements FilterContainer {
    */
   protected void addDefaultServlets() {
     addServlet("stacks", "/stacks", StackServlet.class);
-    addSecuredServlet("logLevel", "/logLevel", LogLevel.Servlet.class);
+    addServlet("logLevel", "/logLevel", LogLevel.Servlet.class);
     addServlet("jmx", "/jmx", JMXJsonServlet.class);
     addServlet("conf", "/conf", ConfServlet.class);
-  }
-
-  /**
-   * Add a servlet that requires Kerberos (SPNEGO) authentication when security
-   * is enabled.
-   */
-  private void addSecuredServlet(String name, String pathSpec,
-      Class<? extends HttpServlet> clazz) {
-    addInternalServlet(name, pathSpec, clazz, true);
-    addFilterPathMapping(pathSpec, webAppContext);
   }
 
   public void addContext(ServletContextHandler ctxt, boolean isFiltered) {
