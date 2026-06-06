@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
@@ -83,7 +84,10 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     // Display consolidated status for successful nodes
     if (!successNodes.isEmpty() && !statuses.isEmpty()) {
       List<DatanodeDiskBalancerInfoProto> statusList =
-          new ArrayList<>(statuses.values());
+          successNodes.stream()
+              .map(statuses::get)
+              .filter(Objects::nonNull)
+              .collect(toList());
       System.out.println(generateStatus(statusList));
     }
   }
