@@ -1187,7 +1187,6 @@ public class TestOMRatisSnapshots {
     long logIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     while (logIndex < targetLogIndex) {
       keys.add(createKey(ozoneBucket));
-      Thread.sleep(100);
       logIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     }
     return keys;
