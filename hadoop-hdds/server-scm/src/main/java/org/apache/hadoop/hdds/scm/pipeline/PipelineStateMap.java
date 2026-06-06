@@ -321,13 +321,17 @@ class PipelineStateMap {
   Pipeline removePipeline(PipelineID pipelineID) throws PipelineNotFoundException, InvalidPipelineStateException {
     Objects.requireNonNull(pipelineID, "Pipeline Id cannot be null");
 
-    final PipelineInfo info = pipelineMap.remove(pipelineID);
+    // Check existence first, before removing
+    final PipelineInfo info = pipelineMap.get(pipelineID);
+    if (info == null) {
+      throw new PipelineNotFoundException("Pipeline not found: " + pipelineID);
+    }
     final Pipeline pipeline = info.getPipeline();
     if (!pipeline.isClosed()) {
-      pipelineMap.put(pipelineID, info);
       throw new InvalidPipelineStateException(
           format("Pipeline with %s is not yet closed", pipelineID));
     }
+    pipelineMap.remove(pipelineID);
     return pipeline;
   }
 
