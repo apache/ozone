@@ -192,7 +192,7 @@ public class TestDiskBalancerSubCommands {
 
       String output = outContent.toString(DEFAULT_ENCODING);
 
-      Pattern p = Pattern.compile("Started DiskBalancer on all IN_SERVICE nodes\\.");
+      Pattern p = Pattern.compile("Started DiskBalancer on all IN_SERVICE and HEALTHY nodes\\.");
       Matcher m = p.matcher(output);
       assertTrue(m.find());
     }
@@ -323,7 +323,7 @@ public class TestDiskBalancerSubCommands {
       c.parseArgs("--in-service-datanodes");
       cmd.call();
 
-      Pattern p = Pattern.compile("Stopped DiskBalancer on all IN_SERVICE nodes\\.");
+      Pattern p = Pattern.compile("Stopped DiskBalancer on all IN_SERVICE and HEALTHY nodes\\.");
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
@@ -378,7 +378,7 @@ public class TestDiskBalancerSubCommands {
       c.parseArgs("--in-service-datanodes", "-t", "0.005", "-b", "100");
       cmd.call();
 
-      Pattern p = Pattern.compile("Updated DiskBalancer configuration on all IN_SERVICE nodes\\.");
+      Pattern p = Pattern.compile("Updated DiskBalancer configuration on all IN_SERVICE and HEALTHY nodes\\.");
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
@@ -885,4 +885,3 @@ public class TestDiskBalancerSubCommands {
         .build();
   }
 }
-
