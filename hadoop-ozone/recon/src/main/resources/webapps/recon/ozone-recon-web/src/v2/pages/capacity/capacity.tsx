@@ -38,6 +38,7 @@ import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/capacity.constants';
 import { UtilizationResponse, SCMPendingDeletion, OMPendingDeletion, DNPendingDeletion, DataNodeUsage } from '@/v2/types/capacity.types';
 import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
+import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 type CapacityState = {
   isDNPending: boolean;
@@ -184,22 +185,19 @@ const Capacity: React.FC<object> = () => {
     }
   };
 
-  // Poll DN pending deletion every 5s until status is FINISHED
+  // Adjust the polling interval based on DN scan status:
+  // fast (5s) while a scan is running, normal (60s) once finished.
+  // Honors the auto-reload toggle: if polling is OFF, do nothing.
   React.useEffect(() => {
-    if (dnPendingDeletes.data.status === "FINISHED") {
+    if (!autoReload.isPolling) {
       return;
     }
-
-    dnPendingDeletes.refetch();
-
-    const intervalId = window.setInterval(() => {
-      dnPendingDeletes.refetch();
-    }, PENDING_POLL_INTERVAL);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [dnPendingDeletes.data.status]); // eslint-disable-line react-hooks/exhaustive-deps
+    autoReload.startPolling(
+      dnPendingDeletes.data.status === "FINISHED"
+        ? AUTO_RELOAD_INTERVAL_DEFAULT
+        : PENDING_POLL_INTERVAL
+    );
+  }, [dnPendingDeletes.data.status, autoReload.isPolling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dnReportStatus = (
     (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
