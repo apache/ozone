@@ -23,7 +23,7 @@ CORE-SITE.XML_hadoop.proxyuser.hadoop.groups=*
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
 OZONE-SITE.XML_ozone.scm.http-address=scm:9876
-OZONE-SITE.XML_ozone.scm.container.size=100MB
+OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.block.size=1MB
 OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
@@ -79,3 +79,19 @@ OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 
 # Periodic snapshot defrag for smoketest snapshot/snapshot-defrag.robot (HDDS-15181)
 OZONE-SITE.XML_ozone.snapshot.defrag.service.interval=30s
+
+# Recon AI Chatbot — DISABLED by default.
+#
+# WARNING: The plaintext API key approach shown below is for LOCAL DOCKER
+# TESTING ONLY. It must NOT be used on production clusters because plaintext
+# keys are exposed via 'hadoop conf | grep api.key' and via Recon's /conf HTTP
+# endpoint. For production clusters, store the key in a Hadoop JCEKS credential
+# store instead (see ozone-site.xml.template for full setup instructions).
+#
+# To enable the chatbot locally for testing:
+#   1. Uncomment the lines below.
+#   2. Replace YOUR_GEMINI_API_KEY_HERE with a real key.
+#   3. Never commit a real key to git — rotate it immediately if you do.
+# OZONE-SITE.XML_ozone.recon.chatbot.enabled=true
+# OZONE-SITE.XML_ozone.recon.chatbot.provider=gemini
+# OZONE-SITE.XML_ozone.recon.chatbot.gemini.api.key=YOUR_GEMINI_API_KEY_HERE

@@ -96,35 +96,39 @@ Returns all the ContainerMetadata objects.
 
 **Returns**
 
-Returns all the KeyMetadata objects for the given ContainerID.
-    
+Returns all the KeyMetadata objects for the given ContainerID. `lastKey` is the final key seen in
+this page: pass it back as `prevKey` to continue paginating.
+
 ```json
     {
-      "totalCount":7,
+      "totalCount": 7,
+      "lastKey": "/vol-1-73141/bucket-3-35816/key-0-43637",
       "keys": [
         {
-          "Volume":"vol-1-73141",
-          "Bucket":"bucket-3-35816",
-          "Key":"key-0-43637",
-          "DataSize":1000,
-          "Versions":[0],
+          "Volume": "vol-1-73141",
+          "Bucket": "bucket-3-35816",
+          "Key": "key-0-43637",
+          "CompletePath": "/vol-1-73141/bucket-3-35816/dir1/dir2/key-0-43637",
+          "DataSize": 1000,
+          "Versions": [0],
           "Blocks": {
             "0": [
               {
-                "containerID":1,
-                "localID":105232659753992201
+                "containerID": 1,
+                "localID": 105232659753992201
               }
             ]
           },
-          "CreationTime":"2020-11-18T18:09:17.722Z",
-          "ModificationTime":"2020-11-18T18:09:30.405Z"
-        },
-        ...
+          "CreationTime": "2020-11-18T18:09:17.722Z",
+          "ModificationTime": "2020-11-18T18:09:30.405Z"
+        }
       ]
     }
 ```
 
 ### GET /api/v1/containers/missing
+
+> **Deprecated.** Use `/api/v1/containers/unhealthy/MISSING` instead.
 
 **Parameters**
 
@@ -159,6 +163,58 @@ Returns the MissingContainerMetadata objects for all the missing containers.
     }
 ``` 
   
+### GET /api/v1/containers/quasiClosed
+
+**Parameters**
+
+* limit (optional)
+
+   Maximum number of containers to return. Default is 1000.
+
+* minContainerId (optional)
+
+   Cursor. Returns containers with ID greater than this value, in ascending order. Pass the
+   previous response's `lastKey` to fetch the next page. Default is 0.
+
+**Returns**
+
+Returns containers currently in the `QUASI_CLOSED` lifecycle state. `quasiClosedCount` is the
+cluster-wide total (not just the current page). When the page is empty, both `firstKey` and
+`lastKey` echo back the `minContainerId` cursor.
+
+```json
+{
+  "quasiClosedCount": 42,
+  "firstKey": 100,
+  "lastKey": 199,
+  "containers": [
+    {
+      "containerID": 100,
+      "pipelineID": "88646d32-a1aa-4e1a-a8d5-aa1e7dd3f5cc",
+      "keys": 17,
+      "stateEnterTime": 1718640123456,
+      "expectedReplicaCount": 3,
+      "actualReplicaCount": 2,
+      "replicas": [
+        {
+          "containerID": 100,
+          "datanodeUuid": "841be80f-0454-47df-b676",
+          "datanodeHost": "localhost-1",
+          "firstSeenTime": 1605724047057,
+          "lastSeenTime": 1605731201301,
+          "lastBcsId": 123,
+          "state": "QUASI_CLOSED"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Responses:
+
+* `400 Bad Request`: `limit` or `minContainerId` is negative.
+
 ### GET /api/v1/containers/:id/replicaHistory
 
 **Parameters**
@@ -183,22 +239,26 @@ Returns all the ContainerHistory objects for the given ContainerID.
  
 ### GET /api/v1/containers/unhealthy
 
- 
+
 **Parameters**
 
-* batchNum (optional)
-
-    The batch number (like "page number") of results to return.
-    Passing 1, will return records 1 to limit. 2 will return
-    limit + 1 to 2 * limit, etc.
-    
 * limit (optional)
 
-    Only returns the limited number of results. The default limit is 1000.  
+    Only returns the limited number of results. The default limit is 1000.
+
+* maxContainerId (optional)
+
+    Upper bound for container IDs (exclusive). When specified, returns containers with IDs less
+    than this value in descending order. Use it for backward pagination.
+
+* minContainerId (optional)
+
+    Lower bound for container IDs (exclusive). When `maxContainerId` is not specified, returns
+    containers with IDs greater than this value in ascending order. Use it for forward pagination.
 
 **Returns**
 
-Returns the UnhealthyContainerMetadata objects for all the unhealthycontainers.
+Returns the UnhealthyContainerMetadata objects for all the unhealthy containers.
      
 ```json
      {
@@ -231,24 +291,97 @@ Returns the UnhealthyContainerMetadata objects for all the unhealthycontainers.
 ```
 
 ### GET /api/v1/containers/unhealthy/:state
- 
+
 **Parameters**
 
-* batchNum (optional)
-     
-   The batch number (like "page number") of results to return.
-   Passing 1, will return records 1 to limit. 2 will return
-   limit + 1 to 2 * limit, etc.
- 
 * limit (optional)
 
-   Only returns the limited number of results. The default limit is 1000.  
+   Only returns the limited number of results. The default limit is 1000.
+
+* maxContainerId (optional)
+
+   Upper bound for container IDs (exclusive). When specified, returns containers with IDs less
+   than this value in descending order. Use it for backward pagination.
+
+* minContainerId (optional)
+
+   Lower bound for container IDs (exclusive). When `maxContainerId` is not specified, returns
+   containers with IDs greater than this value in ascending order. Use it for forward pagination.
 
 **Returns**
 
 Returns the UnhealthyContainerMetadata objects for the containers in the given state.
-Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`,`UNDER_REPLICATED`, `OVER_REPLICATED`.
+Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`, `OVER_REPLICATED`.
 The response structure is same as `/containers/unhealthy`.
+
+
+### GET /api/v1/containers/unhealthy/export
+
+**Returns**
+
+Lists every unhealthy-container export job currently tracked by Recon, in any status.
+Items are `ExportJob` objects (see schema below).
+
+```json
+[
+  {
+    "jobId": "4f7a8b9c-1234-5678-9abc-def012345678",
+    "state": "MISSING",
+    "status": "RUNNING",
+    "submittedAt": 1718640123456,
+    "startedAt": 1718640124000,
+    "completedAt": 0,
+    "totalRecords": 250,
+    "estimatedTotal": 1000,
+    "fileName": "",
+    "errorMessage": null,
+    "progressPercent": 25,
+    "queuePosition": 0,
+    "downloadCount": 0,
+    "downloadsRemaining": 3
+  }
+]
+```
+
+### POST /api/v1/containers/unhealthy/export
+
+**Parameters**
+
+* state (required)
+
+    One of `MISSING`, `MIS_REPLICATED`, `UNDER_REPLICATED`, `OVER_REPLICATED`.
+
+**Returns**
+
+Submits a new CSV export job and returns the `ExportJob` with the assigned `jobId`.
+The job initially has `status: QUEUED`.
+
+* `400 Bad Request`: `state` is missing or not a valid unhealthy state.
+* `429 Too Many Requests`: the export queue is full; retry later. Body: `{ "error": "Too Many Requests", "message": "<reason>" }`.
+
+### GET /api/v1/containers/unhealthy/export/:jobId
+
+**Returns**
+
+Returns the current `ExportJob` for the given `jobId`. `404 Not Found` if no job has that id.
+
+### GET /api/v1/containers/unhealthy/export/:jobId/download
+
+**Returns**
+
+Streams the TAR archive produced by the export job. Response `Content-Type` is `application/x-tar` with
+a `Content-Disposition: attachment` header carrying the export filename.
+
+* `404 Not Found`: `jobId` is unknown or the on-disk file was removed.
+* `409 Conflict`: the job has not reached `COMPLETED` status yet.
+* `429 Too Many Requests`: the per-job download limit has been reached. Body: `{ "error": "Download limit reached", "message": "<reason>" }` (schema `DownloadLimitReachedError`).
+
+### DELETE /api/v1/containers/unhealthy/export/:jobId
+
+**Returns**
+
+Cancels the export job. `200 OK` with empty body on success. `404 Not Found` if the job cannot be
+cancelled (for example, it has already reached a terminal state).
 
 
 ### GET /api/v1/containers/mismatch
@@ -306,6 +439,41 @@ list of keys mapped to such DELETED state containers.
 ]
 ```
 
+### GET /api/v1/containers/deleted
+
+**Parameters**
+
+* limit (optional)
+
+  Maximum number of DELETED containers to return. Default 1000.
+
+* prevKey (optional)
+
+  Previous container ID to skip. Use the last returned `containerId` to fetch the next page.
+  Default 0.
+
+**Returns**
+
+Returns all DELETED containers in SCM along with their pipeline and replication info.
+
+```json
+[
+  {
+    "containerId": 12,
+    "pipelineID": { "id": "1202e6bb-b7c1-4a85-8067-61374b069adb" },
+    "containerState": "DELETED",
+    "stateEnterTime": 1716123456789,
+    "lastUsed": 1716123456789,
+    "replicationConfig": {
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE",
+      "replicationNodes": 3
+    },
+    "replicationFactor": "THREE"
+  }
+]
+```
+
 ### GET /api/v1/keys/open
 
 
@@ -320,57 +488,95 @@ list of keys mapped to such DELETED state containers.
 
     Only returns the limited number of results. The default limit is 1000.
 
+* startPrefix (optional)
+
+    Restricts the listing to keys matching this prefix. Must be at bucket level or deeper
+    (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`); shallower prefixes return `400 Bad Request`.
+
+* includeFso (optional)
+
+    Boolean, default `false`. Include keys/files from FSO buckets in the result.
+
+* includeNonFso (optional)
+
+    Boolean, default `false`. Include keys/files from non-FSO (OBS / LEGACY) buckets.
+
+If neither `includeFso` nor `includeNonFso` is `true`, the response will be empty.
+
 **Returns**
 
-Returns set of keys/files which are open.
+Returns set of keys/files which are open. FSO and non-FSO keys are reported in separate arrays.
 
 ```json
 {
   "lastKey": "/vol1/fso-bucket/dir1/dir2/file2",
-  "replicatedTotal": 13824,
-  "unreplicatedTotal": 4608,
-  "entities": [
+  "replicatedDataSize": 13824,
+  "unreplicatedDataSize": 4608,
+  "status": "OK",
+  "fso": [
     {
-      "path": "/vol1/bucket1/key1",
-      "keyState": "Open",
-      "inStateSince": 1667564193026,
-      "size": 1024,
-      "replicatedSize": 3072,
-      "unreplicatedSize": 1024,
-      "replicationType": "RATIS",
-      "replicationFactor": "THREE"
-    },
-    {
-      "path": "/vol1/bucket1/key2",
-      "keyState": "Open",
-      "inStateSince": 1667564193026,
-      "size": 512,
-      "replicatedSize": 1536,
-      "unreplicatedSize": 512,
-      "replicationType": "RATIS",
-      "replicationFactor": "THREE"
-    },
-    {
+      "key": "/-9223372036854775552/-9223372036854774016/file1",
       "path": "/vol1/fso-bucket/dir1/file1",
-      "keyState": "Open",
       "inStateSince": 1667564193026,
       "size": 1024,
       "replicatedSize": 3072,
-      "unreplicatedSize": 1024,
-      "replicationType": "RATIS",
-      "replicationFactor": "THREE"
-    },
+      "replicationInfo": {
+        "replicationFactor": "THREE",
+        "requiredNodes": 3,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1667564000000,
+      "modificationTime": 1667564193026,
+      "isKey": true
+    }
+  ],
+  "nonFSO": [
     {
-      "path": "/vol1/fso-bucket/dir1/dir2/file2",
-      "keyState": "Open",
+      "key": "/vol1/bucket1/key1",
+      "path": "/vol1/bucket1/key1",
       "inStateSince": 1667564193026,
-      "size": 2048,
-      "replicatedSize": 6144,
-      "unreplicatedSize": 2048,
-      "replicationType": "RATIS",
-      "replicationFactor": "THREE"
+      "size": 1024,
+      "replicatedSize": 3072,
+      "replicationInfo": {
+        "replicationFactor": "THREE",
+        "requiredNodes": 3,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1667564000000,
+      "modificationTime": 1667564193026,
+      "isKey": true
     }
   ]
+}
+```
+
+### GET /api/v1/keys/open/summary
+
+**Returns**
+
+Returns a flat summary of all currently-open keys across the cluster.
+
+```json
+{
+  "totalOpenKeys": 8,
+  "totalReplicatedDataSize": 90000,
+  "totalUnreplicatedDataSize": 30000
+}
+```
+
+### GET /api/v1/keys/open/mpu/summary
+
+**Returns**
+
+Returns a flat summary of all currently-open multipart-upload keys across the cluster. Note that
+the unreplicated total is reported as `totalDataSize` (not `totalUnreplicatedDataSize`): the
+naming differs from `/keys/open/summary`.
+
+```json
+{
+  "totalOpenMPUKeys": 2,
+  "totalReplicatedDataSize": 90000,
+  "totalDataSize": 30000
 }
 ```
 
@@ -388,48 +594,41 @@ Returns set of keys/files which are open.
 
   Only returns the limited number of results. The default limit is 1000.
 
+* startPrefix (optional)
+
+  Restricts the listing to keys matching this prefix. Must be at bucket level or deeper
+  (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`); shallower prefixes return `400 Bad Request`.
+
 **Returns**
 
-Returns set of keys/files pending for deletion.
+Returns the set of keys/files pending deletion, paired with aggregated size totals. Each item in
+`deletedKeyInfo` is a `RepeatedOmKeyInfo` (a wrapper around one or more `OmKeyInfo` entries).
 
 ```json
 {
   "lastKey": "sampleVol/bucketOne/key_one",
-  "replicatedTotal": -1530804718628866300,
-  "unreplicatedTotal": -1530804718628866300,
-  "deletedkeyinfo": [
+  "replicatedDataSize": 1800000,
+  "unreplicatedDataSize": 600000,
+  "deletedKeyInfo": [
     {
       "omKeyInfoList": [
         {
-          "metadata": {},
-          "objectID": 0,
-          "updateID": 0,
-          "parentObjectID": 0,
           "volumeName": "sampleVol",
           "bucketName": "bucketOne",
           "keyName": "key_one",
-          "dataSize": -1530804718628866300,
-          "keyLocationVersions": [],
-          "creationTime": 0,
-          "modificationTime": 0,
+          "dataSize": 200000,
+          "replicatedSize": 600000,
           "replicationConfig": {
-            "replicationFactor": "ONE",
-            "requiredNodes": 1,
-            "replicationType": "STANDALONE"
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
           },
-          "fileChecksum": null,
-          "fileName": "key_one",
-          "acls": [],
-          "path": "0/key_one",
-          "file": false,
-          "latestVersionLocations": null,
-          "replicatedSize": -1530804718628866300,
-          "fileEncryptionInfo": null,
-          "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='-1530804718628866186', creationTime='0', objectID='0', parentID='0', replication='STANDALONE/ONE', fileChecksum='null}",
-          "updateIDset": false
+          "creationTime": 1717000000000,
+          "modificationTime": 1717100000000
         }
       ]
-    }
+    },
+    ...
   ],
   "status": "OK"
 }
@@ -451,48 +650,124 @@ Returns set of keys/files pending for deletion.
 
 **Returns**
 
-   Returns set of directories pending for deletion.
+Returns the set of directories pending for deletion. Each entry in `deletedDirInfo` is a
+`KeyEntityInfo` describing one pending-delete directory (not a `RepeatedOmKeyInfo` like
+`/keys/deletePending`).
 
 ```json
 {
-  "lastKey": "vol1/bucket1/bucket1/dir1",
-  "replicatedTotal": -1530804718628866300,
-  "unreplicatedTotal": -1530804718628866300,
-  "deletedkeyinfo": [
+  "lastKey": "/vol1/bucket1/dir1",
+  "replicatedDataSize": 13824,
+  "unreplicatedDataSize": 4608,
+  "deletedDirInfo": [
     {
-      "omKeyInfoList": [
-        {
-          "metadata": {},
-          "objectID": 0,
-          "updateID": 0,
-          "parentObjectID": 0,
-          "volumeName": "sampleVol",
-          "bucketName": "bucketOne",
-          "keyName": "key_one",
-          "dataSize": -1530804718628866300,
-          "keyLocationVersions": [],
-          "creationTime": 0,
-          "modificationTime": 0,
-          "replicationConfig": {
-            "replicationFactor": "ONE",
-            "requiredNodes": 1,
-            "replicationType": "STANDALONE"
-          },
-          "fileChecksum": null,
-          "fileName": "key_one",
-          "acls": [],
-          "path": "0/key_one",
-          "file": false,
-          "latestVersionLocations": null,
-          "replicatedSize": -1530804718628866300,
-          "fileEncryptionInfo": null,
-          "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='-1530804718628866186', creationTime='0', objectID='0', parentID='0', replication='STANDALONE/ONE', fileChecksum='null}",
-          "updateIDset": false
-        }
-      ]
+      "key": "/-9223372036854775552/-9223372036854774016/dir1",
+      "path": "/vol1/bucket1/dir1",
+      "inStateSince": 1717000000000,
+      "size": 4608,
+      "replicatedSize": 13824,
+      "replicationInfo": {
+        "replicationFactor": "THREE",
+        "requiredNodes": 3,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1716900000000,
+      "modificationTime": 1716999999999,
+      "isKey": false
     }
   ],
   "status": "OK"
+}
+```
+
+### GET /api/v1/keys/deletePending/summary
+
+**Returns**
+
+Returns a flat summary of all keys pending deletion across the cluster.
+
+```json
+{
+  "totalDeletedKeys": 8,
+  "totalReplicatedDataSize": 90000,
+  "totalUnreplicatedDataSize": 30000
+}
+```
+
+### GET /api/v1/keys/deletePending/dirs/summary
+
+**Returns**
+
+Returns the total count of directories pending deletion.
+
+```json
+{
+  "totalDeletedDirectories": 5
+}
+```
+
+### GET /api/v1/keys/listKeys
+
+**Parameters**
+
+* startPrefix (optional, but effectively required)
+
+  Bucket-level or deeper prefix (e.g. `/vol1/bucket1` or `/vol1/bucket1/dir1`). HTTP-level the
+  parameter is optional (defaults to `/`), but the handler rejects anything shallower than
+  bucket level with `400 Bad Request`, so in practice callers must supply one.
+
+* replicationType (optional)
+
+  Filter by replication type (e.g. `RATIS`, `EC`).
+
+* creationDate (optional)
+
+  Filter by creation date; only keys created on or after this date are returned.
+
+* keySize (optional)
+
+  Filter to keys with data size at least this many bytes. Default 0.
+
+* prevKey (optional)
+
+  Pagination cursor. Pass back the `lastKey` from the previous response to continue iteration.
+
+* limit (optional)
+
+  Maximum number of keys to return. Default 1000.
+
+**Returns**
+
+Returns committed keys (and files in FSO buckets) under the given prefix.
+
+* `200 OK` with a `ListKeysResponse` body.
+* `204 No Content` when no keys matched the given filters.
+* `400 Bad Request` when `startPrefix` is missing or shallower than bucket level.
+* `503 Service Unavailable` while Recon is still bootstrapping OM DB; response body status is `INITIALIZING`.
+
+```json
+{
+  "status": "OK",
+  "path": "/vol1/bucket1",
+  "replicatedDataSize": 600000,
+  "unReplicatedDataSize": 200000,
+  "lastKey": "/vol1/bucket1/dir1/file42",
+  "keys": [
+    {
+      "key": "/vol1/bucket1/dir1/file42",
+      "path": "/vol1/bucket1/dir1/file42",
+      "size": 1048576,
+      "replicatedSize": 3145728,
+      "replicationInfo": {
+        "replicationFactor": "THREE",
+        "requiredNodes": 3,
+        "replicationType": "RATIS"
+      },
+      "creationTime": 1717000000000,
+      "modificationTime": 1717100000000,
+      "isKey": true
+    }
+  ]
 }
 ```
 
@@ -761,20 +1036,33 @@ No parameters.
 Returns a summary of the current state of the Ozone cluster.
 
 ```json
-     {
-     	"pipelines": 5,
-     	"totalDatanodes": 4,
-     	"healthyDatanodes": 4,
-     	"storageReport": {
-     		"capacity": 1081719668736,
-     		"used": 1309212672,
-     		"remaining": 597361258496
-     	},
-     	"containers": 26,
-     	"volumes": 6,
-     	"buckets": 26,
-     	"keys": 25
-     }
+{
+  "pipelines": 5,
+  "totalDatanodes": 4,
+  "healthyDatanodes": 4,
+  "storageReport": {
+    "capacity": 1081719668736,
+    "used": 1309212672,
+    "remaining": 597361258496,
+    "committed": 27007111,
+    "reserved": 31457280,
+    "minimumFreeSpace": 20480,
+    "filesystemCapacity": 1081730000000,
+    "filesystemUsed": 1310000000,
+    "filesystemAvailable": 597361258496
+  },
+  "containers": 26,
+  "missingContainers": 0,
+  "openContainers": 5,
+  "deletedContainers": 1,
+  "volumes": 6,
+  "buckets": 26,
+  "keys": 25,
+  "keysPendingDeletion": 0,
+  "deletedDirs": 0,
+  "scmServiceId": "scmservice",
+  "omServiceId": "omservice"
+}
 ```
 
 ## Volumes (admin only)
@@ -898,35 +1186,42 @@ No parameters.
 Returns all the datanodes in the cluster.
 
 ```json
-     {
-     	"totalCount": 4,
-     	"datanodes": [{
-     		"uuid": "f8f8cb45-3ab2-4123",
-     		"hostname": "localhost-1",
-     		"state": "HEALTHY",
-     		"lastHeartbeat": 1605738400544,
-     		"storageReport": {
-     			"capacity": 270429917184,
-     			"used": 358805504,
-     			"remaining": 119648149504
-     		},
-     		"pipelines": [{
-     			"pipelineID": "b9415b20-b9bd-4225",
-     			"replicationType": "RATIS",
-     			"replicationFactor": 3,
-     			"leaderNode": "localhost-2"
-     		}, {
-     			"pipelineID": "3bf4a9e9-69cc-4d20",
-     			"replicationType": "RATIS",
-     			"replicationFactor": 1,
-     			"leaderNode": "localhost-1"
-     		}],
-     		"containers": 17,
-     		"leaderCount": 1
-     	},
-        ...
-        ]
-     }
+{
+  "totalCount": 4,
+  "datanodes": [
+    {
+      "uuid": "f8f8cb45-3ab2-4123",
+      "hostname": "localhost-1",
+      "state": "HEALTHY",
+      "opState": "IN_SERVICE",
+      "lastHeartbeat": 1605738400544,
+      "storageReport": {
+        "capacity": 270429917184,
+        "used": 358805504,
+        "remaining": 270071111680,
+        "committed": 27007111,
+        "reserved": 31457280,
+        "minimumFreeSpace": 20480,
+        "filesystemCapacity": 270461374464,
+        "filesystemUsed": 390262784,
+        "filesystemAvailable": 270071111680
+      },
+      "pipelines": [
+        { "pipelineID": "b9415b20-b9bd-4225", "replicationType": "RATIS", "replicationFactor": 3, "leaderNode": "localhost-2" },
+        { "pipelineID": "3bf4a9e9-69cc-4d20", "replicationType": "RATIS", "replicationFactor": 1, "leaderNode": "localhost-1" }
+      ],
+      "containers": 17,
+      "openContainers": 4,
+      "leaderCount": 1,
+      "version": "2.0.0",
+      "setupTime": 1605700000000,
+      "revision": "abcdef1",
+      "layoutVersion": 6,
+      "networkLocation": "/default-rack"
+    },
+    ...
+  ]
+}
 ```
 
 ### PUT /api/v1/datanodes/remove
@@ -938,30 +1233,99 @@ Returns all the datanodes in the cluster.
 ```json
 [
   "50ca4c95-2ef3-4430-b944-97d2442c3daf"
-]  
+]
 ```
 
 **Returns**
 
-Returns the list of datanodes which are removed successfully and list of datanodes which were not found.
+Returns a `datanodesResponseMap` keyed by the outcome category. Each value is a `DatanodesResponse`
+(same shape as `GET /api/v1/datanodes`). Categories that have no entries for a given request are
+omitted (not present as empty arrays).
+
+* `removedDatanodes`: successfully removed.
+* `failedDatanodes`: pre-checks failed (e.g. node is not DEAD, or still has open containers/pipelines). Includes `totalCount` and a per-uuid `errors` map describing the failure reason; `datanodes` is empty.
+* `notFoundDatanodes`: uuid did not match any known datanode.
 
 ```json
 {
-  "removedNodes": {
-    "totalCount": 1,
-    "datanodes": [
-      {
-        "uuid": "50ca4c95-2ef3-4430-b944-97d2442c3daf",
-        "hostname": "ozone-datanode-4.ozone_default",
-        "state": "DEAD",
-        "pipelines": null
+  "datanodesResponseMap": {
+    "removedDatanodes": {
+      "totalCount": 1,
+      "datanodes": [
+        {
+          "uuid": "50ca4c95-2ef3-4430-b944-97d2442c3daf",
+          "hostname": "ozone-datanode-4.ozone_default",
+          "state": "DEAD"
+        }
+      ]
+    },
+    "failedDatanodes": {
+      "totalCount": 1,
+      "datanodes": [],
+      "errors": {
+        "60ca4c95-...": "Open Containers/Pipelines"
       }
-    ],
-    "message": "Success"
+    }
   }
-}     
+}
 ```
-  
+
+### GET /api/v1/datanodes/decommission/info
+
+**Parameters**
+
+No parameters.
+
+**Returns**
+
+Returns info for every datanode currently in the `DECOMMISSIONING` state. Each entry wraps the
+datanode details, the per-state container list, and decommission metrics from the SCM JMX bean
+`Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics`.
+
+```json
+{
+  "DatanodesDecommissionInfo": [
+    {
+      "datanodeDetails": {
+        "uuid": "f8f8cb45-3ab2-4123",
+        "hostName": "ozone-datanode-3",
+        "ipAddress": "10.0.0.13",
+        "persistedOpState": "DECOMMISSIONING"
+      },
+      "metrics": {
+        "decommissionStartTime": "2024-05-01T10:00:00Z",
+        "numOfUnclosedContainers": 2,
+        "numOfUnclosedPipelines": 0,
+        "numOfUnderReplicatedContainers": 1
+      },
+      "containers": {
+        "OPEN": ["#1234"],
+        "CLOSED": ["#1235", "#1236"]
+      }
+    }
+  ]
+}
+```
+
+### GET /api/v1/datanodes/decommission/info/datanode
+
+Returns info for a single decommissioning datanode. Provide either `uuid` or `ipAddress`. If both
+are passed, `uuid` wins. Omitting both returns an error.
+
+**Parameters**
+
+* uuid (optional)
+
+   UUID of the decommissioning datanode.
+
+* ipAddress (optional)
+
+   IP address of the decommissioning datanode. Used when `uuid` is not provided.
+
+**Returns**
+
+Same shape as `/api/v1/datanodes/decommission/info`, but the array contains at most one entry.
+
 ## Pipelines
 
 ### GET /api/v1/pipelines
@@ -1124,4 +1488,272 @@ Example: /api/v1/metrics/query?query=ratis_leader_election_electionCount
        }
      }
 ```
-  
+
+## Storage Distribution (admin only)
+
+### GET /api/v1/storageDistribution
+
+**Parameters**
+
+No parameters.
+
+**Returns**
+
+Aggregated storage capacity distribution across the cluster, including the global storage hierarchy
+(filesystem capacity, Ozone capacity, used/free/reserved/committed space), namespace totals, a
+breakdown of used space (open vs finalized), and per-datanode storage reports.
+
+`500 Internal Server Error` (text/plain body) is returned if the report cannot be produced.
+
+```json
+{
+  "globalStorage": {
+    "totalFileSystemCapacity": 270461374464,
+    "totalReservedSpace": 31457280,
+    "totalOzoneCapacity": 270429917184,
+    "totalOzoneUsedSpace": 358805504,
+    "totalOzoneFreeSpace": 270071111680,
+    "totalOzoneCommittedSpace": 27007111,
+    "totalMinimumFreeSpace": 20480
+  },
+  "globalNamespace": {
+    "totalUsedSpace": 500000000,
+    "totalKeys": 10000
+  },
+  "usedSpaceBreakdown": {
+    "openKeyBytes": {
+      "openKeyAndFileBytes": 13824,
+      "multipartOpenKeyBytes": 4096,
+      "totalOpenKeyBytes": 17920
+    },
+    "finalizedKeyBytes": 450000000
+  },
+  "dataNodeUsage": [
+    {
+      "datanodeUuid": "841be80f-0454-47df-b676",
+      "hostName": "ozone-datanode-1",
+      "capacity": 270429917184,
+      "used": 358805504,
+      "remaining": 270071111680,
+      "committed": 27007111,
+      "minimumFreeSpace": 20480,
+      "reserved": 31457280,
+      "filesystemCapacity": 270461374464,
+      "filesystemUsed": 390262784,
+      "filesystemAvailable": 270071111680
+    }
+  ]
+}
+```
+
+### GET /api/v1/storageDistribution/download
+
+**Parameters**
+
+No parameters.
+
+**Returns**
+
+Triggers or polls a background per-datanode metrics collection. The response varies by collection
+state:
+
+* `200 OK` (`text/csv`) when collection is FINISHED. The CSV columns are HostName, Datanode UUID,
+  Filesystem Capacity, Filesystem Used Space, Filesystem Remaining Space, Ozone Capacity, Ozone Used
+  Space, Ozone Remaining Space, PreAllocated Container Space, Reserved Space, Minimum Free Space,
+  Pending Block Size. A `Content-Disposition: attachment` header carries the file name.
+* `202 Accepted` (`application/json`, body matches `DataNodeMetricsServiceResponse`) when collection
+  is NOT_STARTED or IN_PROGRESS. Poll the endpoint again until status is FINISHED.
+* `500 Internal Server Error` (`text/plain`) if collection is marked FINISHED but the metrics data
+  is missing.
+
+## Pending Deletion (admin only)
+
+### GET /api/v1/pendingDeletion
+
+Returns pending-deletion statistics for one of the three Ozone components.
+
+**Parameters**
+
+* component (required)
+
+  One of `scm`, `om`, `dn`. Selects the source whose pending-deletion data should be returned.
+
+* limit (optional)
+
+  Maximum number of per-datanode entries to return. Only applies when `component=dn`. Must be at
+  least 1.
+
+**Returns**
+
+The response body depends on `component`:
+
+* `component=scm`
+  * `200 OK` with a `ScmPendingDeletion` object (`totalBlocksize`, `totalReplicatedBlockSize`,
+    `totalBlocksCount`).
+  * `204 No Content` if SCM has no pending-deletion summary yet.
+* `component=om`
+  * `200 OK` with a map keyed by category (typical keys: `pendingDirectorySize`,
+    `pendingKeySize`). Values are byte counts.
+* `component=dn`
+  * `200 OK` with a `DataNodeMetricsServiceResponse` body when the background metrics collection
+    has FINISHED.
+  * `202 Accepted` with the same shape while collection is NOT_STARTED or IN_PROGRESS; poll until
+    `status` becomes `FINISHED`.
+
+`400 Bad Request` (text/plain) is returned when `component` is missing/invalid, or when
+`component=dn` and `limit < 1`.
+
+```json
+{
+  "totalBlocksize": 10485760,
+  "totalReplicatedBlockSize": 31457280,
+  "totalBlocksCount": 500
+}
+```
+
+## Heat Map (admin only)
+
+Read-access heatmap data is feature-gated. If the HeatMap feature is listed by
+`/api/v1/features/disabledFeatures`, `/api/v1/heatmap/readaccess` returns `404 Not Found`.
+
+### GET /api/v1/heatmap/readaccess
+
+**Parameters**
+
+* startDate (optional)
+
+  Look-back window for access aggregation. Default `24H`.
+
+* entityType (optional)
+
+  Entity granularity. Default `key`.
+
+* path (optional)
+
+  Restrict the heatmap to this path prefix.
+
+**Returns**
+
+A nested `EntityReadAccessHeatMap` tree. The root represents `/`; children represent volumes, then
+buckets, then directories, then keys. Each node carries `size`, `accessCount`,
+`minAccessCount`/`maxAccessCount`, and a normalized `color` value.
+
+```json
+{
+  "label": "root",
+  "path": "/",
+  "size": 12345678,
+  "accessCount": 1000,
+  "minAccessCount": 0,
+  "maxAccessCount": 250,
+  "color": 0.5,
+  "children": [
+    {
+      "label": "vol1",
+      "path": "/vol1",
+      "size": 8345678,
+      "accessCount": 750,
+      "color": 0.75,
+      "children": []
+    }
+  ]
+}
+```
+
+### GET /api/v1/heatmap/healthCheck
+
+**Returns**
+
+Health-check response from the configured HeatMap provider. The body shape depends on the provider
+implementation.
+
+## Features (admin only)
+
+### GET /api/v1/features/disabledFeatures
+
+**Returns**
+
+JSON array of feature enum names that are currently disabled. The only feature name in use today
+is `HEATMAP`. Useful for the UI to decide whether to show or grey out feature-gated controls.
+
+```json
+["HEATMAP"]
+```
+
+## Admin Utilities (admin only)
+
+### GET /api/v1/triggerdbsync/om
+
+**Returns**
+
+Requests Recon to start an immediate sync from the Ozone Manager DB. Returns a boolean indicating
+whether the sync request was accepted by the OM service provider.
+
+```json
+true
+```
+
+### POST /api/v1/triggerdbsync/scm/snapshot
+
+**Returns**
+
+Starts a one-shot SCM DB snapshot sync in the background. Idempotent. The response always carries
+the current `ScmDbSnapshotSyncStatus` so callers can distinguish "accepted and started" from
+"rejected because another sync is already in progress".
+
+* `202 Accepted`: sync accepted and started. Body has `accepted: true`.
+* `409 Conflict`: another SCM DB sync is already running. Body has `accepted: false`.
+
+```json
+{
+  "accepted": true,
+  "status": "IN_PROGRESS",
+  "message": "SCM DB snapshot sync started."
+}
+```
+
+### GET /api/v1/triggerdbsync/scm/snapshot/status
+
+**Returns**
+
+Current status of the triggered SCM DB snapshot sync. Always returns 200, even when no sync has
+ever run (status will be `IDLE`, phase `NONE`, `startedAt`/`finishedAt` zero).
+
+* `status`: one of `IDLE`, `IN_PROGRESS`, `SUCCESS`, `FAILED`, `CANCELLED`.
+* `phase`: one of `NONE`, `DOWNLOADING_CHECKPOINT`, `INITIALIZING_DB`, `SWAPPING_DB`,
+  `COMPLETED`, `FAILED`, `CANCELLED`.
+* `cancelAllowed`: true only while in `DOWNLOADING_CHECKPOINT`. Once the phase advances to
+  `INITIALIZING_DB`, cancellation is no longer honored.
+* `durationMs`: elapsed time in millis; for a running sync, computed against `now()`.
+
+```json
+{
+  "status": "IN_PROGRESS",
+  "phase": "DOWNLOADING_CHECKPOINT",
+  "startedAt": 1718640123456,
+  "finishedAt": 0,
+  "durationMs": 12345,
+  "cancelAllowed": true,
+  "lastError": null
+}
+```
+
+### POST /api/v1/triggerdbsync/scm/snapshot/cancel
+
+**Returns**
+
+Cancels an in-progress SCM DB snapshot sync. Only honored while `status == IN_PROGRESS` and
+`cancelAllowed == true` (see `/triggerdbsync/scm/snapshot/status`).
+
+* `200 OK`: cancellation accepted and the sync has been cancelled. Body has `cancelled: true`.
+* `409 Conflict`: no sync is running, or the sync has passed the cancellable phase. Body has
+  `cancelled: false` and `message` explains which.
+
+```json
+{
+  "cancelled": true,
+  "status": "CANCELLED",
+  "phase": "CANCELLED",
+  "message": "SCM DB snapshot sync cancelled."
+}
+```

@@ -204,7 +204,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     });
   }
 
-  synchronized void updateAndRestart(OzoneConfiguration conf) {
+  void updateAndRestart(OzoneConfiguration conf) {
     long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
         OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
     int newCorePoolSize = conf.getInt(OZONE_THREAD_NUMBER_DIR_DELETION,
@@ -212,11 +212,15 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     LOG.info("Updating and restarting DirectoryDeletingService with interval {} {}" +
             " and core pool size {}",
         newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize);
+    // shutdown() awaits the executor; do not hold this monitor (same object as
+    // BackgroundService.PeriodicalTask) or the pool thread can deadlock.
     shutdown();
-    setInterval(newInterval, TimeUnit.SECONDS);
-    setPoolSize(newCorePoolSize);
-    this.numberOfParallelThreadsPerStore.set(newCorePoolSize);
-    start();
+    synchronized (this) {
+      setInterval(newInterval, TimeUnit.SECONDS);
+      setPoolSize(newCorePoolSize);
+      this.numberOfParallelThreadsPerStore.set(newCorePoolSize);
+      start();
+    }
   }
 
   @Override

@@ -218,11 +218,9 @@
   </property>
   <property>
     <name>hdds.datanode.disk.balancer.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, DATANODE, DISKBALANCER</tag>
-    <description>If this property is set to true, then the Disk Balancer
-      feature is enabled on Datanodes, and users can use
-      this service. By default, this is disabled.
+    <description>By default Disk Balancer feature is enabled on Datanodes.
     </description>
   </property>
   <property>
@@ -1035,6 +1033,17 @@
       creates less SCM metadata, but recovery time will be more. 5GB is a number
       that maps to quick replication times in gigabit networks, but still
       balances the amount of metadata.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.pending.container.roll.interval</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The interval at which the two-window tumbling bucket for pending
+      container allocations rolls over per DataNode. Pending containers
+      that have not been confirmed within two intervals are automatically
+      aged out. Default is 5 minutes.
     </description>
   </property>
   <property>
@@ -3660,6 +3669,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.dn.metrics.collection.thread.count</name>
+    <value>0</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Size of the thread pool Recon uses to collect JMX metrics from DataNodes.
+      A value of 0 (or any non-positive value) means "auto" and selects
+      2 x Runtime.availableProcessors() at startup.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
@@ -4200,12 +4219,6 @@
     <description>The duration at which we periodically fetch the updated network
       topology cluster tree from SCM.
     </description>
-  </property>
-  <property>
-    <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
-    <value>1024</value>
-    <tag>SCM, OZONE</tag>
-    <description>Raft snapshot gap index after which snapshot can be taken.</description>
   </property>
   <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>

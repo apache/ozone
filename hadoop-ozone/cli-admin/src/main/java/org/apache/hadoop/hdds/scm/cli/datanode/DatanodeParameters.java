@@ -29,10 +29,22 @@ public class DatanodeParameters extends ItemsFromStdin {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Parameters(description = "Datanode addresses: one or more, separated by spaces." +
-      " To read from stdin, specify '-' and supply one item per line." +
-      "Port is optional and defaults to 19864 (CLIENT_RPC port). " +
-      "Examples: 'DN-1', 'DN-1:19864', '192.168.1.10'. ",
+  @CommandLine.Parameters(
+      description = {
+          "Datanode addresses: one or more on the command line, OR read from stdin with '-'.",
+          "Stdin usage:",
+          "  ozone admin datanode diskbalancer <subcommand> -",
+          "  Then type one datanode per line and end input:",
+          "    - Linux/macOS: Ctrl-D",
+          "    - Windows:     Ctrl-Z, then Enter",
+          "Examples:",
+          "  # Piped (recommended for scripts)",
+          "  echo -e \"DN-1\\nDN-2\" | ozone admin datanode diskbalancer status -",
+          "  # From file having list of dns to balance",
+          "  ozone admin datanode diskbalancer report - < datanode-lists.txt",
+          "Port is optional and defaults to 19864 (CLIENT_RPC port).",
+          "Address examples: 'DN-1', 'DN-1:19864', '192.168.1.10'."
+      },
       arity = "0..*",
       paramLabel = "<datanode address>")
 

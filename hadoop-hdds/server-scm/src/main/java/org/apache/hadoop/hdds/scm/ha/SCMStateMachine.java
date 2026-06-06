@@ -160,6 +160,7 @@ public class SCMStateMachine extends BaseStateMachine {
       final TransactionContext trx) {
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
+    transactionBuffer.beginApplyingTransaction();
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
@@ -192,6 +193,8 @@ public class SCMStateMachine extends BaseStateMachine {
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
     return applyTransactionFuture;
   }
@@ -363,23 +366,28 @@ public class SCMStateMachine extends BaseStateMachine {
       return lastAppliedIndex;
     }
 
-    long startTime = Time.monotonicNow();
+    transactionBuffer.beginApplyingTransaction();
+    try {
+      long startTime = Time.monotonicNow();
 
-    TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
-    final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
+      TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
+      final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
 
-    if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
-      transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
-      transactionBuffer.setLatestSnapshot(lastAppliedTrxInfo.toSnapshotInfo());
-    } else {
-      lastAppliedIndex = latestTrxInfo.getTransactionIndex();
+      if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
+        transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
+        transactionBuffer.setLatestSnapshot(lastAppliedTrxInfo.toSnapshotInfo());
+      } else {
+        lastAppliedIndex = latestTrxInfo.getTransactionIndex();
+      }
+
+      transactionBuffer.flush();
+
+      LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
+          lastAppliedIndex, Time.monotonicNow() - startTime);
+      return lastAppliedIndex;
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
-
-    transactionBuffer.flush();
-
-    LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
-        lastAppliedIndex, Time.monotonicNow() - startTime);
-    return lastAppliedIndex;
   }
 
   @Override
@@ -399,7 +407,12 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (transactionBuffer != null) {
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
+      transactionBuffer.beginApplyingTransaction();
+      try {
+        transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
+      } finally {
+        transactionBuffer.endApplyingTransaction();
+      }
     }
 
     if (currentLeaderTerm.get() == term) {

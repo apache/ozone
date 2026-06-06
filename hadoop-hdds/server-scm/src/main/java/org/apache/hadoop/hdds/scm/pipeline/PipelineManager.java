@@ -95,17 +95,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       throws PipelineNotFoundException, InvalidPipelineStateException;
 
   /**
-   * Records a pending container allocation for every DataNode in the pipeline.
-   * The allocation is tracked in each node's two-window tumbling bucket so that
-   * {@code hasEnoughSpace} can account for in-flight allocations before a container
-   * report arrives from the DataNode.
-   *
-   * @param pipeline    the pipeline whose nodes will receive the pending record
-   * @param containerID the container being allocated
-   */
-  void recordPendingAllocation(Pipeline pipeline, ContainerID containerID);
-
-  /**
    * Add container to pipeline during SCM Start.
    *
    * @param pipelineID ID of the pipeline to which container is added.
@@ -224,13 +213,15 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void releaseWriteLock();
 
   /**
-   * Checks whether all Datanodes in the specified pipeline have enough space to store a new container.
+   * Atomically checks if all datanodes in the pipeline have space for a new container
+   * and records the allocation if space is available. This prevents race conditions
+   * where multiple threads check space concurrently and over-allocate.
    *
-   * @param pipeline pipeline to check
-   * @return false if any Datanode in the pipeline has no volume with space greater than the configured
-   * container size, otherwise true
+   * @param pipeline the pipeline whose nodes will be checked and recorded
+   * @param containerID the container being allocated
+   * @return true if all nodes had space and allocation was recorded, false otherwise
    */
-  boolean hasEnoughSpace(Pipeline pipeline);
+  boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID);
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
 
