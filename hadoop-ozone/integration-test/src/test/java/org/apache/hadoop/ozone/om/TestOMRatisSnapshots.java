@@ -804,6 +804,24 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
     assertLogCapture(logCapture, "Install Checkpoint is finished");
 
+    // All newKeys writes have completed (writeFuture.get() above), so the
+    // leader must already contain them.
+    OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
+    for (String key : newKeys) {
+      assertNotNull(leaderOmMetaMgr.getKeyTable(
+          TEST_BUCKET_LAYOUT)
+          .get(leaderOmMetaMgr.getOzoneKey(volumeName, bucketName, key)));
+    }
+
+    // Wait for the follower to apply everything the leader has applied; all
+    // writes have completed on the leader, so after this no further snapshot
+    // install (and DB reload) can occur and the follower DB reads below are
+    // safe from "Rocks Database is closed" races.
+    long leaderApplied = leaderOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    GenericTestUtils.waitFor(() -> followerOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex() >= leaderApplied, 100, 30_000);
+
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
@@ -829,19 +847,6 @@ public class TestOMRatisSnapshots {
           TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
-    OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
-    for (String key : newKeys) {
-      assertNotNull(leaderOmMetaMgr.getKeyTable(
-          TEST_BUCKET_LAYOUT)
-          .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
-    }
-    // Wait for the follower to apply all transactions the leader has applied;
-    // by this point every write has completed on the leader, so reaching the
-    // leader's applied index implies all newKeys are visible on the follower.
-    long leaderApplied = leaderOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
-    GenericTestUtils.waitFor(() -> followerOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex() >= leaderApplied, 100, 30_000);
     followerOMMetaMgr = followerOM.getMetadataManager();
     for (String key : newKeys) {
       assertNotNull(followerOMMetaMgr.getKeyTable(
