@@ -68,13 +68,13 @@ import org.junit.jupiter.api.Test;
  * Tests the containerStateMachine failure handling.
  */
 public class TestClientRetryContainerStateMachineFailures {
-  private static OzoneConfiguration  conf;
-  private static MiniOzoneCluster cluster;
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
-  private static String volumeName;
-  private static String bucketName;
-  private static XceiverClientManager xceiverClientManager;
+  private OzoneConfiguration  conf;
+  private MiniOzoneCluster cluster;
+  private OzoneClient client;
+  private ObjectStore objectStore;
+  private String volumeName;
+  private String bucketName;
+  private XceiverClientManager xceiverClientManager;
 
   @BeforeEach
   public void init() throws Exception {
@@ -228,7 +228,8 @@ public class TestClientRetryContainerStateMachineFailures {
   void testContainerStateMachineWriteLeaderNextChunkFailure() throws Exception {
     ReplicationConfig replicationConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
         ReplicationFactor.THREE);
-    int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
+    int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, OZONE_SCM_CHUNK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
     int size = chunkSize +  1024;
     // 1. mark leader pipeline dn's volume as full to induce failure
     List<Pair<StorageVolume, Long>> increasedVolumeSpace = new ArrayList<>();
@@ -315,7 +316,8 @@ public class TestClientRetryContainerStateMachineFailures {
     // 1. ensure pipeline is ready
     ReplicationConfig replicationConfig = ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
         ReplicationFactor.THREE);
-    int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
+    int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, OZONE_SCM_CHUNK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
     int size = chunkSize +  1024;
     // 2. mark leader pipeline dn's volume as full to induce failure
     List<Pair<StorageVolume, Long>> increasedVolumeSpace = new ArrayList<>();
