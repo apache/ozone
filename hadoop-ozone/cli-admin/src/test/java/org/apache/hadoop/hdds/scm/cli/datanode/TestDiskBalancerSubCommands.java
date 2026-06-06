@@ -513,8 +513,8 @@ public class TestDiskBalancerSubCommands {
   public void testStatusDiskBalancerWithMultipleNodes() throws Exception {
     DiskBalancerStatusSubcommand cmd = new DiskBalancerStatusSubcommand();
     
-    DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-1");
-    DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-2");
+    DatanodeDiskBalancerInfoProto statusProto1 = generateRandomStatusProto("host-2");
+    DatanodeDiskBalancerInfoProto statusProto2 = generateRandomStatusProto("host-1");
     
     when(mockProtocol.getDiskBalancerInfo())
         .thenReturn(statusProto1, statusProto2);
@@ -522,12 +522,14 @@ public class TestDiskBalancerSubCommands {
     try (DiskBalancerMocks mocks = setupAllMocks()) {
 
       CommandLine c = new CommandLine(cmd);
-      c.parseArgs("host-1", "host-2");
+      c.parseArgs("host-2", "host-1");
       cmd.call();
 
       String output = outContent.toString(DEFAULT_ENCODING);
-      assertTrue(output.contains("host-1"));
-      assertTrue(output.contains("host-2"));
+      int host2Index = output.indexOf("host-2");
+      int host1Index = output.indexOf("host-1");
+      assertTrue(host2Index >= 0);
+      assertTrue(host1Index > host2Index, output);
     }
   }
 
