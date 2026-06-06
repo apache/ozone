@@ -835,16 +835,13 @@ public class TestOMRatisSnapshots {
           TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
-    OMMetadataManager catchUpMetaMgr = followerOM.getMetadataManager();
-    String lastNewKey = newKeys.get(newKeys.size() - 1);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return catchUpMetaMgr.getKeyTable(TEST_BUCKET_LAYOUT)
-            .get(catchUpMetaMgr.getOzoneKey(volumeName, bucketName, lastNewKey)) != null;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 100, 30_000);
+    // Wait for the follower to apply all transactions the leader has applied;
+    // by this point every write has completed on the leader, so reaching the
+    // leader's applied index implies all newKeys are visible on the follower.
+    long leaderApplied = leaderOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    GenericTestUtils.waitFor(() -> followerOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex() >= leaderApplied, 100, 30_000);
     followerOMMetaMgr = followerOM.getMetadataManager();
     for (String key : newKeys) {
       assertNotNull(followerOMMetaMgr.getKeyTable(
