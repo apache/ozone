@@ -59,13 +59,13 @@ class TestLocalOzoneCluster {
   private Path tempDir;
 
   @Test
-  void startPreparesConfiguration() throws Exception {
+  void prepareConfigurationExposesPreparedPorts() throws Exception {
     Path dataDir = tempDir.resolve("local-ozone");
     LocalOzoneClusterConfig config =
         LocalOzoneClusterConfig.builder(dataDir).build();
 
     try (LocalOzoneCluster cluster = newCluster(config)) {
-      cluster.start();
+      cluster.prepareConfiguration();
 
       assertTrue(Files.isDirectory(metadataDir(dataDir)));
       assertTrue(Files.isRegularFile(portStateFile(dataDir)));
