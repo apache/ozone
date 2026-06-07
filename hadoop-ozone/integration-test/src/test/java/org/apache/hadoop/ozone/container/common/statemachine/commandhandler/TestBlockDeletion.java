@@ -220,12 +220,12 @@ public class TestBlockDeletion {
 
     String keyName = UUID.randomUUID().toString();
 
-    OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, repConfig, new HashMap<>());
-    for (int i = 0; i < 10; i++) {
-      out.write(value.getBytes(UTF_8));
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, repConfig, new HashMap<>())) {
+      for (int i = 0; i < 10; i++) {
+        out.write(value.getBytes(UTF_8));
+      }
     }
-    out.close();
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
@@ -353,11 +353,11 @@ public class TestBlockDeletion {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream out = bucket.createKey(keyName,
+    try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+        ReplicationFactor.THREE, new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
@@ -464,11 +464,11 @@ public class TestBlockDeletion {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream out = bucket.createKey(keyName,
+    try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+        ReplicationFactor.THREE, new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
@@ -594,11 +594,11 @@ public class TestBlockDeletion {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream out = bucket.createKey(keyName,
+    try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+        ReplicationFactor.THREE, new HashMap<>())) {
+      out.write(value.getBytes(UTF_8));
+    }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
@@ -798,11 +798,11 @@ public class TestBlockDeletion {
     List<String> keys = new ArrayList<>();
     for (int j = 0; j < keyCount; j++) {
       String keyName = UUID.randomUUID().toString();
-      OzoneOutputStream out = bucket.createKey(keyName,
+      try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes(UTF_8).length, ReplicationType.RATIS,
-          ReplicationFactor.THREE, new HashMap<>());
-      out.write(value.getBytes(UTF_8));
-      out.close();
+          ReplicationFactor.THREE, new HashMap<>())) {
+        out.write(value.getBytes(UTF_8));
+      }
       keys.add(keyName);
     }
 

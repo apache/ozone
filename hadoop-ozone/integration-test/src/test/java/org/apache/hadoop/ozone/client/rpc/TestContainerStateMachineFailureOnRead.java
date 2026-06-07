@@ -165,23 +165,22 @@ public class TestContainerStateMachineFailureOnRead {
     }
 
     OmKeyLocationInfo omKeyLocationInfo;
-    OzoneOutputStream key = objectStore.getVolume(volumeName)
+    try (OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
         .createKey("ratis", 1024, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
-    // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes(UTF_8));
-    key.flush();
-    
-    // get the name of a valid container
-    KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
+            ReplicationFactor.THREE, new HashMap<>())) {
+      // First write and flush creates a container in the datanode
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+      
+      // get the name of a valid container
+      KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
 
-    List<OmKeyLocationInfo> locationInfoList =
-        groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
-    omKeyLocationInfo = locationInfoList.get(0);
-    key.close();
-    groupOutputStream.close();
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
+      omKeyLocationInfo = locationInfoList.get(0);
+    }
 
     Optional<HddsDatanodeService> leaderDn =
         cluster.getHddsDatanodes().stream().filter(dn -> {
