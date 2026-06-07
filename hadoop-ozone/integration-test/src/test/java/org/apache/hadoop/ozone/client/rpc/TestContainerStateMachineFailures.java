@@ -175,7 +175,7 @@ public class TestContainerStateMachineFailures {
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
-    //the easiest way to create an open container is creating a key
+    // The easiest way to create an open container is creating a key.
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -318,15 +318,16 @@ public class TestContainerStateMachineFailures {
   @Order(Integer.MAX_VALUE)
   public void testContainerStateMachineFailures() throws Exception {
     byte[] testData = "ratis".getBytes(UTF_8);
-    long containerID;
-    HddsDatanodeService dn;
+    long containerID = 0;
+    HddsDatanodeService dn = null;
+    boolean injectedContainerFailure = false;
     try (OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024,
                 ReplicationConfig.fromTypeAndFactor(
                     ReplicationType.RATIS,
                     ReplicationFactor.ONE), new HashMap<>())) {
-      // First write and flush creates a container in the datanode
+      // First write and flush creates a container in the datanode.
       key.write(testData);
       key.flush();
       key.write(testData);
@@ -338,17 +339,22 @@ public class TestContainerStateMachineFailures {
       OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
       dn = TestHelper.getDatanodeService(omKeyLocationInfo,
           cluster);
-      // delete the container dir
+      // Delete the container directory.
       FileUtil.fullyDelete(new File(dn.getDatanodeStateMachine()
           .getContainer().getContainerSet()
           .getContainer(omKeyLocationInfo.getContainerID()).
           getContainerData().getContainerPath()));
       containerID = omKeyLocationInfo.getContainerID();
+      injectedContainerFailure = true;
     } catch (IOException ioe) {
-      // there is only 1 datanode in the pipeline, the pipeline will be closed
-      // and allocation to new pipeline will fail as there is no other dn in
-      // the cluster
+      // There is only 1 datanode in the pipeline, the pipeline will be closed
+      // and allocation to a new pipeline will fail as there is no other DN in
+      // the cluster.
+      assertTrue(injectedContainerFailure,
+          "Unexpected IOException before closing the key");
     }
+    assertTrue(containerID > 0, "Container ID should be captured");
+    assertNotNull(dn, "Datanode should be captured");
 
     // Make sure the container is marked unhealthy
     assertSame(dn.getDatanodeStateMachine()
@@ -357,7 +363,7 @@ public class TestContainerStateMachineFailures {
         .getContainerState(), UNHEALTHY);
     OzoneContainer ozoneContainer;
 
-    // restart the hdds datanode, container should not in the regular set
+    // Restart the HDDS datanode; the container should not be in the regular set.
     OzoneConfiguration config = dn.getConf();
     final String dir = config.get(OzoneConfigKeys.
         HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
@@ -373,16 +379,17 @@ public class TestContainerStateMachineFailures {
 
   @Test
   public void testUnhealthyContainer() throws Exception {
-    long containerID;
-    HddsDatanodeService dn;
-    KeyValueContainerData keyValueContainerData;
+    long containerID = 0;
+    HddsDatanodeService dn = null;
+    KeyValueContainerData keyValueContainerData = null;
+    boolean injectedContainerFailure = false;
     try (OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024,
                 ReplicationConfig.fromTypeAndFactor(
                     ReplicationType.RATIS,
                     ReplicationFactor.ONE), new HashMap<>())) {
-      // First write and flush creates a container in the datanode
+      // First write and flush creates a container in the datanode.
       key.write("ratis".getBytes(UTF_8));
       key.flush();
       key.write("ratis".getBytes(UTF_8));
@@ -401,14 +408,20 @@ public class TestContainerStateMachineFailures {
               .getContainerData();
       keyValueContainerData =
           assertInstanceOf(KeyValueContainerData.class, containerData);
-      // delete the container db file
+      // Delete the container DB file.
       FileUtil.fullyDelete(new File(keyValueContainerData.getChunksPath()));
       containerID = omKeyLocationInfo.getContainerID();
+      injectedContainerFailure = true;
     } catch (IOException ioe) {
-      // there is only 1 datanode in the pipeline, the pipeline will be closed
-      // and allocation to new pipeline will fail as there is no other dn in
-      // the cluster
+      // There is only 1 datanode in the pipeline, the pipeline will be closed
+      // and allocation to a new pipeline will fail as there is no other DN in
+      // the cluster.
+      assertTrue(injectedContainerFailure,
+          "Unexpected IOException before closing the key");
     }
+    assertTrue(containerID > 0, "Container ID should be captured");
+    assertNotNull(dn, "Datanode should be captured");
+    assertNotNull(keyValueContainerData, "Container data should be captured");
 
     // Make sure the container is marked unhealthy
     assertSame(dn.getDatanodeStateMachine()
@@ -428,10 +441,10 @@ public class TestContainerStateMachineFailures {
         + UUID.randomUUID();
     config.set(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     int index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
-    // restart the hdds datanode and see if the container is listed in the
-    // in the missing container set and not in the regular set
+    // Restart the HDDS datanode and see if the container is listed in the
+    // missing container set and not in the regular set.
     cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
-    // make sure the container state is still marked unhealthy after restart
+    // Make sure the container state is still marked unhealthy after restart.
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
     assertEquals(keyValueContainerData.getState(), UNHEALTHY);
@@ -468,7 +481,7 @@ public class TestContainerStateMachineFailures {
                 ReplicationConfig.fromTypeAndFactor(
                     ReplicationType.RATIS,
                     ReplicationFactor.ONE), new HashMap<>())) {
-      // First write and flush creates a container in the datanode
+      // First write and flush creates a container in the datanode.
       key.write("ratis".getBytes(UTF_8));
       key.flush();
       key.write("ratis".getBytes(UTF_8));
@@ -494,7 +507,7 @@ public class TestContainerStateMachineFailures {
             getHddsDatanodes().get(index), omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    // delete the container db file
+    // Delete the container DB file.
     FileUtil.fullyDelete(new File(keyValueContainerData.getContainerPath()));
     long bcsid = containerData.getBlockCommitSequenceId();
 
@@ -509,8 +522,8 @@ public class TestContainerStateMachineFailures {
     request.setContainerID(containerID);
     request.setCloseContainer(
         ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
-    // close container transaction will fail over Ratis and will initiate
-    // a pipeline close action
+    // The close container transaction will fail over Ratis and initiate
+    // a pipeline close action.
 
     try {
       assertThrows(IOException.class, () -> xceiverClient.sendCommand(request.build()));
@@ -528,7 +541,7 @@ public class TestContainerStateMachineFailures {
       }
     }, 100, 5000);
     try {
-      // try to take a new snapshot, ideally it should just fail
+      // Try to take a new snapshot, ideally it should just fail.
       stateMachine.takeSnapshot();
       fail("Should have thrown StateMachineException because it is UNHEALTHY");
     } catch (IOException ioe) {
@@ -542,7 +555,8 @@ public class TestContainerStateMachineFailures {
 
 
     final FileInfo snapshot = getSnapshotFileInfo(storage);
-    // when remove pipeline, group dir including snapshot will be deleted
+    // When the pipeline is removed, the group directory including the snapshot
+    // is deleted.
     LambdaTestUtils.await(10000, 500,
         () -> (!snapshot.getPath().toFile().exists()));
   }
@@ -559,7 +573,7 @@ public class TestContainerStateMachineFailures {
                 ReplicationConfig.fromTypeAndFactor(
                     ReplicationType.RATIS,
                     ReplicationFactor.ONE), new HashMap<>())) {
-      // First write and flush creates a container in the datanode
+      // First write and flush creates a container in the datanode.
       key.write("ratis".getBytes(UTF_8));
       key.flush();
       key.write("ratis".getBytes(UTF_8));
@@ -649,7 +663,7 @@ public class TestContainerStateMachineFailures {
                 ReplicationConfig.fromTypeAndFactor(
                     ReplicationType.RATIS,
                     ReplicationFactor.ONE), new HashMap<>())) {
-      // First write and flush creates a container in the datanode
+      // First write and flush creates a container in the datanode.
       key.write("ratis".getBytes(UTF_8));
       key.flush();
       key.write("ratis".getBytes(UTF_8));

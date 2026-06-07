@@ -108,7 +108,7 @@ public class TestContainerStateMachine {
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
     cluster.getOzoneManager().startSecretManager();
-    //the easiest way to create an open container is creating a key
+    // The easiest way to create an open container is creating a key.
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
@@ -133,12 +133,12 @@ public class TestContainerStateMachine {
             .createKey("ratis", 1024,
                 ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
                     ReplicationFactor.ONE), new HashMap<>())) {
-      // First write and flush creates a container in the datanode
+      // First write and flush creates a container in the datanode.
       key.write("ratis".getBytes(UTF_8));
       key.flush();
       key.write("ratis".getBytes(UTF_8));
 
-      //get the name of a valid container
+      // Get the name of a valid container.
       KeyOutputStream groupOutputStream =
           (KeyOutputStream) key.getOutputStream();
 
@@ -147,7 +147,7 @@ public class TestContainerStateMachine {
       assertEquals(1, locationInfoList.size());
       omKeyLocationInfo = locationInfoList.get(0);
 
-      // delete the container dir
+      // Delete the container directory.
       FileUtil.fullyDelete(new File(
           cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()
@@ -180,7 +180,7 @@ public class TestContainerStateMachine {
               .createKey(("ratis" + i), 1024,
                   ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
                       ReplicationFactor.ONE), new HashMap<>())) {
-        // First write and flush creates a container in the datanode
+        // First write and flush creates a container in the datanode.
         key.write(("ratis" + i).getBytes(UTF_8));
         key.flush();
         key.write(("ratis" + i).getBytes(UTF_8));
@@ -205,7 +205,7 @@ public class TestContainerStateMachine {
               .createKey(("ratis" + i), 1024,
                   ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
                       ReplicationFactor.ONE), new HashMap<>())) {
-        // First write and flush creates a container in the datanode
+        // First write and flush creates a container in the datanode.
         key.write(("ratis" + i).getBytes(UTF_8));
         key.flush();
         key.write(("ratis" + i).getBytes(UTF_8));

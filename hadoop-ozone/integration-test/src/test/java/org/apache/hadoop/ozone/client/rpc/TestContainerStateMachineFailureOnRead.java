@@ -169,11 +169,11 @@ public class TestContainerStateMachineFailureOnRead {
         .getBucket(bucketName)
         .createKey("ratis", 1024, ReplicationType.RATIS,
             ReplicationFactor.THREE, new HashMap<>())) {
-      // First write and flush creates a container in the datanode
+      // First write and flush creates a container in the datanode.
       key.write("ratis".getBytes(UTF_8));
       key.flush();
-      
-      // get the name of a valid container
+
+      // Get the name of a valid container.
       KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
 
       List<OmKeyLocationInfo> locationInfoList =
@@ -193,7 +193,7 @@ public class TestContainerStateMachineFailureOnRead {
         }).findFirst();
 
     assertTrue(leaderDn.isPresent());
-    // delete the container dir from leader
+    // Delete the container directory from leader.
     FileUtil.fullyDelete(new File(
         leaderDn.get().getDatanodeStateMachine()
             .getContainer().getContainerSet()
@@ -212,7 +212,7 @@ public class TestContainerStateMachineFailureOnRead {
       assertEquals(Pipeline.PipelineState.CLOSED, pipeline.getPipelineState(),
           "Pipeline " + pipeline.getId() + "should be in CLOSED state");
     } catch (PipelineNotFoundException e) {
-      // do nothing
+      // Do nothing.
     }
   }
 }
