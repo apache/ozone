@@ -109,6 +109,11 @@ public final class S3Consts {
   public static final String IF_UNMODIFIED_SINCE_HEADER =
       "If-Unmodified-Since";
 
+  // Constants related to S3 Express / ListDirectoryBuckets
+  public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
+  public static final String DEFAULT_S3_REGION = "us-east-1";
+  public static final String S3_EXPRESS_SERVICE = "s3express";
+
   //Never Constructed
   private S3Consts() {
 
@@ -121,11 +126,6 @@ public final class S3Consts {
     COPY, // Default directive
     REPLACE
   }
-
-  // Constants related to S3 Express / ListDirectoryBuckets
-  public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
-  public static final String DEFAULT_S3_REGION = "us-east-1";
-  public static final String S3_EXPRESS_SERVICE = "s3express";
 
   /** Constants for query parameters. */
   public static final class QueryParams {
