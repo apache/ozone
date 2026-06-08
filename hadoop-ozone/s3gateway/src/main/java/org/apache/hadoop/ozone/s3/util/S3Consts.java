@@ -122,6 +122,11 @@ public final class S3Consts {
     REPLACE
   }
 
+  // Constants related to S3 Express / ListDirectoryBuckets
+  public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
+  public static final String DEFAULT_S3_REGION = "us-east-1";
+  public static final String S3_EXPRESS_SERVICE = "s3express";
+
   /** Constants for query parameters. */
   public static final class QueryParams {
     public static final String ACL = "acl";

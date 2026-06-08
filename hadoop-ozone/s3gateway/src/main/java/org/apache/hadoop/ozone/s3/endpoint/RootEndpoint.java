@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
 import org.apache.hadoop.ozone.s3.commontypes.DirectoryBucketMetadata;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -44,10 +45,6 @@ public class RootEndpoint extends EndpointBase {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RootEndpoint.class);
-
-  private static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
-  private static final String DEFAULT_S3_REGION = "us-east-1";
-  private static final String S3_EXPRESS_SERVICE = "s3express";
 
   /**
    * Rest endpoint to list all the buckets of the current user.
@@ -79,7 +76,7 @@ public class RootEndpoint extends EndpointBase {
       return false;
     }
     String[] parts = credentialScope.split("/");
-    return parts.length >= 3 && S3_EXPRESS_SERVICE.equals(parts[2]);
+    return parts.length >= 3 && S3Consts.S3_EXPRESS_SERVICE.equals(parts[2]);
   }
 
   /**
@@ -92,7 +89,7 @@ public class RootEndpoint extends EndpointBase {
     try {
       final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
       int maxDirectoryBuckets =
-          queryParams().getInt(QueryParams.MAX_DIRECTORY_BUCKETS, MAX_DIRECTORY_BUCKETS_LIMIT);
+          queryParams().getInt(QueryParams.MAX_DIRECTORY_BUCKETS, S3Consts.MAX_DIRECTORY_BUCKETS_LIMIT);
       maxDirectoryBuckets = validateMaxDirectoryBuckets(maxDirectoryBuckets);
 
       ListDirectoryBucketsResponse response = new ListDirectoryBucketsResponse();
@@ -191,7 +188,7 @@ public class RootEndpoint extends EndpointBase {
     if (maxDirectoryBuckets < 0) {
       throw newError(INVALID_ARGUMENT, "max-directory-buckets must be >= 0");
     }
-    return Math.min(maxDirectoryBuckets, MAX_DIRECTORY_BUCKETS_LIMIT);
+    return Math.min(maxDirectoryBuckets, S3Consts.MAX_DIRECTORY_BUCKETS_LIMIT);
   }
 
   private String resolveBucketRegion() {
@@ -204,7 +201,7 @@ public class RootEndpoint extends EndpointBase {
         }
       }
     }
-    return DEFAULT_S3_REGION;
+    return S3Consts.DEFAULT_S3_REGION;
   }
 
   static String buildDirectoryBucketArn(String region, String accountId,
