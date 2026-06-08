@@ -38,6 +38,11 @@ import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Handles the S3 {@code GET Bucket (List Objects)} operation: reads the listing
+ * parameters from the request's query parameters, validates them, lists the
+ * bucket's keys and builds the {@link ListObjectResponse}.
+ */
 final class BucketListing {
 
   private static final Logger LOG = LoggerFactory.getLogger(BucketListing.class);
@@ -201,7 +206,7 @@ final class BucketListing {
 
     if (count < maxKeys) {
       response.setTruncated(false);
-    } else if (ozoneKeyIterator.hasNext() && lastKey != null) {
+    } else if (ozoneKeyIterator != null && ozoneKeyIterator.hasNext() && lastKey != null) {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
