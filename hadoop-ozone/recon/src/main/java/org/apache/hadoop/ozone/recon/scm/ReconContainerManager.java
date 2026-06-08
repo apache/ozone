@@ -190,16 +190,16 @@ public class ReconContainerManager extends ContainerManagerImpl {
    * targeted sync path use this method to avoid divergence in the count exposed
    * to the Recon Node API.
    *
-   * <p>If the container was recorded without a pipeline, the count decrement is
-   * safely skipped.
+   * <p>If the container was recorded without a pipeline (null pipeline at
+   * {@code addNewContainer} time) the count decrement is safely skipped.
    *
    * @param containerID   container to advance from OPEN to CLOSING
-   * @param containerInfo already-fetched ContainerInfo for the container
+   * @param containerInfo already-fetched {@code ContainerInfo} for the container
+   *                      (avoids a redundant lookup inside this method)
    * @throws IOException                     if the state update fails
-   * @throws InvalidStateTransitionException if the state transition is invalid
+   * @throws InvalidStateTransitionException if the container is not in OPEN state
    */
-  void transitionOpenToClosing(ContainerID containerID,
-                               ContainerInfo containerInfo)
+  void transitionOpenToClosing(ContainerID containerID, ContainerInfo containerInfo)
       throws IOException, InvalidStateTransitionException {
     PipelineID pipelineID = containerInfo.getPipelineID();
     if (pipelineID != null) {
@@ -210,7 +210,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
         pipelineToOpenContainer.put(pipelineID, curCnt - 1);
       }
     }
-    updateContainerState(containerID, FINALIZE);
+    updateContainerState(containerID, FINALIZE);  // OPEN → CLOSING
   }
 
   /**
@@ -224,18 +224,18 @@ public class ReconContainerManager extends ContainerManagerImpl {
    * method by Recon's report handlers.
    *
    * @param containerID containerID to check
-   * @param state replica state reported by a DataNode
+   * @param replicaState replica state reported by a DataNode
    */
   private void checkContainerStateAndUpdate(ContainerID containerID,
-                                            ContainerReplicaProto.State state)
+                                            ContainerReplicaProto.State replicaState)
       throws IOException, InvalidStateTransitionException {
     ContainerInfo containerInfo = getContainer(containerID);
     HddsProtos.LifeCycleState reconState = containerInfo.getState();
 
     if (reconState == HddsProtos.LifeCycleState.OPEN
-        && state != ContainerReplicaProto.State.OPEN && isHealthy(state)) {
+        && replicaState != ContainerReplicaProto.State.OPEN && isHealthy(replicaState)) {
       LOG.info("Container {} has state OPEN, but given state is {}.",
-          containerID, state);
+          containerID, replicaState);
       transitionOpenToClosing(containerID, containerInfo);
     }
   }
@@ -255,8 +255,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
    * the container is still recorded in the state manager without pipeline
    * tracking so that it is not permanently absent from Recon.
    *
-   * @param containerWithPipeline containerInfo with pipeline info
-   *                              (pipeline may be null)
+   * @param containerWithPipeline containerInfo with pipeline info (pipeline may be null)
    * @throws IOException on Error.
    */
   public void addNewContainer(ContainerWithPipeline containerWithPipeline)
@@ -270,23 +269,21 @@ public class ReconContainerManager extends ContainerManagerImpl {
           PipelineID pipelineID = pipeline.getId();
           // Check if the pipeline is present in Recon; add it if not.
           if (reconPipelineManager.addPipeline(pipeline)) {
-            LOG.info("Added new pipeline {} to Recon pipeline metadata from "
-                + "SCM.", pipelineID);
+            LOG.info("Added new pipeline {} to Recon pipeline metadata from SCM.", pipelineID);
           }
           getContainerStateManager().addContainer(containerInfo.getProtobuf());
-          pipelineManager.addContainerToPipeline(pipelineID,
-              containerInfo.containerID());
+          pipelineManager.addContainerToPipeline(pipelineID, containerInfo.containerID());
           // Update open container count on all datanodes on this pipeline.
           pipelineToOpenContainer.put(pipelineID,
               pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
-          LOG.info("Successfully added OPEN container {} with pipeline {} to "
-              + "Recon.", containerInfo.containerID(), pipelineID);
+          LOG.info("Successfully added OPEN container {} with pipeline {} to Recon.",
+              containerInfo.containerID(), pipelineID);
         } else {
           // Pipeline not available (cleaned up in SCM). Record the container
           // without pipeline tracking so it is not permanently absent from Recon.
           getContainerStateManager().addContainer(containerInfo.getProtobuf());
           LOG.warn("Added OPEN container {} to Recon without pipeline "
-              + "(pipeline was null - likely cleaned up on SCM side). "
+              + "(pipeline was null — likely cleaned up on SCM side). "
               + "Pipeline tracking unavailable for this container.",
               containerInfo.containerID());
         }
@@ -296,8 +293,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
             containerInfo.containerID(), containerInfo.getState());
       }
     } catch (IOException ex) {
-      LOG.info("Exception while adding container {}.",
-          containerInfo.containerID(), ex);
+      LOG.info("Exception while adding container {}.", containerInfo.containerID(), ex);
       PipelineID pipelineID = containerInfo.getPipelineID();
       if (pipelineID != null) {
         pipelineManager.removeContainerFromPipeline(
