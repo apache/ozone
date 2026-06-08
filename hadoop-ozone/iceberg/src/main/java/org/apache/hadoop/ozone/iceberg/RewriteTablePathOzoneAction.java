@@ -100,22 +100,12 @@ public class RewriteTablePathOzoneAction implements RewriteTablePath {
 
   private ExecutorService executorService;
   private static final int MAX_INFLIGHT_MULTIPLIER = 4;
-  private static final int DEFAULT_THREAD_COUNT = 10;
 
   private final Table table;
-
-  public RewriteTablePathOzoneAction(Table table) {
-    this.table = table;
-    this.threads = DEFAULT_THREAD_COUNT;
-  }
 
   public RewriteTablePathOzoneAction(Table table, int threads) {
     this.table = table;
     this.threads = threads;
-  }
-
-  int getThreads() {
-    return threads;
   }
 
   @Override

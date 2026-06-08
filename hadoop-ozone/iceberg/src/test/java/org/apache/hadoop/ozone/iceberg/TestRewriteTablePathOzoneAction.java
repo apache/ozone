@@ -88,7 +88,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
-import picocli.CommandLine;
 
 /**
  * Testing path rewrite of iceberg table metadata files.
@@ -251,7 +250,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void executeRejectsMissingLocationPrefix() {
     NullPointerException exception = assertThrows(NullPointerException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .stagingLocation(stagingDir.toString() + "/")
             .execute());
 
@@ -261,7 +260,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void executeRejectsMissingTargetPrefix() {
     NullPointerException exception = assertThrows(NullPointerException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, null));
 
     assertEquals("Target prefix is null", exception.getMessage());
@@ -270,7 +269,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void rewriteLocationPrefixRejectsSameSourceAndTarget() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, sourcePrefix)
             .execute());
 
@@ -281,7 +280,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void startVersionRejectsUnknownVersion() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, targetPrefix)
             .startVersion("missing.metadata.json")
             .execute());
@@ -297,7 +296,7 @@ class TestRewriteTablePathOzoneAction {
     table.io().deleteFile(metadataPaths.get(0));
 
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, targetPrefix)
             .startVersion(existingName)
             .execute());
@@ -308,7 +307,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void endVersionRejectsUnknownVersion() {
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, targetPrefix)
             .endVersion("missing.metadata.json")
             .execute());
@@ -324,7 +323,7 @@ class TestRewriteTablePathOzoneAction {
     table.io().deleteFile(metadataPaths.get(0));
 
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> new RewriteTablePathOzoneAction(table)
+        () -> new RewriteTablePathOzoneAction(table, 2)
             .rewriteLocationPrefix(sourcePrefix, targetPrefix)
             .endVersion(existingName)
             .execute());
@@ -335,7 +334,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void usesCurrentMetadataIfEndVersionNotProvided() {
     String currentMetadata = ((HasTableOperations) table).operations().current().metadataFileLocation();
-    RewriteTablePathOzoneAction action = new RewriteTablePathOzoneAction(table);
+    RewriteTablePathOzoneAction action = new RewriteTablePathOzoneAction(table, 2);
     action.rewriteLocationPrefix(sourcePrefix, targetPrefix).stagingLocation(stagingDir + "/");
     RewriteTablePath.Result result = action.execute();
     assertThat(result.latestVersion()).isEqualTo(RewriteTablePathUtil.fileName(currentMetadata));
@@ -344,7 +343,7 @@ class TestRewriteTablePathOzoneAction {
   @Test
   void defaultStagingDirIsUnderTableMetadataLocation() {
     String metadataLocation = RewriteTablePathOzoneUtils.getMetadataLocation(table);
-    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table)
+    RewriteTablePath.Result result = new RewriteTablePathOzoneAction(table, 2)
         .rewriteLocationPrefix(sourcePrefix, targetPrefix)
         .execute();
 
@@ -418,7 +417,7 @@ class TestRewriteTablePathOzoneAction {
     TableOperations ops = ((HasTableOperations) table).operations();
     ops.commit(baseMetadata, metadataWithStats);
 
-    RewriteTablePath action = new RewriteTablePathOzoneAction(table)
+    RewriteTablePath action = new RewriteTablePathOzoneAction(table, 2)
         .rewriteLocationPrefix(sourcePrefix, targetPrefix)
         .stagingLocation(stagingDir + "/");
 
@@ -497,7 +496,7 @@ class TestRewriteTablePathOzoneAction {
     String manifestListLocation = snapshot.manifestListLocation();
     table.io().deleteFile(manifestListLocation);
 
-    RewriteTablePath action = new RewriteTablePathOzoneAction(table)
+    RewriteTablePath action = new RewriteTablePathOzoneAction(table, 2)
         .rewriteLocationPrefix(sourcePrefix, targetPrefix)
         .stagingLocation(stagingDir + "/");
     
@@ -506,13 +505,10 @@ class TestRewriteTablePathOzoneAction {
     assertThat(exception.getCause()).hasMessageContaining("Failed to read manifests for snapshot " +
         snapshot.snapshotId());
   }
-  
-  private CommandLine newRewritePathCommand() {
-    return new CommandLine(new RewriteTablePathCommand());
-  }
 
   private String executeRewriteCommand(String... optionalArgs) {
     List<String> args = new ArrayList<>();
+    args.add("rewrite-path");
     args.add("-l");
     args.add(table.location());
     args.add("-s");
@@ -523,7 +519,7 @@ class TestRewriteTablePathOzoneAction {
     args.add(stagingDir + "/");
     args.addAll(Arrays.asList(optionalArgs));
 
-    int exitCode = newRewritePathCommand().execute(args.toArray(new String[0]));
+    int exitCode = new IcebergCommand().getCmd().execute(args.toArray(new String[0]));
     assertEquals(0, exitCode,
         "Command failed.\nstdout:\n" + stdout() + "\nstderr:\n" + stderr());
     assertThat(stdout())

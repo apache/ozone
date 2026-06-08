@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.iceberg;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.actions.RewriteTablePath;
 import org.apache.iceberg.hadoop.HadoopTables;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -30,10 +30,9 @@ import picocli.CommandLine.Option;
  */
 @Command(
     name = "rewrite-path",
-    description = "Rewrite Iceberg table paths for table migration",
-    mixinStandardHelpOptions = true
+    description = "Rewrite Iceberg table paths for table migration"
 )
-public class RewriteTablePathCommand implements Runnable {
+public class RewriteTablePathCommand extends AbstractSubcommand implements Callable<Void> {
 
   @Option(
       names = {"-l", "--table-location"},
@@ -77,65 +76,52 @@ public class RewriteTablePathCommand implements Runnable {
 
   @Option(
       names = {"--threads"},
+      defaultValue = "10",
       description = "Number of threads to use (positive integer). "
-          + "If omitted or zero, the default thread count is used."
+          + "If omitted or zero, the default thread count 10 is used."
   )
   private int threads;
 
   @Override
-  public void run() {
-    System.out.println("Starting Iceberg table path rewrite");
-    System.out.println("Table location: " + tableLocation);
-    System.out.println("Source prefix: " + sourcePrefix);
-    System.out.println("Target prefix: " + targetPrefix);
+  public Void call() {
+    out().println("Starting Iceberg table path rewrite");
+    out().println("Table location: " + tableLocation);
+    out().println("Source prefix: " + sourcePrefix);
+    out().println("Target prefix: " + targetPrefix);
 
-    OzoneConfiguration conf = new OzoneConfiguration();
+    HadoopTables tables = new HadoopTables(getOzoneConf());
+    Table table = tables.load(tableLocation.trim());
+    out().println("Table loaded: " + table.location());
 
-    Table table = null;
-    if (tableLocation != null && !tableLocation.isBlank()) {
-      HadoopTables tables = new HadoopTables(conf);
-      table = tables.load(tableLocation.trim());
-      System.out.println("Table loaded: " + table.location());
-    }
-
-    RewriteTablePathOzoneAction action;
-    if (threads > 0) {
-      action = new RewriteTablePathOzoneAction(table, threads);
-    } else {
-      action = new RewriteTablePathOzoneAction(table);
-    }
-    System.out.println("Threads: " + action.getThreads());
+    RewriteTablePathOzoneAction action = new RewriteTablePathOzoneAction(table, threads);
+    out().println("Threads: " + threads);
 
     RewriteTablePath rewriteAction = action.rewriteLocationPrefix(sourcePrefix, targetPrefix);
 
     if (stagingLocation != null && !stagingLocation.isBlank()) {
-      System.out.println("Staging location: " + stagingLocation);
+      out().println("Staging location: " + stagingLocation);
       rewriteAction.stagingLocation(stagingLocation);
     }
 
     if (startVersion != null && !startVersion.isBlank()) {
-      System.out.println("Start version: " + startVersion);
+      out().println("Start version: " + startVersion);
       rewriteAction.startVersion(startVersion);
     }
 
     if (endVersion != null && !endVersion.isBlank()) {
-      System.out.println("End version: " + endVersion);
+      out().println("End version: " + endVersion);
       rewriteAction.endVersion(endVersion);
     }
 
     RewriteTablePath.Result result = rewriteAction.execute();
 
-    System.out.println();
-    System.out.println("Rewrite completed successfully");
-    System.out.println("  Latest version: " + result.latestVersion());
-    System.out.println("  Staging location: " + result.stagingLocation());
-    System.out.println();
-    System.out.println("Next step: Copy files from source to target using the file list");
-    System.out.println("  File list location: " + result.fileListLocation());
-  }
-
-  public static void main(String[] args) {
-    int exitCode = new CommandLine(new RewriteTablePathCommand()).execute(args);
-    System.exit(exitCode);
+    out().println();
+    out().println("Rewrite completed successfully");
+    out().println("  Latest version: " + result.latestVersion());
+    out().println("  Staging location: " + result.stagingLocation());
+    out().println();
+    out().println("Next step: Copy files from source to target using the file list");
+    out().println("  File list location: " + result.fileListLocation());
+    return null;
   }
 }

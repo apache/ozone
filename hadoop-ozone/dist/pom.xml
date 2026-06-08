@@ -37,8 +37,6 @@
     <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor>
     <downloadSources>true</downloadSources>
     <file.encoding>UTF-8</file.encoding>
-    <!-- ozone-iceberg is built only with JDK 11+, dist matches that via jdk11-with-iceberg profile -->
-    <include.iceberg>false</include.iceberg>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
     <!-- rpm usage-->
@@ -197,7 +195,6 @@
                 <argument>${basedir}/dev-support/bin/dist-layout-stitching</argument>
                 <argument>${project.build.directory}</argument>
                 <argument>${hdds.version}</argument>
-                <argument>${include.iceberg}</argument>
               </arguments>
             </configuration>
           </execution>
@@ -282,9 +279,6 @@
       <activation>
         <jdk>[11,)</jdk>
       </activation>
-      <properties>
-        <include.iceberg>true</include.iceberg>
-      </properties>
       <dependencies>
         <dependency>
           <groupId>org.apache.ozone</groupId>

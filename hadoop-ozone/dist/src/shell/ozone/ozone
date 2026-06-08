@@ -76,7 +76,7 @@ function ozone_usage
   ozone_add_subcommand "ratis" client "Ozone ratis tool"
   ozone_add_subcommand "vapor" client "Ozone server simulator"
   if ozone_iceberg_available; then
-    ozone_add_subcommand "iceberg" client "rewrite Iceberg table paths for table migration (see ozone iceberg rewrite-path --help for tool options)"
+    ozone_add_subcommand "iceberg" client "commands for Iceberg tables on Ozone (see ozone iceberg --help for subcommands)"
   fi
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
@@ -269,15 +269,9 @@ function ozonecmd_case
         ozone_error "ERROR: ozone iceberg is not available in this distribution (requires JDK 11+ build)."
         exit 1
       fi
-      if [[ $# -eq 0 ]] || [[ "$1" != "rewrite-path" ]]; then
-        echo "Usage: ozone iceberg rewrite-path [OPTIONS]" >&2
-        exit 1
-      fi
-      shift
-      OZONE_CLASSNAME="org.apache.hadoop.ozone.iceberg.RewriteTablePathCommand"
+      OZONE_CLASSNAME="org.apache.hadoop.ozone.iceberg.IcebergCommand"
       OZONE_RUN_ARTIFACT_NAME="ozone-iceberg"
       OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
-      OZONE_SUBCMD_ARGS=("$@")
     ;;
     *)
       OZONE_CLASSNAME="${subcmd}"
