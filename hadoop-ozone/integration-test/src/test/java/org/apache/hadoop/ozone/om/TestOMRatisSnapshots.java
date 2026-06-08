@@ -791,6 +791,15 @@ public class TestOMRatisSnapshots {
     });
     List<String> newKeys = writeFuture.get();
 
+    // All newKeys writes have completed (writeFuture.get() above), so the
+    // leader must already contain them.
+    OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
+    for (String key : newKeys) {
+      assertNotNull(leaderOmMetaMgr.getKeyTable(
+          TEST_BUCKET_LAYOUT)
+          .get(leaderOmMetaMgr.getOzoneKey(volumeName, bucketName, key)));
+    }
+
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 3s
@@ -803,15 +812,6 @@ public class TestOMRatisSnapshots {
     String msg = "Reloaded OM state";
     assertLogCapture(logCapture, msg);
     assertLogCapture(logCapture, "Install Checkpoint is finished");
-
-    // All newKeys writes have completed (writeFuture.get() above), so the
-    // leader must already contain them.
-    OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
-    for (String key : newKeys) {
-      assertNotNull(leaderOmMetaMgr.getKeyTable(
-          TEST_BUCKET_LAYOUT)
-          .get(leaderOmMetaMgr.getOzoneKey(volumeName, bucketName, key)));
-    }
 
     // Wait for the follower to apply everything the leader has applied; all
     // writes have completed on the leader, so after this no further snapshot
