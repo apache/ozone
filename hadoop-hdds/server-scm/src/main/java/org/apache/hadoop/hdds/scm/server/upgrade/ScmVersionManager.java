@@ -15,60 +15,66 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.upgrade;
+package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
-import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeAction;
-import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeActionProvider;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
-import org.apache.hadoop.ozone.container.common.DatanodeStorage;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
+import org.apache.hadoop.hdds.upgrade.ScmUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
-import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
+import org.apache.hadoop.ozone.upgrade.RatisBasedVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 
 /**
- * Datanode-specific version manager that wires upgrade actions internally.
+ * SCM-specific version manager that wires upgrade actions internally.
  */
-public class DatanodeVersionManager extends ComponentVersionManager {
+public class ScmVersionManager extends RatisBasedVersionManager {
 
-  private final Map<ComponentVersion, DatanodeUpgradeAction> upgradeActions;
-  private final DatanodeStateMachine upgradeActionArg;
+  private final Map<ComponentVersion, ScmUpgradeAction> upgradeActions;
+  private final OzoneStorageContainerManager upgradeActionArg;
 
-  public DatanodeVersionManager(DatanodeStorage storage, DatanodeStateMachine upgradeActionArg) throws IOException {
-    this(storage, upgradeActionArg, new DatanodeUpgradeActionProvider());
+  public ScmVersionManager(SCMStorageConfig storage, OzoneStorageContainerManager upgradeActionArg) throws IOException {
+    this(storage, upgradeActionArg, new ScmUpgradeActionProvider());
   }
 
   @VisibleForTesting
-  public DatanodeVersionManager(DatanodeStorage storage, DatanodeStateMachine upgradeActionArg,
-      ComponentUpgradeActionProvider<DatanodeUpgradeAction> upgradeActionProvider) throws IOException {
-    super(storage,
-        HDDSVersionUtils.deserializedPersistedApparentVersion(storage.getApparentVersion()),
+  public ScmVersionManager(SCMStorageConfig storage,
+      OzoneStorageContainerManager upgradeActionArg,
+      ComponentUpgradeActionProvider<ScmUpgradeAction> upgradeActionProvider)
+      throws IOException {
+    super(storage, HDDSVersionUtils.deserializedPersistedApparentVersion(storage.getApparentVersion()),
         HDDSVersion.SOFTWARE_VERSION);
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();
   }
 
   @VisibleForTesting
-  public Map<ComponentVersion, DatanodeUpgradeAction> getUpgradeActionsForTesting() {
+  public Map<ComponentVersion, ScmUpgradeAction> getUpgradeActionsForTesting() {
     return upgradeActions;
   }
 
   @Override
   protected void runUpgradeAction(ComponentVersion version) throws UpgradeException {
-    DatanodeUpgradeAction action = upgradeActions.get(version);
+    ScmUpgradeAction action = upgradeActions.get(version);
     if (action == null) {
       return;
     }
     try {
       action.execute(upgradeActionArg);
     } catch (Exception e) {
-      logAndThrow(e, "Datanode upgrade action for version " + version + " failed.",
+      logAndThrow(e, "SCM upgrade action for version " + version + " failed.",
           UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED);
     }
+  }
+
+  @Override
+  protected ComponentVersion computeApparentVersion(int serializedVersion) throws IOException {
+    return HDDSVersionUtils.deserializedPersistedApparentVersion(serializedVersion);
   }
 }
