@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.debug.datanode.container.analyze;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,14 +39,14 @@ public final class ContainerScanResult {
   }
 
   public Map<Long, String> getSingles() {
-    return singles;
+    return Collections.unmodifiableMap(singles);
   }
 
   public Map<Long, List<String>> getDuplicates() {
-    return duplicates;
+    return Collections.unmodifiableMap(duplicates);
   }
 
   public List<String> getVolumeScanErrors() {
-    return volumeScanErrors;
+    return Collections.unmodifiableList(volumeScanErrors);
   }
 }

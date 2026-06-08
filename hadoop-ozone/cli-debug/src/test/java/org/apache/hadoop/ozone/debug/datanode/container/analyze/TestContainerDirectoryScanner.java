@@ -25,49 +25,35 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for {@link ContainerDirectoryScanner}.
  */
 public class TestContainerDirectoryScanner {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestContainerDirectoryScanner.class);
-
   @TempDir
   private Path tempDir;
 
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String datanodeUuid;
+  private ContainerAnalyzeTestHelper testHelper;
 
   @BeforeEach
   public void setup() {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    datanodeUuid = UUID.randomUUID().toString();
+    testHelper = new ContainerAnalyzeTestHelper(tempDir, conf,
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
   }
 
   @Test
   public void testValidContainer() throws Exception {
-    File volumeRoot = formatVolume("volume0");
+    File volumeRoot = testHelper.formatVolume("volume0");
     long containerId = 1001L;
-    createContainerDirectory(volumeRoot, containerId, true, containerId);
+    testHelper.createContainerDirectory(volumeRoot, containerId, true, containerId);
     ContainerDiskOccurrence occurrence = enrichSingleContainer(volumeRoot, containerId);
     assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.VALID, occurrence.getStatus());
     assertThat(occurrence.getContainerPath()).startsWith(volumeRoot.getAbsolutePath());
@@ -76,38 +62,38 @@ public class TestContainerDirectoryScanner {
 
   @Test
   public void testMissingMetadata() throws Exception {
-    File volumeRoot = formatVolume("volume0");
+    File volumeRoot = testHelper.formatVolume("volume0");
     long containerId = 2002L;
-    createContainerDirectory(volumeRoot, containerId, false, containerId);
+    testHelper.createContainerDirectory(volumeRoot, containerId, false, containerId);
     ContainerDiskOccurrence occurrence = enrichSingleContainer(volumeRoot, containerId);
     assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.MISSING_METADATA, occurrence.getStatus());
   }
 
   @Test
   public void testInvalidMetadataIdMismatch() throws Exception {
-    File volumeRoot = formatVolume("volume0");
+    File volumeRoot = testHelper.formatVolume("volume0");
     long containerId = 3003L;
-    createContainerDirectory(volumeRoot, containerId, true, 9999L);
+    testHelper.createContainerDirectory(volumeRoot, containerId, true, 9999L);
     ContainerDiskOccurrence occurrence = enrichSingleContainer(volumeRoot, containerId);
     assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.INVALID_METADATA, occurrence.getStatus());
   }
 
   @Test
   public void testInvalidMetadataEmptyContainerFile() throws Exception {
-    File volumeRoot = formatVolume("volume0");
+    File volumeRoot = testHelper.formatVolume("volume0");
     long containerId = 5005L;
-    createEmptyContainerFileOnVolume(volumeRoot, containerId);
+    testHelper.createEmptyContainerFileOnVolume(volumeRoot, containerId);
     ContainerDiskOccurrence occurrence = enrichSingleContainer(volumeRoot, containerId);
     assertEquals(ContainerDirectoryScanner.ContainerDiskScanStatus.INVALID_METADATA, occurrence.getStatus());
   }
 
   @Test
   public void testDuplicateAcrossVolumes() throws Exception {
-    File volumeRoot1 = formatVolume("volume0");
-    File volumeRoot2 = formatVolume("volume1");
+    File volumeRoot1 = testHelper.formatVolume("volume0");
+    File volumeRoot2 = testHelper.formatVolume("volume1");
     long containerId = 4004L;
-    createContainerDirectory(volumeRoot1, containerId, true, containerId);
-    createContainerDirectory(volumeRoot2, containerId, true, containerId);
+    testHelper.createContainerDirectory(volumeRoot1, containerId, true, containerId);
+    testHelper.createContainerDirectory(volumeRoot2, containerId, true, containerId);
 
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         volumeRoot1.getAbsolutePath() + "," + volumeRoot2.getAbsolutePath());
@@ -122,9 +108,9 @@ public class TestContainerDirectoryScanner {
 
   @Test
   public void testSingletonStoredInSinglesNotDuplicates() throws Exception {
-    File volumeRoot = formatVolume("volume0");
+    File volumeRoot = testHelper.formatVolume("volume0");
     long containerId = 6006L;
-    createContainerDirectory(volumeRoot, containerId, true, containerId);
+    testHelper.createContainerDirectory(volumeRoot, containerId, true, containerId);
 
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeRoot.getAbsolutePath());
     ContainerScanResult scanResult = ContainerDirectoryScanner.scan(conf);
@@ -137,8 +123,8 @@ public class TestContainerDirectoryScanner {
 
   @Test
   public void testNonNumericDirectorySkipped() throws Exception {
-    File volumeRoot = formatVolume("volume0");
-    Path invalidDir = containerTopDir(volumeRoot).resolve("not-a-container");
+    File volumeRoot = testHelper.formatVolume("volume0");
+    Path invalidDir = testHelper.containerTopDir(volumeRoot).resolve("not-a-container");
     Files.createDirectories(invalidDir);
 
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeRoot.getAbsolutePath());
@@ -164,51 +150,5 @@ public class TestContainerDirectoryScanner {
     String containerPath = scanResult.getSingles().get(containerId);
     assertThat(containerPath).isNotBlank();
     return ContainerDirectoryScanner.enrichOccurrence(containerId, containerPath);
-  }
-
-  private void createEmptyContainerFileOnVolume(File volumeRoot, long containerId) throws IOException {
-    Path containerBase = containerTopDir(volumeRoot).resolve(Long.toString(containerId));
-    Files.createDirectories(containerBase.resolve("metadata"));
-    Files.createDirectories(containerBase.resolve("chunks"));
-    Files.createFile(ContainerUtils.getContainerFile(containerBase.toFile()).toPath());
-  }
-
-  private File formatVolume(String name) throws IOException {
-    File volumeRoot = tempDir.resolve(name).toFile();
-    HddsVolume volume = new HddsVolume.Builder(volumeRoot.getAbsolutePath())
-        .conf(conf)
-        .datanodeUuid(datanodeUuid)
-        .clusterID(clusterId)
-        .build();
-    StorageVolumeUtil.checkVolume(volume, clusterId, clusterId, conf, LOG, null);
-    return volumeRoot;
-  }
-
-  private Path containerTopDir(File volumeRoot) {
-    return volumeRoot.toPath()
-        .resolve(HddsVolume.HDDS_VOLUME_DIR)
-        .resolve(clusterId)
-        .resolve(Storage.STORAGE_DIR_CURRENT)
-        .resolve("containerDir0");
-  }
-
-  private void createContainerDirectory(File volumeRoot, long containerId,
-      boolean writeMetadata, long metadataContainerId) throws IOException {
-    Path containerBase = containerTopDir(volumeRoot).resolve(Long.toString(containerId));
-    Files.createDirectories(containerBase.resolve("metadata"));
-    Files.createDirectories(containerBase.resolve("chunks"));
-
-    if (writeMetadata) {
-      KeyValueContainerData containerData = new KeyValueContainerData(
-          metadataContainerId,
-          ContainerLayoutVersion.FILE_PER_BLOCK,
-          (long) StorageUnit.GB.toBytes(1),
-          UUID.randomUUID().toString(),
-          datanodeUuid);
-      containerData.setChunksPath(containerBase.resolve("chunks").toString());
-      containerData.setMetadataPath(containerBase.resolve("metadata").toString());
-      File containerFile = ContainerUtils.getContainerFile(containerBase.toFile());
-      ContainerDataYaml.createContainerFile(containerData, containerFile);
-    }
   }
 }

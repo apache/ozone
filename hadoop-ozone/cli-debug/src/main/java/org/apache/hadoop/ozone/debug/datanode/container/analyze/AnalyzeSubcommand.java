@@ -99,9 +99,9 @@ public class AnalyzeSubcommand extends AbstractSubcommand implements Callable<Vo
     if (volumeScanErrors.isEmpty()) {
       return;
     }
-    out().printf("%nVolumes that failed to scan (%d):%n", volumeScanErrors.size());
+    err().printf("%nVolumes that failed to scan (%d):%n", volumeScanErrors.size());
     for (String error : volumeScanErrors) {
-      out().printf("  %s%n", error);
+      err().printf("  %s%n", error);
     }
   }
 }
