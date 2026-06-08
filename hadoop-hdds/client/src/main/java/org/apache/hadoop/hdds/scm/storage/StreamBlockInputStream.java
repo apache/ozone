@@ -186,7 +186,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private synchronized void advancePosition(long delta, boolean preRead) {
-    LOG.debug("{}: advance {} -> {}", getName(streamingReader), position, position + delta);
+    LOG.trace("{}: advance {} -> {}", getName(streamingReader), position, position + delta);
     position += delta;
     if (preRead && position >= blockLength) {
       closeReader("advancePosition");
@@ -508,6 +508,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
       while (true) {
         final ReadBlockResponseProto proto = poll();
+        if (proto == null) {
+          return null;
+        }
         final ByteBuffer buffer = getByteBuffer(proto, getPos());
         final ReadBuffer read = buffer != null ? new ReadBuffer(proto, buffer) : null;
         if (hasRemaining(read)) {
@@ -597,9 +600,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     private void offerToQueue(ReadBlockResponseProto item) {
-      if (LOG.isDebugEnabled()) {
+      if (LOG.isTraceEnabled()) {
         final ContainerProtos.ChecksumData checksumData = item.getChecksumData();
-        LOG.debug("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
+        LOG.trace("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
             name, item.getOffset(), item.getData().size(),
             checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
       }

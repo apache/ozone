@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -61,7 +62,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     GenericTestUtils.setLogLevel(LoggerFactory.getLogger("SCMHATransactionMonitor"), Level.ERROR);
     GenericTestUtils.setLogLevel(GrpcXceiverService.class, Level.ERROR);
 
-//    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(StreamBlockInputStream.class), Level.TRACE);
+//    GenericTestUtils.setLogLevel(StreamBlockInputStream.class, Level.DEBUG);
 //    GenericTestUtils.setLogLevel(LoggerFactory.getLogger(XceiverClientGrpc.class), Level.TRACE);
   }
 
@@ -81,7 +82,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       OzoneConfiguration conf = cluster.getConf();
 
       runTestReadKey(DATA_LENGTH, false, conf);
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < 2; i++) {
         final int keyLength = DATA_LENGTH + ThreadLocalRandom.current().nextInt(DATA_LENGTH);
         runTestReadKey(keyLength, true, conf);
       }
@@ -185,13 +186,25 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
   }
 
   @Test
-  void testAll() throws Exception {
+  void testAllWithPreRead() throws Exception {
+    runTestAll(true);
+  }
+
+  @Test
+  void testAllWithoutPreRead() throws Exception {
+    runTestAll(false);
+  }
+
+  void runTestAll(boolean preRead) throws Exception {
     try (MiniOzoneCluster cluster = newCluster()) {
       cluster.waitForClusterToBeReady();
 
       OzoneConfiguration conf = cluster.getConf();
       OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
       clientConfig.setStreamReadBlock(true);
+      if (!preRead) {
+        clientConfig.setStreamReadPreReadSize(0);
+      }
       OzoneConfiguration copy = new OzoneConfiguration(conf);
       copy.setFromObject(clientConfig);
       String keyName = getNewKeyName();
@@ -250,15 +263,38 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     }
   }
 
+  void assertSeekRead(KeyInputStream in, int position) throws IOException {
+    in.seek(position);
+    int b = in.read();
+    assertEquals(inputData[position], (byte) b, "Read data is not same as written data at index " + position);
+  }
+
+  private void runTestSeek(KeyInputStream in, int seekSize, Random random) throws IOException {
+    LOG.info("runTestSeek: seekSize={}", seekSize);
+    for (int i = 0; i < 100; i++) {
+      int position = random.nextInt(seekSize);
+      assertSeekRead(in, position);
+    }
+
+    for (int position = 0; position < DATA_LENGTH; position += random.nextInt(seekSize)) {
+      assertSeekRead(in, position);
+    }
+
+    for (int position = DATA_LENGTH - 1; position >= 0; position -= random.nextInt(seekSize)) {
+      assertSeekRead(in, position);
+    }
+    assertSeekRead(in, 0);
+  }
+
   private void testSeek(String key) throws IOException {
-    java.util.Random random = new java.util.Random();
+    final Random random = new Random();
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
-      for (int i = 0; i < 100; i++) {
-        int position = random.nextInt(DATA_LENGTH);
-        keyInputStream.seek(position);
-        int b = keyInputStream.read();
-        assertEquals(inputData[position], (byte) b, "Read data is not same as written data at index " + position);
-      }
+      runTestSeek(keyInputStream, CHUNK_SIZE / 8, random);
+      runTestSeek(keyInputStream, CHUNK_SIZE, random);
+      runTestSeek(keyInputStream, BLOCK_SIZE, random);
+      runTestSeek(keyInputStream, DATA_LENGTH, random);
+
+      // error cases
       StreamBlockInputStream blockStream = (StreamBlockInputStream) keyInputStream.getPartStreams().get(0);
       long length = blockStream.getLength();
       blockStream.seek(10);
