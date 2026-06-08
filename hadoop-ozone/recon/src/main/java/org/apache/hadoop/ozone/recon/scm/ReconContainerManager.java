@@ -202,6 +202,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   void transitionOpenToClosing(ContainerID containerID, ContainerInfo containerInfo)
       throws IOException, InvalidStateTransitionException {
     PipelineID pipelineID = containerInfo.getPipelineID();
+    updateContainerState(containerID, FINALIZE);  // OPEN → CLOSING
     if (pipelineID != null) {
       int curCnt = pipelineToOpenContainer.getOrDefault(pipelineID, 0);
       if (curCnt == 1) {
@@ -210,7 +211,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
         pipelineToOpenContainer.put(pipelineID, curCnt - 1);
       }
     }
-    updateContainerState(containerID, FINALIZE);  // OPEN → CLOSING
   }
 
   /**

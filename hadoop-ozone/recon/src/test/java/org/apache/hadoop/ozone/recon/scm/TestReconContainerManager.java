@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -204,6 +206,25 @@ public class TestReconContainerManager
         .containsKey(openContainer.getPipeline().getId()));
     verify(getContainerManager().getScmClient(), never())
         .getContainerWithPipeline(containerID.getId());
+  }
+
+  @Test
+  public void testTransitionOpenToClosingDoesNotDecrementCountOnFailure()
+      throws Exception {
+    ContainerWithPipeline missingContainer =
+        getTestContainer(114L, LifeCycleState.OPEN);
+    ContainerID containerID =
+        missingContainer.getContainerInfo().containerID();
+    Pipeline pipeline = missingContainer.getPipeline();
+    getContainerManager().getPipelineToOpenContainer().put(pipeline.getId(), 1);
+
+    assertThrows(ContainerNotFoundException.class,
+        () -> getContainerManager().transitionOpenToClosing(containerID,
+            missingContainer.getContainerInfo()));
+
+    assertEquals(1,
+        getContainerManager().getPipelineToOpenContainer()
+            .get(pipeline.getId()));
   }
 
   @Test
