@@ -88,7 +88,6 @@ const Capacity: React.FC<object> = () => {
     CONSTANTS.DEFAULT_DN_PENDING_DELETION,
     {
       retryAttempts: 2,
-      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -114,7 +113,19 @@ const Capacity: React.FC<object> = () => {
     })
   }
 
-  const autoReload = useAutoReload(loadData);
+  const loadDataIfIdle = () => {
+    if (
+      storageDistribution.loading ||
+      scmPendingDeletes.loading ||
+      omPendingDeletes.loading ||
+      dnPendingDeletes.loading
+    ) {
+      return;
+    }
+    loadData();
+  };
+
+  const autoReload = useAutoReload(loadDataIfIdle);
 
   const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
