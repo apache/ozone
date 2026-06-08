@@ -36,7 +36,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
- * Metrics for Recon SCM targeted sync execution.
+ * Metrics for Recon SCM container sync execution.
  */
 @InterfaceAudience.Private
 @Metrics(about = "Recon SCM Container Sync Metrics", context = OzoneConsts.OZONE)
@@ -56,29 +56,25 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
       "scmContainerSyncStatus",
       "SCM container sync status: 0=idle, 1=in progress, 2=success, 3=failure");
 
-  private static final MetricsInfo LAST_TARGETED_SYNC_DURATION_MS = Interns.info(
-      "lastTargetedSyncDurationMs",
-      "Time taken by the last targeted sync in milliseconds");
+  private static final MetricsInfo SCM_CONTAINER_SYNC_DURATION_MS = Interns.info(
+      "scmContainerSyncDurationMs",
+      "Time taken by the SCM container sync in milliseconds");
 
   /**
-   * No targeted sync has run yet, or the latest scheduler cycle did not run one.
+   * SCM container sync is currently running.
    */
-  public static final int TARGETED_SYNC_STATUS_IDLE = 0;
+  public static final int SCM_CONTAINER_SYNC_STATUS_IN_PROGRESS = 1;
   /**
-   * Targeted sync is currently running.
+   * SCM container sync completed successfully.
    */
-  public static final int TARGETED_SYNC_STATUS_IN_PROGRESS = 1;
+  public static final int SCM_CONTAINER_SYNC_STATUS_SUCCESS = 2;
   /**
-   * The last targeted sync completed successfully.
+   * SCM container sync completed with one or more failed passes.
    */
-  public static final int TARGETED_SYNC_STATUS_SUCCESS = 2;
-  /**
-   * The last targeted sync completed with one or more failed passes.
-   */
-  public static final int TARGETED_SYNC_STATUS_FAILURE = 3;
+  public static final int SCM_CONTAINER_SYNC_STATUS_FAILURE = 3;
 
   private final AtomicInteger scmContainerSyncStatus = new AtomicInteger();
-  private final AtomicLong lastTargetedSyncDurationMs = new AtomicLong();
+  private final AtomicLong scmContainerSyncDurationMs = new AtomicLong();
   private final Map<HddsProtos.LifeCycleState, AtomicLong>
       containerSyncDurationMs;
   private final Map<HddsProtos.LifeCycleState, AtomicLong>
@@ -111,8 +107,8 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
     scmContainerSyncStatus.set(status);
   }
 
-  public void setLastTargetedSyncDurationMs(long durationMs) {
-    lastTargetedSyncDurationMs.set(durationMs);
+  public void setScmContainerSyncDurationMs(long durationMs) {
+    scmContainerSyncDurationMs.set(durationMs);
   }
 
   public void setContainerSyncDurationMs(
@@ -129,8 +125,8 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
     return scmContainerSyncStatus.get();
   }
 
-  public long getLastTargetedSyncDurationMs() {
-    return lastTargetedSyncDurationMs.get();
+  public long getScmContainerSyncDurationMs() {
+    return scmContainerSyncDurationMs.get();
   }
 
   public long getContainerSyncDurationMs(
@@ -147,8 +143,8 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(SOURCE_NAME);
     builder.addGauge(SCM_CONTAINER_SYNC_STATUS, getScmContainerSyncStatus());
-    builder.addGauge(LAST_TARGETED_SYNC_DURATION_MS,
-        getLastTargetedSyncDurationMs());
+    builder.addGauge(SCM_CONTAINER_SYNC_DURATION_MS,
+        getScmContainerSyncDurationMs());
     for (HddsProtos.LifeCycleState state : SYNC_STATES) {
       builder.addGauge(containerSyncDurationMetricInfo.get(state),
           getContainerSyncDurationMs(state));
@@ -191,8 +187,8 @@ public final class ReconScmContainerSyncMetrics implements MetricsSource {
       metrics.put(state, Interns.info(
           CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_CAMEL, stateName)
               + "ContainerCountDrift",
-          "Pre-sync observed " + stateName
-              + " container count drift, computed as SCM count minus Recon count"));
+          "Container count drift observed at start of sync pass "
+              + "(SCM count minus Recon count for " + stateName + " state)."));
     }
     return Collections.unmodifiableMap(metrics);
   }

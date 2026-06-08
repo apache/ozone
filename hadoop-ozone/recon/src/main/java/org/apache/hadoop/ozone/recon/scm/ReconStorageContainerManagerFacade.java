@@ -598,8 +598,8 @@ public class ReconStorageContainerManagerFacade
       initializePipelinesFromScm();
     }
     // -----------------------------------------------------------------------
-    // Scheduler (incremental/targeted sync): runs on the configured interval.
-    // Each cycle directly runs targeted reconciliation. The sync itself already
+    // Scheduler (SCM container sync): runs on the configured interval.
+    // Each cycle directly runs SCM container reconciliation. The sync itself already
     // fetches the SCM state counts needed for pagination, so a separate drift
     // preflight would duplicate SCM calls before doing the same work.
     // -----------------------------------------------------------------------
@@ -618,9 +618,9 @@ public class ReconStorageContainerManagerFacade
         return;
       }
       try {
-        boolean success = runTargetedSyncWithMetrics();
+        boolean success = runScmContainerSyncWithMetrics();
         if (!success) {
-          LOG.warn("Targeted sync completed with one or more phase failures. "
+          LOG.warn("SCM container sync completed with one or more phase failures. "
               + "Check logs above for details.");
         }
       } catch (Throwable t) {
@@ -887,7 +887,7 @@ public class ReconStorageContainerManagerFacade
   public boolean triggerTargetedSCMContainerSync() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
       try {
-        return runTargetedSyncWithMetrics();
+        return runScmContainerSyncWithMetrics();
       } finally {
         isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
@@ -900,7 +900,7 @@ public class ReconStorageContainerManagerFacade
   public boolean syncWithSCMContainerInfo() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
       try {
-        return runTargetedSyncWithMetrics();
+        return runScmContainerSyncWithMetrics();
       } finally {
         isSyncDataFromSCMRunning.compareAndSet(true, false);
       }
@@ -910,22 +910,22 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
-  private boolean runTargetedSyncWithMetrics() {
+  private boolean runScmContainerSyncWithMetrics() {
     long startTime = Time.monotonicNow();
     containerSyncMetrics.setScmContainerSyncStatus(
-        ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_IN_PROGRESS);
+        ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_IN_PROGRESS);
     try {
       boolean success = containerSyncHelper.syncWithSCMContainerInfo();
       containerSyncMetrics.setScmContainerSyncStatus(success
-          ? ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_SUCCESS
-          : ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_FAILURE);
+          ? ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_SUCCESS
+          : ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_FAILURE);
       return success;
     } catch (RuntimeException | Error e) {
       containerSyncMetrics.setScmContainerSyncStatus(
-          ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_FAILURE);
+          ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_FAILURE);
       throw e;
     } finally {
-      containerSyncMetrics.setLastTargetedSyncDurationMs(
+      containerSyncMetrics.setScmContainerSyncDurationMs(
           Time.monotonicNow() - startTime);
     }
   }

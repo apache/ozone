@@ -68,12 +68,14 @@ class TestReconScmContainerSyncMetrics {
     metrics.setContainerCountDrift(CLOSING, 100L);
     metrics.setContainerSyncDurationMs(DELETING, 200L);
     metrics.setScmContainerSyncStatus(
-        ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_SUCCESS);
+        ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_SUCCESS);
+    metrics.setScmContainerSyncDurationMs(500L);
 
     MetricsRecordBuilder builder = getMetrics(metrics);
 
-    assertEquals(ReconScmContainerSyncMetrics.TARGETED_SYNC_STATUS_SUCCESS,
+    assertEquals(ReconScmContainerSyncMetrics.SCM_CONTAINER_SYNC_STATUS_SUCCESS,
         getIntGauge("scmContainerSyncStatus", builder));
+    assertEquals(500L, getLongGauge("scmContainerSyncDurationMs", builder));
     assertEquals(10L, getLongGauge("openContainerSyncDurationMs", builder));
     assertEquals(20L,
         getLongGauge("quasiClosedContainerSyncDurationMs", builder));

@@ -122,6 +122,8 @@ class ReconStorageContainerSyncHelper {
    */
   private static final long CONTAINER_WITH_PIPELINE_PROTO_SIZE_BYTES = 1024;
 
+  private static final int LIVE_STATE_SYNC_PROGRESS_LOG_INTERVAL = 50;
+
   /**
    * Monotonic cursor for OPEN add-only sync. OPEN containers are
    * created with increasing container IDs, so each cycle only needs to scan
@@ -193,7 +195,10 @@ class ReconStorageContainerSyncHelper {
       long retrieved = 0;
       int addedCount = 0;
       int reconciledCount = 0;
+      int batchCount = 0;
 
+      LOG.info("{} sync starting: total={}, batchSize={}, startId={}.",
+          scmState, total, batchSize, initialStart);
       while (true) {
         List<ContainerID> batch = scmServiceProvider.getListOfContainerIDs(
             startContainerId, batchSize, scmState);
@@ -227,6 +232,14 @@ class ReconStorageContainerSyncHelper {
         }
         startContainerId = ContainerID.valueOf(nextID);
         retrieved += batch.size();
+        batchCount++;
+
+        if (batchCount % LIVE_STATE_SYNC_PROGRESS_LOG_INTERVAL == 0) {
+          LOG.info("{} sync progress: batch={}, totalRetrieved={}, added={}, "
+                  + "reconciled={}, nextId={}.",
+              scmState, batchCount, retrieved, addedCount, reconciledCount,
+              nextID);
+        }
       }
 
       LOG.info("{} sync complete from start {}, checked {}, added {}, reconciled {}.",
