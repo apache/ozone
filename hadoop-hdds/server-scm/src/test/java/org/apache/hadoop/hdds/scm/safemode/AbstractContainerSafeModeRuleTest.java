@@ -55,6 +55,7 @@ import org.mockito.ArgumentCaptor;
  * Abstract base class for container safe mode rule tests.
  */
 public abstract class AbstractContainerSafeModeRuleTest {
+  private final List<ContainerInfo> deletedContainers = new ArrayList<>();
   private List<ContainerInfo> containers;
   private SCMSafeModeManager safeModeManager;
   private ConfigurationSource conf;
@@ -74,6 +75,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
     when(safeModeManager.getSafeModeMetrics()).thenReturn(safeModeMetrics);
     containers = new ArrayList<>();
     when(containerManager.getContainers(getReplicationType())).thenReturn(containers);
+    when(containerManager.getContainers(LifeCycleState.DELETED)).thenReturn(deletedContainers);
     when(containerManager.getContainer(any(ContainerID.class))).thenAnswer(invocation -> {
       ContainerID id = invocation.getArgument(0);
       return containers.stream()
@@ -98,7 +100,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
     containers.add(mockContainer(LifeCycleState.OPEN, 3L));
     containers.add(mockContainer(LifeCycleState.CLOSED, 4L));
     containers.removeIf(c -> c.containerID().equals(ContainerID.valueOf(8L)));
-    containers.add(mockContainer(LifeCycleState.DELETED, 8L));
+    deletedContainers.add(mockContainer(LifeCycleState.DELETED, 8L));
     rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
@@ -110,6 +112,9 @@ public abstract class AbstractContainerSafeModeRuleTest {
       names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
   public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
     containers.add(mockContainer(state, 1L));
+    if (state == LifeCycleState.DELETED) {
+      deletedContainers.add(mockContainer(state, 1L));
+    }
     AbstractContainerSafeModeRule rule = createRule(eventQueue, conf, containerManager, safeModeManager);
     rule.setValidateBasedOnReportProcessing(false);
 
