@@ -35,33 +35,30 @@ public abstract class AbstractComponentVersionTest {
 
   protected abstract ComponentVersion getDefaultVersion();
 
-  protected abstract ComponentVersion getFutureVersion();
+  protected abstract ComponentVersion getUnknownVersion();
 
   protected abstract ComponentVersion deserialize(int value);
 
-  // FUTURE_VERSION is the latest
   @Test
-  public void testFutureVersionHasTheHighestOrdinal() {
+  public void testUnknownFutureVersionHasTheHighestOrdinal() {
     ComponentVersion[] values = getValues();
-    ComponentVersion futureValue = getFutureVersion();
-    assertEquals(values[values.length - 1], futureValue);
+    ComponentVersion unknownVersion = getUnknownVersion();
+    assertEquals(values[values.length - 1], unknownVersion);
   }
 
-  // FUTURE_VERSION's internal version id is -1
   @Test
-  public void testFutureVersionSerializesToMinusOne() {
-    ComponentVersion futureValue = getFutureVersion();
-    assertEquals(-1, futureValue.serialize());
+  public void testUnknownVersionSerializesToMinusOne() {
+    ComponentVersion unknownVersion = getUnknownVersion();
+    assertEquals(-1, unknownVersion.serialize());
   }
 
-  // DEFAULT_VERSION's internal version id is 0
   @Test
   public void testDefaultVersionSerializesToZero() {
     ComponentVersion defaultValue = getDefaultVersion();
     assertEquals(0, defaultValue.serialize());
   }
 
-  // known (non-future) versions are strictly increasing
+  // known versions are strictly increasing
   @Test
   public void testSerializedValuesAreMonotonic() {
     ComponentVersion[] values = getValues();
@@ -75,7 +72,7 @@ public abstract class AbstractComponentVersionTest {
   @Test
   public void testNextVersionProgression() {
     ComponentVersion[] values = getValues();
-    ComponentVersion futureValue = getFutureVersion();
+    ComponentVersion unknownVersion = getUnknownVersion();
     int knownVersionCount = values.length - 1;
     for (int i = 0; i < knownVersionCount - 1; i++) {
       assertEquals(values[i + 1], values[i].nextVersion(),
@@ -83,8 +80,8 @@ public abstract class AbstractComponentVersionTest {
     }
     assertNull(values[knownVersionCount - 1].nextVersion(),
         "Expected latest known version to have no nextVersion");
-    assertNull(futureValue.nextVersion(),
-        "Expected FUTURE_VERSION.nextVersion() to return null");
+    assertNull(unknownVersion.nextVersion(),
+        "Expected unknown version to have no nextVersion");
   }
 
   @Test
@@ -105,18 +102,19 @@ public abstract class AbstractComponentVersionTest {
   }
 
   @Test
-  public void testFutureVersionSupportsAllKnownVersions() {
+  public void testUnknownFutureVersionSupportsAllKnownVersions() {
     ComponentVersion[] values = getValues();
-    int unknownFutureVersion = Integer.MAX_VALUE;
+    int unknownSerializedVersion = Integer.MAX_VALUE;
     for (ComponentVersion knownVersion : values) {
-      if (knownVersion == getFutureVersion()) {
-        // FUTURE_VERSION with serialized value < 0 is considered larger than any version with a concrete
-        // positive value.
-        assertFalse(knownVersion.isSupportedBy(unknownFutureVersion), knownVersion +
-            " should not support unknown future version " + unknownFutureVersion);
+      if (knownVersion == getUnknownVersion()) {
+        // Two unknown future versions should not support each other.
+        assertFalse(knownVersion.isSupportedBy(unknownSerializedVersion), knownVersion +
+            " should not support unknown future version " + unknownSerializedVersion);
       } else {
-        assertTrue(knownVersion.isSupportedBy(unknownFutureVersion), knownVersion +
-            " should support unknown future version " + unknownFutureVersion);
+        // The unknown future version should deserialize to a negative value, but still be considered larger than all
+        // known versions.
+        assertTrue(knownVersion.isSupportedBy(unknownSerializedVersion), knownVersion +
+            " should support unknown future version " + unknownSerializedVersion);
       }
     }
   }
@@ -129,7 +127,7 @@ public abstract class AbstractComponentVersionTest {
   }
 
   @Test
-  public void testDeserializeUnknownReturnsFutureVersion() {
-    assertEquals(getFutureVersion(), deserialize(Integer.MAX_VALUE));
+  public void testDeserializeUnknownVersion() {
+    assertEquals(getUnknownVersion(), deserialize(Integer.MAX_VALUE));
   }
 }

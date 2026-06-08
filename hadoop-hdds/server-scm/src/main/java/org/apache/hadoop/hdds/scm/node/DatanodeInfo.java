@@ -111,6 +111,7 @@ public class DatanodeInfo extends DatanodeDetails {
 
   /**
    * Updates the last known apparent and software versions for this datanode.
+   * Updates the last known version reported by this datanode.
    */
   public void updateLastKnownVersions(LayoutVersionProto version) {
     if (version == null) {
