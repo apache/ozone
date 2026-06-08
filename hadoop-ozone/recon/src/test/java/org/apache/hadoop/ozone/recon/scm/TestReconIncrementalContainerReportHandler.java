@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -133,9 +135,6 @@ public class TestReconIncrementalContainerReportHandler
 
       ReconContainerManager containerManager = getContainerManager();
       containerManager.addNewContainer(containerWithPipeline);
-      when(containerManager.getScmClient()
-          .getContainerWithPipeline(containerID.getId()))
-          .thenReturn(getTestContainer(containerID.getId(), expectedState));
 
       DatanodeDetails datanodeDetails =
           containerWithPipeline.getPipeline().getFirstNode();
@@ -164,6 +163,8 @@ public class TestReconIncrementalContainerReportHandler
       assertEquals(expectedState, actualState,
           String.format("Expecting %s in container state for replica state %s",
               expectedState, state));
+      verify(containerManager.getScmClient(), never())
+          .getContainerWithPipeline(containerID.getId());
     }
   }
 
