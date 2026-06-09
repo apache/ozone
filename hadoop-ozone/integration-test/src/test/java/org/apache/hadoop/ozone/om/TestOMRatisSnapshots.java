@@ -169,11 +169,13 @@ public class TestOMRatisSnapshots {
     clientConfig.setRpcTimeOut(TimeUnit.SECONDS.toMillis(5));
     conf.setFromObject(clientConfig);
 
-    cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId("om-service-test1")
+    MiniOzoneHAClusterImpl.Builder clusterBuilder =
+        MiniOzoneCluster.newHABuilder(conf);
+    clusterBuilder.setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(NUM_OF_OMS)
         .setNumOfActiveOMs(2)
-        .build();
+        .setNumDatanodes(1);
+    cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
@@ -789,8 +791,14 @@ public class TestOMRatisSnapshots {
     });
     List<String> newKeys = writeFuture.get();
 
-    // Wait checkpoint installation to finish
-    Thread.sleep(5000);
+    // All newKeys writes have completed (writeFuture.get() above), so the
+    // leader must already contain them.
+    OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
+    for (String key : newKeys) {
+      assertNotNull(leaderOmMetaMgr.getKeyTable(
+          TEST_BUCKET_LAYOUT)
+          .get(leaderOmMetaMgr.getOzoneKey(volumeName, bucketName, key)));
+    }
 
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
@@ -804,6 +812,15 @@ public class TestOMRatisSnapshots {
     String msg = "Reloaded OM state";
     assertLogCapture(logCapture, msg);
     assertLogCapture(logCapture, "Install Checkpoint is finished");
+
+    // Wait for the follower to apply everything the leader has applied; all
+    // writes have completed on the leader, so after this no further snapshot
+    // install (and DB reload) can occur and the follower DB reads below are
+    // safe from "Rocks Database is closed" races.
+    long leaderApplied = leaderOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    GenericTestUtils.waitFor(() -> followerOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex() >= leaderApplied, 100, 30_000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -830,13 +847,6 @@ public class TestOMRatisSnapshots {
           TEST_BUCKET_LAYOUT)
           .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
     }
-    OMMetadataManager leaderOmMetaMgr = leaderOM.getMetadataManager();
-    for (String key : newKeys) {
-      assertNotNull(leaderOmMetaMgr.getKeyTable(
-          TEST_BUCKET_LAYOUT)
-          .get(followerOMMetaMgr.getOzoneKey(volumeName, bucketName, key)));
-    }
-    Thread.sleep(5000);
     followerOMMetaMgr = followerOM.getMetadataManager();
     for (String key : newKeys) {
       assertNotNull(followerOMMetaMgr.getKeyTable(
@@ -931,8 +941,6 @@ public class TestOMRatisSnapshots {
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
-    // Wait installation finish
-    Thread.sleep(5000);
     // Verify checkpoint installation was happened.
     assertLogCapture(logCapture, "Reloaded OM state");
     assertLogCapture(logCapture, "Install Checkpoint is finished");
@@ -970,6 +978,13 @@ public class TestOMRatisSnapshots {
     // leader OM.
     writeKeysToIncreaseLogIndex(followerOM.getOmRatisServer(),
         leaderCheckpointTermIndex.getIndex() + 100);
+
+    // Wait for the follower to finish applying in-flight transactions, so
+    // that the TermIndex read below matches what installCheckpoint observes.
+    long leaderAppliedIndex = leaderOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    GenericTestUtils.waitFor(() -> followerRatisServer
+        .getLastAppliedTermIndex().getIndex() >= leaderAppliedIndex, 100, 10_000);
 
     // Install the old checkpoint on the follower OM. This should fail as the
     // followerOM is already ahead of that transactionLogIndex and the OM
@@ -1187,7 +1202,6 @@ public class TestOMRatisSnapshots {
     long logIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     while (logIndex < targetLogIndex) {
       keys.add(createKey(ozoneBucket));
-      Thread.sleep(100);
       logIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     }
     return keys;
