@@ -155,7 +155,7 @@ public class TestOMRatisSnapshotTransfer {
 
     MiniOzoneHAClusterImpl.Builder clusterBuilder =
         MiniOzoneCluster.newHABuilder(conf);
-    clusterBuilder.setOMServiceId(OM_SERVICE_ID)
+    clusterBuilder.setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(NUM_OF_OMS)
         .setNumOfActiveOMs(2)
         .setNumDatanodes(1);
