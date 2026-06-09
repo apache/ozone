@@ -20,13 +20,19 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
@@ -443,6 +449,142 @@ class TestContainerBalancerSubCommand {
     doThrow(IOException.class).when(scmClient).stopContainerBalancer();
     assertThrows(IOException.class, () -> stopCmd.execute(scmClient));
     assertThat(err.get()).containsPattern(STOP_FAILED);
+  }
+
+  private static final Pattern DEPRECATED_MAX_DATANODES_PERCENTAGE = Pattern.compile(
+      "warning: --maxDatanodesPercentageToInvolvePerIteration is deprecated");
+  private static final Pattern DEPRECATED_MAX_SIZE_TO_MOVE = Pattern.compile(
+      "warning: --maxSizeToMovePerIterationInGB is deprecated");
+  private static final Pattern DEPRECATED_MAX_SIZE_ENTERING_TARGET = Pattern.compile(
+      "warning: --maxSizeEnteringTargetInGB is deprecated");
+  private static final Pattern DEPRECATED_MAX_SIZE_LEAVING_SOURCE = Pattern.compile(
+      "warning: --maxSizeLeavingSourceInGB is deprecated");
+
+  private static StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto
+      startBalancerSuccessResponse() {
+    return StorageContainerLocationProtocolProtos
+        .StartContainerBalancerResponseProto.newBuilder()
+        .setStart(true)
+        .build();
+  }
+
+  private void mockStartContainerBalancerSuccess(ScmClient scmClient) throws IOException {
+    when(scmClient.startContainerBalancer(
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(startBalancerSuccessResponse());
+  }
+
+  @Test
+  void testStartSubcommandHelpDoesNotShowDeprecatedFlags() {
+    CommandLine cmd = new CommandLine(startCmd);
+    ByteArrayOutputStream usage = new ByteArrayOutputStream();
+    cmd.usage(new PrintWriter(usage, true));
+    String help = usage.toString();
+    assertThat(help)
+        .contains("--max-datanodes-percentage-to-involve-per-iteration")
+        .contains("--max-size-to-move-per-iteration-in-gb")
+        .contains("--max-size-entering-target-in-gb")
+        .contains("--max-size-leaving-source-in-gb")
+        .doesNotContain("maxDatanodesPercentageToInvolvePerIteration")
+        .doesNotContain("maxSizeToMovePerIterationInGB")
+        .doesNotContain("maxSizeEnteringTargetInGB")
+        .doesNotContain("maxSizeLeavingSourceInGB");
+  }
+
+  @Test
+  void testStartSubcommandMaxDatanodesPercentageKebabCaseFlag() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockStartContainerBalancerSuccess(scmClient);
+
+    CommandLine cmd = new CommandLine(startCmd);
+    cmd.parseArgs("--max-datanodes-percentage-to-involve-per-iteration", "30");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
+    assertThat(err.get()).doesNotContain("maxDatanodesPercentageToInvolvePerIteration");
+    verify(scmClient).startContainerBalancer(
+        eq(Optional.empty()), eq(Optional.empty()), eq(Optional.of(30)),
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testStartSubcommandMaxDatanodesPercentageShortFlag() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockStartContainerBalancerSuccess(scmClient);
+
+    CommandLine cmd = new CommandLine(startCmd);
+    cmd.parseArgs("-d", "40");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
+    assertThat(err.get()).doesNotContain("maxDatanodesPercentageToInvolvePerIteration");
+    verify(scmClient).startContainerBalancer(
+        eq(Optional.empty()), eq(Optional.empty()), eq(Optional.of(40)),
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testStartSubcommandDeprecatedMaxDatanodesPercentageFlag() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockStartContainerBalancerSuccess(scmClient);
+
+    CommandLine cmd = new CommandLine(startCmd);
+    cmd.parseArgs("--maxDatanodesPercentageToInvolvePerIteration", "35");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
+    assertThat(err.get()).containsPattern(DEPRECATED_MAX_DATANODES_PERCENTAGE);
+    verify(scmClient).startContainerBalancer(
+        eq(Optional.empty()), eq(Optional.empty()), eq(Optional.of(35)),
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testStartSubcommandDeprecatedMaxSizeToMovePerIterationInGBFlag() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockStartContainerBalancerSuccess(scmClient);
+
+    CommandLine cmd = new CommandLine(startCmd);
+    cmd.parseArgs("--maxSizeToMovePerIterationInGB", "100");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
+    assertThat(err.get()).containsPattern(DEPRECATED_MAX_SIZE_TO_MOVE);
+    verify(scmClient).startContainerBalancer(
+        eq(Optional.empty()), eq(Optional.empty()), any(),
+        eq(Optional.of(100L)), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testStartSubcommandDeprecatedMaxSizeEnteringTargetInGBFlag() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockStartContainerBalancerSuccess(scmClient);
+
+    CommandLine cmd = new CommandLine(startCmd);
+    cmd.parseArgs("--maxSizeEnteringTargetInGB", "15");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
+    assertThat(err.get()).containsPattern(DEPRECATED_MAX_SIZE_ENTERING_TARGET);
+    verify(scmClient).startContainerBalancer(
+        eq(Optional.empty()), eq(Optional.empty()), any(), any(),
+        eq(Optional.of(15L)), any(), any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testStartSubcommandDeprecatedMaxSizeLeavingSourceInGBFlag() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    mockStartContainerBalancerSuccess(scmClient);
+
+    CommandLine cmd = new CommandLine(startCmd);
+    cmd.parseArgs("--maxSizeLeavingSourceInGB", "18");
+    startCmd.execute(scmClient);
+
+    assertThat(out.get()).containsPattern(STARTED_SUCCESSFULLY);
+    assertThat(err.get()).containsPattern(DEPRECATED_MAX_SIZE_LEAVING_SOURCE);
+    verify(scmClient).startContainerBalancer(
+        eq(Optional.empty()), eq(Optional.empty()), any(), any(), any(),
+        eq(Optional.of(18L)), any(), any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test

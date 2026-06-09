@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -44,10 +45,16 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
   private final FilterPipelineOptions filterOptions = new FilterPipelineOptions();
 
   @CommandLine.Option(
-      names = {"-s", "--state", "-fst", "--filterByState", "--filter-by-state"},
+      names = {"-s", "--state", "-fst", "--filter-by-state"},
       description = "Filter listed pipelines by State, eg OPEN, CLOSED",
       defaultValue = "")
   private String state;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @CommandLine.Option(names = "--filterByState", hidden = true)
+  private String deprecatedFilterByState;
 
   @CommandLine.Option(
       names = {"--json"},
@@ -59,13 +66,17 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     Optional<Predicate<? super Pipeline>> replicationFilter = filterOptions.getReplicationFilter();
 
+    String resolvedState = DeprecatedCliOptions.resolveString(state, deprecatedFilterByState);
+    DeprecatedCliOptions.warnIfDeprecatedStringUsed("--filterByState", "--filter-by-state",
+        deprecatedFilterByState, state);
+
     Stream<Pipeline> stream = scmClient.listPipelines().stream();
     if (replicationFilter.isPresent()) {
       stream = stream.filter(replicationFilter.get());
     }
-    if (!Strings.isNullOrEmpty(state)) {
+    if (!Strings.isNullOrEmpty(resolvedState)) {
       stream = stream.filter(p -> p.getPipelineState().toString()
-          .compareToIgnoreCase(state) == 0);
+          .compareToIgnoreCase(resolvedState) == 0);
     }
 
     if (json) {

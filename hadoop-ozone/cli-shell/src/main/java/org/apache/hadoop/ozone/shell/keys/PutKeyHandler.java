@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -65,9 +67,28 @@ public class PutKeyHandler extends KeyHandler {
   @Mixin
   private ShellReplicationOptions replication;
 
-  @Option(names = "--expectedGeneration",
+  @Option(names = "--expected-generation",
       description = "Store key only if it already exists and its generation matches the value provided")
   private Long expectedGeneration;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--expectedGeneration", hidden = true)
+  private Long deprecatedExpectedGeneration;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
+  private Long resolveExpectedGeneration() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--expectedGeneration", "--expected-generation", spec,
+        "--expected-generation");
+    if (DeprecatedCliOptions.hasMatchedOption(spec, "--expectedGeneration")) {
+      return deprecatedExpectedGeneration;
+    }
+    return expectedGeneration;
+  }
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -127,8 +148,9 @@ public class PutKeyHandler extends KeyHandler {
   private OzoneOutputStream createOrReplaceKey(OzoneBucket bucket, String keyName,
       long size, Map<String, String> keyMetadata, ReplicationConfig replicationConfig
   ) throws IOException {
-    if (expectedGeneration != null) {
-      final long existingGeneration = expectedGeneration;
+    Long generation = resolveExpectedGeneration();
+    if (generation != null) {
+      final long existingGeneration = generation;
       Preconditions.checkArgument(existingGeneration > 0,
           "expectedGeneration must be positive, but was %s", existingGeneration);
       return bucket.rewriteKey(keyName, size, existingGeneration, replicationConfig, keyMetadata);

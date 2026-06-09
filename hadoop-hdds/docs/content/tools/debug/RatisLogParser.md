@@ -30,7 +30,7 @@ Shell for printing Ratis Log in understandable text
   -h, --help          Show this help message and exit.
       --role=<role>   Component role for parsing. Values: om, scm, datanode
                         Default: generic
-  -s, --segmentPath, --segment-path=<segmentFile>
+  -s, --segment-path=<segmentFile>
                       Path of the segment file
   -V, --version       Print version information and exit.
       --verbose       More verbose output. Show the stack trace of the errors.
