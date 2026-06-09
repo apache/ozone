@@ -118,6 +118,12 @@ import org.slf4j.LoggerFactory;
 public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
+  // Metadata key under which the object's Content-Type is stored in the OM key
+  // metadata (the standard Content-Type header name).
+  protected static final String CONTENT_TYPE = HttpHeaders.CONTENT_TYPE;
+  // Key used to preserve a user-supplied "x-amz-meta-content-type" so it does
+  // not collide with the object's Content-Type stored under CONTENT_TYPE.
+  protected static final String CONTENT_TYPE_CUSTOM = "content-type-custom";
 
   private static final ThreadLocal<MessageDigest> MD5_PROVIDER;
   private static final ThreadLocal<MessageDigest> SHA_256_PROVIDER;
@@ -319,20 +325,33 @@ public abstract class EndpointBase {
       }
     }
 
-    // If the request contains a custom metadata header "x-amz-meta-ETag",
-    // replace the metadata key to "etag-custom" to prevent key metadata collision with
-    // the ETag calculated by hashing the object when storing the key in OM table.
-    // The custom ETag metadata header will be rebuilt during the headObject operation.
-    if (customMetadata.containsKey(HttpHeaders.ETAG)
-        || customMetadata.containsKey(HttpHeaders.ETAG.toLowerCase())) {
-      String customETag = customMetadata.get(HttpHeaders.ETAG) != null ?
-          customMetadata.get(HttpHeaders.ETAG) : customMetadata.get(HttpHeaders.ETAG.toLowerCase());
-      customMetadata.remove(HttpHeaders.ETAG);
-      customMetadata.remove(HttpHeaders.ETAG.toLowerCase());
-      customMetadata.put(ETAG_CUSTOM, customETag);
-    }
+    // A user-supplied x-amz-meta-{etag,content-type} would collide with the
+    // system ETag / Content-Type stored under the same key in the OM key
+    // metadata. Remap them to dedicated custom keys; they are rebuilt on read
+    // in addCustomMetadataHeaders().
+    remapReservedMetadataKey(customMetadata, HttpHeaders.ETAG, ETAG_CUSTOM);
+    remapReservedMetadataKey(customMetadata, CONTENT_TYPE, CONTENT_TYPE_CUSTOM);
 
     return customMetadata;
+  }
+
+  /**
+   * If {@code metadata} contains a user-supplied value under {@code headerName}
+   * (in either the canonical or lower-case form), move it to {@code customKey}
+   * so it does not collide with the system value stored under
+   * {@code headerName}. The original header is rebuilt on read in
+   * {@link #addCustomMetadataHeaders}.
+   */
+  private static void remapReservedMetadataKey(Map<String, String> metadata,
+      String headerName, String customKey) {
+    String lowerName = headerName.toLowerCase();
+    if (metadata.containsKey(headerName) || metadata.containsKey(lowerName)) {
+      String value = metadata.get(headerName) != null
+          ? metadata.get(headerName) : metadata.get(lowerName);
+      metadata.remove(headerName);
+      metadata.remove(lowerName);
+      metadata.put(customKey, value);
+    }
   }
 
   protected void addCustomMetadataHeaders(
@@ -343,10 +362,18 @@ public abstract class EndpointBase {
       if (entry.getKey().equals(ETAG)) {
         continue;
       }
+      // The object's Content-Type is returned as the standard Content-Type
+      // response header, not as a user-metadata header.
+      if (entry.getKey().equals(CONTENT_TYPE)) {
+        continue;
+      }
       String metadataKey = entry.getKey();
       if (metadataKey.equals(ETAG_CUSTOM)) {
         // Rebuild the ETag custom metadata header
         metadataKey = ETAG.toLowerCase();
+      } else if (metadataKey.equals(CONTENT_TYPE_CUSTOM)) {
+        // Rebuild the user-supplied content-type custom metadata header
+        metadataKey = CONTENT_TYPE.toLowerCase();
       }
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
