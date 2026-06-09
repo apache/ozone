@@ -102,6 +102,20 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
   }
 
   @Test
+  public void wellFormedBodyWithZeroPartsReturnsEmptyList() throws IOException {
+    // The fix lets a non-empty body through, so a well-formed request with no
+    // <Part> elements (a shape a chunked SDK can send) is parsed into an empty
+    // part list; rejecting the empty list is deferred to the endpoint.
+    ByteArrayInputStream inputBody = new ByteArrayInputStream(
+        "<CompleteMultipartUpload></CompleteMultipartUpload>".getBytes(UTF_8));
+
+    CompleteMultipartUploadRequest request = unmarshall(inputBody);
+
+    assertNotNull(request);
+    assertTrue(request.getPartList().isEmpty());
+  }
+
+  @Test
   public void fromStreamWithoutNamespace() throws IOException {
     //GIVEN
     ByteArrayInputStream inputBody =

@@ -70,6 +70,7 @@ Test Multipart Upload Complete With Chunked Transfer Encoding
     ${access_key} =     Execute    aws configure get aws_access_key_id
     ${secret_key} =     Execute    aws configure get aws_secret_access_key
     ${key} =            Set Variable    ${PREFIX}/chunkedCompleteKey
+    ${uploadID} =       Set Variable    ${EMPTY}
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${key}
     ${eTag1} =          Upload MPU part    ${BUCKET}    ${key}    ${uploadID}    1    /tmp/part1
     ${eTag2} =          Upload MPU part    ${BUCKET}    ${key}    ${uploadID}    2    /tmp/part2
@@ -81,10 +82,15 @@ Test Multipart Upload Complete With Chunked Transfer Encoding
     Create File         /tmp/${PREFIX}-complete.xml    ${body}
     ${presigned_url} =  Generate Presigned Complete Multipart Upload Url    ${access_key}    ${secret_key}    ${BUCKET}    ${key}    ${uploadID}    us-east-1    3600    ${ENDPOINT_URL}
     ${result} =         Execute    curl -s -X POST -H "Transfer-Encoding: chunked" -H "Content-Length:" -H "Content-Type: application/xml" --data-binary @/tmp/${PREFIX}-complete.xml "${presigned_url}"
+    # A success response carries <CompleteMultipartUploadResult>/<ETag>; the
+    # error response would instead contain the "must specify at least one part"
+    # message (the bucket/key alone are not success discriminators, since the
+    # key also appears in the <Resource> element of an error response).
     Should Not Contain  ${result}    must specify at least one part
-    Should Contain      ${result}    ${key}
+    Should Contain      ${result}    CompleteMultipartUploadResult
     Should Contain      ${result}    ETag
-    [Teardown]          Remove File    /tmp/${PREFIX}-complete.xml
+    [Teardown]          Run Keywords    Remove File    /tmp/${PREFIX}-complete.xml
+    ...                 AND    Run Keyword And Ignore Error    Abort MPU    ${BUCKET}    ${key}    ${uploadID}
 
 Overwrite Empty File
     Execute                     touch ${TEMP_DIR}/empty
