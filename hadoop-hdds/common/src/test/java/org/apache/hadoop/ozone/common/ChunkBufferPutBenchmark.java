@@ -40,13 +40,8 @@ import org.apache.hadoop.ozone.common.JfrByteBufferAllocations.AllocationStats;
  *     -Dexec.args="--add-opens jdk.jfr/jdk.jfr=ALL-UNNAMED --add-opens jdk.jfr/jdk.jfr.consumer=ALL-UNNAMED"
  * </pre>
  * JFR ByteBuffer counts are sampled; put-op count reports exact wrap calls.
- * Wrap-path timings use a blackhole on each {@code ByteBuffer.wrap} so the JVM
- * cannot eliminate short-lived wrapper allocations via escape analysis.
  */
 public final class ChunkBufferPutBenchmark {
-
-  /** Prevents escape analysis from removing ByteBuffer.wrap allocations in the wrap path. */
-  private static volatile Object blackhole;
 
   private static final int WARMUP_SECONDS = 10;
   private static final int BENCHMARK_SECONDS = 20;
@@ -101,7 +96,6 @@ public final class ChunkBufferPutBenchmark {
 
   private static void runThroughputComparison(Scenario scenario) {
     printScenarioHeader(scenario);
-    System.out.println("  (wrap path blackholes each ByteBuffer.wrap to model real allocation cost)");
     warmupBothPaths(scenario);
     final double[] improvements = new double[THROUGHPUT_ROUNDS];
     for (int round = 0; round < THROUGHPUT_ROUNDS; round++) {
@@ -278,9 +272,7 @@ public final class ChunkBufferPutBenchmark {
       buffer.clear();
       int off = 0;
       for (int i = 0; i < writesPerChunk; i++) {
-        final ByteBuffer slice = ByteBuffer.wrap(source, off, writeSize);
-        blackhole = slice;
-        buffer.put(slice);
+        buffer.put(ByteBuffer.wrap(source, off, writeSize));
         off += writeSize;
         totalBytes += writeSize;
       }
