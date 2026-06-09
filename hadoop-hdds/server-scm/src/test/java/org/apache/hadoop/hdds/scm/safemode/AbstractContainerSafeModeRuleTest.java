@@ -100,6 +100,7 @@ public abstract class AbstractContainerSafeModeRuleTest {
     containers.add(mockContainer(LifeCycleState.OPEN, 3L));
     containers.add(mockContainer(LifeCycleState.CLOSED, 4L));
     containers.removeIf(c -> c.containerID().equals(ContainerID.valueOf(8L)));
+    containers.add(mockContainer(LifeCycleState.DELETED, 8L));
     deletedContainers.add(mockContainer(LifeCycleState.DELETED, 8L));
     rule.refresh(true);
 
