@@ -604,6 +604,30 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_JVM_NETWORK_ADDRESS_CACHE_ENABLED_DEFAULT =
           true;
 
+  /**
+   * When true, RPC clients (DN heartbeat, OM client, SCM client) re-resolve
+   * cached hostnames on connection failure and rebuild the proxy if the
+   * resolved IP has changed. Set to true in environments where server pod
+   * IPs may change while DNS names remain stable, such as Kubernetes.
+   * Default false preserves pre-fix behavior. Mirrors the design intent of
+   * HADOOP-17068 / HDFS-14118.
+   */
+  public static final String OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY =
+          "ozone.client.failover.resolve-needed";
+  public static final boolean OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT =
+          false;
+
+  /**
+   * Number of consecutive heartbeat failures the DN tolerates against the
+   * same SCM endpoint before re-resolving its hostname. Only consulted when
+   * {@link #OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY} is true. Conservative
+   * default avoids re-resolution on transient blips while still recovering
+   * from a peer pod IP change within seconds.
+   */
+  public static final String OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY =
+          "ozone.datanode.scm.heartbeat.address.refresh.threshold";
+  public static final int OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_DEFAULT = 3;
+
   public static final String OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY =
       "ozone.client.required.om.version.min";
 

@@ -21,17 +21,23 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.time.ZonedDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -77,6 +83,8 @@ public class HeartbeatEndpointTask
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
   private HDDSLayoutVersionManager layoutVersionManager;
+  private final boolean resolveOnFailureEnabled;
+  private final int refreshThreshold;
 
   /**
    * Constructs a SCM heart beat.
@@ -100,6 +108,12 @@ public class HeartbeatEndpointTask
     } else {
       this.layoutVersionManager = context.getParent().getLayoutVersionManager();
     }
+    this.resolveOnFailureEnabled = conf.getBoolean(
+        OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
+        OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
+    this.refreshThreshold = Math.max(1, conf.getInt(
+        OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_KEY,
+        OZONE_DN_SCM_HEARTBEAT_REFRESH_THRESHOLD_DEFAULT));
   }
 
   /**
@@ -157,10 +171,75 @@ public class HeartbeatEndpointTask
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
       rpcEndpoint.logIfNeeded(ex);
+      maybeRefreshScmAddress(ex);
     } finally {
       rpcEndpoint.unlock();
     }
     return rpcEndpoint.getState();
+  }
+
+  /**
+   * After a heartbeat IOException, if (a) DNS-refresh-on-failure is
+   * enabled, (b) the exception's cause chain contains a connection-class
+   * type (per {@link ConnectionFailureUtils#isConnectionFailure}), and
+   * (c) the missed-heartbeat counter has reached the configured
+   * threshold, ask {@link org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager}
+   * to re-resolve this peer's hostname. If the resolved IP differs from
+   * the cached one, the connection manager swaps the endpoint atomically
+   * for a fresh one bound to the new address. The replacement starts in
+   * GETVERSION state, which is the correct behavior when the peer pod
+   * has been recreated -- the new SCM is effectively a fresh process and
+   * needs the version handshake plus DN re-registration.
+   * <p>
+   * Symmetric with the OM/SCM client-side failover providers, which
+   * also gate refresh on connection-class exceptions: an
+   * {@code AccessControlException} or {@code OMException} arriving
+   * via the heartbeat path indicates the cached IP is reachable but
+   * the peer is rejecting us at the application layer -- DNS won't help.
+   * <p>
+   * Off by default. Enable via
+   * {@code ozone.client.failover.resolve-needed=true}.
+   */
+  private void maybeRefreshScmAddress(IOException heartbeatFailure) {
+    if (!resolveOnFailureEnabled) {
+      return;
+    }
+    if (!ConnectionFailureUtils.isConnectionFailure(heartbeatFailure)) {
+      return;
+    }
+    if (rpcEndpoint.getMissedCount() < refreshThreshold) {
+      return;
+    }
+    if (rpcEndpoint.getHostAndPort() == null) {
+      // Caller did not preserve the original config string for this
+      // endpoint. Re-resolution is unsupported here; rely on operator
+      // restart for IP recovery.
+      return;
+    }
+    InetSocketAddress oldAddress = rpcEndpoint.getAddress();
+    try {
+      InetSocketAddress refreshed = context.getParent().getConnectionManager()
+          .refreshSCMServer(oldAddress, context.getThreadNamePrefix());
+      if (refreshed != null) {
+        // The connection manager swapped scmMachines from oldAddress to
+        // refreshed. Migrate the per-endpoint StateContext queues to
+        // match -- otherwise incremental container reports, container
+        // actions, and pipeline actions queued under oldAddress are
+        // silently dropped (the producers continue writing to the old
+        // key while the new endpoint reads from the new key and sees
+        // an empty queue). Failing to migrate here is the difference
+        // between "DN heartbeats fine but stops reporting changes" and
+        // "DN heartbeats fine and keeps SCM in sync".
+        context.migrateEndpoint(oldAddress, refreshed);
+        // Old endpoint is about to be GC'd; reset its counter so any
+        // concurrent observer sees a clean slate before it's released.
+        rpcEndpoint.zeroMissedCount();
+      }
+    } catch (IOException refreshEx) {
+      LOG.warn("Failed to refresh SCM address {} after {} missed "
+              + "heartbeats: {}", oldAddress,
+          rpcEndpoint.getMissedCount(), refreshEx.getMessage());
+    }
   }
 
   // TODO: Make it generic.

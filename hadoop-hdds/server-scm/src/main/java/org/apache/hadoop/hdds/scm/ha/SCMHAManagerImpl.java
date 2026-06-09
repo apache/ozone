@@ -118,9 +118,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
       final boolean success = HAUtils.addSCM(ozoneConf,
           new AddSCMRequest.Builder().setClusterId(scm.getClusterId())
               .setScmId(scm.getScmId())
-              .setRatisAddr(nodeDetails
-                  // TODO : Should we use IP instead of hostname??
-                  .getRatisHostPortStr()).build(), scm.getSCMNodeId());
+              // Hostname is intentional: gRPC's DnsNameResolver re-resolves
+              // hostnames on connection failure, so SCM peer pod restarts
+              // are recovered automatically. See HDDS-15514.
+              .setRatisAddr(nodeDetails.getRatisHostPortStr())
+              .build(), scm.getSCMNodeId());
       if (!success) {
         throw new IOException("Adding SCM to existing HA group failed");
       } else {

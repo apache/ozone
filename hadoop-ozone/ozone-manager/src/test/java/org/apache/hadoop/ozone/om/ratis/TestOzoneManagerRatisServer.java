@@ -145,6 +145,37 @@ public class TestOzoneManagerRatisServer {
         "Ratis Server should be in running state");
   }
 
+  /**
+   * RaftPeer.address must always be a hostname:port string, never an
+   * IP:port string. This is what allows gRPC's DnsNameResolver to
+   * re-resolve the peer when its underlying IP changes (Kubernetes pod
+   * restart). If a resolved IP were baked in, recovery would require
+   * a full OM restart.
+   */
+  @Test
+  public void testCreateRaftPeerUsesHostnameAddress() {
+    String hostname = "om-2.om.example.svc.cluster.local";
+    int ratisPort = 9872;
+    OMNodeDetails peer = new OMNodeDetails.Builder()
+        .setOMServiceId("test-service")
+        .setOMNodeId("om2")
+        .setHostAddress(hostname)
+        .setRpcPort(9862)
+        .setRatisPort(ratisPort)
+        .build();
+
+    org.apache.ratis.protocol.RaftPeer raftPeer =
+        OzoneManagerRatisServer.createRaftPeer(peer);
+    String addr = raftPeer.getAddress();
+    assertEquals(hostname + ":" + ratisPort, addr,
+        "RaftPeer address must preserve hostname; baking a resolved IP "
+            + "would freeze the gRPC channel at one IP and break peer-pod "
+            + "IP-change recovery in Kubernetes.");
+    // Defensive: must not contain a numeric IPv4 octet in the host portion.
+    String host = addr.substring(0, addr.lastIndexOf(':'));
+    assertThat(host).doesNotMatch("^\\d{1,3}(\\.\\d{1,3}){3}$");
+  }
+
   @Test
   public void testLoadSnapshotInfoOnStart() throws Exception {
     // Stop the Ratis server and manually update the snapshotInfo.

@@ -402,8 +402,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     final RaftGroupId groupId = buildRaftGroupId(clusterId);
     RaftPeerId selfPeerId = getSelfPeerId(scmId);
 
+    // The peer address is intentionally a hostname:port string, never a
+    // resolved IP. Ratis hands this string to gRPC's NettyChannelBuilder,
+    // whose default DnsNameResolver re-resolves hostnames on connection
+    // failure. Baking a resolved IP would freeze the peer at one IP,
+    // breaking recovery from peer pod restarts in Kubernetes-style
+    // environments where DNS names are stable but IPs are not. See
+    // HDDS-15514 (DNS-refresh-on-failure for all RPC paths).
     RaftPeer localRaftPeer = RaftPeer.newBuilder().setId(selfPeerId)
-        // TODO : Should we use IP instead of hostname??
         .setAddress(details.getRatisHostPortStr()).build();
 
     List<RaftPeer> raftPeers = new ArrayList<>();
