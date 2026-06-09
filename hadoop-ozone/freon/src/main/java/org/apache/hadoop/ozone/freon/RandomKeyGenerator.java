@@ -56,6 +56,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -77,6 +78,7 @@ import org.apache.hadoop.util.VersionInfo;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -116,62 +118,105 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private volatile boolean completed = false;
   private volatile Throwable exception;
 
-  @Option(names = {"--num-of-threads", "--numOfThreads"},
-      description = "number of threads to be launched for the run. Full name " +
-          "--numOfThreads will be removed in later versions.",
+  @Option(names = {"--num-of-threads"},
+      description = "number of threads to be launched for the run.",
       defaultValue = "10")
   private int numOfThreads = 10;
 
-  @Option(names = {"--num-of-volumes", "--numOfVolumes"},
-      description = "specifies number of Volumes to be created in offline " +
-          "mode. Full name --numOfVolumes will be removed in later versions.",
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--numOfThreads", hidden = true)
+  private Integer deprecatedNumOfThreads;
+
+  @Option(names = {"--num-of-volumes"},
+      description = "specifies number of Volumes to be created in offline mode.",
       defaultValue = "10")
   private int numOfVolumes = 10;
 
-  @Option(names = {"--num-of-buckets", "--numOfBuckets"},
-      description = "specifies number of Buckets to be created per Volume. " +
-          "Full name --numOfBuckets will be removed in later versions.",
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--numOfVolumes", hidden = true)
+  private Integer deprecatedNumOfVolumes;
+
+  @Option(names = {"--num-of-buckets"},
+      description = "specifies number of Buckets to be created per Volume.",
       defaultValue = "1000")
   private int numOfBuckets = 1000;
 
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--numOfBuckets", hidden = true)
+  private Integer deprecatedNumOfBuckets;
+
   @Option(
-      names = {"--num-of-keys", "--numOfKeys"},
-      description = "specifies number of Keys to be created per Bucket. Full" +
-          " name --numOfKeys will be removed in later versions.",
+      names = {"--num-of-keys"},
+      description = "specifies number of Keys to be created per Bucket.",
       defaultValue = "500000"
   )
   private int numOfKeys = 500000;
 
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--numOfKeys", hidden = true)
+  private Integer deprecatedNumOfKeys;
+
   @Option(
-      names = {"--key-size", "--keySize"},
-      description = "Specifies the size of Key in bytes to be created. Full" +
-          " name --keySize will be removed in later versions. " +
-          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      names = {"--key-size"},
+      description = "Specifies the size of Key in bytes to be created. "
+          + StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "10KB",
       converter = StorageSizeConverter.class
   )
   private StorageSize keySize;
 
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--keySize", hidden = true, converter = StorageSizeConverter.class)
+  private StorageSize deprecatedKeySize;
+
   @Option(
-      names = {"--validate-writes", "--validateWrites"},
-      description = "Specifies whether to validate keys after writing. Full" +
-          " name --validateWrites will be removed in later versions."
+      names = {"--validate-writes"},
+      description = "Specifies whether to validate keys after writing."
   )
   private boolean validateWrites = false;
 
-  @Option(names = {"--num-of-validate-threads", "--numOfValidateThreads"},
-      description = "number of threads to be launched for validating keys." +
-          "Full name --numOfValidateThreads will be removed in later versions.",
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--validateWrites", hidden = true)
+  private Boolean deprecatedValidateWrites;
+
+  @Option(names = {"--num-of-validate-threads"},
+      description = "number of threads to be launched for validating keys.",
       defaultValue = "1")
   private int numOfValidateThreads = 1;
 
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--numOfValidateThreads", hidden = true)
+  private Integer deprecatedNumOfValidateThreads;
+
   @Option(
-      names = {"--buffer-size", "--bufferSize"},
-      description = "Specifies the buffer size while writing. Full name " +
-          "--bufferSize will be removed in later versions.",
+      names = {"--buffer-size"},
+      description = "Specifies the buffer size while writing.",
       defaultValue = "4096"
   )
   private int bufferSize = 4096;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--bufferSize", hidden = true)
+  private Integer deprecatedBufferSize;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   @Option(
       names = "--json",
@@ -290,8 +335,68 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     }
   }
 
+  private void applyDeprecatedOptionOverrides() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--numOfThreads", "--num-of-threads", spec, "--num-of-threads");
+    if (deprecatedNumOfThreads != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--num-of-threads")) {
+      numOfThreads = deprecatedNumOfThreads;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--numOfVolumes", "--num-of-volumes", spec, "--num-of-volumes");
+    if (deprecatedNumOfVolumes != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--num-of-volumes")) {
+      numOfVolumes = deprecatedNumOfVolumes;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--numOfBuckets", "--num-of-buckets", spec, "--num-of-buckets");
+    if (deprecatedNumOfBuckets != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--num-of-buckets")) {
+      numOfBuckets = deprecatedNumOfBuckets;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--numOfKeys", "--num-of-keys", spec, "--num-of-keys");
+    if (deprecatedNumOfKeys != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--num-of-keys")) {
+      numOfKeys = deprecatedNumOfKeys;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--keySize", "--key-size", spec, "--key-size");
+    if (deprecatedKeySize != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--key-size")) {
+      keySize = deprecatedKeySize;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--validateWrites", "--validate-writes", spec, "--validate-writes");
+    if (deprecatedValidateWrites != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--validate-writes")) {
+      validateWrites = deprecatedValidateWrites;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--numOfValidateThreads", "--num-of-validate-threads", spec,
+        "--num-of-validate-threads");
+    if (deprecatedNumOfValidateThreads != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--num-of-validate-threads")) {
+      numOfValidateThreads = deprecatedNumOfValidateThreads;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--bufferSize", "--buffer-size", spec, "--buffer-size");
+    if (deprecatedBufferSize != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--buffer-size")) {
+      bufferSize = deprecatedBufferSize;
+    }
+  }
+
   @Override
   public Void call() throws Exception {
+    applyDeprecatedOptionOverrides();
     if (ozoneConfiguration == null) {
       ozoneConfiguration = freon.getOzoneConf();
     }

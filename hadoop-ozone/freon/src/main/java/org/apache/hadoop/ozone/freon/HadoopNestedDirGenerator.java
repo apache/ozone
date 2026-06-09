@@ -20,10 +20,12 @@ package org.apache.hadoop.ozone.freon;
 import java.util.concurrent.Callable;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -56,15 +58,24 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
       defaultValue = "10")
   private int span;
 
-  @Option(names = {"-l", "--name-len", "--nameLen"},
+  @Option(names = {"-l", "--name-len"},
       description =
-          "Length of the random name of directory you want to create. Full " +
-              "name --nameLen will be removed in later versions.",
+          "Length of the random name of directory you want to create.",
       defaultValue = "10")
   private int length;
 
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--nameLen", hidden = true)
+  private Integer deprecatedLength;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @Override
   public Void call() throws Exception {
+    applyDeprecatedOptionOverrides();
     String s;
     if (depth <= 0) {
       s = "Invalid depth value, depth value should be greater than zero!";
@@ -77,6 +88,16 @@ public class HadoopNestedDirGenerator extends HadoopBaseFreonGenerator
       runTests(this::createDir);
     }
     return null;
+  }
+
+  private void applyDeprecatedOptionOverrides() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--nameLen", "--name-len", spec, "--name-len", "-l");
+    if (deprecatedLength != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--name-len")
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "-l")) {
+      length = deprecatedLength;
+    }
   }
 
   /*

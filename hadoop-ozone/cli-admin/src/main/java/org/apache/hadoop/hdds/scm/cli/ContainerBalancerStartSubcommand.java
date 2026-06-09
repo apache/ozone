@@ -48,35 +48,55 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           "or -1, with a default of 10 (specify '10' for 10 iterations).")
   private Optional<Integer> iterations;
 
-  @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration",
-      "--maxDatanodesPercentageToInvolvePerIteration"},
+  @Option(names = {"-d", "--max-datanodes-percentage-to-involve-per-iteration"},
       description = "Max percentage of healthy, in service datanodes " +
           "that can be involved in balancing in one iteration. The value " +
           "should be in the range [0,100], with a default of 20 (specify " +
           "'20' for 20%%).")
   private Optional<Integer> maxDatanodesPercentageToInvolvePerIteration;
 
-  @Option(names = {"-s", "--max-size-to-move-per-iteration-in-gb",
-      "--maxSizeToMovePerIterationInGB"},
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--maxDatanodesPercentageToInvolvePerIteration", hidden = true)
+  private Optional<Integer> deprecatedMaxDatanodesPercentage;
+
+  @Option(names = {"-s", "--max-size-to-move-per-iteration-in-gb"},
       description = "Maximum size that can be moved per iteration of " +
           "balancing. The value should be positive, with a default of 500 " +
           "(specify '500' for 500GB).")
   private Optional<Long> maxSizeToMovePerIterationInGB;
 
-  @Option(names = {"-e", "--max-size-entering-target-in-gb",
-      "--maxSizeEnteringTargetInGB"},
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--maxSizeToMovePerIterationInGB", hidden = true)
+  private Optional<Long> deprecatedMaxSizeToMovePerIterationInGB;
+
+  @Option(names = {"-e", "--max-size-entering-target-in-gb"},
       description = "Maximum size that can enter a target datanode while " +
           "balancing. This is the sum of data from multiple sources. The value " +
           "should be positive, with a default of 26 (specify '26' for 26GB).")
   private Optional<Long> maxSizeEnteringTargetInGB;
 
-  @Option(names = {"-l", "--max-size-leaving-source-in-gb",
-      "--maxSizeLeavingSourceInGB"},
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--maxSizeEnteringTargetInGB", hidden = true)
+  private Optional<Long> deprecatedMaxSizeEnteringTargetInGB;
+
+  @Option(names = {"-l", "--max-size-leaving-source-in-gb"},
       description = "Maximum size that can leave a source datanode while " +
           "balancing. This is the sum of data moving to multiple targets. " +
           "The value should be positive, with a default of 26 " +
           "(specify '26' for 26GB).")
   private Optional<Long> maxSizeLeavingSourceInGB;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--maxSizeLeavingSourceInGB", hidden = true)
+  private Optional<Long> deprecatedMaxSizeLeavingSourceInGB;
 
   @Option(names = {"--balancing-iteration-interval-minutes"},
       description = "The interval period in minutes between each iteration of Container Balancer. " +
@@ -134,13 +154,92 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           "(specify \"1,2,3\" for container IDs).")
   private Optional<String> includeContainers;
 
+  private Optional<Integer> resolveMaxDatanodesPercentageToInvolvePerIteration() {
+    if (maxDatanodesPercentageToInvolvePerIteration != null
+        && maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
+      return maxDatanodesPercentageToInvolvePerIteration;
+    }
+    return deprecatedMaxDatanodesPercentage;
+  }
+
+  private Optional<Long> resolveMaxSizeToMovePerIterationInGB() {
+    if (maxSizeToMovePerIterationInGB != null
+        && maxSizeToMovePerIterationInGB.isPresent()) {
+      return maxSizeToMovePerIterationInGB;
+    }
+    return deprecatedMaxSizeToMovePerIterationInGB;
+  }
+
+  private Optional<Long> resolveMaxSizeEnteringTargetInGB() {
+    if (maxSizeEnteringTargetInGB != null && maxSizeEnteringTargetInGB.isPresent()) {
+      return maxSizeEnteringTargetInGB;
+    }
+    return deprecatedMaxSizeEnteringTargetInGB;
+  }
+
+  private Optional<Long> resolveMaxSizeLeavingSourceInGB() {
+    if (maxSizeLeavingSourceInGB != null && maxSizeLeavingSourceInGB.isPresent()) {
+      return maxSizeLeavingSourceInGB;
+    }
+    return deprecatedMaxSizeLeavingSourceInGB;
+  }
+
+  private void warnIfDeprecatedMaxDatanodesPercentageUsed() {
+    if (deprecatedMaxDatanodesPercentage != null
+        && deprecatedMaxDatanodesPercentage.isPresent()
+        && (maxDatanodesPercentageToInvolvePerIteration == null
+            || !maxDatanodesPercentageToInvolvePerIteration.isPresent())) {
+      System.err.println("warning: --maxDatanodesPercentageToInvolvePerIteration "
+          + "is deprecated, use --max-datanodes-percentage-to-involve-per-iteration "
+          + "instead.");
+    }
+  }
+
+  private void warnIfDeprecatedMaxSizeToMovePerIterationInGBUsed() {
+    if (deprecatedMaxSizeToMovePerIterationInGB != null
+        && deprecatedMaxSizeToMovePerIterationInGB.isPresent()
+        && (maxSizeToMovePerIterationInGB == null
+            || !maxSizeToMovePerIterationInGB.isPresent())) {
+      System.err.println("warning: --maxSizeToMovePerIterationInGB is deprecated, "
+          + "use --max-size-to-move-per-iteration-in-gb instead.");
+    }
+  }
+
+  private void warnIfDeprecatedMaxSizeEnteringTargetInGBUsed() {
+    if (deprecatedMaxSizeEnteringTargetInGB != null
+        && deprecatedMaxSizeEnteringTargetInGB.isPresent()
+        && (maxSizeEnteringTargetInGB == null
+            || !maxSizeEnteringTargetInGB.isPresent())) {
+      System.err.println("warning: --maxSizeEnteringTargetInGB is deprecated, "
+          + "use --max-size-entering-target-in-gb instead.");
+    }
+  }
+
+  private void warnIfDeprecatedMaxSizeLeavingSourceInGBUsed() {
+    if (deprecatedMaxSizeLeavingSourceInGB != null
+        && deprecatedMaxSizeLeavingSourceInGB.isPresent()
+        && (maxSizeLeavingSourceInGB == null
+            || !maxSizeLeavingSourceInGB.isPresent())) {
+      System.err.println("warning: --maxSizeLeavingSourceInGB is deprecated, "
+          + "use --max-size-leaving-source-in-gb instead.");
+    }
+  }
+
+  private void warnIfDeprecatedOptionsUsed() {
+    warnIfDeprecatedMaxDatanodesPercentageUsed();
+    warnIfDeprecatedMaxSizeToMovePerIterationInGBUsed();
+    warnIfDeprecatedMaxSizeEnteringTargetInGBUsed();
+    warnIfDeprecatedMaxSizeLeavingSourceInGBUsed();
+  }
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    warnIfDeprecatedOptionsUsed();
     StartContainerBalancerResponseProto response = scmClient.
         startContainerBalancer(threshold, iterations,
-        maxDatanodesPercentageToInvolvePerIteration,
-        maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
-        maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
+        resolveMaxDatanodesPercentageToInvolvePerIteration(),
+        resolveMaxSizeToMovePerIterationInGB(), resolveMaxSizeEnteringTargetInGB(),
+        resolveMaxSizeLeavingSourceInGB(), balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
         excludeNodes, excludeContainers, includeContainers);
     if (response.getStart()) {

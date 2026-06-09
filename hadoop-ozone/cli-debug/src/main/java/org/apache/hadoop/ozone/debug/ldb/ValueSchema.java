@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -56,15 +57,29 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ValueSchema.class);
 
-  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
-      required = true,
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       description = "Table name")
   private String tableName;
 
-  @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @CommandLine.Option(names = "--column_family", hidden = true)
+  private String deprecatedTableName;
+
+  @CommandLine.Option(names = {"--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
       defaultValue = "V3")
   private String dnDBSchemaVersion;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @CommandLine.Option(names = "--dnSchema", hidden = true)
+  private String deprecatedDnDBSchemaVersion;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Option(names = {"--depth"},
       description = "The level till which the value-schema should be shown. Values in the range [0-10] are allowed)",
@@ -76,6 +91,9 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
     if (depth < 0 || depth > 10) {
       throw new IOException("depth should be specified in the range [0, 10]");
     }
+
+    tableName = resolveTableName();
+    dnDBSchemaVersion = resolveDnDBSchemaVersion();
 
     boolean success = true;
 
@@ -92,6 +110,27 @@ public class ValueSchema extends AbstractSubcommand implements Callable<Void> {
           "Exit code is non-zero. Check the error message above");
     }
     return null;
+  }
+
+  private String resolveTableName() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--column_family", "--column-family", spec, "--column-family", "--cf");
+    String resolved = DeprecatedCliOptions.resolveString(tableName, deprecatedTableName);
+    if (resolved == null || resolved.isEmpty()) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "Missing required option '--column-family=<tableName>'");
+    }
+    return resolved;
+  }
+
+  private String resolveDnDBSchemaVersion() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--dnSchema", "--dn-schema", spec, "--dn-schema", "-d");
+    if (DeprecatedCliOptions.hasMatchedOption(spec, "--dnSchema")) {
+      return deprecatedDnDBSchemaVersion != null ? deprecatedDnDBSchemaVersion
+          : dnDBSchemaVersion;
+    }
+    return dnDBSchemaVersion;
   }
 
   public boolean getValueFields(String dbPath, Map<String, Object> valueSchema) {

@@ -36,9 +36,9 @@ import picocli.CommandLine.Command;
  *      ozone admin containerbalancer start
  *      [ -t/--threshold {@literal <threshold>}]
  *      [ -i/--iterations {@literal <iterations>}]
- *      [ -d/--maxDatanodesPercentageToInvolvePerIteration
+ *      [ -d/--max-datanodes-percentage-to-involve-per-iteration
  *      {@literal <maxDatanodesPercentageToInvolvePerIteration>}]
- *      [ -s/--maxSizeToMovePerIterationInGB
+ *      [ -s/--max-size-to-move-per-iteration-in-gb
  *      {@literal <maxSizeToMovePerIterationInGB>}]
  *      Examples:
  *      ozone admin containerbalancer start

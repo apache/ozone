@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -156,10 +157,18 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
       defaultValue = "4")
   private int numHeartbeats = 4;
 
-  @CommandLine.Option(names = {"--scmHost", "--scm-host"},
-      required = true,
+  @CommandLine.Option(names = {"--scm-host"},
       description = "The leader scm host x.x.x.x.")
   private String scm;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @CommandLine.Option(names = "--scmHost", hidden = true)
+  private String deprecatedScm;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   @CommandLine.Mixin
   private FreonReplicationOptions replication;
@@ -180,6 +189,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
 
   @Override
   public Void call() throws Exception {
+    scm = resolveScmHost();
     conf = freon.getOzoneConf();
 
     ThroughputBenchmark benchmark = createBenchmark();
@@ -187,6 +197,17 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
     benchmark.run();
 
     return null;
+  }
+
+  private String resolveScmHost() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--scmHost", "--scm-host", spec, "--scm-host");
+    String resolved = DeprecatedCliOptions.resolveString(scm, deprecatedScm);
+    if (resolved == null || resolved.isEmpty()) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "Missing required option '--scm-host=<scm>'");
+    }
+    return resolved;
   }
 
   private ThroughputBenchmark createBenchmark() {

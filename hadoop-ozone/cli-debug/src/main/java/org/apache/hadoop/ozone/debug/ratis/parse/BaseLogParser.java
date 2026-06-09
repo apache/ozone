@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.debug.ratis.parse;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.util.function.Function;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.tools.ParseRatisLog;
 import picocli.CommandLine;
@@ -28,16 +29,40 @@ import picocli.CommandLine;
  * Base Ratis Log Parser used by generic, datanode etc.
  */
 public abstract class BaseLogParser {
-  @CommandLine.Option(names = {"-s", "--segmentPath", "--segment-path"},
-      required = true,
+  @CommandLine.Option(names = {"-s", "--segment-path"},
       description = "Path of the segment file")
   private File segmentFile;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @CommandLine.Option(names = "--segmentPath", hidden = true)
+  private File deprecatedSegmentFile;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
+  private File resolveSegmentFile() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--segmentPath", "--segment-path", spec, "--segment-path", "-s");
+    File resolved;
+    if (DeprecatedCliOptions.hasMatchedOption(spec, "--segmentPath")) {
+      resolved = deprecatedSegmentFile;
+    } else {
+      resolved = segmentFile;
+    }
+    if (resolved == null) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "Missing required option '--segment-path=<segmentFile>'");
+    }
+    return resolved;
+  }
 
   public void parseRatisLogs(
       Function<RaftProtos.StateMachineLogEntryProto, String> smLogToStr) {
     try {
       ParseRatisLog.Builder builder = new ParseRatisLog.Builder();
-      builder.setSegmentFile(segmentFile);
+      builder.setSegmentFile(resolveSegmentFile());
       builder.setSMLogToString(smLogToStr);
 
       ParseRatisLog prl = builder.build();

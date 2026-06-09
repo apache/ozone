@@ -23,11 +23,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.cli.DeprecatedCliOptions;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.kohsuke.MetaInfServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -55,19 +57,30 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
       defaultValue = "5")
   private int depth;
 
-  @Option(names = {"-c", "--file-count", "--fileCount"},
-      description = "Number of files to be written in each directory. Full" +
-          " name --fileCount will be removed in later versions.",
+  @Option(names = {"-c", "--file-count"},
+      description = "Number of files to be written in each directory.",
       defaultValue = "2")
   private int fileCount;
 
-  @Option(names = {"-g", "--file-size", "--fileSize"},
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--fileCount", hidden = true)
+  private Integer deprecatedFileCount;
+
+  @Option(names = {"-g", "--file-size"},
       description = "Generated data size of each file to be " +
           "written in each directory. " +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "4KB",
       converter = StorageSizeConverter.class)
   private StorageSize fileSize;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--fileSize", hidden = true, converter = StorageSizeConverter.class)
+  private StorageSize deprecatedFileSize;
 
   @Option(names = {"-b", "--buffer"},
           description = "Size of buffer used to generated the file content.",
@@ -80,12 +93,20 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
       defaultValue = "10")
   private int span;
 
-  @Option(names = {"-l", "--name-len", "--nameLen"},
+  @Option(names = {"-l", "--name-len"},
       description =
-          "Length of the random name of directory you want to create. Full " +
-              "name --nameLen will be removed in later versions.",
+          "Length of the random name of directory you want to create.",
       defaultValue = "10")
   private int length;
+
+  /** For backward compatibility. */
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  @Option(names = "--nameLen", hidden = true)
+  private Integer deprecatedLength;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   private AtomicLong totalDirsCnt = new AtomicLong();
 
@@ -95,6 +116,7 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
+    applyDeprecatedOptionOverrides();
     String s;
     if (depth <= 0) {
       s = "Invalid depth value, depth value should be greater than zero!";
@@ -110,6 +132,32 @@ public class HadoopDirTreeGenerator extends HadoopBaseFreonGenerator
       runTests(this::createDir);
     }
     return null;
+  }
+
+  private void applyDeprecatedOptionOverrides() {
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--fileCount", "--file-count", spec, "--file-count", "-c");
+    if (deprecatedFileCount != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--file-count")
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "-c")) {
+      fileCount = deprecatedFileCount;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--fileSize", "--file-size", spec, "--file-size", "-g");
+    if (deprecatedFileSize != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--file-size")
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "-g")) {
+      fileSize = deprecatedFileSize;
+    }
+
+    DeprecatedCliOptions.warnIfDeprecatedUsedWithoutCanonical(
+        "--nameLen", "--name-len", spec, "--name-len", "-l");
+    if (deprecatedLength != null
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "--name-len")
+        && !DeprecatedCliOptions.hasMatchedOption(spec, "-l")) {
+      length = deprecatedLength;
+    }
   }
 
   /*
