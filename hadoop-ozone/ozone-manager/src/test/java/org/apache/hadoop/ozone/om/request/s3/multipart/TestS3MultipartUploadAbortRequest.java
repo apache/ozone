@@ -137,8 +137,8 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    when(ozoneManager.getVersionManager()
-        .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)).thenReturn(true);
+    when(ozoneManager.getVersionManager().getMetadataLayoutVersion())
+        .thenReturn(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());

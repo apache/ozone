@@ -173,17 +173,19 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      // This gate runs in the replicated apply path, so the check must remain
-      // deterministic across replicas for a given log index. MLV advances only
-      // via the Ratis-logged finalize-upgrade request.
-      if (!ozoneManager.getVersionManager()
-          .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
+      // Use the layout version stamped by the leader in preExecute so all
+      // replicas evaluate the gate deterministically at apply.
+      long requestLayoutVersion = getOmRequest().getLayoutVersion().getVersion();
+      boolean splitPartsFeatureAllowed = requestLayoutVersion
+          >= OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion();
+      if (!splitPartsFeatureAllowed
           && multipartKeyInfo.getSchemaVersion() != 0) {
         throw new OMException("MPU parts-table split behavior is not allowed " +
             "before cluster finalization for commit part request.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
-      if (multipartKeyInfo.getSchemaVersion() == 1) {
+      if (splitPartsFeatureAllowed
+          && multipartKeyInfo.getSchemaVersion() == 1) {
         throw new OMException("MPU parts-table split commit path is not " +
             "supported in this write flow.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION);

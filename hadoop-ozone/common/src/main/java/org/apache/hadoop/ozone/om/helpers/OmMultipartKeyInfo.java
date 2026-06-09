@@ -89,7 +89,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   // 1 - New Schema -> Uses a separate table to store the multipart part info
   private static final int LEGACY_SCHEMA_VERSION = 0;
   private static final int SPLIT_PARTS_SCHEMA_VERSION = 1;
-  private final byte schemaVersion;
+  private final int schemaVersion;
 
   public static Codec<OmMultipartKeyInfo> getCodec() {
     return CODEC;
@@ -275,7 +275,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     return replicationConfig;
   }
 
-  public byte getSchemaVersion() {
+  public int getSchemaVersion() {
     return schemaVersion;
   }
 
@@ -297,7 +297,7 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     private final AclListBuilder acls;
     private final TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long parentID;
-    private byte schemaVersion;
+    private int schemaVersion;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -410,9 +410,8 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       return this;
     }
 
-    public Builder setSchemaVersion(byte schemaVersion) {
-      this.schemaVersion =
-          validateAndConvertSchemaVersion(Byte.toUnsignedInt(schemaVersion));
+    public Builder setSchemaVersion(int schemaVersion) {
+      this.schemaVersion = validateAndConvertSchemaVersion(schemaVersion);
       return this;
     }
 
@@ -520,13 +519,13 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     return builder.build();
   }
 
-  private static byte validateAndConvertSchemaVersion(int schemaVersion) {
+  private static int validateAndConvertSchemaVersion(int schemaVersion) {
     if (schemaVersion != LEGACY_SCHEMA_VERSION
         && schemaVersion != SPLIT_PARTS_SCHEMA_VERSION) {
       throw new IllegalArgumentException("Unsupported schemaVersion: "
           + schemaVersion + ". Expected one of [0, 1].");
     }
-    return (byte) schemaVersion;
+    return schemaVersion;
   }
 
   @Override

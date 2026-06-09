@@ -165,12 +165,11 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      // This gate runs in the replicated apply path, so the check must remain
-      // deterministic across replicas for a given log index. MLV advances only
-      // via the Ratis-logged finalize-upgrade request.
-      if (!ozoneManager.getVersionManager()
-          .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)
-          && multipartKeyInfo.getSchemaVersion() != 0) {
+      // Use the layout version stamped by the leader in preExecute so all
+      // replicas evaluate the gate deterministically at apply.
+      long requestLayoutVersion = getOmRequest().getLayoutVersion().getVersion();
+      if (requestLayoutVersion < OMLayoutFeature.MPU_PARTS_TABLE_SPLIT
+          .layoutVersion() && multipartKeyInfo.getSchemaVersion() != 0) {
         throw new OMException("MPU parts-table split behavior is not allowed " +
           "before cluster finalization.",
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
