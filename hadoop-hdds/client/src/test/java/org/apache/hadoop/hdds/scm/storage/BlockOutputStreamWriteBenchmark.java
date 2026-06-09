@@ -22,13 +22,10 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.text.DecimalFormat;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -70,8 +67,10 @@ public final class BlockOutputStreamWriteBenchmark {
   private static final int BENCHMARK_SECONDS = 20;
   private static final int WRITE_SIZE = 4 * 1024;
   private static final int STREAM_BUFFER_SIZE = 4 * 1024 * 1024;
+  /** User read buffer; one stream write cycle fills this buffer at advancing offsets. */
+  private static final int SOURCE_BUFFER_SIZE = STREAM_BUFFER_SIZE;
   private static final int POOL_CAPACITY = 8;
-  private static final int WRITES_PER_BLOCK = STREAM_BUFFER_SIZE / WRITE_SIZE;
+  private static final int WRITES_PER_STREAM = SOURCE_BUFFER_SIZE / WRITE_SIZE;
 
   private static final DecimalFormat MBPS = new DecimalFormat("#,##0.0");
   private static final DecimalFormat NS = new DecimalFormat("#,##0");
@@ -88,21 +87,22 @@ public final class BlockOutputStreamWriteBenchmark {
 
     System.out.println("BlockOutputStream client write benchmark (mocked container RPCs)");
     System.out.println("Profile: " + label);
-    System.out.println("Git: " + gitHeadShort());
     System.out.println("Log level: INFO for BufferPool and BlockOutputStream");
     System.out.println("JVM: " + System.getProperty("java.version")
         + " on " + System.getProperty("os.arch"));
-    System.out.printf("Write=%dKB streamBuffer=%dMB poolCapacity=%d writes/block=%d%n",
-        WRITE_SIZE / 1024, STREAM_BUFFER_SIZE / (1024 * 1024), POOL_CAPACITY,
-        WRITES_PER_BLOCK);
+    System.out.printf("Write=%dKB sourceBuffer=%dMB streamBuffer=%dMB poolCapacity=%d "
+            + "writes/stream=%d%n",
+        WRITE_SIZE / 1024, SOURCE_BUFFER_SIZE / (1024 * 1024),
+        STREAM_BUFFER_SIZE / (1024 * 1024), POOL_CAPACITY,
+        WRITES_PER_STREAM);
     System.out.println();
 
-    final byte[] writeBuffer = new byte[WRITE_SIZE];
-    ThreadLocalRandom.current().nextBytes(writeBuffer);
+    final byte[] sourceBuffer = new byte[SOURCE_BUFFER_SIZE];
+    ThreadLocalRandom.current().nextBytes(sourceBuffer);
 
     try (BenchmarkSession session = BenchmarkSession.open()) {
-      runTimedWrite(session, writeBuffer, WARMUP_SECONDS, "warmup");
-      final Result result = runTimedWrite(session, writeBuffer, BENCHMARK_SECONDS, "benchmark");
+      runTimedWrite(session, sourceBuffer, WARMUP_SECONDS, "warmup");
+      final Result result = runTimedWrite(session, sourceBuffer, BENCHMARK_SECONDS, "benchmark");
 
       System.out.printf("elapsed: %.2fs%n", result.elapsedSeconds);
       System.out.printf("bytes written: %s%n", COUNT.format(result.bytesWritten));
@@ -117,25 +117,7 @@ public final class BlockOutputStreamWriteBenchmark {
     }
   }
 
-  private static String gitHeadShort() {
-    try {
-      final Process process = new ProcessBuilder("git", "rev-parse", "--short", "HEAD")
-          .redirectErrorStream(true)
-          .start();
-      try (BufferedReader reader = new BufferedReader(
-          new InputStreamReader(process.getInputStream()))) {
-        final String line = reader.readLine();
-        if (process.waitFor(5, TimeUnit.SECONDS) && process.exitValue() == 0 && line != null) {
-          return line.trim();
-        }
-      }
-    } catch (IOException | InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-    return "unknown";
-  }
-
-  private static Result runTimedWrite(BenchmarkSession session, byte[] writeBuffer,
+  private static Result runTimedWrite(BenchmarkSession session, byte[] sourceBuffer,
       int seconds, String phase) throws Exception {
     final long start = System.nanoTime();
     final long deadline = start + seconds * 1_000_000_000L;
@@ -148,9 +130,10 @@ public final class BlockOutputStreamWriteBenchmark {
 
     while (System.nanoTime() < deadline) {
       try (BlockOutputStream stream = session.newStream()) {
-        for (int i = 0; i < WRITES_PER_BLOCK && System.nanoTime() < deadline; i++) {
-          stream.write(writeBuffer, 0, writeBuffer.length);
-          bytesWritten += writeBuffer.length;
+        for (int offset = 0; offset + WRITE_SIZE <= sourceBuffer.length
+            && System.nanoTime() < deadline; offset += WRITE_SIZE) {
+          stream.write(sourceBuffer, offset, WRITE_SIZE);
+          bytesWritten += WRITE_SIZE;
           writeOps++;
         }
       }
