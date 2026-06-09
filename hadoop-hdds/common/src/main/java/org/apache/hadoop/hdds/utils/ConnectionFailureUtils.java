@@ -56,16 +56,16 @@ import java.net.UnknownHostException;
  *   <li>{@link SocketException} (e.g. "Connection reset") -- the peer
  *       sent RST mid-stream. </li>
  * </ul>
- * The walk is bounded to {@value #MAX_CAUSE_DEPTH} levels to defend
+ * The walk is bounded to {@link #MAX_CAUSE_DEPTH} levels to defend
  * against cause chains that have been constructed (in violation of
- * {@code Throwable.initCause}'s contract) into a cycle of length > 1.
+ * {@code Throwable.initCause}'s contract) into a cycle of length &gt; 1.
  */
 public final class ConnectionFailureUtils {
 
   /**
    * Maximum depth of the {@code Throwable.getCause()} chain we walk
-   * before giving up. Matches Hadoop's own walkers in
-   * {@code RemoteException} handling.
+   * before giving up (currently {@value}). Matches Hadoop's own
+   * walkers in {@code RemoteException} handling.
    */
   static final int MAX_CAUSE_DEPTH = 16;
 
