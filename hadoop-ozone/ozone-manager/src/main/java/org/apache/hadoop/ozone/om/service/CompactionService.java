@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.slf4j.Logger;
@@ -68,16 +67,7 @@ public class CompactionService extends BackgroundService {
     this.numCompactions = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
     this.compactableTables = validateTables(tables);
-    int compactionType = Integer.parseInt(ozoneManager.getConfiguration().get(
-        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
-        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
-    ManagedCompactRangeOptions.BottommostLevelCompaction level =
-        ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
-    if (level == null) {
-      compactionType = Integer.parseInt(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
-      level = ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
-    }
-    this.bottommostLevelCompaction = level;
+    this.bottommostLevelCompaction = CompactDBUtil.getBottommostLevelCompaction(ozoneManager.getConfiguration());
   }
 
   private List<String> validateTables(List<String> tables) {
