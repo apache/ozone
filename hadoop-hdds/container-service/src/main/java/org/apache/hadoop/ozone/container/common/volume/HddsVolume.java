@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ScanTransientIOUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.Time;
@@ -336,9 +337,14 @@ public class HddsVolume extends StorageVolume {
       Files.createDirectories(secondaryDir.toPath());
     } catch (IOException e) {
       LOG.error("Failed to create secondary instance dir {} for volume {}", secondaryDir, getStorageDir(), e);
-      getIoTestSlidingWindow().add();
+
+      if (!isNoSpaceAvailable(e) && !ScanTransientIOUtil.isTooManyOpenFiles(e)) {
+        getIoTestSlidingWindow().add();
+      }
+
       return getIoTestSlidingWindow().isExceeded()
-          ? VolumeCheckResult.FAILED : VolumeCheckResult.HEALTHY;
+          ? VolumeCheckResult.FAILED
+          : VolumeCheckResult.HEALTHY;
     }
 
     try (ManagedOptions managedOptions = new ManagedOptions();

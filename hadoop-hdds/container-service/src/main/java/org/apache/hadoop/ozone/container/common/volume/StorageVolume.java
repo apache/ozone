@@ -850,4 +850,14 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
           ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
     }
   }
+
+  public static boolean isNoSpaceAvailable(Throwable t) {
+    for (Throwable cause = t; cause != null; cause = cause.getCause()) {
+      String msg = cause.getMessage();
+      if (msg != null && msg.contains("No space left on device")) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
