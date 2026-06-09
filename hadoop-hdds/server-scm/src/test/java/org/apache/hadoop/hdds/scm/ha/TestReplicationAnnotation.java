@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
+import org.apache.hadoop.hdds.scm.ha.invoker.ContainerStateManagerInvoker;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -127,7 +128,8 @@ public class TestReplicationAnnotation {
     ContainerStateManager impl = mock(ContainerStateManager.class);
     when(impl.getType()).thenReturn(RequestType.CONTAINER);
 
-    ContainerStateManager proxy = scmRatisServer.getProxyHandler(ContainerStateManager.class, impl);
+    ContainerStateManager proxy = scmRatisServer.getProxyHandler(
+        new ContainerStateManagerInvoker(impl, scmRatisServer));
 
     IOException e =
         assertThrows(IOException.class,
