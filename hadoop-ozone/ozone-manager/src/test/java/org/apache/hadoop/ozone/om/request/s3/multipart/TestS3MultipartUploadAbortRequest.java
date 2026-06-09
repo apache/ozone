@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
@@ -114,6 +115,13 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
             keyName, (byte) 1);
 
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
+        .getMultipartInfoTable().get(multipartKey);
+    assertNotNull(multipartKeyInfo);
+    assertEquals(1, multipartKeyInfo.getSchemaVersion());
+
     OMRequest abortMPURequest =
         doPreExecuteAbortMPU(volumeName, bucketName, keyName,
             multipartUploadID);
@@ -145,9 +153,22 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
     createParentPath(volumeName, bucketName);
 
-    String multipartUploadID =
-        initiateMultipartUploadWithSchemaVersion(volumeName, bucketName,
-            keyName, (byte) 1);
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,
+        bucketName, keyName);
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadRequest =
+        getS3InitiateMultipartUploadReq(initiateMPURequest);
+    OMClientResponse initiateResponse =
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
+            1L);
+    String multipartUploadID = initiateResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
+        bucketName, keyName, multipartUploadID);
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
+        .getMultipartInfoTable().get(multipartKey);
+    assertNotNull(multipartKeyInfo);
+    assertEquals(1, multipartKeyInfo.getSchemaVersion());
 
     OMRequest abortMPURequest =
         doPreExecuteAbortMPU(volumeName, bucketName, keyName,

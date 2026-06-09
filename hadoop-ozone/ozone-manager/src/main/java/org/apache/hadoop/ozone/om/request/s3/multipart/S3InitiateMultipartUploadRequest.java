@@ -195,6 +195,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               replicationConfig)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
+          .setSchemaVersion(resolveMultipartSchemaVersion())
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
@@ -282,6 +283,12 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
           multipartInfoInitiateRequest);
     }
+  }
+
+  protected int resolveMultipartSchemaVersion() {
+    long requestLayoutVersion = getOmRequest().getLayoutVersion().getVersion();
+    return requestLayoutVersion >= OMLayoutFeature.MPU_PARTS_TABLE_SPLIT
+        .layoutVersion() ? 1 : 0;
   }
 
   @RequestFeatureValidator(
