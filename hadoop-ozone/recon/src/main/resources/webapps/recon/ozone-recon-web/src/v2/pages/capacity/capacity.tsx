@@ -41,7 +41,6 @@ import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
 import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 type CapacityState = {
-  isDNPending: boolean;
   lastUpdated: number;
 };
 
@@ -52,7 +51,6 @@ const Capacity: React.FC<object> = () => {
   const DOWNLOAD_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
   const [state, setState] = React.useState<CapacityState>({
-    isDNPending: true,
     lastUpdated: 0
   });
 
@@ -108,7 +106,6 @@ const Capacity: React.FC<object> = () => {
     omPendingDeletes.refetch();
     dnPendingDeletes.refetch();
     setState({
-      isDNPending: dnPendingDeletes.data.status !== "FINISHED",
       lastUpdated: Number(moment())
     })
   }
