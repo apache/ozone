@@ -98,9 +98,9 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -215,8 +215,8 @@ public class ReconStorageContainerManagerFacade
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, ReconSCMDBDefinition.get());
 
-    HDDSLayoutVersionManager scmLayoutVersionManager =
-        new HDDSLayoutVersionManager(scmStorageConfig.getApparentVersion(), null, null);
+    // TODO HDDS-15374 Fully switch recon to the new versioning framework.
+    ScmVersionManager versionManager = new ScmVersionManager(scmStorageConfig, this);
     this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
@@ -225,7 +225,7 @@ public class ReconStorageContainerManagerFacade
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore),
-            scmLayoutVersionManager, reconContext);
+            versionManager, reconContext);
     SCMContainerPlacementMetrics placementMetrics = SCMContainerPlacementMetrics.create();
     PlacementPolicy containerPlacementPolicy = ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
         clusterMap, true, placementMetrics);

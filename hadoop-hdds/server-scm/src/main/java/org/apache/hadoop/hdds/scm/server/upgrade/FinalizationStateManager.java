@@ -28,10 +28,19 @@ import org.apache.hadoop.hdds.utils.db.Table;
  */
 public interface FinalizationStateManager extends SCMHandler {
 
+  // TODO this will need a parameter for peer version info to validate.
   @Replicate
-  void finalizeLayoutFeatures(Integer toLayoutVersion)
-      throws IOException;
+  void finalizeUpgrade() throws IOException;
 
+  /**
+   * Legacy layout-feature finalization API. Retained until obsolete finalizer classes are removed.
+   */
+  @Replicate
+  void finalizeLayoutFeatures(Integer toLayoutVersion) throws IOException;
+
+  /**
+   * Legacy finalization context. Retained until obsolete finalizer classes are removed.
+   */
   void setUpgradeContext(SCMUpgradeFinalizationContext context);
 
   /**

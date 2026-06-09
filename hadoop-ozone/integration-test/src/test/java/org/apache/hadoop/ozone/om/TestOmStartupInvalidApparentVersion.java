@@ -67,7 +67,7 @@ public class TestOmStartupInvalidApparentVersion {
 
     UpgradeTestUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, serializedApparentVersion);
 
-    MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf);
+    MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf).withoutDatanodes();
 
     String expectedMessage =
         "Initialization failed. Disk contains unknown apparent version " + serializedApparentVersion

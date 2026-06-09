@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
@@ -33,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.node.PendingContainerTracker.TwoWindowBucket;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +58,8 @@ public class DatanodeInfo extends DatanodeDetails {
 
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
-  private LayoutVersionProto lastKnownLayoutVersion;
+  private ComponentVersion lastKnownSoftwareVersion;
+  private ComponentVersion lastKnownApparentVersion;
   private final Map<SCMCommandProto.Type, Integer> commandCounts;
 
   private NodeStatus nodeStatus;
@@ -74,9 +75,10 @@ public class DatanodeInfo extends DatanodeDetails {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
-    lastKnownLayoutVersion = toVersionProto(
-        versionInfo != null ? versionInfo.getMetadataLayoutVersion() : 0,
-        versionInfo != null ? versionInfo.getSoftwareLayoutVersion() : 0);
+    this.lastKnownSoftwareVersion =
+        HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getSoftwareLayoutVersion());
+    this.lastKnownApparentVersion =
+        HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getMetadataLayoutVersion());
     this.storageReports = Collections.emptyList();
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
@@ -108,6 +110,7 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Updates the last known apparent and software versions for this datanode.
    * Updates the last known version reported by this datanode.
    */
   public void updateLastKnownVersions(LayoutVersionProto version) {
@@ -116,9 +119,10 @@ public class DatanodeInfo extends DatanodeDetails {
     }
     try {
       lock.writeLock().lock();
-      lastKnownLayoutVersion = toVersionProto(
-          version.getMetadataLayoutVersion(),
-          version.getSoftwareLayoutVersion());
+      lastKnownSoftwareVersion =
+          HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getSoftwareLayoutVersion());
+      lastKnownApparentVersion =
+          HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getMetadataLayoutVersion());
     } finally {
       lock.writeLock().unlock();
     }
@@ -138,15 +142,19 @@ public class DatanodeInfo extends DatanodeDetails {
     }
   }
 
-  /**
-   * Returns the last known Layout Version .
-   *
-   * @return last  Layout Version.
-   */
-  public LayoutVersionProto getLastKnownLayoutVersion() {
+  public ComponentVersion getLastKnownSoftwareVersion() {
     try {
       lock.readLock().lock();
-      return lastKnownLayoutVersion;
+      return lastKnownSoftwareVersion;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  public ComponentVersion getLastKnownApparentVersion() {
+    try {
+      lock.readLock().lock();
+      return lastKnownApparentVersion;
     } finally {
       lock.readLock().unlock();
     }

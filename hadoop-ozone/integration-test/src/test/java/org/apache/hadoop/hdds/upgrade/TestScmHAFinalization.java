@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import static org.apache.hadoop.hdds.upgrade.TestHddsUpgradeUtils.waitForScmToFinalize;
+import static org.apache.hadoop.hdds.upgrade.TestHddsUpgradeUtils.waitForScmsToFinalize;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -30,14 +32,10 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManagerImpl;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
-import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.ozone.upgrade.RatisBasedVersionManager;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -57,12 +55,9 @@ public class TestScmHAFinalization {
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
 
-  public void init(OzoneConfiguration conf,
-      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
-      int numInactiveSCMs) throws Exception {
+  public void init(OzoneConfiguration conf, int numInactiveSCMs) throws Exception {
 
     SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setUpgradeFinalizationExecutor(executor);
 
     conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "5s");
@@ -94,7 +89,7 @@ public class TestScmHAFinalization {
   @Test
   public void testFinalization() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    init(conf, new DefaultUpgradeFinalizationExecutor<>(), 0);
+    init(conf, 0);
     scmClient.finalizeUpgrade();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient);
     // Ensure all SCMs finalize, indicating the message has been propagated across them all
@@ -116,9 +111,9 @@ public class TestScmHAFinalization {
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         5);
 
-    init(conf, new DefaultUpgradeFinalizationExecutor<>(), numInactiveSCMs);
+    init(conf, numInactiveSCMs);
 
-    LogCapturer logCapture = LogCapturer.captureLogs(FinalizationStateManagerImpl.class);
+    LogCapturer logCapture = LogCapturer.captureLogs(RatisBasedVersionManager.class);
 
     StorageContainerManager inactiveScm = cluster.getInactiveSCM().next();
     LOG.info("Inactive SCM node ID: {}", inactiveScm.getSCMNodeId());
@@ -154,29 +149,16 @@ public class TestScmHAFinalization {
     }
 
     cluster.startInactiveSCM(inactiveScm.getSCMNodeId());
-    waitForScmToFinalize(inactiveScm);
+    LOG.info("Waiting for restarted SCM to finalize");
+    // When the leader sends a snapshot to the follower, it should have flushed all entries to the DB, including the
+    // apparent versin. This means the follower should see it in the DB it receives immediately to trigger finalization.
+    waitForScmToFinalize(inactiveScm, true);
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         inactiveScm, 0);
 
     // Use log to verify a snapshot was installed.
-    assertThat(logCapture.getOutput()).contains("New SCM snapshot " +
-        "received with metadata layout version");
-  }
-
-  private void waitForScmsToFinalize(Collection<StorageContainerManager> scms)
-      throws Exception {
-    for (StorageContainerManager scm: scms) {
-      waitForScmToFinalize(scm);
-    }
-  }
-
-  private void waitForScmToFinalize(StorageContainerManager scm)
-      throws Exception {
-    GenericTestUtils.waitFor(() -> !scm.isInSafeMode(), 500, 5000);
-    GenericTestUtils.waitFor(() -> {
-      LOG.info("Waiting for SCM {} (leader? {}) to finalize.", scm.getSCMNodeId(), scm.checkLeader());
-      return !scm.getLayoutVersionManager().needsFinalization();
-    }, 2_000, 60_000);
+    assertThat(logCapture.getOutput()).contains("New snapshot received with higher apparent version " +
+        HDDSVersion.SOFTWARE_VERSION + ". Attempting to finalize to that version.");
   }
 }

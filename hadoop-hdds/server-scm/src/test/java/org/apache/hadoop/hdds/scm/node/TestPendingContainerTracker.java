@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -58,8 +59,8 @@ public class TestPendingContainerTracker {
     datanodes = new ArrayList<>(NUM_DATANODES);
     for (int i = 0; i < NUM_DATANODES; i++) {
       datanodes.add(new DatanodeInfo(
-          MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
-          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
+          MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(),
+          UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
     }
 
     containers = new ArrayList<>(NUM_CONTAINERS);
@@ -126,8 +127,8 @@ public class TestPendingContainerTracker {
   public void testTwoWindowRollAgesOutContainerAfterTwoIntervals() throws InterruptedException {
     long rollMs = 200L;
     DatanodeInfo shortDn = new DatanodeInfo(
-        MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
-        rollMs);
+        MockDatanodeDetails.randomLocalDatanodeDetails(), NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultVersionProto(), rollMs);
 
     PendingContainerTracker shortRollTracker = new PendingContainerTracker(MAX_CONTAINER_SIZE, rollMs, null);
 
@@ -162,8 +163,8 @@ public class TestPendingContainerTracker {
   @Test
   public void testUnknownDatanodeHasZeroPendingCount() {
     DatanodeInfo unknownDN = new DatanodeInfo(
-        MockDatanodeDetails.randomDatanodeDetails(), NodeStatus.inServiceHealthy(), null,
-        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+        MockDatanodeDetails.randomDatanodeDetails(), NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
     assertEquals(0, unknownDN.getPendingContainerAllocations().getCount());
   }
 
