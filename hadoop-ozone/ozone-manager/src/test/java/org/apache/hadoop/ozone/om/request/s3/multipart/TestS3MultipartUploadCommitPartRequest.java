@@ -175,7 +175,7 @@ public class TestS3MultipartUploadCommitPartRequest
   }
 
   @Test
-  public void testValidateAndUpdateCacheAllowsSchemaVersionOneAfterFinalization()
+  public void testValidateAndUpdateCacheAllowsSchemaVersionZeroAfterFinalization()
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -204,7 +204,7 @@ public class TestS3MultipartUploadCommitPartRequest
     OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
         .getMultipartInfoTable().get(multipartKey);
     assertNotNull(multipartKeyInfo);
-    assertEquals(1, multipartKeyInfo.getSchemaVersion());
+    assertEquals(0, multipartKeyInfo.getSchemaVersion());
 
     long clientID = Time.now();
     OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
@@ -222,7 +222,7 @@ public class TestS3MultipartUploadCommitPartRequest
     assertNotEquals(OzoneManagerProtocolProtos.Status
             .NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
         omClientResponse.getOMResponse().getStatus());
-    assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
 

@@ -260,10 +260,6 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   }
 
   public void addPartKeyInfo(PartKeyInfo partKeyInfo) {
-    if (schemaVersion == SPLIT_PARTS_SCHEMA_VERSION) {
-      throw new IllegalStateException(
-          "PartKeyInfoMap is not supported for schemaVersion 1");
-    }
     this.partKeyInfoMap = PartKeyInfoMap.put(partKeyInfo, partKeyInfoMap);
   }
 
@@ -316,10 +312,8 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       this.acls = AclListBuilder.of(multipartKeyInfo.acls);
       this.partKeyInfoList = new TreeMap<>();
 
-      if (multipartKeyInfo.getSchemaVersion() == LEGACY_SCHEMA_VERSION) {
-        for (PartKeyInfo partKeyInfo : multipartKeyInfo.partKeyInfoMap) {
-          this.partKeyInfoList.put(partKeyInfo.getPartNumber(), partKeyInfo);
-        }
+      for (PartKeyInfo partKeyInfo : multipartKeyInfo.partKeyInfoMap) {
+        this.partKeyInfoList.put(partKeyInfo.getPartNumber(), partKeyInfo);
       }
 
       this.parentID = multipartKeyInfo.parentID;
@@ -429,11 +423,11 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   public static Builder builderFromProto(
       MultipartKeyInfo multipartKeyInfo) {
     final SortedMap<Integer, PartKeyInfo> list = new TreeMap<>();
-    if (!multipartKeyInfo.hasSchemaVersion()
-        || multipartKeyInfo.getSchemaVersion() == LEGACY_SCHEMA_VERSION) {
-      multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
-          list.put(partKeyInfo.getPartNumber(), partKeyInfo));
-    }
+    // Keep reading the embedded part list for both schema versions so MPU
+    // commit/complete/list flows stay backward compatible until the parts
+    // split-table write/read path is fully wired in all requests.
+    multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
+        list.put(partKeyInfo.getPartNumber(), partKeyInfo));
 
     final ReplicationConfig replicationConfig = ReplicationConfig.fromProto(
         multipartKeyInfo.getType(),
@@ -477,13 +471,6 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
    * @return MultipartKeyInfo
    */
   public MultipartKeyInfo getProto() {
-    if (schemaVersion == SPLIT_PARTS_SCHEMA_VERSION
-        && partKeyInfoMap != null
-        && partKeyInfoMap.size() > 0) {
-      throw new IllegalStateException(
-          "PartKeyInfoMap must be empty for schemaVersion 1");
-    }
-
     MultipartKeyInfo.Builder builder = MultipartKeyInfo.newBuilder()
         .setUploadID(uploadID)
         .setCreationTime(creationTime)
@@ -513,9 +500,9 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     }
 
     builder.addAllAcls(OzoneAclUtil.toProtobuf(acls));
-    if (schemaVersion == LEGACY_SCHEMA_VERSION) {
-      builder.addAllPartKeyInfoList(partKeyInfoMap);
-    }
+    // Keep serializing the embedded part list for both schema versions for
+    // compatibility with existing MPU request flows.
+    builder.addAllPartKeyInfoList(partKeyInfoMap);
     return builder.build();
   }
 

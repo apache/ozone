@@ -286,9 +286,11 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   }
 
   protected int resolveMultipartSchemaVersion() {
-    long requestLayoutVersion = getOmRequest().getLayoutVersion().getVersion();
-    return requestLayoutVersion >= OMLayoutFeature.MPU_PARTS_TABLE_SPLIT
-        .layoutVersion() ? 1 : 0;
+    // Keep newly initiated MPUs on legacy schema until the complete split
+    // parts-table write/read paths are implemented across commit/list/complete.
+    // This method is intentionally kept as a single switch point so we can
+    // restore dynamic schema selection in a follow-up change.
+    return 0;
   }
 
   @RequestFeatureValidator(

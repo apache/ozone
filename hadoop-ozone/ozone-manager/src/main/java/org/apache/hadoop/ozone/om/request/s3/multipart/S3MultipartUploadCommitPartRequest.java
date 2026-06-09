@@ -184,12 +184,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             "before cluster finalization for commit part request.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
-      if (splitPartsFeatureAllowed
-          && multipartKeyInfo.getSchemaVersion() == 1) {
-        throw new OMException("MPU parts-table split commit path is not " +
-            "supported in this write flow.",
-            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
-      }
       // Add/Update user defined metadata.
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()

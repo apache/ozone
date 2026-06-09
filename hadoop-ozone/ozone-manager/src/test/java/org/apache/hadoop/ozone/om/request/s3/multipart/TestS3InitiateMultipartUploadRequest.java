@@ -146,7 +146,7 @@ public class TestS3InitiateMultipartUploadRequest
   }
 
   @Test
-  public void testValidateAndUpdateCacheSetsSchemaVersionOneAfterFinalization()
+  public void testValidateAndUpdateCacheKeepsSchemaVersionZeroAfterFinalization()
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -174,7 +174,7 @@ public class TestS3InitiateMultipartUploadRequest
     OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
         .getMultipartInfoTable().get(multipartKey);
     assertNotNull(multipartKeyInfo);
-    assertEquals(1, multipartKeyInfo.getSchemaVersion());
+    assertEquals(0, multipartKeyInfo.getSchemaVersion());
   }
 
   @Test

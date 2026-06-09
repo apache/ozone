@@ -139,7 +139,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
   }
 
   @Test
-  public void testValidateAndUpdateCacheAllowsSchemaVersionOneAfterFinalization()
+  public void testValidateAndUpdateCacheAllowsSchemaVersionZeroAfterFinalization()
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -168,7 +168,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
     OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
         .getMultipartInfoTable().get(multipartKey);
     assertNotNull(multipartKeyInfo);
-    assertEquals(1, multipartKeyInfo.getSchemaVersion());
+    assertEquals(0, multipartKeyInfo.getSchemaVersion());
 
     OMRequest abortMPURequest =
         doPreExecuteAbortMPU(volumeName, bucketName, keyName,
