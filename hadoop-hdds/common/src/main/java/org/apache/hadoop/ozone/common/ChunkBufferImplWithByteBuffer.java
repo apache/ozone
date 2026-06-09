@@ -120,6 +120,7 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
   @Override
   public ChunkBuffer put(byte[] b, int offset, int length) {
+    checkArgument(b, offset, length);
     buffer.put(b, offset, length);
     return this;
   }

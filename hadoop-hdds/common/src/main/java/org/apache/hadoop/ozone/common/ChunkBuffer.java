@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.common;
 
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
 import java.util.Objects;
+
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -62,6 +65,22 @@ public interface ChunkBuffer extends ChunkBufferToByteString, UncheckedAutoClose
       return wrap(buffers.get(0));
     }
     return new ChunkBufferImplWithByteBufferList(buffers);
+  }
+
+  default void checkArgument(byte[] b, int offset, int length) {
+    Objects.requireNonNull(b, "b == null");
+    Preconditions.checkArgument(offset >= 0 && length >= 0,
+        "offset = %s, length = %s", offset, length);
+    Preconditions.checkArgument(length <= b.length - offset,
+        "length = %s out of range for array.length = %s, offset = %s",
+        length, b.length, offset);
+    if (length > remaining()) {
+      final BufferOverflowException boe = new BufferOverflowException();
+      boe.initCause(new IllegalArgumentException(
+          "Failed to put since length = " + length
+              + " > this.remaining() = " + remaining()));
+      throw boe;
+    }
   }
 
   /** Similar to {@link ByteBuffer#position()}. */
