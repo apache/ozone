@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
@@ -56,8 +55,7 @@ public class TestReplicationAnnotation {
       }
 
       @Override
-      public void registerStateMachineHandler(
-          SCMRatisProtocol.RequestType handlerType, ScmInvoker<?> handler) {
+      public void registerStateMachineHandler(ScmInvoker<?> handler) {
       }
 
       @Override

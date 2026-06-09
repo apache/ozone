@@ -179,9 +179,8 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     @Override
-    public void registerStateMachineHandler(final RequestType handlerType,
-        final ScmInvoker<?> handler) {
-      invokers.put(handlerType, handler);
+    public void registerStateMachineHandler(final ScmInvoker<?> handler) {
+      invokers.put(handler.getType(), handler);
     }
 
     @Override
