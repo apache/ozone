@@ -21,7 +21,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.TreeMap;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  private final Map<DatanodeID, ContainerReplica> replicasMap = new ConcurrentSkipListMap<>();
+  private final Map<DatanodeID, ContainerReplica> replicasMap = new TreeMap<>();
   private Set<ContainerReplica> replicas = Collections.emptySet();
 
   ContainerEntry(ContainerInfo info) {
