@@ -45,7 +45,7 @@ public final class CompactDBUtil {
     long startTime = Time.monotonicNow();
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
       options.setBottommostLevelCompaction(compactionType);
-      LOG.info("Compacting column family: {} with {} bottommostlevel compaction",
+      LOG.info("Compacting column family: {} with {} bottommost level compaction",
           tableName, options.bottommostLevelCompaction());
       options.setExclusiveManualCompaction(true);
       RocksDatabase rocksDatabase =
@@ -78,13 +78,13 @@ public final class CompactDBUtil {
 
   public static ManagedCompactRangeOptions.BottommostLevelCompaction getBottommostLevelCompaction(
       OzoneConfiguration configuration) {
-    int compactionType = Integer.parseInt(configuration.get(
+    int compactionType = configuration.getInt(
         OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
-        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
+        OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
     ManagedCompactRangeOptions.BottommostLevelCompaction level =
         ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
     if (level == null) {
-      compactionType = Integer.parseInt(OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+      compactionType = OMConfigKeys.OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
       level = ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType);
       LOG.warn("Invalid bottommost level compaction type. Using default value: {}", level);
     }

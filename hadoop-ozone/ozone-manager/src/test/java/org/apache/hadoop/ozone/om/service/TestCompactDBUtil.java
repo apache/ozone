@@ -79,7 +79,7 @@ class TestCompactDBUtil {
 
   @Test
   void testDefaultConfigValueMapsToKSkip() {
-    int defaultValue = Integer.parseInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
+    int defaultValue = OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT;
     assertEquals(0, defaultValue);
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kSkip,
         ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(defaultValue));
@@ -104,14 +104,14 @@ class TestCompactDBUtil {
   void testConfigKeyIsReadFromOzoneConfiguration() {
     OzoneConfiguration conf = new OzoneConfiguration();
     // Default - not set, should use the default value
-    assertEquals("0", conf.get(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
+    assertEquals(0, conf.getInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
         OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
 
     // Override to kForce
-    conf.set(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, "2");
-    int compactionType = Integer.parseInt(conf.get(
+    conf.setInt(OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION, 2);
+    int compactionType = conf.getInt(
         OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION,
-        OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT));
+        OZONE_OM_COMPACTION_SERVICE_BOTTOMMOSTLEVELCOMPACTION_DEFAULT);
     assertEquals(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce,
         ManagedCompactRangeOptions.BottommostLevelCompaction.fromRocksId(compactionType));
   }
