@@ -796,7 +796,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         continue;
       }
       try {
-        connectionManager.addSCMServer(scmAddress, context.getThreadNamePrefix());
+        String hostAndPort = scmAddress.getHostString() + ":" + scmAddress.getPort();
+        connectionManager.addSCMServer(scmAddress, hostAndPort,
+            context.getThreadNamePrefix());
         context.addEndpoint(scmAddress);
         effectiveScmNodeIds.add(scmNodeId);
         LOG.info("Reconfiguration successfully add SCM address {} for SCM service {}", scmAddress, scmServiceId);

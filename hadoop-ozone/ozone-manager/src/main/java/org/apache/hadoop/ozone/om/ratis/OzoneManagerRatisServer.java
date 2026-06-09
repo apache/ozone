@@ -435,42 +435,27 @@ public final class OzoneManagerRatisServer {
     }
   }
 
-  private static RaftPeer createRaftPeer(OMNodeDetails omNode) {
-    String nodeId = omNode.getNodeId();
-    RaftPeerId raftPeerId = RaftPeerId.valueOf(nodeId);
-    InetSocketAddress ratisAddr = new InetSocketAddress(
-        omNode.getHostAddress(), omNode.getRatisPort());
-    RaftPeerRole startRole = omNode.isRatisListener() ?
-        RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER;
-
-    return RaftPeer.newBuilder()
-        .setId(raftPeerId)
-        .setAddress(ratisAddr)
-        .setStartupRole(startRole)
-        .build();
+  /**
+   * Build a RaftPeer for the given OM node. The peer address is always set
+   * as a hostname:port string (never a resolved IP). Ratis ultimately hands
+   * this string to gRPC's NettyChannelBuilder.forTarget(...), whose default
+   * DnsNameResolver re-resolves hostnames on connection failure / refresh.
+   * Baking a resolved IP into RaftPeer.address would freeze the peer at one
+   * IP for the channel's lifetime, breaking recovery from peer pod restarts
+   * in environments like Kubernetes where DNS names are stable but IPs are
+   * not. See HDDS-15514 (DNS-refresh-on-failure for all RPC paths).
+   */
+  static RaftPeer createRaftPeer(OMNodeDetails omNode) {
+    return createRaftPeer(omNode, omNode.getNodeId());
   }
 
-  /**
-   * Helper method to create a RaftPeer from OMNodeDetails, handling unresolved hosts.
-   * @param omNode the OM node details
-   * @param nodeId the node ID to use
-   * @return the created RaftPeer
-   */
-  private static RaftPeer createRaftPeer(OMNodeDetails omNode, String nodeId) {
-    RaftPeerId raftPeerId = RaftPeerId.valueOf(nodeId);
-    RaftPeer.Builder builder = RaftPeer.newBuilder()
-        .setId(raftPeerId)
-        .setStartupRole(omNode.isRatisListener() ? RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER);
-    
-    if (omNode.isHostUnresolved()) {
-      builder.setAddress(omNode.getRatisHostPortStr());
-    } else {
-      InetSocketAddress ratisAddr = new InetSocketAddress(
-          omNode.getInetAddress(), omNode.getRatisPort());
-      builder.setAddress(ratisAddr);
-    }
-    
-    return builder.build();
+  static RaftPeer createRaftPeer(OMNodeDetails omNode, String nodeId) {
+    return RaftPeer.newBuilder()
+        .setId(RaftPeerId.valueOf(nodeId))
+        .setAddress(omNode.getRatisHostPortStr())
+        .setStartupRole(omNode.isRatisListener()
+            ? RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER)
+        .build();
   }
 
   /**
