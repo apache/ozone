@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,6 +33,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import javax.ws.rs.WebApplicationException;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
@@ -90,15 +93,16 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
   }
 
   @Test
-  public void emptyBodyThrowsMustSpecifyAtLeastOnePart() {
+  public void emptyBodyIsRejectedAsInvalidRequest() {
     InputStream emptyBody = new ByteArrayInputStream(new byte[0]);
 
     WebApplicationException ex = assertThrows(WebApplicationException.class,
         () -> new CompleteMultipartUploadRequestUnmarshaller()
             .readFrom(null, null, null, null, null, emptyBody));
 
-    assertTrue(ex.getMessage().contains("must specify at least one part"),
-        "Unexpected message: " + ex.getMessage());
+    // Assert on the stable S3 error code rather than the human-readable message.
+    OS3Exception cause = assertInstanceOf(OS3Exception.class, ex.getCause());
+    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), cause.getCode());
   }
 
   @Test
