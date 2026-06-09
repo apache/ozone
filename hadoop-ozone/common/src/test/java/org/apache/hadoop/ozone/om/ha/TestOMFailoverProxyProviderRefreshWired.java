@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESO
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -80,7 +79,7 @@ public class TestOMFailoverProxyProviderRefreshWired {
    */
   private static final class CountingProvider
       extends HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> {
-    int refreshCalls;
+    private int refreshCalls;
 
     CountingProvider(OzoneConfiguration c) throws IOException {
       super(c, UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,

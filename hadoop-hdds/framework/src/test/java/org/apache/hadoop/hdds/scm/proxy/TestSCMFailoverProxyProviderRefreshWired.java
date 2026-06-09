@@ -59,7 +59,7 @@ public class TestSCMFailoverProxyProviderRefreshWired {
    */
   private static final class CountingProvider
       extends SCMBlockLocationFailoverProxyProvider {
-    int refreshCalls;
+    private int refreshCalls;
 
     CountingProvider(OzoneConfiguration c) {
       super(c);

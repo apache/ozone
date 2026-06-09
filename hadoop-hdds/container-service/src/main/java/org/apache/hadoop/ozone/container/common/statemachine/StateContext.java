@@ -1057,50 +1057,7 @@ public class StateContext {
     // are dropped (logged) -- the alternative of merging into a foreign
     // peer's queue is worse.
 
-    // Step 1 (PUBLISH): install new-key queues. On collision, do not
-    // touch newEndpoint's existing queues (foreign peer owns them).
-    synchronized (incrementalReportsQueue) {
-      if (!newAlreadyRegistered) {
-        List<Message> oldQueue = incrementalReportsQueue.get(oldEndpoint);
-        if (oldQueue != null) {
-          // Both keys reference the SAME LinkedList. Safe because
-          // producers serialize on `incrementalReportsQueue`'s monitor
-          // and the inner list is not mutated unsynchronized. After
-          // step 3 removes the old key, only the new key references
-          // the list.
-          incrementalReportsQueue.put(newEndpoint, oldQueue);
-        } else {
-          incrementalReportsQueue.putIfAbsent(newEndpoint, new LinkedList<>());
-        }
-      }
-    }
-    synchronized (containerActions) {
-      if (!newAlreadyRegistered) {
-        Queue<ContainerAction> oldActions = containerActions.get(oldEndpoint);
-        if (oldActions != null) {
-          containerActions.put(newEndpoint, oldActions);
-        } else {
-          containerActions.putIfAbsent(newEndpoint, new LinkedList<>());
-        }
-      }
-    }
-    if (!newAlreadyRegistered) {
-      PipelineActionMap oldPipelineActions = pipelineActions.get(oldEndpoint);
-      pipelineActions.computeIfAbsent(newEndpoint,
-          k -> oldPipelineActions != null
-              ? oldPipelineActions
-              : new PipelineActionMap());
-
-      // Always seed all-true flags for the new peer. A rescheduled SCM
-      // pod is a fresh process and needs a full container/node/pipeline
-      // report on the next heartbeat regardless of what the old peer
-      // had already received.
-      Map<String, AtomicBoolean> flags = new HashMap<>();
-      for (String e : fullReportTypeList) {
-        flags.put(e, new AtomicBoolean(true));
-      }
-      isFullReportReadyToBeSent.putIfAbsent(newEndpoint, flags);
-    }
+    publishMigratedQueues(oldEndpoint, newEndpoint, newAlreadyRegistered);
 
     // Step 2 (SWITCH): swap endpoint membership under the same monitors
     // producers hold when fanning out incremental reports and container
@@ -1136,8 +1093,81 @@ public class StateContext {
       }
     }
 
-    // Step 3 (RETIRE): drop the old-key queues. From this point no
-    // producer iterating `endpoints` reaches the old key.
+    retireMigratedQueues(oldEndpoint, newEndpoint, newAlreadyRegistered);
+
+    if (getQueueMetrics() != null) {
+      getQueueMetrics().removeEndpoint(oldEndpoint);
+      if (!newAlreadyRegistered) {
+        getQueueMetrics().addEndpoint(newEndpoint);
+      }
+    }
+  }
+
+  /**
+   * Step 1 of {@link #migrateEndpoint}: install new-key queues
+   * alongside the old-key queues so producers iterating `endpoints`
+   * find a valid queue for either key during the SWITCH window. On
+   * collision, do not touch newEndpoint's existing queues (foreign
+   * peer owns them).
+   * <p>
+   * Receiver-state ({@code isFullReportReadyToBeSent}) is RESET, not
+   * preserved: a rescheduled SCM pod is a fresh process and needs a
+   * full container/node/pipeline report on the next heartbeat
+   * regardless of what the old peer already received.
+   */
+  private void publishMigratedQueues(InetSocketAddress oldEndpoint,
+                                     InetSocketAddress newEndpoint,
+                                     boolean newAlreadyRegistered) {
+    synchronized (incrementalReportsQueue) {
+      if (!newAlreadyRegistered) {
+        List<Message> oldQueue = incrementalReportsQueue.get(oldEndpoint);
+        if (oldQueue != null) {
+          // Both keys reference the SAME LinkedList. Safe because
+          // producers serialize on `incrementalReportsQueue`'s monitor
+          // and the inner list is not mutated unsynchronized. After
+          // retireMigratedQueues removes the old key, only the new
+          // key references the list.
+          incrementalReportsQueue.put(newEndpoint, oldQueue);
+        } else {
+          incrementalReportsQueue.putIfAbsent(newEndpoint, new LinkedList<>());
+        }
+      }
+    }
+    synchronized (containerActions) {
+      if (!newAlreadyRegistered) {
+        Queue<ContainerAction> oldActions = containerActions.get(oldEndpoint);
+        if (oldActions != null) {
+          containerActions.put(newEndpoint, oldActions);
+        } else {
+          containerActions.putIfAbsent(newEndpoint, new LinkedList<>());
+        }
+      }
+    }
+    if (!newAlreadyRegistered) {
+      PipelineActionMap oldPipelineActions = pipelineActions.get(oldEndpoint);
+      pipelineActions.computeIfAbsent(newEndpoint,
+          k -> oldPipelineActions != null
+              ? oldPipelineActions
+              : new PipelineActionMap());
+
+      Map<String, AtomicBoolean> flags = new HashMap<>();
+      for (String e : fullReportTypeList) {
+        flags.put(e, new AtomicBoolean(true));
+      }
+      isFullReportReadyToBeSent.putIfAbsent(newEndpoint, flags);
+    }
+  }
+
+  /**
+   * Step 3 of {@link #migrateEndpoint}: drop the old-key queues. From
+   * this point no producer iterating `endpoints` reaches the old key
+   * (Step 2 SWITCH removed it). On collision, log the dropped queues
+   * for operator visibility -- merging into the foreign peer's queue
+   * would deliver one peer's reports to another, which is worse.
+   */
+  private void retireMigratedQueues(InetSocketAddress oldEndpoint,
+                                    InetSocketAddress newEndpoint,
+                                    boolean newAlreadyRegistered) {
     synchronized (incrementalReportsQueue) {
       List<Message> oldQueue =
           incrementalReportsQueue.remove(oldEndpoint);
@@ -1167,13 +1197,6 @@ public class StateContext {
           retiredPipelineActions.size(), oldEndpoint, newEndpoint);
     }
     isFullReportReadyToBeSent.remove(oldEndpoint);
-
-    if (getQueueMetrics() != null) {
-      getQueueMetrics().removeEndpoint(oldEndpoint);
-      if (!newAlreadyRegistered) {
-        getQueueMetrics().addEndpoint(newEndpoint);
-      }
-    }
   }
 
   @VisibleForTesting

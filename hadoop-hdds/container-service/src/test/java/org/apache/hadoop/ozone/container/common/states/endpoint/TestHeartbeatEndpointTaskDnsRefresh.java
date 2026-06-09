@@ -34,7 +34,6 @@ import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.UUID;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -44,6 +43,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.security.AccessControlException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -261,6 +261,13 @@ public class TestHeartbeatEndpointTaskDnsRefresh {
 
   // ------- fixture helpers -------
 
+  /**
+   * Internal test-only fixture holding all mocks and the task under
+   * test. Package-private fields are intentional — accessor methods
+   * for a small test-internal record-like class would be more noise
+   * than signal.
+   */
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   private static class Fixture {
     final HeartbeatEndpointTask task;
     final EndpointStateMachine endpoint;
