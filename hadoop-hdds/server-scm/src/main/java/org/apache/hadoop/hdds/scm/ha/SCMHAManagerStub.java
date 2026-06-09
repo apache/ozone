@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static java.util.Objects.requireNonNull;
+
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -178,8 +180,8 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
     @Override
     public void registerStateMachineHandler(final RequestType handlerType,
-        final Object handler) {
-      invokers.put(handlerType, (ScmInvoker<?>) handler);
+        final ScmInvoker<?> handler) {
+      invokers.put(handlerType, handler);
     }
 
     @Override
@@ -218,9 +220,7 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
     private Message process(final SCMRatisRequest request) throws Exception {
       final ScmInvoker<?> invoker = invokers.get(request.getType());
-      if (invoker == null) {
-        throw new IOException("No handler found for request type " + request.getType());
-      }
+      requireNonNull(invoker, "invoker == null");
       return invoker.invokeLocal(request.getOperation(), request.getArguments());
     }
 

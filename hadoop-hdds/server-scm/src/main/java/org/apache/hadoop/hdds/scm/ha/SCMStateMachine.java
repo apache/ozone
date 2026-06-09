@@ -192,9 +192,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   private Message process(final SCMRatisRequest request) throws Exception {
     final ScmInvoker<?> invoker = invokers.get(request.getType());
-    if (invoker == null) {
-      throw new IOException("No handler found for request type " + request.getType());
-    }
+    requireNonNull(invoker, "invoker == null");
     return invoker.invokeLocal(request.getOperation(), request.getArguments());
   }
 
