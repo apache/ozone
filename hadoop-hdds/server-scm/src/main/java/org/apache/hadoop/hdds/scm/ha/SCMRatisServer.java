@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -75,13 +74,6 @@ public interface SCMRatisServer {
   default <T extends SCMHandler> T getProxyHandler(ScmInvoker<T> invoker) {
     registerStateMachineHandler(invoker.getType(), invoker);
     return invoker.getProxy();
-  }
-
-  default <T extends SCMHandler> T getProxyHandler(Class<T> intf, T impl) {
-    final SCMHAInvocationHandler invocationHandler =
-        new SCMHAInvocationHandler(impl.getType(), impl, this);
-    return intf.cast(Proxy.newProxyInstance(getClass().getClassLoader(),
-        new Class<?>[] {intf}, invocationHandler));
   }
 
 }
