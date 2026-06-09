@@ -37,7 +37,7 @@ public interface SCMRatisServer {
 
   void start() throws IOException;
 
-  void registerStateMachineHandler(RequestType handlerType, Object handler);
+  void registerStateMachineHandler(RequestType handlerType, ScmInvoker<?> handler);
 
   SCMRatisResponse submitRequest(SCMRatisRequest request)
       throws IOException, ExecutionException, InterruptedException,

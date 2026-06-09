@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.ha.invoker.ContainerStateManagerInvoker;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -56,7 +57,7 @@ public class TestReplicationAnnotation {
 
       @Override
       public void registerStateMachineHandler(
-          SCMRatisProtocol.RequestType handlerType, Object handler) {
+          SCMRatisProtocol.RequestType handlerType, ScmInvoker<?> handler) {
       }
 
       @Override
