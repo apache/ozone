@@ -1182,7 +1182,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
       ReconStorageContainerManagerFacade reconScm,
       ReconContainerManager reconCm,
       List<ContainerID> containerIDs) throws Exception {
-    reconScm.triggerTargetedSCMContainerSync();
+    reconScm.triggerSCMContainerSync();
     drainScmAndReconEventQueues();
     backfillMissingContainersFromScm(reconCm, containerIDs);
     LambdaTestUtils.await(REPLICA_SYNC_TIMEOUT_MS, POLL_INTERVAL_MS,

@@ -884,7 +884,7 @@ public class ReconStorageContainerManagerFacade
    * Runs targeted reconciliation immediately rather than waiting for the next
    * scheduled cycle.
    */
-  public boolean triggerTargetedSCMContainerSync() {
+  public boolean triggerSCMContainerSync() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
       try {
         return runScmContainerSyncWithMetrics();

@@ -185,7 +185,7 @@ public class TestReconTasks {
     int scmContainersCount = scmContainerManager.getContainers().size();
     int reconContainersCount = reconCm.getContainers().size();
     assertNotEquals(scmContainersCount, reconContainersCount);
-    reconScm.triggerTargetedSCMContainerSync();
+    reconScm.triggerSCMContainerSync();
     reconContainersCount = reconCm.getContainers().size();
     assertEquals(scmContainersCount, reconContainersCount);
   }

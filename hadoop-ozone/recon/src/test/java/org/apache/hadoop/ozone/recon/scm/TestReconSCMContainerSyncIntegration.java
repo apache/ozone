@@ -59,7 +59,7 @@ import org.junit.jupiter.api.Timeout;
 
 /**
  * Integration tests for {@link ReconStorageContainerSyncHelper} and
- * {@link ReconStorageContainerManagerFacade#triggerTargetedSCMContainerSync()}.
+ * {@link ReconStorageContainerManagerFacade#triggerSCMContainerSync()}.
  *
  * <p>Uses a <em>real</em> {@link ReconContainerManager} backed by RocksDB
  * (from {@link AbstractReconContainerManagerTest}) and a mocked
