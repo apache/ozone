@@ -32,9 +32,13 @@ public final class StorageTierUtil {
    * Validates the given StorageTier and throws an exception if it is empty.
    *
    * @param storageTier the StorageTier to check
+   * @throws IllegalArgumentException if the StorageTier is null
    * @throws SCMException if the StorageTier is empty
    */
   public static void validateNotEmpty(StorageTier storageTier) throws SCMException {
+    if (storageTier == null) {
+      throw new IllegalArgumentException("storageTier must not be null");
+    }
     if (storageTier.equals(StorageTier.EMPTY)) {
       throw new SCMException("Cannot create Pipeline for empty tier",
           SCMException.ResultCodes.CANNOT_CREATE_PIPELINE_FOR_EMPTY_TIER);

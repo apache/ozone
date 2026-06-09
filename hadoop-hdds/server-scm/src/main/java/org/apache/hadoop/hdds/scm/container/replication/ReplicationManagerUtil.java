@@ -79,7 +79,7 @@ public final class ReplicationManagerUtil {
    * @param excludedNodes        Any Excluded nodes which cannot be selected
    * @param defaultContainerSize The cluster default max container size
    * @param container            The container to select new replicas for
-   * @param storageType
+   * @param storageType          The storage type supported by target nodes
    * @return A list of up to requiredNodes datanodes to use as targets for new
    * replicas. Note the number of nodes returned may be less than the
    * number of nodes requested if the placement policy is unable to
