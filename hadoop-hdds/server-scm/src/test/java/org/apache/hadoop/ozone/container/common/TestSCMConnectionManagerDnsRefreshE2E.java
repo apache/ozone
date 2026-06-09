@@ -91,11 +91,10 @@ public class TestSCMConnectionManagerDnsRefreshE2E {
     InetSocketAddress liveAddr = scmServer.getListenerAddress();
     int port = liveAddr.getPort();
 
-    // The hostname we'll preserve. localhost reliably resolves to a
-    // loopback address in any test environment, and the server is
-    // bound to a loopback address, so a dial of localhost:port
-    // succeeds.
-    String hostAndPort = "localhost:" + port;
+    // Preserve the server's actual bound host so DNS re-resolution and
+    // the RPC dial use the same address family (avoids IPv4/IPv6
+    // localhost mismatch on dual-stack CI hosts).
+    String hostAndPort = liveAddr.getAddress().getHostAddress() + ":" + port;
 
     // Step 2: prime the connection manager with a deliberately stale
     // cached InetSocketAddress (127.0.0.99 has no listener; any RPC
@@ -120,7 +119,8 @@ public class TestSCMConnectionManagerDnsRefreshE2E {
 
     assertNotNull(refreshed,
         "refreshSCMServer must report a swap when the cached IP "
-            + "127.0.0.99 differs from what DNS now returns for localhost");
+            + "127.0.0.99 differs from what DNS now returns for "
+            + hostAndPort);
     assertEquals(port, refreshed.getPort(),
         "port must be preserved across the swap; only the IP changes");
     assertEquals(1, connectionManager.getNumOfConnections(),

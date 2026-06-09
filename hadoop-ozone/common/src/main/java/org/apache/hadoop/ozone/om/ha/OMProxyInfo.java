@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.ha;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -104,6 +105,15 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
 
   public synchronized InetSocketAddress getAddress() {
     return rpcAddr;
+  }
+
+  /**
+   * Test-only: inject a deliberately stale cached address to drive
+   * the DNS-refresh code path without standing up a real OM.
+   */
+  @VisibleForTesting
+  synchronized void setCachedAddressForTest(InetSocketAddress address) {
+    this.rpcAddr = address;
   }
 
   public synchronized Text getDelegationTokenService() {

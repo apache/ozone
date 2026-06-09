@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.lang.reflect.Field;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import org.junit.jupiter.api.Test;
@@ -35,15 +34,6 @@ import org.junit.jupiter.api.Test;
  * the Client → OM RPC route.
  */
 public class TestOMProxyInfoDnsRefresh {
-
-  /** Force a deliberately stale cached address into the private field. */
-  private static void forceCachedAddress(OMProxyInfo<?> info,
-                                         InetSocketAddress staleAddr)
-      throws Exception {
-    Field rpcAddrField = OMProxyInfo.class.getDeclaredField("rpcAddr");
-    rpcAddrField.setAccessible(true);
-    rpcAddrField.set(info, staleAddr);
-  }
 
   /**
    * When DNS for the configured hostname now returns the same IP that
@@ -71,11 +61,9 @@ public class TestOMProxyInfoDnsRefresh {
 
   /**
    * To drive the change-detection path we construct an OMProxyInfo
-   * pointing at "localhost", then forcibly inject a deliberately stale
-   * IP via reflection (the field is private and we don't want to
-   * expand the public API surface for tests). Re-resolving "localhost"
-   * then yields the live loopback IP, the cached stale IP differs, and
-   * the swap fires.
+   * pointing at "localhost", then inject a deliberately stale IP via
+   * the test hook. Re-resolving "localhost" then yields the live
+   * loopback IP, the cached stale IP differs, and the swap fires.
    */
   @Test
   public void testRefreshSwapsAddressOnIpChange() throws Exception {
@@ -84,7 +72,7 @@ public class TestOMProxyInfoDnsRefresh {
 
     InetSocketAddress staleAddr = new InetSocketAddress(
         InetAddress.getByAddress(new byte[] {127, 0, 0, 99}), 9862);
-    forceCachedAddress(info, staleAddr);
+    info.setCachedAddressForTest(staleAddr);
 
     boolean swapped = info.refreshAddressIfChanged();
     assertTrue(swapped, "swap must fire when DNS returns a different IP "
@@ -108,7 +96,7 @@ public class TestOMProxyInfoDnsRefresh {
 
     InetSocketAddress staleAddr = new InetSocketAddress(
         InetAddress.getByAddress(new byte[] {127, 0, 0, 99}), 9862);
-    forceCachedAddress(info, staleAddr);
+    info.setCachedAddressForTest(staleAddr);
     assertTrue(info.refreshAddressIfChanged());
     assertNull(info.getProxy());
 
@@ -137,7 +125,7 @@ public class TestOMProxyInfoDnsRefresh {
         new Object(), "svc", "om1", "localhost:9862");
     InetSocketAddress staleAddr = new InetSocketAddress(
         InetAddress.getByAddress(new byte[] {127, 0, 0, 99}), 9862);
-    forceCachedAddress(info, staleAddr);
+    info.setCachedAddressForTest(staleAddr);
     // dtService was built from the original "localhost" resolution; in
     // SecurityUtil.buildTokenService form the value depends on the IP.
     // After we forced the stale IP and refresh, dtService should be

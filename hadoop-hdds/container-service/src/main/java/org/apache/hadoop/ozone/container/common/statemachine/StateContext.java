@@ -32,7 +32,6 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -1092,28 +1091,50 @@ public class StateContext {
               ? oldPipelineActions
               : new PipelineActionMap());
 
-      Map<String, AtomicBoolean> oldFullReportFlags =
-          isFullReportReadyToBeSent.get(oldEndpoint);
-      Map<String, AtomicBoolean> flags = oldFullReportFlags;
-      if (flags == null) {
-        // Seed with all-true so the next heartbeat ships a fresh full
-        // report to the new peer.
-        flags = new HashMap<>();
-        for (String e : fullReportTypeList) {
-          flags.putIfAbsent(e, new AtomicBoolean(true));
-        }
+      // Always seed all-true flags for the new peer. A rescheduled SCM
+      // pod is a fresh process and needs a full container/node/pipeline
+      // report on the next heartbeat regardless of what the old peer
+      // had already received.
+      Map<String, AtomicBoolean> flags = new HashMap<>();
+      for (String e : fullReportTypeList) {
+        flags.put(e, new AtomicBoolean(true));
       }
       isFullReportReadyToBeSent.putIfAbsent(newEndpoint, flags);
     }
 
-    // Step 2 (SWITCH): atomically swap endpoint membership. Add new
-    // before removing old so producers always see at least one valid
-    // key with a populated queue. CopyOnWriteArraySet writes serve as
-    // release fences for the queue installations above.
-    if (!newAlreadyRegistered) {
-      endpoints.add(newEndpoint);
+    // Step 2 (SWITCH): swap endpoint membership under the same monitors
+    // producers hold when fanning out incremental reports and container
+    // actions, so no producer observes both keys while they alias the
+    // same underlying queue.
+    //
+    // Lock order: incrementalReportsQueue then containerActions.
+    // Steps 1 (PUBLISH) and 3 (RETIRE) take these monitors in the same
+    // order; producers (addIncrementalReport, addContainerAction) only
+    // ever take one of the two. No path takes them in reverse, so the
+    // nested acquisition here cannot deadlock. Future maintainers
+    // adding new producers MUST preserve this ordering.
+    //
+    // Why pipelineActions and isFullReportReadyToBeSent are NOT inside
+    // this critical section:
+    //   - pipelineActions: producer (addPipelineActionIfAbsent) calls
+    //     PipelineActionMap.putIfAbsent which is idempotent under
+    //     aliasing -- a producer that sees both keys during the SWITCH
+    //     window puts under one and the no-op-puts under the other,
+    //     because both keys reference the same PipelineActionMap.
+    //   - isFullReportReadyToBeSent: not iterated through `endpoints`.
+    //     Its readers (getFullReports) look up by a single endpoint
+    //     argument supplied by the heartbeat dispatcher, which is
+    //     keyed by scmMachines (the connection manager's map), not by
+    //     this StateContext's endpoints set. The SWITCH window never
+    //     produces a "both keys observed" read on this field.
+    synchronized (incrementalReportsQueue) {
+      synchronized (containerActions) {
+        if (!newAlreadyRegistered) {
+          endpoints.add(newEndpoint);
+        }
+        endpoints.remove(oldEndpoint);
+      }
     }
-    endpoints.remove(oldEndpoint);
 
     // Step 3 (RETIRE): drop the old-key queues. From this point no
     // producer iterating `endpoints` reaches the old key.

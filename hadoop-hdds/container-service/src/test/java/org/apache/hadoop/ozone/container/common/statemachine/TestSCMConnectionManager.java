@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.net.NetUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -67,19 +68,19 @@ public class TestSCMConnectionManager {
   /**
    * When the cached IP matches what DNS currently returns for the
    * preserved hostname, resolveLatestAddress() returns null (no swap
-   * needed). Uses "localhost" because it reliably resolves to a loopback
-   * address in any test environment.
+   * needed). Build the cached address via NetUtils so the IP family
+   * matches what resolveLatestAddress() re-resolves (avoids IPv4/IPv6
+   * localhost mismatch on dual-stack hosts).
    */
   @Test
   public void testResolveLatestAddressReturnsNullWhenIpUnchanged()
       throws Exception {
-    InetAddress loopback = InetAddress.getByName("localhost");
-    InetSocketAddress address = new InetSocketAddress(loopback, 9861);
+    InetSocketAddress address = NetUtils.createSocketAddr("127.0.0.1:9861");
     EndpointStateMachine endpoint = new EndpointStateMachine(
-        address, "localhost:9861", null, new OzoneConfiguration(), "");
+        address, "127.0.0.1:9861", null, new OzoneConfiguration(), "");
     InetSocketAddress refreshed = endpoint.resolveLatestAddress();
     Assertions.assertNull(refreshed,
-        "localhost re-resolves to the same loopback address; refresh "
+        "127.0.0.1 re-resolves to the same address; refresh "
             + "must report no change so the endpoint is not torn down "
             + "needlessly.");
   }
@@ -206,9 +207,8 @@ public class TestSCMConnectionManager {
   public void testRefreshSCMServerNoopWhenIpUnchanged() throws Exception {
     try (SCMConnectionManager connectionManager =
              new SCMConnectionManager(new OzoneConfiguration())) {
-      InetAddress loopback = InetAddress.getByName("localhost");
-      InetSocketAddress address = new InetSocketAddress(loopback, 9861);
-      connectionManager.addSCMServer(address, "localhost:9861", "");
+      InetSocketAddress address = NetUtils.createSocketAddr("127.0.0.1:9861");
+      connectionManager.addSCMServer(address, "127.0.0.1:9861", "");
       EndpointStateMachine before =
           connectionManager.getValues().iterator().next();
 
