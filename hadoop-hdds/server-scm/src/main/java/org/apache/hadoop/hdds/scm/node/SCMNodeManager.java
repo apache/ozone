@@ -51,6 +51,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -1492,7 +1493,7 @@ public class SCMNodeManager implements NodeManager {
     @Override
     public boolean test(DatanodeInfo dn) {
       return !dn.getNodeStatus().isNodeWritable()
-          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize)
+          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, StorageType.DEFAULT)
           && !hasEnoughCommittedVolumeSpace(dn));
     }
 

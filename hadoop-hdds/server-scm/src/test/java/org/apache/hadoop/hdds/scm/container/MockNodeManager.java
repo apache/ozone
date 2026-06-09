@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.apache.hadoop.hdds.client.StorageTypeUtils.getStorageTypeProto;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
@@ -36,6 +37,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -116,6 +118,7 @@ public class MockNodeManager implements NodeManager {
   private int numPipelinePerDatanode;
   private PendingContainerTracker pendingContainerTracker;
   private final OzoneConfiguration conf = new OzoneConfiguration();
+  private StorageType storageType = null;
 
   {
     this.healthyNodes = new LinkedList<>();
@@ -129,6 +132,13 @@ public class MockNodeManager implements NodeManager {
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.pendingContainerTracker = new PendingContainerTracker(5L * 1024 * 1024 * 1024,
         HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT, null);
+  }
+
+  public MockNodeManager(NetworkTopologyImpl clusterMap,
+      List<DatanodeDetails> nodes,
+      boolean initializeFakeNodes, int nodeCount, StorageType storageType) {
+    this(clusterMap, nodes, initializeFakeNodes, nodeCount);
+    this.storageType = storageType;
   }
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
@@ -153,6 +163,12 @@ public class MockNodeManager implements NodeManager {
     numHealthyDisksPerDatanode = 1;
     numPipelinePerDatanode = NUM_RAFT_LOG_DISKS_PER_DATANODE *
         NUM_PIPELINE_PER_METADATA_DISK;
+  }
+
+  public MockNodeManager(boolean initializeFakeNodes, int nodeCount, StorageType storageType) {
+    this(new NetworkTopologyImpl(new OzoneConfiguration()), new ArrayList<>(),
+        initializeFakeNodes, nodeCount);
+    this.storageType = storageType;
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -275,7 +291,8 @@ public class MockNodeManager implements NodeManager {
         long remaining = nodeMetricMap.get(dd).getRemaining().get();
         StorageReportProto storage1 = HddsTestUtils.createStorageReport(
             di.getID(), "/data1-" + di.getID(),
-            capacity, used, remaining, null);
+            capacity, used, remaining,
+            storageType == null ? null : getStorageTypeProto(storageType));
         MetadataStorageReportProto metaStorage1 =
             HddsTestUtils.createMetadataStorageReport(
                 "/metadata1-" + di.getID(), capacity, used, remaining, null);

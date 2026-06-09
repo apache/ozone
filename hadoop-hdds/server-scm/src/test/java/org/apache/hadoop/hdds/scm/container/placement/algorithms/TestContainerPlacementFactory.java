@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -153,7 +154,7 @@ public class TestContainerPlacementFactory {
 
     int nodeNum = 3;
     List<DatanodeDetails> datanodeDetails =
-        policy.chooseDatanodes(null, null, nodeNum, 15, 15);
+        policy.chooseDatanodes(null, null, nodeNum, 15, 15, StorageType.DEFAULT);
     assertEquals(nodeNum, datanodeDetails.size());
     assertTrue(cluster.isSameParent(datanodeDetails.get(0),
         datanodeDetails.get(1)));
@@ -191,7 +192,7 @@ public class TestContainerPlacementFactory {
         List<DatanodeDetails> usedNodes,
         List<DatanodeDetails> excludedNodes,
         List<DatanodeDetails> favoredNodes,
-        int nodesRequired, long metadataSizeRequired, long dataSizeRequired) {
+        int nodesRequired, long metadataSizeRequired, long dataSizeRequired, StorageType storageType) {
       return null;
     }
 

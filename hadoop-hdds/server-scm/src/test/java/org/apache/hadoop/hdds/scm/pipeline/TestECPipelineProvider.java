@@ -41,7 +41,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -82,7 +84,7 @@ public class TestECPipelineProvider {
     // Placement policy will always return EC number of random nodes.
     when(placementPolicy.chooseDatanodes(anyList(),
         anyList(), anyInt(), anyLong(),
-        anyLong()))
+        anyLong(), any(StorageType.class)))
         .thenAnswer(invocation -> {
           List<DatanodeDetails> dns = new ArrayList<>();
           for (int i = 0; i < (int) invocation.getArguments()[2]; i++) {
@@ -98,7 +100,7 @@ public class TestECPipelineProvider {
   @Test
   public void testSimplePipelineCanBeCreatedWithIndexes() throws IOException {
     ECReplicationConfig ecConf = new ECReplicationConfig(3, 2);
-    Pipeline pipeline = provider.create(ecConf);
+    Pipeline pipeline = provider.create(ecConf, StorageTier.getDefaultTier());
     assertEquals(EC, pipeline.getType());
     assertEquals(ecConf.getData() + ecConf.getParity(), pipeline.getNodes().size());
     assertEquals(ALLOCATED, pipeline.getPipelineState());
@@ -195,12 +197,11 @@ public class TestECPipelineProvider {
     List<DatanodeDetails> favoredNodes = new ArrayList<>();
     favoredNodes.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    Pipeline pipeline = provider.create(ecConf, excludedNodes, favoredNodes);
+    Pipeline pipeline = provider.create(ecConf, excludedNodes, favoredNodes, StorageTier.getDefaultTier());
     assertEquals(EC, pipeline.getType());
     assertEquals(ecConf.getData() + ecConf.getParity(), pipeline.getNodes().size());
-
     verify(placementPolicy).chooseDatanodes(excludedNodes, favoredNodes,
-        ecConf.getRequiredNodes(), 0, containerSizeBytes);
+        ecConf.getRequiredNodes(), 0, containerSizeBytes, StorageType.DEFAULT);
   }
 
   private Set<ContainerReplica> createContainerReplicas(int number) {

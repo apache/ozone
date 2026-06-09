@@ -69,6 +69,7 @@ import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -1036,9 +1037,8 @@ public class TestECUnderReplicationHandler {
         .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_MAINTENANCE, 3), Pair.of(IN_SERVICE, 4),
             Pair.of(IN_SERVICE, 5));
-
     when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(),
-            isNull(), anyInt(), anyLong(), anyLong()))
+            isNull(), anyInt(), anyLong(), anyLong(), any(StorageType.class)))
         .thenAnswer(invocationOnMock -> {
           int numNodes = invocationOnMock.getArgument(3);
           List<DatanodeDetails> targets = new ArrayList<>();
@@ -1059,7 +1059,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(1, commandsSent.size());
     verify(ecPlacementPolicy, times(0))
         .chooseDatanodes(anyList(), isNull(), eq(0), anyLong(),
-            anyLong());
+            anyLong(), any(StorageType.class));
   }
 
   /**
@@ -1082,7 +1082,7 @@ public class TestECUnderReplicationHandler {
     contain the DN pending ADD.
      */
     when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(),
-            isNull(), anyInt(), anyLong(), anyLong()))
+            isNull(), anyInt(), anyLong(), anyLong(), any(StorageType.class)))
         .thenAnswer(invocationOnMock -> {
           List<DatanodeDetails> usedList = invocationOnMock.getArgument(0);
           List<DatanodeDetails> excludeList = invocationOnMock.getArgument(1);
@@ -1203,7 +1203,7 @@ public class TestECUnderReplicationHandler {
 
   /**
    * Helper to mock and verify calls to
-   * {@link PlacementPolicy#chooseDatanodes(List, List, int, long, long)}.
+   * {@link PlacementPolicy#chooseDatanodes(List, List, int, long, long, StorageType)}.
    */
   private static class PlacementPolicySpy {
 
@@ -1215,7 +1215,7 @@ public class TestECUnderReplicationHandler {
     PlacementPolicySpy(PlacementPolicy placementPolicy, int totalNodes)
         throws IOException {
       when(placementPolicy.chooseDatanodes(any(), any(),
-          any(), anyInt(), anyLong(), anyLong())
+          any(), anyInt(), anyLong(), anyLong(), any(StorageType.class))
       ).thenAnswer(invocation -> {
         final Collection<DatanodeDetails> used = invocation.getArgument(0);
         final Collection<DatanodeDetails> excluded = invocation.getArgument(1);

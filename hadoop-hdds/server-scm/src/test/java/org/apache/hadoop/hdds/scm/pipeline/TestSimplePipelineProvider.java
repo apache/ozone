@@ -17,18 +17,27 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.CANNOT_CREATE_PIPELINE_FOR_EMPTY_TIER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -41,6 +50,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test for SimplePipelineProvider.
@@ -54,10 +65,19 @@ public class TestSimplePipelineProvider {
   private DBStore dbStore;
 
   @BeforeEach
-  public void init() throws Exception {
-    NodeManager nodeManager = new MockNodeManager(true, 10);
-    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
+  public void startup() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        new File(testDir, "metadata").getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
+  }
+
+  public void init(StorageTier storageTier) throws Exception {
+    assertTrue(storageTier.isUniform(), "Only support uniform StorageTier");
+    assertFalse(storageTier.equals(StorageTier.EMPTY), "not support the EMPTY StorageTier");
+    StorageType storageType = storageTier.getStorageTypes(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE).getRequiredNodes()).get(0);
+    NodeManager nodeManager = new MockNodeManager(true, 10, storageType);
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
@@ -75,11 +95,13 @@ public class TestSimplePipelineProvider {
     }
   }
 
-  @Test
-  public void testCreatePipelineWithFactor() throws Exception {
+  @ParameterizedTest
+  @MethodSource("storageTiers")
+  public void testCreatePipelineWithFactor(StorageTier storageTier) throws Exception {
+    init(storageTier);
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
-        provider.create(StandaloneReplicationConfig.getInstance(factor));
+        provider.create(StandaloneReplicationConfig.getInstance(factor), storageTier);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
         ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
@@ -90,7 +112,7 @@ public class TestSimplePipelineProvider {
 
     factor = HddsProtos.ReplicationFactor.ONE;
     Pipeline pipeline1 =
-        provider.create(StandaloneReplicationConfig.getInstance(factor));
+        provider.create(StandaloneReplicationConfig.getInstance(factor), storageTier);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
         ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto1);
@@ -111,7 +133,9 @@ public class TestSimplePipelineProvider {
   }
 
   @Test
-  public void testCreatePipelineWithNodes() throws IOException {
+  public void testCreatePipelineWithNodes()
+      throws Exception {
+    init(StorageTier.getDefaultTier());
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
         provider.create(StandaloneReplicationConfig.getInstance(factor),
@@ -133,5 +157,27 @@ public class TestSimplePipelineProvider {
             .getReplicationFactor(), factor);
     assertEquals(pipeline.getPipelineState(), Pipeline.PipelineState.OPEN);
     assertEquals(pipeline.getNodes().size(), factor.getNumber());
+  }
+
+  @Test
+  public void testCreatePipelinesInEmptyTier() throws Exception {
+    init(StorageTier.getDefaultTier());
+    for (HddsProtos.ReplicationFactor factor: HddsProtos.ReplicationFactor.values()) {
+      if (factor == HddsProtos.ReplicationFactor.ZERO) {
+        continue;
+      }
+      SCMException ex = assertThrows(SCMException.class, () ->
+              provider.create(StandaloneReplicationConfig.getInstance(factor), StorageTier.EMPTY),
+          "Expected SCMException for empty StorageTier" + factor.toString());
+      assertEquals(ex.getResult(), CANNOT_CREATE_PIPELINE_FOR_EMPTY_TIER);
+    }
+  }
+
+  static Stream<StorageTier> storageTiers() {
+    return Stream.of(
+        StorageTier.DISK,
+        StorageTier.SSD,
+        StorageTier.ARCHIVE
+    );
   }
 }

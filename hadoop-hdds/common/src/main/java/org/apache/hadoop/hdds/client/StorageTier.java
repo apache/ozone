@@ -17,15 +17,9 @@
 
 package org.apache.hadoop.hdds.client;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTierProto;
 
@@ -40,21 +34,20 @@ public enum StorageTier {
 
   private final String tierName;
   private final List<StorageType> storageTypes;
-  private final boolean uniformStorageType;
-  private static final Map<StorageTier, Map<ReplicationConfig, List<StorageType>>>
-      CACHE = new EnumMap<>(StorageTier.class);
+  private final boolean isUniform;
+  private static StorageTier defaultTier = DISK;
 
   StorageTier(String tierName) {
     this.tierName = tierName;
     this.storageTypes = Collections.emptyList();
-    this.uniformStorageType = true;
+    this.isUniform = true;
   }
 
   // Constructor for uniform storage tiers
   StorageTier(String tierName, StorageType uniformStorageType) {
     this.tierName = tierName;
     this.storageTypes = Collections.singletonList(uniformStorageType);
-    this.uniformStorageType = true;
+    this.isUniform = true;
   }
 
   // Constructor for non-uniform storage tiers
@@ -68,25 +61,11 @@ public enum StorageTier {
           " StorageType were provided.");
     }
     this.storageTypes = Arrays.asList(storageTypes);
-    this.uniformStorageType = false;
+    this.isUniform = false;
   }
 
-  static {
-    // Precompute storage type mappings for each replication config
-    for (StorageTier tier : StorageTier.values()) {
-      Map<ReplicationConfig, List<StorageType>> tierCache = new HashMap<>();
-      List<ReplicationConfig> replicationConfigs = Arrays.asList(
-          RatisReplicationConfig.getInstance(ONE),
-          RatisReplicationConfig.getInstance(THREE),
-          StandaloneReplicationConfig.getInstance(ONE),
-          StandaloneReplicationConfig.getInstance(THREE)
-      );
-
-      for (ReplicationConfig config : replicationConfigs) {
-        tierCache.put(config, tier.computeStorageTypes(config));
-      }
-      CACHE.put(tier, tierCache);
-    }
+  public static StorageTier getDefaultTier() {
+    return defaultTier;
   }
 
   public StorageTierProto toProto() {
@@ -121,50 +100,31 @@ public enum StorageTier {
     return tierName;
   }
 
-  public boolean isUniformStorageType() {
-    return uniformStorageType;
-  }
-
-  /**
-   * Computes the list of StorageTypes based on replication configuration.
-   *
-   * @param replicationConfig The replication configuration.
-   * @return The list of StorageTypes for the given tier and replication configuration.
-   */
-  private List<StorageType> computeStorageTypes(
-      ReplicationConfig replicationConfig) {
-    if (isUniformStorageType()) {
-      int numberOfNodes = replicationConfig.getRequiredNodes();
-      if (storageTypes.isEmpty()) {
-        return Collections.emptyList();
-      }
-      return Collections.nCopies(numberOfNodes, storageTypes.get(0));
-    } else {
-      throw new UnsupportedOperationException(
-          "Unsupported not UniformStorage Storage Tier: " + replicationConfig);
-    }
+  public boolean isUniform() {
+    return isUniform;
   }
 
   /**
    * Maps a StorageTier to its corresponding StorageType based on replication type.
    *
-   * @param replicationConfig The replication configuration.
+   * @param nodeCount The node count of the storageTier required.
    * @return The list of StorageTypes corresponding to the given tier and replication configuration.
    * @throws IllegalArgumentException if the replication configuration is not supported.
    */
-  public List<StorageType> getStorageTypes(
-      ReplicationConfig replicationConfig) {
-    Map<ReplicationConfig, List<StorageType>> tierCache = CACHE.get(this);
-
-    if (tierCache != null) {
-      List<StorageType> cachedStorageType = tierCache.get(replicationConfig);
-      if (cachedStorageType != null) {
-        return cachedStorageType;
-      }
+  public List<StorageType> getStorageTypes(int nodeCount) {
+    if (nodeCount < 0) {
+      throw new IllegalArgumentException("Unsupported node count: " +
+          nodeCount + " for StorageTier: " + getTierName());
     }
 
-    throw new IllegalArgumentException("Unsupported ReplicationConfig: " +
-        replicationConfig + " for StorageTier: " + getTierName());
-  }
+    if (isUniform()) {
+      if (storageTypes.isEmpty()) {
+        return Collections.emptyList();
+      }
+      return Collections.nCopies(nodeCount, storageTypes.get(0));
+    }
 
+    throw new UnsupportedOperationException(
+        "Unsupported not uniform StorageTier: " + this);
+  }
 }

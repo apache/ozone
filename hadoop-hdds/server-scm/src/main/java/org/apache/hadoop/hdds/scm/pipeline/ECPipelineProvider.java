@@ -25,7 +25,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
+import org.apache.hadoop.hdds.client.StorageTierUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -76,19 +79,21 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   }
 
   @Override
-  public synchronized Pipeline create(ECReplicationConfig replicationConfig)
+  public synchronized Pipeline create(ECReplicationConfig replicationConfig, StorageTier storageTier)
       throws IOException {
     return create(replicationConfig, Collections.emptyList(),
-        Collections.emptyList());
+        Collections.emptyList(), storageTier);
   }
 
   @Override
   protected Pipeline create(ECReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+      StorageTier storageTier)
       throws IOException {
+    StorageType storageType = StorageTierUtil.getStorageTypeForUniformStorageTier(storageTier, replicationConfig);
     List<DatanodeDetails> dns = placementPolicy
         .chooseDatanodes(excludedNodes, favoredNodes,
-            replicationConfig.getRequiredNodes(), 0, this.containerSizeBytes);
+            replicationConfig.getRequiredNodes(), 0, this.containerSizeBytes, storageType);
     return create(replicationConfig, dns);
   }
 

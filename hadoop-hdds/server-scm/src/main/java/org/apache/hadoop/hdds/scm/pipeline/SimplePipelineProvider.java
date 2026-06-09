@@ -22,9 +22,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
+import org.apache.hadoop.hdds.client.StorageTierUtil;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
@@ -40,23 +45,30 @@ public class SimplePipelineProvider
   }
 
   @Override
-  public Pipeline create(StandaloneReplicationConfig replicationConfig)
+  public Pipeline create(StandaloneReplicationConfig replicationConfig, StorageTier storageTier)
       throws IOException {
+    StorageTierUtil.validateNotEmpty(storageTier);
     return create(replicationConfig, Collections.emptyList(),
-        Collections.emptyList());
+        Collections.emptyList(), storageTier);
   }
 
   @Override
   public Pipeline create(StandaloneReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, StorageTier storageTier)
       throws IOException {
+    StorageType storageType = StorageTierUtil.getStorageTypeForUniformStorageTier(storageTier, replicationConfig);
     List<DatanodeDetails> dns = pickNodesNotUsed(replicationConfig);
+    dns = dns.stream().filter(dn ->
+            ((DatanodeInfo) dn).getStorageReports().stream()
+            .anyMatch(reportProto ->
+                StorageTypeUtils.getFromProtobuf(reportProto.getStorageType()).equals(storageType)))
+        .collect(Collectors.toList());
     int available = dns.size();
     int required = replicationConfig.getRequiredNodes();
     if (available < required) {
       String msg = String.format(
-          "Cannot create pipeline of factor %d using %d nodes.",
-          required, available);
+          "Cannot create pipeline of factor %d using %d nodes storageTier %s",
+          required, available, storageTier);
       throw new InsufficientDatanodesException(required, available, msg);
     }
 

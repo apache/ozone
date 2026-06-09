@@ -1649,7 +1649,7 @@ public class TestReplicationManager {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testNotifyNodeStateChangeWakesUpThread(boolean queueIsEmpty) 
+  public void testNotifyNodeStateChangeWakesUpThread(boolean queueIsEmpty)
       throws IOException, InterruptedException, ReflectiveOperationException, TimeoutException {
 
     AtomicBoolean processAllCalled = new AtomicBoolean(false);

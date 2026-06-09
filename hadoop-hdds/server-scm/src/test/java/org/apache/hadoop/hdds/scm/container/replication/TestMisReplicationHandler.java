@@ -45,6 +45,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -204,7 +205,7 @@ public abstract class TestMisReplicationHandler {
     if (expectedNumberOfNodes > 0) {
       when(mockedPlacementPolicy.chooseDatanodes(
                       any(), any(), any(),
-                      eq(copy.size()), anyLong(), anyLong()))
+                      eq(copy.size()), anyLong(), anyLong(), any(StorageType.class)))
               .thenAnswer(invocation -> {
                 List<DatanodeDetails> datanodeDetails =
                         invocation.getArgument(0);

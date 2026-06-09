@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -101,8 +102,8 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
                     anyInt())).thenReturn(mockedContainerPlacementStatus);
     when(placementPolicy.chooseDatanodes(
                     any(), any(), any(),
-                    anyInt(), anyLong(), anyLong()))
-            .thenThrow(new IOException("No nodes found"));
+                    anyInt(), anyLong(), anyLong(), any(StorageType.class)))
+            .thenThrow(new SCMException("No nodes found", SCMException.ResultCodes.NO_SUCH_DATANODE));
     assertThrows(SCMException.class, () -> testMisReplication(
             availableReplicas, placementPolicy, Collections.emptyList(),
             0, 2, 0));

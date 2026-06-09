@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -71,22 +72,24 @@ public final class ReplicationManagerUtil {
    * policy will be called again. This will continue until the placement policy
    * is able to select enough nodes or the number of nodes requested is reduced
    * to zero when an exception will be thrown.
-   * @param policy The placement policy to use to select nodes.
-   * @param requiredNodes The number of nodes required
-   * @param usedNodes Any nodes already used by the container
-   * @param excludedNodes Any Excluded nodes which cannot be selected
+   *
+   * @param policy               The placement policy to use to select nodes.
+   * @param requiredNodes        The number of nodes required
+   * @param usedNodes            Any nodes already used by the container
+   * @param excludedNodes        Any Excluded nodes which cannot be selected
    * @param defaultContainerSize The cluster default max container size
-   * @param container The container to select new replicas for
+   * @param container            The container to select new replicas for
+   * @param storageType          The storage type supported by target nodes
    * @return A list of up to requiredNodes datanodes to use as targets for new
-   *         replicas. Note the number of nodes returned may be less than the
-   *         number of nodes requested if the placement policy is unable to
-   *         return enough nodes.
+   * replicas. Note the number of nodes returned may be less than the
+   * number of nodes requested if the placement policy is unable to
+   * return enough nodes.
    * @throws SCMException If no nodes can be selected.
    */
   public static List<DatanodeDetails> getTargetDatanodes(PlacementPolicy policy,
       int requiredNodes, List<DatanodeDetails> usedNodes,
       List<DatanodeDetails> excludedNodes, long defaultContainerSize,
-      ContainerInfo container) throws SCMException {
+      ContainerInfo container, StorageType storageType) throws SCMException {
 
     // Ensure that target datanodes have enough space to hold a complete
     // container.
@@ -98,10 +101,10 @@ public final class ReplicationManagerUtil {
       try {
         if (usedNodes == null) {
           return policy.chooseDatanodes(excludedNodes, null,
-              mutableRequiredNodes, 0, dataSizeRequired);
+              mutableRequiredNodes, 0, dataSizeRequired, storageType);
         } else {
           return policy.chooseDatanodes(usedNodes, excludedNodes, null,
-              mutableRequiredNodes, 0, dataSizeRequired);
+              mutableRequiredNodes, 0, dataSizeRequired, storageType);
         }
       } catch (IOException e) {
         LOG.debug("Placement policy was not able to return {} nodes for " +
