@@ -15,32 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds;
-
-import org.apache.hadoop.ozone.ClientVersion;
-
 /**
- * Invariants for {@link ClientVersion}.
+ * Package contains test classes for upgrade responses.
  */
-public class TestClientVersion extends AbstractComponentVersionTest {
-
-  @Override
-  protected ComponentVersion[] getValues() {
-    return ClientVersion.values();
-  }
-
-  @Override
-  protected ComponentVersion getDefaultVersion() {
-    return ClientVersion.DEFAULT_VERSION;
-  }
-
-  @Override
-  protected ComponentVersion getUnknownVersion() {
-    return ClientVersion.FUTURE_VERSION;
-  }
-
-  @Override
-  protected ComponentVersion deserialize(int value) {
-    return ClientVersion.deserialize(value);
-  }
-}
+package org.apache.hadoop.ozone.om.response.upgrade;

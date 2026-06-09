@@ -98,11 +98,11 @@ public class TestHDDSLayoutFeature {
   }
 
   @Test
-  public void testAllLayoutFeaturesAreSupportedByFutureVersions() {
+  public void testAllLayoutFeaturesAreSupportedByUnknownFutureVersions() {
     for (HDDSLayoutFeature feature : HDDSLayoutFeature.values()) {
       assertSupportedBy(feature, HDDSVersion.ZDU);
       assertSupportedBy(feature, HDDSVersion.UNKNOWN_VERSION);
-      // No ComponentVersion instance represents an arbitrary future version.
+      // No ComponentVersion instance represents an arbitrary unknown version.
       assertTrue(feature.isSupportedBy(Integer.MAX_VALUE));
     }
   }
