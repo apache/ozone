@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -148,18 +149,13 @@ class ReconStorageContainerSyncHelper {
 
   ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
                                   OzoneConfiguration ozoneConfiguration,
-                                  ReconContainerManager containerManager) {
-    this(scmServiceProvider, ozoneConfiguration, containerManager, null);
-  }
-
-  ReconStorageContainerSyncHelper(StorageContainerServiceProvider scmServiceProvider,
-                                  OzoneConfiguration ozoneConfiguration,
                                   ReconContainerManager containerManager,
                                   ReconScmContainerSyncMetrics containerSyncMetrics) {
     this.scmServiceProvider = scmServiceProvider;
     this.ozoneConfiguration = ozoneConfiguration;
     this.containerManager = containerManager;
-    this.containerSyncMetrics = containerSyncMetrics;
+    this.containerSyncMetrics =
+        Objects.requireNonNull(containerSyncMetrics, "containerSyncMetrics");
   }
 
   /**
@@ -427,9 +423,6 @@ class ReconStorageContainerSyncHelper {
   }
 
   private void updateDeletedContainerCountDrift() {
-    if (containerSyncMetrics == null) {
-      return;
-    }
     try {
       long total = scmServiceProvider.getContainerCount(
           HddsProtos.LifeCycleState.DELETED);
@@ -441,9 +434,6 @@ class ReconStorageContainerSyncHelper {
 
   private void updateContainerCountDrift(HddsProtos.LifeCycleState state,
                                          long scmCount) {
-    if (containerSyncMetrics == null) {
-      return;
-    }
     long reconCount = containerManager.getContainerStateCount(state);
     containerSyncMetrics.setContainerCountDrift(state,
         scmCount - reconCount);
@@ -451,9 +441,7 @@ class ReconStorageContainerSyncHelper {
 
   private void updateContainerSyncDuration(HddsProtos.LifeCycleState state,
                                            long durationMs) {
-    if (containerSyncMetrics != null) {
-      containerSyncMetrics.setContainerSyncDurationMs(state, durationMs);
-    }
+    containerSyncMetrics.setContainerSyncDurationMs(state, durationMs);
   }
 
   /**
