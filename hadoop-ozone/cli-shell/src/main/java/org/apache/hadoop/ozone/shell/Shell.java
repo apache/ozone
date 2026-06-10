@@ -89,6 +89,7 @@ public abstract class Shell extends GenericCli {
   }
 
   private int execute(CommandLine.ParseResult parseResult) {
+    DeprecatedCliOption.warnIfMatched(parseResult);
     name = spec.name();
 
     if (parseResult.hasMatchedOption("--interactive") || parseResult.hasMatchedOption("--execute")) {

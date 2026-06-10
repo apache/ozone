@@ -56,9 +56,18 @@ public abstract class GenericCli implements GenericParentCommand {
     configOverrides.forEach(config::set);
   }
 
-  @Option(names = {"-conf"})
+  @Option(names = {"--conf"},
+      description = "Path to custom configuration file.")
   public void setConfigurationPath(String configPath) {
     config.addResource(new Path(configPath));
+  }
+
+  /** For backward compatibility. */
+  @Option(names = {"-conf"}, hidden = true)
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  public void setDeprecatedConfigurationPath(String configPath) {
+    setConfigurationPath(configPath);
   }
 
   public GenericCli() {
@@ -70,6 +79,10 @@ public abstract class GenericCli implements GenericParentCommand {
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
+    });
+    cmd.setExecutionStrategy(parseResult -> {
+      DeprecatedCliOption.warnIfMatched(parseResult);
+      return new CommandLine.RunLast().execute(parseResult);
     });
 
     ExtensibleParentCommand.addSubcommands(cmd);

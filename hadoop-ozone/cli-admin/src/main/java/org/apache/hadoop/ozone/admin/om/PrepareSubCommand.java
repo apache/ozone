@@ -57,7 +57,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
   @CommandLine.Option(
-      names = {"-tawt", "--transaction-apply-wait-timeout"},
+      names = {"--transaction-apply-wait-timeout"},
       description = "Max time in SECONDS to wait for all transactions before" +
           "the prepare request to be applied to the OM DB.",
       defaultValue = "120",
@@ -65,8 +65,17 @@ public class PrepareSubCommand implements Callable<Void> {
   )
   private long txnApplyWaitTimeSeconds;
 
+  /** For backward compatibility. */
   @CommandLine.Option(
-      names = {"-tact", "--transaction-apply-check-interval"},
+      names = {"-tawt"},
+      hidden = true
+  )
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  private Long deprecatedTxnApplyWaitTimeSeconds;
+
+  @CommandLine.Option(
+      names = {"--transaction-apply-check-interval"},
       description = "Time in SECONDS to wait between successive checks for " +
           "all transactions to be applied to the OM DB.",
       defaultValue = "5",
@@ -74,8 +83,17 @@ public class PrepareSubCommand implements Callable<Void> {
   )
   private long txnApplyCheckIntervalSeconds;
 
+  /** For backward compatibility. */
   @CommandLine.Option(
-      names = {"-pct", "--prepare-check-interval"},
+      names = {"-tact"},
+      hidden = true
+  )
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  private Long deprecatedTxnApplyCheckIntervalSeconds;
+
+  @CommandLine.Option(
+      names = {"--prepare-check-interval"},
       description = "Time in SECONDS to wait between successive checks for OM" +
           " preparation.",
       defaultValue = "10",
@@ -83,13 +101,31 @@ public class PrepareSubCommand implements Callable<Void> {
   )
   private long prepareCheckInterval;
 
+  /** For backward compatibility. */
   @CommandLine.Option(
-      names = {"-pt", "--prepare-timeout"},
+      names = {"-pct"},
+      hidden = true
+  )
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  private Long deprecatedPrepareCheckInterval;
+
+  @CommandLine.Option(
+      names = {"--prepare-timeout"},
       description = "Max time in SECONDS to wait for all OMs to be prepared",
       defaultValue = "300",
       hidden = true
   )
   private long prepareTimeOut;
+
+  /** For backward compatibility. */
+  @CommandLine.Option(
+      names = {"-pt"},
+      hidden = true
+  )
+  @Deprecated
+  @SuppressWarnings("DeprecatedIsStillUsed")
+  private Long deprecatedPrepareTimeOut;
 
   @Override
   public Void call() throws Exception {
@@ -100,8 +136,8 @@ public class PrepareSubCommand implements Callable<Void> {
   }
 
   private void execute(OzoneManagerProtocol client) throws Exception {
-    long prepareTxnId = client.prepareOzoneManager(txnApplyWaitTimeSeconds,
-        txnApplyCheckIntervalSeconds);
+    long prepareTxnId = client.prepareOzoneManager(getTxnApplyWaitTimeSeconds(),
+        getTxnApplyCheckIntervalSeconds());
     System.out.println("Ozone Manager Prepare Request successfully returned " +
         "with Transaction Id : [" + prepareTxnId + "].");
 
@@ -109,8 +145,8 @@ public class PrepareSubCommand implements Callable<Void> {
     Set<String> omHosts = getOmHostsFromConfig(
         parent.getParent().getOzoneConf(), omServiceOption.getServiceID());
     omHosts.forEach(h -> omPreparedStatusMap.put(h, false));
-    Duration pTimeout = Duration.of(prepareTimeOut, ChronoUnit.SECONDS);
-    Duration pInterval = Duration.of(prepareCheckInterval, ChronoUnit.SECONDS);
+    Duration pTimeout = Duration.of(getPrepareTimeOut(), ChronoUnit.SECONDS);
+    Duration pInterval = Duration.of(getPrepareCheckInterval(), ChronoUnit.SECONDS);
 
     System.out.println();
     System.out.println("Checking individual OM instances for prepare request " +
@@ -143,7 +179,7 @@ public class PrepareSubCommand implements Callable<Void> {
         }
       }
       if (currentNumPreparedOms < expectedNumPreparedOms) {
-        System.out.println("Waiting for " + prepareCheckInterval +
+        System.out.println("Waiting for " + getPrepareCheckInterval() +
             " seconds before retrying...");
         Thread.sleep(pInterval.toMillis());
       }
@@ -167,6 +203,30 @@ public class PrepareSubCommand implements Callable<Void> {
       System.out.println("No new write requests will be allowed until " +
           "preparation is cancelled or upgrade/downgrade is done.");
     }
+  }
+
+  private long getTxnApplyWaitTimeSeconds() {
+    return deprecatedTxnApplyWaitTimeSeconds != null
+        ? deprecatedTxnApplyWaitTimeSeconds
+        : txnApplyWaitTimeSeconds;
+  }
+
+  private long getTxnApplyCheckIntervalSeconds() {
+    return deprecatedTxnApplyCheckIntervalSeconds != null
+        ? deprecatedTxnApplyCheckIntervalSeconds
+        : txnApplyCheckIntervalSeconds;
+  }
+
+  private long getPrepareCheckInterval() {
+    return deprecatedPrepareCheckInterval != null
+        ? deprecatedPrepareCheckInterval
+        : prepareCheckInterval;
+  }
+
+  private long getPrepareTimeOut() {
+    return deprecatedPrepareTimeOut != null
+        ? deprecatedPrepareTimeOut
+        : prepareTimeOut;
   }
 
 }

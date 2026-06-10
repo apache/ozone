@@ -39,23 +39,42 @@ public class DecommissionScmSubcommand extends ScmSubcommand {
   @CommandLine.ParentCommand
   private ScmAdmin parent;
 
-  @CommandLine.Option(names = {"-nodeid", "--nodeid"},
-      description = "NodeID of the SCM to be decommissioned.",
-      required = true)
-  private String nodeId;
+  @CommandLine.ArgGroup(multiplicity = "1")
+  private NodeIdOptions nodeIdOptions;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    DecommissionScmResponseProto response = scmClient.decommissionScm(nodeId);
+    DecommissionScmResponseProto response = scmClient.decommissionScm(
+        nodeIdOptions.getNodeId());
     if (!response.getSuccess()) {
-      String errorMsg = "Error decommissioning Scm " + nodeId;
+      String errorMsg = "Error decommissioning Scm " + nodeIdOptions.getNodeId();
       if (response.hasErrorMsg()) {
         errorMsg = errorMsg + ", " + response.getErrorMsg();
       }
       // Throwing exception to create non-zero exit code in case of failure.
       throw new IOException(errorMsg);
     } else {
-      System.out.println("Decommissioned Scm " + nodeId);
+      System.out.println("Decommissioned Scm " + nodeIdOptions.getNodeId());
+    }
+  }
+
+  /** Options for SCM node ID. */
+  static class NodeIdOptions {
+    @CommandLine.Option(names = {"--nodeid"},
+        description = "NodeID of the SCM to be decommissioned.",
+        required = true)
+    private String nodeId;
+
+    /** For backward compatibility. */
+    @CommandLine.Option(names = {"-nodeid"},
+        hidden = true,
+        required = true)
+    @Deprecated
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    private String deprecatedNodeId;
+
+    String getNodeId() {
+      return nodeId != null ? nodeId : deprecatedNodeId;
     }
   }
 }
