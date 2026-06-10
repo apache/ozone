@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.common;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
@@ -135,15 +134,8 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
 
   @Override
   public ChunkBuffer put(ByteBuffer that) {
-    final int thisRemaining = remaining();
+    checkArgument(that);
     int thatRemaining = that.remaining();
-    if (thatRemaining > thisRemaining) {
-      final BufferOverflowException boe = new BufferOverflowException();
-      boe.initCause(new IllegalArgumentException(
-          "Failed to put since that.remaining() = " + thatRemaining
-              + " > this.remaining() = " + thisRemaining));
-      throw boe;
-    }
 
     while (thatRemaining > 0) {
       final ByteBuffer b = current();

@@ -17,14 +17,13 @@
 
 package org.apache.hadoop.ozone.common;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
 import java.util.Objects;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -78,6 +77,18 @@ public interface ChunkBuffer extends ChunkBufferToByteString, UncheckedAutoClose
       final BufferOverflowException boe = new BufferOverflowException();
       boe.initCause(new IllegalArgumentException(
           "Failed to put since length = " + length
+              + " > this.remaining() = " + remaining()));
+      throw boe;
+    }
+  }
+
+  default void checkArgument(ByteBuffer that) {
+    Objects.requireNonNull(that, "that == null");
+    final int thatRemaining = that.remaining();
+    if (thatRemaining > remaining()) {
+      final BufferOverflowException boe = new BufferOverflowException();
+      boe.initCause(new IllegalArgumentException(
+          "Failed to put since that.remaining() = " + thatRemaining
               + " > this.remaining() = " + remaining()));
       throw boe;
     }

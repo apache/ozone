@@ -121,6 +121,7 @@ final class JfrByteBufferAllocations {
       this.byteBufferAllocCount = byteBufferAllocCount;
       this.byteBufferAllocBytes = byteBufferAllocBytes;
     }
+
     long getByteBufferAllocCount() {
       return byteBufferAllocCount;
     }
